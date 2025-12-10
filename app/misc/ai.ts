@@ -685,10 +685,14 @@ export function outputToScenePart(text: string): ScenePart {
         }
       }
 
-      // Parse item_loss: true/false
+      // Parse item_loss: true/false - DEPRECATED, kept for backward compatibility
+      // item_loss was intended to signal if item_used should be consumed
       const lossMatch = metadata.match(/item_loss:\s*(true|false)/i);
-      if (lossMatch) {
-        choice.item_loss = lossMatch[1].toLowerCase() === "true";
+      if (lossMatch && lossMatch[1].toLowerCase() === "true") {
+        // If item_loss is true and item_used is set, store item name as item_loss
+        if (choice.item_used) {
+          choice.item_loss = choice.item_used;
+        }
       }
 
       // Parse agmt_check: question (likelihood)

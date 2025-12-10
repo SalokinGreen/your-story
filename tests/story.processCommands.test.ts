@@ -79,130 +79,6 @@ describe("processCommands", () => {
     };
   });
 
-  describe("/add_item command", () => {
-    it("should add a new item to inventory", () => {
-      processCommands(
-        ["/add_item: Health Potion | Restores health | consumable | 3"],
-        mockStoryData,
-        mockNotification
-      );
-
-      expect(mockStoryData.inventory).toHaveLength(1);
-      expect(mockStoryData.inventory[0]).toMatchObject({
-        name: "Health Potion",
-        description: "Restores health",
-        type: "consumable",
-        quantity: 3,
-      });
-      // Notification removed - granular item notifications no longer shown
-    });
-
-    it("should add to existing item quantity", () => {
-      mockStoryData.inventory = [
-        {
-          name: "Health Potion",
-          quantity: 2,
-          description: "Restores health",
-          type: "consumable",
-          stat: "",
-          resource: "",
-          symbol: "📦",
-        },
-      ];
-
-      processCommands(
-        ["/add_item: Health Potion | Restores health | consumable | 3"],
-        mockStoryData,
-        mockNotification
-      );
-
-      expect(mockStoryData.inventory).toHaveLength(1);
-      expect(mockStoryData.inventory[0].quantity).toBe(5);
-      // Notification removed - granular item notifications no longer shown
-    });
-
-    it("should support all item types", () => {
-      const types = ["normal", "consumable", "story", "misc"] as const;
-
-      types.forEach((type) => {
-        const freshData = {
-          ...mockStoryData,
-          inventory: Array.from(mockStoryData.inventory),
-        };
-        processCommands(
-          [`/add_item: Test Item | Description | ${type} | 1`],
-          freshData,
-          mockNotification
-        );
-
-        expect(freshData.inventory[0].type).toBe(type);
-      });
-    });
-  });
-
-  describe("/modify_item command", () => {
-    beforeEach(() => {
-      mockStoryData.inventory = [
-        {
-          name: "Health Potion",
-          quantity: 5,
-          description: "Restores health",
-          type: "consumable",
-          stat: "",
-          resource: "",
-          symbol: "📦",
-        },
-      ];
-    });
-
-    it("should increase item quantity", () => {
-      processCommands(
-        ["/modify_item: Health Potion(3)"],
-        mockStoryData,
-        mockNotification
-      );
-
-      expect(mockStoryData.inventory[0].quantity).toBe(8);
-      // Notification removed - granular item notifications no longer shown
-    });
-
-    it("should decrease item quantity", () => {
-      processCommands(
-        ["/modify_item: Health Potion(-2)"],
-        mockStoryData,
-        mockNotification
-      );
-
-      expect(mockStoryData.inventory[0].quantity).toBe(3);
-      // Notification removed - granular item notifications no longer shown
-    });
-
-    it("should remove item when quantity reaches 0 or below", () => {
-      processCommands(
-        ["/modify_item: Health Potion(-5)"],
-        mockStoryData,
-        mockNotification
-      );
-
-      expect(mockStoryData.inventory).toHaveLength(0);
-      // Notification removed - granular item notifications no longer shown
-    });
-
-    it("should create new item if adding positive quantity to non-existent item", () => {
-      processCommands(
-        ["/modify_item: New Item(3)"],
-        mockStoryData,
-        mockNotification
-      );
-
-      expect(mockStoryData.inventory).toHaveLength(2);
-      expect(mockStoryData.inventory[1]).toMatchObject({
-        name: "New Item",
-        quantity: 3,
-      });
-    });
-  });
-
   describe("/trigger_achievement command", () => {
     it("should unlock achievement and award XP", () => {
       processCommands(
@@ -217,7 +93,7 @@ describe("processCommands", () => {
         "Achievement Unlocked: First Victory",
         "success"
       );
-      expect(mockNotification).toHaveBeenCalledWith("+25 XP!", "success");
+      expect(mockNotification).toHaveBeenCalledWith("+25 points!", "success");
     });
 
     it("should not unlock achievement twice", () => {
@@ -396,7 +272,7 @@ describe("processCommands", () => {
         "Quest completed: Test Quest",
         "success"
       );
-      expect(mockNotification).toHaveBeenCalledWith("+50 XP!", "success");
+      expect(mockNotification).toHaveBeenCalledWith("+50 points!", "success");
     });
 
     it("should not award points twice for same quest", () => {

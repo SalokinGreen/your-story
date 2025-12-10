@@ -19,7 +19,7 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/story/upgrades.tsx: Character upgrade shop for spending progression points.
 - app/library/page.tsx: Library page showing user's stories and adventures with authenticated fetch.
 - app/creator/page.tsx: Adventure creation interface with full editing capabilities for all story elements including passives.
-- app/creator/manual/page.tsx: Manual adventure creation with all story elements including passives (stored in nodeEffects.passives with nodeId="manual").
+- app/creator/manual/page.tsx: Manual adventure creation. Uses Character Schema system for defining character structure (stats, resources, etc.). Steps: basic info, preset, character-schema, character-values, premise, starting choices, lore, achievements, quests, mythic, variables, tables, upgrades, preview.
 - app/profile/[userId]/page.tsx: User profile page with token balance, adventures, public stories, and admin controls (always at bottom).
 
 ### Data Models
@@ -186,6 +186,29 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/components/CustomVoiceManager.tsx: Manage custom voice IDs for TTS (Kokoro format: [lang][gender]\_[name]).
 - app/components/DiceVisualizer.tsx: Main dice animation component with 4-phase system (rolling→stopped→calculating→result). Supports all 8 RPG systems with visual feedback for advantage/disadvantage, explosions, stress dice, partial success, and Fate ladder outcomes. Click or keyboard (Enter/Space/Escape) to skip animation.
 - app/components/StoryCreativeAssistant.tsx: AI-powered story editing modal for in-game modifications. Features BYOK/Coins toggle, model selection, output size slider, cost estimation, chat history persistence. Uses story_creator_ai.ts to build prompts with recent story history (last 15 scene parts) and memory context, then applies AI-suggested changes to StoryData.
+- app/components/CharacterSheet.tsx: Renders character sheet from CharacterSchema + CharacterData. Supports both default field-based rendering and custom HTML/CSS/JS templates via sandboxed iframe.
+- app/components/CharacterSchemaEditor.tsx: UI for creating/editing character schemas. Three tabs: Fields (add/edit schema fields), Custom Template (HTML/CSS/JS editor with syntax help), Resources (upload images/fonts for templates).
+
+### Character Schema System
+
+- app/misc/characterSchema.ts: Core character schema type definitions and template processing.
+  - **SchemaField types**: number, derived (formula-based), resource (current/max), text, list, boolean, select
+  - **DerivedField formulas**: Use `{{fieldId}}` syntax with math.js evaluation (e.g., `floor(({{Strength}} - 10) / 2)`)
+  - **SchemaTemplate**: { html: string, css: string, js?: string } - Custom character sheet templates
+  - **SchemaResource**: { id, name, url, type: 'image'|'font'|'other' } - Uploaded assets for templates
+  - **Template syntax**:
+    - `{{fieldId}}` - Simple value substitution
+    - `{{fieldId.current}}` / `{{fieldId.max}}` - Resource sub-values
+    - `{{percent fieldId}}` - Resource as percentage (0-100)
+    - `{{modifier fieldId}}` - D&D-style modifier with +/- prefix
+    - `{{resource:id}}` - Uploaded resource URL
+    - `{{#if condition}}...{{/if}}`, `{{#unless}}...{{/unless}}` - Conditionals
+    - `{{#each items}}...{{/each}}` - List iteration with {{.}} for current item
+    - `{{#compare a op b}}...{{/compare}}` - Comparisons (==, !=, <, >, <=, >=)
+  - **Key functions**: processTemplate(), buildTemplateDocument(), recalculateDerivedFields(), getNumericValue()
+  - **Preset schemas**: DND5E_SCHEMA (default), COC_SCHEMA, NARRATIVE_SCHEMA
+  - **DEFAULT_CHARACTER_SCHEMA**: Used when adventures don't define a custom schema (currently D&D 5e style)
+  - **hasCustomJS flag**: Boolean on CharacterSchema indicating custom JavaScript in template (triggers security warning)
 
 ### Config
 

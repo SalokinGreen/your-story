@@ -103,6 +103,119 @@ export interface TakeRestParams {
   narrative_context?: string;
 }
 
+// ============================================
+// FORMULA-BASED GM TOOL INTERFACES
+// ============================================
+// These tools use dice formulas with {{variable}} syntax
+// that resolve from characterData (the new schema system)
+
+/**
+ * Roll a dice formula against an optional DC
+ * Formula can include {{variables}} that resolve from character data
+ * Example: "1d20+{{STR_mod}}+{{proficiency}}" vs DC 15
+ */
+export interface FormulaRollParams {
+  formula: string; // "1d20+{{STR_mod}}+{{proficiency}}", "2d6+5"
+  dc?: number; // Optional target number
+  reason: string;
+  display_name?: string;
+  stakes?: "low" | "medium" | "high" | "deadly";
+  consequences?: {
+    success?: string;
+    failure?: string;
+  };
+}
+
+/**
+ * Opposed roll using formulas for both sides
+ * Both formulas can include {{variables}}
+ * Example: player "1d20+{{DEX_mod}}" vs opponent "1d20+5"
+ */
+export interface OpposedFormulaParams {
+  player_formula: string; // "1d20+{{DEX_mod}}"
+  opponent_formula: string; // "1d20+5" (usually fixed)
+  opponent_name: string;
+  reason: string;
+  display_name?: string;
+  stakes?: "low" | "medium" | "high" | "deadly";
+  consequences?: {
+    player_wins?: string;
+    opponent_wins?: string;
+    tie?: string;
+  };
+}
+
+/**
+ * Challenge check using a formula instead of stat lookup
+ * For multi-step challenges with the new schema system
+ */
+export interface FormulaChallengeCheckParams {
+  formula: string; // "1d20+{{Athletics}}"
+  dc: number;
+  description: string;
+  display_name?: string;
+  consequences?: {
+    success?: string;
+    failure?: string;
+  };
+}
+
+// ============================================
+// ORACLE & UTILITY GM TOOL INTERFACES
+// ============================================
+
+/**
+ * Fate Question - Ask yes/no question using Mythic-style oracle
+ * Uses AGMT fate chart with chaos factor and likelihood modifiers
+ */
+export interface FateQuestionParams {
+  question: string; // The yes/no question to ask
+  likelihood:
+    | "Impossible"
+    | "No Way"
+    | "Very Unlikely"
+    | "Unlikely"
+    | "50/50"
+    | "Somewhat Likely"
+    | "Likely"
+    | "Very Likely"
+    | "Near Sure Thing"
+    | "A Sure Thing"
+    | "Has To Be";
+  reason?: string; // Why asking this question
+}
+
+/**
+ * Roll Table - Roll on a custom table or AGMT table
+ * Uses weighted random selection
+ */
+export interface RollTableParams {
+  table_name: string; // Name of table to roll on
+  reason: string; // What this roll determines
+  display_name?: string; // Optional UI label
+}
+
+/**
+ * Request Continuation - Ask for another GM round after seeing results
+ * Use when you need to chain actions (e.g., attack roll → damage roll)
+ */
+export interface RequestContinuationParams {
+  reason: string; // Why another round is needed
+  context: string; // What info you need to process
+  next_action?: string; // What you plan to do next
+}
+
+/**
+ * Ask Player - Pause and ask the player a question
+ * The player's answer will be included in the next GM round
+ */
+export interface AskPlayerParams {
+  question: string; // Question to ask the player
+  context: string; // Why you need this information
+  options?: string[]; // Optional: suggested answers
+  allow_custom?: boolean; // Whether player can give custom answer (default true)
+}
+
 // Union type for all GM tool parameters
 export type GMToolParams =
   | { name: "skill_check"; params: SkillCheckParams }
@@ -112,7 +225,14 @@ export type GMToolParams =
   | { name: "roll_dice"; params: RollDiceParams }
   | { name: "calculate"; params: CalculateParams }
   | { name: "no_check_needed"; params: NoCheckNeededParams }
-  | { name: "take_rest"; params: TakeRestParams };
+  | { name: "take_rest"; params: TakeRestParams }
+  | { name: "formula_roll"; params: FormulaRollParams }
+  | { name: "opposed_formula"; params: OpposedFormulaParams }
+  | { name: "formula_challenge_check"; params: FormulaChallengeCheckParams }
+  | { name: "fate_question"; params: FateQuestionParams }
+  | { name: "roll_table"; params: RollTableParams }
+  | { name: "request_continuation"; params: RequestContinuationParams }
+  | { name: "ask_player"; params: AskPlayerParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -525,6 +645,376 @@ Types:
 };
 
 // ============================================
+// FORMULA-BASED TOOL SCHEMAS
+// ============================================
+// These tools use the dice formula parser with {{variable}} syntax
+// Variables resolve from characterData (the new schema system)
+
+const formulaRollTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "formula_roll",
+    description: `Roll a dice formula with optional variable substitution.
+
+Use when:
+- The adventure uses custom character sheets (characterData exists)
+- You need to roll a formula like "1d20+{{STR_mod}}+{{proficiency}}"
+- The DC is known and you want to check success/failure
+
+Variables in {{double braces}} resolve from the character's data:
+- {{Strength}} → stat value
+- {{STR_mod}} → D&D-style modifier = floor((value-10)/2)
+- {{proficiency}} → custom field value
+
+Example formulas:
+- "1d20+{{STR_mod}}+{{proficiency}}" (D&D attack)
+- "2d6+{{damage_bonus}}" (damage roll)
+- "1d100" (percentile check)`,
+    parameters: {
+      type: "object",
+      properties: {
+        formula: {
+          type: "string",
+          description:
+            "Dice formula with optional {{variables}}: '1d20+{{STR_mod}}', '2d6+5', '1d100'",
+        },
+        dc: {
+          type: "number",
+          description: "Target number to beat for success (optional)",
+        },
+        reason: {
+          type: "string",
+          description: "What this roll represents",
+        },
+        display_name: {
+          type: "string",
+          description: "Optional label for UI display (e.g., 'Strength Check')",
+        },
+        stakes: {
+          type: "string",
+          enum: ["low", "medium", "high", "deadly"],
+          description: "Consequence tier on failure",
+        },
+        consequences: {
+          type: "object",
+          description: "What happens on each outcome",
+          properties: {
+            success: { type: "string", description: "What happens on success" },
+            failure: { type: "string", description: "What happens on failure" },
+          },
+        },
+      },
+      required: ["formula", "reason"],
+    },
+  },
+};
+
+const opposedFormulaTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "opposed_formula",
+    description: `Opposed roll using formulas. Both player and opponent roll, higher wins.
+
+Use when:
+- Player contests an NPC directly
+- Both sides should roll (not just player vs static DC)
+- The adventure uses custom character sheets
+
+Player formula can use {{variables}}, opponent formula is usually fixed.
+
+Examples:
+- Player: "1d20+{{DEX_mod}}" vs Opponent: "1d20+3"
+- Player: "2d6+{{Stealth}}" vs Opponent: "2d6+5"`,
+    parameters: {
+      type: "object",
+      properties: {
+        player_formula: {
+          type: "string",
+          description:
+            "Player's dice formula with optional {{variables}}: '1d20+{{DEX_mod}}'",
+        },
+        opponent_formula: {
+          type: "string",
+          description: "Opponent's dice formula (usually fixed): '1d20+5'",
+        },
+        opponent_name: {
+          type: "string",
+          description: "NPC's name for narrative context",
+        },
+        reason: {
+          type: "string",
+          description: "What the contest is about",
+        },
+        display_name: {
+          type: "string",
+          description: "Optional label (e.g., 'Stealth vs Perception')",
+        },
+        stakes: {
+          type: "string",
+          enum: ["low", "medium", "high", "deadly"],
+          description: "Consequence tier if player loses",
+        },
+        consequences: {
+          type: "object",
+          description: "What happens on each outcome",
+          properties: {
+            player_wins: { type: "string" },
+            opponent_wins: { type: "string" },
+            tie: { type: "string" },
+          },
+        },
+      },
+      required: [
+        "player_formula",
+        "opponent_formula",
+        "opponent_name",
+        "reason",
+      ],
+    },
+  },
+};
+
+const formulaChallengeCheckTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "formula_challenge_check",
+    description: `Make a challenge check using a dice formula instead of stat lookup.
+
+Use when:
+- There's an active challenge in progress
+- The adventure uses custom character sheets (characterData)
+- You want to roll a formula like "1d20+{{Athletics}}"
+
+This tool updates challenge progress (successes/failures) based on the roll result.`,
+    parameters: {
+      type: "object",
+      properties: {
+        formula: {
+          type: "string",
+          description:
+            "Dice formula with optional {{variables}}: '1d20+{{Athletics}}'",
+        },
+        dc: {
+          type: "number",
+          description: "Target number to beat for success",
+        },
+        description: {
+          type: "string",
+          description:
+            "What this specific check represents (e.g., 'Vault over the gap')",
+        },
+        display_name: {
+          type: "string",
+          description: "Optional label for UI (e.g., 'Athletics Check')",
+        },
+        consequences: {
+          type: "object",
+          description: "Specific consequences for this check",
+          properties: {
+            success: { type: "string" },
+            failure: { type: "string" },
+          },
+        },
+      },
+      required: ["formula", "dc", "description"],
+    },
+  },
+};
+
+// ============================================
+// ORACLE & UTILITY TOOL SCHEMAS
+// ============================================
+
+const fateQuestionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "fate_question",
+    description: `Ask a yes/no "fate" question using the Mythic-style oracle system.
+
+Use when:
+- You need to determine an unknown fact about the world
+- The player asks "Is X true?" style questions
+- You need random narrative direction with weighted probability
+
+The chaos factor (from agmtState) affects randomness. Higher chaos = more unexpected results.
+
+LIKELIHOODS (from least to most likely):
+- Impossible: Almost certainly no
+- No Way: Very strong no
+- Very Unlikely: Strong no
+- Unlikely: Probably no
+- 50/50: Equal chance (DEFAULT)
+- Somewhat Likely: Leaning yes
+- Likely: Probably yes
+- Very Likely: Strong yes
+- Near Sure Thing: Very strong yes
+- A Sure Thing: Almost certainly yes
+- Has To Be: Definitely yes
+
+Results can be: Exceptional No, No, Yes, or Exceptional Yes.
+Exceptional results are extreme versions - treat them dramatically.
+
+May also trigger a Random Event (check the result).`,
+    parameters: {
+      type: "object",
+      properties: {
+        question: {
+          type: "string",
+          description:
+            "The yes/no question to ask fate (e.g., 'Is the door locked?')",
+        },
+        likelihood: {
+          type: "string",
+          enum: [
+            "Impossible",
+            "No Way",
+            "Very Unlikely",
+            "Unlikely",
+            "50/50",
+            "Somewhat Likely",
+            "Likely",
+            "Very Likely",
+            "Near Sure Thing",
+            "A Sure Thing",
+            "Has To Be",
+          ],
+          description: "How likely is a 'yes' answer? Default: 50/50",
+        },
+        reason: {
+          type: "string",
+          description: "Optional context for why this question matters",
+        },
+      },
+      required: ["question", "likelihood"],
+    },
+  },
+};
+
+const rollTableTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "roll_table",
+    description: `Roll on a custom table or AGMT table for random content generation.
+
+Use when:
+- You need random content from a defined set of options
+- The adventure has custom tables (weather, encounters, NPCs, etc.)
+- You want weighted random selection
+
+Tables are defined in the adventure's customTables or agmtState.tables.
+Each entry has a weight - higher weight = more likely to be selected.`,
+    parameters: {
+      type: "object",
+      properties: {
+        table_name: {
+          type: "string",
+          description:
+            "Name of the table to roll on (case-insensitive, partial match supported)",
+        },
+        reason: {
+          type: "string",
+          description: "What this roll determines in the narrative",
+        },
+        display_name: {
+          type: "string",
+          description: "Optional label for UI display (e.g., 'Weather Roll')",
+        },
+      },
+      required: ["table_name", "reason"],
+    },
+  },
+};
+
+const requestContinuationTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "request_continuation",
+    description: `Request another GM stage round after seeing the current roll results.
+
+Use when:
+- You need to chain multiple rolls (attack → damage)
+- The outcome of one check determines what check comes next
+- You want to see roll results before deciding what to do
+- Complex multi-step mechanics need sequential resolution
+
+The GM stage will run again with the current results available.
+
+Example flow:
+1. First GM call: skill_check for attack
+2. GM sees SUCCESS, calls request_continuation for damage
+3. Second GM call: roll_dice for damage calculation
+4. Story stage receives both attack and damage results`,
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description:
+            "Why another GM round is needed (e.g., 'Need to roll damage after successful attack')",
+        },
+        context: {
+          type: "string",
+          description:
+            "What information from this round you need (e.g., 'Attack succeeded with margin +5')",
+        },
+        next_action: {
+          type: "string",
+          description:
+            "What you plan to do in the next round (e.g., 'Roll 2d6+3 damage')",
+        },
+      },
+      required: ["reason", "context"],
+    },
+  },
+};
+
+const askPlayerTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "ask_player",
+    description: `Pause GM processing and ask the player a question.
+
+Use when:
+- You need player input before deciding mechanics
+- A choice would change what rolls are needed
+- You want to give the player narrative agency mid-action
+- Clarification is needed before proceeding
+
+The player will see the question and provide an answer.
+The GM stage will run again with their answer included.
+
+Example uses:
+- "Do you want to use your healing potion now, or save it?"
+- "Which enemy do you focus your attack on?"
+- "Do you try to negotiate or fight?"`,
+    parameters: {
+      type: "object",
+      properties: {
+        question: {
+          type: "string",
+          description: "The question to ask the player",
+        },
+        context: {
+          type: "string",
+          description: "Why you need this information (shown to player)",
+        },
+        options: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional: Suggested answer options for the player",
+        },
+        allow_custom: {
+          type: "boolean",
+          description:
+            "Whether the player can give a custom answer (default: true)",
+        },
+      },
+      required: ["question", "context"],
+    },
+  },
+};
+
+// ============================================
 // EXPORT
 // ============================================
 
@@ -540,6 +1030,15 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   calculateTool,
   noCheckNeededTool,
   takeRestTool,
+  // Formula-based tools (for custom character schemas)
+  formulaRollTool,
+  opposedFormulaTool,
+  formulaChallengeCheckTool,
+  // Oracle & utility tools
+  fateQuestionTool,
+  rollTableTool,
+  requestContinuationTool,
+  askPlayerTool,
 ];
 
 /**

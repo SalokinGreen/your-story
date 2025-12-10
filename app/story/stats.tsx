@@ -2,28 +2,19 @@
 
 import {
   StoryData,
-  UPGRADE_COSTS,
   Condition,
   Variable,
   NumberVariable,
   BooleanVariable,
   StringVariable,
   ListVariable,
-  Ability,
 } from "../misc/structs";
 import { DynamicIcon } from "../components/DynamicIcon";
-import { useState } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { getRPGSystem } from "../misc/rpgSystems";
-import { GRADE_CONFIG, getMaxDurability, ItemGrade } from "../misc/itemSystem";
-import {
-  getXPProgress,
-  getAvailableUpgrades,
-  formatXP,
-} from "../misc/leveling";
 import {
   ABILITY_GRADE_CONFIG,
   formatAbilityCost,
-  formatCooldown,
   getAbilityBonus,
 } from "../misc/abilitySystem";
 import {
@@ -31,27 +22,116 @@ import {
   getResourceBonusFromNodes,
   getActivePassives,
 } from "../misc/skillTree";
+import CharacterSheet from "../components/CharacterSheet";
+import { buildPageTemplateDocument, SchemaPage } from "../misc/characterSchema";
 
-type StatsTab =
+// Built-in tab types
+type BuiltInTab =
+  | "character"
   | "stats"
   | "resources"
-  | "inventory"
   | "abilities"
-  | "achievements"
   | "quests"
-  | "relationships"
   | "variables";
 
+// Custom page renderer component
+function CustomPageRenderer({
+  page,
+  storyData,
+}: {
+  page: SchemaPage;
+  storyData: StoryData;
+}) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [height, setHeight] = useState(400);
+
+  const htmlDoc = useMemo(() => {
+    if (!storyData.characterSchema || !storyData.characterData) return "";
+    return buildPageTemplateDocument(
+      page,
+      storyData.characterSchema,
+      storyData.characterData.values
+    );
+  }, [page, storyData.characterSchema, storyData.characterData]);
+
+  useEffect(() => {
+    const iframe = iframeRef.current;
+    if (!iframe) return;
+
+    const updateHeight = () => {
+      try {
+        const doc = iframe.contentDocument;
+        if (doc) {
+          const body = doc.body;
+          const html = doc.documentElement;
+          if (body && html) {
+            const contentHeight = Math.max(
+              body.scrollHeight,
+              body.offsetHeight,
+              html.clientHeight,
+              html.scrollHeight,
+              html.offsetHeight
+            );
+            if (contentHeight > 0) {
+              setHeight(contentHeight + 40);
+            }
+          }
+        }
+      } catch {
+        // Cross-origin issues - use default height
+      }
+    };
+
+    const handleLoad = () => {
+      updateHeight();
+      setTimeout(updateHeight, 100);
+      setTimeout(updateHeight, 300);
+      setTimeout(updateHeight, 600);
+    };
+
+    iframe.addEventListener("load", handleLoad);
+    return () => iframe.removeEventListener("load", handleLoad);
+  }, [htmlDoc]);
+
+  return (
+    <iframe
+      ref={iframeRef}
+      srcDoc={htmlDoc}
+      sandbox="allow-scripts"
+      className="w-full border-0 rounded-lg bg-transparent"
+      style={{ height: `${height}px`, minHeight: "200px", overflow: "hidden" }}
+      title={page.name}
+      scrolling="no"
+    />
+  );
+}
+
 export default function StatsPage(storyData: StoryData) {
-  const [activeTab, setActiveTab] = useState<StatsTab>(() => {
+  // Check if using new character schema system
+  const hasCharacterSchema = !!(
+    storyData.characterSchema && storyData.characterData
+  );
+
+  // Get custom pages from schema
+  const customPages = storyData.characterSchema?.pages || [];
+
+  const [activeTab, setActiveTab] = useState<string>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("statsActiveTab");
-      return (saved as StatsTab) || "stats";
+      // If using schema mode and saved tab is stats/resources, redirect to character
+      if (hasCharacterSchema && (saved === "stats" || saved === "resources")) {
+        return "character";
+      }
+      // If saved tab is "character" but not in schema mode, use "stats"
+      if (!hasCharacterSchema && saved === "character") {
+        return "stats";
+      }
+      return saved || (hasCharacterSchema ? "character" : "stats");
     }
-    return "stats";
+    return hasCharacterSchema ? "character" : "stats";
   });
 
-  const handleTabChange = (tab: StatsTab) => {
+  const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       localStorage.setItem("statsActiveTab", tab);
@@ -72,93 +152,36 @@ export default function StatsPage(storyData: StoryData) {
                 {storyData.player_summary}
               </p>
             </div>
-
-            {/* Level & XP Display */}
-            <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-10 h-10 rounded-full bg-yellow-500/20 border-2 border-yellow-400 flex items-center justify-center">
-                    <span className="text-lg font-bold text-yellow-400">
-                      {storyData.level || 1}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="font-medium text-sm text-white">
-                      Level {storyData.level || 1}
-                    </span>
-                    <p className="text-xs text-blue-200/40">
-                      {formatXP(storyData.points || 0)} XP total
-                    </p>
-                  </div>
-                </div>
-                {(() => {
-                  const available = getAvailableUpgrades(
-                    storyData.level || 1,
-                    storyData.upgradesSpent || 0,
-                    storyData.difficulty,
-                    storyData.levelingSettings
-                  );
-                  return available > 0 ? (
-                    <div className="px-2 py-1 rounded-lg bg-green-500/20 border border-green-400/50">
-                      <span className="text-sm font-bold text-green-400">
-                        {available} ↑
-                      </span>
-                    </div>
-                  ) : null;
-                })()}
-              </div>
-
-              {/* XP Progress Bar */}
-              {(() => {
-                const progress = getXPProgress(
-                  storyData.points || 0,
-                  storyData.levelingSettings
-                );
-                return (
-                  <div className="space-y-1">
-                    <div className="h-2 bg-yellow-950/50 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-linear-to-r from-yellow-500 to-amber-400 rounded-full transition-all duration-500"
-                        style={{ width: `${progress.percentage}%` }}
-                      />
-                    </div>
-                    <div className="flex justify-between text-xs text-yellow-300/50">
-                      <span>
-                        {formatXP(progress.xpIntoLevel)}/
-                        {formatXP(progress.xpNeededForNext)} XP
-                      </span>
-                      <span>
-                        {progress.xpNeededForNext === 0
-                          ? "Max level reached"
-                          : `Level ${progress.currentLevel + 1}`}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })()}
-            </div>
           </div>
         </div>
 
         {/* Tab Navigation */}
         <div className="flex gap-1 px-3 pt-2 pb-1 border-b border-blue-800/30 overflow-x-auto scrollbar-hide">
           {[
-            { id: "stats", label: "Stats", icon: "BarChart2" },
-            { id: "resources", label: "Resources", icon: "Zap" },
-            { id: "inventory", label: "Items", icon: "Backpack" },
+            // Show "Character" tab when using schema, otherwise show Stats/Resources
+            ...(hasCharacterSchema
+              ? [{ id: "character", label: "Character", icon: "User" }]
+              : [
+                  { id: "stats", label: "Stats", icon: "BarChart2" },
+                  { id: "resources", label: "Resources", icon: "Zap" },
+                ]),
             ...(storyData.abilities && storyData.abilities.length > 0
               ? [{ id: "abilities", label: "Abilities", icon: "Sparkles" }]
               : []),
-            { id: "achievements", label: "Badges", icon: "Trophy" },
             { id: "quests", label: "Quests", icon: "Scroll" },
-            { id: "relationships", label: "NPCs", icon: "Users" },
             ...(storyData.variables && storyData.variables.length > 0
               ? [{ id: "variables", label: "Variables", icon: "Variable" }]
               : []),
+            // Add custom pages from schema
+            ...customPages.map((page) => ({
+              id: `page:${page.id}`,
+              label: page.name,
+              icon: page.icon || "FileText",
+            })),
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => handleTabChange(tab.id as StatsTab)}
+              onClick={() => handleTabChange(tab.id)}
               className={`px-2 py-1.5 font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 text-xs ${
                 activeTab === tab.id
                   ? "bg-blue-600 text-white"
@@ -173,6 +196,16 @@ export default function StatsPage(storyData: StoryData) {
 
         {/* Tab Content */}
         <div className="p-4">
+          {/* Character Tab (Schema Mode) */}
+          {activeTab === "character" && hasCharacterSchema && (
+            <CharacterSheet
+              schema={storyData.characterSchema!}
+              data={storyData.characterData!}
+              readOnly={true}
+              compact={true}
+            />
+          )}
+
           {/* Stats Tab */}
           {activeTab === "stats" && (
             <div>
@@ -559,132 +592,6 @@ export default function StatsPage(storyData: StoryData) {
             </div>
           )}
 
-          {/* Inventory Tab */}
-          {activeTab === "inventory" && (
-            <div>
-              <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
-                <DynamicIcon
-                  name="Backpack"
-                  className="w-5 h-5 text-purple-400"
-                />
-                Inventory
-              </h3>
-              {storyData.inventory.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {storyData.inventory.map((item, index) => {
-                    const grade = (item.grade || "common") as ItemGrade;
-                    const gradeConfig =
-                      GRADE_CONFIG[grade] || GRADE_CONFIG.common;
-                    const maxDurability =
-                      item.maxDurability || getMaxDurability(grade);
-                    const durability = item.durability ?? maxDurability;
-                    const durabilityPercent =
-                      grade === "mythic"
-                        ? 100
-                        : Math.round((durability / maxDurability) * 100);
-                    const isLowDurability =
-                      durabilityPercent <= 33 && grade !== "mythic";
-
-                    return (
-                      <div
-                        key={index}
-                        className="flex flex-row items-center gap-2.5 p-3 rounded-lg border"
-                        style={{
-                          backgroundColor: `${gradeConfig.color}10`,
-                          borderColor: `${gradeConfig.color}40`,
-                        }}
-                      >
-                        <div className="shrink-0">
-                          <DynamicIcon
-                            name={item.symbol}
-                            className="w-6 h-6"
-                            style={{ color: gradeConfig.color }}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-row items-baseline justify-between">
-                            <span className="font-medium text-sm text-white truncate">
-                              {item.name}
-                            </span>
-                            <span
-                              className="font-bold text-sm ml-2"
-                              style={{ color: gradeConfig.color }}
-                            >
-                              ×{item.quantity}
-                            </span>
-                          </div>
-                          {item.description && (
-                            <p className="text-xs text-blue-200/40 mt-0.5">
-                              {item.description}
-                            </p>
-                          )}
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                            {/* Grade badge */}
-                            <span
-                              className="inline-block px-1.5 py-0.5 text-xs rounded font-medium"
-                              style={{
-                                backgroundColor: `${gradeConfig.color}30`,
-                                color: gradeConfig.color,
-                              }}
-                            >
-                              {gradeConfig.label}
-                            </span>
-                            {/* Type badge */}
-                            {item.type && (
-                              <span className="inline-block px-1.5 py-0.5 text-xs rounded bg-purple-500/20 text-purple-300 font-medium">
-                                {item.type}
-                              </span>
-                            )}
-                          </div>
-                          {/* Durability bar */}
-                          {item.type !== "consumable" && (
-                            <div className="mt-1.5">
-                              <div className="flex items-center justify-between text-xs mb-0.5">
-                                <span className="text-blue-200/40">
-                                  Durability
-                                </span>
-                                <span
-                                  className={
-                                    isLowDurability
-                                      ? "text-red-400"
-                                      : "text-blue-200/60"
-                                  }
-                                >
-                                  {grade === "mythic"
-                                    ? "∞"
-                                    : `${durability}/${maxDurability}`}
-                                </span>
-                              </div>
-                              {grade !== "mythic" && (
-                                <div className="h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full transition-all"
-                                    style={{
-                                      width: `${durabilityPercent}%`,
-                                      backgroundColor: isLowDurability
-                                        ? "#ef4444"
-                                        : gradeConfig.color,
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="p-4 text-center rounded-lg bg-blue-900/30 border border-blue-800/30">
-                  <p className="text-sm text-blue-200/40">
-                    Your inventory is empty
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Abilities Tab */}
           {activeTab === "abilities" && (
             <div>
@@ -823,90 +730,6 @@ export default function StatsPage(storyData: StoryData) {
             </div>
           )}
 
-          {/* Achievements Tab */}
-          {activeTab === "achievements" && (
-            <div>
-              <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
-                <DynamicIcon name="Trophy" className="w-5 h-5 text-amber-400" />
-                Achievements
-                {storyData.achievements.filter(
-                  (a) => a.hidden && !a.dateAchieved
-                ).length > 0 && (
-                  <span className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 rounded text-xs font-medium ml-2">
-                    +
-                    {
-                      storyData.achievements.filter(
-                        (a) => a.hidden && !a.dateAchieved
-                      ).length
-                    }{" "}
-                    <DynamicIcon name="Lock" className="inline-block w-3 h-3" />{" "}
-                    Hidden
-                  </span>
-                )}
-              </h3>
-              {storyData.achievements.filter((a) => !a.hidden || a.dateAchieved)
-                .length > 0 ? (
-                <div className="space-y-2">
-                  {storyData.achievements
-                    .filter((a) => !a.hidden || a.dateAchieved)
-                    .sort((a, b) => {
-                      // Sort by achieved status first (achieved first)
-                      if (a.dateAchieved && !b.dateAchieved) return -1;
-                      if (!a.dateAchieved && b.dateAchieved) return 1;
-                      // If both achieved or both not achieved, maintain original order
-                      return 0;
-                    })
-                    .map((achievement, index) => (
-                      <div
-                        key={index}
-                        className={`flex flex-row items-center gap-2.5 p-3 rounded-lg border transition-all ${
-                          achievement.dateAchieved
-                            ? "bg-amber-500/10 border-amber-500/30"
-                            : "bg-blue-900/30 border-blue-800/30 opacity-60"
-                        }`}
-                      >
-                        <div className="shrink-0">
-                          <DynamicIcon
-                            name={achievement.symbol}
-                            className="w-6 h-6 text-amber-400"
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-row items-baseline justify-between">
-                            <span className="font-medium text-sm text-white">
-                              {achievement.title}
-                            </span>
-                            <span className="font-bold text-xs text-amber-400 ml-2">
-                              {achievement.points} pts
-                            </span>
-                          </div>
-                          {achievement.description && (
-                            <p className="text-xs text-blue-200/40 mt-0.5">
-                              {achievement.description}
-                            </p>
-                          )}
-                          {achievement.dateAchieved && (
-                            <p className="text-xs text-amber-400/70 mt-0.5">
-                              🎉 Unlocked:{" "}
-                              {new Date(
-                                achievement.dateAchieved
-                              ).toLocaleDateString()}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              ) : (
-                <div className="p-4 text-center rounded-lg bg-blue-900/30 border border-blue-800/30">
-                  <p className="text-sm text-blue-200/40">
-                    No achievements yet
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Quests Tab */}
           {activeTab === "quests" &&
             storyData.quests &&
@@ -968,89 +791,6 @@ export default function StatsPage(storyData: StoryData) {
                     <p className="text-sm text-blue-200/40">No active quests</p>
                   </div>
                 )}
-              </div>
-            )}
-
-          {/* Relationships Tab */}
-          {activeTab === "relationships" &&
-            storyData.relationships &&
-            storyData.relationships.length > 0 && (
-              <div>
-                <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
-                  <DynamicIcon name="Users" className="w-5 h-5 text-pink-400" />
-                  Relationships
-                </h3>
-                <div className="space-y-2">
-                  {storyData.relationships.map((rel, index) => (
-                    <div
-                      key={index}
-                      className="flex flex-row items-start gap-2.5 p-3 rounded-lg bg-pink-500/10 border border-pink-500/30"
-                    >
-                      <div className="shrink-0">
-                        <DynamicIcon
-                          name={rel.symbol}
-                          className="w-6 h-6 text-pink-400"
-                        />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex flex-row items-center justify-between mb-1 gap-2">
-                          <span className="font-medium text-sm text-white">
-                            {rel.name}
-                          </span>
-                          <span
-                            className={`font-bold text-sm px-1.5 py-0.5 rounded shrink-0 ${
-                              rel.value >= 50
-                                ? "bg-green-500/20 text-green-400"
-                                : rel.value >= 0
-                                ? "bg-blue-500/20 text-blue-400"
-                                : rel.value >= -50
-                                ? "bg-orange-500/20 text-orange-400"
-                                : "bg-red-500/20 text-red-400"
-                            }`}
-                          >
-                            {rel.value > 0 ? "+" : ""}
-                            {rel.value}
-                          </span>
-                        </div>
-                        <p className="text-xs text-blue-200/40">
-                          {rel.description}
-                        </p>
-                        {/* Relationship bar - fills from center, -100 to +100 range */}
-                        <div className="w-full bg-blue-900/50 rounded-full h-1.5 mt-2 relative overflow-hidden">
-                          {/* Center line indicator */}
-                          <div className="absolute left-1/2 top-0 w-0.5 h-full bg-blue-700 -translate-x-1/2 z-10" />
-                          {/* Fill bar */}
-                          {rel.value !== 0 && (
-                            <div
-                              className={`absolute top-0 h-full rounded-full transition-all duration-300 ${
-                                rel.value >= 0
-                                  ? "bg-linear-to-r from-blue-500 to-green-500"
-                                  : "bg-linear-to-l from-orange-500 to-red-500"
-                              }`}
-                              style={{
-                                width: `${
-                                  Math.min(Math.abs(rel.value), 100) / 2
-                                }%`,
-                                left:
-                                  rel.value >= 0
-                                    ? "50%"
-                                    : `${
-                                        50 -
-                                        Math.min(Math.abs(rel.value), 100) / 2
-                                      }%`,
-                              }}
-                            />
-                          )}
-                        </div>
-                        <div className="flex justify-between text-xs text-blue-200/30 mt-0.5">
-                          <span>Hostile</span>
-                          <span>Neutral</span>
-                          <span>Allied</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
               </div>
             )}
 
@@ -1238,6 +978,26 @@ export default function StatsPage(storyData: StoryData) {
                 </div>
               </div>
             )}
+
+          {/* Custom Pages from Schema */}
+          {activeTab.startsWith("page:") &&
+            (() => {
+              const pageId = activeTab.replace("page:", "");
+              const page = customPages.find((p) => p.id === pageId);
+              if (!page) return null;
+              return (
+                <div>
+                  <h3 className="text-base font-semibold mb-3 flex items-center gap-2 text-white">
+                    <DynamicIcon
+                      name={page.icon || "FileText"}
+                      className="w-5 h-5 text-blue-400"
+                    />
+                    {page.name}
+                  </h3>
+                  <CustomPageRenderer page={page} storyData={storyData} />
+                </div>
+              );
+            })()}
         </div>
       </div>
     </div>

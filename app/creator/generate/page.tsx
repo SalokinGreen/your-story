@@ -9,7 +9,6 @@ import { useNotification } from "@/app/misc/NotificationContext";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import {
   BigAdventureConfig,
-  RPGSystemType,
   ComplexityLevel,
   GenerationStage,
   LegacyStage,
@@ -143,79 +142,6 @@ function AutosaveRecoveryModal({
             Resume
           </button>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// Iteration Slider Component
-function IterationSlider({
-  label,
-  value,
-  onChange,
-  min = 1,
-  max = 5,
-  description,
-}: {
-  label: string;
-  value: number;
-  onChange: (value: number) => void;
-  min?: number;
-  max?: number;
-  description?: string;
-}) {
-  // Use local state to handle dragging smoothly
-  const [localValue, setLocalValue] = useState(value);
-  const [isDragging, setIsDragging] = useState(false);
-
-  // Sync with external value when not dragging
-  useEffect(() => {
-    if (!isDragging) {
-      setLocalValue(value);
-    }
-  }, [value, isDragging]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = parseInt(e.target.value);
-    setLocalValue(newValue);
-    // Call onChange immediately for responsive feedback
-    onChange(newValue);
-  };
-
-  const handleMouseDown = () => {
-    setIsDragging(true);
-  };
-
-  const handleMouseUp = () => {
-    setIsDragging(false);
-    // Ensure final value is committed
-    onChange(localValue);
-  };
-
-  return (
-    <div className="flex items-center gap-4">
-      <div className="flex-1">
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-sm text-blue-200">{label}</span>
-          <span className="text-sm font-mono text-purple-400">
-            {localValue}x
-          </span>
-        </div>
-        <input
-          type="range"
-          min={min}
-          max={max}
-          value={localValue}
-          onChange={handleChange}
-          onMouseDown={handleMouseDown}
-          onMouseUp={handleMouseUp}
-          onTouchStart={handleMouseDown}
-          onTouchEnd={handleMouseUp}
-          className="w-full h-1.5 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
-        />
-        {description && (
-          <p className="text-xs text-blue-300/50 mt-1">{description}</p>
-        )}
       </div>
     </div>
   );
@@ -516,7 +442,7 @@ function ContentBrowser({
   if (storyTemplate?.lore && storyTemplate.lore.length > 0) {
     sections.push({
       key: "lore",
-      label: "Lore",
+      label: "Notes",
       icon: "📜",
       color: "purple",
       items: storyTemplate.lore.map((l) => ({
@@ -1057,7 +983,6 @@ function BigAdventureCreatorPage() {
   const [config, setConfig] = useState<BigAdventureConfig>({
     prompt: "",
     genre: "",
-    rpgSystem: "1d20",
     complexity: "moderate",
     nsfw: false,
     includeAGMT: true,
@@ -1393,28 +1318,6 @@ function BigAdventureCreatorPage() {
         superheroes: "cinematic",
       };
 
-      // Genre-specific RPG system recommendations
-      const genreRpgMap: Record<string, RPGSystemType> = {
-        fantasy: "1d20", // Classic D&D-style for fantasy
-        "sci-fi": "pbta", // PbtA for sci-fi narrative drama
-        horror: "percentile", // Percentile for horror (Call of Cthulhu style)
-        mystery: "pbta", // PbtA for mystery narrative tension
-        romance: "fate", // Fate for romance (aspects fit emotional connections)
-        western: "pbta", // PbtA for western drama and hard choices
-        comedy: "fate", // Fate for comedy (aspects and stunts fit humor)
-        superheroes: "fate", // Fate for superhero aspects and dramatic action
-        "dark fantasy": "pbta", // PbtA for grim choices and consequences
-        historical: "pbta", // PbtA for historical drama
-        pirates: "fate", // Fate for swashbuckling adventure aspects
-        survival: "pbta", // PbtA for hard survival choices
-        "urban fantasy": "pbta", // PbtA for modern supernatural drama
-        steampunk: "fate", // Fate for inventive gadget aspects
-        drama: "fate", // Fate for character-driven emotional aspects
-        thriller: "pbta", // PbtA for tense action sequences
-        "post-apocalyptic": "pbta", // PbtA for harsh survival choices
-        noir: "pbta", // PbtA for hard-boiled detective drama
-      };
-
       // Genre-specific complexity (some genres benefit from more depth)
       const genreComplexityMap: Record<
         string,
@@ -1472,7 +1375,6 @@ function BigAdventureCreatorPage() {
       setConfig({
         prompt: finalPrompt,
         genre: genreCapitalized,
-        rpgSystem: (genreRpgMap[genre] || "1d20") as RPGSystemType,
         complexity: (genreComplexityMap[genre] ||
           "moderate") as ComplexityLevel,
         nsfw: false,
@@ -1700,7 +1602,6 @@ function BigAdventureCreatorPage() {
       updateConfig({
         prompt: template.promptStarter,
         genre: template.genre,
-        rpgSystem: template.suggestedSystem,
         complexity: template.suggestedComplexity,
         stylePreset: template.suggestedStyle,
       });
@@ -1838,20 +1739,6 @@ function BigAdventureCreatorPage() {
           },
         };
       });
-    },
-    []
-  );
-
-  // Update content iterations
-  const updateContentIterations = useCallback(
-    (updates: Partial<ContentIterationConfig>) => {
-      setConfig((prev) => ({
-        ...prev,
-        contentIterations: {
-          ...(prev.contentIterations || DEFAULT_CONTENT_ITERATIONS),
-          ...updates,
-        },
-      }));
     },
     []
   );
@@ -3020,26 +2907,14 @@ ${result.description || ""}`;
                     Generated in this stage:
                   </h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                    {previewStageData.partialResult.storyTemplate.stats && (
+                    {previewStageData.partialResult.storyTemplate
+                      .characterSchema && (
                       <div className="bg-blue-900/30 rounded px-3 py-2">
                         <span className="text-amber-400 font-bold">
-                          {
-                            previewStageData.partialResult.storyTemplate.stats
-                              .length
-                          }
+                          {previewStageData.partialResult.storyTemplate
+                            .characterSchema.fields?.length || 0}
                         </span>
-                        <span className="text-blue-300/60 ml-2">Stats</span>
-                      </div>
-                    )}
-                    {previewStageData.partialResult.storyTemplate.resources && (
-                      <div className="bg-blue-900/30 rounded px-3 py-2">
-                        <span className="text-emerald-400 font-bold">
-                          {
-                            previewStageData.partialResult.storyTemplate
-                              .resources.length
-                          }
-                        </span>
-                        <span className="text-blue-300/60 ml-2">Resources</span>
+                        <span className="text-blue-300/60 ml-2">Fields</span>
                       </div>
                     )}
                     {previewStageData.partialResult.storyTemplate.abilities && (
@@ -3061,7 +2936,7 @@ ${result.description || ""}`;
                               .length
                           }
                         </span>
-                        <span className="text-blue-300/60 ml-2">Lore</span>
+                        <span className="text-blue-300/60 ml-2">Notes</span>
                       </div>
                     )}
                     {previewStageData.partialResult.storyTemplate
@@ -3196,7 +3071,6 @@ ${result.description || ""}`;
                   This template will save:
                 </p>
                 <ul className="list-disc list-inside space-y-0.5">
-                  <li>RPG System: {config.rpgSystem}</li>
                   <li>Complexity: {config.complexity}</li>
                   <li>All feature toggles & iterations</li>
                   <li>Output token settings</li>
@@ -3287,8 +3161,6 @@ ${result.description || ""}`;
                             <span className="text-amber-400">
                               {entry.tokenCost} coins
                             </span>
-                            <span>•</span>
-                            <span>{entry.config.rpgSystem}</span>
                             <span>•</span>
                             <span>{entry.config.complexity}</span>
                           </div>
@@ -3623,34 +3495,10 @@ ${result.description || ""}`;
               </div>
             </ConfigStep>
 
-            {/* Step 2: RPG System & Complexity */}
+            {/* Step 2: Complexity */}
             <ConfigStep step={2} currentStep={configStep} title="Game Settings">
               <div className="space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm text-blue-300/60 mb-2">
-                      RPG System
-                    </label>
-                    <select
-                      value={config.rpgSystem}
-                      onChange={(e) =>
-                        updateConfig({
-                          rpgSystem: e.target.value as RPGSystemType,
-                        })
-                      }
-                      className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500/50 transition-all"
-                    >
-                      <option value="1d20">D20 (D&D-style)</option>
-                      <option value="3d6">3d6 (Bell Curve)</option>
-                      <option value="1d100">Percentile (d100)</option>
-                      <option value="pbta">Powered by the Apocalypse</option>
-                      <option value="fate">Fate</option>
-                      <option value="yze">Year Zero Engine</option>
-                      <option value="explosive">Explosive Dice</option>
-                      <option value="narrative">Narrative (No Dice)</option>
-                    </select>
-                  </div>
-
                   <div>
                     <label className="block text-sm text-blue-300/60 mb-2">
                       Complexity
@@ -3837,27 +3685,6 @@ ${result.description || ""}`;
                       </div>
                       <p className="text-sm text-blue-300/60">
                         Multiple ways to begin the adventure
-                      </p>
-                    </div>
-                  </label>
-
-                  <label className="flex items-start gap-3 p-4 bg-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/50 transition-colors border border-blue-700/30">
-                    <input
-                      type="checkbox"
-                      checked={config.includeSkillTrees}
-                      onChange={(e) =>
-                        updateConfig({
-                          includeSkillTrees: e.target.checked,
-                        })
-                      }
-                      className="w-5 h-5 mt-0.5 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
-                    />
-                    <div>
-                      <div className="font-medium text-white">
-                        🌳 Skill Trees
-                      </div>
-                      <p className="text-sm text-blue-300/60">
-                        Unlock progression paths with interconnected abilities
                       </p>
                     </div>
                   </label>
@@ -4324,52 +4151,6 @@ ${result.description || ""}`;
                       </div>
                     </div>
 
-                    {/* Content Iterations */}
-                    <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-700/30">
-                      <h4 className="font-medium text-white mb-1">
-                        Content Iterations
-                      </h4>
-                      <p className="text-xs text-blue-300/50 mb-4">
-                        Run multiple passes for richer content (1x = normal, 5x
-                        = maximum detail)
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <IterationSlider
-                          label="📚 Lore Entries"
-                          value={config.contentIterations?.lore ?? 1}
-                          onChange={(v) => updateContentIterations({ lore: v })}
-                        />
-                        <IterationSlider
-                          label="🏆 Achievements"
-                          value={config.contentIterations?.achievements ?? 1}
-                          onChange={(v) =>
-                            updateContentIterations({ achievements: v })
-                          }
-                        />
-                        <IterationSlider
-                          label="🤝 Relationships"
-                          value={config.contentIterations?.relationships ?? 1}
-                          onChange={(v) =>
-                            updateContentIterations({ relationships: v })
-                          }
-                        />
-                        <IterationSlider
-                          label="📋 Quests"
-                          value={config.contentIterations?.quests ?? 1}
-                          onChange={(v) =>
-                            updateContentIterations({ quests: v })
-                          }
-                        />
-                        <IterationSlider
-                          label="🎒 Inventory"
-                          value={config.contentIterations?.inventory ?? 1}
-                          onChange={(v) =>
-                            updateContentIterations({ inventory: v })
-                          }
-                        />
-                      </div>
-                    </div>
-
                     {/* Per-Stage Token Limits */}
                     <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-700/30">
                       <h4 className="font-medium text-white mb-1">
@@ -4778,15 +4559,13 @@ ${result.description || ""}`;
                     <button
                       onClick={() => {
                         const allSections: RegenerateSection[] = [
-                          "stats",
-                          "resources",
+                          "characterSchema",
                           "abilities",
+                          "mechanicsLore",
                           "lore",
                           "achievements",
                           "quests",
-                          "relationships",
                           "presets",
-                          "inventory",
                           "variables",
                           "startingChoices",
                           "customTables",
@@ -4808,87 +4587,56 @@ ${result.description || ""}`;
                     </button>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    {/* Stats */}
+                    {/* Character Schema */}
                     <ExpandableContentCard
-                      section="stats"
-                      label="Stats"
-                      count={result.storyTemplate.stats?.length || 0}
+                      section="characterSchema"
+                      label="Character Schema"
+                      count={
+                        result.storyTemplate.characterSchema?.fields?.length ||
+                        0
+                      }
                       color="amber"
-                      items={result.storyTemplate.stats || []}
-                      isExpanded={expandedSections.has("stats")}
-                      onToggleExpand={() => toggleSectionExpanded("stats")}
-                      onRegenerate={() =>
-                        handleRegenerateSection("stats", extensionInstructions)
+                      items={result.storyTemplate.characterSchema?.fields || []}
+                      isExpanded={expandedSections.has("characterSchema")}
+                      onToggleExpand={() =>
+                        toggleSectionExpanded("characterSchema")
                       }
-                      onExtend={() =>
-                        handleExtendSection(
-                          "stats",
-                          extensionOutputSize,
-                          extensionInstructions
-                        )
-                      }
-                      isRegenerating={regeneratingSections.has("stats")}
-                      isExtending={extendingSections.has("stats")}
-                      renderItem={(item) => {
-                        const stat = item as Stat;
-                        return (
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{stat.symbol}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-amber-300 truncate">
-                                {stat.name}
-                              </div>
-                              <div className="text-xs text-blue-300/60 truncate">
-                                {stat.description}
-                              </div>
-                            </div>
-                            <span className="text-amber-400 font-bold">
-                              {stat.value}
-                            </span>
-                          </div>
-                        );
-                      }}
-                    />
-
-                    {/* Resources */}
-                    <ExpandableContentCard
-                      section="resources"
-                      label="Resources"
-                      count={result.storyTemplate.resources?.length || 0}
-                      color="emerald"
-                      items={result.storyTemplate.resources || []}
-                      isExpanded={expandedSections.has("resources")}
-                      onToggleExpand={() => toggleSectionExpanded("resources")}
                       onRegenerate={() =>
                         handleRegenerateSection(
-                          "resources",
+                          "characterSchema",
                           extensionInstructions
                         )
                       }
                       onExtend={() =>
                         handleExtendSection(
-                          "resources",
+                          "characterSchema",
                           extensionOutputSize,
                           extensionInstructions
                         )
                       }
-                      isRegenerating={regeneratingSections.has("resources")}
-                      isExtending={extendingSections.has("resources")}
+                      isRegenerating={regeneratingSections.has(
+                        "characterSchema"
+                      )}
+                      isExtending={extendingSections.has("characterSchema")}
                       renderItem={(item) => {
-                        const resource = item as Resource;
+                        const field = item as {
+                          name: string;
+                          type: string;
+                          category?: string;
+                          description?: string;
+                        };
                         return (
                           <div className="flex items-center gap-2">
-                            <span className="text-lg">{resource.symbol}</span>
                             <div className="flex-1 min-w-0">
-                              <div className="font-medium text-emerald-300 truncate">
-                                {resource.name}
+                              <div className="font-medium text-amber-300 truncate">
+                                {field.name}
                               </div>
                               <div className="text-xs text-blue-300/60 truncate">
-                                {resource.description}
+                                {field.description || field.category}
                               </div>
                             </div>
-                            <span className="text-emerald-400 font-bold">
-                              {resource.value}/{resource.maxValue}
+                            <span className="text-amber-400 text-xs px-1.5 py-0.5 bg-amber-900/50 rounded">
+                              {field.type}
                             </span>
                           </div>
                         );
@@ -4940,10 +4688,10 @@ ${result.description || ""}`;
                       }}
                     />
 
-                    {/* Lore */}
+                    {/* Notes */}
                     <ExpandableContentCard
                       section="lore"
-                      label="Lore Entries"
+                      label="Notes"
                       count={result.storyTemplate.lore?.length || 0}
                       color="purple"
                       items={result.storyTemplate.lore || []}
@@ -5061,90 +4809,6 @@ ${result.description || ""}`;
                       }}
                     />
 
-                    {/* Relationships */}
-                    <ExpandableContentCard
-                      section="relationships"
-                      label="Relationships"
-                      count={result.storyTemplate.relationships?.length || 0}
-                      color="pink"
-                      items={result.storyTemplate.relationships || []}
-                      isExpanded={expandedSections.has("relationships")}
-                      onToggleExpand={() =>
-                        toggleSectionExpanded("relationships")
-                      }
-                      onRegenerate={() =>
-                        handleRegenerateSection(
-                          "relationships",
-                          extensionInstructions
-                        )
-                      }
-                      onExtend={() =>
-                        handleExtendSection(
-                          "relationships",
-                          extensionOutputSize,
-                          extensionInstructions
-                        )
-                      }
-                      isRegenerating={regeneratingSections.has("relationships")}
-                      isExtending={extendingSections.has("relationships")}
-                      renderItem={(item) => {
-                        const rel = item as Relationship;
-                        // Calculate slider position (0-100 from -100 to +100 value)
-                        const sliderPosition = ((rel.value + 100) / 200) * 100;
-                        return (
-                          <div className="p-3 bg-pink-900/20 rounded-lg border border-pink-800/40">
-                            <div className="flex items-start gap-3">
-                              <div className="text-2xl shrink-0">
-                                {rel.symbol || "💛"}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between gap-2">
-                                  <span className="font-bold text-white">
-                                    {rel.name}
-                                  </span>
-                                  <span
-                                    className={`font-bold text-sm ${
-                                      rel.value >= 0
-                                        ? "text-green-400"
-                                        : "text-red-400"
-                                    }`}
-                                  >
-                                    {rel.value > 0 ? "+" : ""}
-                                    {rel.value}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-blue-300/70 mt-1 line-clamp-2">
-                                  {rel.description}
-                                </p>
-                                {/* Relationship slider bar */}
-                                <div className="mt-3">
-                                  <div className="relative h-1.5 bg-linear-to-r from-red-500 via-blue-500 to-green-500 rounded-full">
-                                    <div
-                                      className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-white rounded-full border-2 border-blue-400 shadow-md"
-                                      style={{
-                                        left: `calc(${sliderPosition}% - 6px)`,
-                                      }}
-                                    />
-                                  </div>
-                                  <div className="flex justify-between mt-1">
-                                    <span className="text-xs text-red-400/60">
-                                      Hostile
-                                    </span>
-                                    <span className="text-xs text-blue-400/60">
-                                      Neutral
-                                    </span>
-                                    <span className="text-xs text-green-400/60">
-                                      Allied
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      }}
-                    />
-
                     {/* Presets */}
                     <ExpandableContentCard
                       section="presets"
@@ -5184,52 +4848,6 @@ ${result.description || ""}`;
                                 {preset.description}
                               </div>
                             )}
-                          </div>
-                        );
-                      }}
-                    />
-
-                    {/* Inventory */}
-                    <ExpandableContentCard
-                      section="inventory"
-                      label="Inventory"
-                      count={result.storyTemplate.inventory?.length || 0}
-                      color="orange"
-                      items={result.storyTemplate.inventory || []}
-                      isExpanded={expandedSections.has("inventory")}
-                      onToggleExpand={() => toggleSectionExpanded("inventory")}
-                      onRegenerate={() =>
-                        handleRegenerateSection(
-                          "inventory",
-                          extensionInstructions
-                        )
-                      }
-                      onExtend={() =>
-                        handleExtendSection(
-                          "inventory",
-                          extensionOutputSize,
-                          extensionInstructions
-                        )
-                      }
-                      isRegenerating={regeneratingSections.has("inventory")}
-                      isExtending={extendingSections.has("inventory")}
-                      renderItem={(item) => {
-                        const inv = item as InventoryItem;
-                        return (
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">{inv.symbol}</span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-orange-300 truncate">
-                                {inv.name}
-                              </div>
-                              <div className="text-xs text-blue-300/60 truncate">
-                                {inv.description}
-                              </div>
-                            </div>
-                            <span className="text-orange-400 text-xs px-1.5 py-0.5 bg-orange-900/50 rounded">
-                              {inv.type}{" "}
-                              {inv.quantity > 1 ? `×${inv.quantity}` : ""}
-                            </span>
                           </div>
                         );
                       }}

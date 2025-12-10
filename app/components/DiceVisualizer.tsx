@@ -26,6 +26,12 @@ interface DiceVisualizerProps {
   // Condition penalty
   conditionPenalty?: number; // Negative modifier from conditions
   conditionName?: string; // Name of the condition causing the penalty
+  // ==== NEW: Formula-based rolls (generic mode) ====
+  // When formula is provided, uses a simplified generic display
+  // that works with any dice notation (1d20+5, 2d6, etc.)
+  formula?: string; // The formula used (e.g., "1d20+{{STR}}")
+  resolvedFormula?: string; // Formula with variables resolved (e.g., "1d20+5")
+  // ==== LEGACY: RPG system type (backward compatibility) ====
   rpgSystem?:
     | "3d6"
     | "1d20"
@@ -66,6 +72,8 @@ export function DiceVisualizer({
   conditionName,
   onComplete,
   diceRolls,
+  formula,
+  resolvedFormula,
   rpgSystem = "3d6",
   baseDice,
   stressDice,
@@ -77,28 +85,52 @@ export function DiceVisualizer({
   explosions,
   dieSize,
 }: DiceVisualizerProps) {
+  // ==== GENERIC MODE (formula-based) ====
+  // When formula is provided, use a simpler visualization that works with any dice
+  const isGenericMode = !!formula;
+
   // Determine dice system configuration
-  const is3d6 = rpgSystem === "3d6";
-  const is1d20 = rpgSystem === "1d20";
-  const is1d100 = rpgSystem === "1d100";
-  const isPercentile = rpgSystem === "percentile";
-  const isPbtA = rpgSystem === "pbta";
-  const isFate = rpgSystem === "fate";
-  const isYZE = rpgSystem === "yze";
-  const isExplosive = rpgSystem === "explosive";
-  const diceCount = is3d6 ? 3 : isPbtA ? 2 : isFate ? 4 : 1;
-  const diceSides =
-    is3d6 || isPbtA
-      ? 6
-      : is1d20
-      ? 20
-      : isFate
-      ? 3
-      : isExplosive
-      ? dieSize || 20
-      : 100;
-  const minRoll = is3d6 ? 3 : isPbtA ? 2 : isFate ? -4 : 1;
-  const maxRoll = is3d6
+  const is3d6 = !isGenericMode && rpgSystem === "3d6";
+  const is1d20 = !isGenericMode && rpgSystem === "1d20";
+  const is1d100 = !isGenericMode && rpgSystem === "1d100";
+  const isPercentile = !isGenericMode && rpgSystem === "percentile";
+  const isPbtA = !isGenericMode && rpgSystem === "pbta";
+  const isFate = !isGenericMode && rpgSystem === "fate";
+  const isYZE = !isGenericMode && rpgSystem === "yze";
+  const isExplosive = !isGenericMode && rpgSystem === "explosive";
+
+  // For generic mode, infer dice count and sides from the rolls array
+  const genericDiceCount = isGenericMode
+    ? diceRolls?.[0]?.length || rolls.length || 1
+    : 0;
+  const genericDiceSides = isGenericMode
+    ? Math.max(...(diceRolls?.[0] || rolls || [20]), 20)
+    : 0;
+
+  const diceCount = isGenericMode
+    ? genericDiceCount
+    : is3d6
+    ? 3
+    : isPbtA
+    ? 2
+    : isFate
+    ? 4
+    : 1;
+  const diceSides = isGenericMode
+    ? genericDiceSides
+    : is3d6 || isPbtA
+    ? 6
+    : is1d20
+    ? 20
+    : isFate
+    ? 3
+    : isExplosive
+    ? dieSize || 20
+    : 100;
+  const minRoll = isGenericMode ? 1 : is3d6 ? 3 : isPbtA ? 2 : isFate ? -4 : 1;
+  const maxRoll = isGenericMode
+    ? Math.max(finalRoll, genericDiceSides * genericDiceCount)
+    : is3d6
     ? 18
     : isPbtA
     ? 12
@@ -112,6 +144,9 @@ export function DiceVisualizer({
 
   const [currentNumber, setCurrentNumber] = useState(minRoll);
   const [currentDice, setCurrentDice] = useState<number[]>(() => {
+    if (isGenericMode) {
+      return Array(genericDiceCount).fill(1);
+    }
     if (isYZE) {
       const totalDice = (baseDice?.length || 0) + (stressDice?.length || 0);
       return Array(totalDice).fill(1);
@@ -163,7 +198,17 @@ export function DiceVisualizer({
     let elapsed = 0;
     intervalRef.current = window.setInterval(() => {
       elapsed += DURATIONS.numberInterval;
-      if (isYZE) {
+      if (isGenericMode) {
+        // Generic mode: animate dice based on what we have
+        const count = genericDiceCount || 1;
+        const sides = genericDiceSides || 20;
+        const randomDice: number[] = [];
+        for (let i = 0; i < count; i++) {
+          randomDice.push(Math.floor(Math.random() * sides) + 1);
+        }
+        setCurrentDice(randomDice);
+        setCurrentNumber(randomDice.reduce((a, b) => a + b, 0));
+      } else if (isYZE) {
         // Animate YZE dice pool (base + stress dice)
         const baseCount = baseDice?.length || 0;
         const stressCount = stressDice?.length || 0;
@@ -213,7 +258,17 @@ export function DiceVisualizer({
         if (intervalRef.current) clearInterval(intervalRef.current);
         intervalRef.current = null;
 
-        if (isYZE) {
+        if (isGenericMode) {
+          // Generic mode: Set final values
+          setCurrentNumber(finalRoll);
+          if (diceRolls && diceRolls[0]) {
+            setCurrentDice(diceRolls[0]);
+          } else if (rolls.length > 0) {
+            setCurrentDice(rolls);
+          } else {
+            setCurrentDice([finalRoll]);
+          }
+        } else if (isYZE) {
           // YZE: Set final dice (base + stress combined)
           const finalDice = [...(baseDice || []), ...(stressDice || [])];
           setCurrentDice(finalDice);
@@ -265,11 +320,14 @@ export function DiceVisualizer({
     isFate,
     isYZE,
     isExplosive,
+    isGenericMode,
+    genericDiceCount,
+    genericDiceSides,
     baseDice,
     stressDice,
     diceSides,
     diceRolls,
-    rolls.length,
+    rolls,
   ]);
 
   const skipAnimation = useCallback(() => {
@@ -277,7 +335,17 @@ export function DiceVisualizer({
     skippedRef.current = true;
     clearAllTimers();
 
-    if (isYZE) {
+    if (isGenericMode) {
+      // Generic mode: Set final values
+      setCurrentNumber(finalRoll);
+      if (diceRolls && diceRolls[0]) {
+        setCurrentDice(diceRolls[0]);
+      } else if (rolls.length > 0) {
+        setCurrentDice(rolls);
+      } else {
+        setCurrentDice([finalRoll]);
+      }
+    } else if (isYZE) {
       // YZE: Set final dice (base + stress combined)
       const finalDice = [...(baseDice || []), ...(stressDice || [])];
       setCurrentDice(finalDice);
@@ -317,10 +385,11 @@ export function DiceVisualizer({
     isFate,
     isYZE,
     isExplosive,
+    isGenericMode,
     baseDice,
     stressDice,
     diceRolls,
-    rolls.length,
+    rolls,
   ]);
 
   useEffect(() => {

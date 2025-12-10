@@ -54,10 +54,11 @@ function getMinimalFallbackJSON(stage: GenerationStage): string {
       });
     case "mechanics":
       return JSON.stringify({
-        stats: [],
-        resources: [],
+        characterSchema: null,
+        characterData: null,
         abilities: [],
         variables: [],
+        lore: [], // mechanics lore
       });
     case "content-lore":
       return JSON.stringify({
@@ -67,11 +68,6 @@ function getMinimalFallbackJSON(stage: GenerationStage): string {
       return JSON.stringify({
         achievements: [],
         quests: [],
-      });
-    case "content-items":
-      return JSON.stringify({
-        inventory: [],
-        relationships: [],
       });
     case "advanced-presets":
       return JSON.stringify({

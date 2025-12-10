@@ -1071,7 +1071,7 @@ export default function AdventureDetailPage() {
                   : "bg-blue-900/30 hover:bg-blue-800/30"
               }`}
             >
-              📚 Lore ({adventure.storyTemplate?.lore?.length || 0})
+              📚 Notes ({adventure.storyTemplate?.lore?.length || 0})
             </button>
           </div>
 
@@ -1091,7 +1091,7 @@ export default function AdventureDetailPage() {
                     onChange={(e) => setShowSecretLore(e.target.checked)}
                     className="rounded border-blue-700 bg-blue-900/50 text-purple-500"
                   />
-                  Show Secret Lore
+                  Show Secret Notes
                 </label>
               </div>
 

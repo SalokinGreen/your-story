@@ -52,7 +52,11 @@ import {
   getAbilityBonus,
 } from "../misc/abilitySystem";
 import { getRPGSystem, type RPGSystemType } from "../misc/rpgSystems";
-import { getCumulativeXPForLevel, calculateLevel } from "../misc/leveling";
+import CharacterSheet from "../components/CharacterSheet";
+import {
+  recalculateDerivedFields,
+  CharacterData,
+} from "../misc/characterSchema";
 
 // Basic Settings Component
 interface BasicSettingsForm {
@@ -62,8 +66,6 @@ interface BasicSettingsForm {
   premise: string;
   max_chapters: number;
   points: number;
-  level: number;
-  upgradesSpent: number;
   momentum: number;
   maxMomentum: number;
   rpgSystem:
@@ -145,31 +147,11 @@ function BasicSettings({
         />
       </div>
 
-      {/* Level & XP Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* Points Section */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-sm font-semibold text-blue-200 mb-2">
-            Level
-          </label>
-          <input
-            type="number"
-            min={1}
-            value={form.level}
-            onChange={(e) =>
-              onChange({
-                ...form,
-                level: Math.max(1, parseInt(e.target.value) || 1),
-              })
-            }
-            className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-          />
-          <p className="text-xs text-blue-200/60 mt-1">
-            Changing level auto-adjusts XP
-          </p>
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-blue-200 mb-2">
-            XP (Points)
+            Points
           </label>
           <input
             type="number"
@@ -180,23 +162,9 @@ function BasicSettings({
             }
             className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
-        </div>
-        <div>
-          <label className="block text-sm font-semibold text-blue-200 mb-2">
-            Upgrades Spent
-          </label>
-          <input
-            type="number"
-            min={0}
-            value={form.upgradesSpent}
-            onChange={(e) =>
-              onChange({
-                ...form,
-                upgradesSpent: parseInt(e.target.value) || 0,
-              })
-            }
-            className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-          />
+          <p className="text-xs text-blue-200/60 mt-1">
+            Earned from achievements, quests, and challenges
+          </p>
         </div>
       </div>
 
@@ -2809,7 +2777,7 @@ function LoreEditor({
                   onChange={(e) =>
                     setEditLore({ ...editLore, title: e.target.value })
                   }
-                  placeholder="Lore title"
+                  placeholder="Note title"
                   className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white font-semibold"
                 />
                 <textarea
@@ -2817,7 +2785,7 @@ function LoreEditor({
                   onChange={(e) =>
                     setEditLore({ ...editLore, content: e.target.value })
                   }
-                  placeholder="Lore content (supports Markdown)"
+                  placeholder="Note content (supports Markdown)"
                   className="w-full h-32 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
                 />
                 <LoreImageGenerator
@@ -3407,7 +3375,7 @@ function LoreEditor({
                           : "bg-gray-400 text-white hover:bg-gray-500"
                       }`}
                       title={
-                        loreItem.on ? "Lore is enabled" : "Lore is disabled"
+                        loreItem.on ? "Note is enabled" : "Note is disabled"
                       }
                     >
                       {loreItem.on ? "ON" : "OFF"}
@@ -4952,8 +4920,6 @@ export default function MenuPage({
     premise: storyData.premise,
     max_chapters: storyData.max_chapters,
     points: storyData.points,
-    level: calculateLevel(storyData.points, storyData.levelingSettings),
-    upgradesSpent: storyData.upgradesSpent || 0,
     momentum: storyData.momentum,
     maxMomentum: storyData.maxMomentum,
     rpgSystem: storyData.rpgSystem || "3d6",
@@ -4965,8 +4931,14 @@ export default function MenuPage({
   const [editingInventory, setEditingInventory] = useState(false);
   const [editingAchievements, setEditingAchievements] = useState(false);
   const [editingLore, setEditingLore] = useState(false);
+  // Check if using character schema mode
+  const hasCharacterSchema = !!(
+    storyData.characterSchema && storyData.characterData
+  );
+
   const [activeTab, setActiveTab] = useState<
     | "basic"
+    | "character" // New: for character schema editing
     | "stats"
     | "inventory"
     | "abilities"
@@ -5107,29 +5079,13 @@ export default function MenuPage({
 
   const handleSaveSettings = async () => {
     try {
-      // Calculate XP from level if level changed
-      const currentLevel = calculateLevel(
-        storyData.points,
-        storyData.levelingSettings
-      );
-      let newPoints = settingsForm.points;
-
-      // If level changed, calculate the XP needed for that level
-      if (settingsForm.level !== currentLevel) {
-        newPoints = getCumulativeXPForLevel(
-          settingsForm.level,
-          storyData.levelingSettings
-        );
-      }
-
       onUpdateStoryData({
         story_name: settingsForm.story_name,
         player_name: settingsForm.player_name,
         player_summary: settingsForm.player_summary,
         premise: settingsForm.premise,
         max_chapters: settingsForm.max_chapters,
-        points: newPoints,
-        upgradesSpent: settingsForm.upgradesSpent,
+        points: settingsForm.points,
         momentum: settingsForm.momentum,
         maxMomentum: settingsForm.maxMomentum,
         rpgSystem: settingsForm.rpgSystem,
@@ -5701,7 +5657,7 @@ export default function MenuPage({
             </span>
           </div>
           <div className="flex justify-between py-2">
-            <span className="text-blue-200/60">Lore Entries:</span>
+            <span className="text-blue-200/60">Notes:</span>
             <span className="font-semibold text-white">
               {storyData.lore.length}
             </span>
@@ -5750,12 +5706,21 @@ export default function MenuPage({
             >
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
-                { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
+                // Show "Character" tab when using schema mode, otherwise "Stats & Resources"
+                ...(hasCharacterSchema
+                  ? [{ id: "character", label: "Character", icon: "User" }]
+                  : [
+                      {
+                        id: "stats",
+                        label: "Stats & Resources",
+                        icon: "BarChart2",
+                      },
+                    ]),
                 { id: "inventory", label: "Inventory", icon: "Backpack" },
                 { id: "abilities", label: "Abilities", icon: "Wand2" },
                 { id: "passives", label: "Passives", icon: "Sparkles" },
                 { id: "quests", label: "Quests", icon: "Scroll" },
-                { id: "lore", label: "Lore", icon: "Book" },
+                { id: "lore", label: "Notes", icon: "Book" },
                 { id: "variables", label: "Variables", icon: "Variable" },
                 { id: "tables", label: "Tables", icon: "Dices" },
                 { id: "relationships", label: "Relationships", icon: "Users" },
@@ -5792,6 +5757,38 @@ export default function MenuPage({
                   <BasicSettings
                     form={settingsForm}
                     onChange={setSettingsForm}
+                  />
+                </div>
+              )}
+
+              {/* Character Tab (Schema Mode) */}
+              {activeTab === "character" && hasCharacterSchema && (
+                <div className="mt-4">
+                  <div className="mb-4 p-3 bg-blue-900/30 rounded-lg border border-blue-700/40">
+                    <div className="flex items-center gap-2 text-blue-200 text-sm">
+                      <DynamicIcon name="Info" className="w-4 h-4" />
+                      <span>
+                        Edit your character sheet values. Derived fields are
+                        calculated automatically.
+                      </span>
+                    </div>
+                  </div>
+                  <CharacterSheet
+                    schema={storyData.characterSchema!}
+                    data={storyData.characterData!}
+                    onChange={(newData: CharacterData) => {
+                      // Recalculate derived fields before saving
+                      const updatedValues = { ...newData.values };
+                      recalculateDerivedFields(
+                        storyData.characterSchema!,
+                        updatedValues
+                      );
+                      onUpdateStoryData({
+                        characterData: { values: updatedValues },
+                      });
+                    }}
+                    readOnly={false}
+                    compact={false}
                   />
                 </div>
               )}
@@ -6199,11 +6196,6 @@ export default function MenuPage({
                     premise: storyData.premise,
                     max_chapters: storyData.max_chapters,
                     points: storyData.points,
-                    level: calculateLevel(
-                      storyData.points,
-                      storyData.levelingSettings
-                    ),
-                    upgradesSpent: storyData.upgradesSpent || 0,
                     momentum: storyData.momentum,
                     maxMomentum: storyData.maxMomentum,
                     rpgSystem: storyData.rpgSystem || "3d6",

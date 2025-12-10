@@ -265,43 +265,6 @@ describe("Explosive Dice System", () => {
     });
   });
 
-  describe("Upgrade system", () => {
-    it("should have correct upgrade amounts", () => {
-      expect(SYSTEM_EXPLOSIVE.upgrades.statUpgradeAmount).toBe(8);
-      expect(SYSTEM_EXPLOSIVE.upgrades.resourceUpgradeAmount).toBe(5);
-      expect(SYSTEM_EXPLOSIVE.upgrades.shopStatStartingValue).toBe(25); // d6
-    });
-
-    it("should upgrade stat through die size brackets", () => {
-      const { statToDieSize } = SYSTEM_EXPLOSIVE;
-      const upgradeAmount = SYSTEM_EXPLOSIVE.upgrades.statUpgradeAmount;
-
-      // Start at 25 (d6)
-      let stat = 25;
-      expect(statToDieSize!(stat)).toBe(6);
-
-      // After 1 upgrade: 25 + 8 = 33 (still d6)
-      stat += upgradeAmount;
-      expect(statToDieSize!(stat)).toBe(6);
-
-      // After 2 upgrades: 33 + 8 = 41 (d8)
-      stat += upgradeAmount;
-      expect(statToDieSize!(stat)).toBe(8);
-
-      // After 4 upgrades: 41 + 16 = 57 (d10)
-      stat += upgradeAmount * 2;
-      expect(statToDieSize!(stat)).toBe(10);
-
-      // After 6 upgrades: 57 + 16 = 73 (d12)
-      stat += upgradeAmount * 2;
-      expect(statToDieSize!(stat)).toBe(12);
-
-      // After 8 upgrades: 73 + 16 = 89 (d20)
-      stat += upgradeAmount * 2;
-      expect(statToDieSize!(stat)).toBe(20);
-    });
-  });
-
   describe("Edge cases", () => {
     it("should handle stat value of 0", () => {
       const { statToDieSize } = SYSTEM_EXPLOSIVE;

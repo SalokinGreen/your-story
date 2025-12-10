@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
-import { getSystemUpgradeDefaults } from "@/app/misc/rpgSystems";
+
 import {
   StoryData,
   Stat,
@@ -83,28 +83,30 @@ import { getAuthToken } from "@/app/misc/getAuthToken";
 import SkillTreeEditor from "@/app/components/SkillTreeEditor";
 import { createEmptyTree } from "@/app/misc/skillTree";
 import { DEFAULT_LEVELING_SETTINGS } from "@/app/misc/leveling";
+import CharacterSchemaEditor from "@/app/components/CharacterSchemaEditor";
+import CharacterSheet from "@/app/components/CharacterSheet";
+import {
+  CharacterSchema,
+  CharacterData,
+  createDefaultCharacterData,
+  PRESET_SCHEMAS,
+} from "@/app/misc/characterSchema";
 
 type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 type DeepInfraImageModelKey = keyof typeof DEEPINFRA_IMAGE_MODELS;
 type CreatorStep =
   | "basic"
   | "preset"
+  | "character-schema"
+  | "character-values"
   | "premise"
   | "starting-choices"
-  | "stats"
-  | "resources"
-  | "inventory"
-  | "abilities"
-  | "passives"
   | "lore"
-  | "relationships"
-  | "conditions"
   | "achievements"
   | "quests"
   | "mythic"
   | "variables"
   | "tables"
-  | "upgrades"
   | "preview";
 
 // Safe grade config getters with fallbacks
@@ -884,32 +886,10 @@ function AdventureCreatorContent() {
   const [difficulty, setDifficulty] = useState<
     "easy" | "medium" | "hard" | "expert"
   >("medium");
-  const [rpgSystem, setRpgSystem] = useState<
-    | "3d6"
-    | "1d20"
-    | "1d100"
-    | "percentile"
-    | "pbta"
-    | "fate"
-    | "yze"
-    | "explosive"
-    | "narrative"
-  >("3d6");
   const [visibility, setVisibility] = useState<"public" | "hidden" | "private">(
     "private"
   );
-
-  // Update upgrade values when RPG system changes
-  useEffect(() => {
-    const systemDefaults = getSystemUpgradeDefaults(rpgSystem);
-    setUpgradeSettings((prev) => ({
-      ...prev,
-      statUpgradeAmount: systemDefaults.statUpgradeAmount,
-      resourceUpgradeAmount: systemDefaults.resourceUpgradeAmount,
-    }));
-  }, [rpgSystem]);
   const [nsfw, setNsfw] = useState(false);
-  const [showAllSystems, setShowAllSystems] = useState(false);
   const [showAdvancedBasic, setShowAdvancedBasic] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState("");
@@ -1620,7 +1600,6 @@ function AdventureCreatorContent() {
         setShortDescription(adventure.shortDescription || "");
         setDescription(adventure.description || "");
         setDifficulty(adventure.difficulty || "medium");
-        setRpgSystem(adventure.storyTemplate?.rpgSystem || "3d6");
         setVisibility(adventure.visibility || "private");
         setNsfw(adventure.nsfw || false);
         setTags(adventure.tags || []);
@@ -1662,6 +1641,17 @@ function AdventureCreatorContent() {
         });
         setLevelingSettings(cloneLevelingSettings(template.levelingSettings));
         setSkillTrees(template.skillTrees || []);
+
+        // Load character schema if present
+        if (template.characterSchema) {
+          setCharacterSchema(template.characterSchema);
+          setCharacterData(
+            createDefaultCharacterData(template.characterSchema)
+          );
+        } else {
+          setCharacterSchema(null);
+          setCharacterData(null);
+        }
 
         // Load points and momentum
         setPoints(template.points || 0);
@@ -1779,7 +1769,6 @@ function AdventureCreatorContent() {
     if (saved.shortDescription) setShortDescription(saved.shortDescription);
     if (saved.description) setDescription(saved.description);
     if (saved.difficulty) setDifficulty(saved.difficulty);
-    if (saved.rpgSystem) setRpgSystem(saved.rpgSystem);
     if (saved.visibility) setVisibility(saved.visibility);
     if (saved.nsfw !== undefined) setNsfw(saved.nsfw);
     if (Array.isArray(saved.tags)) setTags(saved.tags);
@@ -1893,7 +1882,6 @@ function AdventureCreatorContent() {
         setShortDescription(adventure.shortDescription || "");
         setDescription(adventure.description || "");
         setDifficulty(adventure.difficulty || "medium");
-        setRpgSystem(adventure.storyTemplate?.rpgSystem || "3d6");
         setVisibility("private"); // Always private for copies
         setNsfw(adventure.nsfw || false);
         setTags(adventure.tags || []);
@@ -1935,6 +1923,17 @@ function AdventureCreatorContent() {
             ...(template.upgradeSettings || {}),
           });
           setSkillTrees(template.skillTrees || []);
+
+          // Load character schema if present
+          if (template.characterSchema) {
+            setCharacterSchema(template.characterSchema);
+            setCharacterData(
+              createDefaultCharacterData(template.characterSchema)
+            );
+          } else {
+            setCharacterSchema(null);
+            setCharacterData(null);
+          }
 
           // Load points and momentum
           setPoints(template.points || 0);
@@ -2058,6 +2057,13 @@ function AdventureCreatorContent() {
     { name: string; description: string; nodeId: string }[]
   >([]);
   const [newPassive, setNewPassive] = useState({ name: "", description: "" });
+
+  // Character Schema (defines character structure)
+  const [characterSchema, setCharacterSchema] =
+    useState<CharacterSchema | null>(null);
+  const [characterData, setCharacterData] = useState<CharacterData | null>(
+    null
+  );
   const [editingPassiveIndex, setEditingPassiveIndex] = useState<number | null>(
     null
   );
@@ -2079,6 +2085,7 @@ function AdventureCreatorContent() {
     untrigger_lores: [],
     tags: [],
     folder: "",
+    type: undefined, // "lore" (default) or "mechanics" (rules)
   });
   const [newLoreOnTrigger, setNewLoreOnTrigger] = useState("");
   const [newLoreOffTrigger, setNewLoreOffTrigger] = useState("");
@@ -2262,22 +2269,20 @@ function AdventureCreatorContent() {
   const steps: { id: CreatorStep; label: string; icon: string }[] = [
     { id: "basic", label: "Basic Info", icon: "FileText" },
     { id: "preset", label: "Character Preset", icon: "User" },
+    {
+      id: "character-schema",
+      label: "Character Schema",
+      icon: "FileSpreadsheet",
+    },
+    { id: "character-values", label: "Starting Values", icon: "Sliders" },
     { id: "premise", label: "Story Setup", icon: "BookOpen" },
     { id: "starting-choices", label: "Starting Choices", icon: "Play" },
-    { id: "stats", label: "Stats", icon: "BarChart2" },
-    { id: "resources", label: "Resources", icon: "Gem" },
-    { id: "inventory", label: "Starting Items", icon: "Backpack" },
-    { id: "abilities", label: "Starting Abilities", icon: "Wand2" },
-    { id: "passives", label: "Passive Effects", icon: "Sparkles" },
-    { id: "lore", label: "Lore", icon: "Scroll" },
-    { id: "relationships", label: "Relationships", icon: "Users" },
-    { id: "conditions", label: "Conditions", icon: "HeartPulse" },
+    { id: "lore", label: "Notes", icon: "Scroll" },
     { id: "achievements", label: "Achievements", icon: "Trophy" },
     { id: "quests", label: "Quests", icon: "ClipboardList" },
     { id: "variables", label: "Variables", icon: "Variable" },
     { id: "tables", label: "Custom Tables", icon: "Dices" },
     { id: "mythic", label: "Advanced RPG Tools", icon: "Sparkles" },
-    { id: "upgrades", label: "Upgrade Settings", icon: "ArrowUpCircle" },
     { id: "preview", label: "Preview", icon: "Eye" },
   ];
 
@@ -2348,6 +2353,13 @@ function AdventureCreatorContent() {
       if (saved.agmtState) setAGMTState(saved.agmtState);
       if (Array.isArray(saved.startingChoices))
         setStartingChoices(saved.startingChoices);
+      if (saved.characterSchema) {
+        setCharacterSchema(saved.characterSchema);
+        setCharacterData(
+          saved.characterData ||
+            createDefaultCharacterData(saved.characterSchema)
+        );
+      }
 
       if (
         typeof saved.currentStep === "string" &&
@@ -2389,7 +2401,6 @@ function AdventureCreatorContent() {
       shortDescription,
       description,
       difficulty,
-      rpgSystem,
       visibility,
       nsfw,
       tags,
@@ -2424,6 +2435,8 @@ function AdventureCreatorContent() {
       agmtEnabled,
       agmtState,
       startingChoices,
+      characterSchema,
+      characterData,
       currentStep,
       updatedAt: Date.now(),
     };
@@ -2476,6 +2489,8 @@ function AdventureCreatorContent() {
     upgradeSettings,
     skillTrees,
     startingChoices,
+    characterSchema,
+    characterData,
     currentStep,
   ]);
 
@@ -3466,7 +3481,6 @@ ${description || ""}`;
       presets: presets,
       upgradeSettings: upgradeSettings,
       levelingSettings,
-      rpgSystem: rpgSystem,
       agmtState: agmtEnabled ? agmtState : undefined,
       skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
       nodeEffects:
@@ -3476,6 +3490,14 @@ ${description || ""}`;
               resourceBonuses: [],
               passives: passives,
             }
+          : undefined,
+      // Character schema - defines the character sheet structure and starting values
+      characterSchema: characterSchema || undefined,
+      characterData:
+        characterSchema && characterData
+          ? characterData
+          : characterSchema
+          ? createDefaultCharacterData(characterSchema)
           : undefined,
     };
 
@@ -3542,7 +3564,6 @@ ${description || ""}`;
       setShortDescription("");
       setDescription("");
       setDifficulty("medium");
-      setRpgSystem("3d6");
       setVisibility("private");
       setNsfw(false);
       setTags([]);
@@ -3641,7 +3662,6 @@ ${description || ""}`;
         presets: presets,
         upgradeSettings: upgradeSettings,
         levelingSettings,
-        rpgSystem: rpgSystem,
         agmtState: agmtEnabled ? agmtState : undefined,
         skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
         nodeEffects:
@@ -3651,6 +3671,14 @@ ${description || ""}`;
                 resourceBonuses: [],
                 passives: passives,
               }
+            : undefined,
+        // Character schema - defines the character sheet structure and starting values
+        characterSchema: characterSchema || undefined,
+        characterData:
+          characterSchema && characterData
+            ? characterData
+            : characterSchema
+            ? createDefaultCharacterData(characterSchema)
             : undefined,
       };
 
@@ -3792,7 +3820,6 @@ ${description || ""}`;
       presets: presets,
       upgradeSettings: upgradeSettings,
       levelingSettings,
-      rpgSystem: rpgSystem,
       agmtState: agmtEnabled ? agmtState : undefined,
       skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
       nodeEffects:
@@ -3802,6 +3829,14 @@ ${description || ""}`;
               resourceBonuses: [],
               passives: passives,
             }
+          : undefined,
+      // Character schema - defines the character sheet structure and starting values
+      characterSchema: characterSchema || undefined,
+      characterData:
+        characterSchema && characterData
+          ? characterData
+          : characterSchema
+          ? createDefaultCharacterData(characterSchema)
           : undefined,
     };
 
@@ -4021,171 +4056,6 @@ ${description || ""}`;
                   </button>
                 ))}
               </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-blue-200 mb-2">
-                RPG Dice System
-              </label>
-              <p className="text-xs text-blue-300/60 mb-3">
-                Choose how dice rolls determine success in your adventure.
-              </p>
-
-              {/* Recommended Systems */}
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <button
-                  onClick={() => setRpgSystem("pbta")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                    rpgSystem === "pbta"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon name="Zap" className="w-5 h-5 inline mr-2" />
-                  PbtA (Recommended)
-                  <div className="text-xs opacity-75 mt-1">
-                    2d6+mod: 10+ success, 7-9 partial
-                  </div>
-                </button>
-                <button
-                  onClick={() => setRpgSystem("fate")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                    rpgSystem === "fate"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon name="Scale" className="w-5 h-5 inline mr-2" />
-                  Fate Core (4dF)
-                  <div className="text-xs opacity-75 mt-1">
-                    Fudge dice, fail/tie/succeed/style
-                  </div>
-                </button>
-                <button
-                  onClick={() => setRpgSystem("percentile")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                    rpgSystem === "percentile"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon
-                    name="TrendingDown"
-                    className="w-5 h-5 inline mr-2"
-                  />
-                  Classic Percentile
-                  <div className="text-xs opacity-75 mt-1">
-                    Roll under stat to win
-                  </div>
-                </button>
-                <button
-                  onClick={() => setRpgSystem("1d20")}
-                  className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                    rpgSystem === "1d20"
-                      ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                      : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
-                  1d20 (D&D Style)
-                  <div className="text-xs opacity-75 mt-1">
-                    Roll 1-20, swingy results
-                  </div>
-                </button>
-              </div>
-
-              {/* Show More Systems Toggle */}
-              <button
-                onClick={() => setShowAllSystems(!showAllSystems)}
-                className="w-full py-2 text-sm text-blue-300 hover:text-purple-300 transition-colors flex items-center justify-center gap-2"
-              >
-                <DynamicIcon
-                  name={showAllSystems ? "ChevronUp" : "ChevronDown"}
-                  className="w-4 h-4"
-                />
-                {showAllSystems
-                  ? "Hide advanced systems"
-                  : "Show more systems (5 more)"}
-              </button>
-
-              {/* Advanced Systems (Collapsible) */}
-              {showAllSystems && (
-                <div className="grid grid-cols-2 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200">
-                  <button
-                    onClick={() => setRpgSystem("3d6")}
-                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                      rpgSystem === "3d6"
-                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                    }`}
-                  >
-                    <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
-                    3d6
-                    <div className="text-xs opacity-75 mt-1">
-                      Roll 3-18, predictable bell curve
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setRpgSystem("1d100")}
-                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all ${
-                      rpgSystem === "1d100"
-                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                    }`}
-                  >
-                    <DynamicIcon name="Dices" className="w-5 h-5 inline mr-2" />
-                    1d100
-                    <div className="text-xs opacity-75 mt-1">
-                      Roll 1-100, very granular
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setRpgSystem("narrative")}
-                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                      rpgSystem === "narrative"
-                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                    }`}
-                  >
-                    <DynamicIcon
-                      name="BookHeart"
-                      className="w-5 h-5 inline mr-2"
-                    />
-                    Narrative (No Dice)
-                    <div className="text-xs opacity-75 mt-1">
-                      Pure storytelling, outcomes from dramatic logic
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setRpgSystem("yze")}
-                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                      rpgSystem === "yze"
-                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                    }`}
-                  >
-                    <DynamicIcon name="Skull" className="w-5 h-5 inline mr-2" />
-                    Year Zero Engine (YZE)
-                    <div className="text-xs opacity-75 mt-1">
-                      d6 pool, count 6s, stress + panic
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => setRpgSystem("explosive")}
-                    className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all col-span-2 ${
-                      rpgSystem === "explosive"
-                        ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
-                    }`}
-                  >
-                    <DynamicIcon name="Flame" className="w-5 h-5 inline mr-2" />
-                    Exploding Dice
-                    <div className="text-xs opacity-75 mt-1">
-                      Stat = die size, max rolls explode!
-                    </div>
-                  </button>
-                </div>
-              )}
             </div>
 
             <div>
@@ -6095,1842 +5965,6 @@ ${description || ""}`;
           </div>
         );
 
-      case "stats":
-        return (
-          <div className="space-y-6">
-            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="Lightbulb"
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                />
-                <span>
-                  <strong>Tip:</strong> Stats represent character attributes
-                  that can be tested during skill checks (like Strength,
-                  Intelligence, etc.). They range from 0-100.
-                </span>
-              </p>
-            </div>
-
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add New Stat
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={newStat.name}
-                    onChange={(e) =>
-                      setNewStat({ ...newStat, name: e.target.value })
-                    }
-                    placeholder="e.g., Strength"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Icon
-                  </label>
-                  <IconPicker
-                    value={newStat.symbol || "Star"}
-                    onChange={(icon) =>
-                      setNewStat({ ...newStat, symbol: icon })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Starting Value (0-100)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={newStat.value}
-                    onChange={(e) =>
-                      setNewStat({
-                        ...newStat,
-                        value: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Description *
-                  </label>
-                  <input
-                    type="text"
-                    value={newStat.description}
-                    onChange={(e) =>
-                      setNewStat({ ...newStat, description: e.target.value })
-                    }
-                    placeholder="e.g., Physical power and combat prowess"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={addStat}
-                disabled={!newStat.name || !newStat.description}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-              >
-                Add Stat
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-white">
-                Stats ({stats.length})
-              </h3>
-              {stats.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">No stats added yet</p>
-              ) : (
-                stats.map((stat, index) =>
-                  editingStatIndex === index ? (
-                    // Edit mode
-                    <div
-                      key={index}
-                      className="p-4 bg-blue-900/40 rounded-lg border-2 border-blue-600"
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Name *
-                          </label>
-                          <input
-                            type="text"
-                            value={editStat.name || ""}
-                            onChange={(e) =>
-                              setEditStat({ ...editStat, name: e.target.value })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Icon
-                          </label>
-                          <IconPicker
-                            value={editStat.symbol || "Star"}
-                            onChange={(icon) =>
-                              setEditStat({
-                                ...editStat,
-                                symbol: icon,
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Value (0-100)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="100"
-                            value={editStat.value || 0}
-                            onChange={(e) =>
-                              setEditStat({
-                                ...editStat,
-                                value: parseInt(e.target.value) || 0,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Description *
-                          </label>
-                          <input
-                            type="text"
-                            value={editStat.description || ""}
-                            onChange={(e) =>
-                              setEditStat({
-                                ...editStat,
-                                description: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveEditStat}
-                          disabled={!editStat.name || !editStat.description}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          <DynamicIcon
-                            name="Save"
-                            className="inline-block w-4 h-4 mr-1"
-                          />
-                          Save
-                        </button>
-                        <button
-                          onClick={cancelEditStat}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // View mode with drag-and-drop
-                    <div
-                      key={index}
-                      draggable
-                      onDragStart={() => handleStatDragStart(index)}
-                      onDragOver={(e) => handleStatDragOver(e, index)}
-                      onDragEnd={handleStatDragEnd}
-                      className="flex items-center gap-3 p-4 bg-blue-900/20 rounded-lg border border-blue-800/50 cursor-move hover:bg-blue-800/30 transition-colors"
-                      style={{ opacity: draggedStatIndex === index ? 0.5 : 1 }}
-                    >
-                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
-                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
-                      </div>
-                      <div className="text-2xl">
-                        <DynamicIcon name={stat.symbol} className="w-8 h-8" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-bold text-white">{stat.name}</div>
-                        <div className="text-sm text-blue-300/60">
-                          {stat.description}
-                        </div>
-                        <div className="text-sm text-blue-400 font-semibold">
-                          Value: {stat.value}
-                        </div>
-                      </div>
-                      {/* Button Area */}
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex flex-row items-center gap-1 ml-3">
-                          <button
-                            onClick={() => moveStatUp(index)}
-                            disabled={index === 0}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move up"
-                          >
-                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => moveStatDown(index)}
-                            disabled={index === stats.length - 1}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move down"
-                          >
-                            <DynamicIcon
-                              name="ChevronDown"
-                              className="w-4 h-4"
-                            />
-                          </button>
-                        </div>
-                        <div className="flex flex-row items-center gap-1 ml-3">
-                          <button
-                            onClick={() => startEditStat(index)}
-                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Edit2" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => removeStat(index)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Trash2" className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                )
-              )}
-            </div>
-          </div>
-        );
-
-      case "resources":
-        return (
-          <div className="space-y-6">
-            <div className="bg-green-900/20 border border-green-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="Lightbulb"
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                />
-                <span>
-                  <strong>Tip:</strong> Resources are consumable values like
-                  Health, Mana, or Stamina that can be spent or restored during
-                  the adventure.
-                </span>
-              </p>
-            </div>
-
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add New Resource
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={newResource.name}
-                    onChange={(e) =>
-                      setNewResource({ ...newResource, name: e.target.value })
-                    }
-                    placeholder="e.g., Health"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Icon
-                  </label>
-                  <IconPicker
-                    value={newResource.symbol || "Gem"}
-                    onChange={(icon) =>
-                      setNewResource({ ...newResource, symbol: icon })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Starting Value
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={newResource.value}
-                    onChange={(e) =>
-                      setNewResource({
-                        ...newResource,
-                        value: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Max Value
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={newResource.maxValue}
-                    onChange={(e) =>
-                      setNewResource({
-                        ...newResource,
-                        maxValue: parseInt(e.target.value) || 100,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Description *
-                  </label>
-                  <input
-                    type="text"
-                    value={newResource.description}
-                    onChange={(e) =>
-                      setNewResource({
-                        ...newResource,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., Your life force"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={addResource}
-                disabled={!newResource.name || !newResource.description}
-                className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-              >
-                Add Resource
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-white">
-                Resources ({resources.length})
-              </h3>
-              {resources.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">
-                  No resources added yet
-                </p>
-              ) : (
-                resources.map((resource, index) =>
-                  editingResourceIndex === index ? (
-                    // Edit mode
-                    <div
-                      key={index}
-                      className="p-4 bg-green-900/40 rounded-lg border-2 border-green-600"
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Name *
-                          </label>
-                          <input
-                            type="text"
-                            value={editResource.name || ""}
-                            onChange={(e) =>
-                              setEditResource({
-                                ...editResource,
-                                name: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Icon
-                          </label>
-                          <IconPicker
-                            value={editResource.symbol || "Gem"}
-                            onChange={(icon) =>
-                              setEditResource({
-                                ...editResource,
-                                symbol: icon,
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Starting Value
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            value={editResource.value || 0}
-                            onChange={(e) =>
-                              setEditResource({
-                                ...editResource,
-                                value: parseInt(e.target.value) || 0,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Max Value
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            value={editResource.maxValue || 1}
-                            onChange={(e) =>
-                              setEditResource({
-                                ...editResource,
-                                maxValue: parseInt(e.target.value) || 1,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Description *
-                          </label>
-                          <input
-                            type="text"
-                            value={editResource.description || ""}
-                            onChange={(e) =>
-                              setEditResource({
-                                ...editResource,
-                                description: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveEditResource}
-                          disabled={
-                            !editResource.name || !editResource.description
-                          }
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          <DynamicIcon
-                            name="Save"
-                            className="inline-block w-4 h-4 mr-1"
-                          />
-                          Save
-                        </button>
-                        <button
-                          onClick={cancelEditResource}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // View mode with drag-and-drop
-                    <div
-                      key={index}
-                      draggable
-                      onDragStart={() => handleResourceDragStart(index)}
-                      onDragOver={(e) => handleResourceDragOver(e, index)}
-                      onDragEnd={handleResourceDragEnd}
-                      className="flex items-center gap-3 p-4 bg-green-900/20 rounded-lg border border-green-800/50 cursor-move hover:bg-green-800/30 transition-colors"
-                      style={{
-                        opacity: draggedResourceIndex === index ? 0.5 : 1,
-                      }}
-                    >
-                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
-                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
-                      </div>
-                      <div className="text-2xl">
-                        <DynamicIcon
-                          name={resource.symbol}
-                          className="w-8 h-8"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-bold text-white">
-                          {resource.name}
-                        </div>
-                        <div className="text-sm text-blue-300/60">
-                          {resource.description}
-                        </div>
-                        <div className="text-sm text-green-400 font-semibold">
-                          {resource.value}/{resource.maxValue}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex flex-row items-center gap-1 ml-3">
-                          <button
-                            onClick={() => moveResourceUp(index)}
-                            disabled={index === 0}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move up"
-                          >
-                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => moveResourceDown(index)}
-                            disabled={index === resources.length - 1}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move down"
-                          >
-                            <DynamicIcon
-                              name="ChevronDown"
-                              className="w-4 h-4"
-                            />
-                          </button>
-                        </div>
-                        <div className="flex flex-row items-center gap-1 ml-3">
-                          <button
-                            onClick={() => startEditResource(index)}
-                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Edit2" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => removeResource(index)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Trash2" className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                )
-              )}
-            </div>
-          </div>
-        );
-
-      case "inventory":
-        return (
-          <div className="space-y-6">
-            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="Lightbulb"
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                />
-                <span>
-                  <strong>Tip:</strong> Starting inventory items that players
-                  begin the adventure with.
-                </span>
-              </p>
-            </div>
-
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add Starting Item
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={newItem.name}
-                    onChange={(e) =>
-                      setNewItem({ ...newItem, name: e.target.value })
-                    }
-                    placeholder="e.g., Rusty Sword"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Icon
-                  </label>
-                  <IconPicker
-                    value={newItem.symbol || "Package"}
-                    onChange={(icon) =>
-                      setNewItem({ ...newItem, symbol: icon })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Quantity
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="999"
-                    value={newItem.quantity}
-                    onChange={(e) =>
-                      setNewItem({
-                        ...newItem,
-                        quantity: clampNumber(parseInt(e.target.value), 1, 999),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Type
-                  </label>
-                  <select
-                    value={newItem.type}
-                    onChange={(e) =>
-                      setNewItem({
-                        ...newItem,
-                        type: e.target.value as
-                          | "normal"
-                          | "consumable"
-                          | "story"
-                          | "misc",
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  >
-                    <option value="normal">Normal Item</option>
-                    <option value="consumable">Consumable</option>
-                    <option value="story">Story Item</option>
-                    <option value="misc">Miscellaneous</option>
-                  </select>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    value={newItem.description}
-                    onChange={(e) =>
-                      setNewItem({ ...newItem, description: e.target.value })
-                    }
-                    placeholder="e.g., A worn but reliable blade"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={addInventoryItem}
-                disabled={!newItem.name}
-                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-              >
-                Add Item
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-white">
-                Starting Inventory ({inventory.length})
-              </h3>
-              {inventory.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">No items added yet</p>
-              ) : (
-                inventory.map((item, index) =>
-                  editingInventoryIndex === index ? (
-                    // Edit mode
-                    <div
-                      key={index}
-                      className="p-4 bg-purple-900/40 rounded-lg border-2 border-purple-600"
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Name *
-                          </label>
-                          <input
-                            type="text"
-                            value={editInventoryItem.name || ""}
-                            onChange={(e) =>
-                              setEditInventoryItem({
-                                ...editInventoryItem,
-                                name: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Icon
-                          </label>
-                          <IconPicker
-                            value={editInventoryItem.symbol || "Package"}
-                            onChange={(icon) =>
-                              setEditInventoryItem({
-                                ...editInventoryItem,
-                                symbol: icon,
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Quantity
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="999"
-                            value={editInventoryItem.quantity || 1}
-                            onChange={(e) =>
-                              setEditInventoryItem({
-                                ...editInventoryItem,
-                                quantity: clampNumber(
-                                  parseInt(e.target.value),
-                                  1,
-                                  999
-                                ),
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Type
-                          </label>
-                          <select
-                            value={editInventoryItem.type || "misc"}
-                            onChange={(e) =>
-                              setEditInventoryItem({
-                                ...editInventoryItem,
-                                type: e.target.value as any,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          >
-                            <option value="normal">Normal</option>
-                            <option value="consumable">Consumable</option>
-                            <option value="story">Story</option>
-                            <option value="misc">Misc</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Grade
-                          </label>
-                          <select
-                            value={editInventoryItem.grade || "common"}
-                            onChange={(e) => {
-                              const newGrade = e.target.value as ItemGrade;
-                              const maxDur = getMaxDurability(newGrade);
-                              setEditInventoryItem({
-                                ...editInventoryItem,
-                                grade: newGrade,
-                                maxDurability: maxDur,
-                                durability: Math.min(
-                                  editInventoryItem.durability || maxDur,
-                                  maxDur
-                                ),
-                              });
-                            }}
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                            style={{
-                              color: getGradeConfig(editInventoryItem.grade)
-                                .color,
-                            }}
-                          >
-                            {GRADE_ORDER.map((g) => (
-                              <option
-                                key={g}
-                                value={g}
-                                style={{ color: GRADE_CONFIG[g].color }}
-                              >
-                                {GRADE_CONFIG[g].label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Durability{" "}
-                            {editInventoryItem.grade === "mythic"
-                              ? "(∞)"
-                              : `(max ${getMaxDurability(
-                                  (editInventoryItem.grade as ItemGrade) ||
-                                    "common"
-                                )})`}
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max={getMaxDurability(
-                              (editInventoryItem.grade as ItemGrade) || "common"
-                            )}
-                            value={
-                              editInventoryItem.grade === "mythic"
-                                ? ""
-                                : editInventoryItem.durability ??
-                                  getMaxDurability(
-                                    (editInventoryItem.grade as ItemGrade) ||
-                                      "common"
-                                  )
-                            }
-                            onChange={(e) =>
-                              setEditInventoryItem({
-                                ...editInventoryItem,
-                                durability: Math.max(
-                                  0,
-                                  Math.min(
-                                    parseInt(e.target.value) || 0,
-                                    getMaxDurability(
-                                      (editInventoryItem.grade as ItemGrade) ||
-                                        "common"
-                                    )
-                                  )
-                                ),
-                              })
-                            }
-                            disabled={editInventoryItem.grade === "mythic"}
-                            placeholder={
-                              editInventoryItem.grade === "mythic"
-                                ? "∞"
-                                : "Durability"
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm disabled:opacity-50"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Description
-                          </label>
-                          <input
-                            type="text"
-                            value={editInventoryItem.description || ""}
-                            onChange={(e) =>
-                              setEditInventoryItem({
-                                ...editInventoryItem,
-                                description: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveEditInventoryItem}
-                          disabled={!editInventoryItem.name}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          <DynamicIcon
-                            name="Save"
-                            className="inline-block w-4 h-4 mr-1"
-                          />
-                          Save
-                        </button>
-                        <button
-                          onClick={cancelEditInventoryItem}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // View mode with drag-and-drop
-                    <div
-                      key={index}
-                      draggable
-                      onDragStart={() => handleInventoryDragStart(index)}
-                      onDragOver={(e) => handleInventoryDragOver(e, index)}
-                      onDragEnd={handleInventoryDragEnd}
-                      className="flex items-center gap-3 p-4 rounded-lg border cursor-move hover:opacity-80 transition-colors"
-                      style={{
-                        opacity: draggedInventoryIndex === index ? 0.5 : 1,
-                        backgroundColor: `${
-                          getGradeConfig(item.grade).color
-                        }15`,
-                        borderColor: `${getGradeConfig(item.grade).color}40`,
-                      }}
-                    >
-                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
-                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
-                      </div>
-                      <div className="text-2xl">
-                        <DynamicIcon
-                          name={item.symbol}
-                          className="w-8 h-8"
-                          style={{
-                            color: getGradeConfig(item.grade).color,
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-bold text-white flex items-center gap-2 flex-wrap">
-                          <span>
-                            {item.name} ×{item.quantity}
-                          </span>
-                          <span
-                            className="text-xs px-1.5 py-0.5 rounded"
-                            style={{
-                              backgroundColor: `${
-                                getGradeConfig(item.grade).color
-                              }30`,
-                              color: getGradeConfig(item.grade).color,
-                            }}
-                          >
-                            {getGradeConfig(item.grade).label}
-                          </span>
-                          {item.type && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
-                              {item.type}
-                            </span>
-                          )}
-                        </div>
-                        {item.description && (
-                          <div className="text-sm text-blue-300/60">
-                            {item.description}
-                          </div>
-                        )}
-                        {item.type !== "consumable" && (
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-blue-200/40">
-                              Durability:
-                            </span>
-                            {item.grade === "mythic" ? (
-                              <span className="text-xs text-yellow-400">∞</span>
-                            ) : (
-                              <>
-                                <div className="w-16 h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full rounded-full"
-                                    style={{
-                                      width: `${
-                                        ((item.durability ??
-                                          getMaxDurability(
-                                            (item.grade as ItemGrade) ||
-                                              "common"
-                                          )) /
-                                          getMaxDurability(
-                                            (item.grade as ItemGrade) ||
-                                              "common"
-                                          )) *
-                                        100
-                                      }%`,
-                                      backgroundColor: getGradeConfig(
-                                        item.grade
-                                      ).color,
-                                    }}
-                                  />
-                                </div>
-                                <span className="text-xs text-blue-200/60">
-                                  {item.durability ??
-                                    getMaxDurability(
-                                      (item.grade as ItemGrade) || "common"
-                                    )}
-                                  /
-                                  {getMaxDurability(
-                                    (item.grade as ItemGrade) || "common"
-                                  )}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex flex-row items-center gap-1 ml-3">
-                          <button
-                            onClick={() => moveInventoryUp(index)}
-                            disabled={index === 0}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move up"
-                          >
-                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => moveInventoryDown(index)}
-                            disabled={index === inventory.length - 1}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move down"
-                          >
-                            <DynamicIcon
-                              name="ChevronDown"
-                              className="w-4 h-4"
-                            />
-                          </button>
-                        </div>
-                        <div className="flex flex-row items-center gap-1 ml-3">
-                          <button
-                            onClick={() => startEditInventoryItem(index)}
-                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Edit2" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => removeInventoryItem(index)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Trash2" className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                )
-              )}
-            </div>
-          </div>
-        );
-
-      case "abilities":
-        return (
-          <div className="space-y-6">
-            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="Lightbulb"
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                />
-                <span>
-                  <strong>Tip:</strong> Abilities are skills, spells, or
-                  techniques that cost resources or variables to use. They
-                  provide bonuses to skill checks based on their grade and can
-                  have cooldowns.
-                </span>
-              </p>
-            </div>
-
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add Starting Ability
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={newAbility.name}
-                    onChange={(e) =>
-                      setNewAbility({ ...newAbility, name: e.target.value })
-                    }
-                    placeholder="e.g., Fireball"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Icon
-                  </label>
-                  <IconPicker
-                    value={newAbility.symbol || "Sparkles"}
-                    onChange={(icon) =>
-                      setNewAbility({ ...newAbility, symbol: icon })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Grade
-                  </label>
-                  <select
-                    value={newAbility.grade || "novice"}
-                    onChange={(e) =>
-                      setNewAbility({
-                        ...newAbility,
-                        grade: e.target.value as AbilityGrade,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                    style={{
-                      color: getAbilityGradeConfig(newAbility.grade).color,
-                    }}
-                  >
-                    {ABILITY_GRADE_ORDER.map((g) => (
-                      <option
-                        key={g}
-                        value={g}
-                        style={{ color: ABILITY_GRADE_CONFIG[g].color }}
-                      >
-                        {ABILITY_GRADE_CONFIG[g].label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Associated Stat
-                  </label>
-                  <select
-                    value={newAbility.stat || ""}
-                    onChange={(e) =>
-                      setNewAbility({
-                        ...newAbility,
-                        stat: e.target.value || undefined,
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  >
-                    <option value="">None (any stat)</option>
-                    {stats.map((stat) => (
-                      <option key={stat.name} value={stat.name}>
-                        {stat.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Cooldown (turns)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="99"
-                    value={newAbility.cooldown || 0}
-                    onChange={(e) =>
-                      setNewAbility({
-                        ...newAbility,
-                        cooldown: clampNumber(
-                          parseInt(e.target.value) || 0,
-                          0,
-                          99
-                        ),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Description
-                  </label>
-                  <input
-                    type="text"
-                    value={newAbility.description}
-                    onChange={(e) =>
-                      setNewAbility({
-                        ...newAbility,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., Launch a ball of fire at enemies"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-blue-200 mb-2">
-                    Costs ({newAbilityCosts.length})
-                  </label>
-                  <div className="space-y-2">
-                    {newAbilityCosts.map((cost, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center gap-2 bg-blue-900/20 p-2 rounded-lg"
-                      >
-                        <select
-                          value={cost.type}
-                          onChange={(e) =>
-                            updateNewAbilityCost(index, {
-                              type: e.target.value as "resource" | "variable",
-                            })
-                          }
-                          className="px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
-                        >
-                          <option value="resource">Resource</option>
-                          <option value="variable">Variable</option>
-                        </select>
-                        {cost.type === "resource" ? (
-                          <select
-                            value={cost.name}
-                            onChange={(e) =>
-                              updateNewAbilityCost(index, {
-                                name: e.target.value,
-                              })
-                            }
-                            className="flex-1 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
-                          >
-                            <option value="">Select resource...</option>
-                            {resources.map((r) => (
-                              <option key={r.name} value={r.name}>
-                                {r.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <input
-                            type="text"
-                            value={cost.name}
-                            onChange={(e) =>
-                              updateNewAbilityCost(index, {
-                                name: e.target.value,
-                              })
-                            }
-                            placeholder="Variable name"
-                            className="flex-1 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
-                          />
-                        )}
-                        <input
-                          type="number"
-                          min="1"
-                          max="999"
-                          value={cost.amount}
-                          onChange={(e) =>
-                            updateNewAbilityCost(index, {
-                              amount: clampNumber(
-                                parseInt(e.target.value) || 1,
-                                1,
-                                999
-                              ),
-                            })
-                          }
-                          className="w-16 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
-                        />
-                        <button
-                          onClick={() => removeNewAbilityCost(index)}
-                          className="p-1 text-red-400 hover:text-red-300"
-                        >
-                          <DynamicIcon name="X" className="w-4 h-4" />
-                        </button>
-                      </div>
-                    ))}
-                    <button
-                      onClick={addNewAbilityCost}
-                      className="w-full px-3 py-2 bg-blue-700/30 hover:bg-blue-700/50 text-blue-300 rounded-lg text-sm flex items-center justify-center gap-2"
-                    >
-                      <DynamicIcon name="Plus" className="w-4 h-4" />
-                      Add Cost
-                    </button>
-                  </div>
-                </div>
-              </div>
-              <button
-                onClick={addAbility}
-                disabled={!newAbility.name}
-                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-              >
-                Add Ability
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-white">
-                Starting Abilities ({abilities.length})
-              </h3>
-              {abilities.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">
-                  No abilities added yet
-                </p>
-              ) : (
-                abilities.map((ability, index) =>
-                  editingAbilityIndex === index ? (
-                    // Edit mode
-                    <div
-                      key={index}
-                      className="p-4 bg-purple-900/40 rounded-lg border-2 border-purple-600"
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Name *
-                          </label>
-                          <input
-                            type="text"
-                            value={editAbility.name || ""}
-                            onChange={(e) =>
-                              setEditAbility({
-                                ...editAbility,
-                                name: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Icon
-                          </label>
-                          <IconPicker
-                            value={editAbility.symbol || "Sparkles"}
-                            onChange={(icon) =>
-                              setEditAbility({
-                                ...editAbility,
-                                symbol: icon,
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Grade
-                          </label>
-                          <select
-                            value={editAbility.grade || "novice"}
-                            onChange={(e) =>
-                              setEditAbility({
-                                ...editAbility,
-                                grade: e.target.value as AbilityGrade,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                            style={{
-                              color: getAbilityGradeConfig(editAbility.grade)
-                                .color,
-                            }}
-                          >
-                            {ABILITY_GRADE_ORDER.map((g) => (
-                              <option
-                                key={g}
-                                value={g}
-                                style={{ color: ABILITY_GRADE_CONFIG[g].color }}
-                              >
-                                {ABILITY_GRADE_CONFIG[g].label}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Associated Stat
-                          </label>
-                          <select
-                            value={editAbility.stat || ""}
-                            onChange={(e) =>
-                              setEditAbility({
-                                ...editAbility,
-                                stat: e.target.value || undefined,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          >
-                            <option value="">None (any stat)</option>
-                            {stats.map((stat) => (
-                              <option key={stat.name} value={stat.name}>
-                                {stat.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Cooldown (turns)
-                          </label>
-                          <input
-                            type="number"
-                            min="0"
-                            max="99"
-                            value={editAbility.cooldown || 0}
-                            onChange={(e) =>
-                              setEditAbility({
-                                ...editAbility,
-                                cooldown: clampNumber(
-                                  parseInt(e.target.value) || 0,
-                                  0,
-                                  99
-                                ),
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Description
-                          </label>
-                          <input
-                            type="text"
-                            value={editAbility.description || ""}
-                            onChange={(e) =>
-                              setEditAbility({
-                                ...editAbility,
-                                description: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-blue-300 mb-2">
-                            Costs ({editAbilityCosts.length})
-                          </label>
-                          <div className="space-y-2">
-                            {editAbilityCosts.map((cost, costIndex) => (
-                              <div
-                                key={costIndex}
-                                className="flex items-center gap-2 bg-blue-900/20 p-2 rounded-lg"
-                              >
-                                <select
-                                  value={cost.type}
-                                  onChange={(e) =>
-                                    updateEditAbilityCost(costIndex, {
-                                      type: e.target.value as
-                                        | "resource"
-                                        | "variable",
-                                    })
-                                  }
-                                  className="px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
-                                >
-                                  <option value="resource">Resource</option>
-                                  <option value="variable">Variable</option>
-                                </select>
-                                {cost.type === "resource" ? (
-                                  <select
-                                    value={cost.name}
-                                    onChange={(e) =>
-                                      updateEditAbilityCost(costIndex, {
-                                        name: e.target.value,
-                                      })
-                                    }
-                                    className="flex-1 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
-                                  >
-                                    <option value="">Select resource...</option>
-                                    {resources.map((r) => (
-                                      <option key={r.name} value={r.name}>
-                                        {r.name}
-                                      </option>
-                                    ))}
-                                  </select>
-                                ) : (
-                                  <input
-                                    type="text"
-                                    value={cost.name}
-                                    onChange={(e) =>
-                                      updateEditAbilityCost(costIndex, {
-                                        name: e.target.value,
-                                      })
-                                    }
-                                    placeholder="Variable name"
-                                    className="flex-1 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
-                                  />
-                                )}
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="999"
-                                  value={cost.amount}
-                                  onChange={(e) =>
-                                    updateEditAbilityCost(costIndex, {
-                                      amount: clampNumber(
-                                        parseInt(e.target.value) || 1,
-                                        1,
-                                        999
-                                      ),
-                                    })
-                                  }
-                                  className="w-16 px-2 py-1 border border-blue-700/40 rounded bg-blue-900/30 text-white text-sm"
-                                />
-                                <button
-                                  onClick={() =>
-                                    removeEditAbilityCost(costIndex)
-                                  }
-                                  className="p-1 text-red-400 hover:text-red-300"
-                                >
-                                  <DynamicIcon name="X" className="w-4 h-4" />
-                                </button>
-                              </div>
-                            ))}
-                            <button
-                              onClick={addEditAbilityCost}
-                              className="w-full px-3 py-2 bg-blue-700/30 hover:bg-blue-700/50 text-blue-300 rounded-lg text-sm flex items-center justify-center gap-2"
-                            >
-                              <DynamicIcon name="Plus" className="w-4 h-4" />
-                              Add Cost
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveEditAbility}
-                          disabled={!editAbility.name}
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          <DynamicIcon
-                            name="Save"
-                            className="inline-block w-4 h-4 mr-1"
-                          />
-                          Save
-                        </button>
-                        <button
-                          onClick={cancelEditAbility}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // View mode with drag-and-drop
-                    <div
-                      key={index}
-                      draggable
-                      onDragStart={() => handleAbilityDragStart(index)}
-                      onDragOver={(e) => handleAbilityDragOver(e, index)}
-                      onDragEnd={handleAbilityDragEnd}
-                      className="flex items-center gap-3 p-4 rounded-lg border cursor-move hover:opacity-80 transition-colors"
-                      style={{
-                        opacity: draggedAbilityIndex === index ? 0.5 : 1,
-                        backgroundColor: `${
-                          getAbilityGradeConfig(ability.grade).color
-                        }15`,
-                        borderColor: `${
-                          getAbilityGradeConfig(ability.grade).color
-                        }40`,
-                      }}
-                    >
-                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
-                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
-                      </div>
-                      <div className="text-2xl">
-                        <DynamicIcon
-                          name={ability.symbol || "Sparkles"}
-                          className="w-8 h-8"
-                          style={{
-                            color: getAbilityGradeConfig(ability.grade).color,
-                          }}
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-bold text-white flex items-center gap-2 flex-wrap">
-                          <span>{ability.name}</span>
-                          <span
-                            className="text-xs px-1.5 py-0.5 rounded"
-                            style={{
-                              backgroundColor: `${
-                                getAbilityGradeConfig(ability.grade).color
-                              }30`,
-                              color: getAbilityGradeConfig(ability.grade).color,
-                            }}
-                          >
-                            {getAbilityGradeConfig(ability.grade).label}
-                          </span>
-                          {ability.stat && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
-                              {ability.stat}
-                            </span>
-                          )}
-                        </div>
-                        {ability.description && (
-                          <div className="text-sm text-blue-300/60">
-                            {ability.description}
-                          </div>
-                        )}
-                        <div className="flex items-center gap-3 mt-1 flex-wrap">
-                          {(ability.cooldown || 0) > 0 && (
-                            <span className="text-xs text-blue-200/60">
-                              Cooldown: {ability.cooldown} turns
-                            </span>
-                          )}
-                          {ability.cost && ability.cost.length > 0 && (
-                            <span className="text-xs text-purple-300">
-                              Cost:{" "}
-                              {ability.cost
-                                .map((c) => `${c.amount} ${c.name}`)
-                                .join(", ")}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex flex-row items-center gap-1 ml-3">
-                          <button
-                            onClick={() => moveAbilityUp(index)}
-                            disabled={index === 0}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move up"
-                          >
-                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => moveAbilityDown(index)}
-                            disabled={index === abilities.length - 1}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move down"
-                          >
-                            <DynamicIcon
-                              name="ChevronDown"
-                              className="w-4 h-4"
-                            />
-                          </button>
-                        </div>
-                        <div className="flex flex-row items-center gap-1 ml-3">
-                          <button
-                            onClick={() => startEditAbility(index)}
-                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Edit2" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => removeAbility(index)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Trash2" className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                )
-              )}
-            </div>
-          </div>
-        );
-
-      case "passives":
-        return (
-          <div className="space-y-6">
-            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="Lightbulb"
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                />
-                <span>
-                  <strong>Tip:</strong> Passives are story and RP traits that
-                  influence how the AI treats your character - they affect
-                  narrative, difficulty, and NPC reactions rather than giving
-                  direct mechanical bonuses. Example: &quot;Wolf Slayer&quot;
-                  might make wolves easier to fight or intimidate.
-                </span>
-              </p>
-            </div>
-
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add Starting Passive
-              </h3>
-              <div className="space-y-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Name *
-                  </label>
-                  <input
-                    type="text"
-                    value={newPassive.name}
-                    onChange={(e) =>
-                      setNewPassive({ ...newPassive, name: e.target.value })
-                    }
-                    placeholder="e.g., Swift Reflexes"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Description *
-                  </label>
-                  <textarea
-                    value={newPassive.description}
-                    onChange={(e) =>
-                      setNewPassive({
-                        ...newPassive,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., +1 to all Agility checks"
-                    rows={3}
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  if (newPassive.name && newPassive.description) {
-                    setPassives([
-                      ...passives,
-                      { ...newPassive, nodeId: "manual" },
-                    ]);
-                    setNewPassive({ name: "", description: "" });
-                  }
-                }}
-                disabled={!newPassive.name || !newPassive.description}
-                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-              >
-                Add Passive
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-white">
-                Starting Passives ({passives.length})
-              </h3>
-              {passives.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">
-                  No passives added yet
-                </p>
-              ) : (
-                passives.map((passive, index) =>
-                  editingPassiveIndex === index ? (
-                    <div
-                      key={index}
-                      className="p-4 bg-purple-900/40 rounded-lg border-2 border-purple-600"
-                    >
-                      <div className="space-y-3 mb-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Name *
-                          </label>
-                          <input
-                            type="text"
-                            value={editPassive.name}
-                            onChange={(e) =>
-                              setEditPassive({
-                                ...editPassive,
-                                name: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Description *
-                          </label>
-                          <textarea
-                            value={editPassive.description}
-                            onChange={(e) =>
-                              setEditPassive({
-                                ...editPassive,
-                                description: e.target.value,
-                              })
-                            }
-                            rows={3}
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm resize-none"
-                          />
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            if (editPassive.name && editPassive.description) {
-                              const updated = [...passives];
-                              updated[index] = {
-                                ...editPassive,
-                                nodeId: passives[index].nodeId,
-                              };
-                              setPassives(updated);
-                              setEditingPassiveIndex(null);
-                              setEditPassive({ name: "", description: "" });
-                            }
-                          }}
-                          disabled={
-                            !editPassive.name || !editPassive.description
-                          }
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          <DynamicIcon
-                            name="Save"
-                            className="inline-block w-4 h-4 mr-1"
-                          />
-                          Save
-                        </button>
-                        <button
-                          onClick={() => {
-                            setEditingPassiveIndex(null);
-                            setEditPassive({ name: "", description: "" });
-                          }}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div
-                      key={index}
-                      className="flex items-center gap-3 p-4 rounded-lg border bg-purple-900/15 border-purple-700/40"
-                    >
-                      <div className="text-2xl text-purple-400">
-                        <DynamicIcon name="Sparkles" className="w-8 h-8" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="font-bold text-white flex items-center gap-2">
-                          <span>{passive.name}</span>
-                          {passive.nodeId !== "manual" && (
-                            <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
-                              Skill Tree
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-blue-300/60">
-                          {passive.description}
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => {
-                            setEditingPassiveIndex(index);
-                            setEditPassive({
-                              name: passive.name,
-                              description: passive.description,
-                            });
-                          }}
-                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          <DynamicIcon name="Edit2" className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setPassives(passives.filter((_, i) => i !== index));
-                          }}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                        >
-                          <DynamicIcon name="Trash2" className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                )
-              )}
-            </div>
-          </div>
-        );
-
       case "lore":
         return (
           <div className="space-y-6">
@@ -7941,11 +5975,12 @@ ${description || ""}`;
                   className="w-4 h-4 mt-0.5 shrink-0"
                 />
                 <span>
-                  <strong>What is Lore?</strong> Lore entries are world-building
-                  facts the AI uses for context.
+                  <strong>What are Notes?</strong> Notes are world-building
+                  facts the AI uses for context. <strong>Mechanics</strong> type
+                  notes are rules that are always prioritized.
                   <strong> Triggers</strong> control visibility:{" "}
                   <span className="text-green-400">ON triggers</span> (keywords
-                  that reveal this lore when mentioned) and
+                  that reveal this note when mentioned) and
                   <span className="text-red-400"> OFF triggers</span> (keywords
                   that hide it).
                 </span>
@@ -7953,23 +5988,44 @@ ${description || ""}`;
             </div>
 
             <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add Lore Entry
-              </h3>
+              <h3 className="text-lg font-bold mb-4 text-white">Add Note</h3>
               <div className="space-y-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={newLore.title}
-                    onChange={(e) =>
-                      setNewLore({ ...newLore, title: e.target.value })
-                    }
-                    placeholder="e.g., The Ancient Prophecy"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
+                <div className="flex gap-4">
+                  <div className="flex-1">
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
+                      Title *
+                    </label>
+                    <input
+                      type="text"
+                      value={newLore.title}
+                      onChange={(e) =>
+                        setNewLore({ ...newLore, title: e.target.value })
+                      }
+                      placeholder="e.g., The Ancient Prophecy"
+                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    />
+                  </div>
+                  <div className="w-40">
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
+                      Type
+                    </label>
+                    <select
+                      value={newLore.type || ""}
+                      onChange={(e) =>
+                        setNewLore({
+                          ...newLore,
+                          type: (e.target.value || undefined) as
+                            | "lore"
+                            | "mechanics"
+                            | undefined,
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    >
+                      <option value="">Normal</option>
+                      <option value="mechanics">Mechanics</option>
+                    </select>
+                  </div>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-blue-200 mb-1">
@@ -7980,7 +6036,7 @@ ${description || ""}`;
                     onChange={(e) =>
                       setNewLore({ ...newLore, content: e.target.value })
                     }
-                    placeholder="Write the lore entry content..."
+                    placeholder="Write the note content..."
                     rows={5}
                     maxLength={5000}
                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
@@ -8002,7 +6058,7 @@ ${description || ""}`;
                       className="text-sm text-blue-300 flex items-center gap-1"
                     >
                       <DynamicIcon name="Lock" className="w-3 h-3" /> Hidden
-                      (only revealed when triggered by keys)
+                      (only revealed when triggered)
                     </label>
                   </div>
                   <div className="flex items-center gap-2">
@@ -8791,23 +6847,46 @@ ${description || ""}`;
                             <div className="space-y-4">
                               <h4 className="text-md font-bold text-indigo-100 flex items-center gap-2">
                                 <DynamicIcon name="Edit2" className="w-4 h-4" />{" "}
-                                Editing Lore Entry
+                                Editing Note
                               </h4>
-                              <div>
-                                <label className="block text-sm font-semibold text-blue-200 mb-1">
-                                  Title *
-                                </label>
-                                <input
-                                  type="text"
-                                  value={editLore.title || ""}
-                                  onChange={(e) =>
-                                    setEditLore({
-                                      ...editLore,
-                                      title: e.target.value,
-                                    })
-                                  }
-                                  className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                                />
+                              <div className="flex gap-4">
+                                <div className="flex-1">
+                                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                                    Title *
+                                  </label>
+                                  <input
+                                    type="text"
+                                    value={editLore.title || ""}
+                                    onChange={(e) =>
+                                      setEditLore({
+                                        ...editLore,
+                                        title: e.target.value,
+                                      })
+                                    }
+                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                  />
+                                </div>
+                                <div className="w-40">
+                                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                                    Type
+                                  </label>
+                                  <select
+                                    value={editLore.type || ""}
+                                    onChange={(e) =>
+                                      setEditLore({
+                                        ...editLore,
+                                        type: (e.target.value || undefined) as
+                                          | "lore"
+                                          | "mechanics"
+                                          | undefined,
+                                      })
+                                    }
+                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                  >
+                                    <option value="">Normal</option>
+                                    <option value="mechanics">Mechanics</option>
+                                  </select>
+                                </div>
                               </div>
                               <div>
                                 <label className="block text-sm font-semibold text-blue-200 mb-1">
@@ -9661,8 +7740,8 @@ ${description || ""}`;
                                     }`}
                                     title={
                                       entry.on
-                                        ? "Lore is enabled"
-                                        : "Lore is disabled"
+                                        ? "Note is enabled"
+                                        : "Note is disabled"
                                     }
                                   >
                                     {entry.on ? "ON" : "OFF"}
@@ -9671,7 +7750,7 @@ ${description || ""}`;
                                 {entry.thumbnailUrl && (
                                   <img
                                     src={entry.thumbnailUrl}
-                                    alt="Lore thumb"
+                                    alt="Note thumb"
                                     className="w-24 h-24 object-cover rounded border mb-2"
                                   />
                                 )}
@@ -9821,879 +7900,6 @@ ${description || ""}`;
                     </>
                   );
                 })()
-              )}
-            </div>
-          </div>
-        );
-
-      case "relationships":
-        return (
-          <div className="space-y-6">
-            <div className="bg-pink-900/20 border border-pink-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="Lightbulb"
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                />
-                <span>
-                  <strong>Tip:</strong> Track relationships with characters,
-                  factions, or organizations. Value ranges from -100 (hostile
-                  enemy) to +100 (strong ally). The AI will use these to inform
-                  dialogue and plot decisions.
-                </span>
-              </p>
-            </div>
-
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add Relationship
-              </h3>
-              <div className="space-y-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Name * (Character/Faction/Organization)
-                  </label>
-                  <input
-                    type="text"
-                    value={newRelationship.name}
-                    onChange={(e) =>
-                      setNewRelationship({
-                        ...newRelationship,
-                        name: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., King's Guard, The Shadow Syndicate"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center justify-between">
-                    <span>
-                      Relationship Value * ({newRelationship.value ?? 0})
-                    </span>
-                    <DynamicIcon
-                      name={getRelationshipIcon(newRelationship.value ?? 0)}
-                      className="w-6 h-6"
-                    />
-                  </label>
-                  <input
-                    type="range"
-                    min="-100"
-                    max="100"
-                    value={newRelationship.value ?? 0}
-                    onChange={(e) =>
-                      setNewRelationship({
-                        ...newRelationship,
-                        value: parseInt(e.target.value),
-                      })
-                    }
-                    className="w-full h-2 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
-                    style={{
-                      background: `linear-gradient(to right, 
-                        #ef4444 0%, 
-                        #f59e0b 25%, 
-                        #84cc16 50%, 
-                        #10b981 75%, 
-                        #06b6d4 100%)`,
-                    }}
-                  />
-                  <div className="flex justify-between text-xs text-blue-300/60 mt-1">
-                    <span>-100 (Enemy)</span>
-                    <span>0 (Neutral)</span>
-                    <span>+100 (Ally)</span>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Description *
-                  </label>
-                  <textarea
-                    value={newRelationship.description}
-                    onChange={(e) =>
-                      setNewRelationship({
-                        ...newRelationship,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="Describe the current state of this relationship..."
-                    rows={3}
-                    maxLength={1000}
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
-                  />
-                </div>
-              </div>
-              <button
-                onClick={addRelationship}
-                disabled={!newRelationship.name || !newRelationship.description}
-                className="w-full px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-              >
-                Add Relationship
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <div className="flex items-center justify-between mb-2">
-                <h3 className="text-lg font-bold text-white">
-                  Relationships ({relationships.length})
-                </h3>
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={relationshipSearchQuery}
-                    onChange={(e) => {
-                      setRelationshipSearchQuery(e.target.value);
-                      setRelationshipPage(1);
-                    }}
-                    placeholder="Search relationships..."
-                    className="pl-8 pr-3 py-1 text-sm border border-blue-700/40 rounded-lg bg-blue-900/20 text-white focus:ring-2 focus:ring-pink-500"
-                  />
-                  <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
-                    <DynamicIcon name="Search" className="w-4 h-4" />
-                  </span>
-                </div>
-              </div>
-
-              {relationships.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">
-                  No relationships added yet
-                </p>
-              ) : (
-                (() => {
-                  const filteredRelationships = relationships
-                    .map((rel, index) => ({ rel, originalIndex: index }))
-                    .filter(
-                      (item) =>
-                        item.rel.name
-                          .toLowerCase()
-                          .includes(relationshipSearchQuery.toLowerCase()) ||
-                        item.rel.description
-                          .toLowerCase()
-                          .includes(relationshipSearchQuery.toLowerCase())
-                    )
-                    .sort((a, b) => a.rel.name.localeCompare(b.rel.name));
-
-                  const totalPages = Math.ceil(
-                    filteredRelationships.length / relationshipItemsPerPage
-                  );
-                  const displayedRelationships = filteredRelationships.slice(
-                    (relationshipPage - 1) * relationshipItemsPerPage,
-                    relationshipPage * relationshipItemsPerPage
-                  );
-
-                  if (
-                    filteredRelationships.length === 0 &&
-                    relationships.length > 0
-                  ) {
-                    return (
-                      <p className="text-blue-300/50 text-sm italic">
-                        No relationships match your search.
-                      </p>
-                    );
-                  }
-
-                  return (
-                    <>
-                      {displayedRelationships.map(
-                        ({ rel, originalIndex: index }) => (
-                          <div
-                            key={index}
-                            draggable={false}
-                            className="p-4 bg-pink-900/20 rounded-lg border border-pink-800/50"
-                          >
-                            {editingRelationshipIndex === index ? (
-                              // Edit mode
-                              <div className="space-y-4">
-                                <h4 className="text-md font-bold text-pink-100 flex items-center gap-2">
-                                  <DynamicIcon
-                                    name="Edit2"
-                                    className="w-4 h-4"
-                                  />{" "}
-                                  Editing Relationship
-                                </h4>
-                                <div>
-                                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                                    Name *
-                                  </label>
-                                  <input
-                                    type="text"
-                                    value={editRelationship.name || ""}
-                                    onChange={(e) =>
-                                      setEditRelationship({
-                                        ...editRelationship,
-                                        name: e.target.value,
-                                      })
-                                    }
-                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                                  />
-                                </div>
-                                <div>
-                                  <label className="text-sm font-semibold text-blue-200 mb-1 flex items-center justify-between">
-                                    <span>
-                                      Relationship Value (
-                                      {editRelationship.value ?? 0})
-                                    </span>
-                                    <DynamicIcon
-                                      name={getRelationshipIcon(
-                                        editRelationship.value ?? 0
-                                      )}
-                                      className="w-6 h-6"
-                                    />
-                                  </label>
-                                  <input
-                                    type="range"
-                                    min="-100"
-                                    max="100"
-                                    value={editRelationship.value ?? 0}
-                                    onChange={(e) =>
-                                      setEditRelationship({
-                                        ...editRelationship,
-                                        value: parseInt(e.target.value),
-                                      })
-                                    }
-                                    className="w-full h-2 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
-                                    style={{
-                                      background: `linear-gradient(to right, 
-                                      #ef4444 0%, 
-                                      #f59e0b 25%, 
-                                      #84cc16 50%, 
-                                      #10b981 75%, 
-                                      #06b6d4 100%)`,
-                                    }}
-                                  />
-                                  <div className="flex justify-between text-xs text-blue-300/60 mt-1">
-                                    <span>-100 (Enemy)</span>
-                                    <span>0 (Neutral)</span>
-                                    <span>+100 (Ally)</span>
-                                  </div>
-                                </div>
-                                <div>
-                                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                                    Description *
-                                  </label>
-                                  <textarea
-                                    value={editRelationship.description || ""}
-                                    onChange={(e) =>
-                                      setEditRelationship({
-                                        ...editRelationship,
-                                        description: e.target.value,
-                                      })
-                                    }
-                                    rows={3}
-                                    maxLength={1000}
-                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
-                                  />
-                                </div>
-                                <div className="flex gap-2">
-                                  <button
-                                    onClick={saveEditRelationship}
-                                    disabled={
-                                      !editRelationship.name ||
-                                      !editRelationship.description
-                                    }
-                                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-                                  >
-                                    <DynamicIcon
-                                      name="Save"
-                                      className="inline-block w-4 h-4 mr-1"
-                                    />
-                                    Save
-                                  </button>
-                                  <button
-                                    onClick={cancelEditRelationship}
-                                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              </div>
-                            ) : (
-                              // View mode
-                              <div className="flex items-start gap-3">
-                                <div className="text-3xl shrink-0">
-                                  <DynamicIcon
-                                    name={
-                                      rel.symbol ||
-                                      getRelationshipIcon(rel.value)
-                                    }
-                                    className="w-8 h-8"
-                                  />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-bold text-white flex items-center gap-2 flex-wrap">
-                                    <span>{rel.name}</span>
-                                    <span
-                                      className={`text-sm px-2 py-0.5 rounded-full ${
-                                        rel.value >= 50
-                                          ? "bg-green-900/30 text-green-200"
-                                          : rel.value >= 0
-                                          ? "bg-blue-900/30 text-blue-200"
-                                          : rel.value >= -50
-                                          ? "bg-orange-900/30 text-orange-200"
-                                          : "bg-red-900/30 text-red-200"
-                                      }`}
-                                    >
-                                      {rel.value > 0 ? "+" : ""}
-                                      {rel.value}
-                                    </span>
-                                  </div>
-                                  <p className="text-sm text-blue-300/60 mt-1">
-                                    {rel.description}
-                                  </p>
-                                </div>
-                                <div className="flex gap-2 shrink-0">
-                                  <button
-                                    onClick={() => startEditRelationship(index)}
-                                    className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                                    title="Edit"
-                                  >
-                                    <DynamicIcon
-                                      name="Edit2"
-                                      className="w-4 h-4"
-                                    />
-                                  </button>
-                                  <button
-                                    onClick={() => removeRelationship(index)}
-                                    className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                                    title="Delete"
-                                  >
-                                    <DynamicIcon
-                                      name="Trash2"
-                                      className="w-4 h-4"
-                                    />
-                                  </button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      )}
-
-                      {totalPages > 1 && (
-                        <div className="flex items-center justify-between gap-2 pt-4">
-                          <button
-                            onClick={() =>
-                              setRelationshipPage(
-                                Math.max(1, relationshipPage - 1)
-                              )
-                            }
-                            disabled={relationshipPage === 1}
-                            className="px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:bg-gray-400 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon
-                              name="ChevronLeft"
-                              className="w-4 h-4"
-                            />
-                          </button>
-                          <span className="text-sm text-blue-300">
-                            Page {relationshipPage} of {totalPages}
-                          </span>
-                          <button
-                            onClick={() =>
-                              setRelationshipPage(
-                                Math.min(totalPages, relationshipPage + 1)
-                              )
-                            }
-                            disabled={relationshipPage === totalPages}
-                            className="px-4 py-2 bg-pink-600 hover:bg-pink-700 disabled:bg-gray-400 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon
-                              name="ChevronRight"
-                              className="w-4 h-4"
-                            />
-                          </button>
-                        </div>
-                      )}
-                    </>
-                  );
-                })()
-              )}
-            </div>
-          </div>
-        );
-
-      case "conditions":
-        return (
-          <div className="space-y-6">
-            <div className="bg-rose-900/20 border border-rose-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="Lightbulb"
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                />
-                <span>
-                  <strong>Tip:</strong> Conditions represent injuries,
-                  afflictions, or debuffs that penalize skill checks. Tier I is
-                  minor (sprain), Tier VI is permanent/fatal. Use these to give
-                  starting characters existing conditions or disabilities.
-                </span>
-              </p>
-            </div>
-
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add Condition
-              </h3>
-              <div className="space-y-4 mb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-1">
-                      Name *
-                    </label>
-                    <input
-                      type="text"
-                      value={newCondition.name || ""}
-                      onChange={(e) =>
-                        setNewCondition({
-                          ...newCondition,
-                          name: e.target.value,
-                        })
-                      }
-                      placeholder="e.g., Broken Arm, Poisoned, Cursed"
-                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-1">
-                      Severity Tier *
-                    </label>
-                    <select
-                      value={newCondition.tier || 1}
-                      onChange={(e) =>
-                        setNewCondition({
-                          ...newCondition,
-                          tier: parseInt(e.target.value) as ConditionTier,
-                        })
-                      }
-                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                    >
-                      <option value={1}>I - Minor (Sprain, Scratch)</option>
-                      <option value={2}>
-                        II - Moderate (Deep Cut, Fracture)
-                      </option>
-                      <option value={3}>
-                        III - Severe (Broken Bone, Infection)
-                      </option>
-                      <option value={4}>
-                        IV - Critical (Internal Bleeding)
-                      </option>
-                      <option value={5}>
-                        V - Life-Threatening (Organ Damage)
-                      </option>
-                      <option value={6}>VI - Permanent/Fatal</option>
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Description *
-                  </label>
-                  <textarea
-                    value={newCondition.description || ""}
-                    onChange={(e) =>
-                      setNewCondition({
-                        ...newCondition,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="Describe the condition and its effects..."
-                    rows={2}
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-2">
-                    Affects Stats
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() =>
-                        setNewCondition({
-                          ...newCondition,
-                          affectsAll: !newCondition.affectsAll,
-                          affects: newCondition.affectsAll
-                            ? newCondition.affects
-                            : [],
-                        })
-                      }
-                      className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                        newCondition.affectsAll
-                          ? "bg-rose-600 text-white"
-                          : "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
-                      }`}
-                    >
-                      All Stats
-                    </button>
-                    {!newCondition.affectsAll &&
-                      stats.map((stat) => (
-                        <button
-                          key={stat.name}
-                          onClick={() => {
-                            const affects = newCondition.affects || [];
-                            if (affects.includes(stat.name)) {
-                              setNewCondition({
-                                ...newCondition,
-                                affects: affects.filter((a) => a !== stat.name),
-                              });
-                            } else {
-                              setNewCondition({
-                                ...newCondition,
-                                affects: [...affects, stat.name],
-                              });
-                            }
-                          }}
-                          className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                            (newCondition.affects || []).includes(stat.name)
-                              ? "bg-rose-600 text-white"
-                              : "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
-                          }`}
-                        >
-                          {stat.name}
-                        </button>
-                      ))}
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newCondition.permanent || false}
-                      onChange={(e) =>
-                        setNewCondition({
-                          ...newCondition,
-                          permanent: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 rounded border-blue-700/40 bg-blue-900/30 text-rose-600 focus:ring-rose-500"
-                    />
-                    <span className="text-sm text-blue-200">
-                      Permanent (cannot be healed)
-                    </span>
-                  </label>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  if (
-                    newCondition.name &&
-                    newCondition.description &&
-                    newCondition.tier
-                  ) {
-                    const condition: Condition = {
-                      id: `condition_${Date.now()}`,
-                      name: newCondition.name,
-                      tier: newCondition.tier as ConditionTier,
-                      description: newCondition.description,
-                      affects: newCondition.affectsAll
-                        ? []
-                        : newCondition.affects || [],
-                      affectsAll: newCondition.affectsAll || false,
-                      permanent: newCondition.permanent || false,
-                      createdAt: Date.now(),
-                    };
-                    setConditions([...conditions, condition]);
-                    setNewCondition({
-                      name: "",
-                      tier: 1,
-                      description: "",
-                      affects: [],
-                      affectsAll: false,
-                      permanent: false,
-                    });
-                  }
-                }}
-                disabled={
-                  !newCondition.name ||
-                  !newCondition.description ||
-                  !newCondition.tier
-                }
-                className="w-full px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-              >
-                Add Condition
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-white">
-                Starting Conditions ({conditions.length})
-              </h3>
-
-              {conditions.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">
-                  No starting conditions added. Characters will begin healthy.
-                </p>
-              ) : (
-                conditions.map((condition, index) => (
-                  <div
-                    key={condition.id}
-                    className="p-4 bg-rose-900/20 rounded-lg border border-rose-800/50"
-                  >
-                    {editingConditionIndex === index ? (
-                      <div className="space-y-4">
-                        <h4 className="text-md font-bold text-rose-100 flex items-center gap-2">
-                          <DynamicIcon name="Edit2" className="w-4 h-4" />{" "}
-                          Editing Condition
-                        </h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          <div>
-                            <label className="block text-sm font-semibold text-blue-200 mb-1">
-                              Name *
-                            </label>
-                            <input
-                              type="text"
-                              value={editCondition.name || ""}
-                              onChange={(e) =>
-                                setEditCondition({
-                                  ...editCondition,
-                                  name: e.target.value,
-                                })
-                              }
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-sm font-semibold text-blue-200 mb-1">
-                              Severity Tier *
-                            </label>
-                            <select
-                              value={editCondition.tier || 1}
-                              onChange={(e) =>
-                                setEditCondition({
-                                  ...editCondition,
-                                  tier: parseInt(
-                                    e.target.value
-                                  ) as ConditionTier,
-                                })
-                              }
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                            >
-                              <option value={1}>I - Minor</option>
-                              <option value={2}>II - Moderate</option>
-                              <option value={3}>III - Severe</option>
-                              <option value={4}>IV - Critical</option>
-                              <option value={5}>V - Life-Threatening</option>
-                              <option value={6}>VI - Permanent/Fatal</option>
-                            </select>
-                          </div>
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-blue-200 mb-1">
-                            Description *
-                          </label>
-                          <textarea
-                            value={editCondition.description || ""}
-                            onChange={(e) =>
-                              setEditCondition({
-                                ...editCondition,
-                                description: e.target.value,
-                              })
-                            }
-                            rows={2}
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-semibold text-blue-200 mb-2">
-                            Affects Stats
-                          </label>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              onClick={() =>
-                                setEditCondition({
-                                  ...editCondition,
-                                  affectsAll: !editCondition.affectsAll,
-                                  affects: editCondition.affectsAll
-                                    ? editCondition.affects
-                                    : [],
-                                })
-                              }
-                              className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                                editCondition.affectsAll
-                                  ? "bg-rose-600 text-white"
-                                  : "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
-                              }`}
-                            >
-                              All Stats
-                            </button>
-                            {!editCondition.affectsAll &&
-                              stats.map((stat) => (
-                                <button
-                                  key={stat.name}
-                                  onClick={() => {
-                                    const affects = editCondition.affects || [];
-                                    if (affects.includes(stat.name)) {
-                                      setEditCondition({
-                                        ...editCondition,
-                                        affects: affects.filter(
-                                          (a) => a !== stat.name
-                                        ),
-                                      });
-                                    } else {
-                                      setEditCondition({
-                                        ...editCondition,
-                                        affects: [...affects, stat.name],
-                                      });
-                                    }
-                                  }}
-                                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                                    (editCondition.affects || []).includes(
-                                      stat.name
-                                    )
-                                      ? "bg-rose-600 text-white"
-                                      : "bg-blue-900/30 text-blue-300 hover:bg-blue-900/50"
-                                  }`}
-                                >
-                                  {stat.name}
-                                </button>
-                              ))}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={editCondition.permanent || false}
-                              onChange={(e) =>
-                                setEditCondition({
-                                  ...editCondition,
-                                  permanent: e.target.checked,
-                                })
-                              }
-                              className="w-4 h-4 rounded border-blue-700/40 bg-blue-900/30 text-rose-600 focus:ring-rose-500"
-                            />
-                            <span className="text-sm text-blue-200">
-                              Permanent
-                            </span>
-                          </label>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              if (
-                                editCondition.name &&
-                                editCondition.description &&
-                                editCondition.tier
-                              ) {
-                                const updated = [...conditions];
-                                updated[index] = {
-                                  ...conditions[index],
-                                  name: editCondition.name,
-                                  tier: editCondition.tier as ConditionTier,
-                                  description: editCondition.description,
-                                  affects: editCondition.affectsAll
-                                    ? []
-                                    : editCondition.affects || [],
-                                  affectsAll: editCondition.affectsAll || false,
-                                  permanent: editCondition.permanent || false,
-                                };
-                                setConditions(updated);
-                                setEditingConditionIndex(null);
-                                setEditCondition({});
-                              }
-                            }}
-                            disabled={
-                              !editCondition.name ||
-                              !editCondition.description ||
-                              !editCondition.tier
-                            }
-                            className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-                          >
-                            <DynamicIcon
-                              name="Save"
-                              className="inline-block w-4 h-4 mr-1"
-                            />
-                            Save
-                          </button>
-                          <button
-                            onClick={() => {
-                              setEditingConditionIndex(null);
-                              setEditCondition({});
-                            }}
-                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-start gap-3">
-                        <div className="text-3xl shrink-0">
-                          <DynamicIcon
-                            name="HeartPulse"
-                            className={`w-8 h-8 ${
-                              condition.tier >= 5
-                                ? "text-red-500"
-                                : condition.tier >= 3
-                                ? "text-orange-500"
-                                : "text-yellow-500"
-                            }`}
-                          />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-white flex items-center gap-2 flex-wrap">
-                            <span>{condition.name}</span>
-                            <span
-                              className={`text-xs px-2 py-0.5 rounded-full ${
-                                condition.tier >= 5
-                                  ? "bg-red-900/50 text-red-200"
-                                  : condition.tier >= 3
-                                  ? "bg-orange-900/50 text-orange-200"
-                                  : "bg-yellow-900/50 text-yellow-200"
-                              }`}
-                            >
-                              Tier {condition.tier}
-                            </span>
-                            {condition.permanent && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300">
-                                Permanent
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-blue-300/60 mt-1">
-                            {condition.description}
-                          </p>
-                          <p className="text-xs text-blue-300/40 mt-1">
-                            Affects:{" "}
-                            {condition.affectsAll
-                              ? "All stats"
-                              : condition.affects?.length
-                              ? condition.affects.join(", ")
-                              : "None specified"}
-                          </p>
-                        </div>
-                        <div className="flex gap-2 shrink-0">
-                          <button
-                            onClick={() => {
-                              setEditingConditionIndex(index);
-                              setEditCondition({
-                                name: condition.name,
-                                tier: condition.tier,
-                                description: condition.description,
-                                affects: condition.affects || [],
-                                affectsAll: condition.affectsAll || false,
-                                permanent: condition.permanent || false,
-                              });
-                            }}
-                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                            title="Edit"
-                          >
-                            <DynamicIcon name="Edit2" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() =>
-                              setConditions(
-                                conditions.filter((_, i) => i !== index)
-                              )
-                            }
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                            title="Delete"
-                          >
-                            <DynamicIcon name="Trash2" className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))
               )}
             </div>
           </div>
@@ -11782,414 +8988,113 @@ ${description || ""}`;
           </div>
         );
 
-      case "upgrades":
+      case "character-schema":
         return (
           <div className="space-y-6">
             <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-100">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
-                  name="Lightbulb"
-                  className="inline-block w-4 h-4 mr-1 text-blue-600"
+                  name="FileSpreadsheet"
+                  className="w-4 h-4 mt-0.5 shrink-0"
                 />
-                Configure the upgrade system for your adventure. Control whether
-                players can spend points to upgrade stats, resources, or add
-                items, and customize the costs and amounts.
+                <span>
+                  <strong>Character Schema</strong> defines the structure of
+                  your character sheet - what attributes, resources, and derived
+                  values your characters have. Choose a preset or create your
+                  own.
+                </span>
               </p>
             </div>
 
-            {/* Leveling Curve */}
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6 space-y-4">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-bold text-white">
-                    Leveling Curve & Upgrade Points
-                  </h3>
-                  <p className="text-sm text-blue-300/60">
-                    Tune XP thresholds, level caps, and how many upgrade points
-                    each level awards.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-2">
-                    XP Base (quadratic curve)
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={levelingSettings.xpBase ?? 100}
-                    onChange={(e) =>
-                      setLevelingSettings((prev) => ({
-                        ...prev,
-                        xpBase: Math.max(1, parseInt(e.target.value, 10) || 1),
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                  <p className="text-xs text-blue-300/60 mt-1">
-                    Controls how quickly XP requirements scale when not using a
-                    custom curve.
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-2">
-                    Level Cap
-                  </label>
-                  <input
-                    type="number"
-                    min={1}
-                    value={levelingSettings.levelCap ?? 100}
-                    onChange={(e) =>
-                      setLevelingSettings((prev) => ({
-                        ...prev,
-                        levelCap: Math.max(
-                          1,
-                          parseInt(e.target.value, 10) || 1
-                        ),
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                  <p className="text-xs text-blue-300/60 mt-1">
-                    Players stop gaining levels (and upgrade points) after
-                    hitting this cap.
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-2">
-                    Default Upgrade Points per Level
-                  </label>
-                  <input
-                    type="number"
-                    min={0}
-                    value={levelingSettings.defaultUpgradesPerLevel ?? 1}
-                    onChange={(e) =>
-                      setLevelingSettings((prev) => ({
-                        ...prev,
-                        defaultUpgradesPerLevel: Math.max(
-                          0,
-                          parseInt(e.target.value, 10) || 0
-                        ),
-                      }))
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                  <p className="text-xs text-blue-300/60 mt-1">
-                    Applied to every level unless you create an override below.
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-2">
-                    Starting Upgrades (by difficulty)
-                  </label>
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    {(
-                      [
-                        "easy",
-                        "medium",
-                        "hard",
-                        "expert",
-                      ] as AdventureDifficulty[]
-                    ).map((difficulty) => (
-                      <div key={difficulty}>
-                        <span className="block text-xs uppercase tracking-wide text-blue-300/70 mb-1">
-                          {difficulty.charAt(0).toUpperCase() +
-                            difficulty.slice(1)}
-                        </span>
-                        <input
-                          type="number"
-                          min={0}
-                          value={
-                            levelingSettings.startingUpgrades?.[difficulty] ??
-                            STARTING_UPGRADES_BY_DIFFICULTY[difficulty]
-                          }
-                          onChange={(e) =>
-                            handleStartingUpgradeChange(
-                              difficulty,
-                              Math.max(0, parseInt(e.target.value, 10) || 0)
-                            )
-                          }
-                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <label className="flex items-center gap-3 text-sm text-blue-200">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 text-purple-500 rounded border-blue-700/40 bg-blue-900/40"
-                  checked={levelingSettings.useCustomCurve ?? false}
-                  onChange={(e) =>
-                    setLevelingSettings((prev) => ({
-                      ...prev,
-                      useCustomCurve: e.target.checked,
-                    }))
-                  }
-                />
-                Use a custom XP curve (define exact XP for each level)
-              </label>
-
-              {levelingSettings.useCustomCurve && (
-                <div className="rounded-lg border border-blue-800/40 bg-blue-950/40 p-4 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-sm font-semibold text-blue-200">
-                      Custom XP Thresholds
-                    </h4>
-                    <button
-                      type="button"
-                      onClick={handleAddCustomCurveEntry}
-                      className="px-3 py-1.5 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
-                    >
-                      <DynamicIcon
-                        name="Plus"
-                        className="inline w-4 h-4 mr-1"
-                      />
-                      Add Level
-                    </button>
-                  </div>
-                  {(levelingSettings.customCurve || []).length === 0 && (
-                    <p className="text-sm text-blue-300/70">
-                      Add entries for each level you want to customize. XP is
-                      the total required to reach that level.
-                    </p>
-                  )}
-                  <div className="space-y-3">
-                    {(levelingSettings.customCurve || []).map(
-                      (entry, index) => (
-                        <div
-                          key={`${entry.level}-${index}`}
-                          className="grid gap-3 sm:grid-cols-[1fr,1fr,auto]"
-                        >
-                          <div>
-                            <label className="block text-xs font-semibold text-blue-200 mb-1">
-                              Level
-                            </label>
-                            <input
-                              type="number"
-                              min={2}
-                              value={entry.level}
-                              onChange={(e) =>
-                                handleCustomCurveChange(
-                                  index,
-                                  "level",
-                                  Math.max(2, parseInt(e.target.value, 10) || 2)
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-blue-200 mb-1">
-                              Total XP Required
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              value={entry.cumulativeXP}
-                              onChange={(e) =>
-                                handleCustomCurveChange(
-                                  index,
-                                  "cumulativeXP",
-                                  Math.max(0, parseInt(e.target.value, 10) || 0)
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                            />
-                          </div>
-                          <div className="flex items-end">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleRemoveCustomCurveEntry(index)
-                              }
-                              className="w-full sm:w-auto px-3 py-2 text-sm font-medium rounded-lg bg-red-900/40 text-red-200 hover:bg-red-800/40 transition-colors"
-                            >
-                              <DynamicIcon
-                                name="Trash2"
-                                className="inline w-4 h-4 mr-1"
-                              />
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="rounded-lg border border-blue-800/40 bg-blue-950/30 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-blue-200">
-                    Upgrade Point Overrides
-                  </h4>
+            {/* Preset Schema Selection */}
+            <div className="space-y-3">
+              <h3 className="font-semibold text-white">Choose a Preset</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Object.entries(PRESET_SCHEMAS).map(([key, schema]) => (
                   <button
-                    type="button"
-                    onClick={handleAddUpgradeOverride}
-                    className="px-3 py-1.5 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
+                    key={key}
+                    onClick={() => {
+                      setCharacterSchema(schema);
+                      setCharacterData(createDefaultCharacterData(schema));
+                    }}
+                    className={`p-4 rounded-lg border text-left transition-all ${
+                      characterSchema?.name === schema.name
+                        ? "border-purple-500 bg-purple-900/30"
+                        : "border-gray-700 bg-gray-800/50 hover:border-gray-600"
+                    }`}
                   >
-                    <DynamicIcon name="Plus" className="inline w-4 h-4 mr-1" />
-                    Add Override
-                  </button>
-                </div>
-                {(levelingSettings.upgradeOverrides || []).length === 0 ? (
-                  <p className="text-sm text-blue-300/70">
-                    Override the default upgrade points for specific levels (for
-                    example, award 3 points at milestone levels).
-                  </p>
-                ) : (
-                  <div className="space-y-3">
-                    {(levelingSettings.upgradeOverrides || []).map(
-                      (override, index) => (
-                        <div
-                          key={`${override.level}-${index}`}
-                          className="grid gap-3 sm:grid-cols-[1fr,1fr,auto]"
-                        >
-                          <div>
-                            <label className="block text-xs font-semibold text-blue-200 mb-1">
-                              Level
-                            </label>
-                            <input
-                              type="number"
-                              min={1}
-                              value={override.level}
-                              onChange={(e) =>
-                                handleUpgradeOverrideChange(
-                                  index,
-                                  "level",
-                                  Math.max(1, parseInt(e.target.value, 10) || 1)
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                            />
-                          </div>
-                          <div>
-                            <label className="block text-xs font-semibold text-blue-200 mb-1">
-                              Upgrade Points
-                            </label>
-                            <input
-                              type="number"
-                              min={0}
-                              value={override.upgrades}
-                              onChange={(e) =>
-                                handleUpgradeOverrideChange(
-                                  index,
-                                  "upgrades",
-                                  Math.max(0, parseInt(e.target.value, 10) || 0)
-                                )
-                              }
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                            />
-                          </div>
-                          <div className="flex items-end">
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveUpgradeOverride(index)}
-                              className="w-full sm:w-auto px-3 py-2 text-sm font-medium rounded-lg bg-red-900/40 text-red-200 hover:bg-red-800/40 transition-colors"
-                            >
-                              <DynamicIcon
-                                name="Trash2"
-                                className="inline w-4 h-4 mr-1"
-                              />
-                              Remove
-                            </button>
-                          </div>
-                        </div>
-                      )
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Legacy Upgrade Shop Notice */}
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <div className="flex items-start gap-3">
-                <DynamicIcon name="Info" className="w-5 h-5 text-blue-300" />
-                <div>
-                  <h3 className="text-lg font-bold text-white">
-                    Upgrade Shop Removed
-                  </h3>
-                  <p className="text-sm text-blue-200/70">
-                    Point-based stat/resource/item purchases have been retired
-                    in favor of skill trees and custom level-up rewards.
-                    Existing adventures keep their stored values, but new
-                    adventures rely on the leveling curve above plus your skill
-                    tree design.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Skill Trees Section */}
-            <div className="bg-purple-900/20 rounded-lg border border-purple-700/40 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                  <DynamicIcon name="GitBranch" className="w-5 h-5" /> Skill
-                  Trees
-                </h3>
-                <button
-                  onClick={() => {
-                    const newTree = createEmptyTree();
-                    setSkillTrees([...skillTrees, newTree]);
-                  }}
-                  className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg flex items-center gap-1"
-                >
-                  <DynamicIcon name="Plus" className="w-4 h-4" /> Add Tree
-                </button>
-              </div>
-              <p className="text-xs text-purple-300/60 mb-4">
-                Create skill trees with prerequisite-based unlocks. When skill
-                trees are defined, simple stat/resource upgrades are hidden.
-              </p>
-
-              {skillTrees.length === 0 ? (
-                <div className="text-center py-8 text-purple-300/50">
-                  <DynamicIcon
-                    name="GitBranch"
-                    className="w-12 h-12 mx-auto mb-2 opacity-50"
-                  />
-                  <p>No skill trees defined</p>
-                  <p className="text-xs mt-1">
-                    Players will see simple stat/resource upgrades
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {skillTrees.map((tree, index) => (
-                    <div
-                      key={tree.id}
-                      className="border border-purple-700/30 rounded-lg p-4"
-                    >
-                      <SkillTreeEditor
-                        tree={tree}
-                        onChange={(updatedTree) => {
-                          const newTrees = [...skillTrees];
-                          newTrees[index] = updatedTree;
-                          setSkillTrees(newTrees);
-                        }}
-                        availableStats={stats}
-                        availableResources={resources}
-                        availableAbilities={abilities}
-                        onDelete={() => {
-                          setSkillTrees(
-                            skillTrees.filter((_, i) => i !== index)
-                          );
-                        }}
-                      />
+                    <div className="font-semibold text-white mb-1">
+                      {schema.name}
                     </div>
-                  ))}
-                </div>
-              )}
+                    <div className="text-sm text-gray-400">
+                      {schema.description}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-2">
+                      {schema.fields.length} fields
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
+
+            {/* Divider */}
+            <div className="flex items-center gap-4">
+              <div className="flex-1 border-t border-gray-700" />
+              <span className="text-gray-500 text-sm">or customize</span>
+              <div className="flex-1 border-t border-gray-700" />
+            </div>
+
+            {/* Schema Editor */}
+            <CharacterSchemaEditor
+              schema={characterSchema}
+              onChange={(newSchema) => {
+                setCharacterSchema(newSchema);
+                if (newSchema) {
+                  setCharacterData(createDefaultCharacterData(newSchema));
+                } else {
+                  setCharacterData(null);
+                }
+              }}
+            />
+          </div>
+        );
+
+      case "character-values":
+        return (
+          <div className="space-y-6">
+            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Sliders"
+                  className="w-4 h-4 mt-0.5 shrink-0"
+                />
+                <span>
+                  <strong>Starting Values</strong> - Set the initial values for
+                  your character sheet fields. These are the values players will
+                  start with.
+                </span>
+              </p>
+            </div>
+
+            {characterSchema && characterData ? (
+              <CharacterSheet
+                schema={characterSchema}
+                data={characterData}
+                onChange={setCharacterData}
+                readOnly={false}
+              />
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                <DynamicIcon
+                  name="FileSpreadsheet"
+                  className="w-12 h-12 mx-auto mb-3 opacity-50"
+                />
+                <p>No character schema defined yet.</p>
+                <p className="text-sm mt-2">
+                  Go back to the Character Schema step to create or select one.
+                </p>
+              </div>
+            )}
           </div>
         );
 
@@ -12241,7 +9146,7 @@ ${description || ""}`;
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">Lore Entries:</span>
+                    <span className="text-blue-300/60">Notes:</span>
                     <span className="ml-2 font-semibold text-white">
                       {lore.length}
                     </span>
@@ -12507,7 +9412,6 @@ ${description || ""}`;
                               presets: presets,
                               upgradeSettings: upgradeSettings,
                               levelingSettings,
-                              rpgSystem: rpgSystem,
                               agmtState: agmtEnabled ? agmtState : undefined,
                               skillTrees:
                                 skillTrees.length > 0 ? skillTrees : undefined,
@@ -12917,7 +9821,7 @@ ${description || ""}`;
                     {conflictData.localDraft.inventory?.length || 0} items
                   </p>
                   <p>
-                    <strong>Lore:</strong>{" "}
+                    <strong>Notes:</strong>{" "}
                     {conflictData.localDraft.lore?.length || 0} entries
                   </p>
                 </div>
@@ -12963,7 +9867,7 @@ ${description || ""}`;
                     items
                   </p>
                   <p>
-                    <strong>Lore:</strong>{" "}
+                    <strong>Notes:</strong>{" "}
                     {conflictData.onlineAdventure.storyTemplate?.lore?.length ||
                       0}{" "}
                     entries

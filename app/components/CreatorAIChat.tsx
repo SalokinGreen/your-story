@@ -1862,7 +1862,7 @@ function ChangeSummary({
   if (data.lore?.length) {
     changes.push({
       type: "Add/Update",
-      label: "Lore",
+      label: "Notes",
       value: `${data.lore.length} entries`,
       details: data.lore,
       icon: "Scroll",

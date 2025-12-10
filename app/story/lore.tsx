@@ -47,7 +47,7 @@ export default function LorePage(props: LorePageProps) {
           <div>
             <h2 className="text-lg font-semibold text-white flex items-center gap-2">
               <DynamicIcon name="Book" className="w-5 h-5 text-purple-400" />
-              Story Lore
+              Story Notes
             </h2>
             <p className="text-xs text-blue-200/40 mt-0.5">
               Discover the world, characters, and secrets
@@ -70,7 +70,7 @@ export default function LorePage(props: LorePageProps) {
         <div className="relative">
           <input
             type="text"
-            placeholder="Search lore entries..."
+            placeholder="Search notes..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full px-3 py-2 pl-9 bg-blue-900/50 border border-blue-800/30 rounded-lg text-white text-sm placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -96,13 +96,13 @@ export default function LorePage(props: LorePageProps) {
         {/* Lore List */}
         <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 xl:col-span-2">
           <h3 className="text-base font-semibold text-white mb-3">
-            Discovered Lore
+            Discovered Notes
           </h3>
 
           {visibleLore.length === 0 && !searchTerm && (
             <div className="text-center py-8">
               <p className="text-sm text-blue-200/40">
-                No lore discovered yet. Continue your adventure!
+                No notes discovered yet. Continue your adventure!
               </p>
             </div>
           )}
@@ -110,7 +110,7 @@ export default function LorePage(props: LorePageProps) {
           {visibleLore.length === 0 && searchTerm && (
             <div className="text-center py-8">
               <p className="text-sm text-blue-200/40">
-                No lore entries match your search.
+                No notes match your search.
               </p>
             </div>
           )}

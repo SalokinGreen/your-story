@@ -19,6 +19,10 @@ import {
   REST_CONFIG,
   StoryThread,
 } from "@/app/misc/structs";
+import {
+  CharacterFieldValue,
+  recalculateDerivedFields,
+} from "@/app/misc/characterSchema";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
 import { logger } from "@/app/misc/logger";
@@ -34,7 +38,6 @@ import {
   parseChallengeRoundsValue,
   RPGSystemType,
 } from "@/app/misc/rpgSystems";
-import { calculateLevel } from "@/app/misc/leveling";
 
 /**
  * Calculate relationship value change based on magnitude, difficulty, and current value.
@@ -121,48 +124,6 @@ function calculateRelationshipDelta(
 }
 
 /**
- * Calculate stat change based on magnitude and difficulty.
- * Stats are 0-100 scale, so changes are absolute values.
- */
-function calculateStatDelta(
-  magnitude: string,
-  difficulty: AdventureDifficulty = "medium"
-): number {
-  // Base changes (absolute values on 0-100 scale)
-  const baseMagnitudes: Record<string, number> = {
-    // Negative (weakening)
-    greatly_weaken: -15,
-    weaken: -10,
-    slightly_weaken: -5,
-    // Positive (strengthening)
-    slightly_strengthen: 5,
-    strengthen: 10,
-    greatly_strengthen: 15,
-  };
-
-  // Difficulty multipliers (harder = less gains, more losses)
-  const difficultyMultipliers: Record<
-    AdventureDifficulty,
-    { gain: number; loss: number }
-  > = {
-    easy: { gain: 1.2, loss: 0.8 },
-    medium: { gain: 1.0, loss: 1.0 },
-    hard: { gain: 0.8, loss: 1.2 },
-    expert: { gain: 0.6, loss: 1.4 },
-  };
-
-  const baseChange = baseMagnitudes[magnitude] || 0;
-  const isStrengthening = baseChange > 0;
-  const diffMult =
-    difficultyMultipliers[difficulty] || difficultyMultipliers.medium;
-
-  const multiplier = isStrengthening ? diffMult.gain : diffMult.loss;
-  const finalChange = Math.round(baseChange * multiplier);
-
-  return finalChange;
-}
-
-/**
  * Calculate durability change based on magnitude and difficulty.
  * Returns percentage-based change scaled to item's max durability.
  */
@@ -225,29 +186,11 @@ export interface ExecuteToolsResult {
  * for the story generation stage. Includes both tool names and their command equivalents.
  */
 const STATE_CHANGE_TOOLS = new Set([
-  // Stats - tool names and command names
-  "adjust_stat",
-  "modify_stat",
-  "set_stat",
-  "create_stat",
-  // Resources - tool names and command names
-  "adjust_resource",
-  "set_resource",
-  "set_resource_max",
-  "create_resource",
-  "add_resource",
-  "delete_resource",
-  "remove_resource",
-  // Items - tool names and command names
-  "add_item",
-  "remove_item",
-  "modify_item",
-  "break_item",
-  "consume_item",
-  "repair_item",
-  "damage_item",
-  "upgrade_item",
-  "set_item_durability",
+  // Character Fields (CharacterSchema system)
+  "modify_field",
+  "set_field",
+  "add_list_item",
+  "remove_list_item",
   // Abilities - tool names and command names
   "add_ability",
   "remove_ability",
@@ -265,11 +208,6 @@ const STATE_CHANGE_TOOLS = new Set([
   "upgrade_condition",
   "downgrade_condition",
   "remove_condition",
-  // Relationships - tool names and command names
-  "add_relationship",
-  "modify_relationship",
-  "delete_relationship",
-  "update_relationship_description",
   // NPC Management
   "add_npc",
   // Achievements - tool names and command names
@@ -528,6 +466,33 @@ export function executeTools(
         continue;
       }
 
+      // === CHARACTER FIELD TOOLS (CharacterSchema system) ===
+      if (
+        [
+          "modify_field",
+          "set_field",
+          "add_list_item",
+          "remove_list_item",
+        ].includes(toolCall.function.name)
+      ) {
+        const fieldResult = executeCharacterFieldTool(
+          toolCall.function.name,
+          args,
+          storyData,
+          toolId
+        );
+        responses.push({
+          ...fieldResult,
+          toolCallId: toolCall.id,
+        });
+        if (fieldResult.success && STATE_CHANGE_TOOLS.has(toolName)) {
+          stateChanges.push(
+            fieldResult.message.replace(/^[✓✗⚠️\s]+/, "").trim()
+          );
+        }
+        continue;
+      }
+
       // Special handling for list_inactive_lore (query tool - returns data directly)
       if (toolCall.function.name === "list_inactive_lore") {
         logger.action("Special handling: list_inactive_lore", {
@@ -713,131 +678,6 @@ export function executeTools(
 
         // Both succeeded - combine messages
         const successMsg = `${descResponse.message} and updated short description`;
-        logger.action(`Tool call succeeded: ${successMsg}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: successMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Special handling for modify_relationship - calculate delta from magnitude
-      // Need to execute two commands if description provided: modify value, then update description
-      if (toolCall.function.name === "modify_relationship") {
-        // Find current relationship value for delta calculation
-        const relationships = storyData.relationships || [];
-        const existingRel = relationships.find(
-          (r) => r.name.toLowerCase() === args.name?.toLowerCase()
-        );
-        const currentValue = existingRel?.value ?? 0;
-        const difficulty = storyData.difficulty || "medium";
-
-        // Calculate actual delta from magnitude
-        const valueDelta = calculateRelationshipDelta(
-          args.magnitude || "slightly_improve",
-          currentValue,
-          difficulty as AdventureDifficulty
-        );
-
-        logger.action("Special handling: modify_relationship with magnitude", {
-          toolCallId: toolId,
-          relationshipName: args.name,
-          magnitude: args.magnitude,
-          currentValue,
-          calculatedDelta: valueDelta,
-          difficulty,
-        });
-
-        // First: modify the value
-        const valueCommand = `/modify_relationship: ${args.name} | ${valueDelta}`;
-        logger.action(`Executing command: ${valueCommand}`, {
-          toolCallId: toolId,
-        });
-        const valueResponse = executeCommandWithResponse(
-          valueCommand,
-          storyData
-        );
-
-        if (!valueResponse || !valueResponse.success) {
-          const errorMsg =
-            valueResponse?.message || `Failed to modify relationship value`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-            command: valueCommand,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // If no description provided, we're done
-        if (!args.description) {
-          const magnitudeLabel = (args.magnitude || "slightly_improve").replace(
-            /_/g,
-            " "
-          );
-          const successMsg = `${valueResponse.message} (${magnitudeLabel})`;
-          logger.action(`Tool call succeeded: ${successMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: true,
-            message: successMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-
-          // Add state change for relationship modification
-          if (STATE_CHANGE_TOOLS.has(toolName)) {
-            stateChanges.push(successMsg);
-          }
-          continue;
-        }
-
-        // Second: update the description
-        const descCommand = `/update_relationship_description: ${args.name} | ${args.description}`;
-        logger.action(`Executing command: ${descCommand}`, {
-          toolCallId: toolId,
-        });
-        const descResponse = executeCommandWithResponse(descCommand, storyData);
-
-        if (!descResponse || !descResponse.success) {
-          // Value was updated but description failed - return partial success
-          const partialMsg = `${
-            valueResponse.message
-          } (description update failed: ${
-            descResponse?.message || "unknown error"
-          })`;
-          logger.warn(`Tool call partial success: ${partialMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: true,
-            message: partialMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Both succeeded - combine messages
-        const successMsg = `${valueResponse.message} and updated description`;
         logger.action(`Tool call succeeded: ${successMsg}`, {
           toolCallId: toolId,
           toolName,
@@ -1823,8 +1663,6 @@ export function executeTools(
         const majority = Math.ceil(challenge.rounds / 2);
         let autoResolved = false;
         let autoResult: "won" | "lost" | null = null;
-        let leveledUp = false;
-        let newLevel = storyData.level || 1;
 
         if (challenge.currentSuccesses >= majority) {
           autoResolved = true;
@@ -1833,18 +1671,10 @@ export function executeTools(
           challenge.resolvedAt = Date.now();
           challenge.result = "won";
 
-          // Award XP and update level
+          // Award points
           if (challenge.pointsAwarded && challenge.pointsAwarded > 0) {
-            const oldLevel = storyData.level || 1;
             storyData.points =
               (storyData.points || 0) + challenge.pointsAwarded;
-            const level = calculateLevel(
-              storyData.points || 0,
-              storyData.levelingSettings
-            );
-            storyData.level = level;
-            newLevel = level;
-            leveledUp = level > oldLevel;
           }
         } else if (challenge.currentFailures >= majority) {
           autoResolved = true;
@@ -1873,9 +1703,7 @@ export function executeTools(
           if (autoResult === "won") {
             message += `\n🏆 CHALLENGE WON: ${challenge.name}!${
               challenge.pointsAwarded
-                ? ` (+${challenge.pointsAwarded} XP${
-                    leveledUp ? `, Level Up to ${newLevel}!` : ""
-                  })`
+                ? ` (+${challenge.pointsAwarded} points)`
                 : ""
             }`;
           } else {
@@ -1946,27 +1774,15 @@ export function executeTools(
         challenge.result = result;
 
         let message = "";
-        let leveledUp = false;
-        let newLevel = storyData.level || 1;
         if (result === "won") {
-          // Award XP and update level
+          // Award points
           if (challenge.pointsAwarded && challenge.pointsAwarded > 0) {
-            const oldLevel = storyData.level || 1;
             storyData.points =
               (storyData.points || 0) + challenge.pointsAwarded;
-            const level = calculateLevel(
-              storyData.points || 0,
-              storyData.levelingSettings
-            );
-            storyData.level = level;
-            newLevel = level;
-            leveledUp = level > oldLevel;
           }
           message = `🏆 CHALLENGE WON: ${challenge.name}!${
             challenge.pointsAwarded
-              ? ` (+${challenge.pointsAwarded} XP${
-                  leveledUp ? `, Level Up to ${newLevel}!` : ""
-                })`
+              ? ` (+${challenge.pointsAwarded} points)`
               : ""
           }${reason ? ` - ${reason}` : ""}`;
         } else {
@@ -1980,7 +1796,7 @@ export function executeTools(
           name: challenge.name,
           result,
           reason,
-          xpAwarded: result === "won" ? challenge.pointsAwarded : 0,
+          pointsAwarded: result === "won" ? challenge.pointsAwarded : 0,
         });
         responses.push({
           command: `/resolve_challenge: ${result}`,
@@ -2055,11 +1871,11 @@ export function executeTools(
       }
 
       // === ADD NPC TOOL HANDLER ===
-      // Creates both a relationship entry and a lore entry for important NPCs
+      // Creates a lore entry for important NPCs
       if (toolCall.function.name === "add_npc") {
         const name = args.name?.trim();
         const role = args.role?.trim();
-        const disposition = args.disposition ?? 0;
+        const disposition = args.disposition?.trim() || "neutral";
         const appearance = args.appearance?.trim();
         const personality = args.personality?.trim();
         const motivation = args.motivation?.trim();
@@ -2115,29 +1931,6 @@ export function executeTools(
           continue;
         }
 
-        // Check for duplicate relationship
-        if (!storyData.relationships) {
-          storyData.relationships = [];
-        }
-        const existingRelationship = storyData.relationships.find(
-          (r) => r.name.toLowerCase() === name.toLowerCase()
-        );
-        if (existingRelationship) {
-          const errorMsg = `NPC "${name}" already exists as a relationship`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/add_npc: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
         // Check for duplicate lore
         if (!storyData.lore) {
           storyData.lore = [];
@@ -2161,17 +1954,9 @@ export function executeTools(
           continue;
         }
 
-        // Create relationship entry
-        const clampedDisposition = Math.max(-100, Math.min(100, disposition));
-        storyData.relationships.push({
-          name,
-          value: clampedDisposition,
-          description: role,
-          symbol: "👤", // Default person symbol for NPCs
-        });
-
         // Build lore content
         let loreContent = `**${role}**\n\n`;
+        loreContent += `**Disposition:** ${disposition}\n\n`;
         loreContent += `**Appearance:** ${appearance}\n\n`;
         loreContent += `**Personality:** ${personality}\n\n`;
         if (motivation) {
@@ -2214,36 +1999,25 @@ export function executeTools(
         // Mark lore as dirty for embedding sync
         storyData.loreEmbeddingsDirty = true;
 
-        const dispositionLabel =
-          clampedDisposition >= 50
-            ? "friendly"
-            : clampedDisposition >= 20
-            ? "warm"
-            : clampedDisposition > -20
-            ? "neutral"
-            : clampedDisposition > -50
-            ? "wary"
-            : "hostile";
-
         logger.action("NPC added via tool", {
           toolCallId: toolId,
           name,
           role,
-          disposition: clampedDisposition,
+          disposition,
           hasSecret: !!secret,
         });
 
         responses.push({
           command: `/add_npc: ${name}`,
           success: true,
-          message: `✓ Added NPC: ${name} (${role}) - ${dispositionLabel} disposition (${clampedDisposition})`,
+          message: `✓ Added NPC: ${name} (${role}) - ${disposition}`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
 
         // Add state change for the story stage
         stateChanges.push(
-          `New NPC introduced: ${name} (${role}, ${dispositionLabel})`
+          `New NPC introduced: ${name} (${role}, ${disposition})`
         );
         continue;
       }
@@ -2715,96 +2489,12 @@ function convertToolToCommand(
     case "delete_quest":
       return `/delete_quest: ${args.title}`;
 
-    // Item Management
-    case "add_item": {
-      // Validate and normalize item type - AI sometimes uses invalid types like "utility"
-      const validTypes = ["normal", "consumable", "story", "misc"];
-      const itemType = validTypes.includes(args.type?.toLowerCase())
-        ? args.type.toLowerCase()
-        : "normal"; // Default to normal if invalid type
-
-      // Include grade if specified
-      if (args.grade) {
-        return `/add_item: ${args.name} | ${args.description} | ${itemType} | ${args.quantity} | ${args.grade}`;
-      }
-      return `/add_item: ${args.name} | ${args.description} | ${itemType} | ${args.quantity}`;
-    }
-
-    case "remove_item":
-      return `/remove_item: ${args.name} | ${args.quantity}`;
-
-    case "modify_item":
-      // Handle new grade and durability parameters
-      if (args.durability !== undefined) {
-        return `/set_item_durability: ${args.name} | ${args.durability}`;
-      } else if (args.grade) {
-        return `/upgrade_item: ${args.name} | ${args.grade}`;
-      } else if (args.description && args.type) {
-        return `/modify_item: ${args.name} | ${args.description} | ${args.type}`;
-      } else if (args.description) {
-        return `/modify_item: ${args.name} | ${args.description}`;
-      } else if (args.type) {
-        return `/modify_item: ${args.name} | ${args.type}`;
-      }
-      return null; // No valid modifications specified
-
-    case "break_item":
-      return `/break_item: ${args.name}`;
-
-    case "consume_item":
-      // Use remove_item with quantity 1 to consume
-      return `/remove_item: ${args.name} | 1`;
-
-    case "repair_item":
-      // Magnitude-based repair - handled in executeTools special handling
+    // Character Field Management - handled directly in executeTools
+    case "modify_field":
+    case "set_field":
+    case "add_list_item":
+    case "remove_list_item":
       return null;
-
-    case "damage_item":
-      // Magnitude-based damage - handled in executeTools special handling
-      return null;
-
-    case "upgrade_item":
-      return `/upgrade_item: ${args.name} | ${args.newGrade}`;
-
-    // Resource Management
-    case "adjust_resource":
-      // Delta-based resource change - handled in executeTools
-      return null;
-
-    case "set_resource":
-      // Set resource values - use /modify_resource with deltas calculated from current values
-      // Note: We can't set absolute values directly, only adjust them
-      // This is a limitation of the current command system
-      if (args.currentValue !== undefined && args.maxValue !== undefined) {
-        // Would need current values to calculate deltas - not possible with command system
-        // Best we can do is use /set_resource_max for max and /modify_resource for current
-        return `/set_resource_max: ${args.name} | ${args.maxValue}`;
-      } else if (args.maxValue !== undefined) {
-        return `/set_resource_max: ${args.name} | ${args.maxValue}`;
-      }
-      // Can't set current value absolutely without knowing the current value
-      return null;
-
-    case "create_resource":
-      // Use /add_resource command: name | description | current | max
-      return `/add_resource: ${args.name} | ${args.description} | ${args.currentValue} | ${args.maxValue}`;
-
-    case "delete_resource":
-      // Use /remove_resource command: resource name
-      return `/remove_resource: ${args.name}`;
-
-    // Stat Management
-    case "adjust_stat": {
-      // Magnitude-based stat change
-      const delta = calculateStatDelta(args.magnitude, difficulty);
-      return `/modify_stat: ${args.name} | ${delta}`;
-    }
-
-    case "set_stat":
-      return `/set_stat: ${args.name} ${args.value}`;
-
-    case "create_stat":
-      return `/create_stat: ${args.name} | ${args.description} | ${args.value}`;
 
     // Achievement
     case "trigger_achievement":
@@ -2852,20 +2542,6 @@ function convertToolToCommand(
     // Momentum
     case "modify_momentum":
       return `/modify_momentum: ${args.amount >= 0 ? "+" : ""}${args.amount}`;
-
-    // Relationships
-    case "add_relationship":
-      return `/add_relationship: ${args.name} | ${args.value} | ${args.description}`;
-
-    case "modify_relationship":
-      // Handled by special logic in executeTools (magnitude-based calculation)
-      return null;
-
-    case "delete_relationship":
-      return `/delete_relationship: ${args.name}`;
-
-    case "edit_relationship":
-      return `/update_relationship_description: ${args.name} | ${args.description}`;
 
     // Ability Management
     case "add_ability": {
@@ -2950,6 +2626,521 @@ function convertToolToCommand(
 
     default:
       throw new Error(`Unhandled tool: ${toolName}`);
+  }
+}
+
+/**
+ * Execute character field management tools (CharacterSchema system)
+ * Returns CommandResponse for the operation
+ */
+function executeCharacterFieldTool(
+  toolName: string,
+  args: Record<string, any>,
+  storyData: StoryData,
+  toolId: string
+): Omit<CommandResponse, "toolCallId"> {
+  // Check if character schema exists
+  if (!storyData.characterSchema || !storyData.characterData) {
+    return {
+      command: toolName,
+      success: false,
+      message: "No character schema defined for this story",
+      timestamp: Date.now(),
+    };
+  }
+
+  const schema = storyData.characterSchema;
+  const data = storyData.characterData;
+
+  // Find field by name with fuzzy matching
+  const findField = (
+    fieldName: string
+  ): { field: (typeof schema.fields)[0]; id: string } | null => {
+    // Try exact match first (case insensitive)
+    const exactMatch = schema.fields.find(
+      (f) =>
+        f.name.toLowerCase() === fieldName.toLowerCase() ||
+        f.id.toLowerCase() === fieldName.toLowerCase()
+    );
+    if (exactMatch) {
+      return { field: exactMatch, id: exactMatch.id };
+    }
+
+    // Try fuzzy match
+    const match = findBestMatch(fieldName, schema.fields, (f) => f.name, 0.6);
+    if (match) {
+      return { field: match.item, id: match.item.id };
+    }
+
+    return null;
+  };
+
+  switch (toolName) {
+    case "modify_field": {
+      const found = findField(args.field);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Field "${args.field}" not found in character schema`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { field, id } = found;
+      const currentValue = data.values[id];
+      const delta = args.delta ?? 0;
+
+      if (field.type === "derived") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot modify derived field "${field.name}" - it is calculated automatically`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (field.type === "number") {
+        const oldValue = typeof currentValue === "number" ? currentValue : 0;
+        let newValue = oldValue + delta;
+
+        // Apply min/max constraints if defined
+        const numField = field as { min?: number; max?: number };
+        if (numField.min !== undefined && newValue < numField.min) {
+          newValue = numField.min;
+        }
+        if (numField.max !== undefined && newValue > numField.max) {
+          newValue = numField.max;
+        }
+
+        data.values[id] = newValue;
+        recalculateDerivedFields(schema, data.values);
+
+        const deltaStr = delta >= 0 ? `+${delta}` : `${delta}`;
+        logger.action(
+          `Modified field: ${field.name} ${deltaStr} (${oldValue} → ${newValue})`,
+          { toolId }
+        );
+        return {
+          command: toolName,
+          success: true,
+          message: `✓ ${field.name}: ${oldValue} ${deltaStr} → ${newValue}`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (field.type === "resource") {
+        const resourceValue =
+          typeof currentValue === "object" && "current" in currentValue
+            ? (currentValue as { current: number; max: number })
+            : { current: 0, max: 0 };
+
+        const oldCurrent = resourceValue.current;
+        let newCurrent = oldCurrent + delta;
+
+        // Clamp to 0 and max
+        newCurrent = Math.max(0, Math.min(newCurrent, resourceValue.max));
+
+        data.values[id] = { ...resourceValue, current: newCurrent };
+        recalculateDerivedFields(schema, data.values);
+
+        const deltaStr = delta >= 0 ? `+${delta}` : `${delta}`;
+        logger.action(
+          `Modified resource: ${field.name} ${deltaStr} (${oldCurrent} → ${newCurrent})`,
+          { toolId }
+        );
+        return {
+          command: toolName,
+          success: true,
+          message: `✓ ${field.name}: ${oldCurrent}/${resourceValue.max} ${deltaStr} → ${newCurrent}/${resourceValue.max}`,
+          timestamp: Date.now(),
+        };
+      }
+
+      return {
+        command: toolName,
+        success: false,
+        message: `Cannot modify ${field.type} field "${field.name}" by delta. Use set_field instead.`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "set_field": {
+      const found = findField(args.field);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Field "${args.field}" not found in character schema`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { field, id } = found;
+      const newValue = args.value;
+
+      if (field.type === "derived") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot set derived field "${field.name}" - it is calculated automatically`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (field.type === "number") {
+        if (typeof newValue !== "number") {
+          return {
+            command: toolName,
+            success: false,
+            message: `Field "${field.name}" requires a number value`,
+            timestamp: Date.now(),
+          };
+        }
+
+        let clampedValue = newValue;
+        const numField = field as { min?: number; max?: number };
+        if (numField.min !== undefined && clampedValue < numField.min) {
+          clampedValue = numField.min;
+        }
+        if (numField.max !== undefined && clampedValue > numField.max) {
+          clampedValue = numField.max;
+        }
+
+        const oldValue = data.values[id];
+        data.values[id] = clampedValue;
+        recalculateDerivedFields(schema, data.values);
+
+        logger.action(`Set field: ${field.name} = ${clampedValue}`, { toolId });
+        return {
+          command: toolName,
+          success: true,
+          message: `✓ Set ${field.name} to ${clampedValue}${
+            oldValue !== undefined ? ` (was ${oldValue})` : ""
+          }`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (field.type === "resource") {
+        const currentResource =
+          typeof data.values[id] === "object" &&
+          "current" in (data.values[id] as object)
+            ? (data.values[id] as { current: number; max: number })
+            : { current: 0, max: 0 };
+
+        let newResource = { ...currentResource };
+
+        if (typeof newValue === "object" && newValue !== null) {
+          if ("current" in newValue && typeof newValue.current === "number") {
+            newResource.current = Math.max(
+              0,
+              Math.min(newValue.current, newResource.max)
+            );
+          }
+          if ("max" in newValue && typeof newValue.max === "number") {
+            newResource.max = Math.max(1, newValue.max);
+            // Clamp current to new max
+            newResource.current = Math.min(
+              newResource.current,
+              newResource.max
+            );
+          }
+        } else if (typeof newValue === "number") {
+          // If just a number, set current value
+          newResource.current = Math.max(
+            0,
+            Math.min(newValue, newResource.max)
+          );
+        } else {
+          return {
+            command: toolName,
+            success: false,
+            message: `Field "${field.name}" requires a number or { current, max } object`,
+            timestamp: Date.now(),
+          };
+        }
+
+        data.values[id] = newResource;
+        recalculateDerivedFields(schema, data.values);
+
+        logger.action(
+          `Set resource: ${field.name} = ${newResource.current}/${newResource.max}`,
+          { toolId }
+        );
+        return {
+          command: toolName,
+          success: true,
+          message: `✓ Set ${field.name} to ${newResource.current}/${newResource.max}`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (field.type === "text") {
+        if (typeof newValue !== "string") {
+          return {
+            command: toolName,
+            success: false,
+            message: `Field "${field.name}" requires a string value`,
+            timestamp: Date.now(),
+          };
+        }
+
+        const oldValue = data.values[id];
+        data.values[id] = newValue;
+
+        logger.action(`Set text field: ${field.name} = "${newValue}"`, {
+          toolId,
+        });
+        return {
+          command: toolName,
+          success: true,
+          message: `✓ Set ${field.name} to "${newValue}"${
+            oldValue ? ` (was "${oldValue}")` : ""
+          }`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (field.type === "boolean") {
+        const boolValue =
+          typeof newValue === "boolean"
+            ? newValue
+            : newValue === "true" || newValue === true;
+        const oldValue = data.values[id];
+        data.values[id] = boolValue;
+
+        logger.action(`Set boolean field: ${field.name} = ${boolValue}`, {
+          toolId,
+        });
+        return {
+          command: toolName,
+          success: true,
+          message: `✓ Set ${field.name} to ${boolValue}${
+            oldValue !== undefined ? ` (was ${oldValue})` : ""
+          }`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (field.type === "select") {
+        if (typeof newValue !== "string") {
+          return {
+            command: toolName,
+            success: false,
+            message: `Field "${field.name}" requires a string value`,
+            timestamp: Date.now(),
+          };
+        }
+
+        // Validate against options if defined
+        const selectField = field as {
+          options?: Array<{ value: string; label: string }>;
+        };
+        if (selectField.options && selectField.options.length > 0) {
+          const validOption = selectField.options.find(
+            (opt) =>
+              opt.value.toLowerCase() === newValue.toLowerCase() ||
+              opt.label.toLowerCase() === newValue.toLowerCase()
+          );
+
+          if (!validOption) {
+            return {
+              command: toolName,
+              success: false,
+              message: `Field "${
+                field.name
+              }" has invalid option "${newValue}". Valid options: ${selectField.options
+                .map((o) => o.label)
+                .join(", ")}`,
+              timestamp: Date.now(),
+            };
+          }
+
+          const finalValue = validOption.value;
+          const oldValue = data.values[id];
+          data.values[id] = finalValue;
+
+          logger.action(`Set select field: ${field.name} = "${finalValue}"`, {
+            toolId,
+          });
+          return {
+            command: toolName,
+            success: true,
+            message: `✓ Set ${field.name} to "${validOption.label}"${
+              oldValue ? ` (was "${oldValue}")` : ""
+            }`,
+            timestamp: Date.now(),
+          };
+        }
+
+        // No options defined, allow any value
+        const oldValue = data.values[id];
+        data.values[id] = newValue;
+
+        logger.action(`Set select field: ${field.name} = "${newValue}"`, {
+          toolId,
+        });
+        return {
+          command: toolName,
+          success: true,
+          message: `✓ Set ${field.name} to "${newValue}"${
+            oldValue ? ` (was "${oldValue}")` : ""
+          }`,
+          timestamp: Date.now(),
+        };
+      }
+
+      if (field.type === "list") {
+        if (!Array.isArray(newValue)) {
+          return {
+            command: toolName,
+            success: false,
+            message: `Field "${field.name}" requires an array value. Use add_list_item/remove_list_item for single items.`,
+            timestamp: Date.now(),
+          };
+        }
+
+        data.values[id] = newValue;
+
+        logger.action(
+          `Set list field: ${field.name} = [${newValue.length} items]`,
+          { toolId }
+        );
+        return {
+          command: toolName,
+          success: true,
+          message: `✓ Set ${field.name} to [${newValue.join(", ")}]`,
+          timestamp: Date.now(),
+        };
+      }
+
+      // Fallback for any other field types
+      return {
+        command: toolName,
+        success: false,
+        message: `Unsupported field type for set_field`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "add_list_item": {
+      const found = findField(args.field);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Field "${args.field}" not found in character schema`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { field, id } = found;
+
+      if (field.type !== "list") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Field "${field.name}" is not a list field`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const currentList = Array.isArray(data.values[id])
+        ? (data.values[id] as string[])
+        : [];
+      const listField = field as { maxItems?: number };
+
+      if (
+        listField.maxItems !== undefined &&
+        currentList.length >= listField.maxItems
+      ) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Cannot add to "${field.name}": list is at maximum size (${listField.maxItems})`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const newList = [...currentList, args.item];
+      data.values[id] = newList;
+
+      logger.action(`Added to list: ${field.name} += "${args.item}"`, {
+        toolId,
+      });
+      return {
+        command: toolName,
+        success: true,
+        message: `✓ Added "${args.item}" to ${field.name} (${newList.length} items)`,
+        timestamp: Date.now(),
+      };
+    }
+
+    case "remove_list_item": {
+      const found = findField(args.field);
+      if (!found) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Field "${args.field}" not found in character schema`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const { field, id } = found;
+
+      if (field.type !== "list") {
+        return {
+          command: toolName,
+          success: false,
+          message: `Field "${field.name}" is not a list field`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const currentList = Array.isArray(data.values[id])
+        ? (data.values[id] as string[])
+        : [];
+
+      // Find item with fuzzy matching
+      const itemMatch = findBestMatch(
+        args.item,
+        currentList,
+        (item) => item,
+        0.6
+      );
+      if (!itemMatch) {
+        return {
+          command: toolName,
+          success: false,
+          message: `Item "${args.item}" not found in "${field.name}"`,
+          timestamp: Date.now(),
+        };
+      }
+
+      const matchedItem = itemMatch.item;
+      const newList = currentList.filter((item) => item !== matchedItem);
+      data.values[id] = newList;
+
+      logger.action(`Removed from list: ${field.name} -= "${matchedItem}"`, {
+        toolId,
+      });
+      return {
+        command: toolName,
+        success: true,
+        message: `✓ Removed "${matchedItem}" from ${field.name} (${newList.length} items remaining)`,
+        timestamp: Date.now(),
+      };
+    }
+
+    default:
+      return {
+        command: toolName,
+        success: false,
+        message: `Unknown character field tool: ${toolName}`,
+        timestamp: Date.now(),
+      };
   }
 }
 

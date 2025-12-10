@@ -9,7 +9,6 @@ import {
   Resource,
   InventoryItem,
   Ability,
-  UPGRADE_COSTS,
   Preset,
   CommandResponse,
   getMemoryContent,
@@ -37,14 +36,13 @@ import {
   GRADE_CONFIG,
   ItemGrade,
 } from "../misc/itemSystem";
-import { addXP, initializeLevel, getAvailableUpgrades } from "../misc/leveling";
 import { MODEL_PRESETS } from "../misc/ai_prices";
 import Story from "./story";
 import StatsPage from "./stats";
 import LorePage from "./lore";
 import QuestsPage from "./quests";
+import AchievementsPage from "./achievements";
 import MenuPage from "./menu";
-import UpgradesPage from "./upgrades";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
@@ -88,7 +86,6 @@ function getModelsFromPreset() {
   );
 
   // Advanced toggle settings
-  const advancedGM = localStorage.getItem("advancedGM") === "true";
   const advancedChoices = localStorage.getItem("advancedChoices") === "true";
 
   // For custom preset, check if user has overridden any models
@@ -104,23 +101,15 @@ function getModelsFromPreset() {
     };
   }
 
-  // For non-custom presets, apply advanced toggles if available
-  const baseToolsModel = preset.toolsModel;
-  const baseChoicesModel = preset.choicesModel;
-
-  const effectiveToolsModel =
-    advancedGM && preset.advancedToolsModel
-      ? preset.advancedToolsModel
-      : baseToolsModel;
-
+  // For non-custom presets, apply advanced choices toggle if available
   const effectiveChoicesModel =
     advancedChoices && preset.advancedChoicesModel
       ? preset.advancedChoicesModel
-      : baseChoicesModel;
+      : preset.choicesModel;
 
   return {
     storyModel: preset.storyModel,
-    toolsModel: effectiveToolsModel,
+    toolsModel: preset.toolsModel,
     choicesModel: effectiveChoicesModel,
     novelaiEnabled,
     novelaiKey,
@@ -130,6 +119,7 @@ function getModelsFromPreset() {
 
 import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
+import PlayerQuestionModal from "../components/PlayerQuestionModal";
 import SyncConflictModal from "../components/SyncConflictModal";
 import SyncIndicator from "../components/SyncIndicator";
 import { authenticatedFetch, getAuthToken } from "../misc/getAuthToken";
@@ -293,7 +283,6 @@ enum StoryState {
   LORE = "LORE",
   QUESTS = "QUESTS",
   ACHIEVEMENTS = "ACHIEVEMENTS",
-  UPGRADES = "UPGRADES",
   MENU = "MENU",
   LOGS = "LOGS",
   CONTEXT = "CONTEXT",
@@ -465,27 +454,13 @@ export function processCommands(
 
       if (existing && !existing.dateAchieved) {
         existing.dateAchieved = new Date();
-        const xpResult = addXP(storyData, existing.points);
+        storyData.points = (storyData.points || 0) + existing.points;
         logger.action("Achievement unlocked via command", {
           title: existing.title,
           points: existing.points,
         });
         addNotification(`Achievement Unlocked: ${existing.title}`, "success");
-        addNotification(
-          `+${existing.points} XP!${
-            xpResult.leveledUp
-              ? ` 🎉 Level Up! Level ${xpResult.newLevel}!`
-              : ""
-          }`,
-          "success"
-        );
-        // Track level up for AI context
-        if (xpResult.leveledUp) {
-          trackPlayerAction(
-            storyData,
-            `Leveled up to Level ${xpResult.newLevel} (from achievement: ${existing.title})`
-          );
-        }
+        addNotification(`+${existing.points} points!`, "success");
       } else if (!existing) {
         logger.warn("Achievement not found - exact match required", {
           achievement: achievementTitle,
@@ -601,35 +576,14 @@ export function processCommands(
 
       if (quest && !quest.fulfilled) {
         quest.fulfilled = true;
-        logger.action("Quest completed via command", { title: quest.title });
-
-        // Award XP if not already awarded
+        // Award points if not already earned
         if (!storyData.earnedPointsFromQuests.includes(quest.id)) {
+          storyData.points = (storyData.points || 0) + quest.points;
           storyData.earnedPointsFromQuests.push(quest.id);
-          const xpResult = addXP(storyData, quest.points);
-          logger.action("XP awarded for quest", {
-            xp: quest.points,
-            totalXP: storyData.points,
-          });
-          addNotification(`Quest completed: ${quest.title}`, "success");
-          addNotification(
-            `+${quest.points} XP!${
-              xpResult.leveledUp
-                ? ` 🎉 Level Up! Level ${xpResult.newLevel}!`
-                : ""
-            }`,
-            "success"
-          );
-          // Track level up for AI context
-          if (xpResult.leveledUp) {
-            trackPlayerAction(
-              storyData,
-              `Leveled up to Level ${xpResult.newLevel} (from quest: ${quest.title})`
-            );
-          }
-        } else {
-          addNotification(`Quest completed: ${quest.title}`, "success");
+          addNotification(`+${quest.points} points!`, "success");
         }
+        logger.action("Quest completed via command", { title: quest.title });
+        addNotification(`Quest completed: ${quest.title}`, "success");
       } else if (!quest) {
         logger.warn("Quest not found or no fuzzy match", {
           quest: questTitle,
@@ -1613,6 +1567,10 @@ function StoryPageContent() {
     advantageSources?: string;
     disadvantageSources?: string;
     diceRolls?: number[][]; // Individual dice for each roll (for 3d6 system)
+    // Formula-based rolls (generic mode) - when provided, uses simplified display
+    formula?: string; // The formula used (e.g., "1d20+{{STR}}")
+    resolvedFormula?: string; // Formula with variables resolved (e.g., "1d20+5")
+    // Legacy RPG system type (backward compatibility)
     rpgSystem?:
       | "3d6"
       | "1d20"
@@ -1647,6 +1605,27 @@ function StoryPageContent() {
   const [pendingCommandResponses, setPendingCommandResponses] = useState<
     CommandResponse[]
   >([]);
+
+  // GM Stage player question state
+  const [playerQuestion, setPlayerQuestion] = useState<{
+    isOpen: boolean;
+    question: string;
+    context: string;
+    options?: string[];
+    allowCustom: boolean;
+    // Store context needed to resume generation after answer
+    pendingUserChoice: string;
+    gmResults: GMToolResult[];
+    gmStoryContext: string;
+  }>({
+    isOpen: false,
+    question: "",
+    context: "",
+    allowCustom: true,
+    pendingUserChoice: "",
+    gmResults: [],
+    gmStoryContext: "",
+  });
 
   // Story part navigation
   const [viewingPartIndex, setViewingPartIndex] = useState<number | null>(null);
@@ -1978,11 +1957,6 @@ function StoryPageContent() {
 
       //Initializequestarraysiftheydon'texist(forbackwardscompatibility)
       if (!loadedStoryData.quests) loadedStoryData.quests = [];
-      if (!loadedStoryData.earnedPointsFromQuests)
-        loadedStoryData.earnedPointsFromQuests = [];
-
-      // Initialize level from XP if not set (backward compatibility)
-      initializeLevel(loadedStoryData);
 
       //ProcessLoretriggersonloadtoinitializeLorevisibility
       processLoreTriggers(loadedStoryData, addNotification, true);
@@ -2356,30 +2330,13 @@ function StoryPageContent() {
     if (preset.authorNotes) updatedStoryData.author_notes = preset.authorNotes;
 
     // Determine starting choices - use custom ones if available, otherwise default
+    // Choices are now plain text only - GM stage handles all dice mechanics
     const startingChoices = updatedStoryData.starting_choices?.length
-      ? updatedStoryData.starting_choices.map((sc) => {
-          const choice: Choice = {
-            text: sc.text,
-            item_used: sc.item_used,
-            item_loss: sc.item_loss,
-            skill_used: sc.skill_used,
-            resource_used: sc.resource_used,
-            agmt_check: sc.agmt_check,
-            agmt_context_only: sc.agmt_context_only,
-            // Use unified table field, with fallback to legacy fields
-            table: sc.table || sc.agmt_table || sc.custom_table,
-            // Include intro_override so it can be used when this choice is selected
-            intro_override: sc.intro_override,
-          };
-
-          if (typeof sc.skill_dc === "number") {
-            choice.skill_dc = sc.skill_dc;
-          } else if (sc.skill_dc) {
-            choice.skill_dc_tier = sc.skill_dc as Choice["skill_dc_tier"];
-          }
-
-          return choice;
-        })
+      ? updatedStoryData.starting_choices.map((sc) => ({
+          text: sc.text,
+          // Include intro_override so it can be used when this choice is selected
+          intro_override: sc.intro_override,
+        }))
       : [{ text: "Start Story" }];
 
     // Determine intro content - priority order:
@@ -2707,8 +2664,8 @@ function StoryPageContent() {
           : true;
       const gmStageEnabled =
         typeof window !== "undefined"
-          ? localStorage.getItem("gmStageEnabled") === "true"
-          : false;
+          ? localStorage.getItem("gmStageEnabled") !== "false"
+          : true;
 
       // Track parallel completion of tools and choices
       let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -2750,6 +2707,25 @@ function StoryPageContent() {
           abortSignal: generationAbortRef.current.signal,
         },
         {
+          onGMStageStart: () => {
+            setLoadingStage("gm");
+            logger.action("GM stage started (custom input)");
+          },
+          onGMStageComplete: (gmResults, storyContext, usage) => {
+            logger.ai_response("GM stage complete (custom input)", {
+              toolCount: gmResults.length,
+              contextLength: storyContext.length,
+              usage,
+            });
+            // Store GM results in the partial part
+            if (gmResults.length > 0) {
+              partialPart.gmToolCalls = gmResults;
+            }
+            if (storyContext) {
+              partialPart.gmStoryContext = storyContext;
+            }
+            setLoadingStage("story");
+          },
           onStoryContent: (chunk: string, fullContent: string) => {
             // Update partial part as content streams
             partialPart.content = fullContent;
@@ -2918,8 +2894,8 @@ function StoryPageContent() {
     // The GM Stage will determine mechanics during generation
     const gmStageEnabled =
       typeof window !== "undefined"
-        ? localStorage.getItem("gmStageEnabled") === "true"
-        : false;
+        ? localStorage.getItem("gmStageEnabled") !== "false"
+        : true;
 
     if (gmStageEnabled) {
       logger.action("GM Stage enabled - skipping action analysis", {
@@ -4712,6 +4688,8 @@ function StoryPageContent() {
     // Process context rolls from action analysis
     if (choice.rolls && choice.rolls.length > 0) {
       for (const roll of choice.rolls) {
+        // Skip rolls without dice notation
+        if (!roll.dice) continue;
         try {
           // Parse dice notation (e.g., "1d4", "2d6", "1d20+5")
           const diceMatch = roll.dice.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
@@ -4831,8 +4809,8 @@ function StoryPageContent() {
         : true;
     const gmStageEnabled =
       typeof window !== "undefined"
-        ? localStorage.getItem("gmStageEnabled") === "true"
-        : false;
+        ? localStorage.getItem("gmStageEnabled") !== "false"
+        : true;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -4979,16 +4957,30 @@ function StoryPageContent() {
                 usage,
               });
 
-              // Find skill_check or challenge_check results to show dice
+              // Store GM results in the partial part - they'll be saved to scene when content streams
+              if (gmResults.length > 0) {
+                partialPart.gmToolCalls = gmResults;
+              }
+              if (storyContext) {
+                partialPart.gmStoryContext = storyContext;
+              }
+
+              // Find skill_check, challenge_check, or formula_roll results to show dice
               const checkResult = gmResults.find(
                 (r) =>
                   r.toolName === "skill_check" ||
                   r.toolName === "challenge_check"
               );
 
+              // Also check for formula_roll results
+              const formulaResult = gmResults.find(
+                (r) => r.toolName === "formula_roll"
+              );
+
+              const rpgSystemId = storyData.rpgSystem || "3d6";
+
               if (checkResult && checkResult.result) {
                 const result = checkResult.result as GMCheckResult;
-                const rpgSystemId = storyData.rpgSystem || "3d6";
 
                 // Trigger dice visualizer with GM stage roll data
                 setDiceRoll({
@@ -5026,6 +5018,41 @@ function StoryPageContent() {
                   dc: result.dc,
                   success: result.success,
                 });
+              } else if (formulaResult && formulaResult.result) {
+                // Handle formula_roll results (custom formula-based dice rolls)
+                const result =
+                  formulaResult.result as import("@/app/misc/gmExecutor").GMFormulaRollResult;
+
+                // Trigger dice visualizer with formula roll data (generic mode)
+                const dc = typeof result.dc === "number" ? result.dc : 0;
+                setDiceRoll({
+                  show: true,
+                  rolls: result.rolls || [],
+                  finalRoll: result.total,
+                  skillName: result.displayName || result.reason || "Roll",
+                  skillBonus: 0, // Formula rolls handle bonuses internally
+                  dc,
+                  isSuccess: result.success ?? true,
+                  isPartial: false, // Formula rolls don't have partial success
+                  isCritical: false,
+                  hasAdvantage: false,
+                  hasDisadvantage: false,
+                  diceRolls: [result.rolls || []],
+                  // Use generic mode (formula-based) instead of rpgSystem
+                  formula: result.formula,
+                  resolvedFormula: result.resolvedFormula,
+                });
+
+                logger.action(
+                  "Dice visualizer triggered from GM formula_roll",
+                  {
+                    formula: result.formula,
+                    resolvedFormula: result.resolvedFormula,
+                    total: result.total,
+                    dc: result.dc,
+                    success: result.success,
+                  }
+                );
               }
 
               setLoadingStage("story");
@@ -5121,6 +5148,35 @@ function StoryPageContent() {
               });
             },
             onComplete: (result) => {
+              // Check if GM stage is asking a player question
+              if (result.playerQuestion && !result.success) {
+                // Store the question and pause generation
+                setPlayerQuestion({
+                  isOpen: true,
+                  question: result.playerQuestion.question,
+                  context: result.playerQuestion.context,
+                  options: result.playerQuestion.options,
+                  allowCustom: result.playerQuestion.allowCustom,
+                  pendingUserChoice: actionChoice?.text || choice?.text || "",
+                  gmResults: result.gmResults || [],
+                  gmStoryContext: result.gmStoryContext || "",
+                });
+
+                // Update balance but don't complete generation
+                if (result.meta.balance !== undefined) {
+                  setTokenBalance(result.meta.balance);
+                }
+
+                // Keep loading state but switch to "waiting for player"
+                setLoadingStage(null);
+                setLoading(false);
+
+                logger.action("Generation paused for player question", {
+                  question: result.playerQuestion.question,
+                });
+                return;
+              }
+
               // Update token balance
               if (result.meta.balance !== undefined) {
                 setTokenBalance(result.meta.balance);
@@ -5129,32 +5185,10 @@ function StoryPageContent() {
               // Check for chapter completion
               if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
                 const currentChapter = storyData.chapters.length;
-                if (
-                  !storyData.earnedPointsFromChapters.includes(currentChapter)
-                ) {
-                  storyData.earnedPointsFromChapters.push(currentChapter);
-                  const xpResult = addXP(
-                    storyData,
-                    UPGRADE_COSTS.CHAPTER_REWARD
-                  );
-                  addNotification(
-                    `Chapter ${currentChapter} Complete! +${
-                      UPGRADE_COSTS.CHAPTER_REWARD
-                    } XP${
-                      xpResult.leveledUp
-                        ? ` 🎉 Level Up! You are now Level ${xpResult.newLevel}!`
-                        : ""
-                    }`,
-                    "success"
-                  );
-                  // Track level up for AI context
-                  if (xpResult.leveledUp) {
-                    trackPlayerAction(
-                      storyData,
-                      `Leveled up to Level ${xpResult.newLevel} (from completing Chapter ${currentChapter})`
-                    );
-                  }
-                }
+                addNotification(
+                  `Chapter ${currentChapter} Complete!`,
+                  "success"
+                );
               }
 
               // Tick ability cooldowns at end of turn
@@ -5248,6 +5282,180 @@ function StoryPageContent() {
     addNotification("Generation stopped", "warning");
   }
 
+  // Handle player question answer from GM stage
+  async function handlePlayerQuestionAnswer(answer: string) {
+    if (!storyData) return;
+
+    logger.action("Player answered GM question", {
+      answer,
+      question: playerQuestion.question,
+    });
+
+    // Close the modal
+    setPlayerQuestion((prev) => ({ ...prev, isOpen: false }));
+
+    // Get model settings (same pattern as handleChoice)
+    const {
+      storyModel,
+      toolsModel,
+      choicesModel,
+      novelaiEnabled,
+      novelaiKey,
+      novelaiTemperature,
+    } = getModelsFromPreset();
+
+    const toolCallingEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("toolCallingEnabled") !== "false"
+        : true;
+    const maxToolLoops =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("maxToolLoops") || "1", 10)
+        : 1;
+    const customMaxContext =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
+        : 36000;
+    const customMaxOutput =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
+        : 4000;
+    const embeddingsEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("embeddingsEnabled") === "true"
+        : false;
+    const embeddingThreshold =
+      typeof window !== "undefined"
+        ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
+        : 0.25;
+    const usePrefill =
+      typeof window !== "undefined"
+        ? localStorage.getItem("usePrefill") !== "false"
+        : true;
+
+    // Add the player's answer to pending actions so it's included in the story prompt
+    // Format: "[Player answered: <question>: <answer>]"
+    const answerContext = `[Player answered: "${playerQuestion.question}": ${answer}]`;
+
+    // Add the GM results context + player answer to the story context
+    const enrichedGMContext = playerQuestion.gmStoryContext
+      ? `${playerQuestion.gmStoryContext}\n\n${answerContext}`
+      : answerContext;
+
+    // Resume generation with the enriched context
+    setLoading(true);
+    setLoadingStage("story");
+
+    // Add the player answer as a pending player action so it's visible to the AI
+    storyData.pendingPlayerActions = storyData.pendingPlayerActions || [];
+    storyData.pendingPlayerActions.push(answerContext);
+
+    // Create abort controller for this generation
+    generationAbortRef.current = new AbortController();
+
+    // Now trigger generation again - the GM stage already ran, so we skip it
+    // and go directly to story generation with the GM context we saved
+    try {
+      await generateStoryTurn(
+        storyData,
+        "", // User choice already in storyData
+        {
+          storyModel,
+          toolsModel,
+          choicesModel,
+          enableTools: toolCallingEnabled,
+          maxToolLoops,
+          customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
+          customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
+          skipChoices: false,
+          novelaiEnabled: novelaiEnabled && !!novelaiKey,
+          novelaiKey,
+          novelaiTemperature,
+          openRouterKey,
+          deepseekKey,
+          googleKey,
+          storyId: storyDbId || undefined,
+          abortSignal: generationAbortRef.current?.signal,
+          enableEmbeddings: embeddingsEnabled,
+          embeddingThreshold,
+          samplingSettings: getSamplingSettings(),
+          usePrefill,
+          enableGMStage: false, // Skip GM stage - we already have the results
+        },
+        {
+          onStoryContent: (chunk, fullContent) => {
+            // Update partial content
+            const lastPart =
+              storyData.scene.parts[storyData.scene.parts.length - 1];
+            if (lastPart && !lastPart.user) {
+              lastPart.content = fullContent;
+              setStoryData({ ...storyData });
+            }
+          },
+          onToolsComplete: (toolCalls, toolResponses, stateChanges, usage) => {
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                toolCalls,
+                toolResponses,
+                stateChanges:
+                  stateChanges.length > 0 ? stateChanges : undefined,
+              };
+            }
+            setPendingCommandResponses(toolResponses);
+            setStoryData({ ...storyData });
+          },
+          onChoicesComplete: (newChoices, usage) => {
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                choices: newChoices,
+              };
+            }
+            setChoices({ choices: newChoices });
+            setStoryData({ ...storyData });
+          },
+          onComplete: (result) => {
+            if (result.meta.balance !== undefined) {
+              setTokenBalance(result.meta.balance);
+            }
+            setCanRetry(true);
+            setCanUndo(true);
+            setLoading(false);
+            setLoadingStage(null);
+            setPendingCommandResponses([]);
+            setStoryData({ ...storyData });
+            saveProgress(storyData, true);
+            logger.ai_response("Generation complete after player answer", {
+              totalTokenCost: result.meta.totalTokenCost,
+            });
+          },
+          onError: (error) => {
+            addNotification(`Error: ${error.message}`, "failure");
+            setLoading(false);
+            setLoadingStage(null);
+            setCanRetry(true);
+          },
+        },
+        pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined
+      );
+    } catch (error: any) {
+      addNotification(`Error: ${error.message}`, "failure");
+      setLoading(false);
+      setLoadingStage(null);
+    }
+  }
+
+  // Handle canceling the player question
+  function handlePlayerQuestionCancel() {
+    setPlayerQuestion((prev) => ({ ...prev, isOpen: false }));
+    setLoading(false);
+    setLoadingStage(null);
+    addNotification("Question cancelled - generation stopped", "warning");
+  }
+
   async function handleRetry() {
     if (!storyData || loading) return;
 
@@ -5339,8 +5547,8 @@ function StoryPageContent() {
         : true;
     const gmStageEnabled =
       typeof window !== "undefined"
-        ? localStorage.getItem("gmStageEnabled") === "true"
-        : false;
+        ? localStorage.getItem("gmStageEnabled") !== "false"
+        : true;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -5478,29 +5686,7 @@ function StoryPageContent() {
             // Check for chapter completion
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
               const currentChapter = storyData.chapters.length;
-              if (
-                !storyData.earnedPointsFromChapters.includes(currentChapter)
-              ) {
-                storyData.earnedPointsFromChapters.push(currentChapter);
-                const xpResult = addXP(storyData, UPGRADE_COSTS.CHAPTER_REWARD);
-                addNotification(
-                  `Chapter ${currentChapter} Complete! +${
-                    UPGRADE_COSTS.CHAPTER_REWARD
-                  } XP${
-                    xpResult.leveledUp
-                      ? ` 🎉 Level Up! You are now Level ${xpResult.newLevel}!`
-                      : ""
-                  }`,
-                  "success"
-                );
-                // Track level up for AI context
-                if (xpResult.leveledUp) {
-                  trackPlayerAction(
-                    storyData,
-                    `Leveled up to Level ${xpResult.newLevel} (from completing Chapter ${currentChapter})`
-                  );
-                }
-              }
+              addNotification(`Chapter ${currentChapter} Complete!`, "success");
             }
 
             // Process lore triggers based on new content
@@ -5682,41 +5868,6 @@ function StoryPageContent() {
     } finally {
       setLoading(false);
       setLoadingStage(null);
-    }
-  }
-
-  // Handle level-up upgrades (no longer costs points - limited by level)
-  async function handleUpgrade(callback: () => void) {
-    if (!storyData) return;
-
-    const availableUpgrades = getAvailableUpgrades(
-      storyData.level || 1,
-      storyData.upgradesSpent || 0,
-      storyData.difficulty,
-      storyData.levelingSettings
-    );
-
-    if (availableUpgrades > 0) {
-      callback(); // Execute the upgrade (will increment upgradesSpent)
-      setStoryData({ ...storyData });
-      const remainingUpgrades = getAvailableUpgrades(
-        storyData.level || 1,
-        storyData.upgradesSpent || 0,
-        storyData.difficulty,
-        storyData.levelingSettings
-      );
-      addNotification(
-        `Upgrade applied! (${remainingUpgrades} upgrade${
-          remainingUpgrades !== 1 ? "s" : ""
-        } remaining)`,
-        "success"
-      );
-      await saveProgress(storyData);
-    } else {
-      addNotification(
-        `No upgrades available! Earn more XP to gain additional upgrade points.`,
-        "failure"
-      );
     }
   }
 
@@ -6433,12 +6584,12 @@ function StoryPageContent() {
             {[
               { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
               { state: StoryState.STATS, icon: "BarChart2", label: "Stats" },
-              { state: StoryState.LORE, icon: "Scroll", label: "Lore" },
+              { state: StoryState.LORE, icon: "Scroll", label: "Notes" },
               { state: StoryState.QUESTS, icon: "Target", label: "Quests" },
               {
-                state: StoryState.UPGRADES,
-                icon: "ShoppingCart",
-                label: "Upgrades",
+                state: StoryState.ACHIEVEMENTS,
+                icon: "Trophy",
+                label: "Achievements",
               },
               { state: StoryState.MENU, icon: "Settings", label: "Menu" },
             ].map(({ state, icon, label }) => (
@@ -6498,8 +6649,8 @@ function StoryPageContent() {
           />
         )}
         {currentState === StoryState.QUESTS && <QuestsPage {...storyData} />}
-        {currentState === StoryState.UPGRADES && (
-          <UpgradesPage storyData={storyData} onUpgrade={handleUpgrade} />
+        {currentState === StoryState.ACHIEVEMENTS && (
+          <AchievementsPage {...storyData} />
         )}
         {currentState === StoryState.MENU && (
           <MenuPage
@@ -6544,6 +6695,17 @@ function StoryPageContent() {
         confirmButtonClass={confirmDialog.confirmButtonClass}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+
+      {/* GM Stage Player Question Modal */}
+      <PlayerQuestionModal
+        isOpen={playerQuestion.isOpen}
+        question={playerQuestion.question}
+        context={playerQuestion.context}
+        options={playerQuestion.options}
+        allowCustom={playerQuestion.allowCustom}
+        onAnswer={handlePlayerQuestionAnswer}
+        onCancel={handlePlayerQuestionCancel}
       />
 
       {/* Sync Conflict Modal */}
@@ -6711,6 +6873,8 @@ function StoryPageContent() {
           hasAdvantage={diceRoll.hasAdvantage}
           hasDisadvantage={diceRoll.hasDisadvantage}
           diceRolls={diceRoll.diceRolls}
+          formula={diceRoll.formula}
+          resolvedFormula={diceRoll.resolvedFormula}
           rpgSystem={diceRoll.rpgSystem}
           baseDice={diceRoll.baseDice}
           stressDice={diceRoll.stressDice}

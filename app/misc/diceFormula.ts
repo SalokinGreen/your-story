@@ -316,7 +316,9 @@ export function rollParsedFormula(
           rollStr += ` 💥×${result.explosions}`;
         }
         breakdownParts.push(
-          `${currentOperator === "-" ? "-" : ""}${result.notation}: ${rollStr} = ${result.subtotal}`
+          `${currentOperator === "-" ? "-" : ""}${
+            result.notation
+          }: ${rollStr} = ${result.subtotal}`
         );
         break;
       }
@@ -399,15 +401,6 @@ export function createCharacterResolver(
     // Check custom mappings first
     if (customMappings && name in customMappings) {
       return customMappings[name];
-    }
-
-    // Check for _mod suffix (D&D-style modifier)
-    if (name.endsWith("_mod")) {
-      const baseName = name.slice(0, -4);
-      const baseValue = characterData[baseName];
-      if (baseValue !== undefined) {
-        return Math.floor((baseValue - 10) / 2);
-      }
     }
 
     // Direct lookup
@@ -530,4 +523,41 @@ export function getRollValues(result: RollResult): number[] {
  */
 export function getTotalExplosions(result: RollResult): number {
   return result.rolls.reduce((sum, r) => sum + r.explosions, 0);
+}
+
+// ============================================
+// CHARACTER SCHEMA INTEGRATION
+// ============================================
+
+/**
+ * Create a variable resolver from CharacterSchema data
+ * This bridges the characterSchema.ts system with diceFormula.ts
+ */
+export function createSchemaBasedResolver(
+  characterValues: Record<string, unknown>,
+  additionalMappings?: Record<string, number>
+): VariableResolver {
+  return (name: string) => {
+    // Check additional mappings first (e.g., DC, advantage count)
+    if (additionalMappings && name in additionalMappings) {
+      return additionalMappings[name];
+    }
+
+    // Get value from character data
+    const value = characterValues[name];
+
+    if (value === undefined) {
+      return undefined;
+    }
+
+    // Handle different value types
+    if (typeof value === "number") return value;
+    if (typeof value === "boolean") return value ? 1 : 0;
+    if (typeof value === "object" && value !== null && "current" in value) {
+      return (value as { current: number }).current;
+    }
+    if (Array.isArray(value)) return value.length;
+
+    return undefined;
+  };
 }

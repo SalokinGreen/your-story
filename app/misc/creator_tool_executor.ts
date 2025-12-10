@@ -30,6 +30,13 @@ import {
   ItemGrade,
   AbilityGrade,
   NodeEffects,
+  CharacterSchema,
+  CharacterData,
+  SchemaField,
+  SchemaCategory,
+  SchemaPage,
+  SchemaResource,
+  CharacterFieldValue,
 } from "@/app/misc/structs";
 import { getCumulativeXPForLevel } from "@/app/misc/leveling";
 
@@ -70,6 +77,8 @@ export interface CreatorChanges {
   customTables?: CustomTable[];
   upgradeSettings?: Partial<UpgradeSettings>;
   levelingSettings?: Partial<LevelingSettings>;
+  characterSchema?: CharacterSchema;
+  characterData?: CharacterData;
 
   // Basic info changes
   story_name?: string;
@@ -1621,6 +1630,407 @@ export function executeCreatorTool(
         const removed = existingChoices.length - remaining.length;
         changesList.push(`Removed ${removed} starting choice(s)`);
         changes.startingChoices = remaining;
+        break;
+      }
+
+      // ============================================
+      // CHARACTER SCHEMA
+      // ============================================
+      case "set_character_schema": {
+        // Args come as direct properties (name, fields, categories, etc.), not nested in schema
+        const name = (args.name as string) || "Custom";
+        const fields = (args.fields as SchemaField[]) || [];
+        const categories = (args.categories as SchemaCategory[]) || [];
+        const description = (args.description as string) || "";
+        changes.characterSchema = {
+          version: 1,
+          name,
+          description,
+          fields,
+          categories,
+          template: undefined,
+          pages: [],
+          resources: [],
+          hasCustomJS: false,
+        };
+        changesList.push(`Set character schema: ${name}`);
+        break;
+      }
+
+      case "add_schema_fields": {
+        const fields = args.fields as SchemaField[];
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingFields = [...existingSchema.fields];
+
+        for (const field of fields) {
+          const existing = existingFields.find(
+            (f) =>
+              f.id === field.id ||
+              f.name.toLowerCase() === field.name.toLowerCase()
+          );
+          if (existing) {
+            changesList.push(`Field "${field.name}" already exists, skipped`);
+          } else {
+            existingFields.push(field);
+            changesList.push(
+              `Added schema field: ${field.name} [${field.type}]`
+            );
+          }
+        }
+
+        changes.characterSchema = {
+          ...existingSchema,
+          fields: existingFields,
+        };
+        break;
+      }
+
+      case "modify_schema_fields": {
+        const modifications = args.fields as Array<
+          Partial<SchemaField> & { id: string }
+        >;
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingFields = [...existingSchema.fields];
+
+        for (const mod of modifications) {
+          const idx = existingFields.findIndex((f) => f.id === mod.id);
+          if (idx === -1) {
+            changesList.push(`Field "${mod.id}" not found, skipped`);
+            continue;
+          }
+          // Use type assertion for the merge since we know the types match
+          existingFields[idx] = {
+            ...existingFields[idx],
+            ...mod,
+          } as SchemaField;
+          changesList.push(
+            `Modified schema field: ${existingFields[idx].name}`
+          );
+        }
+
+        changes.characterSchema = {
+          ...existingSchema,
+          fields: existingFields,
+        };
+        break;
+      }
+
+      case "remove_schema_fields": {
+        const ids = args.ids as string[];
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingFields = [...existingSchema.fields];
+        const remaining = existingFields.filter((f) => !ids.includes(f.id));
+        const removed = existingFields.length - remaining.length;
+        changesList.push(`Removed ${removed} schema field(s)`);
+
+        changes.characterSchema = {
+          ...existingSchema,
+          fields: remaining,
+        };
+        break;
+      }
+
+      case "add_schema_categories": {
+        const categories = args.categories as SchemaCategory[];
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingCategories = [...(existingSchema.categories || [])];
+
+        for (const cat of categories) {
+          const existing = existingCategories.find(
+            (c) =>
+              c.id === cat.id || c.name.toLowerCase() === cat.name.toLowerCase()
+          );
+          if (existing) {
+            changesList.push(`Category "${cat.name}" already exists, skipped`);
+          } else {
+            existingCategories.push(cat);
+            changesList.push(`Added schema category: ${cat.name}`);
+          }
+        }
+
+        changes.characterSchema = {
+          ...existingSchema,
+          categories: existingCategories,
+        };
+        break;
+      }
+
+      case "modify_schema_categories": {
+        const modifications = args.categories as Array<
+          Partial<SchemaCategory> & { id: string }
+        >;
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingCategories = [...(existingSchema.categories || [])];
+
+        for (const mod of modifications) {
+          const idx = existingCategories.findIndex((c) => c.id === mod.id);
+          if (idx === -1) {
+            changesList.push(`Category "${mod.id}" not found, skipped`);
+            continue;
+          }
+          existingCategories[idx] = { ...existingCategories[idx], ...mod };
+          changesList.push(
+            `Modified schema category: ${existingCategories[idx].name}`
+          );
+        }
+
+        changes.characterSchema = {
+          ...existingSchema,
+          categories: existingCategories,
+        };
+        break;
+      }
+
+      case "remove_schema_categories": {
+        const ids = args.ids as string[];
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingCategories = [...(existingSchema.categories || [])];
+        const remaining = existingCategories.filter((c) => !ids.includes(c.id));
+        const removed = existingCategories.length - remaining.length;
+        changesList.push(`Removed ${removed} schema category/categories`);
+
+        changes.characterSchema = {
+          ...existingSchema,
+          categories: remaining,
+        };
+        break;
+      }
+
+      case "set_schema_template": {
+        // Args come as direct properties (html, css, js), not nested in template
+        const html = args.html as string;
+        const css = args.css as string;
+        const js = args.js as string | undefined;
+        const template = { html, css, js };
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+
+        changes.characterSchema = {
+          ...existingSchema,
+          template,
+          hasCustomJS: !!js,
+        };
+        changesList.push("Set character sheet template");
+        break;
+      }
+
+      case "add_schema_pages": {
+        const pages = args.pages as SchemaPage[];
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingPages = [...(existingSchema.pages || [])];
+
+        for (const page of pages) {
+          const existing = existingPages.find(
+            (p) =>
+              p.id === page.id ||
+              p.name.toLowerCase() === page.name.toLowerCase()
+          );
+          if (existing) {
+            changesList.push(`Page "${page.name}" already exists, skipped`);
+          } else {
+            existingPages.push(page);
+            changesList.push(`Added schema page: ${page.name}`);
+          }
+        }
+
+        changes.characterSchema = {
+          ...existingSchema,
+          pages: existingPages,
+        };
+        break;
+      }
+
+      case "modify_schema_pages": {
+        const modifications = args.pages as Array<
+          Partial<SchemaPage> & { id: string }
+        >;
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingPages = [...(existingSchema.pages || [])];
+
+        for (const mod of modifications) {
+          const idx = existingPages.findIndex((p) => p.id === mod.id);
+          if (idx === -1) {
+            changesList.push(`Page "${mod.id}" not found, skipped`);
+            continue;
+          }
+          existingPages[idx] = { ...existingPages[idx], ...mod } as SchemaPage;
+          changesList.push(`Modified schema page: ${existingPages[idx].name}`);
+        }
+
+        changes.characterSchema = {
+          ...existingSchema,
+          pages: existingPages,
+        };
+        break;
+      }
+
+      case "remove_schema_pages": {
+        const ids = args.ids as string[];
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingPages = [...(existingSchema.pages || [])];
+        const remaining = existingPages.filter((p) => !ids.includes(p.id));
+        const removed = existingPages.length - remaining.length;
+        changesList.push(`Removed ${removed} schema page(s)`);
+
+        changes.characterSchema = {
+          ...existingSchema,
+          pages: remaining,
+        };
+        break;
+      }
+
+      case "add_schema_resources": {
+        const resources = args.resources as SchemaResource[];
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingResources = [...(existingSchema.resources || [])];
+
+        for (const resource of resources) {
+          const existing = existingResources.find(
+            (r) =>
+              r.id === resource.id ||
+              r.name.toLowerCase() === resource.name.toLowerCase()
+          );
+          if (existing) {
+            changesList.push(
+              `Resource "${resource.name}" already exists, skipped`
+            );
+          } else {
+            existingResources.push(resource);
+            changesList.push(
+              `Added schema resource: ${resource.name} [${resource.type}]`
+            );
+          }
+        }
+
+        changes.characterSchema = {
+          ...existingSchema,
+          resources: existingResources,
+        };
+        break;
+      }
+
+      case "remove_schema_resources": {
+        const ids = args.ids as string[];
+        const existingSchema: CharacterSchema = currentState.storyData
+          .characterSchema || {
+          version: 1,
+          name: "Custom",
+          description: "",
+          fields: [],
+          categories: [],
+        };
+        const existingResources = [...(existingSchema.resources || [])];
+        const remaining = existingResources.filter((r) => !ids.includes(r.id));
+        const removed = existingResources.length - remaining.length;
+        changesList.push(`Removed ${removed} schema resource(s)`);
+
+        changes.characterSchema = {
+          ...existingSchema,
+          resources: remaining,
+        };
+        break;
+      }
+
+      // ============================================
+      // CHARACTER DATA
+      // ============================================
+      case "set_character_values": {
+        const values = args.values as Record<string, unknown>;
+        changes.characterData = { values } as CharacterData;
+        const count = Object.keys(values).length;
+        changesList.push(`Set ${count} character value(s)`);
+        break;
+      }
+
+      case "modify_character_values": {
+        const modifications = args.values as Record<string, unknown>;
+        const existingData = currentState.storyData.characterData || {
+          values: {},
+        };
+        const existingValues = { ...existingData.values };
+
+        for (const [key, value] of Object.entries(modifications)) {
+          existingValues[key] = value as CharacterFieldValue;
+          changesList.push(`Set ${key} = ${JSON.stringify(value)}`);
+        }
+
+        changes.characterData = { values: existingValues };
         break;
       }
 

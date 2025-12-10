@@ -33,7 +33,6 @@ export type GenerationStage =
   | "mechanics"
   | "content-lore"
   | "content-achievements"
-  | "content-items"
   | "advanced-presets"
   | "advanced-tables"
   | "advanced-skilltrees"
@@ -98,33 +97,24 @@ export function getSubstageConfig(
 }
 
 // Iteration-specific sub-stages for content stage
-export type ContentSubStage =
-  | "lore"
-  | "achievements"
-  | "relationships"
-  | "quests"
-  | "inventory";
+export type ContentSubStage = "lore" | "achievements" | "quests";
 
 export interface ContentIterationConfig {
   lore: number; // 1-5 iterations
   achievements: number;
-  relationships: number;
   quests: number;
-  inventory: number;
 }
 
 export const DEFAULT_CONTENT_ITERATIONS: ContentIterationConfig = {
   lore: 1,
   achievements: 1,
-  relationships: 1,
   quests: 1,
-  inventory: 1,
 };
 
 export interface BigAdventureConfig {
   prompt: string;
   genre?: string;
-  rpgSystem: RPGSystemType;
+  rpgSystem?: RPGSystemType; // Deprecated - GM stage now handles all dice via formula_roll
   complexity: ComplexityLevel;
   nsfw: boolean;
   includeAGMT: boolean;
@@ -502,15 +492,13 @@ export interface BigAdventureAutosave {
 export type RegenerateSection =
   | "title" // Regenerate title, shortDescription, description
   | "intro" // Regenerate intro, premise, player_summary
-  | "stats" // Regenerate stats
-  | "resources" // Regenerate resources
+  | "characterSchema" // Regenerate character schema and data
   | "abilities" // Regenerate abilities
   | "variables" // Regenerate variables
-  | "inventory" // Regenerate inventory
+  | "mechanicsLore" // Regenerate mechanics lore entries
   | "lore" // Regenerate lore entries
   | "achievements" // Regenerate achievements
   | "quests" // Regenerate quests
-  | "relationships" // Regenerate relationships
   | "presets" // Regenerate character presets
   | "agmt" // Regenerate agmt state
   | "customTables" // Regenerate custom tables
@@ -541,16 +529,10 @@ export const REGENERATE_SECTIONS: Record<
     emoji: "📖",
     stage: "core",
   },
-  stats: {
-    name: "Stats",
-    description: "Character attributes",
+  characterSchema: {
+    name: "Character Schema",
+    description: "Character fields and structure",
     emoji: "📊",
-    stage: "mechanics",
-  },
-  resources: {
-    name: "Resources",
-    description: "Health, mana, stamina, etc.",
-    emoji: "⚡",
     stage: "mechanics",
   },
   abilities: {
@@ -565,14 +547,14 @@ export const REGENERATE_SECTIONS: Record<
     emoji: "🔢",
     stage: "mechanics",
   },
-  inventory: {
-    name: "Inventory",
-    description: "Starting items",
-    emoji: "🎒",
-    stage: "content",
+  mechanicsLore: {
+    name: "Mechanics Lore",
+    description: "Game rules and mechanics explanations",
+    emoji: "⚙️",
+    stage: "mechanics",
   },
   lore: {
-    name: "Lore",
+    name: "Notes",
     description: "World lore entries",
     emoji: "📚",
     stage: "content",
@@ -587,12 +569,6 @@ export const REGENERATE_SECTIONS: Record<
     name: "Quests",
     description: "Quest objectives",
     emoji: "📋",
-    stage: "content",
-  },
-  relationships: {
-    name: "Relationships",
-    description: "NPC relationships",
-    emoji: "🤝",
     stage: "content",
   },
   presets: {
@@ -793,50 +769,46 @@ export interface BigAdventureResult {
 const COMPLEXITY_COUNTS: Record<
   ComplexityLevel,
   {
-    stats: number;
-    resources: number;
+    schemaFields: number;
     abilities: number;
     lore: number;
+    mechanicsLore: number;
     achievements: number;
     quests: number;
-    relationships: number;
     presets: number;
     customTables: number;
     shopItems: number;
   }
 > = {
   simple: {
-    stats: 5,
-    resources: 3,
+    schemaFields: 8,
     abilities: 4,
     lore: 12,
+    mechanicsLore: 2,
     achievements: 8,
     quests: 4,
-    relationships: 4,
     presets: 3,
     customTables: 3,
     shopItems: 6,
   },
   moderate: {
-    stats: 7,
-    resources: 4,
+    schemaFields: 14,
     abilities: 8,
     lore: 20,
+    mechanicsLore: 3,
     achievements: 12,
     quests: 8,
-    relationships: 8,
     presets: 4,
     customTables: 5,
     shopItems: 10,
   },
   complex: {
-    stats: 10,
-    resources: 5,
+    schemaFields: 22,
     abilities: 14,
     lore: 30,
+    mechanicsLore: 5,
     achievements: 18,
     quests: 12,
-    relationships: 12,
     presets: 6,
     customTables: 8,
     shopItems: 16,
@@ -954,33 +926,19 @@ export function getStageInfo(stage: GenerationStage): {
       number: 4,
       emoji: "🏆",
     },
-    "content-items": {
-      name: "Items & NPCs",
-      description: "Inventory and relationships",
-      detailedDescription:
-        "Creates the player's starting equipment and NPC relationships that can change over time.",
-      generates: [
-        "Starting inventory items",
-        "NPC relationships with attitudes",
-      ],
-      instructionHint:
-        "Focus on item variety, equipment balance, or NPC dynamics",
-      number: 5,
-      emoji: "🎒",
-    },
     "advanced-presets": {
       name: "Character Presets",
       description: "Pre-made character builds",
       detailedDescription:
-        "Creates alternative character builds players can choose from, each with unique stats, abilities, and starting equipment.",
+        "Creates alternative character builds players can choose from, each with unique character sheet values and abilities.",
       generates: [
         "Character presets/classes",
-        "Unique stat distributions",
+        "Unique character sheet values",
         "Preset-specific abilities",
       ],
       instructionHint:
         "Shape class archetypes, playstyle variety, or build uniqueness",
-      number: 6,
+      number: 5,
       emoji: "🎭",
     },
     "advanced-tables": {
@@ -995,7 +953,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Focus on event variety, oracle themes, or encounter balance",
-      number: 7,
+      number: 6,
       emoji: "🎲",
     },
     "advanced-skilltrees": {
@@ -1011,7 +969,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Shape progression paths, build archetypes, or power scaling",
-      number: 8,
+      number: 7,
       emoji: "🌳",
     },
     "advanced-other": {
@@ -1026,22 +984,22 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Shape upgrade paths, starting variations, or progression balance",
-      number: 9,
+      number: 8,
       emoji: "🛒",
     },
     icons: {
       name: "Icon Assignment",
       description: "Assigns thematic icons to all elements",
       detailedDescription:
-        "Reviews all stats, resources, items, abilities, achievements, and lore entries to assign appropriate icons from the game-icons.net library.",
+        "Reviews all character sheet fields, abilities, achievements, and lore entries to assign appropriate icons from the game-icons.net library.",
       generates: [
-        "Icons for stats and resources",
-        "Icons for items and abilities",
-        "Icons for achievements and relationships",
+        "Icons for character sheet fields",
+        "Icons for abilities",
+        "Icons for achievements and lore",
       ],
       instructionHint:
         "The AI will automatically choose thematic icons for each element",
-      number: 10,
+      number: 9,
       emoji: "🎨",
     },
   };
@@ -1057,7 +1015,6 @@ function buildSystemPrompt(
 ): string {
   const counts = COMPLEXITY_COUNTS[config.complexity];
   const durationMultiplier = DURATION_MULTIPLIERS[config.targetDuration];
-  const rpgDesc = RPG_SYSTEM_DESCRIPTIONS[config.rpgSystem];
 
   // Get style preset modifier if set
   const styleModifier =
@@ -1081,8 +1038,7 @@ ${
     : ""
 }
 
-RPG SYSTEM: ${config.rpgSystem}
-${rpgDesc}
+DICE MECHANICS: The game uses a flexible formula-based dice system. The GM stage will handle all dice rolls using the formula_roll tool with formulas like "1d20+{{STR}}" or "2d6+{{Perception}}". Design stats and abilities that make sense for the genre - the system adapts to any dice formula.
 
 NSFW CONTENT: ${
     config.nsfw
@@ -1124,44 +1080,93 @@ Remember: Output ONLY the JSON object, nothing else.`;
   }
 
   if (stage === "mechanics") {
-    const statCount = Math.round(counts.stats * durationMultiplier);
-    const resourceCount = Math.round(counts.resources * durationMultiplier);
+    const schemaFieldCount = Math.round(
+      counts.schemaFields * durationMultiplier
+    );
     const abilityCount = Math.round(counts.abilities * durationMultiplier);
+    const mechanicsLoreCount = Math.round(
+      counts.mechanicsLore * durationMultiplier
+    );
 
     return `${basePrompt}
 
-STAGE 2: GAME MECHANICS
-Generate stats, resources, abilities, and variables for the adventure.
+STAGE 2: CHARACTER SHEET & GAME MECHANICS
+Generate a character sheet schema with fields, categories, and initial values.
 
 TARGET COUNTS:
-- Stats: ${statCount}
-- Resources: ${resourceCount}
+- Character Sheet Fields: ${schemaFieldCount} (mix of stats, skills, resources)
 - Abilities: ${abilityCount}
+- Mechanics Lore: ${mechanicsLoreCount} (game rules explanations)
 - Variables: 3-6 (mix of number, boolean, string, and list types)
 
-STAT VALUES (LEVEL 1 CHARACTER - START WEAK):
-- Range: 1-100 where 50 is human average
+CHARACTER SCHEMA SYSTEM:
+The character sheet is defined by a schema with fields organized into categories.
+
+FIELD TYPES:
+- "number": Simple numeric value (stats like Strength, skills like Athletics)
+- "derived": Calculated from other fields using formulas (e.g., "floor(({{Strength}} - 10) / 2)")
+- "resource": Has current/max values (e.g., Health: 45/50, Mana: 30/30)
+- "text": String value (character name, backstory notes)
+- "list": Array of strings (languages, equipment, inventory)
+- "boolean": True/false (isConcentrating, hasDarkVision)
+- "select": Single choice from options (class selection, alignment)
+
+CATEGORIES:
+Group related fields together (e.g., "Attributes", "Skills", "Combat", "Resources", "Equipment").
+
+STARTING VALUES (LEVEL 1 CHARACTER - START WEAK):
+- For number stats: Range 1-100 where 50 is human average
 - MOST stats should be below 25 (untrained/weak areas)
 - A FEW stats (2-3) can be between 25-45 (developing skills)
 - Only ONE or TWO stats around 60-70 (natural talent/specialty)
-- The player will grow stronger through gameplay - start humble!
+
+LIST FIELD FOR INVENTORY:
+Create a "list" type field for inventory items. The player's starting equipment goes here as an array of strings.
+Example: { "id": "inventory", "name": "Inventory", "type": "list", "category": "equipment", "defaultValue": ["Leather armor", "Short sword", "Backpack"] }
+
+MECHANICS LORE:
+Generate ${mechanicsLoreCount} lore entries with type="mechanics" to explain game rules.
+These are special rules explanations that help the AI understand how abilities, resources, and mechanics work.
+Examples: "How magic works", "Combat rules", "Rest and recovery", "Skill check difficulty"
 
 ABILITY GRADES (determine skill bonus):
 - novice (+0), apprentice (+1), adept (+2), expert (+3), master (+4), legendary (+5)
 
 ABILITY COSTS:
-- type: "resource" (deducts from resource) or "variable" (deducts from number variable)
-- name: exact name of the resource/variable
+- type: "resource" (deducts from a resource field) or "variable" (deducts from number variable)
+- name: exact name/id of the resource field or variable
 - amount: how much to deduct
 
 OUTPUT JSON SCHEMA:
 {
-  "stats": [
-    { "name": "string", "value": number, "description": "string", "symbol": "emoji" }
-  ],
-  "resources": [
-    { "name": "string", "value": number, "maxValue": number, "description": "string", "symbol": "emoji" }
-  ],
+  "characterSchema": {
+    "version": 1,
+    "name": "string (e.g., 'Dark Fantasy', 'Sci-Fi Operative')",
+    "description": "string (brief description of the character system)",
+    "fields": [
+      { "id": "strength", "name": "Strength", "type": "number", "category": "attributes", "description": "Physical power", "defaultValue": 10, "min": 1, "max": 100 },
+      { "id": "hp", "name": "Hit Points", "type": "resource", "category": "combat", "description": "Life force", "defaultValue": 20, "defaultMax": 20, "regenerates": true },
+      { "id": "str_mod", "name": "STR Modifier", "type": "derived", "category": "modifiers", "formula": "floor(({{strength}} - 10) / 2)" },
+      { "id": "languages", "name": "Known Languages", "type": "list", "category": "background", "defaultValue": ["Common"] },
+      { "id": "inventory", "name": "Inventory", "type": "list", "category": "equipment", "defaultValue": ["Starting item 1", "Starting item 2"] },
+      { "id": "class", "name": "Class", "type": "select", "category": "identity", "options": [{"value": "warrior", "label": "Warrior"}, {"value": "mage", "label": "Mage"}] }
+    ],
+    "categories": [
+      { "id": "attributes", "name": "Attributes", "order": 0 },
+      { "id": "combat", "name": "Combat", "order": 1 },
+      { "id": "equipment", "name": "Equipment", "order": 2 }
+    ]
+  },
+  "characterData": {
+    "values": {
+      "strength": 12,
+      "hp": { "current": 20, "max": 20 },
+      "str_mod": 1,
+      "languages": ["Common", "Elvish"],
+      "inventory": ["Leather armor", "Short sword", "Healing potion x2"],
+      "class": "warrior"
+    }
+  },
   "abilities": [
     {
       "name": "string",
@@ -1170,8 +1175,18 @@ OUTPUT JSON SCHEMA:
       "cost": [{ "type": "resource|variable", "name": "string", "amount": number }],
       "cooldown": number,
       "currentCooldown": 0,
-      "stat": "string (optional - associated stat name)",
+      "stat": "string (optional - associated stat/field name for rolls)",
       "symbol": "emoji"
+    }
+  ],
+  "mechanicsLore": [
+    {
+      "title": "string (e.g., 'Combat Rules')",
+      "content": "string (2-3 paragraphs explaining the mechanic)",
+      "type": "mechanics",
+      "secrtet": false,
+      "on": true,
+      "alwaysOn": true
     }
   ],
   "variables": [
@@ -1287,54 +1302,6 @@ OUTPUT JSON SCHEMA:
 Remember: Output ONLY the JSON object, nothing else.`;
   }
 
-  if (stage === "content-items") {
-    const contentIterations =
-      config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
-    const inventoryCount = Math.round(3 * contentIterations.inventory);
-    const relationshipCount = Math.round(
-      counts.relationships *
-        durationMultiplier *
-        contentIterations.relationships
-    );
-
-    return `${basePrompt}
-
-STAGE 3C: ITEMS & RELATIONSHIPS
-Generate starting inventory and NPC relationships.
-
-TARGET COUNTS:
-- Starting Inventory: ${inventoryCount}-${inventoryCount + 2} items
-- Relationships: ${relationshipCount}
-
-ITEM TYPES:
-- "normal": Gives advantage on skill checks, breaks on critical failure
-- "consumable": Gives advantage, consumed after use
-- "story": Gives advantage, never breaks/consumed (quest items)
-- "misc": Prevents disadvantage, never breaks/consumed
-
-ITEM GRADES (rarity):
-- "common" (+0 bonus, 8 durability)
-- "uncommon" (+1, 13 dur)
-- "rare" (+2, 20 dur)
-- "epic" (+3, 30 dur)
-- "legendary" (+4, 50 dur)
-- "agmt" (+5, infinite dur)
-
-RELATIONSHIP VALUES: -100 (mortal enemy) to +100 (devoted ally)
-
-OUTPUT JSON SCHEMA:
-{
-  "inventory": [
-    { "name": "string", "quantity": number, "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|legendary|agmt", "symbol": "emoji" }
-  ],
-  "relationships": [
-    { "name": "string", "value": number, "description": "string", "symbol": "emoji" }
-  ]
-}
-
-Remember: Output ONLY the JSON object, nothing else.`;
-  }
-
   // ADVANCED SUBSTAGES
   if (stage === "advanced-presets") {
     const presetCount = config.includePresets
@@ -1358,9 +1325,10 @@ Output an empty JSON object.`;
 STAGE 4A: CHARACTER PRESETS
 Generate ${presetCount} different character builds/classes.
 
-Each preset offers a meaningfully different playstyle with unique stats, resources, inventory, and abilities.
+Each preset offers a meaningfully different playstyle with unique character sheet values and abilities.
 
 IMPORTANT: Each preset MUST include abilities. Use abilities from the mechanics stage as a base.
+IMPORTANT: Presets modify the characterData.values, NOT the characterSchema. The schema is shared.
 
 CRITICAL - PRESET INTROS:
 The "intro" field is a COMPLETE REPLACEMENT for the default intro (3-5 paragraphs).
@@ -1369,14 +1337,14 @@ The "playerSummary" is also a COMPLETE REPLACEMENT (2-3 paragraphs).
 REQUIRED - "CUSTOM" PRESET:
 You MUST include a preset with id="preset-custom" and name="Custom" as the LAST preset.
 This is for players who want to create their own character (self-insert).
-- Use the same stat guidelines: most below 25, a few between 25-45, one or two around 60-70
+- Use balanced starting values for character fields
 - Generic playerName like "Adventurer" or "Traveler"
 - playerSummary should be vague and open-ended ("A mysterious stranger...")
 - intro should be generic, letting the player define their own backstory
-- Include basic starting gear and no special abilities beyond novice level
+- Include basic starting gear in inventory and no special abilities beyond novice level
 
-STAT VALUES FOR PRESETS (LEVEL 1 CHARACTERS - START WEAK):
-- Range: 1-100 where 50 is human average
+CHARACTER FIELD VALUES FOR PRESETS (LEVEL 1 CHARACTERS - START WEAK):
+- For number stats: Range 1-100 where 50 is human average
 - MOST stats should be below 25 (untrained/weak areas)
 - A FEW stats (2-3) can be between 25-45 (developing skills)
 - Only ONE or TWO stats around 60-70 (natural talent/specialty)
@@ -1392,9 +1360,13 @@ OUTPUT JSON SCHEMA:
       "playerName": "string",
       "playerSummary": "string (2-3 paragraphs)",
       "intro": "string (3-5 paragraphs - COMPLETE opening narrative)",
-      "stats": [{ "name": "string", "value": number, "description": "string", "symbol": "emoji" }],
-      "resources": [{ "name": "string", "value": number, "maxValue": number, "description": "string", "symbol": "emoji" }],
-      "inventory": [{ "name": "string", "quantity": number, "description": "string", "type": "string", "grade": "string", "symbol": "emoji" }],
+      "characterData": {
+        "values": {
+          "fieldId1": number_or_value,
+          "fieldId2": { "current": number, "max": number },
+          "inventory": ["item1", "item2"]
+        }
+      },
       "abilities": [{ "name": "string", "description": "string", "grade": "string", "cost": [], "cooldown": number, "currentCooldown": 0, "symbol": "emoji" }],
       "authorNotes": "string"
     }
@@ -2219,12 +2191,16 @@ export function parseBigAdventureStageOutput(
     }
 
     if (stage === "mechanics") {
+      // Merge mechanics lore into main lore array
+      const lore = parsed.mechanicsLore || [];
+
       return {
         storyTemplate: {
-          stats: parsed.stats,
-          resources: parsed.resources,
+          characterSchema: parsed.characterSchema,
+          characterData: parsed.characterData,
           abilities: parsed.abilities,
           variables: parsed.variables,
+          lore: lore, // Mechanics lore entries
         },
       };
     }
@@ -2243,15 +2219,6 @@ export function parseBigAdventureStageOutput(
         storyTemplate: {
           achievements: parsed.achievements,
           quests: parsed.quests,
-        },
-      };
-    }
-
-    if (stage === "content-items") {
-      return {
-        storyTemplate: {
-          inventory: parsed.inventory,
-          relationships: parsed.relationships,
         },
       };
     }
@@ -2502,7 +2469,6 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
   if (contentEnabled) {
     stages.push("content-lore");
     stages.push("content-achievements");
-    stages.push("content-items");
   }
 
   // Advanced substages - only if specific features are enabled AND advanced stage is enabled
@@ -2564,7 +2530,6 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
     mechanics: 3000,
     "content-lore": 3500,
     "content-achievements": 3000,
-    "content-items": 2500,
     "advanced-presets": 4000,
     "advanced-tables": 3000,
     "advanced-skilltrees": 4000,
@@ -2587,11 +2552,6 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
     } else if (stage === "content-achievements") {
       const avgMultiplier =
         (contentIterations.achievements + contentIterations.quests) / 2;
-      const outputMultiplier = Math.min(2, avgMultiplier);
-      outputForStage = Math.round(outputForStage * outputMultiplier);
-    } else if (stage === "content-items") {
-      const avgMultiplier =
-        (contentIterations.inventory + contentIterations.relationships) / 2;
       const outputMultiplier = Math.min(2, avgMultiplier);
       outputForStage = Math.round(outputForStage * outputMultiplier);
     }
@@ -2722,9 +2682,10 @@ export function buildRegenerateSectionMessages(
   let context = `ADVENTURE CONTEXT:
 Title: ${currentResult.title}
 Genre: ${config.genre || "Not specified"}
-RPG System: ${config.rpgSystem}
 NSFW: ${config.nsfw ? "Allowed" : "Not allowed"}
 Complexity: ${config.complexity}
+
+DICE MECHANICS: The game uses a flexible formula-based dice system. The GM stage handles all dice rolls using the formula_roll tool with formulas like "1d20+{{STR}}".
 
 EXISTING CONTENT SUMMARY:`;
 
@@ -2765,19 +2726,23 @@ EXISTING CONTENT SUMMARY:`;
         "Generate a new opening intro (3-5 paragraphs), premise (2-3 paragraphs), and player summary (2-3 paragraphs).",
       schema: `{ "intro": "string", "premise": "string", "player_summary": "string" }`,
     },
-    stats: {
-      instruction: `Generate ${Math.round(
-        counts.stats * durationMultiplier
-      )} character stats. Values 1-100 where 50 is human average.`,
-      schema: `{ "stats": [{ "name": "string", "value": number (1-100), "description": "string", "symbol": "emoji" }] }`,
-      count: Math.round(counts.stats * durationMultiplier),
-    },
-    resources: {
-      instruction: `Generate ${Math.round(
-        counts.resources * durationMultiplier
-      )} character resources (health, mana, stamina, etc).`,
-      schema: `{ "resources": [{ "name": "string", "value": number, "maxValue": number, "description": "string", "symbol": "emoji" }] }`,
-      count: Math.round(counts.resources * durationMultiplier),
+    characterSchema: {
+      instruction: `Generate a character schema with ${Math.round(
+        counts.schemaFields * durationMultiplier
+      )} fields. Use categories to organize fields logically.
+
+FIELD TYPES:
+- number: Plain numeric value (Strength: 14)
+- derived: Formula-based (Modifier: floor(({{Strength}} - 10) / 2))
+- resource: Current/max pair (Health: 25/50)
+- text: Free text (Background, Notes)
+- list: Array of strings (Skills, Languages)
+- boolean: True/false (HasMagic, IsNoble)
+- select: Dropdown with options (Class: ["Warrior", "Mage", "Rogue"])
+
+CATEGORIES: Group related fields (Combat, Social, Resources, Background).`,
+      schema: `{ "characterSchema": { "fields": [{ "id": "field_xxx", "name": "string", "type": "number|derived|resource|text|list|boolean|select", "category": "string", "description": "string", "defaultValue": any, "formula": "string (derived only)", "options": ["string"] (select only), "min": number (optional), "max": number (optional) }], "categories": [{ "id": "cat_xxx", "name": "string", "order": number }] }, "characterData": { "values": { "field_id": value } } }`,
+      count: Math.round(counts.schemaFields * durationMultiplier),
     },
     abilities: {
       instruction: `Generate ${Math.round(
@@ -2791,10 +2756,20 @@ EXISTING CONTENT SUMMARY:`;
         "Generate 3-6 story tracking variables (mix of number, boolean, string, and list types). String variables can have optional predefined options.",
       schema: `{ "variables": [{ "id": "var_xxx", "name": "string", "description": "string", "type": "number|boolean|string|list", "value": any, "options": ["opt1", "opt2", ...] (string type only, optional) }] }`,
     },
-    inventory: {
-      instruction:
-        "Generate 3-5 starting items. Types: normal, consumable, story, misc. Grades: common, uncommon, rare, epic, legendary, agmt.",
-      schema: `{ "inventory": [{ "name": "string", "quantity": number, "description": "string", "type": "string", "grade": "string", "symbol": "emoji" }] }`,
+    mechanicsLore: {
+      instruction: `Generate ${Math.round(
+        counts.mechanicsLore * durationMultiplier
+      )} mechanics lore entries explaining game rules and systems.
+
+Each entry should explain ONE specific mechanic clearly:
+- How character fields work (what Strength affects, how Health regenerates)
+- Combat/skill check rules (when to roll, what modifiers apply)
+- Resource management (rest recovery, ability costs)
+- Special systems (magic, crafting, social mechanics)
+
+Write for players who need to understand how the game works.`,
+      schema: `{ "lore": [{ "title": "string", "content": "string (1-2 paragraphs explaining the mechanic)", "type": "mechanics", "alwaysOn": true, "secret": false }] }`,
+      count: Math.round(counts.mechanicsLore * durationMultiplier),
     },
     lore: {
       instruction: `Generate ${Math.round(
@@ -2804,7 +2779,7 @@ EXISTING CONTENT SUMMARY:`;
 REQUIRED LORE CATEGORIES (distribute across all):
 - KEY NPCs (3-4): Important characters with appearance, personality, motivations, secrets
 - LOCATIONS (3-4): Major places with atmosphere, features, dangers, history
-- FACTIONS (2-3): Organizations with goals, methods, leaders, relationships
+- FACTIONS (2-3): Organizations with goals, methods, leaders
 - HISTORY (2-3): Past events that shaped the world
 - UPCOMING THREATS (2-3): Looming dangers, prophecies, secret plots (set secret=true)
 - WORLD LORE: Magic, religions, customs, creatures, artifacts
@@ -2818,7 +2793,7 @@ TRIGGERS - CRITICAL:
 - Be thorough! List every form/alias a player might naturally use
 - Use alwaysOn for core world facts the player should always know
 - EVERY lore entry MUST have on_triggers OR alwaysOn=true - no empty triggers!`,
-      schema: `{ "lore": [{ "title": "Lord Varen Blackwood", "content": "string (2-4 detailed paragraphs)", "secrtet": false, "on": false, "alwaysOn": false, "on_triggers": ["Varen", "Blackwood", "Lord Blackwood", "the lord"], "off_triggers": [], "var_on_triggers": [] }] }`,
+      schema: `{ "lore": [{ "title": "Lord Varen Blackwood", "content": "string (2-4 detailed paragraphs)", "secret": false, "on": false, "alwaysOn": false, "on_triggers": ["Varen", "Blackwood", "Lord Blackwood", "the lord"], "off_triggers": [], "var_on_triggers": [] }] }`,
       count: Math.round(counts.lore * durationMultiplier),
     },
     achievements: {
@@ -2835,22 +2810,15 @@ TRIGGERS - CRITICAL:
       schema: `{ "quests": [{ "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }] }`,
       count: Math.round(counts.quests * durationMultiplier),
     },
-    relationships: {
-      instruction: `Generate ${Math.round(
-        counts.relationships * durationMultiplier
-      )} NPC relationships (-100 to +100).`,
-      schema: `{ "relationships": [{ "name": "string", "value": number (-100 to 100), "description": "string", "symbol": "emoji" }] }`,
-      count: Math.round(counts.relationships * durationMultiplier),
-    },
     presets: {
       instruction: `Generate ${Math.round(
         counts.presets * durationMultiplier
-      )} character presets with unique stats, abilities, and items.
+      )} character presets with unique character data and abilities.
 
 CRITICAL: Each preset's "intro" is a COMPLETE REPLACEMENT (3-5 paragraphs) for the default intro, NOT an addition.
 Each preset's "playerSummary" is a COMPLETE REPLACEMENT (2-3 paragraphs) for the default player background.
 Write full, standalone content - not fragments!`,
-      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "stats": [...], "resources": [...], "inventory": [...], "abilities": [...], "authorNotes": "string" }] }`,
+      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "characterData": { "values": { "field_id": value } }, "abilities": [...], "authorNotes": "string" }] }`,
       count: Math.round(counts.presets * durationMultiplier),
     },
     agmt: {
@@ -3001,24 +2969,25 @@ export function parseRegenerateSectionOutput(
             player_summary: parsed.player_summary,
           },
         };
-      case "stats":
-        return { storyTemplate: { stats: parsed.stats } };
-      case "resources":
-        return { storyTemplate: { resources: parsed.resources } };
+      case "characterSchema":
+        return {
+          storyTemplate: {
+            characterSchema: parsed.characterSchema,
+            characterData: parsed.characterData,
+          },
+        };
       case "abilities":
         return { storyTemplate: { abilities: parsed.abilities } };
       case "variables":
         return { storyTemplate: { variables: parsed.variables } };
-      case "inventory":
-        return { storyTemplate: { inventory: parsed.inventory } };
+      case "mechanicsLore":
+        return { storyTemplate: { lore: parsed.lore } };
       case "lore":
         return { storyTemplate: { lore: parsed.lore } };
       case "achievements":
         return { storyTemplate: { achievements: parsed.achievements } };
       case "quests":
         return { storyTemplate: { quests: parsed.quests } };
-      case "relationships":
-        return { storyTemplate: { relationships: parsed.relationships } };
       case "presets":
         return { storyTemplate: { presets: parsed.presets } };
       case "agmt":
@@ -3046,14 +3015,12 @@ export function parseRegenerateSectionOutput(
  * Sections that support "Add More" functionality
  */
 export const EXTENDABLE_SECTIONS: RegenerateSection[] = [
-  "stats",
-  "resources",
+  "characterSchema",
   "abilities",
-  "inventory",
+  "mechanicsLore",
   "lore",
   "achievements",
   "quests",
-  "relationships",
   "presets",
   "customTables",
   "variables",
@@ -3076,7 +3043,6 @@ export function buildExtendSectionMessages(
   customInstructions?: string
 ): { role: "system" | "user"; content: string }[] {
   const sectionInfo = REGENERATE_SECTIONS[section];
-  const rpgDesc = RPG_SYSTEM_DESCRIPTIONS[config.rpgSystem];
 
   // Get existing content based on section
   let existingItems: { name?: string; title?: string }[] = [];
@@ -3085,26 +3051,12 @@ export function buildExtendSectionMessages(
   if (existingResult.storyTemplate) {
     const template = existingResult.storyTemplate;
     switch (section) {
-      case "stats":
-        existingItems = (template.stats || []) as {
-          name?: string;
-          title?: string;
-        }[];
-        existingItemsPreview = existingItems
-          .map((s) => s.name)
-          .filter(Boolean)
-          .join(", ");
+      case "characterSchema": {
+        const fields = template.characterSchema?.fields || [];
+        existingItems = fields as { name?: string; title?: string }[];
+        existingItemsPreview = fields.map((f) => f.name).join(", ");
         break;
-      case "resources":
-        existingItems = (template.resources || []) as {
-          name?: string;
-          title?: string;
-        }[];
-        existingItemsPreview = existingItems
-          .map((r) => r.name)
-          .filter(Boolean)
-          .join(", ");
-        break;
+      }
       case "abilities":
         existingItems = (template.abilities || []) as {
           name?: string;
@@ -3115,26 +3067,28 @@ export function buildExtendSectionMessages(
           .filter(Boolean)
           .join(", ");
         break;
-      case "inventory":
-        existingItems = (template.inventory || []) as {
-          name?: string;
-          title?: string;
-        }[];
-        existingItemsPreview = existingItems
-          .map((i) => i.name)
-          .filter(Boolean)
-          .join(", ");
-        break;
-      case "lore":
-        existingItems = (template.lore || []) as {
-          name?: string;
-          title?: string;
-        }[];
-        existingItemsPreview = existingItems
+      case "mechanicsLore": {
+        const mechLore = (template.lore || []).filter(
+          (l) => l.type === "mechanics"
+        );
+        existingItems = mechLore as { name?: string; title?: string }[];
+        existingItemsPreview = mechLore
           .map((l) => l.title)
           .filter(Boolean)
           .join(", ");
         break;
+      }
+      case "lore": {
+        const worldLore = (template.lore || []).filter(
+          (l) => l.type !== "mechanics"
+        );
+        existingItems = worldLore as { name?: string; title?: string }[];
+        existingItemsPreview = worldLore
+          .map((l) => l.title)
+          .filter(Boolean)
+          .join(", ");
+        break;
+      }
       case "achievements":
         existingItems = (template.achievements || []) as {
           name?: string;
@@ -3152,16 +3106,6 @@ export function buildExtendSectionMessages(
         }[];
         existingItemsPreview = existingItems
           .map((q) => q.title)
-          .filter(Boolean)
-          .join(", ");
-        break;
-      case "relationships":
-        existingItems = (template.relationships || []) as {
-          name?: string;
-          title?: string;
-        }[];
-        existingItemsPreview = existingItems
-          .map((r) => r.name)
           .filter(Boolean)
           .join(", ");
         break;
@@ -3185,6 +3129,16 @@ export function buildExtendSectionMessages(
           .filter(Boolean)
           .join(", ");
         break;
+      case "variables":
+        existingItems = (template.variables || []) as {
+          name?: string;
+          title?: string;
+        }[];
+        existingItemsPreview = existingItems
+          .map((v) => v.name)
+          .filter(Boolean)
+          .join(", ");
+        break;
     }
   }
 
@@ -3201,8 +3155,7 @@ ${
     : ""
 }
 
-RPG SYSTEM: ${config.rpgSystem}
-${rpgDesc}
+DICE MECHANICS: The game uses a flexible formula-based dice system. The GM stage handles all dice rolls using the formula_roll tool with formulas like "1d20+{{STR}}".
 
 EXISTING ${sectionInfo.name.toUpperCase()} (${existingItems.length} items):
 ${existingItemsPreview || "(none)"}`;
@@ -3214,13 +3167,9 @@ ${existingItemsPreview || "(none)"}`;
   > = {
     title: { instruction: "", schema: "" },
     intro: { instruction: "", schema: "" },
-    stats: {
-      instruction: `Generate NEW stats that complement the existing ones. Avoid duplicating existing stats. Generate as many as possible to fill the output budget.`,
-      schema: `{ "stats": [{ "name": "string", "description": "string", "value": number, "min": number, "max": number, "symbol": "emoji" }] }`,
-    },
-    resources: {
-      instruction: `Generate NEW resources that complement the existing ones. Avoid duplicating existing resources. Generate as many as possible.`,
-      schema: `{ "resources": [{ "name": "string", "description": "string", "value": number, "min": number, "max": number, "symbol": "emoji", "stat": "string (optional)" }] }`,
+    characterSchema: {
+      instruction: `Generate NEW character schema fields that complement the existing ones. Avoid duplicating existing fields. Generate as many as possible.`,
+      schema: `{ "characterSchema": { "fields": [{ "id": "field_xxx", "name": "string", "type": "number|derived|resource|text|list|boolean|select", "category": "string", "description": "string", "defaultValue": any }], "categories": [{ "id": "cat_xxx", "name": "string", "order": number }] } }`,
     },
     abilities: {
       instruction: `Generate NEW abilities that complement the existing ones. Vary grades from novice to master. Generate as many as possible.`,
@@ -3230,9 +3179,9 @@ ${existingItemsPreview || "(none)"}`;
       instruction: `Generate NEW variables. Generate as many as possible.`,
       schema: `{ "variables": [{ "name": "string", "value": number, "symbol": "emoji" }] }`,
     },
-    inventory: {
-      instruction: `Generate NEW inventory items that complement the existing ones. Mix item types. Generate as many as possible.`,
-      schema: `{ "inventory": [{ "name": "string", "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|agmt", "stat": "string (optional)", "symbol": "emoji", "durability": number, "maxDurability": number }] }`,
+    mechanicsLore: {
+      instruction: `Generate NEW mechanics lore entries explaining game rules and systems. Generate as many as possible.`,
+      schema: `{ "lore": [{ "title": "string", "content": "string (1-2 paragraphs)", "type": "mechanics", "alwaysOn": true, "secret": false }] }`,
     },
     lore: {
       instruction: `Generate NEW DETAILED lore entries that expand the world. Generate as many as the output budget allows.
@@ -3253,7 +3202,7 @@ TRIGGERS - IMPORTANT:
 - Include nicknames/aliases: ["Naomy", "Nao", "Lady Naomy"]
 - EVERY lore entry MUST have on_triggers OR alwaysOn=true - no empty triggers!
 Ensure new lore references and connects to existing lore entries.`,
-      schema: `{ "lore": [{ "title": "Captain Sera Vex", "content": "string (2-4 detailed paragraphs)", "secrtet": false, "on": false, "alwaysOn": false, "on_triggers": ["Sera", "Vex", "Captain Vex", "the captain"], "off_triggers": [], "var_on_triggers": [] }] }`,
+      schema: `{ "lore": [{ "title": "Captain Sera Vex", "content": "string (2-4 detailed paragraphs)", "secret": false, "on": false, "alwaysOn": false, "on_triggers": ["Sera", "Vex", "Captain Vex", "the captain"], "off_triggers": [], "var_on_triggers": [] }] }`,
     },
     achievements: {
       instruction: `Generate NEW achievements with ai_hint for precise triggering. Generate as many as possible.`,
@@ -3263,17 +3212,13 @@ Ensure new lore references and connects to existing lore entries.`,
       instruction: `Generate NEW quests with objectives. Generate as many as possible.`,
       schema: `{ "quests": [{ "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }] }`,
     },
-    relationships: {
-      instruction: `Generate NEW NPC relationships (-100 to +100). Generate as many as possible.`,
-      schema: `{ "relationships": [{ "name": "string", "value": number (-100 to 100), "description": "string", "symbol": "emoji" }] }`,
-    },
     presets: {
-      instruction: `Generate NEW character presets with unique stats, abilities, and items. Generate as many as the output budget allows.
+      instruction: `Generate NEW character presets with unique character data and abilities. Generate as many as the output budget allows.
 
 CRITICAL: Each preset's "intro" is a COMPLETE REPLACEMENT (3-5 paragraphs) for the default intro, NOT an addition.
 Each preset's "playerSummary" is a COMPLETE REPLACEMENT (2-3 paragraphs) for the default player background.
 Write full, standalone content - not fragments!`,
-      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "stats": [...], "resources": [...], "inventory": [...], "abilities": [...], "authorNotes": "string" }] }`,
+      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "characterData": { "values": { "field_id": value } }, "abilities": [...], "authorNotes": "string" }] }`,
     },
     agmt: {
       instruction: "",
@@ -3404,21 +3349,35 @@ export function parseExtendSectionOutput(
 
     // Merge new content with existing
     switch (section) {
-      case "stats":
+      case "characterSchema": {
+        // Merge fields and categories intelligently
+        const existingSchema = template.characterSchema || {
+          version: 1,
+          name: "Custom",
+          fields: [],
+          categories: [],
+        };
+        const newFields = parsed.characterSchema?.fields || [];
+        const newCategories = parsed.characterSchema?.categories || [];
+        const existingCategories = existingSchema.categories || [];
         return {
           storyTemplate: {
-            stats: [...(template.stats || []), ...(parsed.stats || [])],
+            characterSchema: {
+              ...existingSchema,
+              fields: [...existingSchema.fields, ...newFields],
+              categories: [
+                ...existingCategories,
+                ...newCategories.filter(
+                  (nc: { id: string }) =>
+                    !existingCategories.some(
+                      (ec: { id: string }) => ec.id === nc.id
+                    )
+                ),
+              ],
+            },
           },
         };
-      case "resources":
-        return {
-          storyTemplate: {
-            resources: [
-              ...(template.resources || []),
-              ...(parsed.resources || []),
-            ],
-          },
-        };
+      }
       case "abilities":
         return {
           storyTemplate: {
@@ -3437,13 +3396,10 @@ export function parseExtendSectionOutput(
             ],
           },
         };
-      case "inventory":
+      case "mechanicsLore":
         return {
           storyTemplate: {
-            inventory: [
-              ...(template.inventory || []),
-              ...(parsed.inventory || []),
-            ],
+            lore: [...(template.lore || []), ...(parsed.lore || [])],
           },
         };
       case "lore":
@@ -3465,15 +3421,6 @@ export function parseExtendSectionOutput(
         return {
           storyTemplate: {
             quests: [...(template.quests || []), ...(parsed.quests || [])],
-          },
-        };
-      case "relationships":
-        return {
-          storyTemplate: {
-            relationships: [
-              ...(template.relationships || []),
-              ...(parsed.relationships || []),
-            ],
           },
         };
       case "presets":

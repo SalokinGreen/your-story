@@ -31,7 +31,11 @@ import {
   CHOICES_AFFIRMATION,
   GM_STAGE_AFFIRMATION,
 } from "@/app/misc/ai_staged";
-import { executeGMTools, GMToolResult } from "@/app/misc/gmExecutor";
+import {
+  executeGMTools,
+  GMToolResult,
+  GMExecutionResult,
+} from "@/app/misc/gmExecutor";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { getAuthToken } from "@/app/misc/getAuthToken";
@@ -171,6 +175,13 @@ export interface GenerationResult {
   // GM Stage results (when enableGMStage is true)
   gmResults?: GMToolResult[];
   gmStoryContext?: string;
+  // Player question (when GM asks a question that needs player input)
+  playerQuestion?: {
+    question: string;
+    context: string;
+    options?: string[];
+    allowCustom: boolean;
+  };
   meta: {
     storyMeta?: GenerationMeta;
     toolsMeta?: GenerationMeta;
@@ -463,10 +474,19 @@ export async function generateStoryTurn(
     // ========================================
     // STAGE 0.5: GM Stage (if enabled)
     // AI determines mechanics via tool calls instead of ActionAnalysis JSON
+    // Supports continuation loops and player questions
     // ========================================
     let gmResults: GMToolResult[] = [];
     let gmStoryContext = "";
     let gmMeta: GenerationMeta | undefined;
+    let playerQuestion:
+      | {
+          question: string;
+          context: string;
+          options?: string[];
+          allowCustom: boolean;
+        }
+      | undefined;
 
     if (options.enableGMStage) {
       callbacks.onGMStageStart?.();
@@ -490,77 +510,143 @@ export async function generateStoryTurn(
         gmStoryContext = "";
       } else {
         const gmModel = options.gmStageModel || options.toolsModel;
-        const gmPrompt = buildGMStagePrompt({
-          storyData,
-          userChoice: gmUserChoice,
-        });
 
-        // Check if user cancelled
-        if (options.abortSignal?.aborted) {
-          throw new Error("Generation cancelled by user");
-        }
+        // GM stage loop - allows continuation requests for chained rolls
+        const MAX_GM_ROUNDS = 5; // Safety limit
+        let gmRound = 0;
+        let allGMContextParts: string[] = [];
+        let continuationContext = "";
 
-        const gmResponse = await fetch("/api/generate", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            messages: gmPrompt.messages,
-            tools: gmPrompt.tools,
-            model: gmModel,
-            maxTokens: 2000,
-            temperature: 0.3, // Low temperature for deterministic mechanics
-            openRouterKey: options.openRouterKey,
-            deepseekKey: options.deepseekKey,
-            googleKey: options.googleKey,
-          }),
-          signal: options.abortSignal,
-        });
+        while (gmRound < MAX_GM_ROUNDS) {
+          gmRound++;
+          logger.action(`GM stage round ${gmRound}`);
 
-        if (!gmResponse.ok) {
-          const errorText = await gmResponse.text().catch(() => "");
-          throw new Error(
-            `GM stage failed: ${gmResponse.status} - ${errorText}`
-          );
-        }
-
-        const gmResult = await gmResponse.json();
-        console.log(
-          "[GM Stage] Raw response:",
-          JSON.stringify(gmResult, null, 2)
-        );
-
-        if (gmResult.meta) {
-          gmMeta = gmResult.meta;
-          totalTokenCost += gmResult.meta.tokenCost || 0;
-          finalBalance = gmResult.meta.balance;
-        }
-
-        // Execute GM tool calls locally
-        if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
-          const gmExecution = await executeGMTools(
-            gmResult.toolCalls,
-            storyData
-          );
-          gmResults = gmExecution.results;
-          gmStoryContext = gmExecution.storyContext;
-
-          // Update storyData with any modifications from GM tools (e.g., rest, challenge state)
-          Object.assign(storyData, gmExecution.modifiedStoryData);
-
-          logger.action("GM stage tools executed", {
-            toolCount: gmResult.toolCalls.length,
-            toolNames: gmResults.map((r) => r.toolName),
-            contextLength: gmStoryContext.length,
+          // Build prompt with continuation context if this is a follow-up round
+          const gmPrompt = buildGMStagePrompt({
+            storyData,
+            userChoice: continuationContext
+              ? `${gmUserChoice}\n\n[Previous round results: ${continuationContext}]`
+              : gmUserChoice,
           });
-        } else {
-          logger.action(
-            "GM stage returned no tool calls (treating as no_check_needed)"
+
+          // Check if user cancelled
+          if (options.abortSignal?.aborted) {
+            throw new Error("Generation cancelled by user");
+          }
+
+          const gmResponse = await fetch("/api/generate", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              messages: gmPrompt.messages,
+              tools: gmPrompt.tools,
+              model: gmModel,
+              maxTokens: 2000,
+              temperature: 0.3, // Low temperature for deterministic mechanics
+              openRouterKey: options.openRouterKey,
+              deepseekKey: options.deepseekKey,
+              googleKey: options.googleKey,
+            }),
+            signal: options.abortSignal,
+          });
+
+          if (!gmResponse.ok) {
+            const errorText = await gmResponse.text().catch(() => "");
+            throw new Error(
+              `GM stage failed: ${gmResponse.status} - ${errorText}`
+            );
+          }
+
+          const gmResult = await gmResponse.json();
+          console.log(
+            `[GM Stage Round ${gmRound}] Raw response:`,
+            JSON.stringify(gmResult, null, 2)
           );
-          gmStoryContext =
-            "[No mechanical check needed - pure narrative/roleplay action]";
+
+          if (gmResult.meta) {
+            // Accumulate meta across rounds
+            if (!gmMeta) {
+              gmMeta = gmResult.meta;
+            } else {
+              gmMeta.usage.promptTokens +=
+                gmResult.meta.usage?.promptTokens || 0;
+              gmMeta.usage.completionTokens +=
+                gmResult.meta.usage?.completionTokens || 0;
+              gmMeta.usage.totalTokens += gmResult.meta.usage?.totalTokens || 0;
+              gmMeta.tokenCost += gmResult.meta.tokenCost || 0;
+            }
+            totalTokenCost += gmResult.meta.tokenCost || 0;
+            finalBalance = gmResult.meta.balance;
+          }
+
+          // Execute GM tool calls locally
+          if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
+            const gmExecution = await executeGMTools(
+              gmResult.toolCalls,
+              storyData
+            );
+
+            // Accumulate results across rounds
+            gmResults.push(...gmExecution.results);
+            if (gmExecution.storyContext) {
+              allGMContextParts.push(gmExecution.storyContext);
+            }
+
+            // Update storyData with any modifications from GM tools (e.g., rest, challenge state)
+            Object.assign(storyData, gmExecution.modifiedStoryData);
+
+            logger.action(`GM stage round ${gmRound} tools executed`, {
+              toolCount: gmResult.toolCalls.length,
+              toolNames: gmExecution.results.map((r) => r.toolName),
+              requestsContinuation: gmExecution.requestsContinuation,
+              asksPlayer: gmExecution.asksPlayer,
+            });
+
+            // Check for player question - pause generation and return question
+            if (gmExecution.asksPlayer && gmExecution.playerQuestion) {
+              playerQuestion = gmExecution.playerQuestion;
+              logger.action("GM stage paused - player question required", {
+                question: playerQuestion.question,
+              });
+              // Break out of GM loop - generation will pause for player input
+              break;
+            }
+
+            // Check for continuation request - run another GM round
+            if (
+              gmExecution.requestsContinuation &&
+              gmExecution.continuationContext
+            ) {
+              continuationContext = gmExecution.continuationContext;
+              logger.action("GM stage continuing - another round requested", {
+                context: continuationContext.substring(0, 100),
+              });
+              // Continue to next round
+              continue;
+            }
+          } else {
+            logger.action(
+              "GM stage returned no tool calls (treating as no_check_needed)"
+            );
+            allGMContextParts.push(
+              "[No mechanical check needed - pure narrative/roleplay action]"
+            );
+          }
+
+          // No continuation requested, exit loop
+          break;
+        }
+
+        // Combine all context parts from all rounds
+        gmStoryContext = allGMContextParts.join("\n\n---\n\n");
+
+        if (gmRound >= MAX_GM_ROUNDS) {
+          logger.action("GM stage hit max rounds limit", {
+            maxRounds: MAX_GM_ROUNDS,
+          });
         }
       }
 
@@ -573,6 +659,35 @@ export async function generateStoryTurn(
           totalTokens: 0,
         }
       );
+
+      // If there's a player question, we need to pause generation
+      // Return a partial result that the UI can use to ask the question
+      if (playerQuestion) {
+        const partialResult: GenerationResult = {
+          success: false, // Indicates incomplete generation
+          content: "",
+          toolCalls: [],
+          toolResponses: [],
+          stateChanges: [],
+          choices: [],
+          scenePart: {
+            content: "",
+            imageUrl: "",
+            user: false,
+            role: "assistant",
+          },
+          gmResults,
+          gmStoryContext,
+          playerQuestion,
+          meta: {
+            gmMeta,
+            totalTokenCost,
+            balance: finalBalance,
+          },
+        };
+        callbacks.onComplete?.(partialResult);
+        return partialResult;
+      }
     }
 
     // ========================================
@@ -1224,6 +1339,8 @@ export async function generateStoryTurn(
       toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
       toolResponses: allToolResponses.length > 0 ? allToolResponses : undefined,
       stateChanges: allStateChanges.length > 0 ? allStateChanges : undefined,
+      gmToolCalls: gmResults.length > 0 ? gmResults : undefined,
+      gmStoryContext: gmStoryContext || undefined,
     };
 
     const result: GenerationResult = {
@@ -1711,17 +1828,17 @@ export function analysisToChoice(
   analysis: ActionAnalysis,
   originalAction: string
 ): Choice {
+  // Since the GM stage now handles all dice mechanics via formula_roll,
+  // we only need to copy the plain text. The deprecated fields are
+  // kept in the Choice interface for backward compatibility with
+  // existing stories, but we don't populate them for new choices.
   return {
     text: originalAction,
+    // Only copy skill_used/skill_dc if they exist, for backward compat
     skill_used: analysis.skill_used || undefined,
     skill_dc: analysis.skill_dc || undefined,
-    stat_bonus: analysis.stat_bonus || undefined,
     item_used: analysis.item_used || undefined,
     resource_used: analysis.resource_used || undefined,
-    agmt_check: analysis.agmt_check || undefined,
-    table: analysis.table || undefined,
-    rolls: analysis.rolls || undefined,
-    challenge_handling: analysis.challenge_handling || undefined,
   };
 }
 

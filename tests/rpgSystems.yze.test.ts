@@ -210,39 +210,6 @@ describe("Year Zero Engine (YZE) Stress System", () => {
     });
   });
 
-  describe("Upgrade system", () => {
-    it("should have correct upgrade amounts", () => {
-      expect(SYSTEM_YZE.upgrades.statUpgradeAmount).toBe(10);
-      expect(SYSTEM_YZE.upgrades.resourceUpgradeAmount).toBe(1); // Changed from 10
-      expect(SYSTEM_YZE.upgrades.shopStatStartingValue).toBe(40); // Changed from 20
-    });
-
-    it("should upgrade stat to add more base dice", () => {
-      const { statToModifier } = SYSTEM_YZE;
-      const upgradeAmount = SYSTEM_YZE.upgrades.statUpgradeAmount;
-
-      // Start at 20 (1 die)
-      let stat = 20;
-      expect(statToModifier(stat)).toBe(1);
-
-      // After 2 upgrades: 20 + 20 = 40 (2 dice)
-      stat += upgradeAmount * 2;
-      expect(statToModifier(stat)).toBe(2);
-
-      // After 4 upgrades: 40 + 20 = 60 (3 dice)
-      stat += upgradeAmount * 2;
-      expect(statToModifier(stat)).toBe(3);
-
-      // After 6 upgrades: 60 + 20 = 80 (4 dice)
-      stat += upgradeAmount * 2;
-      expect(statToModifier(stat)).toBe(4);
-
-      // After 8 upgrades: 80 + 20 = 100 (5 dice)
-      stat += upgradeAmount * 2;
-      expect(statToModifier(stat)).toBe(5);
-    });
-  });
-
   describe("getRPGSystem", () => {
     it("should retrieve YZE system by ID", () => {
       const system = getRPGSystem("yze");

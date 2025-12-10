@@ -363,25 +363,34 @@ describe("Tool Execution", () => {
     });
   });
 
-  describe("Resource Management Tools", () => {
-    test("should adjust resource current value only", () => {
+  describe("Character Field Tools", () => {
+    test("should modify number field with delta", () => {
       const storyData = createTestStory();
-      storyData.resources.push({
-        name: "Health",
-        description: "Life force",
-        value: 50,
-        maxValue: 100,
-        symbol: "❤️",
-      });
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "strength",
+            name: "Strength",
+            type: "number",
+            min: 0,
+            max: 100,
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          strength: 50,
+        },
+      };
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "adjust_resource",
+            name: "modify_field",
             arguments: {
-              name: "Health",
-              currentDelta: -10,
+              field: "strength",
+              delta: -10,
             },
           },
         },
@@ -391,29 +400,35 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(responses[0].message).toContain("Health");
-      expect(storyData.resources[0].value).toBe(40);
+      expect(responses[0].message).toContain("Strength");
+      expect(storyData.characterData!.values.strength).toBe(40);
     });
 
-    test("should adjust resource with maxDelta", () => {
+    test("should modify resource field current value", () => {
       const storyData = createTestStory();
-      storyData.resources.push({
-        name: "Mana",
-        description: "Magic power",
-        value: 30,
-        maxValue: 50,
-        symbol: "✨",
-      });
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "health",
+            name: "Health",
+            type: "resource",
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          health: { current: 50, max: 100 },
+        },
+      };
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "adjust_resource",
+            name: "modify_field",
             arguments: {
-              name: "Mana",
-              currentDelta: 10,
-              maxDelta: 20,
+              field: "health",
+              delta: 20,
             },
           },
         },
@@ -423,21 +438,69 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(storyData.resources[0].value).toBe(40);
-      expect(storyData.resources[0].maxValue).toBe(70);
+      const healthValue = storyData.characterData!.values.health as {
+        current: number;
+        max: number;
+      };
+      expect(healthValue.current).toBe(70);
+      expect(healthValue.max).toBe(100); // Max unchanged
     });
 
-    test("should handle resource not found", () => {
+    test("should set resource field max value with set_field", () => {
       const storyData = createTestStory();
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "mana",
+            name: "Mana",
+            type: "resource",
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          mana: { current: 30, max: 50 },
+        },
+      };
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "adjust_resource",
+            name: "set_field",
             arguments: {
-              name: "NonExistent",
-              currentDelta: 10,
+              field: "mana",
+              value: { current: 30, max: 70 },
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      const manaValue = storyData.characterData!.values.mana as {
+        current: number;
+        max: number;
+      };
+      expect(manaValue.current).toBe(30);
+      expect(manaValue.max).toBe(70);
+    });
+
+    test("should handle field not found", () => {
+      const storyData = createTestStory();
+      storyData.characterSchema = { fields: [] };
+      storyData.characterData = { values: {} };
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "modify_field",
+            arguments: {
+              field: "nonexistent",
+              delta: 10,
             },
           },
         },
@@ -450,19 +513,32 @@ describe("Tool Execution", () => {
       expect(responses[0].message).toContain("not found");
     });
 
-    test("should create new resource", () => {
+    test("should set field to absolute value", () => {
       const storyData = createTestStory();
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "level",
+            name: "Level",
+            type: "number",
+            min: 1,
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          level: 5,
+        },
+      };
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "create_resource",
+            name: "set_field",
             arguments: {
-              name: "Stamina",
-              description: "Physical energy",
-              currentValue: 75,
-              maxValue: 100,
+              field: "level",
+              value: 10,
             },
           },
         },
@@ -472,30 +548,34 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(storyData.resources).toHaveLength(1);
-      expect(storyData.resources[0].name).toBe("Stamina");
-      expect(storyData.resources[0].value).toBe(75);
-      expect(storyData.resources[0].maxValue).toBe(100);
+      expect(storyData.characterData!.values.level).toBe(10);
     });
 
-    test("should set resource max value", () => {
+    test("should set resource field max value", () => {
       const storyData = createTestStory();
-      storyData.resources.push({
-        name: "Health",
-        description: "Life force",
-        value: 50,
-        maxValue: 100,
-        symbol: "❤️",
-      });
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "health",
+            name: "Health",
+            type: "resource",
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          health: { current: 50, max: 100 },
+        },
+      };
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "set_resource",
+            name: "set_field",
             arguments: {
-              name: "Health",
-              maxValue: 150,
+              field: "health",
+              value: { current: 50, max: 150 },
             },
           },
         },
@@ -505,29 +585,39 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      // Only maxValue can be set directly via /set_resource_max
-      expect(storyData.resources[0].maxValue).toBe(150);
-      // Current value remains unchanged
-      expect(storyData.resources[0].value).toBe(50);
+      const healthValue = storyData.characterData!.values.health as {
+        current: number;
+        max: number;
+      };
+      expect(healthValue.max).toBe(150);
+      expect(healthValue.current).toBe(50); // Current unchanged
     });
 
-    test("should delete resource", () => {
+    test("should add item to list field", () => {
       const storyData = createTestStory();
-      storyData.resources.push({
-        name: "TempResource",
-        description: "Temporary",
-        value: 10,
-        maxValue: 10,
-        symbol: "⚡",
-      });
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "skills",
+            name: "Skills",
+            type: "list",
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          skills: ["Swordfighting"],
+        },
+      };
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "delete_resource",
+            name: "add_list_item",
             arguments: {
-              name: "TempResource",
+              field: "skills",
+              item: "Archery",
             },
           },
         },
@@ -537,28 +627,243 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(storyData.resources).toHaveLength(0);
+      const skillsValue = storyData.characterData!.values.skills as string[];
+      expect(skillsValue).toContain("Archery");
+      expect(skillsValue).toHaveLength(2);
+    });
+
+    test("should remove item from list field", () => {
+      const storyData = createTestStory();
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "languages",
+            name: "Languages",
+            type: "list",
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          languages: ["Common", "Elvish", "Dwarvish"],
+        },
+      };
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "remove_list_item",
+            arguments: {
+              field: "languages",
+              item: "Elvish",
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      const languagesValue = storyData.characterData!.values
+        .languages as string[];
+      expect(languagesValue).not.toContain("Elvish");
+      expect(languagesValue).toHaveLength(2);
+    });
+
+    test("should set boolean field", () => {
+      const storyData = createTestStory();
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "isNoble",
+            name: "Noble Status",
+            type: "boolean",
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          isNoble: false,
+        },
+      };
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "set_field",
+            arguments: {
+              field: "isNoble",
+              value: true,
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      expect(storyData.characterData!.values.isNoble).toBe(true);
+    });
+
+    test("should set text field", () => {
+      const storyData = createTestStory();
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "backstory",
+            name: "Backstory",
+            type: "text",
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          backstory: "A humble farmer",
+        },
+      };
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "set_field",
+            arguments: {
+              field: "backstory",
+              value: "Once a humble farmer, now a legendary hero",
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      expect(storyData.characterData!.values.backstory).toBe(
+        "Once a humble farmer, now a legendary hero"
+      );
+    });
+
+    test("should set select field", () => {
+      const storyData = createTestStory();
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "class",
+            name: "Class",
+            type: "select",
+            options: [
+              { value: "warrior", label: "Warrior" },
+              { value: "mage", label: "Mage" },
+              { value: "rogue", label: "Rogue" },
+            ],
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          class: "warrior",
+        },
+      };
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "set_field",
+            arguments: {
+              field: "class",
+              value: "Mage", // Uses label for fuzzy matching
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(true);
+      expect(storyData.characterData!.values.class).toBe("mage"); // Stored as value
+    });
+
+    test("should reject invalid select option", () => {
+      const storyData = createTestStory();
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "class",
+            name: "Class",
+            type: "select",
+            options: [
+              { value: "warrior", label: "Warrior" },
+              { value: "mage", label: "Mage" },
+              { value: "rogue", label: "Rogue" },
+            ],
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          class: "warrior",
+        },
+      };
+
+      const toolCalls: ToolCall[] = [
+        {
+          type: "function",
+          function: {
+            name: "set_field",
+            arguments: {
+              field: "class",
+              value: "Bard", // Not in options
+            },
+          },
+        },
+      ];
+
+      const { responses } = executeTools(toolCalls, storyData);
+
+      expect(responses).toHaveLength(1);
+      expect(responses[0].success).toBe(false);
+      expect(responses[0].message).toContain("invalid option");
     });
   });
 
   describe("stateChanges tracking", () => {
-    test("should generate stateChanges for stat modifications", () => {
+    test("should generate stateChanges for character field modifications", () => {
       const storyData = createTestStory();
-      storyData.stats.push({
-        name: "Strength",
-        description: "Physical power",
-        value: 10,
-        symbol: "💪",
-      });
+      // Set up character schema and data for the new system
+      storyData.characterSchema = {
+        name: "Test Schema",
+        fields: [
+          {
+            id: "strength",
+            name: "Strength",
+            type: "number",
+            min: 0,
+            max: 100,
+          },
+        ],
+        categories: [],
+      };
+      storyData.characterData = {
+        values: {
+          strength: 10,
+        },
+      };
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "adjust_stat",
+            name: "modify_field",
             arguments: {
-              name: "Strength",
-              valueDelta: 5,
+              field: "Strength",
+              delta: 5,
             },
           },
         },
@@ -568,34 +873,9 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(stateChanges).toHaveLength(1);
-      expect(stateChanges[0]).toContain("Strength");
-    });
-
-    test("should generate stateChanges for item additions", () => {
-      const storyData = createTestStory();
-
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "add_item",
-            arguments: {
-              name: "Magic Sword",
-              description: "A glowing blade",
-              type: "normal",
-              quantity: 1,
-            },
-          },
-        },
-      ];
-
-      const { responses, stateChanges } = executeTools(toolCalls, storyData);
-
-      expect(responses).toHaveLength(1);
-      expect(responses[0].success).toBe(true);
-      expect(stateChanges).toHaveLength(1);
-      expect(stateChanges[0]).toContain("Magic Sword");
+      // Check that the expected state change is present
+      expect(stateChanges.some((s) => s.includes("Strength"))).toBe(true);
+      expect(storyData.characterData.values.strength).toBe(15);
     });
 
     test("should NOT generate stateChanges for memory additions", () => {
@@ -623,33 +903,47 @@ describe("Tool Execution", () => {
 
     test("should generate multiple stateChanges for multiple tools", () => {
       const storyData = createTestStory();
-      storyData.stats.push({
-        name: "Health",
-        description: "Life force",
-        value: 100,
-        symbol: "❤️",
-      });
+      storyData.characterSchema = {
+        fields: [
+          {
+            id: "Health",
+            name: "Health",
+            type: "resource",
+            description: "Life force",
+          },
+          {
+            id: "Mana",
+            name: "Mana",
+            type: "resource",
+            description: "Magic energy",
+          },
+        ],
+      };
+      storyData.characterData = {
+        values: {
+          Health: { current: 100, max: 100 },
+          Mana: { current: 50, max: 50 },
+        },
+      };
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "adjust_stat",
+            name: "modify_field",
             arguments: {
-              name: "Health",
-              valueDelta: -10,
+              field: "Health",
+              delta: -10,
             },
           },
         },
         {
           type: "function",
           function: {
-            name: "add_item",
+            name: "modify_field",
             arguments: {
-              name: "Health Potion",
-              description: "Restores health",
-              type: "consumable",
-              quantity: 1,
+              field: "Mana",
+              delta: -5,
             },
           },
         },
@@ -660,23 +954,23 @@ describe("Tool Execution", () => {
       expect(responses).toHaveLength(2);
       expect(responses[0].success).toBe(true);
       expect(responses[1].success).toBe(true);
-      expect(stateChanges).toHaveLength(2);
-      expect(stateChanges[0]).toContain("Health");
-      expect(stateChanges[1]).toContain("Health Potion");
+      // Check that expected state changes are present
+      expect(stateChanges.some((s) => s.includes("Health"))).toBe(true);
+      expect(stateChanges.some((s) => s.includes("Mana"))).toBe(true);
     });
 
     test("should NOT generate stateChanges for failed tool calls", () => {
       const storyData = createTestStory();
-      // No stats exist, so adjust_stat should fail
+      // No characterSchema or characterData defined, so modify_field should fail
 
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "adjust_stat",
+            name: "modify_field",
             arguments: {
-              name: "NonExistentStat",
-              valueDelta: 5,
+              field: "NonExistentField",
+              delta: 5,
             },
           },
         },

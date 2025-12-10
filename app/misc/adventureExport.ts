@@ -291,7 +291,9 @@ export function parseAdventureFile(content: string): ImportResult {
   } catch (e) {
     return {
       success: false,
-      error: `Failed to parse adventure file: ${e instanceof Error ? e.message : "Unknown error"}`,
+      error: `Failed to parse adventure file: ${
+        e instanceof Error ? e.message : "Unknown error"
+      }`,
       warnings,
     };
   }

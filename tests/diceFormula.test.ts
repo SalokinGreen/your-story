@@ -6,6 +6,7 @@ import {
   validateFormula,
   extractVariables,
   createCharacterResolver,
+  createSchemaBasedResolver,
   buildDiceFormula,
   buildAdvantageRoll,
   buildDisadvantageRoll,
@@ -241,12 +242,6 @@ describe("diceFormula", () => {
       expect(resolver("Strength")).toBe(16);
     });
 
-    it("resolves _mod suffix with D&D formula", () => {
-      const resolver = createCharacterResolver({ Strength: 16 });
-      // floor((16 - 10) / 2) = 3
-      expect(resolver("Strength_mod")).toBe(3);
-    });
-
     it("resolves custom mappings first", () => {
       const resolver = createCharacterResolver(
         { Strength: 16 },
@@ -334,6 +329,77 @@ describe("diceFormula", () => {
 
       const result = rollFormula("1d6");
       expect(getTotalExplosions(result)).toBe(0);
+
+      vi.restoreAllMocks();
+    });
+  });
+
+  describe("createSchemaBasedResolver", () => {
+    it("resolves number values directly", () => {
+      const resolver = createSchemaBasedResolver({
+        Strength: 16,
+        Dexterity: 14,
+      });
+
+      expect(resolver("Strength")).toBe(16);
+      expect(resolver("Dexterity")).toBe(14);
+    });
+
+    it("resolves resource values to current", () => {
+      const resolver = createSchemaBasedResolver({
+        HP: { current: 25, max: 50 },
+      });
+
+      expect(resolver("HP")).toBe(25);
+    });
+
+    it("resolves boolean values to 1/0", () => {
+      const resolver = createSchemaBasedResolver({
+        isInspired: true,
+        isCursed: false,
+      });
+
+      expect(resolver("isInspired")).toBe(1);
+      expect(resolver("isCursed")).toBe(0);
+    });
+
+    it("resolves array values to length", () => {
+      const resolver = createSchemaBasedResolver({
+        languages: ["Common", "Elvish", "Dwarvish"],
+      });
+
+      expect(resolver("languages")).toBe(3);
+    });
+
+    it("uses additional mappings first", () => {
+      const resolver = createSchemaBasedResolver(
+        { Strength: 16 },
+        { DC: 15, advantage: 1 }
+      );
+
+      expect(resolver("DC")).toBe(15);
+      expect(resolver("advantage")).toBe(1);
+      expect(resolver("Strength")).toBe(16);
+    });
+
+    it("returns undefined for missing values", () => {
+      const resolver = createSchemaBasedResolver({});
+
+      expect(resolver("NonExistent")).toBeUndefined();
+    });
+
+    it("works with rollFormula", () => {
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+      const resolver = createSchemaBasedResolver({
+        STR_mod: 3,
+        proficiency: 2,
+      });
+
+      const result = rollFormula("1d20+{{STR_mod}}+{{proficiency}}", resolver);
+
+      // d20 with 0.5 random = 11, +3 +2 = 16
+      expect(result.total).toBe(16);
 
       vi.restoreAllMocks();
     });

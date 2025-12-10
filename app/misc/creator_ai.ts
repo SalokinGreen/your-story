@@ -15,6 +15,8 @@ import {
   CustomTable,
   Preset,
   getMemoryContent,
+  CharacterSchema,
+  CharacterData,
 } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 import { getCreatorToolsForAPI } from "@/app/misc/creator_tools";
@@ -61,13 +63,10 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push(basic.join("\n"));
   }
 
-  // Player Progression (level, XP, upgrades)
+  // Points & Momentum
   const progression: string[] = [];
-  if (data.level !== undefined) progression.push(`- **Level:** ${data.level}`);
-  if (data.points !== undefined)
-    progression.push(`- **XP (Points):** ${data.points}`);
-  if (data.upgradesSpent !== undefined)
-    progression.push(`- **Upgrades Spent:** ${data.upgradesSpent}`);
+  if (data.points !== undefined && data.points > 0)
+    progression.push(`- **Points:** ${data.points}`);
   if (data.momentum !== undefined)
     progression.push(
       `- **Momentum:** ${data.momentum}${
@@ -75,7 +74,7 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
       }`
     );
   if (progression.length > 0) {
-    sections.push("## Player Progression\n" + progression.join("\n"));
+    sections.push("## Progression\n" + progression.join("\n"));
   }
 
   // Game settings
@@ -433,19 +432,88 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push(levelingSection.join("\n"));
   }
 
-  // Progress info
+  // Character Schema
+  if (data.characterSchema) {
+    const schema = data.characterSchema;
+    const schemaSection = ["## Character Schema"];
+    schemaSection.push(`- **Name:** ${schema.name}`);
+    if (schema.description)
+      schemaSection.push(`- **Description:** ${schema.description}`);
+    schemaSection.push(`- **Fields:** ${schema.fields?.length || 0} defined`);
+    if (schema.fields && schema.fields.length > 0) {
+      const fieldsByType: Record<string, number> = {};
+      schema.fields.forEach((f: { type: string }) => {
+        fieldsByType[f.type] = (fieldsByType[f.type] || 0) + 1;
+      });
+      schemaSection.push(
+        `  - Types: ${Object.entries(fieldsByType)
+          .map(([t, c]) => `${t}(${c})`)
+          .join(", ")}`
+      );
+    }
+    if (schema.categories && schema.categories.length > 0) {
+      schemaSection.push(
+        `- **Categories:** ${schema.categories
+          .map((c: { name: string }) => c.name)
+          .join(", ")}`
+      );
+    }
+    if (schema.template?.html) {
+      schemaSection.push(
+        `- **Custom Template:** Yes (${
+          schema.template.html.length
+        } chars HTML, ${schema.template.css?.length || 0} chars CSS${
+          schema.template.js ? `, ${schema.template.js.length} chars JS` : ""
+        })`
+      );
+    }
+    if (schema.pages && schema.pages.length > 0) {
+      schemaSection.push(
+        `- **Custom Pages:** ${schema.pages
+          .map((p: { name: string }) => p.name)
+          .join(", ")}`
+      );
+    }
+    if (schema.resources && schema.resources.length > 0) {
+      schemaSection.push(
+        `- **Resources:** ${schema.resources.length} uploaded`
+      );
+    }
+    sections.push(schemaSection.join("\n"));
+  }
+
+  // Character Data (if schema exists)
+  if (data.characterData && data.characterSchema) {
+    const charDataSection = ["## Character Data Values"];
+    const values = data.characterData.values || {};
+    const entries = Object.entries(values).slice(0, 20); // Show first 20
+    entries.forEach(([key, value]) => {
+      if (typeof value === "object" && value !== null && "current" in value) {
+        charDataSection.push(`- **${key}:** ${value.current}/${value.max}`);
+      } else if (Array.isArray(value)) {
+        charDataSection.push(`- **${key}:** [${value.join(", ")}]`);
+      } else {
+        charDataSection.push(`- **${key}:** ${value}`);
+      }
+    });
+    if (Object.keys(values).length > 20) {
+      charDataSection.push(
+        `*(${Object.keys(values).length - 20} more fields...)*`
+      );
+    }
+    sections.push(charDataSection.join("\n"));
+  }
+
+  // Progress info (simplified - removed XP/level/upgrades)
   const progress: string[] = [];
-  if (data.points !== undefined)
-    progress.push(`- **XP (Points):** ${data.points}`);
-  if (data.level !== undefined) progress.push(`- **Level:** ${data.level}`);
-  if (data.upgradesSpent !== undefined)
-    progress.push(`- **Upgrades Spent:** ${data.upgradesSpent}`);
+  if (data.points !== undefined && data.points > 0)
+    progress.push(`- **Points:** ${data.points}`);
   if (data.momentum !== undefined)
     progress.push(`- **Momentum:** ${data.momentum}/${data.maxMomentum || 3}`);
   if (data.currentChapter !== undefined)
     progress.push(`- **Current Chapter:** ${data.currentChapter}`);
   if (progress.length > 0) {
-    sections.push("## Progress\n" + progress.join("\n"));
+    sections.push("## Current Progress\n" + progress.join("\n"));
   }
 
   // Memory (truncated for context)
@@ -1672,6 +1740,101 @@ When the user asks you to create or modify parts of the scenario (like "create a
 
 **Starting Choices:**
 - add_starting_choices, modify_starting_choices, remove_starting_choices - Custom game starts
+
+**Character Schema (defines character sheet structure):**
+- set_character_schema - Create/replace entire character schema with fields, categories, template
+- add_schema_fields, modify_schema_fields, remove_schema_fields - Manage schema field definitions
+- add_schema_categories, modify_schema_categories, remove_schema_categories - Organize fields into UI tabs
+- set_schema_template - Set main character sheet HTML/CSS/JS template
+- add_schema_pages, modify_schema_pages, remove_schema_pages - Add custom tabs with their own templates
+- add_schema_resources, remove_schema_resources - Upload images/fonts for custom templates
+- set_character_values, modify_character_values - Set/update character data values at runtime
+
+## Character Schema System
+
+The Character Schema defines what fields appear on character sheets and how they're displayed.
+
+### Field Types:
+- **number**: Simple numeric value (Strength: 14)
+- **derived**: Calculated from formula using other fields (Modifier: floor((Strength-10)/2))
+- **resource**: Has current/max values (HP: 45/50, Mana: 20/30)
+- **text**: String value (Background: "Orphan raised by wolves")
+- **list**: Array of strings (Languages: ["Common", "Elvish", "Draconic"])
+- **boolean**: True/false flag (Inspiration: true)
+- **select**: Pick from predefined options (Class: "Warrior" from ["Warrior", "Mage", "Rogue"])
+
+### Schema Field Structure:
+\`\`\`json
+{
+  "id": "strength",        // Unique identifier (used in templates as {{strength}})
+  "name": "Strength",      // Display name
+  "type": "number",        // Field type
+  "defaultValue": 10,      // Starting value
+  "min": 1,                // Optional: minimum allowed
+  "max": 30,               // Optional: maximum allowed
+  "category": "attributes" // Optional: groups fields in UI
+}
+\`\`\`
+
+### Derived Field Example:
+\`\`\`json
+{
+  "id": "str_mod",
+  "name": "STR Modifier",
+  "type": "derived",
+  "formula": "floor(({{strength}} - 10) / 2)",
+  "category": "modifiers"
+}
+\`\`\`
+
+### Resource Field Example:
+\`\`\`json
+{
+  "id": "hp",
+  "name": "Hit Points",
+  "type": "resource",
+  "defaultValue": { "current": 10, "max": 10 },
+  "category": "vitals"
+}
+\`\`\`
+
+### Categories:
+Categories organize fields into tabs in the UI:
+\`\`\`json
+{
+  "id": "attributes",
+  "name": "Attributes",
+  "icon": "user",
+  "order": 0
+}
+\`\`\`
+
+### Custom Templates:
+For full visual control, use HTML/CSS/JS templates:
+- Templates render in a sandboxed iframe
+- Use {{fieldId}} for value substitution
+- Use {{fieldId.current}}/{{fieldId.max}} for resources
+- Use {{percent fieldId}} for percentage (0-100)
+- Use {{modifier fieldId}} for D&D-style +/- prefix
+- Use {{resource:id}} for uploaded image/font URLs
+- Conditionals: {{#if condition}}...{{/if}}, {{#unless}}...{{/unless}}
+- Loops: {{#each items}}...{{/each}} with {{.}} for current item
+- Comparisons: {{#compare a op b}}...{{/compare}} (==, !=, <, >, <=, >=)
+
+### Multi-Page Templates:
+Add custom tabs with separate templates:
+\`\`\`json
+{
+  "id": "spells",
+  "name": "Spellbook",
+  "icon": "book-open",
+  "order": 1,
+  "template": {
+    "html": "<div class='spell-list'>{{#each known_spells}}<div>{{.}}</div>{{/each}}</div>",
+    "css": ".spell-list { display: grid; gap: 8px; }"
+  }
+}
+\`\`\`
 
 ## Important Guidelines:
 

@@ -11,7 +11,6 @@ import { getRPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import { ABILITY_GRADE_CONFIG } from "@/app/misc/abilitySystem";
-import { getActivePassives } from "@/app/misc/skillTree";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -37,8 +36,6 @@ Here is the narrative:
 
 export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for game state changes:
 - **Accuracy:** I will use EXACT string matching for items, stats, and quest names.
-- **Challenges:** I will update active challenges based on the Action Result.
-- **Conditions:** I will ONLY add/upgrade conditions when the player FAILED a skill check or lost a challenge. Never for successful actions or "flavor" damage.
 - **Already Applied:** Bracketed annotations like [Item Used: X], [Mana: -10], [Health: -15] mean those changes ALREADY HAPPENED. I will NOT duplicate them.
 
 ⚠️ CRITICAL: I MUST call ALL necessary tools in THIS SINGLE RESPONSE. I will NOT stop after one tool - I will call 2, 3, 4, or more tools together if multiple changes are needed.
@@ -62,21 +59,11 @@ Generating choices:`;
 const FEW_SHOT_INFO_MESSAGE = `# Story: The Merchant's Gambit
 A cunning merchant navigates a dangerous bazaar.
 
-## Character
-**Name:** Khalid
-Agility: Good (+2)
-Persuasion: Average (+0)
-Perception: Fair (+1)
-
-## Resources
-Gold: 50/100
-
-## Inventory
-- Curved Dagger (normal, common)
-- Merchant's Robes (normal, common)
-
-## Relationships
-- Nazim (Street Urchin): +10 - A scrappy kid who knows the bazaar's secrets.`;
+## Character (Merchant)
+- Agility: Good (+2)
+- Persuasion: Average (+0)
+- Perception: Fair (+1)
+- Gold: 50/100`;
 
 const FEW_SHOT_STORY_EXAMPLE_1 = {
   user: `>I'll check the merchant's stall for the stolen amulet.
@@ -114,7 +101,6 @@ Farouk's grip tightens. "Now. We talk price. Or we talk to the Caliph's men."
 [STOP]`,
   stateChanges: [
     "Condition added: Compromised Position (Tier I) - Farouk has you by the wrist",
-    "Relationship changed: Nazim slightly improved (he's watching from nearby, ready to help)",
   ],
 };
 
@@ -133,19 +119,6 @@ const FEW_SHOT_TOOL_CALLS = [
   },
   {
     id: "ex2",
-    type: "function" as const,
-    function: {
-      name: "modify_relationship",
-      arguments: JSON.stringify({
-        name: "Nazim",
-        magnitude: "slightly_improve",
-        description:
-          "The street urchin noticed Khalid's predicament and is positioning himself to help.",
-      }),
-    },
-  },
-  {
-    id: "ex3",
     type: "function" as const,
     function: {
       name: "add_condition",
@@ -170,11 +143,6 @@ const FEW_SHOT_TOOL_RESPONSES = [
   },
   {
     toolCallId: "ex2",
-    success: true,
-    message: "Relationship 'Nazim' improved from +10 to +15",
-  },
-  {
-    toolCallId: "ex3",
     success: true,
     message:
       "Condition 'Compromised Position' (Tier I) added, affects: Agility",
@@ -378,107 +346,6 @@ function getStatDescriptor(value: number): string {
   return "exceptional";
 }
 
-// Helper to convert item durability to condition description
-function getItemCondition(
-  durability: number | undefined,
-  maxDurability: number | undefined,
-  type: string | undefined,
-  grade: string | undefined
-): string {
-  // Consumables don't have durability condition
-  if (type === "consumable") return "consumable";
-  // AGMT items are indestructible
-  if (grade === "mythic") return "indestructible";
-  // Story items don't break
-  if (type === "story") return "quest item";
-  // Misc items don't break
-  if (type === "misc") return "utility";
-
-  // If durability is not tracked, assume good condition
-  if (
-    durability === undefined ||
-    maxDurability === undefined ||
-    maxDurability === 0
-  ) {
-    return "good condition";
-  }
-
-  const percent = (durability / maxDurability) * 100;
-  if (percent >= 100) return "flawless";
-  if (percent >= 80) return "good condition";
-  if (percent >= 60) return "worn";
-  if (percent >= 40) return "damaged";
-  if (percent >= 20) return "badly damaged";
-  if (percent > 0) return "nearly broken";
-  return "broken";
-}
-
-// Helper to convert relationship value to descriptive label with behavioral hint
-function getRelationshipDescriptor(value: number): {
-  label: string;
-  behavior: string;
-} {
-  if (value <= -80)
-    return {
-      label: "nemesis",
-      behavior:
-        "Actively seeks to harm or destroy the player. Will betray, sabotage, or attack on sight.",
-    };
-  if (value <= -50)
-    return {
-      label: "enemy",
-      behavior:
-        "Hostile and antagonistic. Will obstruct, threaten, or fight the player given opportunity.",
-    };
-  if (value <= -25)
-    return {
-      label: "hostile",
-      behavior:
-        "Distrustful and unfriendly. Refuses help, may spread rumors or work against player's interests.",
-    };
-  if (value <= -10)
-    return {
-      label: "unfriendly",
-      behavior:
-        "Cold and dismissive. Reluctant to interact, offers no favors, may charge extra or deny services.",
-    };
-  if (value <= 10)
-    return {
-      label: "stranger",
-      behavior:
-        "Neutral and indifferent. Treats player like anyone else—no special treatment either way.",
-    };
-  if (value <= 25)
-    return {
-      label: "acquaintance",
-      behavior:
-        "Mildly positive. Willing to chat, may offer small tips or minor assistance if convenient.",
-    };
-  if (value <= 50)
-    return {
-      label: "friendly",
-      behavior:
-        "Warm and helpful. Offers discounts, shares useful information, willing to do reasonable favors.",
-    };
-  if (value <= 75)
-    return {
-      label: "trusted friend",
-      behavior:
-        "Loyal and supportive. Will go out of their way to help, keep secrets, and defend the player's reputation.",
-    };
-  if (value <= 90)
-    return {
-      label: "devoted ally",
-      behavior:
-        "Deeply loyal. Will take significant risks for the player, offer resources, and stand by them in crisis.",
-    };
-  return {
-    label: "beloved",
-    behavior:
-      "Unconditional bond. Will sacrifice greatly for the player, trust them implicitly, and prioritize their wellbeing.",
-  };
-}
-
 // Build info message - shared across all stages
 // Optional embeddingContext allows embedding-enhanced lore/memory retrieval
 export function buildInfoMessage(
@@ -511,23 +378,6 @@ export function buildInfoMessage(
         .join("\n")}`
     : "";
 
-  // Build inventory section with condition description
-  const inventorySection = storyData.inventory.length
-    ? `## Inventory\n${storyData.inventory
-        .map((i) => {
-          const condition = getItemCondition(
-            i.durability,
-            i.maxDurability,
-            i.type,
-            i.grade
-          );
-          const desc = i.description ? `: ${i.description}` : "";
-          const qty = i.quantity > 1 ? ` x${i.quantity}` : "";
-          return `- ${i.name} (${condition})${qty}${desc}`;
-        })
-        .join("\n")}`
-    : "## Inventory\nEmpty";
-
   // Build abilities section with grade, cooldown, and cost info
   const abilitiesSection = storyData.abilities?.length
     ? `## Abilities\n${storyData.abilities
@@ -552,15 +402,6 @@ export function buildInfoMessage(
             (a.currentCooldown || 0) > 0 ? " (on cooldown)" : " (ready)";
           return `- ${a.name}${gradeLabel}${statInfo}${cooldownInfo}${costInfo}${readyStatus}${desc}`;
         })
-        .join("\n")}`
-    : "";
-
-  // Build passive effects section from skill trees and other sources
-  // Passives are story/RP traits that influence narrative and difficulty, not direct mechanical bonuses
-  const passives = getActivePassives(storyData);
-  const passivesSection = passives.length
-    ? `## Passive Traits\nThese are story/RP traits that influence narrative, difficulty, and NPC reactions - consider them when setting DCs and describing outcomes:\n${passives
-        .map((p) => `- ${p.name}: ${p.description}`)
         .join("\n")}`
     : "";
 
@@ -645,7 +486,7 @@ export function buildInfoMessage(
   }
 
   const loreSection = activeLore.length
-    ? `## Lore\n----\n${activeLore
+    ? `## Notes/Lore\n----\n${activeLore
         .map((l) => `${l.title}\n${cleanString(l.content)}`)
         .join("\n----\n")}`
     : "";
@@ -665,36 +506,6 @@ export function buildInfoMessage(
           .join("\n")}`
       : "";
   }
-
-  // Build relationships section if any exist
-  const relationshipsSection =
-    storyData.relationships && storyData.relationships.length > 0
-      ? `## Relationships\nNPC relationships influence how characters behave toward the player. Refer to each NPC's lore entry for detailed personality and motivations—the lore takes priority over generic relationship behavior.\n${storyData.relationships
-          .map((r) => {
-            const { label, behavior } = getRelationshipDescriptor(r.value);
-            const desc = r.description ? ` - ${r.description}` : "";
-            return `- ${r.name} (${label})${desc}\n  → ${behavior}`;
-          })
-          .join("\n")}`
-      : "";
-
-  // Build conditions/afflictions section if any exist
-  const conditionsSection =
-    storyData.conditions && storyData.conditions.length > 0
-      ? `## Active Conditions\n${storyData.conditions
-          .map((c) => {
-            const tierLabel = ["I", "II", "III", "IV", "V", "VI"][c.tier - 1];
-            const affectsLabel = c.affectsAll
-              ? "all checks"
-              : c.affects.length > 0
-              ? c.affects.join(", ")
-              : "unspecified";
-            const permanentLabel =
-              c.permanent || c.tier === 6 ? " [PERMANENT]" : "";
-            return `- ${c.name} (Tier ${tierLabel}${permanentLabel}): ${c.description} - affects ${affectsLabel}`;
-          })
-          .join("\n")}`
-      : "";
 
   // Build quests section if any exist
   const activeQuests =
@@ -726,51 +537,6 @@ export function buildInfoMessage(
       )})
 - Scene Count: ${storyData.agmtState.sceneCount}`
     : "";
-
-  // Build active challenge section if one exists
-  const activeChallengeSection = storyData.activeChallenge?.active
-    ? (() => {
-        const majority = Math.ceil(storyData.activeChallenge.rounds / 2);
-        return `## 🎯 ACTIVE CHALLENGE: ${storyData.activeChallenge.name}
-- **Format:** Best of ${
-          storyData.activeChallenge.rounds
-        } (first to ${majority} wins)
-- **Score:** ${storyData.activeChallenge.currentSuccesses} - ${
-          storyData.activeChallenge.currentFailures
-        }
-- **Victory Reward:** ${
-          storyData.activeChallenge.pointsAwarded || 0
-        } progression points
-${
-  storyData.activeChallenge.description
-    ? `- **Situation:** ${storyData.activeChallenge.description}`
-    : ""
-}`;
-      })()
-    : "";
-
-  // Build rest state section - show available rests
-  const difficulty = storyData.difficulty || "medium";
-  const restConfig = REST_CONFIG[difficulty];
-  const restState = storyData.restState || {
-    quickRestsUsed: 0,
-    shortRestsUsed: 0,
-  };
-  const remainingQuick = restConfig.maxQuickRests - restState.quickRestsUsed;
-  const remainingShort = restConfig.maxShortRests - restState.shortRestsUsed;
-
-  // Only show rest section if rests are limited (not all available)
-  const restStateSection =
-    restState.quickRestsUsed > 0 || restState.shortRestsUsed > 0
-      ? `## Rest Availability
-- Quick Rests: ${remainingQuick}/${restConfig.maxQuickRests} remaining
-- Short Rests: ${remainingShort}/${restConfig.maxShortRests} remaining
-${
-  remainingQuick === 0 && remainingShort === 0
-    ? "⚠️ Long rest required to restore rest uses"
-    : ""
-}`
-      : "";
 
   // Build variables section if any exist - clean, simple format
   const variablesSection =
@@ -835,6 +601,112 @@ ${
 }`
       : "";
 
+  // Build character schema section if using new system
+  let characterSchemaSection = "";
+  if (storyData.characterSchema && storyData.characterData) {
+    const schema = storyData.characterSchema;
+    const charData = storyData.characterData;
+
+    // Group fields by category
+    const fieldsByCategory: Record<string, string[]> = {};
+    const uncategorized: string[] = [];
+
+    // Get category order from schema.categories
+    const categoryOrder: Record<string, number> = {};
+    if (schema.categories) {
+      schema.categories.forEach((cat, index) => {
+        categoryOrder[cat.id] = cat.order ?? index;
+      });
+    }
+
+    // Helper to format a field value
+    const formatField = (
+      field: (typeof schema.fields)[0],
+      value: unknown
+    ): string | null => {
+      switch (field.type) {
+        case "number": {
+          return `${field.name}: ${value}`;
+        }
+        case "derived": {
+          const numVal = typeof value === "number" ? value : 0;
+          const displayVal = numVal >= 0 ? `+${numVal}` : String(numVal);
+          return `${field.name}: ${displayVal}`;
+        }
+        case "resource":
+          if (typeof value === "object" && value && "current" in value) {
+            const res = value as { current: number; max: number };
+            return `${field.name}: ${res.current}/${res.max}`;
+          }
+          return null;
+        case "boolean":
+          return `${field.name}: ${value ? "Yes" : "No"}`;
+        case "list":
+          if (Array.isArray(value) && value.length > 0) {
+            return `${field.name}:\n${value
+              .map((item) => `  • ${item}`)
+              .join("\n")}`;
+          }
+          return null;
+        case "select":
+        case "text":
+          if (value) return `${field.name}: ${value}`;
+          return null;
+        default:
+          return null;
+      }
+    };
+
+    for (const field of schema.fields) {
+      const value = charData.values[field.id];
+      if (value === undefined) continue;
+
+      const formatted = formatField(field, value);
+      if (!formatted) continue;
+
+      if (field.category) {
+        if (!fieldsByCategory[field.category]) {
+          fieldsByCategory[field.category] = [];
+        }
+        fieldsByCategory[field.category].push(formatted);
+      } else {
+        uncategorized.push(formatted);
+      }
+    }
+
+    // Build the section with categories as h3 headers
+    const sectionParts: string[] = [];
+    sectionParts.push(`## Character (${schema.name})`);
+
+    // Sort categories by order
+    const sortedCategories = Object.keys(fieldsByCategory).sort((a, b) => {
+      const orderA = categoryOrder[a] ?? 999;
+      const orderB = categoryOrder[b] ?? 999;
+      return orderA - orderB;
+    });
+
+    // Add categorized fields
+    for (const categoryId of sortedCategories) {
+      const categoryName =
+        schema.categories?.find((c) => c.id === categoryId)?.name || categoryId;
+      const fields = fieldsByCategory[categoryId];
+      sectionParts.push(`### ${categoryName}`);
+      sectionParts.push(fields.join("\n"));
+    }
+
+    // Add uncategorized fields at the end
+    if (uncategorized.length > 0) {
+      if (sortedCategories.length > 0) {
+        sectionParts.push(`### Other`);
+      }
+      sectionParts.push(uncategorized.join("\n"));
+    }
+
+    if (sortedCategories.length > 0 || uncategorized.length > 0) {
+      characterSchemaSection = sectionParts.join("\n");
+    }
+  }
+
   // Combine all sections
   const sections = [
     `# ${cleanString(storyData.story_name || "Untitled Story")}`,
@@ -844,24 +716,21 @@ ${
         ? ` - ${cleanString(storyData.player_summary)}`
         : ""
     }`,
-    rpgSystem.id !== "3d6"
+    // Only show RPG system if NOT using character schema (legacy mode)
+    !storyData.characterSchema && rpgSystem.id !== "3d6"
       ? `**RPG System:** ${rpgSystem.name} - ${rpgSystem.description}`
       : "",
+    characterSchemaSection, // New character schema section (if using new system)
     mechanicsSection, // Mechanics lore entries - prioritized first
-    statsSection,
-    resourcesSection,
-    inventorySection,
+    // Only show legacy stats/resources if NOT using character schema
+    !storyData.characterSchema ? statsSection : "",
+    !storyData.characterSchema ? resourcesSection : "",
     abilitiesSection,
-    passivesSection,
     achievementsSection,
     loreSection,
     memorySection,
-    relationshipsSection,
-    conditionsSection,
     questsSection,
     variablesSection,
-    activeChallengeSection,
-    restStateSection,
     threadsSection,
     agmtSection,
     storyData.author_notes
@@ -875,8 +744,8 @@ ${
           storyData.maxMomentum || 3
         } (spend for advantage/guaranteed success)`
       : "",
-    storyData.points !== undefined
-      ? `**Progression Points:** ${storyData.points} (spend on upgrades)`
+    storyData.points !== undefined && storyData.points > 0
+      ? `**Points:** ${storyData.points}`
       : "",
   ]
     .filter(Boolean)
@@ -970,18 +839,8 @@ The Input will provide the "Action Result" (Success/Failure). You describe the o
 - **Exploration:** Slower, atmospheric. Focus on sensory details and clues.
 - **Dialogue:** Give NPCs distinct voices/mannerisms. Use subtext.
 
-## 6. RPG SYSTEM & CONDITIONS
+## 6. RPG SYSTEM
 ${rpgSystem.aiInstructions.diceSystem}
-
-${rpgSystem.aiInstructions.challengeGuidance}
-
-When an [ACTIVE CHALLENGE] is shown in the game state:
-- **Early Game (0-1 on each side):** Describe the initial clash. If player failed, describe them taking a hit but staying in the fight.
-- **Tense (close score, e.g., 2-2):** Maximum tension. Both sides are battered. Describe accumulated wounds affecting the fight.
-- **Momentum (one side ahead, e.g., 2-1):** The leading side presses advantage. Trailing side is desperate, wounded.
-- **Challenge Won:** Triumphant conclusion. Player overcomes the threat. Existing conditions remain but no new ones added.
-- **Challenge Lost:** Apply the threat's "Challenge Loss" consequence from their lore. This is typically a severe condition (Tier III-V) representing total defeat.
-- **Keep It Episodic:** Each turn advances ONE step. Show the blow-by-blow, wound-by-wound progression.
 
 ## 7. OUTPUT FORMAT
 - **Markdown:** Use markdown sparingly for emphasis:
@@ -1192,62 +1051,28 @@ Your role is to read the latest narrative output and ensure the Game Database ma
 
 User will not see your output. Use your message content to "Think Step-by-Step" before calling tools.
 
-## CRITICAL: Already-Processed State Changes
-Player messages contain bracketed annotations showing what the GAME SYSTEM already processed:
-- \`[Skill: success]\` or \`[Skill: failure]\` = Dice already rolled
-- \`[Item Used: X; x2 → 1]\` = Item already consumed/damaged
-- \`[Resource: -10]\` = Resource already deducted
-- \`[Ability: Fireball]\` = Ability already used, cooldown already started
-- \`[Momentum: -1]\` = Momentum already spent
-
-**DO NOT DUPLICATE THESE.** They are informational only. Only process NEW events from the STORY TEXT.
-
 ## CRITICAL: Existing Game Data
 The info message contains the CURRENT game state - these are entries that ALREADY EXIST:
 - **"## Lore"** = Lore entries that exist. Use \`update_lore\` to add info, NOT \`create_lore\`
 - **"### Threads"** = Quests/storylines that exist. Use \`update_thread\` to progress, NOT \`create_thread\`
-- **"## Relationships"** = NPCs that exist. Use \`update_relationship\`, NOT \`add_relationship\`
 - **"## Memory"** = Facts already saved. Don't duplicate them.
 
 Only use CREATE tools for GENUINELY NEW content not shown in the info message.
 
 ## ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
-1. **Inventory Audit:** Did the narrative imply an item was consumed (e.g., "quaffed the potion"), broken, given away, or picked up? -> \`add_item\` / \`remove_item\`
-2. **Resource Delta:** Did the player do anything to lose or gain resources? -> \`update_resource\` (Eat/Bandage/Absorb Mana).
-3. **Condition Check (FAILURE-DRIVEN ONLY):**
-    ⚠️ **CONDITIONS ARE CONSEQUENCES OF FAILURE, NOT FLAVOR.**
-    - ONLY add/upgrade conditions when the player **FAILED a skill check** (look for "failure" or "fail" in the action result)
-    - ONLY add conditions when the player **LOST a challenge** (challenge result = "lost")
-    - Successful actions NEVER cause conditions, even if the story describes effort or strain
-    - DO NOT add conditions because the player "looks tired" or "feels pain" - that's narrative flavor, not mechanical failure
-${rpgSystem.aiInstructions.challengeGuidance}
-    - Did the player receive medical aid or rest? -> \`downgrade_condition\`.
-4. **Memory Management:** ⚠️ MOST TURNS NEED ZERO MEMORIES. Only add memory for:
+1. **Resource Delta:** Did the player do anything to lose or gain resources? -> \`update_resource\` / \`modify_field\` (Eat/Bandage/Absorb Mana).
+2. **Memory Management:** ⚠️ MOST TURNS NEED ZERO MEMORIES. Only add memory for:
     - Promises/debts: "Owes blacksmith 50 gold"
     - Codes/passwords: "Vault password: MOONRISE"
     - NPC facts: "Mayor's daughter is kidnapped"
     - Deadlines: "Must reach temple by dawn"
     - **DO NOT ADD** atmospheric details, descriptions, feelings, or story summaries
-5. **No Changes Needed:** If no game state changes are required, call \`skip_tools\` instead of making unnecessary tool calls.
-6. **NPC Management:** Did a new NPC appear or an existing NPC change significantly? -> \`add_npc\` and  \`add_relationship\` / \`modify_npc\`.
-7. **Relationship Changes:** Did an NPC react positively or negatively **to the PLAYER'S actions**? -> \`modify_relationship\` with magnitude:
-    - **greatly_damage:** Betrayal, violence against them, major offense
-    - **damage:** Insults, broken promises, significant rudeness
-    - **slightly_damage:** Minor slights, dismissiveness, small annoyances
-    - **slightly_improve:** Polite conversation, small kindnesses
-    - **improve:** Helpful actions, gifts, significant favors
-    - **greatly_improve:** Heroic deeds, saving their life, major sacrifices
-    ⚠️ ONLY change relationships based on what the PLAYER did - NOT external events or other NPCs' actions.
-    Note: The system automatically adjusts changes based on difficulty and current relationship - enemies are hard to befriend, friends are resilient to minor slights.
-8. **Passive Traits:** Did the player gain or lose a defining trait through story events? -> \`add_passive\` / \`remove_passive\` / \`modify_passive\`.
-    - Passives are story/RP traits that influence narrative (NOT mechanical bonuses)
-    - Examples: "Wolf Slayer" (gained after defeating many wolves), "Cursed Blood" (gained through dark ritual), "Friend of the Forest" (earned trust of woodland creatures)
-    - Only add passives for SIGNIFICANT character developments, not minor events
-9. **Variables:** Did the story introduce or change a variable (e.g., "The ancient mechanism is now active")? -> \`set_variable\`.
-10. **Advanced RPG Tools (AGMT only):** If using AGMT, did the chaos factor change or scene transitions occur? -> \`update_agmt_state\`.
-11. **Lore Management:** Did the story reveal new lore or update existing lore? -> \`create_lore\` / \`update_lore\`.
-12. **Rest System:** Did the player rest (quick/short/long)? -> \`take_rest\`.
-13. **Thread Management:** Did a new plotline/quest emerge or an existing one progress/conclude? -> \`create_thread\` / \`update_thread\` / \`resolve_thread\` / \`abandon_thread\`.
+3. **No Changes Needed:** If no game state changes are required, call \`skip_tools\` instead of making unnecessary tool calls.
+4. **NPC Management:** Did a new NPC appear? -> \`add_npc\` to create lore entry for significant NPCs.
+5. **Variables:** Did the story introduce or change a variable (e.g., "The ancient mechanism is now active")? -> \`set_variable\`.
+6. **Advanced RPG Tools (AGMT only):** If using AGMT, did the chaos factor change or scene transitions occur? -> \`update_agmt_state\`.
+7. **Lore Management:** Did the story reveal new lore or update existing lore? -> \`create_lore\` / \`update_lore\`.
+8. **Thread Management:** Did a new plotline/quest emerge or an existing one progress/conclude? -> \`create_thread\` / \`update_thread\` / \`resolve_thread\` / \`abandon_thread\`.
 
 ## ⛔ MEMORY ANTI-PATTERNS (NEVER DO THESE)
 BAD: "A crow perches on the angel statue, watching with beady eyes" ← This is story text, not actionable
@@ -1262,28 +1087,11 @@ GOOD: "Crow seems to be following me since helicopter" ← Plot-relevant observa
 If the story is just exploration/atmosphere with no promises, secrets, or deadlines → call \`skip_tools\`
 
 ## TOOL USAGE GUIDELINES
-- **Exact Matching:** You must use exact string matching for Item/Stat/Quest names.
+- **Exact Matching:** You must use exact string matching for Stat/Quest names.
 - **Fail Forward:** If the narrative described a failure, ensure the *cost* of that failure is applied (lost resource, condition, etc.).
-- **Parallel Execution:** Call MULTIPLE tools in a SINGLE response when several independent changes are needed. Don't wait for confirmation between calls - batch them together (e.g., if the story shows the player getting an item AND taking damage, call both \`add_item\` and \`update_resource\` in the same response).
 
 ## LORE MANAGEMENT
 Lore entries are the adventure's world-building database. Your job is to keep it alive and evolving.
-
-### THREAT DOCUMENTATION IN LORE
-When creating lore for NPCs, monsters, or dangerous situations, include their **threat profile**:
-- **Challenge Difficulty:** What kind of challenge they represent (quick/standard/extended/epic)
-- **Approach Difficulties:** Different DCs for different approaches (e.g., "Combat: hard, Stealth: average, Diplomacy: very_hard")
-- **Failure Consequence:** What condition they inflict on failed checks (e.g., "Inflicts Wounded Tier II on failed combat checks")
-- **Challenge Stakes:** What happens if player loses the full challenge (e.g., "Challenge Loss: Broken Body Tier IV")
-
-Example threat lore:
-> **Sergeant Vance** - A grizzled police officer with combat training.
-> - Direct confrontation: Hard challenge (best of 5), inflicts Gunshot Wound Tier III on failed checks
-> - Challenge Loss: Arrested (story consequence) + Flesh Wound Tier II
-> - Stealth approach: Average DC to slip past
-> - Social approach: Very Hard DC (he's by-the-book)
-
-This helps the AI know EXACTLY what consequences to apply without guessing.
 
 ⚠️ **CRITICAL: The "Lore" section in the info message shows EXISTING lore entries. Do NOT recreate them!**
 - If you see "## Lore" with entries like "The Old Church\\n..." - that lore ALREADY EXISTS
@@ -1305,58 +1113,6 @@ This helps the AI know EXACTLY what consequences to apply without guessing.
 - Lore should be DETAILED (2-4 paragraphs), not just one sentence
 - Include: physical description, personality, motivations, relationships, secrets, relevance to player
 - Think of lore as a "GM reference sheet" that will help future story generation
-
-## SCENE CHALLENGES (Progress Clocks)
-**Starting Challenges:** Look for \`[Start Challenge "NAME": X-Y]\` in the user's message.
-- When you see this signal, call \`start_challenge\` with that name and appropriate rounds/stakes
-- The X-Y score shows the first roll result (e.g., 1-0 means success, 0-1 means failure)
-- Pass the first number as \`initialSuccesses\` and second as \`initialFailures\`
-- Set \`rounds\` based on threat complexity (3 for simple, 5 for standard, 7 for boss)
-- Do NOT start challenges without this signal
-
-### CHALLENGE PHILOSOPHY (Inspired by Powered by the Apocalypse)
-Challenges replace HP-based combat with **stakes-based conflict**:
-- **No HP Trading:** We don't track enemy HP. Challenges are "best of X" - first to majority wins.
-- **Clear Stakes:** Each challenge should have documented win/loss consequences.
-- **Conditions on Failure:** Failed checks DURING a challenge still inflict conditions (per the threat's lore).
-- **Challenge Loss = Major Consequence:** Losing the overall challenge inflicts the threat's "Challenge Loss" condition.
-
-**Updating Active Challenges (when a challenge IS active):**
-- If a Challenge is ACTIVE and this turn involved a skill check:
-  - Player succeeded at their action? -> \`update_challenge\` with \`successIncrement: 1\`
-  - Player failed at their action? -> \`update_challenge\` with \`failureIncrement: 1\` AND apply failure condition
-- Individual failures during challenges STILL inflict conditions (the threat hits back)
-- Do NOT update if no skill check was made this turn.
-
-**Challenge Resolution:**
-- **Player Wins:** Objective achieved, threat neutralized, points awarded. No additional conditions.
-- **Player Loses:** Apply the threat's "Challenge Loss" condition (check lore for specifics).
-- Use \`resolve_challenge\` only for non-standard endings (enemy surrenders, rescue arrives, player retreats).
-
-## REST SYSTEM
-Allow players to rest and recover when narratively appropriate.
-
-**Rest Types:**
-- **Quick Rest (~30 min):** Brief break to catch breath. Reduces cooldowns slightly. Use between encounters.
-- **Short Rest (4-8 hours):** Sleep or extended rest. Resets most cooldowns, heals minor conditions. Use at safe camps or inns.
-- **Long Rest (several days):** Extended downtime/time skip. All cooldowns reset, conditions improve significantly. Resets quick/short rest counters.
-
-**IMPORTANT: Resource Recovery:**
-Resources are NOT automatically recovered. You MUST specify which resources to restore using the \`resources\` parameter.
-- Only include REGENERATING resources (Health, Stamina, Mana, Energy, Focus, etc.)
-- Do NOT include non-regenerating resources (Gold, Coins, Ammo, Arrows, Supplies, etc.)
-- Scale recovery by rest type: quick (5-15%), short (30-50%), long (100%)
-- Example: \`resources: [{ name: "Health", amount: 50 }, { name: "Mana", amount: 30 }]\`
-
-**When to Call \`take_rest\`:**
-- Player explicitly requests rest, sleep, or recovery time
-- Narrative reaches a natural pause (safe haven, end of major event, travel montage)
-- Player is injured/exhausted and seeks shelter
-
-**When NOT to Rest:**
-- During active combat or challenges
-- In immediate danger
-- When quick/short rest limits are exhausted (player needs long rest)
 
 ## THREAD MANAGEMENT
 Track ongoing storylines, mysteries, quests, and plot hooks using threads.
@@ -1617,8 +1373,6 @@ export function buildChoicesPrompt({
   embeddingContext?: EmbeddingContext;
   usePrefill?: boolean;
 }): { messages: ChatMessage[] } {
-  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
-
   const systemPrompt = `You are a choice designer for an interactive text-based adventure game.
 Your role is to create meaningful player choices based on the narrative that was just written.
 
@@ -1630,244 +1384,31 @@ Return a plain list of choices, one per line, starting with a dash:
 - Choice 3
 \`\`\`
 
-Choice Syntax:
-${rpgSystem.aiInstructions.choiceSyntax}
-! Only use stats and resources that the player owns!
+IMPORTANT: Choices are PLAIN TEXT only. Do NOT include:
+- Skill checks or DCs (e.g., "[Strength DC 15]")
+- Item tags (e.g., "<use: Sword>")
+- Resource costs (e.g., "<cost: 5 Stamina>")
+- Any bracketed metadata
 
-⚠️ EXACT NAME MATCHING REQUIREMENT:
-When referencing skills, resources, or items in choices, you MUST use the EXACT names as they appear in the game state below.
-- Copy exact spelling, capitalization, and punctuation from Stats, Resources, and Inventory
-- Do NOT paraphrase, abbreviate, or modify names
-- Only use stats and resources that the player owns
+The Game Master stage will determine if dice rolls are needed based on the player's chosen action.
 
-📋 AVAILABLE STATS FOR SKILL CHECKS (use ONLY these exact names):
-${
-  storyData.stats.length > 0
-    ? storyData.stats.map((s) => `• ${s.name}`).join("\n")
-    : "• (No stats defined - do not use skill checks)"
-}
+CHOICE DESIGN GUIDELINES:
+- Offer 3-6 meaningful choices that reflect different approaches
+- Each choice should describe what the player WANTS TO DO
+- Include a mix of safe options and risky options
+- Make choices reflect the player's agency and current situation
+- Avoid dead-end choices that just say "Continue..."
+- Write choices as clear action statements:
+  - GOOD: "Climb the wall to reach the balcony"
+  - GOOD: "Try to convince the guard to let you pass"
+  - GOOD: "Attack the goblin with your sword"
+  - BAD: "Climb wall [Athletics DC 12]" (no brackets!)
+  - BAD: "Attack <use: Sword>" (no item tags!)
 
-📦 AVAILABLE RESOURCES (use ONLY these exact names):
-${
-  storyData.resources.length > 0
-    ? storyData.resources.map((r) => `• ${r.name}`).join("\n")
-    : "• (No resources defined - do not use resources)"
-}
-
-🎒 AVAILABLE ITEMS (use ONLY these exact names):
-${
-  storyData.inventory.length > 0
-    ? storyData.inventory.map((i) => `• ${i.name} [${i.type}]`).join("\n")
-    : "• (No items in inventory)"
-}
-
-✨ AVAILABLE ABILITIES (use ONLY these exact names):
-${
-  storyData.abilities?.length
-    ? storyData.abilities
-        .map((a) => {
-          const gradeLabel = a.grade
-            ? ` (${
-                ABILITY_GRADE_CONFIG[a.grade as AbilityGrade]?.label || a.grade
-              })`
-            : "";
-          const cooldownInfo =
-            (a.cooldown || 0) > 0
-              ? ` [cooldown: ${a.currentCooldown || 0}/${a.cooldown}]`
-              : "";
-          const costInfo = a.cost?.length
-            ? ` [costs: ${a.cost
-                .map((c) => `${c.amount} ${c.name}`)
-                .join(", ")}]`
-            : "";
-          const readyStatus =
-            (a.currentCooldown || 0) > 0 ? " (on cooldown)" : " (ready)";
-          return `• ${a.name}${gradeLabel}${cooldownInfo}${costInfo}${readyStatus}`;
-        })
-        .join("\n")
-    : "• (No abilities available)"
-}
-
-🌟 PASSIVE TRAITS (influence difficulty and narrative):
-${(() => {
-  const passivesList = getActivePassives(storyData);
-  return passivesList.length > 0
-    ? passivesList.map((p) => `• ${p.name}: ${p.description}`).join("\n")
-    : "• (No passive traits)";
-})()}
-
-⚠️ ACTIVE CONDITIONS (penalize skill checks):
-${
-  storyData.conditions && storyData.conditions.length > 0
-    ? storyData.conditions
-        .map((c) => {
-          const tierLabel = ["I", "II", "III", "IV", "V", "VI"][c.tier - 1];
-          const affectsLabel = c.affectsAll
-            ? "ALL checks"
-            : c.affects.length > 0
-            ? c.affects.join(", ")
-            : "unspecified";
-          return `• ${c.name} (Tier ${tierLabel}): affects ${affectsLabel}${
-            c.permanent ? " [PERMANENT]" : ""
-          }`;
-        })
-        .join("\n")
-    : "• (No active conditions)"
-}
-
-Resource System:
-- When a choice uses a resource (use_resource), it signifies that action requires or risks that resource
-- Choose resources that thematically fit the action: use Stamina for running/escaping, Health for combat/dangerous situations, Mana for spellcasting, etc.
-- Resource requirements are based on DC:
-  * Required amount: DC ÷ ${
-    rpgSystem.resources.requiredDivisor
-  } (rounded down, minimum ${rpgSystem.resources.minRequired})
-  * If player has insufficient resource: dice roll receives -DC÷${
-    rpgSystem.resources.penaltyDivisor
-  } penalty (minimum -${rpgSystem.resources.minPenalty})
-- YOU manage all resource gains and losses via tools (adjust_resource, set_resource) based on narrative outcomes
-- Example: A player sprints to escape - on failure, YOU might deduct Stamina; on success, YOU decide if they're winded or energized
-
-Item Types:
-- normal: Advantage on use, breaks on failure (tools, weapons, armor)
-- consumable: Advantage on use, consumed immediately (potions, scrolls, ammunition)
-- story: Advantage on use, never breaks/consumed (quest items, artifacts, keys)
-- misc: Prevents disadvantage only, never breaks/consumed (rope, torches, rations)
-
-RPG System:
-${rpgSystem.aiInstructions.diceSystem}
-${rpgSystem.aiInstructions.dcGuidance}
-${rpgSystem.aiInstructions.dcGuidelines}
-
-Choice Design Guidelines:
-- Offer 3-8 meaningful choices that reflect different approaches or priorities
-- Each choice should have clear stakes and potential consequences
-- Use skill checks for challenging actions
-- Use items for tactical advantages when appropriate
-- Use resources for risky or exhausting actions
-- Balance risk vs reward - higher DCs should offer better outcomes
-- Include at least one "safe" option and one "risky but rewarding" option
-- Make choices reflect the player's agency and the current story situation
-- Avoid dead-end choices that just lead to "Continue..."
-- Balance challenge with narrative flow: not every choice needs a skill check
-- Use skill checks for dramatic moments, high-stakes decisions, and character-defining actions
-
-🎲 SKILL CHECK FINALITY - One Roll Per Task:
-- If the player JUST rolled a skill check, that result is FINAL for that task
-- SUCCESS means they're WINNING - choices should continue their success, not re-test it
-- FAILURE means they FAILED - choices should deal with consequences, not "try again"
-- Do NOT offer choices that would re-roll the same challenge:
-  - BAD: Player failed to climb → "Try to climb again [Athletics DC 12]" (repeat roll)
-  - GOOD: Player failed to climb → "Look for another way around" or "Accept defeat and leave"
-  - BAD: Player succeeded at persuasion → "Continue convincing them [Diplomacy DC 10]" (unnecessary)
-  - GOOD: Player succeeded at persuasion → "Ask for their help with the mission" (continues success)
-- New skill checks should only appear for GENUINELY NEW challenges:
-  - Different obstacles (climbed wall → now face a guard)
-  - Changed circumstances (guards are now alerted)
-  - Different approaches (failed climbing → try picking the lock instead)
-- This prevents frustrating "roll until you win" loops and keeps the story moving forward${
-    storyData.agmtState
-      ? `
-
-⚠️ MYTHIC QUESTIONS vs SKILL CHECKS - STRICT HIERARCHY:
-
-1. SKILL CHECKS DETERMINE SUCCESS/FAILURE - Their result is FINAL and CANNOT be overridden
-   - If a choice has skill_used parameter, the skill check result determines whether the player succeeds
-   - Success = player accomplishes the action
-   - Failure = player fails at the action
-   - DO NOT ask AGMT questions that duplicate or "second guess" the skill check outcome
-
-2. MYTHIC QUESTIONS are for situations where SKILL CHECKS DON'T ANSWER THE QUESTION:
-   
-   ✅ GOOD USE CASES (asking questions skill checks can't answer):
-   - World discovery: "Is the artifact here? (Unlikely)" "Is the door locked? (50/50)"
-   - NPC state: "Is the merchant friendly? (Somewhat Likely)" "Does the guard recognize you? (Unlikely)"
-   - Environmental factors: "Is the path clear? (Likely)" "Is it raining? (50/50)"
-   - Complications: "Does something go wrong? (Likely)" [adds narrative tension]
-   - Opportunities: "Is there another way? (50/50)" [offers alternatives]
-   - Random events: Use Event Meaning for unexpected developments
-   
-   ✅ GOOD COMBINATIONS (skill + agmt asking DIFFERENT questions):
-   "Search the ruins [Perception DC 12] [agmt: Is anything valuable here? (Unlikely) (context)]"
-   → Perception check = Can you find what's there (player ability)
-   → AGMT = What's actually there to find (world state)
-   → Set agmt_context_only: true
-   
-   "Convince the guard [Diplomacy DC 15] [agmt: Is the guard corrupt? (50/50) (context)]"
-   → Diplomacy = Your persuasion skill (player ability)
-   → AGMT = Guard's moral flexibility (NPC trait)
-   → Set agmt_context_only: true
-   
-   "Sneak past patrols [Stealth DC 18] [agmt: Are guards alert? (Likely) (context)]"
-   → Stealth = Your sneaking ability (player ability)
-   → AGMT = Environmental difficulty (world state)
-   → Set agmt_context_only: true
-   
-   ❌ BAD USE CASES (redundant with skill check - NEVER DO THIS):
-   "Climb the wall [Athletics DC 14] [agmt: Can you reach the top? (Somewhat Likely)]"
-   ❌ WRONG: Both determine if you climb successfully - AGMT duplicates skill check
-   
-   "Persuade the king [Diplomacy DC 18] [agmt: Does the king agree? (Likely)]"
-   ❌ WRONG: Diplomacy already answers if you persuade him - AGMT overrides skill check
-   
-   "Decode the runes [Intelligence DC 16] [agmt: Can you understand it? (50/50)]"
-   ❌ WRONG: Intelligence determines comprehension - AGMT second-guesses the result
-
-3. WHEN COMBINING BOTH:
-   - ALWAYS set agmt_context_only: true when using agmt_check with skill_used
-   - Skill check determines if PLAYER ACTION succeeds (primary outcome)
-   - AGMT determines WORLD RESPONSE or CONTEXT (narrative color)
-   - Skill result takes absolute priority for success/failure
-   - AGMT adds complications, opportunities, or environmental factors
-   
-   Example outcomes:
-   - Skill Success + AGMT Yes = Clean success with favorable circumstances
-   - Skill Success + AGMT No = Success despite unfavorable circumstances
-   - Skill Failure + AGMT Yes = Failure with mitigating factors or silver lining
-   - Skill Failure + AGMT No = Complete failure with additional complications
-
-4. STANDALONE MYTHIC (no skill check):
-   - Use for pure world-building, NPC reactions, environmental queries
-   - No agmt_context_only flag needed (there's no skill check to contextualize)
-   - Result directly affects narrative but doesn't test player ability
-
-Advanced RPG Tools ORACLE TABLES:
-The following oracle tables are available for creating choices that involve uncertainty, discovery, or world-building:
-Core Tables:
-- Fate Chart: Ask yes/no questions with likelihood modifiers (Impossible to Has To Be) adjusted by chaos factor
-- Event Focus: Determine what type of random event occurs (Remote event, NPC action, New NPC, Thread movement, PC/NPC positive/negative)
-- Event Meaning: Generate random events using Action + Subject (100 actions × 100 subjects)
-
-Element Tables (45+ categories):
-Character: actions_combat, actions_general, appearance, background, conversations, descriptors, identity, motivations, personality, skills, traits_flaws
-Environment: adventure_tone, cavern, city, civilization, domicile, dungeon, dungeon_traps, forest, locations, terrain
-Creatures: alien_species, animal_actions, creature_abilities, creature_descriptors, undead
-Items: magic_item, objects, powers, scavenging_results, spell_effects
-Narrative: cryptic_message, curses, gods, legends, names, plot_twists, visions_dreams
-Combat: army
-Sensory: smells, sounds
-Special: mutation, noble_house, starship
-
-Example choices using tables: 
-- "Ask the Fate Chart if the guard is trustworthy (Somewhat Likely)"
-- "Roll on Event Meaning to see what happens next"
-- "Generate a character_appearance for the mysterious stranger"
-- "Check creature_abilities to determine what this beast can do"
-- "Roll on plot_twists to add a surprising development"`
-      : ""
-  }${
-    storyData.customTables && storyData.customTables.length > 0
-      ? `
-
-CUSTOM TABLES:
-The creator has defined these custom weighted-random tables. Use them in choices with the table parameter (inside angle brackets with other metadata) when they fit the narrative:
-${storyData.customTables.map((t) => `- ${t.name}: ${t.description}`).join("\n")}
-
-Example: "Take a risk <table: ${
-          storyData.customTables[0]?.name || "TableName"
-        }>"`
-      : ""
-  }`;
+NARRATIVE FLOW:
+- If the player JUST succeeded at something, choices should build on that success
+- If the player JUST failed, choices should deal with consequences or try different approaches
+- Don't offer choices that repeat the same challenge they just faced`;
 
   const infoMessage = buildInfoMessage(storyData, embeddingContext);
 
@@ -2133,20 +1674,6 @@ ${
     : "  None"
 }
 
-PASSIVE TRAITS (influence DC):
-${(() => {
-  const passivesList = getActivePassives(storyData);
-  return passivesList.length > 0
-    ? passivesList.map((p) => `  • ${p.name}: ${p.description}`).join("\n")
-    : "  None";
-})()}
-
-ACTIVE CHALLENGE: ${
-    storyData.activeChallenge?.active
-      ? `"${storyData.activeChallenge.name}" (Best of ${storyData.activeChallenge.rounds}: ${storyData.activeChallenge.currentSuccesses}-${storyData.activeChallenge.currentFailures})`
-      : "None"
-  }
-
 RESPOND WITH JSON ONLY.`;
 
   // Build minimal context within token budget for situational awareness
@@ -2206,6 +1733,10 @@ I will now call the appropriate tool(s):`;
 /**
  * Build the GM stage prompt for determining game mechanics
  * This stage runs BEFORE the story stage and uses tool calls instead of JSON output
+ *
+ * Supports two modes:
+ * 1. Legacy mode: Uses rpgSystem + stats for skill_check, opposed_check, etc.
+ * 2. Schema mode: Uses characterSchema + characterData for formula_roll, opposed_formula, etc.
  */
 export function buildGMStagePrompt({
   storyData,
@@ -2214,89 +1745,251 @@ export function buildGMStagePrompt({
   storyData: StoryData;
   userChoice: string;
 }): { messages: ChatMessage[]; tools: any[] } {
-  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
   const difficulty = storyData.difficulty || "medium";
 
   // Import GM tools dynamically to avoid circular deps
   const { GM_TOOL_SCHEMAS } = require("./gmTools");
 
-  // Build stat list
-  const statList = (storyData.stats || [])
-    .map((s) => `${s.name}: ${s.value}`)
-    .join(", ");
+  // Detect which mode we're in
+  const hasCharacterSchema = !!storyData.characterSchema;
+  const hasCharacterData = !!storyData.characterData;
+  const useSchemaMode = hasCharacterSchema && hasCharacterData;
 
-  // Build resource list
-  const resourceList = (storyData.resources || [])
-    .map((r) => `${r.name}: ${r.value}/${r.maxValue}`)
-    .join(", ");
-
-  // Build inventory list (only items that could be used in checks)
-  const usableItems = (storyData.inventory || [])
-    .filter((i) => i.type !== "misc" && i.quantity > 0)
-    .map((i) => {
-      const parts = [i.name];
-      if (i.grade && i.grade !== "common") parts.push(`(${i.grade})`);
-      if (i.durability !== undefined && i.maxDurability)
-        parts.push(`[${i.durability}/${i.maxDurability}]`);
-      return parts.join(" ");
-    })
-    .join(", ");
-
-  // Build ability list (only ready abilities)
-  const readyAbilities = (storyData.abilities || [])
-    .filter((a) => !a.currentCooldown || a.currentCooldown === 0)
-    .map((a) => {
-      const parts = [a.name];
-      if (a.grade && a.grade !== "novice") parts.push(`(${a.grade})`);
-      if (a.cost && a.cost.length > 0) {
-        const costs = a.cost.map((c) => `${c.amount} ${c.name}`).join(", ");
-        parts.push(`[costs: ${costs}]`);
-      }
-      return parts.join(" ");
-    })
-    .join(", ");
-
-  // Build condition list (affects checks)
-  const conditions = (storyData.conditions || [])
-    .map(
-      (c) =>
-        `${c.name} (Tier ${c.tier}: affects ${
-          c.affectsAll ? "ALL" : c.affects.join(", ")
-        })`
-    )
-    .join(", ");
-
-  // Build passive list
-  const passivesList = getActivePassives(storyData);
-  const passives =
-    passivesList.length > 0
-      ? passivesList.map((p) => `${p.name}: ${p.description}`).join("; ")
-      : "None";
-
-  // Get recent story parts for context (like Tools stage)
+  // Get recent story parts for context
   const recentParts = getPartsWithinTokenBudget(
     storyData.scene.parts,
     ACTION_ANALYSIS_TOKEN_BUDGET
   );
 
-  // Build active challenge context
-  let challengeContext = "None";
-  if (storyData.activeChallenge?.active) {
-    const ch = storyData.activeChallenge;
-    const requiredToWin = Math.floor(ch.rounds / 2) + 1;
-    challengeContext = `"${ch.name}" - Need ${requiredToWin} successes (current: ${ch.currentSuccesses} wins, ${ch.currentFailures} losses)`;
+  // Build lore/notes section for GM stage (mechanics and always-on lore)
+  // GM needs to know game rules and important world details for setting DCs
+  const mechanicsLore = (storyData.lore || []).filter(
+    (l) => l.enabled !== false && l.type === "mechanics"
+  );
+  const alwaysOnLore = (storyData.lore || []).filter(
+    (l) => l.enabled !== false && l.type !== "mechanics" && l.alwaysOn === true
+  );
+
+  let loreSection = "";
+  if (mechanicsLore.length > 0) {
+    loreSection += `## GAME RULES & MECHANICS\nThese rules define how the game works. Use them to set appropriate DCs and determine what actions are possible.\n`;
+    for (const l of mechanicsLore) {
+      loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
+    }
+  }
+  if (alwaysOnLore.length > 0) {
+    loreSection += `\n## IMPORTANT WORLD DETAILS\n`;
+    for (const l of alwaysOnLore) {
+      loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
+    }
   }
 
-  const systemPrompt = `You are the GAME MASTER for a ${rpgSystem.name} (${
-    rpgSystem.id
-  }) game at ${difficulty} difficulty.
+  let systemPrompt: string;
+  let toolsToUse: any[];
+
+  if (useSchemaMode) {
+    // ============================================
+    // SCHEMA MODE: Use formula-based tools
+    // ============================================
+    const schema = storyData.characterSchema!;
+    const charData = storyData.characterData!;
+
+    // Build character data summary for the AI
+    const fieldSummaries: string[] = [];
+    for (const field of schema.fields) {
+      const value = charData.values[field.id];
+      if (value === undefined) continue;
+
+      switch (field.type) {
+        case "number":
+        case "derived":
+          fieldSummaries.push(`${field.name}: ${value}`);
+          break;
+        case "resource":
+          if (typeof value === "object" && "current" in value) {
+            fieldSummaries.push(`${field.name}: ${value.current}/${value.max}`);
+          }
+          break;
+        case "boolean":
+          if (value === true) fieldSummaries.push(`${field.name}: ✓`);
+          break;
+        case "list":
+          if (Array.isArray(value) && value.length > 0) {
+            fieldSummaries.push(`${field.name}: ${value.join(", ")}`);
+          }
+          break;
+        case "select":
+        case "text":
+          if (value) fieldSummaries.push(`${field.name}: ${value}`);
+          break;
+      }
+    }
+
+    // Build usable variable list for formulas
+    const variableList: string[] = [];
+    for (const field of schema.fields) {
+      if (field.type === "number" || field.type === "derived") {
+        variableList.push(`{{${field.id}}}`);
+      }
+    }
+
+    systemPrompt = `You are the GAME MASTER for a custom RPG using the "${
+      schema.name
+    }" character system at ${difficulty} difficulty.
+
+Your role is to DETERMINE MECHANICS before the story is written. You decide:
+1. Whether the player's action requires a roll
+2. What formula to use and what DC to set
+3. Whether to start/continue a challenge
+4. Stakes and consequences
+${loreSection ? `\n${loreSection}` : ""}
+## CHARACTER SYSTEM: ${schema.name}
+${schema.description || "Custom character sheet system"}
+
+## CURRENT CHARACTER
+${fieldSummaries.join("\n") || "No character data"}
+
+## AVAILABLE VARIABLES FOR FORMULAS
+You can use these in dice formulas: ${variableList.join(", ")}
+
+## DECISION FRAMEWORK
+
+**ALWAYS call a tool.** Choose ONE of:
+
+1. **formula_roll** - Player attempts something with meaningful risk
+   - Build a formula using dice and character variables
+   - Example: "1d20+{{STR_mod}}+{{proficiency}}" for a strength check
+   - Example: "2d6+{{Combat}}" for a combat roll
+   - Set DC based on difficulty (easy: 10, medium: 15, hard: 20, very hard: 25)
+   - Set stakes based on danger level
+
+2. **formula_challenge_check** - There's an ACTIVE challenge; this action counts toward it
+   - Use when continuing a fight, chase, or multi-step task
+   - Specify formula and DC for this specific check
+
+3. **start_challenge** - This action begins a complex multi-step task
+   - Combat = 3-5 rounds, Boss fight = 5-7 rounds
+   - After starting, ALSO call formula_challenge_check for the first action
+
+4. **opposed_formula** - Player vs NPC in direct contest
+   - Player formula uses variables: "1d20+{{Dexterity_mod}}"
+   - Opponent formula is usually fixed: "1d20+5"
+   - Set opponent skill appropriately (novice: +2, competent: +5, skilled: +8, master: +12)
+
+5. **roll_dice** - Random determination (not a skill check)
+   - Simple dice notation: "1d6", "2d10", "1d100"
+   - For NPC reactions, loot quality, random encounters
+
+6. **take_rest** - Player is resting
+   - Cannot rest during active challenge
+
+7. **no_check_needed** - Action is trivial or pure roleplay
+   - Walking, talking, continuing a success
+
+8. **fate_question** - Ask the Oracle a yes/no question
+   - Use when uncertainty exists about world state, NPC knowledge, or events
+   - Set likelihood: "impossible", "no_way", "very_unlikely", "unlikely", "fifty_fifty", "likely", "somewhat_likely", "very_likely", "near_sure_thing", "has_to_be"
+   - Higher chaos = more extreme answers and random events
+
+9. **roll_table** - Roll on a custom table
+   - Use for random encounters, loot, NPC generation, etc.
+   - Specify table name exactly as defined in story settings
+
+10. **request_continuation** - Request another GM round
+   - Use when you need to chain rolls (attack → damage, spot → identify)
+   - Explain what you're waiting for in contextMessage
+   - The frontend will run another GM round with your results
+
+11. **ask_player** - Ask the player a question
+   - Use when you need player input to proceed (targeting, resource spending choices)
+   - Player must answer before generation continues
+   - Can be multiple choice or free-form
+
+## FORMULA EXAMPLES
+
+For a ${schema.name} character, typical formulas might be:
+- Attack roll: "1d20+{{attack_bonus}}" or "1d20+{{Strength_mod}}+{{proficiency}}"
+- Skill check: "1d20+{{skill_name}}" or "2d6+{{stat_name}}"
+- Damage: "{{weapon_damage}}+{{Strength_mod}}"
+- Saving throw: "1d20+{{Constitution_mod}}"
+
+## IMPORTANT RULES
+
+- **Build formulas from character data.** Use {{variable}} syntax for character fields.
+- **Passives provide narrative advantages.** Lower difficulty instead of adding bonuses.
+- **Challenges are "Best of X".** Winner = first to majority.
+- **Keep formulas simple.** Don't overcomplicate - use the most relevant stat/skill.`;
+
+    // Filter tools for schema mode
+    const schemaToolNames = [
+      "formula_roll",
+      "opposed_formula",
+      "formula_challenge_check",
+      "start_challenge",
+      "roll_dice",
+      "calculate",
+      "no_check_needed",
+      "take_rest",
+      "fate_question",
+      "roll_table",
+      "request_continuation",
+      "ask_player",
+    ];
+    toolsToUse = GM_TOOL_SCHEMAS.filter((t: any) =>
+      schemaToolNames.includes(t.function.name)
+    );
+  } else {
+    // ============================================
+    // LEGACY MODE: Use stat-based tools
+    // ============================================
+    const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+
+    // Build stat list
+    const statList = (storyData.stats || [])
+      .map((s) => `${s.name}: ${s.value}`)
+      .join(", ");
+
+    // Build resource list
+    const resourceList = (storyData.resources || [])
+      .map((r) => `${r.name}: ${r.value}/${r.maxValue}`)
+      .join(", ");
+
+    // Build inventory list (only items that could be used in checks)
+    const usableItems = (storyData.inventory || [])
+      .filter((i) => i.type !== "misc" && i.quantity > 0)
+      .map((i) => {
+        const parts = [i.name];
+        if (i.grade && i.grade !== "common") parts.push(`(${i.grade})`);
+        if (i.durability !== undefined && i.maxDurability)
+          parts.push(`[${i.durability}/${i.maxDurability}]`);
+        return parts.join(" ");
+      })
+      .join(", ");
+
+    // Build ability list (only ready abilities)
+    const readyAbilities = (storyData.abilities || [])
+      .filter((a) => !a.currentCooldown || a.currentCooldown === 0)
+      .map((a) => {
+        const parts = [a.name];
+        if (a.grade && a.grade !== "novice") parts.push(`(${a.grade})`);
+        if (a.cost && a.cost.length > 0) {
+          const costs = a.cost.map((c) => `${c.amount} ${c.name}`).join(", ");
+          parts.push(`[costs: ${costs}]`);
+        }
+        return parts.join(" ");
+      })
+      .join(", ");
+
+    systemPrompt = `You are the GAME MASTER for a ${rpgSystem.name} (${
+      rpgSystem.id
+    }) game at ${difficulty} difficulty.
 
 Your role is to DETERMINE MECHANICS before the story is written. You decide:
 1. Whether the player's action requires a skill check
 2. What stat, difficulty, items, and abilities apply
 3. Whether to start/continue a challenge
 4. Stakes and consequences
-
+${loreSection ? `\n${loreSection}` : ""}
 ## RPG SYSTEM: ${rpgSystem.name}
 ${rpgSystem.aiInstructions.diceSystem}
 
@@ -2309,17 +2002,6 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 **Resources:** ${resourceList || "None"}
 **Usable Items:** ${usableItems || "None"}
 **Ready Abilities:** ${readyAbilities || "None"}
-**Conditions:** ${conditions || "None"}
-**Passives:** ${passives}
-**Active Challenge:** ${challengeContext}
-
-## REST LIMITS
-- Quick rests used: ${storyData.restState?.quickRestsUsed || 0}/${
-    REST_CONFIG[difficulty].maxQuickRests
-  }
-- Short rests used: ${storyData.restState?.shortRestsUsed || 0}/${
-    REST_CONFIG[difficulty].maxShortRests
-  }
 
 ## DECISION FRAMEWORK
 
@@ -2357,6 +2039,25 @@ ${rpgSystem.aiInstructions.dcGuidelines}
    - Continuing a successful action without new risk
    - Player already succeeded at this exact thing
 
+8. **fate_question** - Ask the Oracle a yes/no question
+   - Use when uncertainty exists about world state, NPC knowledge, or events
+   - Set likelihood: "impossible", "no_way", "very_unlikely", "unlikely", "fifty_fifty", "likely", "somewhat_likely", "very_likely", "near_sure_thing", "has_to_be"
+   - Higher chaos = more extreme answers and random events
+
+9. **roll_table** - Roll on a custom table
+   - Use for random encounters, loot, NPC generation, etc.
+   - Specify table name exactly as defined in story settings
+
+10. **request_continuation** - Request another GM round
+   - Use when you need to chain rolls (attack → damage, spot → identify)
+   - Explain what you're waiting for in contextMessage
+   - The frontend will run another GM round with your results
+
+11. **ask_player** - Ask the player a question
+   - Use when you need player input to proceed (targeting, resource spending choices)
+   - Player must answer before generation continues
+   - Can be multiple choice or free-form
+
 ## IMPORTANT RULES
 
 - **Passives provide narrative advantages, not mechanical bonuses.** Example: "Wolf Slayer" makes fighting wolves EASIER narratively (lower difficulty tier) but doesn't add +X to rolls.
@@ -2364,6 +2065,26 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 - **Challenges are "Best of X".** Winner = first to majority. Don't end challenge early.
 - **If action continues a just-succeeded check, call no_check_needed.**
 - **Resource costs are determined by item/ability specs.** Just name them.`;
+
+    // Use legacy tools only
+    const legacyToolNames = [
+      "skill_check",
+      "challenge_check",
+      "start_challenge",
+      "opposed_check",
+      "roll_dice",
+      "calculate",
+      "no_check_needed",
+      "take_rest",
+      "fate_question",
+      "roll_table",
+      "request_continuation",
+      "ask_player",
+    ];
+    toolsToUse = GM_TOOL_SCHEMAS.filter((t: any) =>
+      legacyToolNames.includes(t.function.name)
+    );
+  }
 
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
@@ -2403,15 +2124,16 @@ ${rpgSystem.aiInstructions.dcGuidelines}
   messages.push({ role: "assistant", content: GM_STAGE_AFFIRMATION });
 
   // Debug logging
-  console.log(`[buildGMStagePrompt] Context breakdown:`);
+  console.log(
+    `[buildGMStagePrompt] Mode: ${useSchemaMode ? "schema" : "legacy"}`
+  );
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
   console.log(`  - Chat history: ${recentParts.length} parts`);
-  console.log(`  - User choice: ${estimateTokens(userChoice)} tokens`);
-  console.log(`  - Total messages: ${messages.length}`);
+  console.log(`  - Available tools: ${toolsToUse.length}`);
 
   return {
     messages,
-    tools: GM_TOOL_SCHEMAS.map((t: any) => ({
+    tools: toolsToUse.map((t: any) => ({
       type: "function",
       function: t.function,
     })),

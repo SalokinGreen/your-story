@@ -619,193 +619,111 @@ const modifyPassiveTool: ToolSchema = {
   },
 };
 
-// Resource Management Tools
-const adjustResourceTool: ToolSchema = {
+// Character Field Management Tools (CharacterSchema system)
+const modifyFieldTool: ToolSchema = {
   type: "function",
   function: {
-    name: "adjust_resource",
+    name: "modify_field",
     description:
-      "Modify a resource's current value by an exact delta amount. Use positive numbers to restore, negative to drain.",
+      "Modify a character sheet field by a delta amount. Works with number fields (add/subtract) and resource fields (adjust current value). Use positive numbers to increase, negative to decrease. For resources, the result is clamped between 0 and max.",
     parameters: {
       type: "object",
       properties: {
-        name: {
+        field: {
           type: "string",
           description:
-            "Resource name (fuzzy matching supported, e.g., Health, Stamina, Mana)",
+            "Field name from character schema (fuzzy matching supported, e.g., 'Strength', 'Health', 'Mana')",
         },
         delta: {
           type: "integer",
           description:
-            "The exact amount to change the resource by. Positive values restore (e.g., +10 heals 10 HP), negative values drain (e.g., -15 deals 15 damage). The result is clamped between 0 and maxValue.",
+            "The amount to change the field by. Positive increases, negative decreases. For resources, this adjusts the current value.",
         },
       },
-      required: ["name", "delta"],
+      required: ["field", "delta"],
     },
   },
 };
 
-const setResourceTool: ToolSchema = {
+const setFieldTool: ToolSchema = {
   type: "function",
   function: {
-    name: "set_resource",
+    name: "set_field",
     description:
-      "Set a resource to specific current and/or max values (absolute, not delta)",
+      "Set a character sheet field to a specific value. Works with all field types: number (set value), resource (set current and/or max), text (set string), boolean (set true/false), select (set option). Cannot modify derived fields (they are calculated automatically).",
     parameters: {
       type: "object",
       properties: {
-        name: {
-          type: "string",
-          description: "Resource name (fuzzy matching supported)",
-        },
-        currentValue: {
-          type: "number",
-          description: "New current value (optional)",
-          minimum: 0,
-        },
-        maxValue: {
-          type: "number",
-          description: "New max value (optional)",
-          minimum: 1,
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const createResourceTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "create_resource",
-    description: "Create a brand new resource type for the character",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Resource name (must be unique)",
-        },
-        description: {
-          type: "string",
-          description: "What this resource represents",
-        },
-        currentValue: {
-          type: "number",
-          description: "Starting current value",
-          minimum: 0,
-        },
-        maxValue: {
-          type: "number",
-          description: "Starting max value",
-          minimum: 1,
-        },
-      },
-      required: ["name", "description", "currentValue", "maxValue"],
-    },
-  },
-};
-
-const deleteResourceTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "delete_resource",
-    description: "Remove a resource entirely from the character",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Resource name (fuzzy matching supported)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-// Stat Management Tools
-const adjustStatTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "adjust_stat",
-    description:
-      "Modify a character stat using narrative magnitude. Stats are capped at 0-100. The actual change is scaled by difficulty.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
+        field: {
           type: "string",
           description:
-            "Stat name (fuzzy matching supported, e.g., Strength, Stealth, Intelligence)",
+            "Field name from character schema (fuzzy matching supported)",
         },
-        magnitude: {
-          type: "string",
-          enum: [
-            "greatly_weaken",
-            "weaken",
-            "slightly_weaken",
-            "slightly_strengthen",
-            "strengthen",
-            "greatly_strengthen",
+        value: {
+          oneOf: [
+            { type: "number" },
+            { type: "boolean" },
+            { type: "string" },
+            {
+              type: "object",
+              properties: {
+                current: { type: "number" },
+                max: { type: "number" },
+              },
+              description: "For resource fields: { current, max }",
+            },
           ],
           description:
-            "How much to change the stat. Weaken decreases, strengthen increases. 'greatly' = ~15, normal = ~10, 'slightly' = ~5 points.",
+            "The value to set. Type depends on field: number for number fields, boolean for boolean fields, string for text/select fields, { current, max } for resource fields.",
         },
       },
-      required: ["name", "magnitude"],
+      required: ["field", "value"],
     },
   },
 };
 
-const setStatTool: ToolSchema = {
+const addListItemTool: ToolSchema = {
   type: "function",
   function: {
-    name: "set_stat",
-    description: "Set a stat to a specific value (absolute, not delta)",
+    name: "add_list_item",
+    description:
+      "Add an item to a list field in the character sheet. Only works with list-type fields.",
     parameters: {
       type: "object",
       properties: {
-        name: {
+        field: {
           type: "string",
-          description: "Stat name (fuzzy matching supported)",
+          description: "List field name from character schema",
         },
-        value: {
-          type: "number",
-          description: "New stat value",
-          minimum: 0,
-          maximum: 100,
+        item: {
+          type: "string",
+          description: "Item to add to the list",
         },
       },
-      required: ["name", "value"],
+      required: ["field", "item"],
     },
   },
 };
 
-const createStatTool: ToolSchema = {
+const removeListItemTool: ToolSchema = {
   type: "function",
   function: {
-    name: "create_stat",
-    description: "Create a brand new stat for the character",
+    name: "remove_list_item",
+    description:
+      "Remove an item from a list field in the character sheet. Uses fuzzy matching to find the item.",
     parameters: {
       type: "object",
       properties: {
-        name: {
+        field: {
           type: "string",
-          description: "Stat name (must be unique)",
+          description: "List field name from character schema",
         },
-        description: {
+        item: {
           type: "string",
-          description: "What this stat represents",
-        },
-        value: {
-          type: "number",
-          description: "Starting value",
-          minimum: 0,
-          maximum: 100,
+          description: "Item to remove (fuzzy matching supported)",
         },
       },
-      required: ["name", "description", "value"],
+      required: ["field", "item"],
     },
   },
 };
@@ -1106,13 +1024,13 @@ const editRelationshipTool: ToolSchema = {
   },
 };
 
-// NPC Management Tool - combines relationship + lore creation
+// NPC Management Tool - creates lore entry for NPCs
 const addNpcTool: ToolSchema = {
   type: "function",
   function: {
     name: "add_npc",
     description:
-      "Add a new NPC to the story. Creates BOTH a relationship entry (for tracking disposition) AND a lore entry (for detailed info). Use this when introducing important named characters who may appear again.",
+      "Add a new NPC to the story by creating a detailed lore entry. Use this when introducing important named characters who may appear again.",
     parameters: {
       type: "object",
       properties: {
@@ -1127,11 +1045,9 @@ const addNpcTool: ToolSchema = {
             "Brief role/title (e.g., 'Town guard captain', 'Mysterious merchant')",
         },
         disposition: {
-          type: "number",
+          type: "string",
           description:
-            "Initial disposition toward player (-100 hostile to +100 friendly). 0 = neutral stranger, 20 = friendly acquaintance, -30 = suspicious/wary",
-          minimum: -100,
-          maximum: 100,
+            "Initial disposition toward player (e.g., 'hostile', 'neutral', 'friendly', 'suspicious', 'grateful')",
         },
         appearance: {
           type: "string",
@@ -1918,16 +1834,6 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   updateQuestTool,
   deleteQuestTool,
 
-  // Item Management (8 tools)
-  addItemTool,
-  removeItemTool,
-  modifyItemTool,
-  breakItemTool,
-  consumeItemTool,
-  repairItemTool,
-  damageItemTool,
-  upgradeItemTool,
-
   // Ability Management (5 tools)
   addAbilityTool,
   removeAbilityTool,
@@ -1940,16 +1846,11 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   removePassiveTool,
   modifyPassiveTool,
 
-  // Resource Management (4 tools)
-  adjustResourceTool,
-  setResourceTool,
-  createResourceTool,
-  deleteResourceTool,
-
-  // Stat Management (3 tools)
-  adjustStatTool,
-  setStatTool,
-  createStatTool,
+  // Character Field Management (4 tools - CharacterSchema system)
+  modifyFieldTool,
+  setFieldTool,
+  addListItemTool,
+  removeListItemTool,
 
   // Achievement (1 tool)
   triggerAchievementTool,
@@ -1965,13 +1866,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Momentum (1 tool)
   modifyMomentumTool,
 
-  // Relationships (4 tools)
-  addRelationshipTool,
-  modifyRelationshipTool,
-  deleteRelationshipTool,
-  editRelationshipTool,
-
-  // NPC Management (1 tool - creates relationship + lore)
+  // NPC Management (1 tool - creates lore for NPCs)
   addNpcTool,
 
   // Thread Management (4 tools)

@@ -1,0 +1,2031 @@
+/**
+ * Character Schema System
+ *
+ * Defines adventure-specific character structures that replace hard-coded stats.
+ * Adventure authors define their own fields, formulas, and character sheet layouts.
+ */
+
+// ============================================
+// FIELD TYPES
+// ============================================
+
+export type SchemaFieldType =
+  | "number" // Simple numeric value (e.g., Strength: 14)
+  | "derived" // Calculated from formula (e.g., STR_mod = floor((Strength - 10) / 2))
+  | "resource" // Current/max value (e.g., HP: 45/50)
+  | "text" // String value (e.g., character name, backstory)
+  | "list" // Array of strings (e.g., known languages)
+  | "boolean" // True/false flag (e.g., isConcentrating)
+  | "select"; // Single choice from options (e.g., class: "Fighter")
+
+export interface SchemaFieldBase {
+  /** Unique identifier for the field */
+  id: string;
+  /** Display name */
+  name: string;
+  /** Optional description/tooltip */
+  description?: string;
+  /** Field type */
+  type: SchemaFieldType;
+  /** Category for grouping in UI (e.g., "Attributes", "Skills", "Combat") */
+  category?: string;
+  /** Display order within category */
+  order?: number;
+  /** Whether field is hidden from player (GM-only) */
+  hidden?: boolean;
+  /** Whether field is read-only (calculated or set by system) */
+  readonly?: boolean;
+}
+
+export interface NumberField extends SchemaFieldBase {
+  type: "number";
+  /** Default value */
+  defaultValue?: number;
+  /** Minimum value */
+  min?: number;
+  /** Maximum value */
+  max?: number;
+  /** Step increment for UI */
+  step?: number;
+}
+
+export interface DerivedField extends SchemaFieldBase {
+  type: "derived";
+  /** Formula using {{variable}} syntax (e.g., "floor(({{Strength}} - 10) / 2)") */
+  formula: string;
+  /** Cache the calculated value */
+  cachedValue?: number;
+}
+
+export interface ResourceField extends SchemaFieldBase {
+  type: "resource";
+  /** Default current value */
+  defaultValue?: number;
+  /** Default max value */
+  defaultMax?: number;
+  /** Whether this resource regenerates on rest */
+  regenerates?: boolean;
+  /** Regeneration rate per rest type (percentage) */
+  regenRates?: {
+    quick?: number; // e.g., 10 = 10% of max
+    short?: number; // e.g., 50 = 50% of max
+    long?: number; // e.g., 100 = full restore
+  };
+}
+
+export interface TextField extends SchemaFieldBase {
+  type: "text";
+  /** Default value */
+  defaultValue?: string;
+  /** Max length */
+  maxLength?: number;
+  /** Whether to use textarea (multiline) */
+  multiline?: boolean;
+  /** Placeholder text */
+  placeholder?: string;
+}
+
+export interface ListField extends SchemaFieldBase {
+  type: "list";
+  /** Default items */
+  defaultValue?: string[];
+  /** Max number of items */
+  maxItems?: number;
+  /** Predefined options to choose from (if restricted) */
+  options?: string[];
+}
+
+export interface BooleanField extends SchemaFieldBase {
+  type: "boolean";
+  /** Default value */
+  defaultValue?: boolean;
+  /** Label for true state */
+  trueLabel?: string;
+  /** Label for false state */
+  falseLabel?: string;
+}
+
+export interface SelectField extends SchemaFieldBase {
+  type: "select";
+  /** Available options */
+  options: { value: string; label: string }[];
+  /** Default selected value */
+  defaultValue?: string;
+  /** Allow multiple selections */
+  multiple?: boolean;
+}
+
+export type SchemaField =
+  | NumberField
+  | DerivedField
+  | ResourceField
+  | TextField
+  | ListField
+  | BooleanField
+  | SelectField;
+
+// ============================================
+// CHARACTER SCHEMA
+// ============================================
+
+export interface SchemaResource {
+  /** Unique identifier */
+  id: string;
+  /** Display name */
+  name: string;
+  /** Supabase storage URL */
+  url: string;
+  /** Resource type */
+  type: "image" | "font" | "other";
+}
+
+export interface SchemaTemplate {
+  /** HTML template with {{field_id}} placeholders and conditionals */
+  html: string;
+  /** CSS styles for the template */
+  css: string;
+  /** Optional JavaScript for interactivity (runs in sandboxed iframe) */
+  js?: string;
+}
+
+/**
+ * Custom page definition for adventure creators
+ * Each page gets its own tab in the Stats view
+ */
+export interface SchemaPage {
+  /** Unique identifier for the page */
+  id: string;
+  /** Display name shown in tab */
+  name: string;
+  /** Icon name (from lucide-react) */
+  icon?: string;
+  /** Display order in navigation */
+  order?: number;
+  /** Custom HTML/CSS/JS template for this page */
+  template: SchemaTemplate;
+}
+
+export interface CharacterSchema {
+  /** Schema version for migrations */
+  version: number;
+  /** Schema name (e.g., "D&D 5e", "Call of Cthulhu") */
+  name: string;
+  /** Description of the system */
+  description?: string;
+  /** Field definitions */
+  fields: SchemaField[];
+  /** Categories for organizing fields */
+  categories?: SchemaCategory[];
+  /** Custom HTML/CSS/JS template for character sheet (optional) */
+  template?: SchemaTemplate;
+  /** Uploaded resources (images, fonts) for use in templates */
+  resources?: SchemaResource[];
+  /** Whether this schema contains custom JavaScript (triggers warning) */
+  hasCustomJS?: boolean;
+  /** Custom pages defined by adventure creator (each gets its own tab) */
+  pages?: SchemaPage[];
+}
+
+/** Category for organizing schema fields in UI */
+export interface SchemaCategory {
+  id: string;
+  name: string;
+  order?: number;
+  collapsed?: boolean;
+}
+
+// ============================================
+// CHARACTER DATA
+// ============================================
+
+/** Runtime character data matching the schema */
+export interface CharacterData {
+  /** Field values keyed by field ID */
+  values: Record<string, CharacterFieldValue>;
+}
+
+export type CharacterFieldValue =
+  | number
+  | string
+  | boolean
+  | string[]
+  | { current: number; max: number };
+
+// ============================================
+// SCHEMA HELPERS
+// ============================================
+
+/**
+ * Create default character data from a schema
+ */
+export function createDefaultCharacterData(
+  schema: CharacterSchema
+): CharacterData {
+  const values: Record<string, CharacterFieldValue> = {};
+
+  for (const field of schema.fields) {
+    switch (field.type) {
+      case "number":
+        values[field.id] = field.defaultValue ?? 0;
+        break;
+      case "derived":
+        // Derived fields start at 0, will be calculated
+        values[field.id] = 0;
+        break;
+      case "resource":
+        values[field.id] = {
+          current: field.defaultValue ?? field.defaultMax ?? 0,
+          max: field.defaultMax ?? 0,
+        };
+        break;
+      case "text":
+        values[field.id] = field.defaultValue ?? "";
+        break;
+      case "list":
+        values[field.id] = field.defaultValue ?? [];
+        break;
+      case "boolean":
+        values[field.id] = field.defaultValue ?? false;
+        break;
+      case "select":
+        values[field.id] = field.defaultValue ?? "";
+        break;
+    }
+  }
+
+  // Calculate derived fields
+  recalculateDerivedFields(schema, values);
+
+  return { values };
+}
+
+/**
+ * Recalculate all derived fields based on current values
+ */
+export function recalculateDerivedFields(
+  schema: CharacterSchema,
+  values: Record<string, CharacterFieldValue>
+): void {
+  const derivedFields = schema.fields.filter(
+    (f): f is DerivedField => f.type === "derived"
+  );
+
+  for (const field of derivedFields) {
+    values[field.id] = evaluateFormula(field.formula, values);
+  }
+}
+
+/**
+ * Evaluate a formula string with variable substitution
+ * Supports: {{variable}}, basic math, floor(), ceil(), min(), max(), abs()
+ */
+export function evaluateFormula(
+  formula: string,
+  values: Record<string, CharacterFieldValue>
+): number {
+  // Replace {{variable}} with actual values
+  let expression = formula.replace(
+    /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g,
+    (_, varName) => {
+      const value = values[varName];
+      if (value === undefined) return "0";
+
+      // Handle different value types
+      if (typeof value === "number") return String(value);
+      if (typeof value === "boolean") return value ? "1" : "0";
+      if (typeof value === "object" && "current" in value)
+        return String(value.current);
+      if (Array.isArray(value)) return String(value.length);
+      return "0";
+    }
+  );
+
+  // Whitelist of allowed functions
+  const allowedFunctions: Record<string, (...args: number[]) => number> = {
+    floor: Math.floor,
+    ceil: Math.ceil,
+    round: Math.round,
+    min: Math.min,
+    max: Math.max,
+    abs: Math.abs,
+  };
+
+  // Process functions from innermost to outermost using balanced parenthesis matching
+  let maxIterations = 50;
+  while (maxIterations-- > 0) {
+    let foundFunction = false;
+
+    for (const [name, fn] of Object.entries(allowedFunctions)) {
+      // Find function calls with balanced parentheses
+      const funcStart = expression.indexOf(name + "(");
+      if (funcStart === -1) continue;
+
+      // Make sure it's a standalone function call (not part of another word)
+      if (funcStart > 0 && /[a-zA-Z_]/.test(expression[funcStart - 1]))
+        continue;
+
+      // Find the matching closing parenthesis
+      const argsStart = funcStart + name.length + 1;
+      let depth = 1;
+      let argsEnd = argsStart;
+
+      while (argsEnd < expression.length && depth > 0) {
+        if (expression[argsEnd] === "(") depth++;
+        if (expression[argsEnd] === ")") depth--;
+        argsEnd++;
+      }
+
+      if (depth !== 0) continue; // Unbalanced
+
+      // Extract arguments and evaluate
+      const argsStr = expression.slice(argsStart, argsEnd - 1);
+
+      // Split arguments at top-level commas only
+      const args: string[] = [];
+      let currentArg = "";
+      let parenDepth = 0;
+
+      for (const char of argsStr) {
+        if (char === "(") parenDepth++;
+        if (char === ")") parenDepth--;
+        if (char === "," && parenDepth === 0) {
+          args.push(currentArg.trim());
+          currentArg = "";
+        } else {
+          currentArg += char;
+        }
+      }
+      if (currentArg.trim()) args.push(currentArg.trim());
+
+      // Evaluate each argument
+      const argValues = args.map((arg) => {
+        try {
+          return evaluateMathExpression(arg);
+        } catch {
+          return 0;
+        }
+      });
+
+      // Replace the function call with its result
+      const result = fn(...argValues);
+      expression =
+        expression.slice(0, funcStart) +
+        String(result) +
+        expression.slice(argsEnd);
+
+      foundFunction = true;
+      break; // Restart loop to handle nested functions
+    }
+
+    if (!foundFunction) break;
+  }
+
+  return evaluateMathExpression(expression);
+}
+
+/**
+ * Safely evaluate a math expression (no eval)
+ * Supports: +, -, *, /, parentheses
+ */
+function evaluateMathExpression(expr: string): number {
+  // Remove whitespace
+  expr = expr.replace(/\s/g, "");
+
+  // Validate - only allow numbers, operators, and parentheses
+  if (!/^[0-9+\-*/().]+$/.test(expr)) {
+    console.warn(`Invalid math expression: ${expr}`);
+    return 0;
+  }
+
+  try {
+    // Use Function constructor (safer than eval, but still sandboxed)
+    const result = new Function(`return (${expr})`)();
+    return typeof result === "number" && isFinite(result) ? result : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Get a numeric value from character data (handles resources)
+ */
+export function getNumericValue(
+  values: Record<string, CharacterFieldValue>,
+  fieldId: string
+): number {
+  const value = values[fieldId];
+  if (value === undefined) return 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "object" && "current" in value) return value.current;
+  if (Array.isArray(value)) return value.length;
+  return 0;
+}
+
+/**
+ * Create a variable resolver for the dice formula system
+ */
+export function createSchemaResolver(
+  schema: CharacterSchema,
+  values: Record<string, CharacterFieldValue>
+): (name: string) => number | undefined {
+  return (name: string) => {
+    // Direct field lookup
+    if (name in values) {
+      return getNumericValue(values, name);
+    }
+
+    return undefined;
+  };
+}
+
+// ============================================
+// SCHEMA VALIDATION
+// ============================================
+
+export interface ValidationResult {
+  valid: boolean;
+  errors: string[];
+  warnings: string[];
+}
+
+/**
+ * Validate a character schema
+ */
+export function validateSchema(schema: CharacterSchema): ValidationResult {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+
+  if (!schema.name) {
+    errors.push("Schema must have a name");
+  }
+
+  if (!schema.fields || schema.fields.length === 0) {
+    errors.push("Schema must have at least one field");
+  }
+
+  const fieldIds = new Set<string>();
+  for (const field of schema.fields || []) {
+    // Check for duplicate IDs
+    if (fieldIds.has(field.id)) {
+      errors.push(`Duplicate field ID: ${field.id}`);
+    }
+    fieldIds.add(field.id);
+
+    // Check for valid ID format
+    if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(field.id)) {
+      errors.push(
+        `Invalid field ID format: ${field.id} (must be alphanumeric with underscores, starting with letter)`
+      );
+    }
+
+    // Validate derived field formulas
+    if (field.type === "derived") {
+      const vars = field.formula.match(/\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g);
+      if (vars) {
+        for (const v of vars) {
+          const varName = v.slice(2, -2);
+          if (varName !== field.id && !fieldIds.has(varName)) {
+            warnings.push(
+              `Derived field "${field.id}" references unknown field: ${varName}`
+            );
+          }
+        }
+      }
+    }
+
+    // Validate select field options
+    if (
+      field.type === "select" &&
+      (!field.options || field.options.length === 0)
+    ) {
+      errors.push(`Select field "${field.id}" must have at least one option`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+// ============================================
+// TEMPLATE PROCESSING
+// ============================================
+
+/**
+ * Process a template string with field values
+ * Supports:
+ * - {{fieldId}} - Simple value substitution
+ * - {{fieldId.current}} / {{fieldId.max}} - Resource sub-values
+ * - {{#if fieldId}}...{{/if}} - Conditional blocks (truthy check)
+ * - {{#unless fieldId}}...{{/unless}} - Inverse conditional
+ * - {{#each fieldId}}...{{/each}} - List iteration ({{this}} for item, {{@index}} for index)
+ * - {{#compare fieldId "op" value}}...{{/compare}} - Comparison (op: ==, !=, >, <, >=, <=)
+ * - {{resource:resourceId}} - Resource URL substitution
+ * - {{percent fieldId}} - Resource as percentage (current/max * 100)
+ * - {{modifier fieldId}} - D&D-style modifier ((value - 10) / 2)
+ */
+export function processTemplate(
+  template: string,
+  values: Record<string, CharacterFieldValue>,
+  resources?: SchemaResource[]
+): string {
+  let result = template;
+
+  // Resource URL substitution: {{resource:id}}
+  result = result.replace(/\{\{resource:([a-zA-Z0-9_-]+)\}\}/g, (_, id) => {
+    const resource = resources?.find((r) => r.id === id);
+    return resource?.url ?? "";
+  });
+
+  // Process {{#each fieldId}}...{{/each}} blocks
+  result = result.replace(
+    /\{\{#each\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}([\s\S]*?)\{\{\/each\}\}/g,
+    (_, fieldId, content) => {
+      const value = values[fieldId];
+      if (!Array.isArray(value)) return "";
+      return value
+        .map((item, index) => {
+          let itemContent = content;
+          itemContent = itemContent.replace(/\{\{this\}\}/g, String(item));
+          itemContent = itemContent.replace(/\{\{@index\}\}/g, String(index));
+          return itemContent;
+        })
+        .join("");
+    }
+  );
+
+  // Process {{#compare fieldId "op" value}}...{{/compare}} blocks
+  result = result.replace(
+    /\{\{#compare\s+([a-zA-Z_][a-zA-Z0-9_]*)\s+"([^"]+)"\s+"?([^"}\s]+)"?\}\}([\s\S]*?)\{\{\/compare\}\}/g,
+    (_, fieldId, op, compareValue, content) => {
+      const value = getNumericValue(values, fieldId);
+      const compare = parseFloat(compareValue) || 0;
+      let condition = false;
+
+      switch (op) {
+        case "==":
+          condition = value === compare;
+          break;
+        case "!=":
+          condition = value !== compare;
+          break;
+        case ">":
+          condition = value > compare;
+          break;
+        case "<":
+          condition = value < compare;
+          break;
+        case ">=":
+          condition = value >= compare;
+          break;
+        case "<=":
+          condition = value <= compare;
+          break;
+      }
+      return condition ? content : "";
+    }
+  );
+
+  // Process {{#if fieldId}}...{{/if}} blocks
+  result = result.replace(
+    /\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    (_, fieldId, content) => {
+      const value = values[fieldId];
+      const isTruthy =
+        value !== undefined &&
+        value !== false &&
+        value !== 0 &&
+        value !== "" &&
+        !(Array.isArray(value) && value.length === 0);
+      return isTruthy ? content : "";
+    }
+  );
+
+  // Process {{#unless fieldId}}...{{/unless}} blocks
+  result = result.replace(
+    /\{\{#unless\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}([\s\S]*?)\{\{\/unless\}\}/g,
+    (_, fieldId, content) => {
+      const value = values[fieldId];
+      const isTruthy =
+        value !== undefined &&
+        value !== false &&
+        value !== 0 &&
+        value !== "" &&
+        !(Array.isArray(value) && value.length === 0);
+      return !isTruthy ? content : "";
+    }
+  );
+
+  // Process {{percent fieldId}} - resource percentage
+  result = result.replace(
+    /\{\{percent\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g,
+    (_, fieldId) => {
+      const value = values[fieldId];
+      if (typeof value === "object" && "current" in value && value.max > 0) {
+        return String(Math.round((value.current / value.max) * 100));
+      }
+      return "0";
+    }
+  );
+
+  // Process {{modifier fieldId}} - D&D-style modifier
+  result = result.replace(
+    /\{\{modifier\s+([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g,
+    (_, fieldId) => {
+      const value = getNumericValue(values, fieldId);
+      const mod = Math.floor((value - 10) / 2);
+      return mod >= 0 ? `+${mod}` : String(mod);
+    }
+  );
+
+  // Process {{fieldId.current}} and {{fieldId.max}} for resources
+  result = result.replace(
+    /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\.(current|max)\}\}/g,
+    (_, fieldId, prop) => {
+      const value = values[fieldId];
+      if (typeof value === "object" && "current" in value) {
+        return String(value[prop as "current" | "max"]);
+      }
+      return "0";
+    }
+  );
+
+  // Simple value substitution: {{fieldId}}
+  result = result.replace(/\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}/g, (_, fieldId) => {
+    const value = values[fieldId];
+    if (value === undefined) return "";
+    if (typeof value === "boolean") return value ? "Yes" : "No";
+    if (Array.isArray(value)) return value.join(", ");
+    if (typeof value === "object" && "current" in value) {
+      return `${value.current}/${value.max}`;
+    }
+    return String(value);
+  });
+
+  return result;
+}
+
+/**
+ * Build a complete HTML document for sandboxed iframe rendering
+ */
+export function buildTemplateDocument(
+  schema: CharacterSchema,
+  values: Record<string, CharacterFieldValue>
+): string {
+  if (!schema.template) return "";
+
+  const processedHtml = processTemplate(
+    schema.template.html,
+    values,
+    schema.resources
+  );
+  const css = schema.template.css || "";
+  const js = schema.template.js || "";
+
+  // Create values object for JS access
+  const valuesJson = JSON.stringify(values);
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { 
+      margin: 0; 
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: transparent;
+      color: #e5e7eb;
+      overflow: visible;
+      height: auto;
+    }
+    body {
+      padding: 16px;
+    }
+    ${css}
+  </style>
+</head>
+<body>
+  ${processedHtml}
+  <script>
+    // Make field values available to custom JS
+    window.characterData = ${valuesJson};
+    
+    // Helper function to get field value
+    window.getField = function(fieldId) {
+      return window.characterData[fieldId];
+    };
+    
+    // Custom JS from template (runs after DOM is ready)
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        ${js}
+      } catch (e) {
+        console.error('Template JS error:', e);
+      }
+    });
+  </script>
+</body>
+</html>
+  `.trim();
+}
+
+/**
+ * Build a complete HTML document for a custom page
+ */
+export function buildPageTemplateDocument(
+  page: SchemaPage,
+  schema: CharacterSchema,
+  values: Record<string, CharacterFieldValue>
+): string {
+  if (!page.template) return "";
+
+  const processedHtml = processTemplate(
+    page.template.html,
+    values,
+    schema.resources
+  );
+  const css = page.template.css || "";
+  const js = page.template.js || "";
+
+  // Create values object for JS access
+  const valuesJson = JSON.stringify(values);
+
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    * { box-sizing: border-box; }
+    html, body { 
+      margin: 0; 
+      padding: 0;
+      font-family: system-ui, -apple-system, sans-serif;
+      background: transparent;
+      color: #e5e7eb;
+      overflow: visible;
+      height: auto;
+    }
+    body {
+      padding: 16px;
+    }
+    ${css}
+  </style>
+</head>
+<body>
+  ${processedHtml}
+  <script>
+    // Make field values available to custom JS
+    window.characterData = ${valuesJson};
+    
+    // Helper function to get field value
+    window.getField = function(fieldId) {
+      return window.characterData[fieldId];
+    };
+    
+    // Custom JS from template (runs after DOM is ready)
+    document.addEventListener('DOMContentLoaded', function() {
+      try {
+        ${js}
+      } catch (e) {
+        console.error('Page JS error:', e);
+      }
+    });
+  </script>
+</body>
+</html>
+  `.trim();
+}
+
+// ============================================
+// PRESET SCHEMAS
+// ============================================
+
+/**
+ * D&D 5e-style character schema
+ */
+export const DND5E_SCHEMA: CharacterSchema = {
+  version: 1,
+  name: "D&D 5e",
+  description: "Dungeons & Dragons 5th Edition character sheet",
+  categories: [
+    { id: "attributes", name: "Attributes", order: 1 },
+    { id: "combat", name: "Combat", order: 2 },
+    { id: "skills", name: "Skills", order: 3 },
+    { id: "info", name: "Character Info", order: 4 },
+  ],
+  template: {
+    html: `
+<div class="sheet">
+  <header class="header">
+    <div class="character-name">{{characterName}}</div>
+    <div class="character-details">
+      <span class="detail">{{race}}</span>
+      <span class="divider">•</span>
+      <span class="detail">{{class}}</span>
+      <span class="divider">•</span>
+      <span class="detail">Level {{Level}}</span>
+    </div>
+  </header>
+
+  <div class="main-content">
+    <div class="attributes-column">
+      <div class="attribute-block">
+        <div class="attr-score">{{Strength}}</div>
+        <div class="attr-mod">{{modifier STR_mod}}</div>
+        <div class="attr-name">STR</div>
+      </div>
+      <div class="attribute-block">
+        <div class="attr-score">{{Dexterity}}</div>
+        <div class="attr-mod">{{modifier DEX_mod}}</div>
+        <div class="attr-name">DEX</div>
+      </div>
+      <div class="attribute-block">
+        <div class="attr-score">{{Constitution}}</div>
+        <div class="attr-mod">{{modifier CON_mod}}</div>
+        <div class="attr-name">CON</div>
+      </div>
+      <div class="attribute-block">
+        <div class="attr-score">{{Intelligence}}</div>
+        <div class="attr-mod">{{modifier INT_mod}}</div>
+        <div class="attr-name">INT</div>
+      </div>
+      <div class="attribute-block">
+        <div class="attr-score">{{Wisdom}}</div>
+        <div class="attr-mod">{{modifier WIS_mod}}</div>
+        <div class="attr-name">WIS</div>
+      </div>
+      <div class="attribute-block">
+        <div class="attr-score">{{Charisma}}</div>
+        <div class="attr-mod">{{modifier CHA_mod}}</div>
+        <div class="attr-name">CHA</div>
+      </div>
+    </div>
+
+    <div class="combat-column">
+      <div class="combat-stats">
+        <div class="combat-stat ac">
+          <div class="stat-value">{{AC}}</div>
+          <div class="stat-label">Armor Class</div>
+        </div>
+        <div class="combat-stat prof">
+          <div class="stat-value">+{{proficiency}}</div>
+          <div class="stat-label">Proficiency</div>
+        </div>
+      </div>
+
+      <div class="hp-section">
+        <div class="hp-label">Hit Points</div>
+        <div class="hp-bar">
+          <div class="hp-fill" style="width: {{percent HP}}%"></div>
+          <div class="hp-text">{{HP.current}} / {{HP.max}}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    `,
+    css: `
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap');
+
+.sheet {
+  font-family: 'Crimson Text', Georgia, serif;
+  background: linear-gradient(135deg, #2d1f1a 0%, #1a1310 100%);
+  color: #e8d4b8;
+  padding: 24px;
+  border-radius: 12px;
+  border: 3px solid #8b6914;
+  box-shadow: 
+    inset 0 0 60px rgba(0,0,0,0.5),
+    0 0 20px rgba(139, 105, 20, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.sheet::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  opacity: 0.03;
+  pointer-events: none;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #8b6914;
+}
+
+.character-name {
+  font-family: 'Cinzel', serif;
+  font-size: 2rem;
+  font-weight: 700;
+  color: #ffd700;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+  letter-spacing: 2px;
+}
+
+.character-details {
+  margin-top: 8px;
+  font-size: 1rem;
+  color: #c4a574;
+}
+
+.divider {
+  margin: 0 8px;
+  color: #8b6914;
+}
+
+.main-content {
+  display: flex;
+  gap: 24px;
+}
+
+.attributes-column {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  flex: 0 0 auto;
+}
+
+.attribute-block {
+  background: linear-gradient(145deg, #3d2a1f 0%, #251810 100%);
+  border: 2px solid #6b4c1a;
+  border-radius: 8px;
+  padding: 12px 16px;
+  text-align: center;
+  min-width: 80px;
+  position: relative;
+}
+
+.attribute-block::after {
+  content: '';
+  position: absolute;
+  top: 4px; left: 4px; right: 4px; bottom: 4px;
+  border: 1px solid rgba(139, 105, 20, 0.3);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.attr-score {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #ffd700;
+}
+
+.attr-mod {
+  font-size: 1.1rem;
+  color: #90ee90;
+  margin: 4px 0;
+}
+
+.attr-name {
+  font-family: 'Cinzel', serif;
+  font-size: 0.75rem;
+  color: #a08060;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.combat-column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.combat-stats {
+  display: flex;
+  gap: 16px;
+}
+
+.combat-stat {
+  flex: 1;
+  background: linear-gradient(145deg, #1a2a3a 0%, #0d1520 100%);
+  border: 2px solid #4a6080;
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.combat-stat.ac {
+  border-color: #6080a0;
+  background: linear-gradient(145deg, #1a2535 0%, #0d1218 100%);
+}
+
+.stat-value {
+  font-family: 'Cinzel', serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #87ceeb;
+}
+
+.stat-label {
+  font-size: 0.8rem;
+  color: #6a8aa8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-top: 4px;
+}
+
+.hp-section {
+  background: linear-gradient(145deg, #2a1a1a 0%, #1a0d0d 100%);
+  border: 2px solid #8b2020;
+  border-radius: 8px;
+  padding: 16px;
+}
+
+.hp-label {
+  font-family: 'Cinzel', serif;
+  font-size: 0.9rem;
+  color: #cc6666;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+}
+
+.hp-bar {
+  height: 32px;
+  background: #1a0808;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #5a1515;
+}
+
+.hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b0000 0%, #dc143c 50%, #ff4444 100%);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+  box-shadow: 0 0 10px rgba(220, 20, 60, 0.5);
+}
+
+.hp-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-weight: 700;
+  font-size: 1rem;
+  color: white;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.8);
+}
+    `,
+  },
+  fields: [
+    // Attributes
+    {
+      id: "Strength",
+      name: "Strength",
+      type: "number",
+      category: "attributes",
+      defaultValue: 10,
+      min: 1,
+      max: 30,
+    },
+    {
+      id: "Dexterity",
+      name: "Dexterity",
+      type: "number",
+      category: "attributes",
+      defaultValue: 10,
+      min: 1,
+      max: 30,
+    },
+    {
+      id: "Constitution",
+      name: "Constitution",
+      type: "number",
+      category: "attributes",
+      defaultValue: 10,
+      min: 1,
+      max: 30,
+    },
+    {
+      id: "Intelligence",
+      name: "Intelligence",
+      type: "number",
+      category: "attributes",
+      defaultValue: 10,
+      min: 1,
+      max: 30,
+    },
+    {
+      id: "Wisdom",
+      name: "Wisdom",
+      type: "number",
+      category: "attributes",
+      defaultValue: 10,
+      min: 1,
+      max: 30,
+    },
+    {
+      id: "Charisma",
+      name: "Charisma",
+      type: "number",
+      category: "attributes",
+      defaultValue: 10,
+      min: 1,
+      max: 30,
+    },
+    // Derived modifiers
+    {
+      id: "STR_mod",
+      name: "STR Modifier",
+      type: "derived",
+      category: "attributes",
+      formula: "floor(({{Strength}} - 10) / 2)",
+      readonly: true,
+    },
+    {
+      id: "DEX_mod",
+      name: "DEX Modifier",
+      type: "derived",
+      category: "attributes",
+      formula: "floor(({{Dexterity}} - 10) / 2)",
+      readonly: true,
+    },
+    {
+      id: "CON_mod",
+      name: "CON Modifier",
+      type: "derived",
+      category: "attributes",
+      formula: "floor(({{Constitution}} - 10) / 2)",
+      readonly: true,
+    },
+    {
+      id: "INT_mod",
+      name: "INT Modifier",
+      type: "derived",
+      category: "attributes",
+      formula: "floor(({{Intelligence}} - 10) / 2)",
+      readonly: true,
+    },
+    {
+      id: "WIS_mod",
+      name: "WIS Modifier",
+      type: "derived",
+      category: "attributes",
+      formula: "floor(({{Wisdom}} - 10) / 2)",
+      readonly: true,
+    },
+    {
+      id: "CHA_mod",
+      name: "CHA Modifier",
+      type: "derived",
+      category: "attributes",
+      formula: "floor(({{Charisma}} - 10) / 2)",
+      readonly: true,
+    },
+    // Combat
+    {
+      id: "Level",
+      name: "Level",
+      type: "number",
+      category: "combat",
+      defaultValue: 1,
+      min: 1,
+      max: 20,
+    },
+    {
+      id: "proficiency",
+      name: "Proficiency Bonus",
+      type: "derived",
+      category: "combat",
+      formula: "floor(({{Level}} - 1) / 4) + 2",
+      readonly: true,
+    },
+    {
+      id: "HP",
+      name: "Hit Points",
+      type: "resource",
+      category: "combat",
+      defaultMax: 10,
+      regenerates: true,
+      regenRates: { quick: 0, short: 25, long: 100 },
+    },
+    {
+      id: "AC",
+      name: "Armor Class",
+      type: "derived",
+      category: "combat",
+      formula: "10 + {{DEX_mod}}",
+      readonly: true,
+    },
+    // Info
+    {
+      id: "characterName",
+      name: "Character Name",
+      type: "text",
+      category: "info",
+    },
+    {
+      id: "race",
+      name: "Race",
+      type: "text",
+      category: "info",
+    },
+    {
+      id: "class",
+      name: "Class",
+      type: "text",
+      category: "info",
+    },
+  ],
+};
+
+/**
+ * Call of Cthulhu-style character schema
+ */
+export const COC_SCHEMA: CharacterSchema = {
+  version: 1,
+  name: "Call of Cthulhu 7e",
+  description: "Call of Cthulhu 7th Edition investigator sheet",
+  categories: [
+    { id: "characteristics", name: "Characteristics", order: 1 },
+    { id: "derived", name: "Derived Attributes", order: 2 },
+    { id: "skills", name: "Investigative Skills", order: 3 },
+  ],
+  template: {
+    html: `
+<div class="investigator-sheet">
+  <div class="header-section">
+    <div class="title-area">
+      <div class="game-title">CALL OF CTHULHU</div>
+      <div class="subtitle">Investigator Sheet</div>
+    </div>
+    <div class="era-badge">1920s</div>
+  </div>
+
+  <div class="main-grid">
+    <div class="characteristics-panel">
+      <div class="panel-header">CHARACTERISTICS</div>
+      <div class="char-grid">
+        <div class="char-item">
+          <span class="char-label">STR</span>
+          <span class="char-value">{{STR}}</span>
+        </div>
+        <div class="char-item">
+          <span class="char-label">CON</span>
+          <span class="char-value">{{CON}}</span>
+        </div>
+        <div class="char-item">
+          <span class="char-label">SIZ</span>
+          <span class="char-value">{{SIZ}}</span>
+        </div>
+        <div class="char-item">
+          <span class="char-label">DEX</span>
+          <span class="char-value">{{DEX}}</span>
+        </div>
+        <div class="char-item">
+          <span class="char-label">APP</span>
+          <span class="char-value">{{APP}}</span>
+        </div>
+        <div class="char-item">
+          <span class="char-label">INT</span>
+          <span class="char-value">{{INT}}</span>
+        </div>
+        <div class="char-item">
+          <span class="char-label">POW</span>
+          <span class="char-value">{{POW}}</span>
+        </div>
+        <div class="char-item">
+          <span class="char-label">EDU</span>
+          <span class="char-value">{{EDU}}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="derived-panel">
+      <div class="vital-stat hp">
+        <div class="vital-icon">♥</div>
+        <div class="vital-info">
+          <div class="vital-label">Hit Points</div>
+          <div class="vital-bar">
+            <div class="vital-fill hp-fill" style="width: {{percent HP}}%"></div>
+          </div>
+          <div class="vital-numbers">{{HP.current}} / {{HP.max}}</div>
+        </div>
+      </div>
+
+      <div class="vital-stat sanity">
+        <div class="vital-icon">🜏</div>
+        <div class="vital-info">
+          <div class="vital-label">Sanity</div>
+          <div class="vital-bar">
+            <div class="vital-fill sanity-fill" style="width: {{percent Sanity}}%"></div>
+          </div>
+          <div class="vital-numbers">{{Sanity.current}} / {{Sanity.max}}</div>
+        </div>
+      </div>
+
+      <div class="vital-stat luck">
+        <div class="vital-icon">🍀</div>
+        <div class="vital-info">
+          <div class="vital-label">Luck</div>
+          <div class="vital-bar">
+            <div class="vital-fill luck-fill" style="width: {{percent Luck}}%"></div>
+          </div>
+          <div class="vital-numbers">{{Luck.current}} / {{Luck.max}}</div>
+        </div>
+      </div>
+
+      <div class="vital-stat mp">
+        <div class="vital-icon">★</div>
+        <div class="vital-info">
+          <div class="vital-label">Magic Points</div>
+          <div class="vital-bar">
+            <div class="vital-fill mp-fill" style="width: {{percent MP}}%"></div>
+          </div>
+          <div class="vital-numbers">{{MP.current}} / {{MP.max}}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="eldritch-warning">
+    <span class="warning-icon">⚠</span>
+    <span class="warning-text">The oldest and strongest emotion of mankind is fear...</span>
+  </div>
+</div>
+    `,
+    css: `
+@import url('https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=Special+Elite&display=swap');
+
+.investigator-sheet {
+  font-family: 'IM Fell English', serif;
+  background: linear-gradient(145deg, #1a1f1a 0%, #0d120d 100%);
+  color: #c4ccb8;
+  padding: 24px;
+  border-radius: 4px;
+  border: 2px solid #2a3a2a;
+  position: relative;
+  overflow: hidden;
+}
+
+.investigator-sheet::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: 
+    radial-gradient(ellipse at 20% 30%, rgba(0, 50, 0, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 70%, rgba(30, 0, 50, 0.1) 0%, transparent 50%);
+  pointer-events: none;
+}
+
+.header-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #3a4a3a;
+}
+
+.title-area {
+  text-align: left;
+}
+
+.game-title {
+  font-family: 'Special Elite', monospace;
+  font-size: 1.5rem;
+  color: #6a8a5a;
+  letter-spacing: 4px;
+  text-shadow: 0 0 10px rgba(100, 140, 80, 0.3);
+}
+
+.subtitle {
+  font-size: 0.9rem;
+  color: #5a6a5a;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.era-badge {
+  font-family: 'Special Elite', monospace;
+  background: #2a3a2a;
+  color: #8a9a7a;
+  padding: 8px 16px;
+  border: 1px solid #4a5a4a;
+  border-radius: 2px;
+  font-size: 0.9rem;
+}
+
+.main-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.characteristics-panel, .derived-panel {
+  background: rgba(20, 30, 20, 0.5);
+  border: 1px solid #3a4a3a;
+  border-radius: 4px;
+  padding: 16px;
+}
+
+.panel-header {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.85rem;
+  color: #7a8a6a;
+  letter-spacing: 2px;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #3a4a3a;
+}
+
+.char-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.char-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(30, 40, 30, 0.5);
+  border: 1px solid #3a4a3a;
+  border-radius: 2px;
+}
+
+.char-label {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.8rem;
+  color: #6a7a6a;
+}
+
+.char-value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: #aaba9a;
+}
+
+.vital-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 12px;
+  background: rgba(30, 40, 30, 0.3);
+  border-radius: 4px;
+}
+
+.vital-stat:last-child {
+  margin-bottom: 0;
+}
+
+.vital-icon {
+  font-size: 1.5rem;
+  width: 40px;
+  text-align: center;
+}
+
+.vital-stat.hp .vital-icon { color: #cc6666; }
+.vital-stat.sanity .vital-icon { color: #9966cc; }
+.vital-stat.luck .vital-icon { color: #66aa66; }
+.vital-stat.mp .vital-icon { color: #6699cc; }
+
+.vital-info {
+  flex: 1;
+}
+
+.vital-label {
+  font-size: 0.85rem;
+  color: #8a9a7a;
+  margin-bottom: 6px;
+}
+
+.vital-bar {
+  height: 16px;
+  background: #1a1f1a;
+  border: 1px solid #3a4a3a;
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+
+.vital-fill {
+  height: 100%;
+  transition: width 0.3s ease;
+}
+
+.hp-fill { background: linear-gradient(90deg, #662222, #aa4444); }
+.sanity-fill { background: linear-gradient(90deg, #442266, #7744aa); }
+.luck-fill { background: linear-gradient(90deg, #224422, #448844); }
+.mp-fill { background: linear-gradient(90deg, #224466, #4488aa); }
+
+.vital-numbers {
+  font-family: 'Special Elite', monospace;
+  font-size: 0.8rem;
+  color: #6a7a6a;
+  text-align: right;
+}
+
+.eldritch-warning {
+  margin-top: 20px;
+  padding: 12px 16px;
+  background: rgba(50, 30, 40, 0.3);
+  border: 1px solid #4a3a4a;
+  border-radius: 2px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.warning-icon {
+  color: #aa6666;
+  font-size: 1rem;
+}
+
+.warning-text {
+  font-style: italic;
+  font-size: 0.85rem;
+  color: #7a6a7a;
+}
+    `,
+  },
+  fields: [
+    // Characteristics (rolled 3d6 * 5 or 2d6+6 * 5)
+    {
+      id: "STR",
+      name: "Strength",
+      type: "number",
+      category: "characteristics",
+      defaultValue: 50,
+      min: 0,
+      max: 99,
+    },
+    {
+      id: "CON",
+      name: "Constitution",
+      type: "number",
+      category: "characteristics",
+      defaultValue: 50,
+      min: 0,
+      max: 99,
+    },
+    {
+      id: "SIZ",
+      name: "Size",
+      type: "number",
+      category: "characteristics",
+      defaultValue: 50,
+      min: 0,
+      max: 99,
+    },
+    {
+      id: "DEX",
+      name: "Dexterity",
+      type: "number",
+      category: "characteristics",
+      defaultValue: 50,
+      min: 0,
+      max: 99,
+    },
+    {
+      id: "APP",
+      name: "Appearance",
+      type: "number",
+      category: "characteristics",
+      defaultValue: 50,
+      min: 0,
+      max: 99,
+    },
+    {
+      id: "INT",
+      name: "Intelligence",
+      type: "number",
+      category: "characteristics",
+      defaultValue: 50,
+      min: 0,
+      max: 99,
+    },
+    {
+      id: "POW",
+      name: "Power",
+      type: "number",
+      category: "characteristics",
+      defaultValue: 50,
+      min: 0,
+      max: 99,
+    },
+    {
+      id: "EDU",
+      name: "Education",
+      type: "number",
+      category: "characteristics",
+      defaultValue: 50,
+      min: 0,
+      max: 99,
+    },
+    // Derived
+    {
+      id: "HP",
+      name: "Hit Points",
+      type: "resource",
+      category: "derived",
+      defaultMax: 10,
+      regenerates: true,
+      regenRates: { quick: 0, short: 10, long: 50 },
+    },
+    {
+      id: "Sanity",
+      name: "Sanity",
+      type: "resource",
+      category: "derived",
+      defaultMax: 50,
+      regenerates: false,
+    },
+    {
+      id: "Luck",
+      name: "Luck",
+      type: "resource",
+      category: "derived",
+      defaultMax: 50,
+      regenerates: false,
+    },
+    {
+      id: "MP",
+      name: "Magic Points",
+      type: "resource",
+      category: "derived",
+      defaultMax: 10,
+      regenerates: true,
+      regenRates: { quick: 0, short: 25, long: 100 },
+    },
+  ],
+};
+
+/**
+ * Simple/Narrative schema (minimal rules)
+ */
+export const NARRATIVE_SCHEMA: CharacterSchema = {
+  version: 1,
+  name: "Narrative",
+  description: "Simple narrative-focused character with minimal mechanics",
+  categories: [
+    { id: "core", name: "Core Traits", order: 1 },
+    { id: "info", name: "Character", order: 2 },
+  ],
+  template: {
+    html: `
+<div class="narrative-sheet">
+  <div class="character-header">
+    <div class="name-section">
+      <div class="character-name">{{characterName}}</div>
+      {{#if concept}}
+      <div class="character-concept">{{concept}}</div>
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="traits-container">
+    <div class="trait-card physique">
+      <div class="trait-icon">💪</div>
+      <div class="trait-info">
+        <div class="trait-name">Physique</div>
+        <div class="trait-value">{{modifier Physique}}</div>
+      </div>
+      <div class="trait-desc">Strength & Endurance</div>
+    </div>
+
+    <div class="trait-card finesse">
+      <div class="trait-icon">🎯</div>
+      <div class="trait-info">
+        <div class="trait-name">Finesse</div>
+        <div class="trait-value">{{modifier Finesse}}</div>
+      </div>
+      <div class="trait-desc">Agility & Precision</div>
+    </div>
+
+    <div class="trait-card mind">
+      <div class="trait-icon">🧠</div>
+      <div class="trait-info">
+        <div class="trait-name">Mind</div>
+        <div class="trait-value">{{modifier Mind}}</div>
+      </div>
+      <div class="trait-desc">Intellect & Reasoning</div>
+    </div>
+
+    <div class="trait-card spirit">
+      <div class="trait-icon">✨</div>
+      <div class="trait-info">
+        <div class="trait-name">Spirit</div>
+        <div class="trait-value">{{modifier Spirit}}</div>
+      </div>
+      <div class="trait-desc">Will & Presence</div>
+    </div>
+  </div>
+
+  <div class="stress-section">
+    <div class="stress-header">
+      <span class="stress-label">Stress</span>
+      <span class="stress-numbers">{{Stress.current}} / {{Stress.max}}</span>
+    </div>
+    <div class="stress-track">
+      <div class="stress-fill" style="width: {{percent Stress}}%"></div>
+      <div class="stress-segments">
+        <div class="segment"></div>
+        <div class="segment"></div>
+        <div class="segment"></div>
+        <div class="segment"></div>
+        <div class="segment"></div>
+        <div class="segment"></div>
+        <div class="segment"></div>
+        <div class="segment"></div>
+        <div class="segment"></div>
+        <div class="segment"></div>
+      </div>
+    </div>
+    <div class="stress-warning">
+      {{#compare Stress.current ">=" 8}}
+      <span class="warning-text">⚠ Near breaking point</span>
+      {{/compare}}
+    </div>
+  </div>
+</div>
+    `,
+    css: `
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&family=Caveat:wght@500&display=swap');
+
+.narrative-sheet {
+  font-family: 'Quicksand', sans-serif;
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d2d44 100%);
+  color: #e0e0e8;
+  padding: 28px;
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.narrative-sheet::before {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: radial-gradient(circle at 30% 30%, rgba(147, 112, 219, 0.08) 0%, transparent 50%),
+              radial-gradient(circle at 70% 70%, rgba(100, 149, 237, 0.08) 0%, transparent 50%);
+  animation: float 20s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes float {
+  0%, 100% { transform: translate(0, 0) rotate(0deg); }
+  50% { transform: translate(-2%, -2%) rotate(1deg); }
+}
+
+.character-header {
+  text-align: center;
+  margin-bottom: 28px;
+  position: relative;
+  z-index: 1;
+}
+
+.character-name {
+  font-family: 'Caveat', cursive;
+  font-size: 2.5rem;
+  font-weight: 500;
+  color: #fff;
+  text-shadow: 0 2px 20px rgba(147, 112, 219, 0.4);
+  letter-spacing: 2px;
+}
+
+.character-concept {
+  font-size: 1rem;
+  color: #a0a0b8;
+  font-style: italic;
+  margin-top: 8px;
+}
+
+.traits-container {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+  position: relative;
+  z-index: 1;
+}
+
+.trait-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.trait-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.trait-card.physique { border-top: 3px solid #e57373; }
+.trait-card.finesse { border-top: 3px solid #81c784; }
+.trait-card.mind { border-top: 3px solid #64b5f6; }
+.trait-card.spirit { border-top: 3px solid #ba68c8; }
+
+.trait-icon {
+  font-size: 2rem;
+  margin-bottom: 8px;
+}
+
+.trait-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.trait-name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #e8e8f0;
+}
+
+.trait-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.trait-card.physique .trait-value { color: #e57373; }
+.trait-card.finesse .trait-value { color: #81c784; }
+.trait-card.mind .trait-value { color: #64b5f6; }
+.trait-card.spirit .trait-value { color: #ba68c8; }
+
+.trait-desc {
+  font-size: 0.75rem;
+  color: #8888a0;
+}
+
+.stress-section {
+  background: rgba(255, 100, 100, 0.1);
+  border: 1px solid rgba(255, 100, 100, 0.2);
+  border-radius: 12px;
+  padding: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+.stress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.stress-label {
+  font-weight: 600;
+  color: #ff8a80;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 2px;
+}
+
+.stress-numbers {
+  font-size: 1rem;
+  color: #e0e0e8;
+}
+
+.stress-track {
+  height: 24px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 12px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stress-fill {
+  position: absolute;
+  top: 0; left: 0; bottom: 0;
+  background: linear-gradient(90deg, #ff6b6b, #ee5a5a);
+  border-radius: 12px;
+  transition: width 0.5s ease;
+  box-shadow: 0 0 20px rgba(255, 107, 107, 0.4);
+}
+
+.stress-segments {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  display: flex;
+}
+
+.segment {
+  flex: 1;
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.segment:last-child {
+  border-right: none;
+}
+
+.stress-warning {
+  margin-top: 12px;
+  min-height: 20px;
+}
+
+.warning-text {
+  font-size: 0.85rem;
+  color: #ff8a80;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+    `,
+  },
+  fields: [
+    {
+      id: "characterName",
+      name: "Name",
+      type: "text",
+      category: "info",
+    },
+    {
+      id: "concept",
+      name: "Concept",
+      type: "text",
+      category: "info",
+      description: "A brief description of who your character is",
+    },
+    {
+      id: "Physique",
+      name: "Physique",
+      type: "number",
+      category: "core",
+      description: "Physical strength, endurance, and athleticism",
+      defaultValue: 2,
+      min: -2,
+      max: 4,
+    },
+    {
+      id: "Finesse",
+      name: "Finesse",
+      type: "number",
+      category: "core",
+      description: "Agility, dexterity, and precision",
+      defaultValue: 2,
+      min: -2,
+      max: 4,
+    },
+    {
+      id: "Mind",
+      name: "Mind",
+      type: "number",
+      category: "core",
+      description: "Intelligence, knowledge, and reasoning",
+      defaultValue: 2,
+      min: -2,
+      max: 4,
+    },
+    {
+      id: "Spirit",
+      name: "Spirit",
+      type: "number",
+      category: "core",
+      description: "Willpower, charisma, and presence",
+      defaultValue: 2,
+      min: -2,
+      max: 4,
+    },
+    {
+      id: "Stress",
+      name: "Stress",
+      type: "resource",
+      category: "core",
+      description: "Mental and physical strain",
+      defaultValue: 0,
+      defaultMax: 10,
+      regenerates: true,
+      regenRates: { quick: 20, short: 50, long: 100 },
+    },
+  ],
+};
+
+/** Available preset schemas */
+export const PRESET_SCHEMAS: Record<string, CharacterSchema> = {
+  dnd5e: DND5E_SCHEMA,
+  coc: COC_SCHEMA,
+  narrative: NARRATIVE_SCHEMA,
+};
+
+/** Default character schema used when adventures don't define a custom one */
+export const DEFAULT_CHARACTER_SCHEMA: CharacterSchema = DND5E_SCHEMA;

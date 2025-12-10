@@ -34,7 +34,6 @@ const SEQUENTIAL_STAGES: GenerationStage[] = ["core", "mechanics"];
 const PARALLELIZABLE_STAGES: GenerationStage[] = [
   "content-lore",
   "content-achievements",
-  "content-items",
   "advanced-presets",
   "advanced-tables",
   "advanced-other",

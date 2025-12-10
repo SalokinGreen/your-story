@@ -1752,6 +1752,528 @@ export const remove_starting_choices: ToolDefinition = {
 };
 
 // ============================================
+// CHARACTER SCHEMA TOOLS
+// ============================================
+
+export const set_character_schema: ToolDefinition = {
+  name: "set_character_schema",
+  description:
+    "Create or replace the character schema. Defines the structure of the character sheet including all fields, categories, and optional custom template.",
+  parameters: {
+    type: "object",
+    properties: {
+      name: {
+        type: "string",
+        description: "Schema name (e.g., 'D&D 5e', 'Call of Cthulhu')",
+      },
+      description: {
+        type: "string",
+        description: "Description of the character system",
+      },
+      fields: {
+        type: "array",
+        description: "Field definitions for the character sheet",
+        items: {
+          type: "object",
+          properties: {
+            id: {
+              type: "string",
+              description: "Unique field ID (alphanumeric_underscore)",
+            },
+            name: { type: "string", description: "Display name" },
+            type: {
+              type: "string",
+              enum: [
+                "number",
+                "derived",
+                "resource",
+                "text",
+                "list",
+                "boolean",
+                "select",
+              ],
+              description: "Field type",
+            },
+            description: { type: "string", description: "Field description" },
+            category: {
+              type: "string",
+              description: "Category ID for grouping",
+            },
+            order: { type: "number", description: "Display order" },
+            hidden: { type: "boolean", description: "Hidden from player" },
+            readonly: {
+              type: "boolean",
+              description: "Read-only (calculated)",
+            },
+            defaultValue: {
+              type: "string",
+              description: "Default value (parsed based on type)",
+            },
+            min: { type: "number", description: "For numbers: minimum" },
+            max: { type: "number", description: "For numbers: maximum" },
+            step: { type: "number", description: "For numbers: step" },
+            formula: {
+              type: "string",
+              description:
+                "For derived: formula using {{fieldId}} syntax (e.g., 'floor(({{Strength}} - 10) / 2)')",
+            },
+            defaultMax: {
+              type: "number",
+              description: "For resources: default max value",
+            },
+            regenerates: {
+              type: "boolean",
+              description: "For resources: regenerates on rest",
+            },
+            maxLength: { type: "number", description: "For text: max length" },
+            multiline: {
+              type: "boolean",
+              description: "For text: use textarea",
+            },
+            placeholder: {
+              type: "string",
+              description: "For text: placeholder",
+            },
+            maxItems: { type: "number", description: "For lists: max items" },
+            options: {
+              type: "array",
+              description: "For lists/selects: predefined options",
+              items: { type: "string" },
+            },
+            selectOptions: {
+              type: "array",
+              description: "For select: options with values and labels",
+              items: {
+                type: "object",
+                properties: {
+                  value: { type: "string" },
+                  label: { type: "string" },
+                },
+              },
+            },
+            trueLabel: {
+              type: "string",
+              description: "For boolean: true label",
+            },
+            falseLabel: {
+              type: "string",
+              description: "For boolean: false label",
+            },
+          },
+          required: ["id", "name", "type"],
+        },
+      },
+      categories: {
+        type: "array",
+        description: "Category definitions for organizing fields",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Unique category ID" },
+            name: { type: "string", description: "Display name" },
+            order: { type: "number", description: "Display order" },
+            collapsed: {
+              type: "boolean",
+              description: "Start collapsed",
+            },
+          },
+          required: ["id", "name"],
+        },
+      },
+    },
+    required: ["name", "fields"],
+  },
+};
+
+export const add_schema_fields: ToolDefinition = {
+  name: "add_schema_fields",
+  description: "Add new fields to the character schema.",
+  parameters: {
+    type: "object",
+    properties: {
+      fields: {
+        type: "array",
+        description: "Fields to add (same structure as set_character_schema)",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string" },
+            name: { type: "string" },
+            type: {
+              type: "string",
+              enum: [
+                "number",
+                "derived",
+                "resource",
+                "text",
+                "list",
+                "boolean",
+                "select",
+              ],
+            },
+            description: { type: "string" },
+            category: { type: "string" },
+            order: { type: "number" },
+            hidden: { type: "boolean" },
+            readonly: { type: "boolean" },
+            defaultValue: { type: "string" },
+            min: { type: "number" },
+            max: { type: "number" },
+            formula: { type: "string" },
+            defaultMax: { type: "number" },
+            options: { type: "array", items: { type: "string" } },
+          },
+          required: ["id", "name", "type"],
+        },
+      },
+    },
+    required: ["fields"],
+  },
+};
+
+export const modify_schema_fields: ToolDefinition = {
+  name: "modify_schema_fields",
+  description: "Modify existing fields in the character schema by ID.",
+  parameters: {
+    type: "object",
+    properties: {
+      fields: {
+        type: "array",
+        description: "Field modifications",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Field ID to modify" },
+            new_id: { type: "string", description: "New ID (if renaming)" },
+            name: { type: "string" },
+            type: { type: "string" },
+            description: { type: "string" },
+            category: { type: "string" },
+            order: { type: "number" },
+            hidden: { type: "boolean" },
+            readonly: { type: "boolean" },
+            defaultValue: { type: "string" },
+            min: { type: "number" },
+            max: { type: "number" },
+            formula: { type: "string" },
+            defaultMax: { type: "number" },
+            options: { type: "array", items: { type: "string" } },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    required: ["fields"],
+  },
+};
+
+export const remove_schema_fields: ToolDefinition = {
+  name: "remove_schema_fields",
+  description: "Remove fields from the character schema by ID.",
+  parameters: {
+    type: "object",
+    properties: {
+      ids: {
+        type: "array",
+        description: "Field IDs to remove",
+        items: { type: "string" },
+      },
+    },
+    required: ["ids"],
+  },
+};
+
+export const add_schema_categories: ToolDefinition = {
+  name: "add_schema_categories",
+  description: "Add categories to organize fields in the character sheet.",
+  parameters: {
+    type: "object",
+    properties: {
+      categories: {
+        type: "array",
+        description: "Categories to add",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Unique category ID" },
+            name: { type: "string", description: "Display name" },
+            order: { type: "number", description: "Display order" },
+            collapsed: { type: "boolean", description: "Start collapsed" },
+          },
+          required: ["id", "name"],
+        },
+      },
+    },
+    required: ["categories"],
+  },
+};
+
+export const modify_schema_categories: ToolDefinition = {
+  name: "modify_schema_categories",
+  description: "Modify existing categories by ID.",
+  parameters: {
+    type: "object",
+    properties: {
+      categories: {
+        type: "array",
+        description: "Category modifications",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Category ID to modify" },
+            new_id: { type: "string" },
+            name: { type: "string" },
+            order: { type: "number" },
+            collapsed: { type: "boolean" },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    required: ["categories"],
+  },
+};
+
+export const remove_schema_categories: ToolDefinition = {
+  name: "remove_schema_categories",
+  description: "Remove categories from the schema by ID.",
+  parameters: {
+    type: "object",
+    properties: {
+      ids: {
+        type: "array",
+        description: "Category IDs to remove",
+        items: { type: "string" },
+      },
+    },
+    required: ["ids"],
+  },
+};
+
+export const set_schema_template: ToolDefinition = {
+  name: "set_schema_template",
+  description:
+    'Set the custom HTML/CSS/JS template for the main character sheet. Template syntax: {{fieldId}} for values, {{fieldId.current}}/{{fieldId.max}} for resources, {{percent fieldId}} for percentage, {{modifier fieldId}} for D&D-style modifier, {{#if fieldId}}...{{/if}}, {{#each fieldId}}...{{/each}}, {{#compare fieldId "op" value}}...{{/compare}}, {{resource:id}} for uploaded resource URLs.',
+  parameters: {
+    type: "object",
+    properties: {
+      html: {
+        type: "string",
+        description:
+          "HTML template with {{fieldId}} placeholders and conditionals",
+      },
+      css: {
+        type: "string",
+        description:
+          "CSS styles for the template (can include @import for fonts)",
+      },
+      js: {
+        type: "string",
+        description:
+          "Optional JavaScript for interactivity (runs in sandboxed iframe, has access to window.characterData and window.getField(id))",
+      },
+    },
+    required: ["html", "css"],
+  },
+};
+
+export const add_schema_pages: ToolDefinition = {
+  name: "add_schema_pages",
+  description:
+    "Add custom pages to the character sheet. Each page gets its own tab in the Stats view with custom HTML/CSS/JS template.",
+  parameters: {
+    type: "object",
+    properties: {
+      pages: {
+        type: "array",
+        description: "Pages to add",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Unique page ID" },
+            name: { type: "string", description: "Tab display name" },
+            icon: {
+              type: "string",
+              description:
+                "Icon name from lucide-react (e.g., 'Sword', 'Book')",
+            },
+            order: { type: "number", description: "Tab order" },
+            html: { type: "string", description: "HTML template" },
+            css: { type: "string", description: "CSS styles" },
+            js: { type: "string", description: "Optional JavaScript" },
+          },
+          required: ["id", "name", "html", "css"],
+        },
+      },
+    },
+    required: ["pages"],
+  },
+};
+
+export const modify_schema_pages: ToolDefinition = {
+  name: "modify_schema_pages",
+  description: "Modify existing schema pages by ID.",
+  parameters: {
+    type: "object",
+    properties: {
+      pages: {
+        type: "array",
+        description: "Page modifications",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Page ID to modify" },
+            new_id: { type: "string" },
+            name: { type: "string" },
+            icon: { type: "string" },
+            order: { type: "number" },
+            html: { type: "string" },
+            css: { type: "string" },
+            js: { type: "string" },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    required: ["pages"],
+  },
+};
+
+export const remove_schema_pages: ToolDefinition = {
+  name: "remove_schema_pages",
+  description: "Remove custom pages from the schema by ID.",
+  parameters: {
+    type: "object",
+    properties: {
+      ids: {
+        type: "array",
+        description: "Page IDs to remove",
+        items: { type: "string" },
+      },
+    },
+    required: ["ids"],
+  },
+};
+
+export const add_schema_resources: ToolDefinition = {
+  name: "add_schema_resources",
+  description:
+    "Add uploaded resources (images, fonts) for use in schema templates. Resources can be referenced in templates using {{resource:id}}.",
+  parameters: {
+    type: "object",
+    properties: {
+      resources: {
+        type: "array",
+        description: "Resources to add",
+        items: {
+          type: "object",
+          properties: {
+            id: { type: "string", description: "Unique resource ID" },
+            name: { type: "string", description: "Display name" },
+            url: { type: "string", description: "URL to the resource" },
+            type: {
+              type: "string",
+              enum: ["image", "font", "other"],
+              description: "Resource type",
+            },
+          },
+          required: ["id", "name", "url", "type"],
+        },
+      },
+    },
+    required: ["resources"],
+  },
+};
+
+export const remove_schema_resources: ToolDefinition = {
+  name: "remove_schema_resources",
+  description: "Remove resources from the schema by ID.",
+  parameters: {
+    type: "object",
+    properties: {
+      ids: {
+        type: "array",
+        description: "Resource IDs to remove",
+        items: { type: "string" },
+      },
+    },
+    required: ["ids"],
+  },
+};
+
+export const set_character_values: ToolDefinition = {
+  name: "set_character_values",
+  description:
+    "Set or update character data values. Use this during gameplay to modify character sheet fields.",
+  parameters: {
+    type: "object",
+    properties: {
+      values: {
+        type: "object",
+        description:
+          "Object mapping field IDs to values. For resources use {current: number, max: number}.",
+      },
+    },
+    required: ["values"],
+  },
+};
+
+export const modify_character_values: ToolDefinition = {
+  name: "modify_character_values",
+  description:
+    "Modify specific character values by field ID. Can increment/decrement numbers or set values directly.",
+  parameters: {
+    type: "object",
+    properties: {
+      modifications: {
+        type: "array",
+        description: "Array of value modifications",
+        items: {
+          type: "object",
+          properties: {
+            field_id: { type: "string", description: "Field ID to modify" },
+            value: {
+              type: "string",
+              description: "New value (parsed based on field type)",
+            },
+            add: {
+              type: "number",
+              description: "For numbers: add this amount (can be negative)",
+            },
+            set_current: {
+              type: "number",
+              description: "For resources: set current value",
+            },
+            set_max: {
+              type: "number",
+              description: "For resources: set max value",
+            },
+            add_current: {
+              type: "number",
+              description: "For resources: add to current",
+            },
+            add_max: {
+              type: "number",
+              description: "For resources: add to max",
+            },
+            append: {
+              type: "string",
+              description: "For lists: add this item",
+            },
+            remove_item: {
+              type: "string",
+              description: "For lists: remove this item",
+            },
+          },
+          required: ["field_id"],
+        },
+      },
+    },
+    required: ["modifications"],
+  },
+};
+
+// ============================================
 // ALL TOOLS EXPORT
 // ============================================
 
@@ -1806,6 +2328,22 @@ export const CREATOR_TOOLS: ToolDefinition[] = [
   add_custom_tables,
   modify_custom_tables,
   remove_custom_tables,
+  // Character Schema
+  set_character_schema,
+  add_schema_fields,
+  modify_schema_fields,
+  remove_schema_fields,
+  add_schema_categories,
+  modify_schema_categories,
+  remove_schema_categories,
+  set_schema_template,
+  add_schema_pages,
+  modify_schema_pages,
+  remove_schema_pages,
+  add_schema_resources,
+  remove_schema_resources,
+  set_character_values,
+  modify_character_values,
   // Settings
   update_basic_info,
   update_adventure_metadata,

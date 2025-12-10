@@ -23,7 +23,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [activeStage, setActiveStage] = useState<
     "story" | "tools" | "actions" | "gm"
   >("story");
-  const [gmStageEnabled, setGmStageEnabled] = useState(false);
+  const [gmStageEnabled, setGmStageEnabled] = useState(true);
   const [contextString, setContextString] = useState("");
   const [estimatedTokens, setEstimatedTokens] = useState(0);
   const [activeModelName, setActiveModelName] = useState("Deepseek Chat");
@@ -33,6 +33,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
   const [showStateChanges, setShowStateChanges] = useState(false);
+  const [showGMToolCalls, setShowGMToolCalls] = useState(false);
   const [prunedParts, setPrunedParts] = useState(0);
   const [embeddingsEnabled, setEmbeddingsEnabled] = useState(false);
   const [embeddingThreshold, setEmbeddingThreshold] = useState(0.25);
@@ -83,11 +84,11 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     // If not set, default to true
     setPrefillEnabled(prefillSetting !== "false");
 
-    // Check GM stage setting
+    // Check GM stage setting (default: true)
     const gmEnabled =
       typeof window !== "undefined"
-        ? localStorage.getItem("gmStageEnabled") === "true"
-        : false;
+        ? localStorage.getItem("gmStageEnabled") !== "false"
+        : true;
     setGmStageEnabled(gmEnabled);
 
     // Get current preset and custom model overrides from localStorage
@@ -189,9 +190,15 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       };
     }
 
-    // Sample GM context to show what story stage would receive
+    // Get actual GM context from last assistant part (if available)
+    // Falls back to a sample if no real GM context exists
+    const lastAssistantPart = [...storyData.scene.parts]
+      .reverse()
+      .find((p) => !p.user);
+    const actualGMContext = lastAssistantPart?.gmStoryContext;
     const sampleGMContext = gmEnabled
-      ? "[Strength Check: SUCCESS | Roll: 14 + 65 (stat) = 79 vs DC 50 (Average)]\n[Stakes: Break down the door]\n[Intended consequence: Door splinters open, alerting guards]"
+      ? actualGMContext ||
+        "[Perception Check: SUCCESS | Roll: 1d100 = 72 vs DC 50 (Average)]\n[Stakes: Notice something unusual]\n[Intended consequence: You spot hidden details]"
       : undefined;
 
     switch (activeStage) {
@@ -202,7 +209,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           modelName: effectiveStoryModel,
           embeddingContext: simulatedEmbeddingContext,
           usePrefill: prefillSetting !== "false",
-          gmStoryContext: sampleGMContext, // Show GM context when enabled
+          gmStoryContext: sampleGMContext, // Show actual GM context if available, else sample
         });
         contextMessages = storyPrompt.messages;
         prunedCount = storyPrompt.prunedParts;
@@ -691,6 +698,59 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
               truncated.
             </div>
 
+            {/* GM Tool Calls from most recent assistant part */}
+            {(() => {
+              const lastAssistantPart = [...storyData.scene.parts]
+                .reverse()
+                .find((p) => !p.user);
+              if (
+                lastAssistantPart?.gmToolCalls &&
+                lastAssistantPart.gmToolCalls.length > 0
+              ) {
+                return (
+                  <div className="text-xs bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-700 p-2 rounded">
+                    <div className="font-semibold text-cyan-700 dark:text-cyan-400 mb-1 flex items-center gap-1">
+                      <DynamicIcon name="Dices" className="w-3 h-3" />
+                      GM Tool Calls (from last turn)
+                    </div>
+                    <ul className="space-y-1 text-cyan-800 dark:text-cyan-300">
+                      {lastAssistantPart.gmToolCalls.map(
+                        (tool: any, i: number) => (
+                          <li key={i} className="flex items-start gap-1">
+                            <span
+                              className={`font-medium ${
+                                tool.success
+                                  ? "text-green-600 dark:text-green-400"
+                                  : "text-red-600 dark:text-red-400"
+                              }`}
+                            >
+                              {tool.success ? "✓" : "✗"}
+                            </span>
+                            <span className="font-mono">{tool.toolName}</span>
+                            {tool.contextForStory && (
+                              <span className="text-gray-600 dark:text-gray-400">
+                                → {tool.contextForStory.substring(0, 100)}
+                                {tool.contextForStory.length > 100 ? "..." : ""}
+                              </span>
+                            )}
+                          </li>
+                        )
+                      )}
+                    </ul>
+                    {lastAssistantPart.gmStoryContext && (
+                      <div className="mt-2 p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded text-cyan-700 dark:text-cyan-300">
+                        <strong>GM Context sent to story:</strong>
+                        <pre className="whitespace-pre-wrap mt-1 text-[10px]">
+                          {lastAssistantPart.gmStoryContext}
+                        </pre>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+              return null;
+            })()}
+
             {/* State Changes from most recent assistant part */}
             {(() => {
               const lastAssistantPart = [...storyData.scene.parts]
@@ -704,7 +764,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   <div className="text-xs bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 p-2 rounded">
                     <div className="font-semibold text-amber-700 dark:text-amber-400 mb-1 flex items-center gap-1">
                       <DynamicIcon name="Zap" className="w-3 h-3" />
-                      GM State Changes (from last turn)
+                      State Changes (from last turn)
                     </div>
                     <ul className="list-disc list-inside text-amber-800 dark:text-amber-300 space-y-0.5">
                       {lastAssistantPart.stateChanges.map((change, i) => (
@@ -712,8 +772,8 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                       ))}
                     </ul>
                     <div className="text-amber-600 dark:text-amber-500 mt-1 italic">
-                      These appear as [GM State Update] assistant messages in
-                      story history.
+                      These appear as [State Update] assistant messages in story
+                      history.
                     </div>
                   </div>
                 );
@@ -722,6 +782,73 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             })()}
           </>
         )}
+
+        {/* GM Tool Calls - Always visible when present (outside showInfo) - Collapsible on mobile */}
+        {!showInfo &&
+          (() => {
+            const lastAssistantPart = [...storyData.scene.parts]
+              .reverse()
+              .find((p) => !p.user);
+            if (
+              lastAssistantPart?.gmToolCalls &&
+              lastAssistantPart.gmToolCalls.length > 0
+            ) {
+              return (
+                <div className="text-xs bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-700 rounded overflow-hidden">
+                  <button
+                    onClick={() => setShowGMToolCalls(!showGMToolCalls)}
+                    className="w-full font-semibold text-cyan-700 dark:text-cyan-400 p-2 flex items-center justify-between gap-1 hover:bg-cyan-100 dark:hover:bg-cyan-900/30 transition-colors"
+                  >
+                    <span className="flex items-center gap-1">
+                      <DynamicIcon name="Dices" className="w-3 h-3" />
+                      GM Tool Calls ({lastAssistantPart.gmToolCalls.length})
+                    </span>
+                    <DynamicIcon
+                      name={showGMToolCalls ? "ChevronUp" : "ChevronDown"}
+                      className="w-3 h-3"
+                    />
+                  </button>
+                  {showGMToolCalls && (
+                    <div className="px-2 pb-2">
+                      <ul className="space-y-1 text-cyan-800 dark:text-cyan-300">
+                        {lastAssistantPart.gmToolCalls.map(
+                          (tool: any, i: number) => (
+                            <li key={i} className="flex items-start gap-1">
+                              <span
+                                className={`font-medium ${
+                                  tool.success
+                                    ? "text-green-600 dark:text-green-400"
+                                    : "text-red-600 dark:text-red-400"
+                                }`}
+                              >
+                                {tool.success ? "✓" : "✗"}
+                              </span>
+                              <span className="font-mono">{tool.toolName}</span>
+                              {tool.contextForStory && (
+                                <span className="text-gray-600 dark:text-gray-400 text-[10px]">
+                                  → {tool.contextForStory.substring(0, 60)}
+                                  {tool.contextForStory.length > 60
+                                    ? "..."
+                                    : ""}
+                                </span>
+                              )}
+                            </li>
+                          )
+                        )}
+                      </ul>
+                      {lastAssistantPart.gmStoryContext && (
+                        <div className="mt-2 text-[10px] text-cyan-600 dark:text-cyan-500 italic">
+                          Full context:{" "}
+                          {lastAssistantPart.gmStoryContext.length} chars
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return null;
+          })()}
 
         {/* State Changes - Always visible when present (outside showInfo) - Collapsible on mobile */}
         {!showInfo &&
@@ -785,6 +912,78 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 relative"
       >
+        {/* GM Stage Results Panel - Show at top when in GM stage view */}
+        {activeStage === "gm" &&
+          (() => {
+            const lastAssistantPart = [...storyData.scene.parts]
+              .reverse()
+              .find((p) => !p.user);
+            if (
+              lastAssistantPart?.gmToolCalls &&
+              lastAssistantPart.gmToolCalls.length > 0
+            ) {
+              return (
+                <div className="mx-2 sm:mx-4 mb-4 p-4 bg-cyan-50 dark:bg-cyan-900/20 border-2 border-cyan-300 dark:border-cyan-700 rounded-lg">
+                  <h4 className="font-bold text-cyan-700 dark:text-cyan-400 mb-3 flex items-center gap-2">
+                    <DynamicIcon name="Dices" className="w-5 h-5" />
+                    GM Stage Results (Last Turn)
+                  </h4>
+                  <div className="space-y-3">
+                    {lastAssistantPart.gmToolCalls.map(
+                      (tool: any, i: number) => (
+                        <div
+                          key={i}
+                          className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-cyan-200 dark:border-cyan-800"
+                        >
+                          <div className="flex items-center gap-2 mb-2">
+                            <span
+                              className={`text-lg ${
+                                tool.success ? "text-green-500" : "text-red-500"
+                              }`}
+                            >
+                              {tool.success ? "✓" : "✗"}
+                            </span>
+                            <span className="font-mono font-semibold text-gray-900 dark:text-white">
+                              {tool.toolName}
+                            </span>
+                          </div>
+                          {tool.contextForStory && (
+                            <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 p-2 rounded">
+                              {tool.contextForStory}
+                            </pre>
+                          )}
+                        </div>
+                      )
+                    )}
+                  </div>
+                  {lastAssistantPart.gmStoryContext && (
+                    <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                      <h5 className="font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center gap-1">
+                        <DynamicIcon name="ArrowRight" className="w-4 h-4" />
+                        Context Sent to Story Stage
+                      </h5>
+                      <pre className="text-xs text-green-800 dark:text-green-300 whitespace-pre-wrap">
+                        {lastAssistantPart.gmStoryContext}
+                      </pre>
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <div className="mx-2 sm:mx-4 mb-4 p-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-center">
+                <DynamicIcon
+                  name="Info"
+                  className="w-6 h-6 mx-auto mb-2 text-gray-400"
+                />
+                <p className="text-sm text-gray-600 dark:text-gray-400">
+                  No GM results from the last turn. The prompt below shows what
+                  would be sent to the GM stage.
+                </p>
+              </div>
+            );
+          })()}
+
         {showRawJSON ? (
           <pre className="bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 rounded text-xs overflow-x-auto text-gray-800 dark:text-gray-200 font-mono mx-2 sm:mx-4">
             {JSON.stringify(messages, null, 2)}

@@ -2854,7 +2854,7 @@ function ChangeSummary({
   if (data.lore?.length) {
     changes.push({
       type: "Add/Update",
-      label: "Lore",
+      label: "Notes",
       value: `${data.lore.length} entr${data.lore.length > 1 ? "ies" : "y"}`,
       details: data.lore,
       icon: "Scroll",
@@ -3281,8 +3281,8 @@ function DetailsDisplay({
       );
     }
 
-    // Lore display
-    if (label === "Lore") {
+    // Notes display
+    if (label === "Notes") {
       return (
         <div className="space-y-2">
           {items.map((item, idx) => (
@@ -3792,12 +3792,12 @@ function StoryContextDisplay({ storyData }: { storyData: StoryData }) {
     });
   }
 
-  // Lore
+  // Notes
   if (storyData.lore?.length) {
     const activeLore = storyData.lore.filter((l) => l.on !== false);
     contextItems.push({
       icon: "Scroll",
-      label: "Lore",
+      label: "Notes",
       value: `${storyData.lore.length} entries (${activeLore.length} active)`,
       color: "text-orange-500",
     });

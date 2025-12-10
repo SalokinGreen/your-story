@@ -23,6 +23,13 @@ import {
   CalculateParams,
   NoCheckNeededParams,
   TakeRestParams,
+  FormulaRollParams,
+  OpposedFormulaParams,
+  FormulaChallengeCheckParams,
+  FateQuestionParams,
+  RollTableParams,
+  RequestContinuationParams,
+  AskPlayerParams,
 } from "./gmTools";
 import {
   getRPGSystem,
@@ -40,6 +47,11 @@ import {
 } from "./fuzzyMatch";
 import { getItemBonus } from "./itemSystem";
 import { getAbilityBonus } from "./abilitySystem";
+import {
+  rollFormula,
+  createSchemaBasedResolver,
+  RollResult,
+} from "./diceFormula";
 
 // ============================================
 // RESULT INTERFACES
@@ -56,7 +68,14 @@ export interface GMToolResult {
     | GMRollResult
     | GMCalculateResult
     | GMRestResult
-    | GMNoCheckResult;
+    | GMNoCheckResult
+    | GMFormulaRollResult
+    | GMOpposedFormulaResult
+    | GMFormulaChallengeResult
+    | GMFateQuestionResult
+    | GMRollTableResult
+    | GMRequestContinuationResult
+    | GMAskPlayerResult;
   contextForStory: string; // Formatted bracket notation for story stage
 }
 
@@ -200,6 +219,118 @@ export interface GMNoCheckResult {
 }
 
 // ============================================
+// FORMULA-BASED RESULT INTERFACES
+// ============================================
+
+export interface GMFormulaRollResult {
+  type: "formula_roll";
+  formula: string;
+  resolvedFormula: string; // Formula with variables substituted
+  rolls: number[]; // Flattened list of all dice rolled
+  total: number;
+  dc?: number;
+  success?: boolean;
+  margin?: number;
+  reason: string;
+  displayName?: string;
+  stakes?: string;
+  consequences?: {
+    success?: string;
+    failure?: string;
+  };
+  unresolvedVariables?: string[]; // Variables that couldn't be resolved
+  breakdown?: string; // Human-readable breakdown
+}
+
+export interface GMOpposedFormulaResult {
+  type: "opposed_formula";
+  playerFormula: string;
+  playerResolvedFormula: string;
+  playerRolls: number[]; // Flattened list of all dice rolled
+  playerTotal: number;
+  opponentFormula: string;
+  opponentResolvedFormula: string;
+  opponentRolls: number[]; // Flattened list of all dice rolled
+  opponentTotal: number;
+  opponentName: string;
+  winner: "player" | "opponent" | "tie";
+  margin: number;
+  reason: string;
+  displayName?: string;
+  stakes?: string;
+  consequences?: {
+    player_wins?: string;
+    opponent_wins?: string;
+    tie?: string;
+  };
+}
+
+export interface GMFormulaChallengeResult {
+  type: "formula_challenge_check";
+  formula: string;
+  resolvedFormula: string;
+  rolls: number[]; // Flattened list of all dice rolled
+  total: number;
+  dc: number;
+  success: boolean;
+  margin: number;
+  description: string;
+  displayName?: string;
+  consequences?: {
+    success?: string;
+    failure?: string;
+  };
+  challengeProgress?: {
+    name: string;
+    successes: number;
+    failures: number;
+    required: number;
+    maxFailures: number;
+    completed?: boolean;
+    won?: boolean;
+  };
+}
+
+// ============================================
+// ORACLE & UTILITY RESULT INTERFACES
+// ============================================
+
+export interface GMFateQuestionResult {
+  type: "fate_question";
+  question: string;
+  likelihood: string;
+  chaosFactor: number;
+  roll: number;
+  answer: "Exceptional Yes" | "Yes" | "No" | "Exceptional No";
+  randomEvent: boolean;
+  reason?: string;
+}
+
+export interface GMRollTableResult {
+  type: "roll_table";
+  tableName: string;
+  result: string;
+  reason: string;
+  displayName?: string;
+  tableNotFound?: boolean;
+}
+
+export interface GMRequestContinuationResult {
+  type: "request_continuation";
+  reason: string;
+  context: string;
+  nextAction?: string;
+}
+
+export interface GMAskPlayerResult {
+  type: "ask_player";
+  question: string;
+  context: string;
+  options?: string[];
+  allowCustom: boolean;
+}
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -301,6 +432,16 @@ export interface GMExecutionResult {
   results: GMToolResult[];
   modifiedStoryData: StoryData;
   storyContext: string; // Combined context for story stage
+  // Special flow control flags
+  requestsContinuation?: boolean; // AI wants another GM round
+  continuationContext?: string; // Context for next round
+  asksPlayer?: boolean; // AI wants to ask the player something
+  playerQuestion?: {
+    question: string;
+    context: string;
+    options?: string[];
+    allowCustom: boolean;
+  };
 }
 
 /**
@@ -369,6 +510,46 @@ export async function executeGMTools(
       case "take_rest":
         result = executeTakeRest(call.id, params as TakeRestParams, modified);
         break;
+      case "formula_roll":
+        result = executeFormulaRoll(
+          call.id,
+          params as FormulaRollParams,
+          modified
+        );
+        break;
+      case "opposed_formula":
+        result = executeOpposedFormula(
+          call.id,
+          params as OpposedFormulaParams,
+          modified
+        );
+        break;
+      case "formula_challenge_check":
+        result = executeFormulaChallengeCheck(
+          call.id,
+          params as FormulaChallengeCheckParams,
+          modified
+        );
+        break;
+      case "fate_question":
+        result = executeFateQuestion(
+          call.id,
+          params as FateQuestionParams,
+          modified
+        );
+        break;
+      case "roll_table":
+        result = executeRollTable(call.id, params as RollTableParams, modified);
+        break;
+      case "request_continuation":
+        result = executeRequestContinuation(
+          call.id,
+          params as RequestContinuationParams
+        );
+        break;
+      case "ask_player":
+        result = executeAskPlayer(call.id, params as AskPlayerParams);
+        break;
       default:
         console.warn(`Unknown GM tool: ${call.function.name}`);
         continue;
@@ -380,10 +561,47 @@ export async function executeGMTools(
     }
   }
 
+  // Check for special flow control results
+  let requestsContinuation = false;
+  let continuationContext: string | undefined;
+  let asksPlayer = false;
+  let playerQuestion:
+    | {
+        question: string;
+        context: string;
+        options?: string[];
+        allowCustom: boolean;
+      }
+    | undefined;
+
+  for (const res of results) {
+    if (res.toolName === "request_continuation") {
+      requestsContinuation = true;
+      const contResult = res.result as GMRequestContinuationResult;
+      continuationContext = `Previous round: ${
+        contResult.context
+      }\nNext planned: ${contResult.nextAction || "See results"}`;
+    }
+    if (res.toolName === "ask_player") {
+      asksPlayer = true;
+      const askResult = res.result as GMAskPlayerResult;
+      playerQuestion = {
+        question: askResult.question,
+        context: askResult.context,
+        options: askResult.options,
+        allowCustom: askResult.allowCustom,
+      };
+    }
+  }
+
   return {
     results,
     modifiedStoryData: modified,
     storyContext: contextParts.join("\n"),
+    requestsContinuation,
+    continuationContext,
+    asksPlayer,
+    playerQuestion,
   };
 }
 
@@ -1310,6 +1528,650 @@ function executeTakeRest(
       recovery,
       narrativeContext: params.narrative_context,
     } as GMRestResult,
+    contextForStory,
+  };
+}
+
+// ============================================
+// FORMULA-BASED TOOL EXECUTORS
+// ============================================
+
+/**
+ * Flatten DiceGroupResult[] into a simple number[] of all kept dice
+ */
+function flattenRolls(rolls: RollResult["rolls"]): number[] {
+  return rolls.flatMap((group) => group.keptRolls);
+}
+
+/**
+ * Build a variable resolver from story data
+ * Prioritizes characterData (new schema system) but falls back to stats
+ */
+function buildResolver(
+  storyData: StoryData
+): (name: string) => number | undefined {
+  // If we have characterData from the new schema system, use it
+  if (storyData.characterData) {
+    // CharacterData has a .values property that contains the actual field values
+    const values = storyData.characterData.values || storyData.characterData;
+    return createSchemaBasedResolver(values as Record<string, unknown>);
+  }
+
+  // Fallback: build resolver from stats array (legacy system)
+  const statMap: Record<string, number> = {};
+  for (const stat of storyData.stats || []) {
+    statMap[stat.name] = stat.value;
+    // Also add common variations
+    statMap[stat.name.toLowerCase()] = stat.value;
+    statMap[stat.name.toUpperCase()] = stat.value;
+  }
+
+  return (name: string) => {
+    return statMap[name] ?? statMap[name.toLowerCase()];
+  };
+}
+
+/**
+ * Execute a formula roll with optional DC check
+ */
+function executeFormulaRoll(
+  toolCallId: string,
+  params: FormulaRollParams,
+  storyData: StoryData
+): GMToolResult {
+  const resolver = buildResolver(storyData);
+
+  // Roll the formula
+  let rollResult: RollResult;
+  try {
+    rollResult = rollFormula(params.formula, resolver);
+  } catch (e) {
+    return {
+      toolName: "formula_roll",
+      toolCallId,
+      success: false,
+      result: {
+        type: "formula_roll",
+        formula: params.formula,
+        resolvedFormula: params.formula,
+        rolls: [],
+        total: 0,
+        reason: params.reason,
+        unresolvedVariables: [],
+      } as GMFormulaRollResult,
+      contextForStory: `[ERROR: Invalid formula "${params.formula}" - ${
+        e instanceof Error ? e.message : "Unknown error"
+      }]`,
+    };
+  }
+
+  // Build resolved formula string for display
+  const resolvedFormula = rollResult.breakdown || params.formula;
+
+  // Check success if DC provided
+  let success: boolean | undefined;
+  let margin: number | undefined;
+  if (params.dc !== undefined) {
+    success = rollResult.total >= params.dc;
+    margin = rollResult.total - params.dc;
+  }
+
+  // Build context string
+  const displayName = params.display_name || "Formula Roll";
+  let contextForStory = `[${displayName}: ${params.formula}`;
+  if (resolvedFormula !== params.formula) {
+    contextForStory += ` → ${resolvedFormula}`;
+  }
+  contextForStory += ` = ${rollResult.total}`;
+  if (params.dc !== undefined) {
+    contextForStory += ` vs DC ${params.dc} → ${
+      success ? "SUCCESS" : "FAILURE"
+    }`;
+    if (margin !== undefined) {
+      contextForStory += ` (margin: ${margin >= 0 ? "+" : ""}${margin})`;
+    }
+  }
+  contextForStory += `]`;
+  contextForStory += `\n[Reason: ${params.reason}]`;
+
+  if (params.stakes) {
+    contextForStory += `\n[Stakes: ${params.stakes}]`;
+  }
+
+  if (params.consequences) {
+    const outcome = success
+      ? params.consequences.success
+      : params.consequences.failure;
+    if (outcome) {
+      contextForStory += `\n[Intended consequence: ${outcome}]`;
+    }
+  }
+
+  return {
+    toolName: "formula_roll",
+    toolCallId,
+    success: success ?? true,
+    result: {
+      type: "formula_roll",
+      formula: params.formula,
+      resolvedFormula,
+      rolls: flattenRolls(rollResult.rolls),
+      total: rollResult.total,
+      dc: params.dc,
+      success,
+      margin,
+      reason: params.reason,
+      displayName: params.display_name,
+      stakes: params.stakes,
+      consequences: params.consequences,
+      breakdown: rollResult.breakdown,
+    } as GMFormulaRollResult,
+    contextForStory,
+  };
+}
+
+/**
+ * Execute an opposed formula roll
+ */
+function executeOpposedFormula(
+  toolCallId: string,
+  params: OpposedFormulaParams,
+  storyData: StoryData
+): GMToolResult {
+  const resolver = buildResolver(storyData);
+
+  // Roll player's formula
+  let playerResult: RollResult;
+  try {
+    playerResult = rollFormula(params.player_formula, resolver);
+  } catch (e) {
+    return {
+      toolName: "opposed_formula",
+      toolCallId,
+      success: false,
+      result: {
+        type: "opposed_formula",
+        playerFormula: params.player_formula,
+        playerResolvedFormula: params.player_formula,
+        playerRolls: [],
+        playerTotal: 0,
+        opponentFormula: params.opponent_formula,
+        opponentResolvedFormula: params.opponent_formula,
+        opponentRolls: [],
+        opponentTotal: 0,
+        opponentName: params.opponent_name,
+        winner: "opponent",
+        margin: 0,
+        reason: params.reason,
+      } as GMOpposedFormulaResult,
+      contextForStory: `[ERROR: Invalid player formula "${
+        params.player_formula
+      }" - ${e instanceof Error ? e.message : "Unknown error"}]`,
+    };
+  }
+
+  // Roll opponent's formula (opponent formulas usually don't have variables)
+  let opponentResult: RollResult;
+  try {
+    opponentResult = rollFormula(params.opponent_formula, () => undefined);
+  } catch (e) {
+    return {
+      toolName: "opposed_formula",
+      toolCallId,
+      success: false,
+      result: {
+        type: "opposed_formula",
+        playerFormula: params.player_formula,
+        playerResolvedFormula: playerResult.breakdown || params.player_formula,
+        playerRolls: flattenRolls(playerResult.rolls),
+        playerTotal: playerResult.total,
+        opponentFormula: params.opponent_formula,
+        opponentResolvedFormula: params.opponent_formula,
+        opponentRolls: [],
+        opponentTotal: 0,
+        opponentName: params.opponent_name,
+        winner: "player",
+        margin: 0,
+        reason: params.reason,
+      } as GMOpposedFormulaResult,
+      contextForStory: `[ERROR: Invalid opponent formula "${
+        params.opponent_formula
+      }" - ${e instanceof Error ? e.message : "Unknown error"}]`,
+    };
+  }
+
+  // Determine winner
+  let winner: "player" | "opponent" | "tie";
+  const margin = playerResult.total - opponentResult.total;
+  if (margin > 0) {
+    winner = "player";
+  } else if (margin < 0) {
+    winner = "opponent";
+  } else {
+    winner = "tie";
+  }
+
+  // Build context string
+  const displayName = params.display_name || "Opposed Roll";
+  let contextForStory = `[${displayName}: ${params.reason}]`;
+  contextForStory += `\n[Player: ${params.player_formula}`;
+  if (playerResult.breakdown !== params.player_formula) {
+    contextForStory += ` → ${playerResult.breakdown}`;
+  }
+  contextForStory += ` = ${playerResult.total}]`;
+  contextForStory += `\n[${params.opponent_name}: ${params.opponent_formula}`;
+  if (opponentResult.breakdown !== params.opponent_formula) {
+    contextForStory += ` → ${opponentResult.breakdown}`;
+  }
+  contextForStory += ` = ${opponentResult.total}]`;
+  contextForStory += `\n[Winner: ${
+    winner === "player"
+      ? "PLAYER"
+      : winner === "opponent"
+      ? params.opponent_name.toUpperCase()
+      : "TIE"
+  } (margin: ${Math.abs(margin)})]`;
+
+  if (params.stakes) {
+    contextForStory += `\n[Stakes: ${params.stakes}]`;
+  }
+
+  if (params.consequences) {
+    const outcome =
+      winner === "player"
+        ? params.consequences.player_wins
+        : winner === "opponent"
+        ? params.consequences.opponent_wins
+        : params.consequences.tie;
+    if (outcome) {
+      contextForStory += `\n[Intended consequence: ${outcome}]`;
+    }
+  }
+
+  return {
+    toolName: "opposed_formula",
+    toolCallId,
+    success: winner === "player",
+    result: {
+      type: "opposed_formula",
+      playerFormula: params.player_formula,
+      playerResolvedFormula: playerResult.breakdown || params.player_formula,
+      playerRolls: flattenRolls(playerResult.rolls),
+      playerTotal: playerResult.total,
+      opponentFormula: params.opponent_formula,
+      opponentResolvedFormula:
+        opponentResult.breakdown || params.opponent_formula,
+      opponentRolls: flattenRolls(opponentResult.rolls),
+      opponentTotal: opponentResult.total,
+      opponentName: params.opponent_name,
+      winner,
+      margin: Math.abs(margin),
+      reason: params.reason,
+      displayName: params.display_name,
+      stakes: params.stakes,
+      consequences: params.consequences,
+    } as GMOpposedFormulaResult,
+    contextForStory,
+  };
+}
+
+/**
+ * Execute a formula-based challenge check
+ */
+function executeFormulaChallengeCheck(
+  toolCallId: string,
+  params: FormulaChallengeCheckParams,
+  storyData: StoryData
+): GMToolResult {
+  const challenge = storyData.activeChallenge;
+  if (!challenge) {
+    return {
+      toolName: "formula_challenge_check",
+      toolCallId,
+      success: false,
+      result: {
+        type: "formula_challenge_check",
+        formula: params.formula,
+        resolvedFormula: params.formula,
+        rolls: [],
+        total: 0,
+        dc: params.dc,
+        success: false,
+        margin: 0,
+        description: params.description,
+      } as GMFormulaChallengeResult,
+      contextForStory: "[ERROR: No active challenge to make a check for]",
+    };
+  }
+
+  const resolver = buildResolver(storyData);
+
+  // Roll the formula
+  let rollResult: RollResult;
+  try {
+    rollResult = rollFormula(params.formula, resolver);
+  } catch (e) {
+    return {
+      toolName: "formula_challenge_check",
+      toolCallId,
+      success: false,
+      result: {
+        type: "formula_challenge_check",
+        formula: params.formula,
+        resolvedFormula: params.formula,
+        rolls: [],
+        total: 0,
+        dc: params.dc,
+        success: false,
+        margin: 0,
+        description: params.description,
+      } as GMFormulaChallengeResult,
+      contextForStory: `[ERROR: Invalid formula "${params.formula}" - ${
+        e instanceof Error ? e.message : "Unknown error"
+      }]`,
+    };
+  }
+
+  const resolvedFormula = rollResult.breakdown || params.formula;
+  const success = rollResult.total >= params.dc;
+  const margin = rollResult.total - params.dc;
+
+  // Update challenge progress
+  if (success) {
+    challenge.currentSuccesses = (challenge.currentSuccesses || 0) + 1;
+  } else {
+    challenge.currentFailures = (challenge.currentFailures || 0) + 1;
+  }
+
+  // Calculate majority needed: (rounds / 2) + 1 rounded down
+  const requiredToWin = Math.floor(challenge.rounds / 2) + 1;
+
+  // Check if challenge is complete
+  let completed = false;
+  let won = false;
+  if (challenge.currentSuccesses >= requiredToWin) {
+    completed = true;
+    won = true;
+    challenge.result = "won";
+    challenge.active = false;
+    challenge.resolvedAt = Date.now();
+  } else if (challenge.currentFailures >= requiredToWin) {
+    completed = true;
+    won = false;
+    challenge.result = "lost";
+    challenge.active = false;
+    challenge.resolvedAt = Date.now();
+  }
+
+  // Build context string
+  const displayName = params.display_name || "Challenge Check";
+  let contextForStory = `[${displayName}: ${params.formula}`;
+  if (resolvedFormula !== params.formula) {
+    contextForStory += ` → ${resolvedFormula}`;
+  }
+  contextForStory += ` = ${rollResult.total} vs DC ${params.dc} → ${
+    success ? "SUCCESS" : "FAILURE"
+  }]`;
+  contextForStory += `\n[${params.description}]`;
+  contextForStory += `\n[Challenge "${challenge.name}": ${challenge.currentSuccesses}/${requiredToWin} successes, ${challenge.currentFailures}/${requiredToWin} failures]`;
+
+  if (completed) {
+    contextForStory += `\n[Challenge ${won ? "WON" : "LOST"}!]`;
+  }
+
+  if (params.consequences) {
+    const outcome = success
+      ? params.consequences.success
+      : params.consequences.failure;
+    if (outcome) {
+      contextForStory += `\n[Intended consequence: ${outcome}]`;
+    }
+  }
+
+  return {
+    toolName: "formula_challenge_check",
+    toolCallId,
+    success,
+    result: {
+      type: "formula_challenge_check",
+      formula: params.formula,
+      resolvedFormula,
+      rolls: flattenRolls(rollResult.rolls),
+      total: rollResult.total,
+      dc: params.dc,
+      success,
+      margin,
+      description: params.description,
+      displayName: params.display_name,
+      consequences: params.consequences,
+      challengeProgress: {
+        name: challenge.name,
+        successes: challenge.currentSuccesses,
+        failures: challenge.currentFailures,
+        required: requiredToWin,
+        maxFailures: requiredToWin,
+        completed,
+        won,
+      },
+    } as GMFormulaChallengeResult,
+    contextForStory,
+  };
+}
+
+// ============================================
+// ORACLE & UTILITY TOOL EXECUTORS
+// ============================================
+
+/**
+ * Execute a fate question using the AGMT oracle system
+ */
+function executeFateQuestion(
+  toolCallId: string,
+  params: FateQuestionParams,
+  storyData: StoryData
+): GMToolResult {
+  // Import askFate dynamically to avoid circular dependencies
+  const { askFate } = require("./mythic") as {
+    askFate: (
+      likelihood: string,
+      chaosFactor: number
+    ) => { answer: string; randomEvent: boolean; roll: number };
+  };
+
+  // Get chaos factor from agmtState or default to 5
+  const chaosFactor = storyData.agmtState?.chaosFactor ?? 5;
+
+  // Validate likelihood - default to 50/50 if invalid
+  const validLikelihoods = [
+    "Impossible",
+    "No Way",
+    "Very Unlikely",
+    "Unlikely",
+    "50/50",
+    "Somewhat Likely",
+    "Likely",
+    "Very Likely",
+    "Near Sure Thing",
+    "A Sure Thing",
+    "Has To Be",
+  ];
+  const likelihood = validLikelihoods.includes(params.likelihood)
+    ? params.likelihood
+    : "50/50";
+
+  // Ask fate
+  const fateResult = askFate(likelihood, chaosFactor);
+
+  // Build context string
+  let contextForStory = `[Fate Question: "${params.question}"]`;
+  contextForStory += `\n[Likelihood: ${likelihood} | Chaos Factor: ${chaosFactor}]`;
+  contextForStory += `\n[Roll: ${fateResult.roll} → ${fateResult.answer}]`;
+
+  if (fateResult.randomEvent) {
+    contextForStory += `\n[⚡ RANDOM EVENT TRIGGERED! Consider adding an unexpected twist.]`;
+  }
+
+  if (params.reason) {
+    contextForStory += `\n[Context: ${params.reason}]`;
+  }
+
+  return {
+    toolName: "fate_question",
+    toolCallId,
+    success: true,
+    result: {
+      type: "fate_question",
+      question: params.question,
+      likelihood,
+      chaosFactor,
+      roll: fateResult.roll,
+      answer: fateResult.answer as
+        | "Exceptional Yes"
+        | "Yes"
+        | "No"
+        | "Exceptional No",
+      randomEvent: fateResult.randomEvent,
+      reason: params.reason,
+    } as GMFateQuestionResult,
+    contextForStory,
+  };
+}
+
+/**
+ * Execute a roll on a custom table
+ */
+function executeRollTable(
+  toolCallId: string,
+  params: RollTableParams,
+  storyData: StoryData
+): GMToolResult {
+  // Import table utilities
+  const { getTableByName, rollOnCustomTable } = require("./tableRoller") as {
+    getTableByName: (
+      tables: {
+        id: string;
+        name: string;
+        entries: { text: string; weight: number }[];
+      }[],
+      name: string
+    ) => {
+      id: string;
+      name: string;
+      entries: { text: string; weight: number }[];
+    } | null;
+    rollOnCustomTable: (table: {
+      entries: { text: string; weight: number }[];
+    }) => { text: string; weight: number } | null;
+  };
+
+  // Use customTables from storyData
+  const allTables = storyData.customTables || [];
+
+  // Find the table
+  const table = getTableByName(allTables, params.table_name);
+
+  if (!table) {
+    const displayName = params.display_name || "Table Roll";
+    return {
+      toolName: "roll_table",
+      toolCallId,
+      success: false,
+      result: {
+        type: "roll_table",
+        tableName: params.table_name,
+        result: "",
+        reason: params.reason,
+        displayName: params.display_name,
+        tableNotFound: true,
+      } as GMRollTableResult,
+      contextForStory: `[${displayName}: Table "${params.table_name}" not found]`,
+    };
+  }
+
+  // Roll on the table
+  const rollResult = rollOnCustomTable(table);
+  const resultText = rollResult?.text || "No result";
+
+  // Build context string
+  const displayName = params.display_name || `${table.name} Roll`;
+  let contextForStory = `[${displayName}: "${resultText}"]`;
+  contextForStory += `\n[Reason: ${params.reason}]`;
+
+  return {
+    toolName: "roll_table",
+    toolCallId,
+    success: true,
+    result: {
+      type: "roll_table",
+      tableName: table.name,
+      result: resultText,
+      reason: params.reason,
+      displayName: params.display_name,
+    } as GMRollTableResult,
+    contextForStory,
+  };
+}
+
+/**
+ * Execute a request for continuation (another GM round)
+ */
+function executeRequestContinuation(
+  toolCallId: string,
+  params: RequestContinuationParams
+): GMToolResult {
+  // Build context string
+  let contextForStory = `[GM Continuation Requested]`;
+  contextForStory += `\n[Reason: ${params.reason}]`;
+  contextForStory += `\n[Context: ${params.context}]`;
+  if (params.next_action) {
+    contextForStory += `\n[Planned Next: ${params.next_action}]`;
+  }
+
+  return {
+    toolName: "request_continuation",
+    toolCallId,
+    success: true,
+    result: {
+      type: "request_continuation",
+      reason: params.reason,
+      context: params.context,
+      nextAction: params.next_action,
+    } as GMRequestContinuationResult,
+    contextForStory,
+  };
+}
+
+/**
+ * Execute an ask player request
+ */
+function executeAskPlayer(
+  toolCallId: string,
+  params: AskPlayerParams
+): GMToolResult {
+  const allowCustom = params.allow_custom !== false; // Default to true
+
+  // Build context string (will be shown to player)
+  let contextForStory = `[GM Question for Player]`;
+  contextForStory += `\n[Question: ${params.question}]`;
+  contextForStory += `\n[Context: ${params.context}]`;
+  if (params.options && params.options.length > 0) {
+    contextForStory += `\n[Suggested Options: ${params.options.join(" | ")}]`;
+    if (allowCustom) {
+      contextForStory += ` (or custom answer)`;
+    }
+  }
+
+  return {
+    toolName: "ask_player",
+    toolCallId,
+    success: true,
+    result: {
+      type: "ask_player",
+      question: params.question,
+      context: params.context,
+      options: params.options,
+      allowCustom,
+    } as GMAskPlayerResult,
     contextForStory,
   };
 }

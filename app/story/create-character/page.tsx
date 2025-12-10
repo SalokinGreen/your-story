@@ -13,6 +13,13 @@ import {
 import { useAuth } from "@/app/misc/AuthContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
+import CharacterSheet from "@/app/components/CharacterSheet";
+import {
+  CharacterSchema,
+  CharacterData,
+  createDefaultCharacterData,
+  recalculateDerivedFields,
+} from "@/app/misc/characterSchema";
 
 type WizardStep = "name" | "points" | "review";
 
@@ -47,6 +54,14 @@ function CreateCharacterContent() {
   const [purchasedStats, setPurchasedStats] = useState<Stat[]>([]);
   const [purchasedResources, setPurchasedResources] = useState<Resource[]>([]);
   const [purchasedItems, setPurchasedItems] = useState<InventoryItem[]>([]);
+
+  // Character Schema mode
+  const [characterSchema, setCharacterSchema] =
+    useState<CharacterSchema | null>(null);
+  const [characterData, setCharacterData] = useState<CharacterData | null>(
+    null
+  );
+  const hasCharacterSchema = !!(characterSchema && characterData);
 
   // Load story data
   useEffect(() => {
@@ -96,6 +111,14 @@ function CreateCharacterContent() {
           const startingPoints = data.points ?? 0;
           setInitialPoints(startingPoints);
           setRemainingPoints(startingPoints);
+          // Load character schema if present
+          if (data.characterSchema) {
+            setCharacterSchema(data.characterSchema);
+            setCharacterData(
+              data.characterData ||
+                createDefaultCharacterData(data.characterSchema)
+            );
+          }
         } else {
           // Load from database
           const { getAuthToken } = await import("@/app/misc/getAuthToken");
@@ -146,6 +169,14 @@ function CreateCharacterContent() {
           const startingPoints = storyDataToUse.points ?? 0;
           setInitialPoints(startingPoints);
           setRemainingPoints(startingPoints);
+          // Load character schema if present
+          if (storyDataToUse.characterSchema) {
+            setCharacterSchema(storyDataToUse.characterSchema);
+            setCharacterData(
+              storyDataToUse.characterData ||
+                createDefaultCharacterData(storyDataToUse.characterSchema)
+            );
+          }
         }
       } catch (error: any) {
         console.error("Error loading story:", error);
@@ -327,6 +358,9 @@ function CreateCharacterContent() {
         stats: finalStats,
         resources: finalResources,
         inventory: finalInventory,
+        // Include character schema data if using schema mode
+        characterSchema: characterSchema || undefined,
+        characterData: characterData || undefined,
         selected_preset: "custom",
         points: 0, // Reset XP to 0 (character creation points were used for allocation)
         level: 1,
@@ -559,324 +593,359 @@ function CreateCharacterContent() {
             </div>
           )}
 
-          {/* Step 2: Point Allocation */}
+          {/* Step 2: Point Allocation / Character Sheet */}
           {currentStep === "points" && (
             <div className="space-y-6">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <DynamicIcon name="Zap" className="w-8 h-8" />
-                  Point Allocation
-                </h2>
-                <p className="text-gray-600 dark:text-gray-400 mb-2">
-                  Customize your character&apos;s stats and resources. You
-                  don&apos;t have to spend all points.
-                </p>
-                <div className="inline-block px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-bold rounded-lg">
-                  Remaining Points: {remainingPoints}
-                </div>
-              </div>
-
-              {/* Existing Stats */}
-              {upgradeSettings.allowStatUpgrade && stats.length > 0 && (
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                    Character Stats
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    {upgradeSettings.statUpgradeCost} points per +
-                    {upgradeSettings.statUpgradeAmount} increase
-                  </p>
-                  <div className="space-y-3">
-                    {stats.map((stat, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
-                      >
-                        <div className="flex-1">
-                          <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                            <DynamicIcon
-                              name={stat.symbol}
-                              className="w-5 h-5"
-                            />
-                            {stat.name}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            Base: {storyData.stats?.[index]?.value || 0}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleStatDecrease(index)}
-                            disabled={
-                              stat.value <=
-                              (storyData.stats?.[index]?.value || 0)
-                            }
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            −
-                          </button>
-                          <div className="text-2xl font-bold text-gray-900 dark:text-white min-w-12 text-center">
-                            {stat.value}
-                          </div>
-                          <button
-                            onClick={() => handleStatIncrease(index)}
-                            disabled={
-                              remainingPoints < upgradeSettings.statUpgradeCost
-                            }
-                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            +
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Stat Shop */}
-              {upgradeSettings.statShopEnabled &&
-                upgradeSettings.statShop.length > 0 && (
+              {/* Character Schema Mode */}
+              {hasCharacterSchema ? (
+                <>
                   <div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                      Unlock New Stats
-                    </h3>
-                    <div className="space-y-3">
-                      {upgradeSettings.statShop.map((shopStat, index) => {
-                        const alreadyPurchased = purchasedStats.some(
-                          (s) => s.name === shopStat.name
-                        );
-                        return (
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <DynamicIcon name="User" className="w-8 h-8" />
+                      Character Sheet
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400 mb-2">
+                      Customize your character&apos;s starting values. Derived
+                      fields are calculated automatically.
+                    </p>
+                  </div>
+                  <CharacterSheet
+                    schema={characterSchema!}
+                    data={characterData!}
+                    onChange={(newData: CharacterData) => {
+                      const updatedValues = { ...newData.values };
+                      recalculateDerivedFields(characterSchema!, updatedValues);
+                      setCharacterData({ values: updatedValues });
+                    }}
+                    readOnly={false}
+                    compact={false}
+                  />
+                </>
+              ) : (
+                /* Traditional Stats/Resources Mode */
+                <>
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                      <DynamicIcon name="Zap" className="w-8 h-8" />
+                      Point Allocation
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400 mb-2">
+                      Customize your character&apos;s stats and resources. You
+                      don&apos;t have to spend all points.
+                    </p>
+                    <div className="inline-block px-4 py-2 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 font-bold rounded-lg">
+                      Remaining Points: {remainingPoints}
+                    </div>
+                  </div>
+
+                  {/* Existing Stats */}
+                  {upgradeSettings.allowStatUpgrade && stats.length > 0 && (
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                        Character Stats
+                      </h3>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                        {upgradeSettings.statUpgradeCost} points per +
+                        {upgradeSettings.statUpgradeAmount} increase
+                      </p>
+                      <div className="space-y-3">
+                        {stats.map((stat, index) => (
                           <div
                             key={index}
-                            className={`flex items-center justify-between p-4 rounded-lg border ${
-                              alreadyPurchased
-                                ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700"
-                                : "bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700"
-                            }`}
+                            className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
                           >
                             <div className="flex-1">
                               <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                 <DynamicIcon
-                                  name={shopStat.symbol}
+                                  name={stat.symbol}
                                   className="w-5 h-5"
                                 />
-                                {shopStat.name}
-                                {alreadyPurchased && (
-                                  <span className="text-xs px-2 py-0.5 bg-green-600 text-white rounded-full">
-                                    Unlocked
-                                  </span>
-                                )}
+                                {stat.name}
                               </div>
                               <div className="text-sm text-gray-600 dark:text-gray-400">
-                                {shopStat.description}
-                              </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                Starting value: {shopStat.startingValue}
+                                Base: {storyData.stats?.[index]?.value || 0}
                               </div>
                             </div>
-                            <button
-                              onClick={() => handlePurchaseStat(shopStat)}
-                              disabled={
-                                remainingPoints < shopStat.cost ||
-                                alreadyPurchased
-                              }
-                              className="ml-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
-                            >
-                              {alreadyPurchased
-                                ? "✓ Unlocked"
-                                : `${shopStat.cost} pts`}
-                            </button>
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => handleStatDecrease(index)}
+                                disabled={
+                                  stat.value <=
+                                  (storyData.stats?.[index]?.value || 0)
+                                }
+                                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              >
+                                −
+                              </button>
+                              <div className="text-2xl font-bold text-gray-900 dark:text-white min-w-12 text-center">
+                                {stat.value}
+                              </div>
+                              <button
+                                onClick={() => handleStatIncrease(index)}
+                                disabled={
+                                  remainingPoints <
+                                  upgradeSettings.statUpgradeCost
+                                }
+                                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                              >
+                                +
+                              </button>
+                            </div>
                           </div>
-                        );
-                      })}
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-              {/* Existing Resources */}
-              {upgradeSettings.allowResourceUpgrade && resources.length > 0 && (
-                <div>
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                    Resources
-                  </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
-                    {upgradeSettings.resourceUpgradeCost} points per +
-                    {upgradeSettings.resourceUpgradeAmount} increase
-                  </p>
-                  <div className="space-y-3">
-                    {resources.map((resource, index) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
-                      >
-                        <div className="flex-1">
-                          <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                            <DynamicIcon
-                              name={resource.symbol}
-                              className="w-5 h-5"
-                            />
-                            {resource.name}
-                          </div>
-                          <div className="text-sm text-gray-600 dark:text-gray-400">
-                            Base: {storyData.resources?.[index]?.value || 0} /{" "}
-                            {storyData.resources?.[index]?.maxValue || 0}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <button
-                            onClick={() => handleResourceDecrease(index)}
-                            disabled={
-                              resource.value <=
-                                (storyData.resources?.[index]?.value || 0) ||
-                              resource.maxValue <=
-                                (storyData.resources?.[index]?.maxValue || 0)
-                            }
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            −
-                          </button>
-                          <div className="text-center min-w-20">
-                            <div className="text-2xl font-bold text-gray-900 dark:text-white">
-                              {resource.value}
-                            </div>
-                            <div className="text-xs text-gray-600 dark:text-gray-400">
-                              / {resource.maxValue}
-                            </div>
-                          </div>
-                          <button
-                            onClick={() => handleResourceIncrease(index)}
-                            disabled={
-                              remainingPoints <
-                              upgradeSettings.resourceUpgradeCost
-                            }
-                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                          >
-                            +
-                          </button>
+                  {/* Stat Shop */}
+                  {upgradeSettings.statShopEnabled &&
+                    upgradeSettings.statShop.length > 0 && (
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                          Unlock New Stats
+                        </h3>
+                        <div className="space-y-3">
+                          {upgradeSettings.statShop.map((shopStat, index) => {
+                            const alreadyPurchased = purchasedStats.some(
+                              (s) => s.name === shopStat.name
+                            );
+                            return (
+                              <div
+                                key={index}
+                                className={`flex items-center justify-between p-4 rounded-lg border ${
+                                  alreadyPurchased
+                                    ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700"
+                                    : "bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700"
+                                }`}
+                              >
+                                <div className="flex-1">
+                                  <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <DynamicIcon
+                                      name={shopStat.symbol}
+                                      className="w-5 h-5"
+                                    />
+                                    {shopStat.name}
+                                    {alreadyPurchased && (
+                                      <span className="text-xs px-2 py-0.5 bg-green-600 text-white rounded-full">
+                                        Unlocked
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    {shopStat.description}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                    Starting value: {shopStat.startingValue}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handlePurchaseStat(shopStat)}
+                                  disabled={
+                                    remainingPoints < shopStat.cost ||
+                                    alreadyPurchased
+                                  }
+                                  className="ml-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+                                >
+                                  {alreadyPurchased
+                                    ? "✓ Unlocked"
+                                    : `${shopStat.cost} pts`}
+                                </button>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+                    )}
 
-              {/* Resource Shop */}
-              {upgradeSettings.resourceShopEnabled &&
-                upgradeSettings.resourceShop.length > 0 && (
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                      Unlock New Resources
-                    </h3>
-                    <div className="space-y-3">
-                      {upgradeSettings.resourceShop.map(
-                        (shopResource, index) => {
-                          const alreadyPurchased = purchasedResources.some(
-                            (r) => r.name === shopResource.name
-                          );
-                          return (
+                  {/* Existing Resources */}
+                  {upgradeSettings.allowResourceUpgrade &&
+                    resources.length > 0 && (
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                          Resources
+                        </h3>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-3">
+                          {upgradeSettings.resourceUpgradeCost} points per +
+                          {upgradeSettings.resourceUpgradeAmount} increase
+                        </p>
+                        <div className="space-y-3">
+                          {resources.map((resource, index) => (
                             <div
                               key={index}
-                              className={`flex items-center justify-between p-4 rounded-lg border ${
-                                alreadyPurchased
-                                  ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700"
-                                  : "bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700"
-                              }`}
+                              className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700"
                             >
                               <div className="flex-1">
                                 <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
                                   <DynamicIcon
-                                    name={shopResource.symbol}
+                                    name={resource.symbol}
                                     className="w-5 h-5"
                                   />
-                                  {shopResource.name}
-                                  {alreadyPurchased && (
-                                    <span className="text-xs px-2 py-0.5 bg-green-600 text-white rounded-full">
-                                      Unlocked
-                                    </span>
-                                  )}
+                                  {resource.name}
                                 </div>
                                 <div className="text-sm text-gray-600 dark:text-gray-400">
-                                  {shopResource.description}
-                                </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                  Starting: {shopResource.startingValue} /{" "}
-                                  {shopResource.startingMaxValue}
+                                  Base:{" "}
+                                  {storyData.resources?.[index]?.value || 0} /{" "}
+                                  {storyData.resources?.[index]?.maxValue || 0}
                                 </div>
                               </div>
-                              <button
-                                onClick={() =>
-                                  handlePurchaseResource(shopResource)
-                                }
-                                disabled={
-                                  remainingPoints < shopResource.cost ||
-                                  alreadyPurchased
-                                }
-                                className="ml-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
-                              >
-                                {alreadyPurchased
-                                  ? "✓ Unlocked"
-                                  : `${shopResource.cost} pts`}
-                              </button>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => handleResourceDecrease(index)}
+                                  disabled={
+                                    resource.value <=
+                                      (storyData.resources?.[index]?.value ||
+                                        0) ||
+                                    resource.maxValue <=
+                                      (storyData.resources?.[index]?.maxValue ||
+                                        0)
+                                  }
+                                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                  −
+                                </button>
+                                <div className="text-center min-w-20">
+                                  <div className="text-2xl font-bold text-gray-900 dark:text-white">
+                                    {resource.value}
+                                  </div>
+                                  <div className="text-xs text-gray-600 dark:text-gray-400">
+                                    / {resource.maxValue}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handleResourceIncrease(index)}
+                                  disabled={
+                                    remainingPoints <
+                                    upgradeSettings.resourceUpgradeCost
+                                  }
+                                  className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                >
+                                  +
+                                </button>
+                              </div>
                             </div>
-                          );
-                        }
-                      )}
-                    </div>
-                  </div>
-                )}
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-              {/* Item Shop */}
-              {upgradeSettings.itemShopEnabled &&
-                upgradeSettings.itemShop.length > 0 && (
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
-                      Purchase Items
-                    </h3>
-                    <div className="space-y-3">
-                      {upgradeSettings.itemShop.map((shopItem, index) => {
-                        const purchaseCount = purchasedItems.filter(
-                          (i) => i.name === shopItem.name
-                        ).length;
-                        return (
-                          <div
-                            key={index}
-                            className="flex items-center justify-between p-4 rounded-lg border bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700"
-                          >
-                            <div className="flex-1">
-                              <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                <DynamicIcon
-                                  name={shopItem.symbol}
-                                  className="w-5 h-5"
-                                />
-                                {shopItem.name}
-                                {purchaseCount > 0 && (
-                                  <span className="text-xs px-2 py-0.5 bg-green-600 text-white rounded-full">
-                                    x{purchaseCount}
-                                  </span>
-                                )}
+                  {/* Resource Shop */}
+                  {upgradeSettings.resourceShopEnabled &&
+                    upgradeSettings.resourceShop.length > 0 && (
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                          Unlock New Resources
+                        </h3>
+                        <div className="space-y-3">
+                          {upgradeSettings.resourceShop.map(
+                            (shopResource, index) => {
+                              const alreadyPurchased = purchasedResources.some(
+                                (r) => r.name === shopResource.name
+                              );
+                              return (
+                                <div
+                                  key={index}
+                                  className={`flex items-center justify-between p-4 rounded-lg border ${
+                                    alreadyPurchased
+                                      ? "bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700"
+                                      : "bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700"
+                                  }`}
+                                >
+                                  <div className="flex-1">
+                                    <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                      <DynamicIcon
+                                        name={shopResource.symbol}
+                                        className="w-5 h-5"
+                                      />
+                                      {shopResource.name}
+                                      {alreadyPurchased && (
+                                        <span className="text-xs px-2 py-0.5 bg-green-600 text-white rounded-full">
+                                          Unlocked
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                      {shopResource.description}
+                                    </div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                      Starting: {shopResource.startingValue} /{" "}
+                                      {shopResource.startingMaxValue}
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() =>
+                                      handlePurchaseResource(shopResource)
+                                    }
+                                    disabled={
+                                      remainingPoints < shopResource.cost ||
+                                      alreadyPurchased
+                                    }
+                                    className="ml-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+                                  >
+                                    {alreadyPurchased
+                                      ? "✓ Unlocked"
+                                      : `${shopResource.cost} pts`}
+                                  </button>
+                                </div>
+                              );
+                            }
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                  {/* Item Shop */}
+                  {upgradeSettings.itemShopEnabled &&
+                    upgradeSettings.itemShop.length > 0 && (
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-3 flex items-center gap-2">
+                          Purchase Items
+                        </h3>
+                        <div className="space-y-3">
+                          {upgradeSettings.itemShop.map((shopItem, index) => {
+                            const purchaseCount = purchasedItems.filter(
+                              (i) => i.name === shopItem.name
+                            ).length;
+                            return (
+                              <div
+                                key={index}
+                                className="flex items-center justify-between p-4 rounded-lg border bg-purple-50 dark:bg-purple-900/20 border-purple-300 dark:border-purple-700"
+                              >
+                                <div className="flex-1">
+                                  <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <DynamicIcon
+                                      name={shopItem.symbol}
+                                      className="w-5 h-5"
+                                    />
+                                    {shopItem.name}
+                                    {purchaseCount > 0 && (
+                                      <span className="text-xs px-2 py-0.5 bg-green-600 text-white rounded-full">
+                                        x{purchaseCount}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                                    {shopItem.description}
+                                  </div>
+                                  <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
+                                    Type: {shopItem.type} • Quantity:{" "}
+                                    {shopItem.quantity}
+                                  </div>
+                                </div>
+                                <button
+                                  onClick={() => handlePurchaseItem(shopItem)}
+                                  disabled={remainingPoints < shopItem.cost}
+                                  className="ml-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
+                                >
+                                  {shopItem.cost} pts
+                                </button>
                               </div>
-                              <div className="text-sm text-gray-600 dark:text-gray-400">
-                                {shopItem.description}
-                              </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-                                Type: {shopItem.type} • Quantity:{" "}
-                                {shopItem.quantity}
-                              </div>
-                            </div>
-                            <button
-                              onClick={() => handlePurchaseItem(shopItem)}
-                              disabled={remainingPoints < shopItem.cost}
-                              className="ml-4 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed whitespace-nowrap"
-                            >
-                              {shopItem.cost} pts
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+                </>
+              )}
 
               <div className="flex justify-between pt-4">
                 <button
@@ -921,169 +990,185 @@ function CreateCharacterContent() {
                   {characterDescription}
                 </p>
 
-                {(stats.length > 0 || purchasedStats.length > 0) && (
-                  <div className="mb-4">
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                      Stats:
-                    </h4>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {stats.map((stat, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-1 text-sm"
-                        >
-                          <DynamicIcon
-                            name={stat.symbol}
-                            className="w-4 h-4 shrink-0"
-                          />
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {stat.name}:
-                          </span>
-                          <span className="font-bold text-gray-900 dark:text-white">
-                            {stat.value}
-                          </span>
-                          {stat.value >
-                            (storyData.stats?.[index]?.value || 0) && (
-                            <span className="text-green-600 dark:text-green-400 text-xs">
-                              (+
-                              {stat.value -
-                                (storyData.stats?.[index]?.value || 0)}
-                              )
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                      {purchasedStats.map((stat, index) => (
-                        <div
-                          key={`purchased-${index}`}
-                          className="flex items-center gap-1 text-sm"
-                        >
-                          <DynamicIcon
-                            name={stat.symbol}
-                            className="w-4 h-4 shrink-0"
-                          />
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {stat.name}:
-                          </span>
-                          <span className="font-bold text-gray-900 dark:text-white">
-                            {stat.value}
-                          </span>
-                          <span className="text-purple-600 dark:text-purple-400">
-                            ✨
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                {/* Character Schema Mode - show compact sheet */}
+                {hasCharacterSchema ? (
+                  <div className="mt-4">
+                    <CharacterSheet
+                      schema={characterSchema!}
+                      data={characterData!}
+                      readOnly={true}
+                      compact={true}
+                    />
                   </div>
-                )}
+                ) : (
+                  <>
+                    {(stats.length > 0 || purchasedStats.length > 0) && (
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                          Stats:
+                        </h4>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {stats.map((stat, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center gap-1 text-sm"
+                            >
+                              <DynamicIcon
+                                name={stat.symbol}
+                                className="w-4 h-4 shrink-0"
+                              />
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {stat.name}:
+                              </span>
+                              <span className="font-bold text-gray-900 dark:text-white">
+                                {stat.value}
+                              </span>
+                              {stat.value >
+                                (storyData.stats?.[index]?.value || 0) && (
+                                <span className="text-green-600 dark:text-green-400 text-xs">
+                                  (+
+                                  {stat.value -
+                                    (storyData.stats?.[index]?.value || 0)}
+                                  )
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          {purchasedStats.map((stat, index) => (
+                            <div
+                              key={`purchased-${index}`}
+                              className="flex items-center gap-1 text-sm"
+                            >
+                              <DynamicIcon
+                                name={stat.symbol}
+                                className="w-4 h-4 shrink-0"
+                              />
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {stat.name}:
+                              </span>
+                              <span className="font-bold text-gray-900 dark:text-white">
+                                {stat.value}
+                              </span>
+                              <span className="text-purple-600 dark:text-purple-400">
+                                ✨
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
-                {(resources.length > 0 || purchasedResources.length > 0) && (
-                  <div className="mb-4">
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                      Resources:
-                    </h4>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {resources.map((resource, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-1 text-sm"
-                        >
-                          <DynamicIcon
-                            name={resource.symbol}
-                            className="w-4 h-4 shrink-0"
-                          />
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {resource.name}:
-                          </span>
-                          <span className="font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                            {resource.value} / {resource.maxValue}
-                          </span>
-                          {(resource.value >
-                            (storyData.resources?.[index]?.value || 0) ||
-                            resource.maxValue >
-                              (storyData.resources?.[index]?.maxValue ||
-                                0)) && (
-                            <span className="text-green-600 dark:text-green-400 text-xs">
-                              (+
-                              {resource.maxValue -
-                                (storyData.resources?.[index]?.maxValue || 0)}
-                              )
-                            </span>
-                          )}
+                    {(resources.length > 0 ||
+                      purchasedResources.length > 0) && (
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                          Resources:
+                        </h4>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {resources.map((resource, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center gap-1 text-sm"
+                            >
+                              <DynamicIcon
+                                name={resource.symbol}
+                                className="w-4 h-4 shrink-0"
+                              />
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {resource.name}:
+                              </span>
+                              <span className="font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                                {resource.value} / {resource.maxValue}
+                              </span>
+                              {(resource.value >
+                                (storyData.resources?.[index]?.value || 0) ||
+                                resource.maxValue >
+                                  (storyData.resources?.[index]?.maxValue ||
+                                    0)) && (
+                                <span className="text-green-600 dark:text-green-400 text-xs">
+                                  (+
+                                  {resource.maxValue -
+                                    (storyData.resources?.[index]?.maxValue ||
+                                      0)}
+                                  )
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                          {purchasedResources.map((resource, index) => (
+                            <div
+                              key={`purchased-${index}`}
+                              className="flex items-center gap-1 text-sm"
+                            >
+                              <DynamicIcon
+                                name={resource.symbol}
+                                className="w-4 h-4 shrink-0"
+                              />
+                              <span className="text-gray-700 dark:text-gray-300">
+                                {resource.name}:
+                              </span>
+                              <span className="font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                                {resource.value} / {resource.maxValue}
+                              </span>
+                              <span className="text-purple-600 dark:text-purple-400">
+                                ✨
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                      {purchasedResources.map((resource, index) => (
-                        <div
-                          key={`purchased-${index}`}
-                          className="flex items-center gap-1 text-sm"
-                        >
-                          <DynamicIcon
-                            name={resource.symbol}
-                            className="w-4 h-4 shrink-0"
-                          />
-                          <span className="text-gray-700 dark:text-gray-300">
-                            {resource.name}:
-                          </span>
-                          <span className="font-bold text-gray-900 dark:text-white whitespace-nowrap">
-                            {resource.value} / {resource.maxValue}
-                          </span>
-                          <span className="text-purple-600 dark:text-purple-400">
-                            ✨
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                      </div>
+                    )}
 
-                {(inventory.length > 0 || purchasedItems.length > 0) && (
-                  <div className="mb-4">
-                    <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
-                      Inventory:
-                    </h4>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {inventory.map((item, index) => (
-                        <div
-                          key={index}
-                          className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300"
-                        >
-                          <DynamicIcon
-                            name={item.symbol}
-                            className="w-4 h-4 shrink-0"
-                          />
-                          <span>
-                            {item.name} x{item.quantity}
-                          </span>
+                    {(inventory.length > 0 || purchasedItems.length > 0) && (
+                      <div className="mb-4">
+                        <h4 className="font-semibold text-gray-900 dark:text-white mb-2">
+                          Inventory:
+                        </h4>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1">
+                          {inventory.map((item, index) => (
+                            <div
+                              key={index}
+                              className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300"
+                            >
+                              <DynamicIcon
+                                name={item.symbol}
+                                className="w-4 h-4 shrink-0"
+                              />
+                              <span>
+                                {item.name} x{item.quantity}
+                              </span>
+                            </div>
+                          ))}
+                          {purchasedItems.map((item, index) => (
+                            <div
+                              key={`purchased-${index}`}
+                              className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300"
+                            >
+                              <DynamicIcon
+                                name={item.symbol}
+                                className="w-4 h-4 shrink-0"
+                              />
+                              <span>
+                                {item.name} x{item.quantity}
+                              </span>
+                              <span className="text-purple-600 dark:text-purple-400">
+                                ✨
+                              </span>
+                            </div>
+                          ))}
                         </div>
-                      ))}
-                      {purchasedItems.map((item, index) => (
-                        <div
-                          key={`purchased-${index}`}
-                          className="flex items-center gap-1 text-sm text-gray-700 dark:text-gray-300"
-                        >
-                          <DynamicIcon
-                            name={item.symbol}
-                            className="w-4 h-4 shrink-0"
-                          />
-                          <span>
-                            {item.name} x{item.quantity}
-                          </span>
-                          <span className="text-purple-600 dark:text-purple-400">
-                            ✨
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                      </div>
+                    )}
 
-                {remainingPoints > 0 && (
-                  <div className="mt-4 pt-4 border-t border-purple-300 dark:border-purple-700">
-                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                      Unspent Points:{" "}
-                      <span className="font-bold">{remainingPoints}</span>
-                    </div>
-                  </div>
+                    {remainingPoints > 0 && (
+                      <div className="mt-4 pt-4 border-t border-purple-300 dark:border-purple-700">
+                        <div className="text-sm text-gray-600 dark:text-gray-400">
+                          Unspent Points:{" "}
+                          <span className="font-bold">{remainingPoints}</span>
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
 

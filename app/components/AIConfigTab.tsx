@@ -66,9 +66,9 @@ export default function AIConfigTab() {
   });
 
   // Advanced toggle states
-  const [advancedGM, setAdvancedGM] = useState(() => {
+  const [advancedTools, setAdvancedTools] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("advancedGM") === "true";
+      return localStorage.getItem("advancedTools") === "true";
     }
     return false;
   });
@@ -114,10 +114,10 @@ export default function AIConfigTab() {
   });
   const [gmStageEnabled, setGmStageEnabled] = useState(() => {
     if (typeof window !== "undefined") {
-      // Default to false (disabled) - experimental feature
-      return localStorage.getItem("gmStageEnabled") === "true";
+      // Default to true (enabled) - GM stage is now the default architecture
+      return localStorage.getItem("gmStageEnabled") !== "false";
     }
-    return false;
+    return true;
   });
   const [customMaxContext, setCustomMaxContext] = useState(() => {
     if (typeof window !== "undefined") {
@@ -292,12 +292,11 @@ export default function AIConfigTab() {
     }
   }, [choicesModel, hasLoadedSettings]);
 
-  // Persist advanced toggle settings
   useEffect(() => {
     if (typeof window !== "undefined") {
-      localStorage.setItem("advancedGM", advancedGM.toString());
+      localStorage.setItem("advancedTools", advancedTools.toString());
     }
-  }, [advancedGM]);
+  }, [advancedTools]);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -376,11 +375,11 @@ export default function AIConfigTab() {
   const effectiveStoryModel =
     currentPreset === "custom" && storyModel ? storyModel : preset.storyModel;
 
-  // Apply advanced GM toggle - use advanced tools model if enabled and available
+  // Get effective tools model - apply advanced toggle if enabled
   const baseToolsModel =
     currentPreset === "custom" && toolsModel ? toolsModel : preset.toolsModel;
   const effectiveToolsModel =
-    advancedGM && preset.advancedToolsModel
+    advancedTools && preset.advancedToolsModel
       ? preset.advancedToolsModel
       : baseToolsModel;
 
@@ -889,81 +888,94 @@ export default function AIConfigTab() {
       </div>
 
       {/* Advanced Toggles - Only show for Coins mode presets with advanced options */}
-      {!byokMode && preset.advancedToolsModel && (
-        <div className="space-y-3">
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-            Advanced Options
-          </label>
-          <div className="flex flex-col gap-2">
-            {/* Advanced GM Toggle */}
-            <button
-              onClick={() => setAdvancedGM(!advancedGM)}
-              className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
-                advancedGM
-                  ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
-                  : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <DynamicIcon name="Bot" className="w-4 h-4 text-purple-500" />
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  Advanced GM
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  (Devstral Medium for tools)
-                </span>
-              </div>
-              <div
-                className={`w-10 h-5 rounded-full transition-colors ${
-                  advancedGM ? "bg-purple-500" : "bg-gray-300 dark:bg-gray-600"
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-0.5 ${
-                    advancedGM ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+      {!byokMode &&
+        (preset.advancedToolsModel || preset.advancedChoicesModel) && (
+          <div className="space-y-3">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              Advanced Options
+            </label>
+            <div className="flex flex-col gap-2">
+              {/* Advanced Tools Toggle */}
+              {preset.advancedToolsModel && (
+                <button
+                  onClick={() => setAdvancedTools(!advancedTools)}
+                  className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
+                    advancedTools
+                      ? "bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700"
+                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-700"
                   }`}
-                />
-              </div>
-            </button>
-
-            {/* Advanced Choices Toggle */}
-            <button
-              onClick={() => setAdvancedChoices(!advancedChoices)}
-              className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
-                advancedChoices
-                  ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
-                  : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <DynamicIcon
-                  name="ListChecks"
-                  className="w-4 h-4 text-purple-500"
-                />
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  Advanced Choices
-                </span>
-                <span className="text-xs text-gray-500 dark:text-gray-400">
-                  (MiniMax M2 for actions)
-                </span>
-              </div>
-              <div
-                className={`w-10 h-5 rounded-full transition-colors ${
-                  advancedChoices
-                    ? "bg-purple-500"
-                    : "bg-gray-300 dark:bg-gray-600"
-                }`}
-              >
-                <div
-                  className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-0.5 ${
-                    advancedChoices ? "translate-x-5 ml-0.5" : "translate-x-0.5"
+                >
+                  <div className="flex items-center gap-2">
+                    <DynamicIcon
+                      name="Wrench"
+                      className="w-4 h-4 text-orange-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      Advanced Tools
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      (Devstral 2 for GM/tools)
+                    </span>
+                  </div>
+                  <div
+                    className={`w-10 h-5 rounded-full transition-colors ${
+                      advancedTools
+                        ? "bg-orange-500"
+                        : "bg-gray-300 dark:bg-gray-600"
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-0.5 ${
+                        advancedTools
+                          ? "translate-x-5 ml-0.5"
+                          : "translate-x-0.5"
+                      }`}
+                    />
+                  </div>
+                </button>
+              )}
+              {/* Advanced Choices Toggle */}
+              {preset.advancedChoicesModel && (
+                <button
+                  onClick={() => setAdvancedChoices(!advancedChoices)}
+                  className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
+                    advancedChoices
+                      ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
+                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
                   }`}
-                />
-              </div>
-            </button>
+                >
+                  <div className="flex items-center gap-2">
+                    <DynamicIcon
+                      name="ListChecks"
+                      className="w-4 h-4 text-purple-500"
+                    />
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      Advanced Choices
+                    </span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      (MiniMax M2 for actions)
+                    </span>
+                  </div>
+                  <div
+                    className={`w-10 h-5 rounded-full transition-colors ${
+                      advancedChoices
+                        ? "bg-purple-500"
+                        : "bg-gray-300 dark:bg-gray-600"
+                    }`}
+                  >
+                    <div
+                      className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-0.5 ${
+                        advancedChoices
+                          ? "translate-x-5 ml-0.5"
+                          : "translate-x-0.5"
+                      }`}
+                    />
+                  </div>
+                </button>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
       {/* Memory Size Slider */}
       <div className="space-y-2">
@@ -1768,59 +1780,6 @@ export default function AIConfigTab() {
               rules...&rdquo; before generation. This technique improves output
               consistency by making the AI &ldquo;commit&rdquo; to constraints.
               Disable for A/B testing.
-            </span>
-          </p>
-        </div>
-      </div>
-
-      {/* GM Stage Section (Experimental) */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-          <DynamicIcon name="Dices" className="w-4 h-4" />
-          GM Stage
-          <span className="text-xs text-amber-500 font-normal">
-            (Experimental)
-          </span>
-        </h4>
-
-        <div className="flex items-center justify-between">
-          <div className="flex-1">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
-              Enable GM Stage Architecture
-            </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
-              AI determines mechanics via tool calls before story generation
-            </p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={gmStageEnabled}
-              onChange={(e) => {
-                const newValue = e.target.checked;
-                setGmStageEnabled(newValue);
-                if (typeof window !== "undefined") {
-                  localStorage.setItem("gmStageEnabled", String(newValue));
-                }
-              }}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
-          </label>
-        </div>
-
-        <div className="p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-          <p className="text-xs text-amber-700 dark:text-amber-300 flex items-start gap-1.5">
-            <DynamicIcon
-              name="FlaskConical"
-              className="w-3.5 h-3.5 mt-0.5 shrink-0"
-            />
-            <span>
-              <strong>Experimental:</strong> When enabled, a GM AI stage runs
-              before story generation to determine skill checks, challenges, and
-              dice rolls using structured tool calls. The story stage then
-              receives the mechanical results for narrative integration. Uses
-              the same model as the Tools stage.
             </span>
           </p>
         </div>

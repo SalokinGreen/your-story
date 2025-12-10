@@ -8,17 +8,6 @@
 import {
   StoryData,
   ScenePart,
-  Stat,
-  Resource,
-  InventoryItem,
-  Ability,
-  Achievement,
-  StoryLore,
-  Quest,
-  Relationship,
-  Variable,
-  Preset,
-  CustomTable,
   SkillTree,
   getMemoryContent,
 } from "@/app/misc/structs";
@@ -75,6 +64,8 @@ export function buildStoryCreatorMessages({
     maxMomentum: storyData.maxMomentum,
     points: storyData.points,
     conditions: storyData.conditions,
+    characterSchema: storyData.characterSchema,
+    characterData: storyData.characterData,
   };
 
   // Build the base creator messages
@@ -196,9 +187,6 @@ export function applyCreatorChangesToStoryData(
   if (changes.maxMomentum !== undefined)
     updates.maxMomentum = changes.maxMomentum;
   if (changes.points !== undefined) updates.points = changes.points;
-  if (changes.level !== undefined) updates.level = changes.level;
-  if (changes.upgradesSpent !== undefined)
-    updates.upgradesSpent = changes.upgradesSpent;
 
   // Array fields - handle merge/replace/delete/add commands
   if (changes.stats) {
@@ -360,6 +348,67 @@ export function applyCreatorChangesToStoryData(
           );
       }
       updates.levelingSettings = changes.levelingSettings;
+    }
+  }
+
+  // Character Schema - complex object with deep merge
+  if ((changes as any).characterSchema !== undefined) {
+    const incomingSchema = (changes as any).characterSchema;
+    if (storyData.characterSchema && incomingSchema) {
+      // Deep merge schema
+      updates.characterSchema = {
+        ...storyData.characterSchema,
+        ...incomingSchema,
+        // Merge arrays by id
+        fields:
+          incomingSchema.fields !== undefined
+            ? mergeArrayWithCommands(
+                storyData.characterSchema.fields || [],
+                incomingSchema.fields,
+                "id" as any
+              )
+            : storyData.characterSchema.fields,
+        categories:
+          incomingSchema.categories !== undefined
+            ? mergeArrayWithCommands(
+                storyData.characterSchema.categories || [],
+                incomingSchema.categories,
+                "id" as any
+              )
+            : storyData.characterSchema.categories,
+        pages:
+          incomingSchema.pages !== undefined
+            ? mergeArrayWithCommands(
+                storyData.characterSchema.pages || [],
+                incomingSchema.pages,
+                "id" as any
+              )
+            : storyData.characterSchema.pages,
+        resources:
+          incomingSchema.resources !== undefined
+            ? mergeArrayWithCommands(
+                storyData.characterSchema.resources || [],
+                incomingSchema.resources,
+                "id" as any
+              )
+            : storyData.characterSchema.resources,
+      };
+    } else {
+      updates.characterSchema = incomingSchema;
+    }
+  }
+
+  // Character Data - direct replacement (runtime values)
+  if ((changes as any).characterData !== undefined) {
+    const incomingData = (changes as any).characterData;
+    if (storyData.characterData && incomingData) {
+      // Merge character data values
+      updates.characterData = {
+        ...storyData.characterData,
+        ...incomingData,
+      };
+    } else {
+      updates.characterData = incomingData;
     }
   }
 
@@ -594,6 +643,9 @@ export function summarizeChanges(changes: CreatorOutputData): string[] {
 
   if (changes.upgradeSettings) summaries.push("Updated upgrade settings");
   if (changes.agmtState) summaries.push("Updated AGMT state");
+  if ((changes as any).characterSchema)
+    summaries.push("Updated character schema");
+  if ((changes as any).characterData) summaries.push("Updated character data");
 
   return summaries;
 }
@@ -675,9 +727,9 @@ export function buildStoryCreatorMessagesWithTools(
 ## YOUR ROLE
 You help players by using tools to make precise changes to their story's data. You have access to a comprehensive set of tools for modifying:
 - **Stats & Resources** - Character attributes, health, mana, etc.
-- **Inventory & Abilities** - Items, skills, spells, techniques
+- **Character Schema** - Stats, resources, abilities all defined through character schema
 - **Lore & Achievements** - World-building entries, unlockable achievements
-- **Quests & Relationships** - Active objectives, NPC relationships
+- **Quests** - Active objectives
 - **Variables & Conditions** - Story flags, character afflictions
 - **Game Settings** - RPG system, difficulty, etc.
 
@@ -689,12 +741,16 @@ You help players by using tools to make precise changes to their story's data. Y
 5. **Explain what you did** after making changes
 
 ## TOOL CATEGORIES
-### Stats & Resources
-- add_stat, modify_stat, remove_stat, rename_stat
-- add_resource, modify_resource, remove_resource, rename_resource
+### Character Schema (defines character sheet structure)
+- set_character_schema - Create/replace entire character schema with fields, categories, template
+- add_schema_fields, modify_schema_fields, remove_schema_fields - Manage schema field definitions
+- add_schema_categories, modify_schema_categories, remove_schema_categories - Organize fields into UI tabs
+- set_schema_template - Set main character sheet HTML/CSS/JS template
+- add_schema_pages, modify_schema_pages, remove_schema_pages - Add custom tabs with their own templates
+- add_schema_resources, remove_schema_resources - Upload images/fonts for custom templates
+- set_character_values, modify_character_values - Set/update character data values at runtime
 
-### Inventory & Abilities  
-- add_item, modify_item, remove_item
+### Abilities  
 - add_ability, modify_ability, remove_ability
 
 ### Lore & Story
@@ -707,9 +763,8 @@ You help players by using tools to make precise changes to their story's data. Y
 - add_achievement, modify_achievement, remove_achievement
 - add_memory
 
-### Quests & Relationships
+### Quests
 - add_quest, modify_quest, remove_quest
-- add_relationship, modify_relationship, remove_relationship
 
 ### Variables & Conditions
 - add_variable, modify_variable, remove_variable
@@ -720,7 +775,34 @@ You help players by using tools to make precise changes to their story's data. Y
 - update_leveling_settings, update_upgrade_settings
 
 ### Player Progression
-- set_progression - Set player level, XP (points), or upgrade points spent directly. Use for leveling up, giving XP rewards, etc.
+- set_progression - Set player points directly for rewards, etc.
+
+## CHARACTER SCHEMA SYSTEM (for advanced customization)
+
+The Character Schema defines what fields appear on character sheets and how they're displayed.
+
+**Field Types:**
+- **number**: Simple numeric value (Strength: 14)
+- **derived**: Calculated from formula using other fields (Modifier: floor((Strength-10)/2))
+- **resource**: Has current/max values (HP: 45/50, Mana: 20/30)
+- **text**: String value (Background: "Orphan raised by wolves")
+- **list**: Array of strings (Languages: ["Common", "Elvish", "Draconic"])
+- **boolean**: True/false flag (Inspiration: true)
+- **select**: Pick from predefined options (Class: "Warrior" from ["Warrior", "Mage", "Rogue"])
+
+**Template Syntax (for custom HTML/CSS templates):**
+- Use {{fieldId}} for value substitution
+- Use {{fieldId.current}}/{{fieldId.max}} for resources
+- Use {{percent fieldId}} for percentage (0-100)
+- Use {{modifier fieldId}} for D&D-style +/- prefix
+- Conditionals: {{#if condition}}...{{/if}}
+- Loops: {{#each items}}...{{/each}} with {{.}} for current item
+
+**When to use schema tools:**
+- Player wants to fundamentally change their character's structure
+- Adding new derived stats or custom calculations
+- Creating a completely custom character sheet layout
+- Adding new pages/tabs to the character sheet
 
 ## STORY CONTEXT
 The player is currently in an active story. Here's what's been happening recently:
