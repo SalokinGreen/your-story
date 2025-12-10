@@ -501,5 +501,69 @@ I hope this works for your adventure!`;
         "Power"
       );
     });
+
+    it("should handle unquoted emoji values", () => {
+      const content = `{
+  "abilities": [
+    {
+      "name": "Combat Instincts",
+      "description": "Your years of training make you formidable",
+      "grade": "novice",
+      "cost": ["stress:5"],
+      "cooldown": 1,
+      "currentCooldown": 0,
+      "symbol": ⚔️
+    },
+    {
+      "name": "Shield Wall",
+      "description": "Defensive stance",
+      "grade": "novice",
+      "cost": [],
+      "cooldown": 0,
+      "currentCooldown": 0,
+      "symbol": "🛡️"
+    }
+  ]
+}`;
+
+      const repaired = attemptJSONRepair(content);
+      const parsed = JSON.parse(repaired);
+      expect(parsed.abilities).toHaveLength(2);
+      expect(parsed.abilities[0].symbol).toBe("⚔️");
+      expect(parsed.abilities[1].symbol).toBe("🛡️");
+    });
+
+    it("should handle Python-style triple-quoted strings", () => {
+      const content = `{
+  "pages": [
+    {
+      "id": "overview",
+      "name": "Overview",
+      "template": {
+        "html": """
+<div class="container">
+  <h1>Character Sheet</h1>
+  <p>Stats: {{strength}}</p>
+</div>
+""",
+        "css": """
+.container {
+  background: #1a1a1a;
+  color: white;
+}
+""",
+        "js": ""
+      }
+    }
+  ]
+}`;
+
+      const repaired = attemptJSONRepair(content);
+      const parsed = JSON.parse(repaired);
+      expect(parsed.pages).toHaveLength(1);
+      expect(parsed.pages[0].template.html).toContain("<div class=");
+      expect(parsed.pages[0].template.html).toContain("{{strength}}");
+      expect(parsed.pages[0].template.css).toContain(".container");
+    });
   });
 });

@@ -2164,12 +2164,37 @@ export function attemptJSONRepair(content: string): string {
   jsonContent = jsonContent.replace(/```json\s*/gi, "");
   jsonContent = jsonContent.replace(/```\s*/g, "");
 
+  // Fix Python-style triple-quoted strings (""") to proper JSON strings
+  // The AI sometimes outputs: "html": """<div>...</div>""" instead of "html": "<div>...</div>"
+  // We need to convert these to properly escaped JSON strings
+  jsonContent = jsonContent.replace(
+    /:\s*"""([\s\S]*?)"""/g,
+    (match, innerContent) => {
+      // Escape the inner content for JSON: escape backslashes, quotes, and newlines
+      const escaped = innerContent
+        .replace(/\\/g, "\\\\")
+        .replace(/"/g, '\\"')
+        .replace(/\n/g, "\\n")
+        .replace(/\r/g, "\\r")
+        .replace(/\t/g, "\\t");
+      return `: "${escaped}"`;
+    }
+  );
+
   // Fix malformed property names like `" "name"` or `"  "name"` -> `"name"`
   // This handles AI mistakes where a space appears before the property name
   jsonContent = jsonContent.replace(/"[ \t]+"([^"]+)"(\s*:)/g, '"$1"$2');
 
   // Fix cases like `" "name":` (orphaned quote with space before actual name)
   jsonContent = jsonContent.replace(/"[ \t]+"/g, '"');
+
+  // Fix unquoted emoji values like "symbol": ⚔️ -> "symbol": "⚔️"
+  // Matches: colon, optional whitespace, emoji(s) with optional variation selectors, optional whitespace before comma/bracket/brace/newline
+  // Emoji ranges include: Emoticons, Dingbats, Symbols, Supplemental Symbols, Variation Selectors, Zero-Width Joiner, etc.
+  jsonContent = jsonContent.replace(
+    /:\s*([\u{1F300}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{1F600}-\u{1F64F}\u{1F680}-\u{1F6FF}\u{FE00}-\u{FE0F}\u{200D}]+)\s*([,}\]\r\n])/gu,
+    ': "$1"$2'
+  );
 
   const startIndex = jsonContent.indexOf("{");
   if (startIndex === -1) return jsonContent;

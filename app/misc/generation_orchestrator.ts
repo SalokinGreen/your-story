@@ -32,6 +32,7 @@ const SEQUENTIAL_STAGES: GenerationStage[] = ["core", "mechanics"];
 
 // Stages that can run in parallel (only depend on core + mechanics, not each other)
 const PARALLELIZABLE_STAGES: GenerationStage[] = [
+  "character-sheet",
   "content-lore",
   "content-achievements",
   "advanced-presets",
