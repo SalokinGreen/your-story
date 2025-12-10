@@ -834,15 +834,16 @@ export function getStageInfo(stage: GenerationStage): {
       name: "Character Sheet",
       description: "Visual character sheet design",
       detailedDescription:
-        "Creates the HTML/CSS character sheet template with multiple pages. Designs the visual layout for displaying stats, resources, inventory, and other character data.",
+        "Creates the HTML/CSS/JS character sheet template with multiple pages. Designs the visual layout for displaying stats, resources, inventory, and other character data. Can include interactive JavaScript for collapsible sections, animated bars, and tooltips.",
       generates: [
         "Character sheet HTML template",
         "CSS styling for dark theme",
         "Multiple sheet pages (Overview, Combat, Skills, etc.)",
         "Resource bars and stat displays",
+        "Optional interactive JavaScript",
       ],
       instructionHint:
-        "Customize sheet layout, page organization, or visual styling",
+        "Customize sheet layout, page organization, visual styling, or interactive features",
       number: 2,
       emoji: "📋",
     },
@@ -1184,6 +1185,9 @@ Create detailed rules explanations. REQUIRED topics:
 5. "Rest & Recovery" - How resources regenerate
 6. "Death & Defeat" - What happens when HP hits 0
 
+CRITICAL: ALL mechanics lore entries MUST have "alwaysOn": true!
+Mechanics are rules references that players need access to at all times.
+
 CRITICAL - ALSO CREATE THESE GM GUIDELINES:
 
 7. "Creating NPCs & Enemies" - How to stat NPCs/monsters for this system:
@@ -1313,6 +1317,23 @@ TEMPLATE SYNTAX (for all pages):
 - {{#each fieldId}}...{{/each}} - List iteration ({{this}} = item)
 - {{#compare fieldId ">" "10"}}...{{/compare}} - Comparisons
 
+JAVASCRIPT SUPPORT (optional but encouraged for interactive features):
+The "js" field can contain JavaScript that executes in the character sheet iframe.
+Available features:
+- document.querySelector/querySelectorAll for DOM manipulation
+- Add click handlers for collapsible sections
+- Add hover effects or tooltips
+- Animate progress bars
+- Toggle visibility of detail sections
+
+JS Examples:
+- Collapsible sections:
+  document.querySelectorAll('.section-header').forEach(h => h.onclick = () => h.nextElementSibling.classList.toggle('collapsed'));
+- Smooth progress bar animation:
+  document.querySelectorAll('.bar-fill').forEach(b => { b.style.transition = 'width 0.5s ease'; });
+- Tooltip on hover:
+  document.querySelectorAll('[data-tooltip]').forEach(el => { el.onmouseenter = e => showTooltip(e, el.dataset.tooltip); });
+
 REQUIRED PAGES (3-5 pages total):
 
 1. OVERVIEW PAGE (id: "overview", icon: "User"):
@@ -1363,7 +1384,7 @@ OUTPUT JSON SCHEMA:
       "template": {
         "html": "<!-- Full HTML for overview page with {{fieldId}} placeholders -->",
         "css": "/* Complete CSS for this page */",
-        "js": ""
+        "js": "// Optional: interactive features like collapsible sections"
       }
     },
     {
@@ -1374,7 +1395,7 @@ OUTPUT JSON SCHEMA:
       "template": {
         "html": "<!-- Combat page HTML -->",
         "css": "/* Combat page CSS */",
-        "js": ""
+        "js": "// Optional: hover effects, animated bars"
       }
     },
     {
@@ -1401,6 +1422,8 @@ OUTPUT JSON SCHEMA:
     }
   ]
 }
+
+NOTE: If ANY page has non-empty "js" content, the character schema will automatically be flagged with hasCustomJS=true.
 
 CRITICAL DESIGN NOTES:
 - Each page should be a complete, styled HTML document with its own CSS
@@ -2514,9 +2537,14 @@ export function mergeBigAdventureResults(
           "characterSchemaPages received but no characterSchema exists"
         );
       } else {
+        // Check if any page has custom JS
+        const hasCustomJS = result.characterSchemaPages.some(
+          (page) => page.template?.js && page.template.js.trim().length > 0
+        );
         merged.storyTemplate.characterSchema = {
           ...merged.storyTemplate.characterSchema,
           pages: result.characterSchemaPages,
+          hasCustomJS,
         };
       }
     }
@@ -2944,6 +2972,9 @@ CATEGORIES: Group fields logically (Attributes, Combat, Skills, Equipment, Backg
     mechanicsLore: {
       instruction: `Generate mechanics lore entries explaining game rules and systems. Create as many as needed to cover all the important mechanics.
 
+CRITICAL: ALL mechanics lore entries MUST have "alwaysOn": true!
+Mechanics are rules references that players need access to at all times - never hidden behind triggers.
+
 REQUIRED MECHANICS TOPICS:
 - How skill checks work (dice system, modifiers, DCs)
 - Combat rules (initiative, attacks, damage, conditions)
@@ -3327,6 +3358,9 @@ ${existingItemsPreview || "(none)"}`;
     },
     mechanicsLore: {
       instruction: `Generate NEW mechanics lore entries explaining game rules and systems. Generate as many as possible.
+
+CRITICAL: ALL mechanics lore entries MUST have "alwaysOn": true!
+Mechanics are rules references that players need access to at all times.
 
 Consider adding GM guidelines for:
 - Creating NPCs & Enemies (stat ranges, HP guidelines, damage scaling)

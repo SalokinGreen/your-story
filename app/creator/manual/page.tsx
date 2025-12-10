@@ -9124,6 +9124,41 @@ ${description || ""}`;
                 }
               }}
             />
+
+            {/* Character Sheet Preview */}
+            {characterSchema &&
+              characterData &&
+              (characterSchema.template || characterSchema.pages) && (
+                <div className="space-y-3 mt-6">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold text-white flex items-center gap-2">
+                      <DynamicIcon name="Eye" className="w-4 h-4" />
+                      Character Sheet Preview
+                    </h3>
+                    <span className="text-xs text-gray-500">
+                      {characterSchema.pages?.length || 1} page
+                      {(characterSchema.pages?.length || 1) > 1 ? "s" : ""}
+                      {characterSchema.hasCustomJS && (
+                        <span className="ml-2 text-amber-400">
+                          (has custom JS)
+                        </span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="border border-gray-700 rounded-lg overflow-hidden bg-gray-900">
+                    <CharacterSheet
+                      schema={characterSchema}
+                      data={characterData}
+                      onChange={setCharacterData}
+                      readOnly={false}
+                      context={{
+                        playerName: playerName || "Test Character",
+                        playerSummary: playerSummary || "A brave adventurer.",
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
           </div>
         );
 
