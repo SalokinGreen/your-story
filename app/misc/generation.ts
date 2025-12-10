@@ -118,6 +118,11 @@ export interface GenerationOptions {
   // GM Stage (new architecture: AI determines mechanics via tool calls)
   enableGMStage?: boolean; // Use GM stage instead of ActionAnalysis JSON
   gmStageModel?: string; // Model to use for GM stage (defaults to toolsModel)
+  precomputedGMContext?: string; // GM context from paused generation (player question flow)
+  // Player answer continuation (after ask_player tool)
+  playerAnswerContext?: string; // Player's answer to inject into GM continuation
+  previousGMResults?: GMToolResult[]; // Results from before question was asked
+  previousGMContext?: string; // Context accumulated before question
   // Sampling settings (for story stage only, Coins mode)
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
@@ -488,7 +493,13 @@ export async function generateStoryTurn(
         }
       | undefined;
 
-    if (options.enableGMStage) {
+    // Use precomputed context if provided AND no player answer (skip GM stage entirely)
+    if (options.precomputedGMContext && !options.playerAnswerContext) {
+      gmStoryContext = options.precomputedGMContext;
+      logger.action("Using precomputed GM context from player question flow", {
+        contextLength: gmStoryContext.length,
+      });
+    } else if (options.enableGMStage) {
       callbacks.onGMStageStart?.();
       logger.action("Stage 0.5: Running GM stage for mechanics determination");
 
@@ -516,6 +527,23 @@ export async function generateStoryTurn(
         let gmRound = 0;
         let allGMContextParts: string[] = [];
         let continuationContext = "";
+
+        // If resuming from player answer, inject previous results and the answer
+        if (options.playerAnswerContext) {
+          // Preserve previous GM results
+          if (options.previousGMResults) {
+            gmResults.push(...options.previousGMResults);
+          }
+          if (options.previousGMContext) {
+            allGMContextParts.push(options.previousGMContext);
+          }
+          // Inject player answer as continuation context
+          continuationContext = options.playerAnswerContext;
+          logger.action("Resuming GM stage with player answer", {
+            answerContext: options.playerAnswerContext,
+            previousResultsCount: options.previousGMResults?.length || 0,
+          });
+        }
 
         while (gmRound < MAX_GM_ROUNDS) {
           gmRound++;

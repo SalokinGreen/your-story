@@ -1522,7 +1522,7 @@ function StoryPageContent() {
   const [storyText, setStoryText] = useState("");
   const [loading, setLoading] = useState(false);
   const [loadingStage, setLoadingStage] = useState<
-    "gm" | "story" | "tools" | "choices" | null
+    "gm" | "story" | "state" | "choices" | null
   >(null);
   const [momentumMode, setMomentumMode] = useState<
     "none" | "advantage" | "guarantee"
@@ -2751,7 +2751,7 @@ function StoryPageContent() {
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
 
-            setLoadingStage("tools");
+            setLoadingStage("state");
             logger.ai_response("Story narration complete (custom input)", {
               length: content.length,
               usage,
@@ -5096,7 +5096,7 @@ function StoryPageContent() {
               setStoryText(content);
               setStoryData({ ...storyData }); // Full update only at completion
 
-              setLoadingStage("tools");
+              setLoadingStage("state");
               logger.ai_response("Story narration complete", {
                 length: content.length,
                 usage,
@@ -5353,28 +5353,34 @@ function StoryPageContent() {
     // Format: "[Player answered: <question>: <answer>]"
     const answerContext = `[Player answered: "${playerQuestion.question}": ${answer}]`;
 
-    // Add the GM results context + player answer to the story context
-    const enrichedGMContext = playerQuestion.gmStoryContext
-      ? `${playerQuestion.gmStoryContext}\n\n${answerContext}`
-      : answerContext;
-
     // Resume generation with the enriched context
     setLoading(true);
-    setLoadingStage("story");
+    setLoadingStage("gm"); // Start with GM stage since we're resuming it
 
     // Add the player answer as a pending player action so it's visible to the AI
     storyData.pendingPlayerActions = storyData.pendingPlayerActions || [];
     storyData.pendingPlayerActions.push(answerContext);
 
+    // Create a partial scene part to hold streaming content
+    // This mirrors the pattern in handleChoice
+    const partialPart: ScenePart = {
+      content: "",
+      imageUrl: "",
+      user: false,
+      role: "assistant",
+      choices: [],
+      // gmToolCalls and gmStoryContext will be updated when GM stage completes
+    };
+
     // Create abort controller for this generation
     generationAbortRef.current = new AbortController();
 
-    // Now trigger generation again - the GM stage already ran, so we skip it
-    // and go directly to story generation with the GM context we saved
+    // Resume GM stage with the player's answer
+    // The GM will get another round to make tool calls based on the answer
     try {
       await generateStoryTurn(
         storyData,
-        "", // User choice already in storyData
+        playerQuestion.pendingUserChoice || "", // Restore original user choice
         {
           storyModel,
           toolsModel,
@@ -5396,40 +5402,57 @@ function StoryPageContent() {
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
           usePrefill,
-          enableGMStage: false, // Skip GM stage - we already have the results
+          // Resume GM stage with player answer - it will continue making tool calls
+          enableGMStage: true,
+          gmStageModel: toolsModel, // Use same model as tools stage
+          playerAnswerContext: answerContext, // Inject the player's answer
+          previousGMResults: playerQuestion.gmResults, // Preserve results from before question
+          previousGMContext: playerQuestion.gmStoryContext, // Preserve context from before question
         },
         {
+          onGMStageStart: () => {
+            setLoadingStage("gm");
+          },
+          onGMStageComplete: (results, storyContext, usage) => {
+            // Update partial part with final GM results
+            partialPart.gmToolCalls = results;
+            partialPart.gmStoryContext = storyContext;
+            setLoadingStage("story");
+          },
           onStoryContent: (chunk, fullContent) => {
-            // Update partial content
-            const lastPart =
-              storyData.scene.parts[storyData.scene.parts.length - 1];
-            if (lastPart && !lastPart.user) {
-              lastPart.content = fullContent;
-              setStoryData({ ...storyData });
+            // Update partial part as content streams
+            partialPart.content = fullContent;
+
+            // Only add to scene once (when we first get content)
+            if (
+              storyData.scene.parts[storyData.scene.parts.length - 1] !==
+              partialPart
+            ) {
+              storyData.scene.parts = [...storyData.scene.parts, partialPart];
             }
+
+            setStoryText(fullContent);
+            setLoading(false); // Let player read while tools/choices generate
+          },
+          onStoryComplete: (content: string, usage: any) => {
+            // Update the partial part with the cleaned content
+            partialPart.content = content;
+            setStoryText(content);
+            setStoryData({ ...storyData }); // Full update at completion
           },
           onToolsComplete: (toolCalls, toolResponses, stateChanges, usage) => {
-            const lastPartIndex = storyData.scene.parts.length - 1;
-            if (lastPartIndex >= 0) {
-              storyData.scene.parts[lastPartIndex] = {
-                ...storyData.scene.parts[lastPartIndex],
-                toolCalls,
-                toolResponses,
-                stateChanges:
-                  stateChanges.length > 0 ? stateChanges : undefined,
-              };
+            // Update the partial part with tool data
+            partialPart.toolCalls = toolCalls;
+            partialPart.toolResponses = toolResponses;
+            if (stateChanges.length > 0) {
+              partialPart.stateChanges = stateChanges;
             }
             setPendingCommandResponses(toolResponses);
             setStoryData({ ...storyData });
           },
           onChoicesComplete: (newChoices, usage) => {
-            const lastPartIndex = storyData.scene.parts.length - 1;
-            if (lastPartIndex >= 0) {
-              storyData.scene.parts[lastPartIndex] = {
-                ...storyData.scene.parts[lastPartIndex],
-                choices: newChoices,
-              };
-            }
+            // Update the partial part with choices
+            partialPart.choices = newChoices;
             setChoices({ choices: newChoices });
             setStoryData({ ...storyData });
           },
@@ -5631,7 +5654,7 @@ function StoryPageContent() {
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
 
-            setLoadingStage("tools");
+            setLoadingStage("state");
             logger.ai_response("Story narration complete (retry)", {
               length: content.length,
               usage,

@@ -1909,8 +1909,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Memory (1 tool)
   addMemoryTool,
 
-  // Conditions (6 tools)
-  addConditionTool,
+  // Conditions (5 tools) - add_condition moved to GM Stage
   upgradeConditionTool,
   downgradeConditionTool,
   removeConditionTool,

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
+import { DynamicIcon } from "./DynamicIcon";
 
 interface PlayerQuestionModalProps {
   isOpen: boolean;
@@ -40,6 +41,27 @@ export default function PlayerQuestionModal({
     }
   }, [isOpen]);
 
+  // Handle escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isOpen) {
+        onCancel();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onCancel]);
+
+  // Prevent body scroll when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = "";
+      };
+    }
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = () => {
@@ -53,48 +75,82 @@ export default function PlayerQuestionModal({
   const canSubmit = selectedOption || customAnswer.trim();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-neutral-900 border border-neutral-700 rounded-lg shadow-xl max-w-lg w-full mx-4 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center">
+      {/* Backdrop */}
+      <div
+        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
+        onClick={onCancel}
+      />
+
+      {/* Modal */}
+      <div className="relative bg-linear-to-b from-gray-900 via-purple-950 to-blue-950 rounded-xl shadow-2xl border border-purple-800/30 max-w-lg w-full mx-4 max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-neutral-700 bg-neutral-800/50">
-          <div className="flex items-center gap-3">
-            <span className="text-2xl">🎲</span>
-            <h2 className="text-lg font-semibold text-white">GM Question</h2>
-          </div>
+        <div className="flex items-center justify-between p-4 border-b border-purple-800/30">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <DynamicIcon
+              name="MessageCircleQuestion"
+              className="w-5 h-5 text-purple-400"
+            />
+            GM Question
+          </h2>
+          <button
+            onClick={onCancel}
+            className="p-2.5 sm:p-2 text-purple-200/60 hover:text-white hover:bg-purple-900/50 rounded-lg transition-colors touch-manipulation"
+          >
+            <DynamicIcon name="X" className="w-5 h-5 sm:w-4 sm:h-4" />
+          </button>
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-4 space-y-4">
           {/* Context */}
           {context && (
-            <div className="text-sm text-neutral-400 italic border-l-2 border-neutral-600 pl-3">
+            <div className="text-sm text-purple-200/60 italic border-l-2 border-purple-600/50 pl-3 bg-purple-900/20 py-2 pr-3 rounded-r-lg">
               {context}
             </div>
           )}
 
           {/* Question */}
-          <p className="text-white text-lg">{question}</p>
+          <p className="text-white text-lg font-medium">{question}</p>
 
           {/* Options */}
           {options && options.length > 0 && (
             <div className="space-y-2">
-              {options.map((option, index) => (
-                <button
-                  key={index}
-                  onClick={() => {
-                    setSelectedOption(option);
-                    setCustomAnswer("");
-                  }}
-                  className={`w-full text-left px-4 py-3 rounded-lg border transition-colors ${
-                    selectedOption === option
-                      ? "bg-blue-600/20 border-blue-500 text-blue-300"
-                      : "bg-neutral-800/50 border-neutral-600 text-neutral-200 hover:border-neutral-500 hover:bg-neutral-800"
-                  }`}
-                >
-                  <span className="mr-2 text-neutral-500">{index + 1}.</span>
-                  {option}
-                </button>
-              ))}
+              {options.map((option, index) => {
+                const isSelected = selectedOption === option;
+                return (
+                  <button
+                    key={index}
+                    onClick={() => {
+                      setSelectedOption(option);
+                      setCustomAnswer("");
+                    }}
+                    className={`w-full text-left p-4 sm:p-3 rounded-lg transition-all border touch-manipulation ${
+                      isSelected
+                        ? "bg-purple-600/20 border-purple-500/50"
+                        : "bg-purple-900/30 border-purple-800/30 hover:border-purple-600/50 active:bg-purple-800/40"
+                    }`}
+                  >
+                    <div className="flex items-start gap-2.5">
+                      <div
+                        className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                          isSelected
+                            ? "border-purple-400 bg-purple-500"
+                            : "border-purple-700"
+                        }`}
+                      >
+                        {isSelected && (
+                          <DynamicIcon
+                            name="Check"
+                            className="w-2.5 h-2.5 text-white"
+                          />
+                        )}
+                      </div>
+                      <span className="text-white text-sm">{option}</span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           )}
 
@@ -102,10 +158,10 @@ export default function PlayerQuestionModal({
           {allowCustom && (
             <div className="space-y-2">
               {options && options.length > 0 && (
-                <div className="flex items-center gap-2 text-sm text-neutral-500">
-                  <div className="flex-1 h-px bg-neutral-700"></div>
-                  <span>or type your own answer</span>
-                  <div className="flex-1 h-px bg-neutral-700"></div>
+                <div className="flex items-center gap-2 text-sm text-purple-300/40">
+                  <div className="flex-1 h-px bg-purple-800/50"></div>
+                  <span>or type your own</span>
+                  <div className="flex-1 h-px bg-purple-800/50"></div>
                 </div>
               )}
               <textarea
@@ -116,7 +172,7 @@ export default function PlayerQuestionModal({
                   setSelectedOption(null);
                 }}
                 placeholder="Type your answer..."
-                className="w-full bg-neutral-800 border border-neutral-600 rounded-lg px-4 py-3 text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+                className="w-full bg-purple-950/50 border border-purple-800/30 rounded-lg px-4 py-3 text-white placeholder:text-purple-200/40 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm"
                 rows={3}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && e.ctrlKey && canSubmit) {
@@ -124,30 +180,31 @@ export default function PlayerQuestionModal({
                   }
                 }}
               />
-              <p className="text-xs text-neutral-500">
-                Press Ctrl+Enter to submit
+              <p className="text-xs text-purple-200/40">
+                {customAnswer.length} characters • Ctrl+Enter to submit
               </p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-neutral-700 bg-neutral-800/50 flex justify-end gap-3">
+        <div className="p-3 border-t border-purple-800/30 bg-purple-900/30 flex justify-end gap-3">
           <button
             onClick={onCancel}
-            className="px-4 py-2 text-neutral-400 hover:text-white transition-colors"
+            className="px-4 py-2 text-purple-200/60 hover:text-white hover:bg-purple-900/50 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleSubmit}
             disabled={!canSubmit}
-            className={`px-6 py-2 rounded-lg font-medium transition-colors ${
+            className={`px-6 py-2.5 rounded-lg font-medium transition-colors flex items-center gap-2 ${
               canSubmit
-                ? "bg-blue-600 hover:bg-blue-500 text-white"
-                : "bg-neutral-700 text-neutral-500 cursor-not-allowed"
+                ? "bg-purple-600 hover:bg-purple-500 text-white"
+                : "bg-purple-800/50 text-purple-400 cursor-not-allowed"
             }`}
           >
+            <DynamicIcon name="Send" className="w-4 h-4" />
             Answer
           </button>
         </div>

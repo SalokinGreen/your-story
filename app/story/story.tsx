@@ -15,7 +15,7 @@ interface StoryProps {
   choices: Choices;
   input: Record<string, boolean>;
   loading: boolean;
-  loadingStage?: "gm" | "story" | "tools" | "choices" | null;
+  loadingStage?: "gm" | "story" | "state" | "choices" | null;
   momentumMode: "none" | "advantage" | "guarantee";
   onMomentumModeChange: (mode: "none" | "advantage" | "guarantee") => void;
   handleChoice: () => void;
@@ -556,7 +556,7 @@ export default function Story({
                   <div className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
                   {loadingStage === "gm"
                     ? "Analyzing action..."
-                    : loadingStage === "tools"
+                    : loadingStage === "state"
                     ? "Updating game state..."
                     : loadingStage === "choices"
                     ? "Preparing choices..."

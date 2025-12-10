@@ -121,14 +121,10 @@ const FEW_SHOT_TOOL_CALLS = [
     id: "ex2",
     type: "function" as const,
     function: {
-      name: "add_condition",
+      name: "modify_momentum",
       arguments: JSON.stringify({
-        name: "Compromised Position",
-        tier: 1,
-        description:
-          "Farouk has grabbed your wrist, limiting your movement options.",
-        affects: ["Agility"],
-        source: "Failed distraction attempt",
+        amount: 1,
+        reason: "Quick thinking and improvisation in a tense situation",
       }),
     },
   },
@@ -145,7 +141,7 @@ const FEW_SHOT_TOOL_RESPONSES = [
     toolCallId: "ex2",
     success: true,
     message:
-      "Condition 'Compromised Position' (Tier I) added, affects: Agility",
+      "Momentum increased by 1 → 2 (Quick thinking and improvisation in a tense situation)",
   },
 ];
 
@@ -2132,9 +2128,25 @@ ${rpgSystem.aiInstructions.dcGuidelines}
     { role: "system", content: cleanString(systemPrompt) },
   ];
 
-  // Build chat history from scene parts (like Tools stage)
+  // Build chat history from scene parts
   // This gives the GM better context about the ongoing story
-  for (const part of recentParts) {
+  // IMPORTANT: Exclude the last user part since userChoice is added separately below
+  // This prevents the player's action from appearing twice in the context
+  const partsToInclude = [...recentParts];
+  if (
+    partsToInclude.length > 0 &&
+    partsToInclude[partsToInclude.length - 1].user
+  ) {
+    // Check if the last part matches the current user choice
+    const lastPart = partsToInclude[partsToInclude.length - 1];
+    const lastPartContent = lastPart.content.replace(/^>\s*/, "").trim();
+    const userChoiceNormalized = userChoice.replace(/^>\s*/, "").trim();
+    if (lastPartContent === userChoiceNormalized) {
+      partsToInclude.pop(); // Remove the duplicate user part
+    }
+  }
+
+  for (const part of partsToInclude) {
     if (part.user) {
       messages.push({
         role: "user",

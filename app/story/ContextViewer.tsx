@@ -21,7 +21,7 @@ interface ContextViewerProps {
 export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [activeStage, setActiveStage] = useState<
-    "story" | "tools" | "actions" | "gm"
+    "story" | "state" | "actions" | "gm"
   >("story");
   const [gmStageEnabled, setGmStageEnabled] = useState(true);
   const [contextString, setContextString] = useState("");
@@ -131,7 +131,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     const currentModel =
       activeStage === "story"
         ? effectiveStoryModel
-        : activeStage === "tools" || activeStage === "gm"
+        : activeStage === "state" || activeStage === "gm"
         ? effectiveToolsModel
         : effectiveChoicesModel;
     const modelConfig = getModelConfig(currentModel);
@@ -214,7 +214,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         contextMessages = storyPrompt.messages;
         prunedCount = storyPrompt.prunedParts;
         break;
-      case "tools":
+      case "state":
         const toolPrompt = buildToolPrompt({
           storyData,
           storyContent: "(Story content from previous stage would go here)",
@@ -404,15 +404,15 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             Story
           </button>
           <button
-            onClick={() => setActiveStage("tools")}
+            onClick={() => setActiveStage("state")}
             className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-              activeStage === "tools"
+              activeStage === "state"
                 ? "bg-white dark:bg-blue-950 text-orange-600 dark:text-orange-400 shadow"
                 : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
             }`}
           >
             <DynamicIcon name="Wrench" className="w-3 h-3 inline mr-1" />
-            Tools
+            State
           </button>
           {/* Show GM State tab when GM stage is enabled, otherwise show Actions */}
           {gmStageEnabled ? (
@@ -465,9 +465,9 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   )}
                 </>
               )}
-              {activeStage === "tools" && (
+              {activeStage === "state" && (
                 <>
-                  <strong>Tools Stage:</strong> Last 20 scene parts + new story
+                  <strong>State Stage:</strong> Last 20 scene parts + new story
                   content. AI analyzes what game state changes to make (items,
                   stats, memory, etc.).
                 </>
@@ -694,7 +694,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             <div className="text-xs text-gray-600 dark:text-gray-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded">
               <DynamicIcon name="Info" className="w-3 h-3 inline mr-1" />
               This shows the exact context sent to the AI for each generation
-              stage. Story stage includes all history; Tools/Actions stages are
+              stage. Story stage includes all history; State/Actions stages are
               truncated.
             </div>
 
