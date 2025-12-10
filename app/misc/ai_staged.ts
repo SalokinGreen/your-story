@@ -1890,6 +1890,8 @@ ${fieldSummaries.join("\n") || "No character data"}
 ## AVAILABLE VARIABLES FOR FORMULAS
 You can use these in dice formulas: ${variableList.join(", ")}
 
+⚠️ **CRITICAL: You may ONLY use variables that appear in the list above or from the notes specified!** Do NOT invent variables like "Perception", "Stealth", etc. if they are not listed. Use the closest matching variable from the list.
+
 ## DECISION FRAMEWORK
 
 **ALWAYS call a tool.** Choose ONE of:
@@ -2040,6 +2042,8 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 **Resources:** ${resourceList || "None"}
 **Usable Items:** ${usableItems || "None"}
 **Ready Abilities:** ${readyAbilities || "None"}
+
+⚠️ **CRITICAL: You may ONLY use stats that appear in the Stats list above.** Do NOT invent stats like "Perception", "Stealth", etc. if they are not listed. Use the closest matching stat from the list.
 
 ## DECISION FRAMEWORK
 
