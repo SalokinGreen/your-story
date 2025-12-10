@@ -219,6 +219,24 @@ export interface AskPlayerParams {
 }
 
 /**
+ * Search Notes - Search through mechanics/rules notes using patterns
+ * Helps the GM find relevant rules without scanning everything
+ */
+export interface SearchNotesParams {
+  patterns: string[]; // Array of search patterns (case-insensitive substring match)
+  include_lore?: boolean; // Also search regular lore (default: false, only mechanics)
+}
+
+/**
+ * Search Memory - Search through story memory entries using patterns
+ * Helps the GM recall past events, NPC names, locations, etc.
+ */
+export interface SearchMemoryParams {
+  patterns: string[]; // Array of search patterns (case-insensitive substring match)
+  max_results?: number; // Limit number of results (default: 10)
+}
+
+/**
  * Respond to Player - TERMINAL TOOL that ends the GM stage loop
  * Called when all mechanics are resolved and ready to narrate
  */
@@ -243,6 +261,8 @@ export type GMToolParams =
   | { name: "formula_challenge_check"; params: FormulaChallengeCheckParams }
   | { name: "fate_question"; params: FateQuestionParams }
   | { name: "roll_table"; params: RollTableParams }
+  | { name: "search_notes"; params: SearchNotesParams }
+  | { name: "search_memory"; params: SearchMemoryParams }
   | { name: "request_continuation"; params: RequestContinuationParams }
   | { name: "ask_player"; params: AskPlayerParams }
   | { name: "end_gm_thinking"; params: RespondToPlayerParams };
@@ -1080,6 +1100,91 @@ DO NOT call if:
   },
 };
 
+const searchNotesTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "search_notes",
+    description: `Search through game rules and mechanics notes to find relevant information.
+
+Use this when you need to look up specific rules before making a roll or decision.
+
+WHEN TO USE:
+- You need to find rules about a specific mechanic (combat, magic, skills)
+- You want to check how modifiers or bonuses are calculated
+- You're unsure about success/failure conditions
+- Looking for critical hit/fumble rules
+- Need to find difficulty scaling or DC calculation rules
+
+The search is case-insensitive and matches partial words.
+Provide multiple patterns to search for different relevant terms.
+
+Example patterns:
+- ["roll under", "success"] - Find roll-under success rules
+- ["critical", "fumble"] - Find crit/fumble rules
+- ["bonus", "modifier", "+5%"] - Find bonus calculation rules
+- ["difficulty", "hard", "DC"] - Find difficulty rules`,
+    parameters: {
+      type: "object",
+      properties: {
+        patterns: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Search patterns to look for (case-insensitive). Use multiple patterns to find related rules.",
+        },
+        include_lore: {
+          type: "boolean",
+          description:
+            "Also search regular lore entries, not just mechanics notes (default: false)",
+        },
+      },
+      required: ["patterns"],
+    },
+  },
+};
+
+const searchMemoryTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "search_memory",
+    description: `Search through story memory entries to recall past events, NPCs, locations, or important details.
+
+Use this when you need to remember something that happened earlier in the story.
+
+WHEN TO USE:
+- Need to recall an NPC's name, title, or relationship
+- Looking for a location the player visited before
+- Checking what happened in a past encounter
+- Finding details about items, quests, or plot points
+- Verifying consistency with established story facts
+
+The search is case-insensitive and matches partial words.
+Provide multiple patterns to search for different relevant terms.
+
+Example patterns:
+- ["tavern", "innkeeper"] - Find memories about the tavern
+- ["dragon", "cave"] - Find memories about the dragon's cave
+- ["merchant", "deal", "gold"] - Find memories about merchant dealings`,
+    parameters: {
+      type: "object",
+      properties: {
+        patterns: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Search patterns to look for (case-insensitive). Use multiple patterns to find related memories.",
+        },
+        max_results: {
+          type: "number",
+          description:
+            "Maximum number of matching memories to return (default: 10)",
+        },
+      },
+      required: ["patterns"],
+    },
+  },
+};
+
 // ============================================
 // EXPORT
 // ============================================
@@ -1102,6 +1207,9 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Oracle & utility tools
   fateQuestionTool,
   rollTableTool,
+  // Lookup tools
+  searchNotesTool,
+  searchMemoryTool,
   requestContinuationTool,
   askPlayerTool,
   // Terminal tool - ends GM loop

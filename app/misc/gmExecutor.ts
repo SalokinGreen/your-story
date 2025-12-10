@@ -27,6 +27,8 @@ import {
   FormulaChallengeCheckParams,
   FateQuestionParams,
   RollTableParams,
+  SearchNotesParams,
+  SearchMemoryParams,
   RequestContinuationParams,
   AskPlayerParams,
   RespondToPlayerParams,
@@ -74,6 +76,8 @@ export interface GMToolResult {
     | GMFormulaChallengeResult
     | GMFateQuestionResult
     | GMRollTableResult
+    | GMSearchNotesResult
+    | GMSearchMemoryResult
     | GMRequestContinuationResult
     | GMAskPlayerResult
     | GMEndGmThinkingResult
@@ -323,6 +327,18 @@ export interface GMRollTableResult {
   tableNotFound?: boolean;
 }
 
+export interface GMSearchNotesResult {
+  type: "search_notes";
+  matchCount: number;
+  matches: string[]; // Titles of matching entries
+}
+
+export interface GMSearchMemoryResult {
+  type: "search_memory";
+  matchCount: number;
+  totalMemories: number;
+}
+
 export interface GMRequestContinuationResult {
   type: "request_continuation";
   reason: string;
@@ -559,6 +575,20 @@ export async function executeGMTools(
         break;
       case "roll_table":
         result = executeRollTable(call.id, params as RollTableParams, modified);
+        break;
+      case "search_notes":
+        result = executeSearchNotes(
+          call.id,
+          params as SearchNotesParams,
+          modified
+        );
+        break;
+      case "search_memory":
+        result = executeSearchMemory(
+          call.id,
+          params as SearchMemoryParams,
+          modified
+        );
         break;
       case "request_continuation":
         result = executeRequestContinuation(
@@ -2186,6 +2216,157 @@ function executeRollTable(
       reason: params.reason,
       displayName: params.display_name,
     } as GMRollTableResult,
+    contextForStory,
+  };
+}
+
+/**
+ * Execute a search through mechanics/lore notes
+ */
+function executeSearchNotes(
+  toolCallId: string,
+  params: SearchNotesParams,
+  storyData: StoryData
+): GMToolResult {
+  const { patterns, include_lore = false } = params;
+
+  if (!patterns || patterns.length === 0) {
+    return {
+      toolName: "search_notes",
+      toolCallId,
+      success: false,
+      result: {
+        type: "search_notes",
+        matchCount: 0,
+        matches: [],
+      },
+      contextForStory: "[Search Notes: No patterns provided]",
+    };
+  }
+
+  // Search through lore entries
+  const loreEntries = storyData.lore || [];
+  const matches: Array<{ title: string; content: string; type: string }> = [];
+
+  for (const entry of loreEntries) {
+    // Skip disabled lore
+    if (entry.enabled === false) continue;
+
+    // If not including regular lore, only search mechanics type
+    const isMechanics = entry.type === "mechanics";
+    if (!include_lore && !isMechanics) continue;
+
+    // Check if any pattern matches title or content (case-insensitive)
+    const searchText = `${entry.title} ${entry.content}`.toLowerCase();
+    const matchedPatterns = patterns.filter((pattern) =>
+      searchText.includes(pattern.toLowerCase())
+    );
+
+    if (matchedPatterns.length > 0) {
+      matches.push({
+        title: entry.title,
+        content: entry.content,
+        type: entry.type || "lore",
+      });
+    }
+  }
+
+  // Build context for the GM
+  let contextForStory = `[Search Notes: ${patterns.join(", ")}]`;
+  if (matches.length === 0) {
+    contextForStory += `\n[No matching rules found]`;
+  } else {
+    contextForStory += `\n[Found ${matches.length} matching ${
+      matches.length === 1 ? "entry" : "entries"
+    }]`;
+    for (const match of matches) {
+      contextForStory += `\n\n---\n### ${match.title}${
+        match.type === "mechanics" ? " (Rules)" : ""
+      }\n${match.content}`;
+    }
+    contextForStory += `\n---`;
+  }
+
+  return {
+    toolName: "search_notes",
+    toolCallId,
+    success: matches.length > 0,
+    result: {
+      type: "search_notes",
+      matchCount: matches.length,
+      matches: matches.map((m) => m.title),
+    },
+    contextForStory,
+  };
+}
+
+/**
+ * Execute a search through memory entries
+ */
+function executeSearchMemory(
+  toolCallId: string,
+  params: SearchMemoryParams,
+  storyData: StoryData
+): GMToolResult {
+  const { patterns, max_results = 10 } = params;
+
+  if (!patterns || patterns.length === 0) {
+    return {
+      toolName: "search_memory",
+      toolCallId,
+      success: false,
+      result: {
+        type: "search_memory",
+        matchCount: 0,
+        totalMemories: storyData.memory?.length || 0,
+      },
+      contextForStory: "[Search Memory: No patterns provided]",
+    };
+  }
+
+  // Import helper to get memory content (handles both string and MemoryEntry)
+  const { getMemoryContent } = require("./structs");
+
+  // Search through memory entries
+  const memoryEntries = storyData.memory || [];
+  const matches: string[] = [];
+
+  for (const entry of memoryEntries) {
+    const content = getMemoryContent(entry);
+
+    // Check if any pattern matches (case-insensitive)
+    const matchedPatterns = patterns.filter((pattern) =>
+      content.toLowerCase().includes(pattern.toLowerCase())
+    );
+
+    if (matchedPatterns.length > 0) {
+      matches.push(content);
+      if (matches.length >= max_results) break;
+    }
+  }
+
+  // Build context for the GM
+  let contextForStory = `[Search Memory: ${patterns.join(", ")}]`;
+  if (matches.length === 0) {
+    contextForStory += `\n[No matching memories found (searched ${memoryEntries.length} entries)]`;
+  } else {
+    contextForStory += `\n[Found ${matches.length} matching ${
+      matches.length === 1 ? "memory" : "memories"
+    }]`;
+    for (let i = 0; i < matches.length; i++) {
+      contextForStory += `\n\n**Memory ${i + 1}:** ${matches[i]}`;
+    }
+  }
+
+  return {
+    toolName: "search_memory",
+    toolCallId,
+    success: matches.length > 0,
+    result: {
+      type: "search_memory",
+      matchCount: matches.length,
+      totalMemories: memoryEntries.length,
+    },
     contextForStory,
   };
 }

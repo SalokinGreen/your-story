@@ -2257,19 +2257,14 @@ You can use these in dice formulas: ${variableList.join(", ")}
 - "50 / 2" → 25
 - Use for damage totals, resource tracking, anything numeric!
 
-### 🔍 LOOKUP TOOLS
+### � LOOKUP TOOLS
 
 **search_notes** - Search mechanics notes for specific rules
 - patterns: ["roll under", "bonus", "+5%"] - finds entries matching ANY pattern
 - Use when unsure about modifiers, DCs, or how a mechanic works
 - **Always search before assuming!** Custom systems have custom rules.
 
-**search_memory** - Search story memory for past events
-- patterns: ["tavern", "merchant"] - finds memories mentioning these terms
-- Use to recall NPC names, locations, past encounters, plot details
-- Helps maintain story consistency
-
-### 📝 STATE TOOLS (call AFTER seeing roll results)
+### �📝 STATE TOOLS (call AFTER seeing roll results)
 
 **Quests:** create_quest, complete_quest, fail_quest, update_quest, delete_quest
 **Items:** add_item, remove_item (via add_list_item, remove_list_item for schema mode)
@@ -2348,7 +2343,6 @@ I'll remove it from the encounter and award some XP.
       "calculate",
       // Lookup
       "search_notes",
-      "search_memory",
       // Flow control
       "start_challenge",
       "take_rest",
@@ -2551,19 +2545,14 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 - "50 / 2" → 25
 - Use for damage totals, resource tracking, anything numeric!
 
-### 🔍 LOOKUP TOOLS
+### � LOOKUP TOOLS
 
 **search_notes** - Search mechanics notes for specific rules
 - patterns: ["roll under", "bonus", "+5%"] - finds entries matching ANY pattern
 - Use when unsure about modifiers, DCs, or how a mechanic works
 - **Always search before assuming!** Custom systems have custom rules.
 
-**search_memory** - Search story memory for past events
-- patterns: ["tavern", "merchant"] - finds memories mentioning these terms
-- Use to recall NPC names, locations, past encounters, plot details
-- Helps maintain story consistency
-
-### 📝 STATE TOOLS (call AFTER seeing roll results)
+### �📝 STATE TOOLS (call AFTER seeing roll results)
 
 **Quests:** create_quest, complete_quest, fail_quest, update_quest, delete_quest
 **Items:** add_item, remove_item
@@ -2634,7 +2623,6 @@ The lock clicks open. No complications.
       "calculate",
       // Lookup
       "search_notes",
-      "search_memory",
       // Flow control
       "start_challenge",
       "take_rest",
@@ -2817,3 +2805,4 @@ Now here is the ACTUAL game you are GMing. Read the mechanics notes carefully!`)
     })),
   };
 }
+
