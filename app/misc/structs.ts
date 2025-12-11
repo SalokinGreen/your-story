@@ -348,6 +348,49 @@ export interface SceneChallenge {
   pointsAwarded?: number; // Points given on completion
 }
 
+// ============================================
+// COMBAT SYSTEM
+// ============================================
+
+/**
+ * A combatant in tactical combat - can be player, ally, enemy, or neutral
+ * Stats are completely custom (system-dependent) - no hardcoded HP/AC
+ */
+/**
+ * Combat condition with optional duration
+ */
+export interface CombatCondition {
+  name: string; // Condition name (e.g., "Stunned", "Prone")
+  duration?: number; // Turns remaining (undefined = permanent)
+}
+
+export interface Combatant {
+  id: string; // Unique identifier
+  name: string; // Display name (e.g., "Goblin Warrior", "Player")
+  type: "player" | "ally" | "enemy" | "neutral";
+  stats: Record<string, number>; // Completely custom stats: { HP: 12, Armor: 14, Attack: 5 }
+  conditions: CombatCondition[]; // Conditions/status effects with optional duration
+  initiative: string; // Initiative formula: "5" (fixed) OR "1d20+4" (rolled at combat start)
+  initiativeRoll?: number; // Actual rolled initiative value (calculated at combat start)
+  loreRef?: string; // Optional link to lore entry title for full NPC details
+  isActive: boolean; // Still in combat? (false = dead/fled/incapacitated)
+  notes?: string; // GM notes about this combatant's behavior/tactics
+}
+
+/**
+ * Active combat state tracking
+ * Only one combat can be active at a time
+ */
+export interface CombatState {
+  active: boolean; // Is combat ongoing?
+  name?: string; // Combat name (e.g., "Battle in the Tavern", "Ambush on the Forest Road")
+  combatants: Combatant[]; // All participants in combat
+  turnOrder: string[]; // Combatant IDs sorted by initiative (highest first)
+  currentTurnIndex: number; // Index into turnOrder for whose turn it is
+  round: number; // Current round number (starts at 1)
+  log?: string[]; // Combat log for reference (recent actions)
+}
+
 export interface Choices {
   choices: Choice[];
 }
@@ -512,6 +555,7 @@ export interface StoryData {
   conditions: Condition[]; // Active conditions/afflictions affecting the player
   gameOver?: GameOver; // Game over state if the player has permanently died/lost
   activeChallenge?: SceneChallenge; // Current scene challenge (progress clock)
+  combatState?: CombatState; // Active tactical combat state (turn-based combat tracking)
   threads?: StoryThread[]; // Active story threads/plotlines (independent of AGMT)
   author_notes?: string;
   player_notes?: string;

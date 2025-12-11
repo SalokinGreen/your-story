@@ -7,6 +7,7 @@ import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
 import STTButton from "../components/STTButton";
+import CombatDisplay from "../components/CombatDisplay";
 import type { SyncStatus } from "../misc/localStoryManager";
 
 interface StoryProps {
@@ -392,6 +393,9 @@ export default function Story({
   // State for GM thinking collapsible
   const [showGMThinking, setShowGMThinking] = React.useState(false);
 
+  // State for combat display expansion
+  const [showCombat, setShowCombat] = React.useState(true);
+
   // Handle choice selection from modal
   const handleSelectChoice = (choice: Choice) => {
     const index = choices.choices.findIndex((c) => c.text === choice.text);
@@ -553,6 +557,15 @@ export default function Story({
               </div>
             )}
           </div>
+        )}
+
+        {/* Combat Display - shows active combat state */}
+        {storyData.combatState?.active && (
+          <CombatDisplay
+            combatState={storyData.combatState}
+            expanded={showCombat}
+            onToggleExpand={() => setShowCombat(!showCombat)}
+          />
         )}
 
         {/* Story Content Area */}

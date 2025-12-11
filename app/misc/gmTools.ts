@@ -104,16 +104,16 @@ export interface TakeRestParams {
 // ============================================
 // FORMULA-BASED GM TOOL INTERFACES
 // ============================================
-// These tools use dice formulas with {{variable}} syntax
-// that resolve from characterData (the new schema system)
+// These tools use standard dice notation (no variable substitution)
+// The GM should look up character values and insert actual numbers
 
 /**
  * Roll a dice formula against an optional DC
- * Formula can include {{variables}} that resolve from character data
- * Example: "1d20+{{STR_mod}}+{{proficiency}}" vs DC 15
+ * The GM must calculate and insert actual numeric values
+ * Example: "1d20+5+2" vs DC 15
  */
 export interface FormulaRollParams {
-  formula: string; // "1d20+{{STR_mod}}+{{proficiency}}", "2d6+5"
+  formula: string; // "1d20+5+2" (actual numbers, not variables)
   dc?: number; // Optional target number
   reverse_dc?: boolean; // If true, success = roll ≤ DC (Call of Cthulhu style)
   reason: string;
@@ -128,11 +128,11 @@ export interface FormulaRollParams {
 
 /**
  * Opposed roll using formulas for both sides
- * Both formulas can include {{variables}}
- * Example: player "1d20+{{DEX_mod}}" vs opponent "1d20+5"
+ * GM should insert actual calculated values
+ * Example: player "1d20+4" vs opponent "1d20+5"
  */
 export interface OpposedFormulaParams {
-  player_formula: string; // "1d20+{{DEX_mod}}"
+  player_formula: string; // "1d20+4" (actual value)
   opponent_formula: string; // "1d20+5" (usually fixed)
   opponent_name: string;
   reason: string;
@@ -148,10 +148,10 @@ export interface OpposedFormulaParams {
 
 /**
  * Challenge check using a formula instead of stat lookup
- * For multi-step challenges with the new schema system
+ * GM should look up character values and insert actual numbers
  */
 export interface FormulaChallengeCheckParams {
-  formula: string; // "1d20+{{Athletics}}"
+  formula: string; // "1d20+5" (actual value)
   dc: number;
   description: string;
   display_name?: string;
@@ -247,6 +247,101 @@ export interface RespondToPlayerParams {
   dramatic_moment?: boolean; // Mark as particularly dramatic (affects narration style)
 }
 
+// ============================================
+// COMBAT SYSTEM INTERFACES
+// ============================================
+
+/**
+ * Start Combat - Initialize tactical combat with combatants
+ * Only one combat can be active at a time
+ */
+export interface StartCombatParams {
+  name: string; // Combat name (e.g., "Ambush at the Bridge")
+  description?: string; // Situational context
+}
+
+/**
+ * Add Combatant - Add a combatant to the active combat
+ * Stats are completely custom (system-dependent)
+ */
+export interface AddCombatantParams {
+  name: string; // Combatant name (e.g., "Goblin Warrior", "Player")
+  type: "player" | "ally" | "enemy" | "neutral";
+  stats: Record<string, number>; // Custom stats: { HP: 30, AC: 14, Attack: 5 }
+  initiative: string; // "1d20+2" (formula) or "10" (fixed value)
+  lore_ref?: string; // Optional lore entry title for full NPC details
+  notes?: string; // Behavior notes (e.g., "Cowardly - flees below 25% HP")
+}
+
+/**
+ * Remove Combatant - Remove a combatant from combat
+ * Use when they're dead, fled, or incapacitated
+ */
+export interface RemoveCombatantParams {
+  combatant: string; // Name or ID of combatant to remove
+  reason: "dead" | "fled" | "incapacitated" | "captured" | "other";
+  narrative?: string; // Optional narrative description of what happened
+}
+
+/**
+ * Update Combatant Stat - Modify a combatant's stat value
+ * Can use delta (-8), absolute (=20), or dice roll (1d6)
+ */
+export interface UpdateCombatantStatParams {
+  combatant: string; // Name or ID of combatant
+  stat: string; // Stat name (e.g., "HP", "Mana", "Armor")
+  value: number | string; // Delta (-8), absolute ("=20"), or dice ("1d6")
+  reason?: string; // Why the stat changed (e.g., "Sword slash damage")
+}
+
+/**
+ * Add Combatant Condition - Add a status effect to a combatant
+ */
+export interface AddCombatantConditionParams {
+  combatant: string; // Name or ID of combatant
+  condition: string; // Condition name (e.g., "Stunned", "Prone", "Frightened")
+  duration?: number; // Optional: turns until condition expires
+}
+
+/**
+ * Remove Combatant Condition - Remove a status effect from a combatant
+ */
+export interface RemoveCombatantConditionParams {
+  combatant: string; // Name or ID of combatant
+  condition: string; // Condition name to remove
+}
+
+/**
+ * NPC Roll - Make a roll for an NPC (attack, ability, check, etc.)
+ * Similar to formula_roll but for NPCs specifically
+ */
+export interface NPCRollParams {
+  combatant: string; // Name or ID of the NPC making the roll
+  formula: string; // Dice formula: "1d20+5", "2d6+3"
+  dc?: number; // Optional target number to check success
+  reason: string; // What the roll is for
+  target?: string; // Optional: who/what is being targeted
+  show_to_player?: boolean; // Show dice animation (default: false for NPC rolls)
+}
+
+/**
+ * Advance Turn - Move to the next combatant in initiative order
+ * Automatically increments round when turn order completes
+ */
+export interface AdvanceTurnParams {
+  skip_inactive?: boolean; // Skip combatants marked as inactive (default: true)
+}
+
+/**
+ * End Combat - Close the combat state and sync player stats
+ * Copies player combatant stats back to character resources
+ */
+export interface EndCombatParams {
+  outcome: "victory" | "defeat" | "fled" | "truce" | "interrupted";
+  summary: string; // Summary of combat outcome for narrative
+  sync_player_stats?: boolean; // Copy player combatant stats to resources (default: true)
+}
+
 // Union type for all GM tool parameters
 export type GMToolParams =
   | { name: "skill_check"; params: SkillCheckParams }
@@ -265,7 +360,20 @@ export type GMToolParams =
   | { name: "search_memory"; params: SearchMemoryParams }
   | { name: "request_continuation"; params: RequestContinuationParams }
   | { name: "ask_player"; params: AskPlayerParams }
-  | { name: "end_gm_thinking"; params: RespondToPlayerParams };
+  | { name: "end_gm_thinking"; params: RespondToPlayerParams }
+  // Combat tools
+  | { name: "start_combat"; params: StartCombatParams }
+  | { name: "add_combatant"; params: AddCombatantParams }
+  | { name: "remove_combatant"; params: RemoveCombatantParams }
+  | { name: "update_combatant_stat"; params: UpdateCombatantStatParams }
+  | { name: "add_combatant_condition"; params: AddCombatantConditionParams }
+  | {
+      name: "remove_combatant_condition";
+      params: RemoveCombatantConditionParams;
+    }
+  | { name: "npc_roll"; params: NPCRollParams }
+  | { name: "advance_turn"; params: AdvanceTurnParams }
+  | { name: "end_combat"; params: EndCombatParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -661,28 +769,26 @@ Types:
 // ============================================
 // FORMULA-BASED TOOL SCHEMAS
 // ============================================
-// These tools use the dice formula parser with {{variable}} syntax
-// Variables resolve from characterData (the new schema system)
+// These tools use the dice formula parser
+// GM must look up character values and insert actual numbers
 
 const formulaRollTool: ToolSchema = {
   type: "function",
   function: {
     name: "formula_roll",
-    description: `Roll a dice formula with optional variable substitution.
+    description: `Roll a dice formula against an optional DC.
 
 Use when:
 - The adventure uses custom character sheets (characterData exists)
-- You need to roll a formula like "1d20+{{STR_mod}}+{{proficiency}}"
+- You need to roll a formula like "1d20+5+2"
 - The DC is known and you want to check success/failure
 
-Variables in {{double braces}} resolve from the character's data:
-- {{Strength}} → stat value
-- {{STR_mod}} → D&D-style modifier = floor((value-10)/2)
-- {{proficiency}} → custom field value
+YOU must look up character stats and insert the actual numeric values.
+For D&D-style modifiers, calculate floor((stat-10)/2) yourself.
 
 Example formulas:
-- "1d20+{{STR_mod}}+{{proficiency}}" (D&D attack)
-- "2d6+{{damage_bonus}}" (damage roll)
+- "1d20+3+2" (attack with +3 STR mod and +2 proficiency)
+- "2d6+4" (damage with +4 bonus)
 - "1d100" (percentile check)`,
     parameters: {
       type: "object",
@@ -690,7 +796,7 @@ Example formulas:
         formula: {
           type: "string",
           description:
-            "Dice formula with optional {{variables}}: '1d20+{{STR_mod}}', '2d6+5', '1d100'",
+            "Dice formula with actual numbers: '1d20+5', '2d6+3', '1d100'",
         },
         dc: {
           type: "number",
@@ -744,18 +850,18 @@ Use when:
 - Both sides should roll (not just player vs static DC)
 - The adventure uses custom character sheets
 
-Player formula can use {{variables}}, opponent formula is usually fixed.
+YOU must look up character stats and insert actual numeric values.
 
 Examples:
-- Player: "1d20+{{DEX_mod}}" vs Opponent: "1d20+3"
-- Player: "2d6+{{Stealth}}" vs Opponent: "2d6+5"`,
+- Player: "1d20+4" vs Opponent: "1d20+3"
+- Player: "2d6+3" vs Opponent: "2d6+5"`,
     parameters: {
       type: "object",
       properties: {
         player_formula: {
           type: "string",
           description:
-            "Player's dice formula with optional {{variables}}: '1d20+{{DEX_mod}}'",
+            "Player's dice formula with actual numbers: '1d20+4'",
         },
         opponent_formula: {
           type: "string",
@@ -812,7 +918,9 @@ const formulaChallengeCheckTool: ToolSchema = {
 Use when:
 - There's an active challenge in progress
 - The adventure uses custom character sheets (characterData)
-- You want to roll a formula like "1d20+{{Athletics}}"
+- You want to roll a formula like "1d20+5"
+
+YOU must look up character stats and insert actual numeric values.
 
 This tool updates challenge progress (successes/failures) based on the roll result.`,
     parameters: {
@@ -821,7 +929,7 @@ This tool updates challenge progress (successes/failures) based on the roll resu
         formula: {
           type: "string",
           description:
-            "Dice formula with optional {{variables}}: '1d20+{{Athletics}}'",
+            "Dice formula with actual numbers: '1d20+5'",
         },
         dc: {
           type: "number",
@@ -1186,6 +1294,394 @@ Example patterns:
 };
 
 // ============================================
+// COMBAT TOOLS
+// ============================================
+
+const startCombatTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "start_combat",
+    description: `Initialize tactical combat tracking.
+
+Use when the story enters structured, turn-based combat.
+Only one combat can be active at a time.
+
+After starting combat:
+1. Add all combatants with add_combatant
+2. Initiative will be auto-rolled when all are added
+3. Use advance_turn to progress through rounds
+4. End with end_combat when resolved
+
+Tactical combat is for:
+- Multi-round fights with multiple participants
+- Situations where turn order and positioning matter
+- Encounters requiring detailed stat tracking
+
+NOT for:
+- Quick narrative fights (use regular skill_check)
+- Single-roll conflicts (use opposed_check)
+- Chases or non-combat challenges (use scene challenges)`,
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "Combat name (e.g., 'Ambush at the Bridge', 'Final Boss Battle')",
+        },
+        description: {
+          type: "string",
+          description:
+            "Brief situational context about the combat (terrain, conditions, etc.)",
+        },
+      },
+      required: ["name"],
+    },
+  },
+};
+
+const addCombatantTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "add_combatant",
+    description: `Add a combatant to the active combat.
+
+Stats are completely custom - use whatever makes sense for the RPG system:
+- D&D-style: { HP: 30, AC: 14, Attack: 5 }
+- Simple: { Health: 100, Damage: 10 }
+- Narrative: { Stress: 0, Composure: 3 }
+
+Initiative can be:
+- A fixed number: "10"
+- A dice formula: "1d20+2"
+- System-appropriate: "2d6" (PbtA), "4dF" (Fate)
+
+For NPCs: Check if a matching lore entry exists to pull stats from.
+For the Player: Use "player" type and sync their current resources as stats.
+
+IMPORTANT: Always add the player as a combatant with type "player".
+Their stats will sync back to their character resources when combat ends.`,
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description: "Combatant name (must be unique in this combat)",
+        },
+        type: {
+          type: "string",
+          enum: ["player", "ally", "enemy", "neutral"],
+          description:
+            "Combatant type determines behavior and victory conditions",
+        },
+        stats: {
+          type: "object",
+          additionalProperties: { type: "number" },
+          description:
+            "Custom stats object. Keys are stat names, values are numbers. e.g., { 'HP': 30, 'AC': 14 }",
+        },
+        initiative: {
+          type: "string",
+          description:
+            "Initiative value: fixed number ('10') or dice formula ('1d20+2')",
+        },
+        lore_ref: {
+          type: "string",
+          description:
+            "Optional: Reference to a lore entry title for full NPC details",
+        },
+        notes: {
+          type: "string",
+          description:
+            "Behavior notes (e.g., 'Cowardly - flees below 25% HP', 'Protects the wizard')",
+        },
+      },
+      required: ["name", "type", "stats", "initiative"],
+    },
+  },
+};
+
+const removeCombatantTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "remove_combatant",
+    description: `Remove a combatant from active combat.
+
+Use when a combatant:
+- Dies or is destroyed
+- Flees the combat
+- Is incapacitated but not killed
+- Is captured or restrained
+- Otherwise can no longer participate
+
+The combatant's final stats are logged for reference.
+If removing the player, combat typically ends (use end_combat).`,
+    parameters: {
+      type: "object",
+      properties: {
+        combatant: {
+          type: "string",
+          description: "Name of the combatant to remove",
+        },
+        reason: {
+          type: "string",
+          enum: ["dead", "fled", "incapacitated", "captured", "other"],
+          description: "Why the combatant is being removed",
+        },
+        narrative: {
+          type: "string",
+          description: "Optional narrative description of what happened",
+        },
+      },
+      required: ["combatant", "reason"],
+    },
+  },
+};
+
+const updateCombatantStatTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "update_combatant_stat",
+    description: `Modify a combatant's stat value.
+
+Value can be:
+- Number: Delta change (positive or negative). e.g., -8 for damage, +5 for healing
+- "=N": Set to absolute value. e.g., "=20" sets stat to exactly 20
+- Dice formula: Roll and apply. e.g., "1d6" rolls and subtracts from stat, "+2d6" rolls and adds
+
+Examples:
+- { stat: "HP", value: -8 } - Deal 8 damage
+- { stat: "HP", value: "+2d6" } - Heal 2d6
+- { stat: "Armor", value: "=0" } - Armor destroyed
+- { stat: "Stress", value: 1 } - Add 1 stress
+
+IMPORTANT: For damage/healing, use appropriate deltas, not absolute values.
+The combatant's stat cannot go below 0 unless the system allows negatives.`,
+    parameters: {
+      type: "object",
+      properties: {
+        combatant: {
+          type: "string",
+          description: "Name of the combatant to modify",
+        },
+        stat: {
+          type: "string",
+          description: "Stat name to modify (must exist on the combatant)",
+        },
+        value: {
+          oneOf: [{ type: "number" }, { type: "string" }],
+          description:
+            "Change amount: number (delta), '=N' (absolute), or dice formula",
+        },
+        reason: {
+          type: "string",
+          description: "Why the stat changed (for combat log)",
+        },
+      },
+      required: ["combatant", "stat", "value"],
+    },
+  },
+};
+
+const addCombatantConditionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "add_combatant_condition",
+    description: `Add a status condition to a combatant.
+
+Conditions are narrative/mechanical effects:
+- Stunned, Prone, Frightened, Poisoned
+- Blessed, Hasted, Invisible
+- On Fire, Bleeding, Cursed
+
+Duration is in turns (rounds of combat).
+Leave duration empty for permanent conditions.
+
+Duplicate conditions: If condition already exists, updates the duration to max of old/new.`,
+    parameters: {
+      type: "object",
+      properties: {
+        combatant: {
+          type: "string",
+          description: "Name of the combatant",
+        },
+        condition: {
+          type: "string",
+          description: "Condition name (e.g., 'Stunned', 'Prone', 'On Fire')",
+        },
+        duration: {
+          type: "number",
+          description:
+            "Optional: Turns until condition expires. Omit for permanent conditions.",
+        },
+      },
+      required: ["combatant", "condition"],
+    },
+  },
+};
+
+const removeCombatantConditionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "remove_combatant_condition",
+    description: `Remove a status condition from a combatant.
+
+Use when:
+- A condition expires naturally (turn duration)
+- A condition is cured or dispelled
+- The situation changes (e.g., they get up from Prone)
+
+If the condition doesn't exist on the combatant, no error is raised.`,
+    parameters: {
+      type: "object",
+      properties: {
+        combatant: {
+          type: "string",
+          description: "Name of the combatant",
+        },
+        condition: {
+          type: "string",
+          description: "Condition name to remove",
+        },
+      },
+      required: ["combatant", "condition"],
+    },
+  },
+};
+
+const npcRollTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "npc_roll",
+    description: `Make a roll for an NPC combatant.
+
+Use for:
+- NPC attack rolls
+- NPC damage rolls
+- NPC saving throws
+- NPC ability checks
+
+Similar to formula_roll but specifically for NPCs.
+By default, rolls are NOT shown to the player (GM secret).
+Set show_to_player: true for dramatic rolls.
+
+The roll result is returned and logged to combat log.
+Use update_combatant_stat to apply damage after calculating.
+
+Example flow:
+1. npc_roll: "1d20+5" for goblin attack vs player AC 15
+2. If hit: npc_roll: "1d6+2" for goblin damage
+3. update_combatant_stat: player HP -damage`,
+    parameters: {
+      type: "object",
+      properties: {
+        combatant: {
+          type: "string",
+          description: "Name of the NPC making the roll",
+        },
+        formula: {
+          type: "string",
+          description: "Dice formula (e.g., '1d20+5', '2d6+3')",
+        },
+        dc: {
+          type: "number",
+          description:
+            "Optional target number. If provided, determines success/failure.",
+        },
+        reason: {
+          type: "string",
+          description:
+            "What this roll is for (e.g., 'Attack vs Player', 'Damage roll')",
+        },
+        target: {
+          type: "string",
+          description: "Optional: Who or what is being targeted",
+        },
+        show_to_player: {
+          type: "boolean",
+          description: "Show dice animation to player (default: false)",
+        },
+      },
+      required: ["combatant", "formula", "reason"],
+    },
+  },
+};
+
+const advanceTurnTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "advance_turn",
+    description: `Advance to the next combatant in initiative order.
+
+Call this after resolving the current combatant's turn.
+
+The tool automatically:
+- Moves to the next active combatant
+- Skips inactive combatants (unless skip_inactive: false)
+- Increments round counter when turn order completes
+- Decrements duration on timed conditions
+- Removes expired conditions
+
+Returns: The next combatant whose turn it is.
+
+If all combatants are inactive, signals that combat should end.`,
+    parameters: {
+      type: "object",
+      properties: {
+        skip_inactive: {
+          type: "boolean",
+          description: "Skip combatants marked as inactive (default: true)",
+        },
+      },
+      required: [],
+    },
+  },
+};
+
+const endCombatTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "end_combat",
+    description: `End the active combat and optionally sync player stats.
+
+Call when combat concludes for any reason:
+- Victory: All enemies defeated
+- Defeat: Player killed or incapacitated  
+- Fled: One or more parties escaped
+- Truce: Combat ended through negotiation
+- Interrupted: External event stopped the fight
+
+If sync_player_stats is true (default):
+- Player combatant stats are copied back to character resources
+- Only stats matching resource names are synced
+- HP -> Health resource, etc.
+
+IMPORTANT: Always call this to properly close combat state.
+Don't just let combat "fade out" - explicitly end it.`,
+    parameters: {
+      type: "object",
+      properties: {
+        outcome: {
+          type: "string",
+          enum: ["victory", "defeat", "fled", "truce", "interrupted"],
+          description: "How combat ended",
+        },
+        summary: {
+          type: "string",
+          description: "Summary of what happened for the narrative",
+        },
+        sync_player_stats: {
+          type: "boolean",
+          description:
+            "Copy player combatant stats back to character resources (default: true)",
+        },
+      },
+      required: ["outcome", "summary"],
+    },
+  },
+};
+
+// ============================================
 // EXPORT
 // ============================================
 
@@ -1212,6 +1708,16 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   searchMemoryTool,
   requestContinuationTool,
   askPlayerTool,
+  // Combat tools
+  startCombatTool,
+  addCombatantTool,
+  removeCombatantTool,
+  updateCombatantStatTool,
+  addCombatantConditionTool,
+  removeCombatantConditionTool,
+  npcRollTool,
+  advanceTurnTool,
+  endCombatTool,
   // Terminal tool - ends GM loop
   endGmThinkingTool,
 ];

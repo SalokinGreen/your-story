@@ -13,6 +13,8 @@ import {
   Condition,
   InventoryItem,
   Ability,
+  Combatant,
+  CombatState,
 } from "./structs";
 import {
   SkillCheckParams,
@@ -32,6 +34,16 @@ import {
   RequestContinuationParams,
   AskPlayerParams,
   RespondToPlayerParams,
+  // Combat tools
+  StartCombatParams,
+  AddCombatantParams,
+  RemoveCombatantParams,
+  UpdateCombatantStatParams,
+  AddCombatantConditionParams,
+  RemoveCombatantConditionParams,
+  NPCRollParams,
+  AdvanceTurnParams,
+  EndCombatParams,
 } from "./gmTools";
 import {
   getRPGSystem,
@@ -51,7 +63,6 @@ import { getItemBonus } from "./itemSystem";
 import { getAbilityBonus } from "./abilitySystem";
 import {
   rollFormula,
-  createSchemaBasedResolver,
   RollResult,
 } from "./diceFormula";
 import { executeTools as executeStateTools } from "./toolExecutor";
@@ -81,7 +92,17 @@ export interface GMToolResult {
     | GMRequestContinuationResult
     | GMAskPlayerResult
     | GMEndGmThinkingResult
-    | GMStateChangeResult;
+    | GMStateChangeResult
+    // Combat results
+    | GMStartCombatResult
+    | GMAddCombatantResult
+    | GMRemoveCombatantResult
+    | GMUpdateCombatantStatResult
+    | GMAddCombatantConditionResult
+    | GMRemoveCombatantConditionResult
+    | GMNPCRollResult
+    | GMAdvanceTurnResult
+    | GMEndCombatResult;
   contextForStory: string; // Formatted bracket notation for story stage
 }
 
@@ -363,6 +384,92 @@ export interface GMEndGmThinkingResult {
 }
 
 // ============================================
+// COMBAT RESULT INTERFACES
+// ============================================
+
+export interface GMStartCombatResult {
+  type: "start_combat";
+  name: string;
+  description?: string;
+}
+
+export interface GMAddCombatantResult {
+  type: "add_combatant";
+  name: string;
+  combatantType: "player" | "ally" | "enemy" | "neutral";
+  stats: Record<string, number>;
+  initiative: string;
+  initiativeRoll?: number;
+  loreRef?: string;
+  notes?: string;
+}
+
+export interface GMRemoveCombatantResult {
+  type: "remove_combatant";
+  name: string;
+  reason: "dead" | "fled" | "incapacitated" | "captured" | "other";
+  narrative?: string;
+  finalStats?: Record<string, number>;
+}
+
+export interface GMUpdateCombatantStatResult {
+  type: "update_combatant_stat";
+  combatant: string;
+  stat: string;
+  oldValue: number;
+  newValue: number;
+  change: number;
+  reason?: string;
+  diceRolled?: number[]; // If value was a dice formula
+}
+
+export interface GMAddCombatantConditionResult {
+  type: "add_combatant_condition";
+  combatant: string;
+  condition: string;
+  duration?: number;
+  wasUpdate: boolean; // True if condition already existed and was updated
+}
+
+export interface GMRemoveCombatantConditionResult {
+  type: "remove_combatant_condition";
+  combatant: string;
+  condition: string;
+  wasRemoved: boolean; // False if condition didn't exist
+}
+
+export interface GMNPCRollResult {
+  type: "npc_roll";
+  combatant: string;
+  formula: string;
+  rolls: number[];
+  total: number;
+  dc?: number;
+  success?: boolean;
+  reason: string;
+  target?: string;
+  showToPlayer: boolean;
+}
+
+export interface GMAdvanceTurnResult {
+  type: "advance_turn";
+  previousCombatant?: string;
+  currentCombatant: string;
+  currentCombatantType: "player" | "ally" | "enemy" | "neutral";
+  round: number;
+  expiredConditions?: { combatant: string; condition: string }[];
+  allInactive?: boolean; // True if all combatants are inactive
+}
+
+export interface GMEndCombatResult {
+  type: "end_combat";
+  outcome: "victory" | "defeat" | "fled" | "truce" | "interrupted";
+  summary: string;
+  rounds: number;
+  syncedStats?: { stat: string; value: number }[];
+}
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -601,6 +708,62 @@ export async function executeGMTools(
         break;
       case "end_gm_thinking":
         result = executeEndGmThinking(call.id, params as RespondToPlayerParams);
+        break;
+      // Combat tools
+      case "start_combat":
+        result = executeStartCombat(
+          call.id,
+          params as StartCombatParams,
+          modified
+        );
+        break;
+      case "add_combatant":
+        result = executeAddCombatant(
+          call.id,
+          params as AddCombatantParams,
+          modified
+        );
+        break;
+      case "remove_combatant":
+        result = executeRemoveCombatant(
+          call.id,
+          params as RemoveCombatantParams,
+          modified
+        );
+        break;
+      case "update_combatant_stat":
+        result = executeUpdateCombatantStat(
+          call.id,
+          params as UpdateCombatantStatParams,
+          modified
+        );
+        break;
+      case "add_combatant_condition":
+        result = executeAddCombatantCondition(
+          call.id,
+          params as AddCombatantConditionParams,
+          modified
+        );
+        break;
+      case "remove_combatant_condition":
+        result = executeRemoveCombatantCondition(
+          call.id,
+          params as RemoveCombatantConditionParams,
+          modified
+        );
+        break;
+      case "npc_roll":
+        result = executeNPCRoll(call.id, params as NPCRollParams, modified);
+        break;
+      case "advance_turn":
+        result = executeAdvanceTurn(
+          call.id,
+          params as AdvanceTurnParams,
+          modified
+        );
+        break;
+      case "end_combat":
+        result = executeEndCombat(call.id, params as EndCombatParams, modified);
         break;
       default:
         // Delegate to state tool executor for tools like modify_stat, add_item, etc.
@@ -1632,47 +1795,21 @@ function flattenRolls(rolls: RollResult["rolls"]): number[] {
 }
 
 /**
- * Build a variable resolver from story data
- * Prioritizes characterData (new schema system) but falls back to stats
- */
-function buildResolver(
-  storyData: StoryData
-): (name: string) => number | undefined {
-  // If we have characterData from the new schema system, use it
-  if (storyData.characterData) {
-    // CharacterData has a .values property that contains the actual field values
-    const values = storyData.characterData.values || storyData.characterData;
-    return createSchemaBasedResolver(values as Record<string, unknown>);
-  }
-
-  // Fallback: build resolver from stats array (legacy system)
-  const statMap: Record<string, number> = {};
-  for (const stat of storyData.stats || []) {
-    statMap[stat.name] = stat.value;
-    // Also add common variations
-    statMap[stat.name.toLowerCase()] = stat.value;
-    statMap[stat.name.toUpperCase()] = stat.value;
-  }
-
-  return (name: string) => {
-    return statMap[name] ?? statMap[name.toLowerCase()];
-  };
-}
-
-/**
  * Execute a formula roll with optional DC check
+ * GM must provide formulas with actual numeric values (no variable substitution)
  */
 function executeFormulaRoll(
   toolCallId: string,
   params: FormulaRollParams,
   storyData: StoryData
 ): GMToolResult {
-  const resolver = buildResolver(storyData);
+  // No variable resolver - GM must provide actual numbers
+  void storyData; // Suppress unused parameter warning
 
   // Roll the formula
   let rollResult: RollResult;
   try {
-    rollResult = rollFormula(params.formula, resolver);
+    rollResult = rollFormula(params.formula);
   } catch (e) {
     return {
       toolName: "formula_roll",
@@ -1778,18 +1915,20 @@ function executeFormulaRoll(
 
 /**
  * Execute an opposed formula roll
+ * GM must provide formulas with actual numeric values (no variable substitution)
  */
 function executeOpposedFormula(
   toolCallId: string,
   params: OpposedFormulaParams,
   storyData: StoryData
 ): GMToolResult {
-  const resolver = buildResolver(storyData);
+  // No variable resolver - GM must provide actual numbers
+  void storyData; // Suppress unused parameter warning
 
   // Roll player's formula
   let playerResult: RollResult;
   try {
-    playerResult = rollFormula(params.player_formula, resolver);
+    playerResult = rollFormula(params.player_formula);
   } catch (e) {
     return {
       toolName: "opposed_formula",
@@ -1816,10 +1955,10 @@ function executeOpposedFormula(
     };
   }
 
-  // Roll opponent's formula (opponent formulas usually don't have variables)
+  // Roll opponent's formula
   let opponentResult: RollResult;
   try {
-    opponentResult = rollFormula(params.opponent_formula, () => undefined);
+    opponentResult = rollFormula(params.opponent_formula);
   } catch (e) {
     return {
       toolName: "opposed_formula",
@@ -1951,12 +2090,12 @@ function executeFormulaChallengeCheck(
     };
   }
 
-  const resolver = buildResolver(storyData);
+  // No variable resolver - GM must provide actual numbers
 
   // Roll the formula
   let rollResult: RollResult;
   try {
-    rollResult = rollFormula(params.formula, resolver);
+    rollResult = rollFormula(params.formula);
   } catch (e) {
     return {
       toolName: "formula_challenge_check",
@@ -2464,5 +2603,931 @@ function executeEndGmThinking(
       dramaticMoment: params.dramatic_moment,
     } as GMEndGmThinkingResult,
     contextForStory,
+  };
+}
+
+// ============================================
+// COMBAT TOOL EXECUTORS
+// ============================================
+
+/**
+ * Roll initiative for a combatant using their initiative formula
+ */
+function rollInitiative(initiative: string): number {
+  // Check if it's a fixed number
+  const fixed = parseFloat(initiative);
+  if (!isNaN(fixed)) {
+    return fixed;
+  }
+
+  // It's a dice formula, roll it
+  try {
+    const result = rollFormula(initiative);
+    return result.total;
+  } catch {
+    // Fallback to 0 if formula is invalid
+    console.error(`Invalid initiative formula: ${initiative}`);
+    return 0;
+  }
+}
+
+/**
+ * Flatten dice group results into a flat array of numbers
+ */
+function flattenDiceRolls(rollResult: RollResult): number[] {
+  return rollResult.rolls.flatMap((group) => group.keptRolls);
+}
+
+/**
+ * Safely push to combat log (initializes if undefined)
+ */
+function logCombat(combatState: CombatState, message: string): void {
+  if (!combatState.log) {
+    combatState.log = [];
+  }
+  combatState.log.push(message);
+}
+
+/**
+ * Find a combatant by name (case-insensitive fuzzy match)
+ */
+function findCombatant(
+  combatState: CombatState,
+  name: string
+): Combatant | undefined {
+  const lowerName = name.toLowerCase();
+  return combatState.combatants.find(
+    (c) =>
+      c.name.toLowerCase() === lowerName ||
+      c.id.toLowerCase() === lowerName ||
+      c.name.toLowerCase().includes(lowerName)
+  );
+}
+
+/**
+ * Sort combatants by initiative (highest first) and update turn order
+ */
+function updateTurnOrder(combatState: CombatState): void {
+  const activeCombatants = combatState.combatants
+    .filter((c) => c.isActive)
+    .sort((a, b) => (b.initiativeRoll ?? 0) - (a.initiativeRoll ?? 0));
+
+  combatState.turnOrder = activeCombatants.map((c) => c.id);
+}
+
+/**
+ * Initialize combat state
+ */
+function executeStartCombat(
+  toolCallId: string,
+  params: StartCombatParams,
+  storyData: StoryData
+): GMToolResult {
+  // Check if combat is already active
+  if (storyData.combatState?.active) {
+    return {
+      toolName: "start_combat",
+      toolCallId,
+      success: false,
+      result: {
+        type: "start_combat",
+        name: params.name,
+        description: params.description,
+      } as GMStartCombatResult,
+      contextForStory: `[Combat Error: Combat already in progress - "${storyData.combatState.name}"]`,
+    };
+  }
+
+  // Initialize new combat state
+  storyData.combatState = {
+    active: true,
+    name: params.name,
+    combatants: [],
+    turnOrder: [],
+    currentTurnIndex: 0,
+    round: 1,
+    log: [`Combat started: ${params.name}`],
+  };
+
+  if (params.description) {
+    logCombat(storyData.combatState, `Situation: ${params.description}`);
+  }
+
+  return {
+    toolName: "start_combat",
+    toolCallId,
+    success: true,
+    result: {
+      type: "start_combat",
+      name: params.name,
+      description: params.description,
+    } as GMStartCombatResult,
+    contextForStory: `[Combat Started: "${params.name}"${
+      params.description ? ` - ${params.description}` : ""
+    }]`,
+  };
+}
+
+/**
+ * Add a combatant to active combat
+ */
+function executeAddCombatant(
+  toolCallId: string,
+  params: AddCombatantParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.combatState?.active) {
+    return {
+      toolName: "add_combatant",
+      toolCallId,
+      success: false,
+      result: {
+        type: "add_combatant",
+        name: params.name,
+        combatantType: params.type,
+        stats: params.stats,
+        initiative: params.initiative,
+      } as GMAddCombatantResult,
+      contextForStory: `[Combat Error: No active combat - cannot add combatant]`,
+    };
+  }
+
+  // Check for duplicate name
+  if (findCombatant(storyData.combatState, params.name)) {
+    return {
+      toolName: "add_combatant",
+      toolCallId,
+      success: false,
+      result: {
+        type: "add_combatant",
+        name: params.name,
+        combatantType: params.type,
+        stats: params.stats,
+        initiative: params.initiative,
+      } as GMAddCombatantResult,
+      contextForStory: `[Combat Error: Combatant "${params.name}" already exists]`,
+    };
+  }
+
+  // Roll initiative
+  const initiativeRoll = rollInitiative(params.initiative);
+
+  // Create the combatant
+  const combatant: Combatant = {
+    id: `combatant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name: params.name,
+    type: params.type,
+    stats: params.stats,
+    conditions: [],
+    initiative: params.initiative,
+    initiativeRoll,
+    loreRef: params.lore_ref,
+    isActive: true,
+    notes: params.notes,
+  };
+
+  storyData.combatState.combatants.push(combatant);
+
+  // Update turn order with new combatant
+  updateTurnOrder(storyData.combatState);
+
+  // Log the addition
+  const statsStr = Object.entries(params.stats)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join(", ");
+  logCombat(
+    storyData.combatState,
+    `${params.name} (${params.type}) joined combat with ${statsStr}. Initiative: ${initiativeRoll}`
+  );
+
+  return {
+    toolName: "add_combatant",
+    toolCallId,
+    success: true,
+    result: {
+      type: "add_combatant",
+      name: params.name,
+      combatantType: params.type,
+      stats: params.stats,
+      initiative: params.initiative,
+      initiativeRoll,
+      loreRef: params.lore_ref,
+      notes: params.notes,
+    } as GMAddCombatantResult,
+    contextForStory: `[Combatant Added: ${params.name} (${params.type}) - ${statsStr} - Initiative: ${initiativeRoll}]`,
+  };
+}
+
+/**
+ * Remove a combatant from combat
+ */
+function executeRemoveCombatant(
+  toolCallId: string,
+  params: RemoveCombatantParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.combatState?.active) {
+    return {
+      toolName: "remove_combatant",
+      toolCallId,
+      success: false,
+      result: {
+        type: "remove_combatant",
+        name: params.combatant,
+        reason: params.reason,
+      } as GMRemoveCombatantResult,
+      contextForStory: `[Combat Error: No active combat]`,
+    };
+  }
+
+  const combatant = findCombatant(storyData.combatState, params.combatant);
+  if (!combatant) {
+    return {
+      toolName: "remove_combatant",
+      toolCallId,
+      success: false,
+      result: {
+        type: "remove_combatant",
+        name: params.combatant,
+        reason: params.reason,
+      } as GMRemoveCombatantResult,
+      contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
+    };
+  }
+
+  // Store final stats before removal
+  const finalStats = { ...combatant.stats };
+
+  // Mark as inactive instead of removing (keeps history)
+  combatant.isActive = false;
+
+  // Update turn order
+  updateTurnOrder(storyData.combatState);
+
+  // Log removal
+  const reasonText =
+    params.reason === "other" ? params.narrative || "removed" : params.reason;
+  logCombat(storyData.combatState, `${combatant.name} ${reasonText}`);
+
+  return {
+    toolName: "remove_combatant",
+    toolCallId,
+    success: true,
+    result: {
+      type: "remove_combatant",
+      name: combatant.name,
+      reason: params.reason,
+      narrative: params.narrative,
+      finalStats,
+    } as GMRemoveCombatantResult,
+    contextForStory: `[Combatant Removed: ${combatant.name} - ${reasonText}]`,
+  };
+}
+
+/**
+ * Update a combatant's stat
+ */
+function executeUpdateCombatantStat(
+  toolCallId: string,
+  params: UpdateCombatantStatParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.combatState?.active) {
+    return {
+      toolName: "update_combatant_stat",
+      toolCallId,
+      success: false,
+      result: {
+        type: "update_combatant_stat",
+        combatant: params.combatant,
+        stat: params.stat,
+        oldValue: 0,
+        newValue: 0,
+        change: 0,
+      } as GMUpdateCombatantStatResult,
+      contextForStory: `[Combat Error: No active combat]`,
+    };
+  }
+
+  const combatant = findCombatant(storyData.combatState, params.combatant);
+  if (!combatant) {
+    return {
+      toolName: "update_combatant_stat",
+      toolCallId,
+      success: false,
+      result: {
+        type: "update_combatant_stat",
+        combatant: params.combatant,
+        stat: params.stat,
+        oldValue: 0,
+        newValue: 0,
+        change: 0,
+      } as GMUpdateCombatantStatResult,
+      contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
+    };
+  }
+
+  const oldValue = combatant.stats[params.stat] ?? 0;
+  let newValue: number;
+  let change: number;
+  let diceRolled: number[] | undefined;
+
+  const valueStr = String(params.value);
+
+  // Check if it's an absolute value (starts with =)
+  if (valueStr.startsWith("=")) {
+    const absValue = parseFloat(valueStr.slice(1));
+    if (isNaN(absValue)) {
+      return {
+        toolName: "update_combatant_stat",
+        toolCallId,
+        success: false,
+        result: {
+          type: "update_combatant_stat",
+          combatant: params.combatant,
+          stat: params.stat,
+          oldValue,
+          newValue: oldValue,
+          change: 0,
+        } as GMUpdateCombatantStatResult,
+        contextForStory: `[Combat Error: Invalid absolute value "${valueStr}"]`,
+      };
+    }
+    newValue = absValue;
+    change = newValue - oldValue;
+  }
+  // Check if it's a dice formula (contains 'd')
+  else if (valueStr.toLowerCase().includes("d")) {
+    try {
+      // Handle +/- prefix for dice rolls
+      const isSubtraction = valueStr.startsWith("-");
+      const formula = isSubtraction
+        ? valueStr.slice(1)
+        : valueStr.replace(/^\+/, "");
+      const result = rollFormula(formula);
+      diceRolled = flattenDiceRolls(result);
+      change = isSubtraction ? -result.total : result.total;
+      newValue = oldValue + change;
+    } catch {
+      return {
+        toolName: "update_combatant_stat",
+        toolCallId,
+        success: false,
+        result: {
+          type: "update_combatant_stat",
+          combatant: params.combatant,
+          stat: params.stat,
+          oldValue,
+          newValue: oldValue,
+          change: 0,
+        } as GMUpdateCombatantStatResult,
+        contextForStory: `[Combat Error: Invalid dice formula "${valueStr}"]`,
+      };
+    }
+  }
+  // Otherwise, it's a numeric delta
+  else {
+    const numericValue =
+      typeof params.value === "number" ? params.value : parseFloat(valueStr);
+    if (isNaN(numericValue)) {
+      return {
+        toolName: "update_combatant_stat",
+        toolCallId,
+        success: false,
+        result: {
+          type: "update_combatant_stat",
+          combatant: params.combatant,
+          stat: params.stat,
+          oldValue,
+          newValue: oldValue,
+          change: 0,
+        } as GMUpdateCombatantStatResult,
+        contextForStory: `[Combat Error: Invalid value "${params.value}"]`,
+      };
+    }
+    change = numericValue;
+    newValue = oldValue + change;
+  }
+
+  // Apply the change
+  combatant.stats[params.stat] = newValue;
+
+  // Log the change
+  const changeStr = change >= 0 ? `+${change}` : `${change}`;
+  const logEntry = params.reason
+    ? `${combatant.name} ${params.stat}: ${oldValue} → ${newValue} (${changeStr}) - ${params.reason}`
+    : `${combatant.name} ${params.stat}: ${oldValue} → ${newValue} (${changeStr})`;
+  logCombat(storyData.combatState, logEntry);
+
+  const diceInfo = diceRolled ? ` [rolled: ${diceRolled.join(", ")}]` : "";
+
+  return {
+    toolName: "update_combatant_stat",
+    toolCallId,
+    success: true,
+    result: {
+      type: "update_combatant_stat",
+      combatant: combatant.name,
+      stat: params.stat,
+      oldValue,
+      newValue,
+      change,
+      reason: params.reason,
+      diceRolled,
+    } as GMUpdateCombatantStatResult,
+    contextForStory: `[${combatant.name} ${
+      params.stat
+    }: ${oldValue} → ${newValue} (${changeStr})${
+      params.reason ? ` - ${params.reason}` : ""
+    }${diceInfo}]`,
+  };
+}
+
+/**
+ * Add a condition to a combatant
+ */
+function executeAddCombatantCondition(
+  toolCallId: string,
+  params: AddCombatantConditionParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.combatState?.active) {
+    return {
+      toolName: "add_combatant_condition",
+      toolCallId,
+      success: false,
+      result: {
+        type: "add_combatant_condition",
+        combatant: params.combatant,
+        condition: params.condition,
+        duration: params.duration,
+        wasUpdate: false,
+      } as GMAddCombatantConditionResult,
+      contextForStory: `[Combat Error: No active combat]`,
+    };
+  }
+
+  const combatant = findCombatant(storyData.combatState, params.combatant);
+  if (!combatant) {
+    return {
+      toolName: "add_combatant_condition",
+      toolCallId,
+      success: false,
+      result: {
+        type: "add_combatant_condition",
+        combatant: params.combatant,
+        condition: params.condition,
+        duration: params.duration,
+        wasUpdate: false,
+      } as GMAddCombatantConditionResult,
+      contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
+    };
+  }
+
+  // Check if condition already exists
+  const existingIdx = combatant.conditions.findIndex(
+    (c) => c.name.toLowerCase() === params.condition.toLowerCase()
+  );
+  let wasUpdate = false;
+
+  if (existingIdx >= 0) {
+    // Update existing condition's duration if new one is longer
+    const existing = combatant.conditions[existingIdx];
+    if (params.duration !== undefined) {
+      if (
+        existing.duration === undefined ||
+        params.duration > existing.duration
+      ) {
+        existing.duration = params.duration;
+        wasUpdate = true;
+      }
+    }
+  } else {
+    // Add new condition
+    combatant.conditions.push({
+      name: params.condition,
+      duration: params.duration,
+    });
+  }
+
+  const durationText =
+    params.duration !== undefined ? ` for ${params.duration} turns` : "";
+  logCombat(
+    storyData.combatState,
+    `${combatant.name} gained condition: ${params.condition}${durationText}`
+  );
+
+  return {
+    toolName: "add_combatant_condition",
+    toolCallId,
+    success: true,
+    result: {
+      type: "add_combatant_condition",
+      combatant: combatant.name,
+      condition: params.condition,
+      duration: params.duration,
+      wasUpdate,
+    } as GMAddCombatantConditionResult,
+    contextForStory: `[${combatant.name} ${
+      wasUpdate ? "extended" : "gained"
+    } condition: ${params.condition}${durationText}]`,
+  };
+}
+
+/**
+ * Remove a condition from a combatant
+ */
+function executeRemoveCombatantCondition(
+  toolCallId: string,
+  params: RemoveCombatantConditionParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.combatState?.active) {
+    return {
+      toolName: "remove_combatant_condition",
+      toolCallId,
+      success: false,
+      result: {
+        type: "remove_combatant_condition",
+        combatant: params.combatant,
+        condition: params.condition,
+        wasRemoved: false,
+      } as GMRemoveCombatantConditionResult,
+      contextForStory: `[Combat Error: No active combat]`,
+    };
+  }
+
+  const combatant = findCombatant(storyData.combatState, params.combatant);
+  if (!combatant) {
+    return {
+      toolName: "remove_combatant_condition",
+      toolCallId,
+      success: false,
+      result: {
+        type: "remove_combatant_condition",
+        combatant: params.combatant,
+        condition: params.condition,
+        wasRemoved: false,
+      } as GMRemoveCombatantConditionResult,
+      contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
+    };
+  }
+
+  const conditionIdx = combatant.conditions.findIndex(
+    (c) => c.name.toLowerCase() === params.condition.toLowerCase()
+  );
+
+  if (conditionIdx < 0) {
+    return {
+      toolName: "remove_combatant_condition",
+      toolCallId,
+      success: true,
+      result: {
+        type: "remove_combatant_condition",
+        combatant: combatant.name,
+        condition: params.condition,
+        wasRemoved: false,
+      } as GMRemoveCombatantConditionResult,
+      contextForStory: `[${combatant.name} did not have condition: ${params.condition}]`,
+    };
+  }
+
+  combatant.conditions.splice(conditionIdx, 1);
+  logCombat(
+    storyData.combatState,
+    `${combatant.name} lost condition: ${params.condition}`
+  );
+
+  return {
+    toolName: "remove_combatant_condition",
+    toolCallId,
+    success: true,
+    result: {
+      type: "remove_combatant_condition",
+      combatant: combatant.name,
+      condition: params.condition,
+      wasRemoved: true,
+    } as GMRemoveCombatantConditionResult,
+    contextForStory: `[${combatant.name} lost condition: ${params.condition}]`,
+  };
+}
+
+/**
+ * Make a roll for an NPC
+ */
+function executeNPCRoll(
+  toolCallId: string,
+  params: NPCRollParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.combatState?.active) {
+    return {
+      toolName: "npc_roll",
+      toolCallId,
+      success: false,
+      result: {
+        type: "npc_roll",
+        combatant: params.combatant,
+        formula: params.formula,
+        rolls: [],
+        total: 0,
+        reason: params.reason,
+        showToPlayer: params.show_to_player ?? false,
+      } as GMNPCRollResult,
+      contextForStory: `[Combat Error: No active combat]`,
+    };
+  }
+
+  const combatant = findCombatant(storyData.combatState, params.combatant);
+  if (!combatant) {
+    return {
+      toolName: "npc_roll",
+      toolCallId,
+      success: false,
+      result: {
+        type: "npc_roll",
+        combatant: params.combatant,
+        formula: params.formula,
+        rolls: [],
+        total: 0,
+        reason: params.reason,
+        showToPlayer: params.show_to_player ?? false,
+      } as GMNPCRollResult,
+      contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
+    };
+  }
+
+  // Roll the formula
+  let rollResult: RollResult;
+  try {
+    rollResult = rollFormula(params.formula);
+  } catch {
+    return {
+      toolName: "npc_roll",
+      toolCallId,
+      success: false,
+      result: {
+        type: "npc_roll",
+        combatant: combatant.name,
+        formula: params.formula,
+        rolls: [],
+        total: 0,
+        reason: params.reason,
+        showToPlayer: params.show_to_player ?? false,
+      } as GMNPCRollResult,
+      contextForStory: `[Combat Error: Invalid dice formula "${params.formula}"]`,
+    };
+  }
+
+  // Check success if DC provided
+  let success: boolean | undefined;
+  if (params.dc !== undefined) {
+    success = rollResult.total >= params.dc;
+  }
+
+  // Log the roll
+  const dcText = params.dc !== undefined ? ` vs DC ${params.dc}` : "";
+  const successText =
+    success !== undefined ? (success ? " - SUCCESS" : " - FAIL") : "";
+  const targetText = params.target ? ` targeting ${params.target}` : "";
+  logCombat(
+    storyData.combatState,
+    `${combatant.name} rolled ${params.formula}${targetText}: ${rollResult.total}${dcText}${successText} - ${params.reason}`
+  );
+
+  const showToPlayer = params.show_to_player ?? false;
+
+  return {
+    toolName: "npc_roll",
+    toolCallId,
+    success: true,
+    result: {
+      type: "npc_roll",
+      combatant: combatant.name,
+      formula: params.formula,
+      rolls: flattenDiceRolls(rollResult),
+      total: rollResult.total,
+      dc: params.dc,
+      success,
+      reason: params.reason,
+      target: params.target,
+      showToPlayer,
+    } as GMNPCRollResult,
+    contextForStory: `[NPC Roll: ${combatant.name} rolled ${params.formula}${targetText} = ${rollResult.total}${dcText}${successText} - ${params.reason}]`,
+  };
+}
+
+/**
+ * Advance to the next turn in combat
+ */
+function executeAdvanceTurn(
+  toolCallId: string,
+  params: AdvanceTurnParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.combatState?.active) {
+    return {
+      toolName: "advance_turn",
+      toolCallId,
+      success: false,
+      result: {
+        type: "advance_turn",
+        currentCombatant: "",
+        currentCombatantType: "neutral",
+        round: 0,
+      } as GMAdvanceTurnResult,
+      contextForStory: `[Combat Error: No active combat]`,
+    };
+  }
+
+  const skipInactive = params.skip_inactive !== false;
+
+  // Decrement condition durations and collect expired ones
+  const expiredConditions: { combatant: string; condition: string }[] = [];
+  for (const combatant of storyData.combatState.combatants) {
+    if (!combatant.isActive) continue;
+
+    combatant.conditions = combatant.conditions.filter((condition) => {
+      if (condition.duration !== undefined) {
+        condition.duration--;
+        if (condition.duration <= 0) {
+          expiredConditions.push({
+            combatant: combatant.name,
+            condition: condition.name,
+          });
+          logCombat(
+            storyData.combatState!,
+            `${combatant.name}'s ${condition.name} expired`
+          );
+          return false;
+        }
+      }
+      return true;
+    });
+  }
+
+  // Get previous combatant
+  const previousIdx = storyData.combatState.currentTurnIndex;
+  const previousId = storyData.combatState.turnOrder[previousIdx];
+  const previousCombatant = storyData.combatState.combatants.find(
+    (c) => c.id === previousId
+  );
+
+  // Move to next turn
+  let nextIdx = (previousIdx + 1) % storyData.combatState.turnOrder.length;
+  let loopCount = 0;
+
+  // Find next active combatant
+  while (loopCount < storyData.combatState.turnOrder.length) {
+    const candidateId = storyData.combatState.turnOrder[nextIdx];
+    const candidate = storyData.combatState.combatants.find(
+      (c) => c.id === candidateId
+    );
+
+    if (candidate?.isActive || !skipInactive) {
+      break;
+    }
+
+    nextIdx = (nextIdx + 1) % storyData.combatState.turnOrder.length;
+    loopCount++;
+  }
+
+  // Check if we completed a full round
+  if (nextIdx <= previousIdx) {
+    storyData.combatState.round++;
+    logCombat(
+      storyData.combatState,
+      `--- Round ${storyData.combatState.round} ---`
+    );
+  }
+
+  storyData.combatState.currentTurnIndex = nextIdx;
+
+  // Get current combatant
+  const currentId = storyData.combatState.turnOrder[nextIdx];
+  const currentCombatant = storyData.combatState.combatants.find(
+    (c) => c.id === currentId
+  );
+
+  if (!currentCombatant) {
+    return {
+      toolName: "advance_turn",
+      toolCallId,
+      success: false,
+      result: {
+        type: "advance_turn",
+        currentCombatant: "",
+        currentCombatantType: "neutral",
+        round: storyData.combatState.round,
+        allInactive: true,
+      } as GMAdvanceTurnResult,
+      contextForStory: `[Combat: All combatants inactive - combat should end]`,
+    };
+  }
+
+  logCombat(storyData.combatState, `${currentCombatant.name}'s turn`);
+
+  return {
+    toolName: "advance_turn",
+    toolCallId,
+    success: true,
+    result: {
+      type: "advance_turn",
+      previousCombatant: previousCombatant?.name,
+      currentCombatant: currentCombatant.name,
+      currentCombatantType: currentCombatant.type,
+      round: storyData.combatState.round,
+      expiredConditions:
+        expiredConditions.length > 0 ? expiredConditions : undefined,
+    } as GMAdvanceTurnResult,
+    contextForStory: `[Turn: ${currentCombatant.name} (${
+      currentCombatant.type
+    }) - Round ${storyData.combatState.round}${
+      expiredConditions.length > 0
+        ? ` | Expired: ${expiredConditions
+            .map((e) => `${e.combatant}'s ${e.condition}`)
+            .join(", ")}`
+        : ""
+    }]`,
+  };
+}
+
+/**
+ * End combat and optionally sync player stats
+ */
+function executeEndCombat(
+  toolCallId: string,
+  params: EndCombatParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.combatState?.active) {
+    return {
+      toolName: "end_combat",
+      toolCallId,
+      success: false,
+      result: {
+        type: "end_combat",
+        outcome: params.outcome,
+        summary: params.summary,
+        rounds: 0,
+      } as GMEndCombatResult,
+      contextForStory: `[Combat Error: No active combat to end]`,
+    };
+  }
+
+  const rounds = storyData.combatState.round;
+  const syncStats = params.sync_player_stats !== false;
+  const syncedStats: { stat: string; value: number }[] = [];
+
+  // Find player combatant and sync stats
+  if (syncStats) {
+    const playerCombatant = storyData.combatState.combatants.find(
+      (c) => c.type === "player"
+    );
+    if (playerCombatant && storyData.resources) {
+      // Sync combatant stats to character resources
+      for (const [statName, statValue] of Object.entries(
+        playerCombatant.stats
+      )) {
+        const resource = storyData.resources.find(
+          (r) => r.name.toLowerCase() === statName.toLowerCase()
+        );
+        if (resource) {
+          resource.value = Math.max(0, Math.min(statValue, resource.maxValue));
+          syncedStats.push({ stat: resource.name, value: resource.value });
+        }
+      }
+    }
+  }
+
+  // Log combat end
+  logCombat(
+    storyData.combatState,
+    `Combat ended: ${params.outcome} - ${params.summary}`
+  );
+
+  // Store the final log for reference but deactivate combat
+  storyData.combatState.active = false;
+
+  return {
+    toolName: "end_combat",
+    toolCallId,
+    success: true,
+    result: {
+      type: "end_combat",
+      outcome: params.outcome,
+      summary: params.summary,
+      rounds,
+      syncedStats: syncedStats.length > 0 ? syncedStats : undefined,
+    } as GMEndCombatResult,
+    contextForStory: `[Combat Ended: ${
+      params.outcome
+    } after ${rounds} rounds - ${params.summary}${
+      syncedStats.length > 0
+        ? ` | Stats synced: ${syncedStats
+            .map((s) => `${s.stat}=${s.value}`)
+            .join(", ")}`
+        : ""
+    }]`,
   };
 }
