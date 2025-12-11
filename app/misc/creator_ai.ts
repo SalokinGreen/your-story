@@ -616,6 +616,8 @@ export function buildCreatorMessages({
 Your goal is to help the user design a text adventure game scenario.
 You can brainstorm ideas, write content, and most importantly, GENERATE SCENARIO DATA.
 
+**STYLE RULE: Do NOT use emojis in any content you generate.** Use #icon(name) syntax for icons in templates, or text symbols where appropriate. Emojis look unprofessional in game content.
+
 When the user asks you to create or modify parts of the scenario (like "create a dragon boss", "make a sci-fi setting", "add a healing potion"), you MUST include a JSON block in your response containing the structured data.
 
 ### JSON Structure Rules:
@@ -1767,6 +1769,8 @@ export function buildCreatorMessagesWithTools({
   const systemPrompt = `You are an expert Game Designer and Creative Writer assistant.
 Your goal is to help the user design a text adventure game scenario.
 You can brainstorm ideas, write content, and modify the scenario using the available tools.
+
+**STYLE RULE: Do NOT use emojis in any content you generate.** Use #icon(name) syntax for icons in templates, or text symbols where appropriate. Emojis look unprofessional in game content.
 
 ## How to Use Tools
 

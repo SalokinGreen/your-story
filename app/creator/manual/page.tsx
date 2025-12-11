@@ -89,6 +89,7 @@ import CharacterSheet from "@/app/components/CharacterSheet";
 import {
   CharacterSchema,
   CharacterData,
+  SchemaPage,
   createDefaultCharacterData,
   PRESET_SCHEMAS,
 } from "@/app/misc/characterSchema";
@@ -1550,6 +1551,22 @@ function AdventureCreatorContent() {
         // Cast to Partial<CharacterSchema> to access optional fields
         const incoming = data.characterSchema as Partial<CharacterSchema>;
 
+        // Transform pages from flat AI format (html, css, js) to nested template format
+        const transformPages = (pages: any[]): SchemaPage[] => {
+          return pages.map((p: any) => ({
+            id: p.id,
+            name: p.name,
+            icon: p.icon || "FileText",
+            order: p.order ?? 0,
+            // If AI already provided nested template, use it; otherwise construct from flat fields
+            template: p.template || {
+              html: p.html || "",
+              css: p.css || "",
+              js: p.js || "",
+            },
+          }));
+        };
+
         // Smart merge: don't overwrite non-empty arrays with empty arrays
         // This prevents tool-populated data from being wiped by raw AI response
         const merged: CharacterSchema = {
@@ -1566,7 +1583,7 @@ function AdventureCreatorContent() {
               : base.categories || [],
           pages:
             incoming.pages && incoming.pages.length > 0
-              ? incoming.pages
+              ? transformPages(incoming.pages)
               : base.pages || [],
           resources:
             incoming.resources && incoming.resources.length > 0

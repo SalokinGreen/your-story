@@ -72,11 +72,14 @@ function CustomPageRenderer({
 
   const htmlDoc = useMemo(() => {
     if (!storyData.characterSchema || !storyData.characterData) return "";
+    // Get base URL for resolving relative paths like /icons/...
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
     return buildPageTemplateDocument(
       page,
       storyData.characterSchema,
       storyData.characterData.values,
-      context
+      context,
+      baseUrl
     );
   }, [page, storyData.characterSchema, storyData.characterData, context]);
 
@@ -235,7 +238,7 @@ function CustomPageRenderer({
           <iframe
             ref={iframeRef}
             srcDoc={htmlDoc}
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-same-origin"
             className="w-full border-0 bg-transparent pointer-events-none"
             style={{
               height: `${height}px`,

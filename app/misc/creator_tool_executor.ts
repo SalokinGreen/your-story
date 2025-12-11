@@ -1895,7 +1895,30 @@ export function executeCreatorTool(
       }
 
       case "add_schema_pages": {
-        const pages = args.pages as SchemaPage[];
+        // AI sends flat structure (html, css, js), we need nested template
+        const rawPages = args.pages as Array<{
+          id: string;
+          name: string;
+          icon?: string;
+          order?: number;
+          html?: string;
+          css?: string;
+          js?: string;
+          template?: { html: string; css: string; js?: string };
+        }>;
+        const pages: SchemaPage[] = rawPages.map((p) => ({
+          id: p.id,
+          name: p.name,
+          icon: p.icon || "FileText",
+          order: p.order ?? 0,
+          // If AI already provided nested template, use it; otherwise construct from flat fields
+          template: p.template || {
+            html: p.html || "",
+            css: p.css || "",
+            js: p.js || "",
+          },
+        }));
+
         const existingSchema: CharacterSchema = currentState.storyData
           .characterSchema || {
           version: 1,
@@ -1928,9 +1951,19 @@ export function executeCreatorTool(
       }
 
       case "modify_schema_pages": {
-        const modifications = args.pages as Array<
-          Partial<SchemaPage> & { id: string }
-        >;
+        // AI sends flat structure (html, css, js), we need to merge into nested template
+        const rawMods = args.pages as Array<{
+          id: string;
+          new_id?: string;
+          name?: string;
+          icon?: string;
+          order?: number;
+          html?: string;
+          css?: string;
+          js?: string;
+          template?: { html?: string; css?: string; js?: string };
+        }>;
+
         const existingSchema: CharacterSchema = currentState.storyData
           .characterSchema || {
           version: 1,
@@ -1941,13 +1974,43 @@ export function executeCreatorTool(
         };
         const existingPages = [...(existingSchema.pages || [])];
 
-        for (const mod of modifications) {
+        for (const mod of rawMods) {
           const idx = existingPages.findIndex((p) => p.id === mod.id);
           if (idx === -1) {
             changesList.push(`Page "${mod.id}" not found, skipped`);
             continue;
           }
-          existingPages[idx] = { ...existingPages[idx], ...mod } as SchemaPage;
+
+          const existing = existingPages[idx];
+          const baseTemplate = existing.template || {
+            html: "",
+            css: "",
+            js: "",
+          };
+
+          // Build template updates from flat fields or nested template
+          const templateUpdates: { html?: string; css?: string; js?: string } =
+            {};
+          if (mod.html !== undefined) templateUpdates.html = mod.html;
+          if (mod.css !== undefined) templateUpdates.css = mod.css;
+          if (mod.js !== undefined) templateUpdates.js = mod.js;
+          if (mod.template) {
+            if (mod.template.html !== undefined)
+              templateUpdates.html = mod.template.html;
+            if (mod.template.css !== undefined)
+              templateUpdates.css = mod.template.css;
+            if (mod.template.js !== undefined)
+              templateUpdates.js = mod.template.js;
+          }
+
+          existingPages[idx] = {
+            ...existing,
+            ...(mod.new_id && { id: mod.new_id }),
+            ...(mod.name && { name: mod.name }),
+            ...(mod.icon && { icon: mod.icon }),
+            ...(mod.order !== undefined && { order: mod.order }),
+            template: { ...baseTemplate, ...templateUpdates },
+          };
           changesList.push(`Modified schema page: ${existingPages[idx].name}`);
         }
 

@@ -643,21 +643,36 @@ export function validateSchema(schema: CharacterSchema): ValidationResult {
  * - {{fieldId.current}} / {{fieldId.max}} - Resource sub-values
  * - {{length fieldId}} - Array length
  * - {{#if fieldId}}...{{/if}} - Conditional blocks (truthy check)
+ * - {{#if (expr)}}...{{/if}} - Conditional with expression (see below)
  * - {{#unless fieldId}}...{{/unless}} - Inverse conditional
+ * - {{#unless (expr)}}...{{/unless}} - Inverse conditional with expression
  * - {{#each fieldId}}...{{/each}} - List iteration ({{this}} for item, {{@index}}, {{@first}}, {{@last}} for position)
  * - {{#times N}}...{{/times}} - Repeat content N times ({{@index}} available)
  * - {{#compare fieldId "op" value}}...{{/compare}} - Comparison (op: ==, !=, >, <, >=, <=)
  * - {{resource:resourceId}} - Resource URL substitution
  * - {{percent fieldId}} - Resource as percentage (current/max * 100)
+ * - {{modifier fieldId}} - Number with +/- prefix (e.g., +3, -1)
+ * - {{subtract a b}}, {{add a b}}, {{mul a b}}, {{div a b}} - Math operations
+ * - #icon(name) - Resolves to game icon (e.g., #icon(sword), #icon(health))
+ *
+ * Expression syntax for conditionals:
+ * - (compare left "op" right) - Comparison: (compare health.current "<" (div health.max 2))
+ * - (filter array "prop" "value") - Filter array: (filter inventory "category" "weapon")
+ * - (or expr1 expr2 ...) - Boolean OR: (or (filter inv "cat" "a") (filter inv "cat" "b"))
+ * - (and expr1 expr2 ...) - Boolean AND
+ * - (not expr) - Boolean NOT
+ * - (gt a b), (lt a b), (eq a b) - Comparisons returning boolean
+ * - (div a b), (mul a b), (add a b), (sub a b) - Math operations
  */
 export function processTemplate(
   template: string,
   values: Record<string, CharacterFieldValue>,
-  resources?: SchemaResource[]
+  resources?: SchemaResource[],
+  baseUrl?: string
 ): string {
   let result = template;
 
-  // Icon resolution: #icon(name) - resolves to best-matching icon and renders inline SVG
+  // Icon resolution: #icon(name) - resolves to best-matching icon and renders as img
   // This allows AI-generated templates to use readable icon names that get
   // fuzzy-matched to actual icons from our icon database
   result = result.replace(/#icon\(([^)]+)\)/g, (_, iconName) => {
@@ -668,10 +683,16 @@ export function processTemplate(
       return `<span style="font-size: 1em; line-height: 1;">${resolved}</span>`;
     }
 
-    // Check if it's a game-icon and render inline SVG
+    // Check if it's a game-icon and render using CSS mask
+    // This works in sandboxed iframes with absolute URLs
     const iconPath = getGameIconPath(resolved);
     if (iconPath) {
-      return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="width: 1em; height: 1em; display: inline-block; vertical-align: -0.125em; fill: currentColor;"><path d="${iconPath}"/></svg>`;
+      // Build absolute URL if baseUrl provided (needed for sandboxed iframes)
+      const fullUrl = baseUrl ? `${baseUrl}${iconPath}` : iconPath;
+      // Use mask-image with LUMINANCE mode: the SVG has black background + white icon paths
+      // In luminance mode: white = opaque, black = transparent
+      // Must explicitly set mask-mode: luminance (default is alpha which doesn't work for these SVGs)
+      return `<span style="display: inline-block; width: 1.5em; height: 1.5em; vertical-align: -0.3em; background-color: currentColor; -webkit-mask-image: url('${fullUrl}'); mask-image: url('${fullUrl}'); -webkit-mask-mode: luminance; mask-mode: luminance; -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center;"></span>`;
     }
 
     // Fallback: return a placeholder circle
@@ -719,45 +740,184 @@ export function processTemplate(
   };
 
   // Helper to evaluate simple expressions like (div a b), (mul a b), etc.
+  // Also handles nested expressions recursively
   const evalExpression = (
     expr: string,
     contextValues: Record<string, CharacterFieldValue> = values
-  ): number => {
-    // Match (func arg1 arg2)
-    const funcMatch = expr.match(/^\((\w+)\s+([^\s]+)\s+([^\s)]+)\)$/);
-    if (funcMatch) {
-      const [, func, arg1, arg2] = funcMatch;
-      const val1 =
-        typeof resolveValueRef(arg1, contextValues) === "number"
-          ? (resolveValueRef(arg1, contextValues) as number)
-          : parseFloat(arg1) || 0;
-      const val2 =
-        typeof resolveValueRef(arg2, contextValues) === "number"
-          ? (resolveValueRef(arg2, contextValues) as number)
-          : parseFloat(arg2) || 0;
+  ): number | boolean | unknown[] => {
+    expr = expr.trim();
 
+    // Handle nested parenthetical expressions by finding matching parens
+    if (expr.startsWith("(")) {
+      // Find the function name and parse arguments respecting nesting
+      const funcEndIdx = expr.indexOf(" ", 1);
+      if (funcEndIdx === -1) return 0;
+      const func = expr.slice(1, funcEndIdx);
+      const argsStr = expr.slice(funcEndIdx + 1, expr.length - 1);
+
+      // Parse arguments respecting nested parentheses
+      const args: string[] = [];
+      let current = "";
+      let depth = 0;
+      let inQuote = false;
+
+      for (let i = 0; i < argsStr.length; i++) {
+        const char = argsStr[i];
+        if (char === '"' && argsStr[i - 1] !== "\\") {
+          inQuote = !inQuote;
+          current += char;
+        } else if (!inQuote && char === "(") {
+          depth++;
+          current += char;
+        } else if (!inQuote && char === ")") {
+          depth--;
+          current += char;
+        } else if (!inQuote && char === " " && depth === 0) {
+          if (current.trim()) args.push(current.trim());
+          current = "";
+        } else {
+          current += char;
+        }
+      }
+      if (current.trim()) args.push(current.trim());
+
+      // Evaluate based on function
       switch (func) {
-        case "div":
+        case "div": {
+          const val1 = Number(evalExpression(args[0], contextValues));
+          const val2 = Number(evalExpression(args[1], contextValues));
           return val2 !== 0 ? Math.floor(val1 / val2) : 0;
-        case "mul":
+        }
+        case "mul": {
+          const val1 = Number(evalExpression(args[0], contextValues));
+          const val2 = Number(evalExpression(args[1], contextValues));
           return val1 * val2;
-        case "add":
+        }
+        case "add": {
+          const val1 = Number(evalExpression(args[0], contextValues));
+          const val2 = Number(evalExpression(args[1], contextValues));
           return val1 + val2;
-        case "sub":
+        }
+        case "sub": {
+          const val1 = Number(evalExpression(args[0], contextValues));
+          const val2 = Number(evalExpression(args[1], contextValues));
           return val1 - val2;
-        case "mod":
+        }
+        case "mod": {
+          const val1 = Number(evalExpression(args[0], contextValues));
+          const val2 = Number(evalExpression(args[1], contextValues));
           return val2 !== 0 ? val1 % val2 : 0;
-        case "min":
+        }
+        case "min": {
+          const val1 = Number(evalExpression(args[0], contextValues));
+          const val2 = Number(evalExpression(args[1], contextValues));
           return Math.min(val1, val2);
-        case "max":
+        }
+        case "max": {
+          const val1 = Number(evalExpression(args[0], contextValues));
+          const val2 = Number(evalExpression(args[1], contextValues));
           return Math.max(val1, val2);
+        }
+        case "compare": {
+          // (compare left "op" right) - returns boolean
+          const left = Number(evalExpression(args[0], contextValues));
+          const op = args[1].replace(/"/g, "");
+          const right = Number(evalExpression(args[2], contextValues));
+          switch (op) {
+            case "==":
+              return left === right;
+            case "!=":
+              return left !== right;
+            case ">":
+              return left > right;
+            case "<":
+              return left < right;
+            case ">=":
+              return left >= right;
+            case "<=":
+              return left <= right;
+            default:
+              return false;
+          }
+        }
+        case "or": {
+          // (or expr1 expr2 ...) - returns true if any expression is truthy
+          for (const arg of args) {
+            const result = evalExpression(arg, contextValues);
+            if (isTruthyValue(result)) return true;
+          }
+          return false;
+        }
+        case "and": {
+          // (and expr1 expr2 ...) - returns true if all expressions are truthy
+          for (const arg of args) {
+            const result = evalExpression(arg, contextValues);
+            if (!isTruthyValue(result)) return false;
+          }
+          return true;
+        }
+        case "not": {
+          // (not expr) - negates the expression
+          const result = evalExpression(args[0], contextValues);
+          return !isTruthyValue(result);
+        }
+        case "filter": {
+          // (filter arrayField "property" "value") - returns filtered array
+          const arrayFieldName = args[0];
+          const prop = args[1].replace(/"/g, "");
+          const val = args[2].replace(/"/g, "");
+
+          // Get the array from values
+          const arrayValue = contextValues[arrayFieldName];
+          if (!Array.isArray(arrayValue)) return [];
+
+          return arrayValue.filter((item) => {
+            if (typeof item === "object" && item !== null) {
+              return (item as Record<string, unknown>)[prop] === val;
+            }
+            return false;
+          });
+        }
+        case "gt": {
+          // (gt a b) - greater than, returns boolean
+          const a = Number(evalExpression(args[0], contextValues));
+          const b = Number(evalExpression(args[1], contextValues));
+          return a > b;
+        }
+        case "lt": {
+          // (lt a b) - less than, returns boolean
+          const a = Number(evalExpression(args[0], contextValues));
+          const b = Number(evalExpression(args[1], contextValues));
+          return a < b;
+        }
+        case "eq": {
+          // (eq a b) - equals, returns boolean
+          const a = evalExpression(args[0], contextValues);
+          const b = evalExpression(args[1], contextValues);
+          return a === b;
+        }
         default:
           return 0;
       }
     }
+
     // Not an expression, try to resolve as value reference or parse as number
     const resolved = resolveValueRef(expr, contextValues);
-    return typeof resolved === "number" ? resolved : parseFloat(expr) || 0;
+    if (typeof resolved === "number") return resolved;
+    if (typeof resolved === "string") {
+      const num = parseFloat(resolved);
+      return isNaN(num) ? 0 : num;
+    }
+    return 0;
+  };
+
+  // Helper to check if a value is truthy
+  const isTruthyValue = (val: unknown): boolean => {
+    if (Array.isArray(val)) return val.length > 0;
+    if (typeof val === "boolean") return val;
+    if (typeof val === "number") return val !== 0;
+    if (typeof val === "string") return val !== "";
+    return !!val;
   };
 
   // Enhanced evalCompare that supports field.property refs and expressions
@@ -880,8 +1040,9 @@ export function processTemplate(
 
   // Process {{#compare expr "op" expr}}...{{/compare}} blocks
   // Supports field.property references and (func arg1 arg2) expressions
+  // Accepts both single and double quotes around the operator
   result = result.replace(
-    /\{\{#compare\s+([^\s"]+)\s+"([^"]+)"\s+([^}]+)\}\}([\s\S]*?)\{\{\/compare\}\}/g,
+    /\{\{#compare\s+([^\s"']+)\s+["']([^"']+)["']\s+([^}]+)\}\}([\s\S]*?)\{\{\/compare\}\}/g,
     (_, leftExpr, op, rightExpr, content) => {
       return evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim())
         ? content
@@ -889,13 +1050,85 @@ export function processTemplate(
     }
   );
 
-  // Process {{#if (compare fieldId "op" value)}}...{{/if}} - nested comparison syntax
+  // Process {{#if field op value}}...{{/if}} - inline comparison syntax
+  // e.g., {{#if sanity.current < 50}}, {{#if health.current >= 100}}
+  // Must come BEFORE the s-expression and simple field patterns
+  // Use a function to find the matching {{/if}} to handle nested blocks
+  const processInlineIfComparisons = (input: string): string => {
+    const ifPattern = /\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s*(>=|<=|!=|==|>|<)\s*(\d+(?:\.\d+)?)\s*\}\}/g;
+    let output = input;
+    let match;
+    
+    while ((match = ifPattern.exec(input)) !== null) {
+      const fullMatch = match[0];
+      const leftExpr = match[1];
+      const op = match[2];
+      const rightExpr = match[3];
+      const startIdx = match.index;
+      
+      // Find the matching {{/if}}
+      let depth = 1;
+      let searchIdx = startIdx + fullMatch.length;
+      let endIdx = -1;
+      
+      while (searchIdx < input.length && depth > 0) {
+        const nextIf = input.indexOf('{{#if', searchIdx);
+        const nextEndIf = input.indexOf('{{/if}}', searchIdx);
+        
+        if (nextEndIf === -1) break;
+        
+        if (nextIf !== -1 && nextIf < nextEndIf) {
+          depth++;
+          searchIdx = nextIf + 5;
+        } else {
+          depth--;
+          if (depth === 0) {
+            endIdx = nextEndIf;
+          }
+          searchIdx = nextEndIf + 7;
+        }
+      }
+      
+      if (endIdx !== -1) {
+        const content = input.slice(startIdx + fullMatch.length, endIdx);
+        const conditionResult = evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim());
+        const replacement = conditionResult ? content : '';
+        output = output.slice(0, startIdx) + replacement + output.slice(endIdx + 7);
+        // Reset pattern to search from beginning since string changed
+        ifPattern.lastIndex = 0;
+        input = output;
+      }
+    }
+    
+    return output;
+  };
+  result = processInlineIfComparisons(result);
+
+  // Process {{#if (expression)}}...{{/if}} - general expression syntax
+  // Handles any s-expression: (compare ...), (or ...), (and ...), (filter ...), (gt ...), (lt ...), etc.
+  // Must come BEFORE the simple {{#if fieldId}} pattern
   result = result.replace(
-    /\{\{#if\s+\(compare\s+([^\s"]+)\s+"([^"]+)"\s+([^)]+)\)\}\}([\s\S]*?)\{\{\/if\}\}/g,
-    (_, leftExpr, op, rightExpr, content) => {
-      return evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim())
-        ? content
-        : "";
+    /\{\{#if\s+(\([^]*?\))\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    (match, expr, content) => {
+      // Need to find matching closing paren for the expression
+      // Count parens to handle nested expressions like (compare a "<" (div b 2))
+      let parenDepth = 0;
+      let exprEnd = 0;
+      for (let i = 0; i < expr.length; i++) {
+        if (expr[i] === "(") parenDepth++;
+        else if (expr[i] === ")") {
+          parenDepth--;
+          if (parenDepth === 0) {
+            exprEnd = i + 1;
+            break;
+          }
+        }
+      }
+      if (parenDepth !== 0) return match; // Malformed expression
+
+      const fullExpr = expr.slice(0, exprEnd);
+      const result = evalExpression(fullExpr);
+      return isTruthyValue(result) ? content : "";
     }
   );
 
@@ -915,15 +1148,83 @@ export function processTemplate(
     }
   );
 
-  // Process {{#unless (compare fieldId "op" value)}}...{{/unless}} - nested comparison syntax
+  // Process {{#unless (expression)}}...{{/unless}} - general expression syntax
+  // Must come BEFORE the simple {{#unless fieldId}} pattern
   result = result.replace(
-    /\{\{#unless\s+\(compare\s+([^\s"]+)\s+"([^"]+)"\s+([^)]+)\)\}\}([\s\S]*?)\{\{\/unless\}\}/g,
-    (_, leftExpr, op, rightExpr, content) => {
-      return !evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim())
-        ? content
-        : "";
+    /\{\{#unless\s+(\([^]*?\))\}\}([\s\S]*?)\{\{\/unless\}\}/g,
+    (match, expr, content) => {
+      // Need to find matching closing paren for the expression
+      let parenDepth = 0;
+      let exprEnd = 0;
+      for (let i = 0; i < expr.length; i++) {
+        if (expr[i] === "(") parenDepth++;
+        else if (expr[i] === ")") {
+          parenDepth--;
+          if (parenDepth === 0) {
+            exprEnd = i + 1;
+            break;
+          }
+        }
+      }
+      if (parenDepth !== 0) return match; // Malformed expression
+
+      const fullExpr = expr.slice(0, exprEnd);
+      const result = evalExpression(fullExpr);
+      return !isTruthyValue(result) ? content : "";
     }
   );
+
+  // Process {{#unless field op value}}...{{/unless}} - inline comparison syntax
+  // e.g., {{#unless sanity.current < 50}}, {{#unless health.current >= 100}}
+  const processInlineUnlessComparisons = (input: string): string => {
+    const unlessPattern = /\{\{#unless\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s*(>=|<=|!=|==|>|<)\s*(\d+(?:\.\d+)?)\s*\}\}/g;
+    let output = input;
+    let match;
+    
+    while ((match = unlessPattern.exec(input)) !== null) {
+      const fullMatch = match[0];
+      const leftExpr = match[1];
+      const op = match[2];
+      const rightExpr = match[3];
+      const startIdx = match.index;
+      
+      // Find the matching {{/unless}}
+      let depth = 1;
+      let searchIdx = startIdx + fullMatch.length;
+      let endIdx = -1;
+      
+      while (searchIdx < input.length && depth > 0) {
+        const nextUnless = input.indexOf('{{#unless', searchIdx);
+        const nextEndUnless = input.indexOf('{{/unless}}', searchIdx);
+        
+        if (nextEndUnless === -1) break;
+        
+        if (nextUnless !== -1 && nextUnless < nextEndUnless) {
+          depth++;
+          searchIdx = nextUnless + 9;
+        } else {
+          depth--;
+          if (depth === 0) {
+            endIdx = nextEndUnless;
+          }
+          searchIdx = nextEndUnless + 11;
+        }
+      }
+      
+      if (endIdx !== -1) {
+        const content = input.slice(startIdx + fullMatch.length, endIdx);
+        const conditionResult = evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim());
+        const replacement = !conditionResult ? content : '';
+        output = output.slice(0, startIdx) + replacement + output.slice(endIdx + 11);
+        // Reset pattern to search from beginning since string changed
+        unlessPattern.lastIndex = 0;
+        input = output;
+      }
+    }
+    
+    return output;
+  };
+  result = processInlineUnlessComparisons(result);
 
   // Process {{#unless fieldId}}...{{/unless}} blocks
   result = result.replace(
@@ -1013,6 +1314,59 @@ export function processTemplate(
     }
   );
 
+  // Process {{modifier fieldId}} - D&D-style modifier with +/- prefix
+  result = result.replace(
+    /\{\{modifier\s+([a-zA-Z_][a-zA-Z0-9_.]*)\}\}/g,
+    (_, fieldId) => {
+      const resolved = resolveValueRef(fieldId);
+      const num =
+        typeof resolved === "number"
+          ? resolved
+          : parseFloat(String(resolved)) || 0;
+      return num >= 0 ? `+${num}` : String(num);
+    }
+  );
+
+  // Process {{subtract a b}} - subtraction helper
+  result = result.replace(
+    /\{\{subtract\s+([^\s}]+)\s+([^\s}]+)\}\}/g,
+    (_, aExpr, bExpr) => {
+      const a = Number(evalExpression(aExpr));
+      const b = Number(evalExpression(bExpr));
+      return String(a - b);
+    }
+  );
+
+  // Process {{add a b}} - addition helper
+  result = result.replace(
+    /\{\{add\s+([^\s}]+)\s+([^\s}]+)\}\}/g,
+    (_, aExpr, bExpr) => {
+      const a = Number(evalExpression(aExpr));
+      const b = Number(evalExpression(bExpr));
+      return String(a + b);
+    }
+  );
+
+  // Process {{multiply a b}} / {{mul a b}} - multiplication helper
+  result = result.replace(
+    /\{\{(?:multiply|mul)\s+([^\s}]+)\s+([^\s}]+)\}\}/g,
+    (_, aExpr, bExpr) => {
+      const a = Number(evalExpression(aExpr));
+      const b = Number(evalExpression(bExpr));
+      return String(a * b);
+    }
+  );
+
+  // Process {{divide a b}} / {{div a b}} - division helper
+  result = result.replace(
+    /\{\{(?:divide|div)\s+([^\s}]+)\s+([^\s}]+)\}\}/g,
+    (_, aExpr, bExpr) => {
+      const a = Number(evalExpression(aExpr));
+      const b = Number(evalExpression(bExpr));
+      return b !== 0 ? String(Math.floor(a / b)) : "0";
+    }
+  );
+
   // Process {{fieldId.current}} and {{fieldId.max}} for resources
   result = result.replace(
     /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\.(current|max)\}\}/g,
@@ -1073,7 +1427,8 @@ export interface TemplateContext {
 export function buildTemplateDocument(
   schema: CharacterSchema,
   values: Record<string, CharacterFieldValue>,
-  context?: TemplateContext
+  context?: TemplateContext,
+  baseUrl?: string
 ): string {
   if (!schema.template) return "";
 
@@ -1092,7 +1447,8 @@ export function buildTemplateDocument(
   const processedHtml = processTemplate(
     schema.template.html,
     allValues,
-    schema.resources
+    schema.resources,
+    baseUrl
   );
   const css = schema.template.css || "";
   const js = schema.template.js || "";
@@ -1100,12 +1456,16 @@ export function buildTemplateDocument(
   // Create values object for JS access (include context values)
   const valuesJson = JSON.stringify(allValues);
 
+  // Base URL for resolving relative paths (like /icons/...)
+  const baseTag = baseUrl ? `<base href="${baseUrl}" />` : "";
+
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${baseTag}
   <style>
     * { box-sizing: border-box; }
     html, body { 
@@ -1116,7 +1476,15 @@ export function buildTemplateDocument(
       color: #e5e7eb;
       overflow: visible;
       height: auto;
+      /* Mobile-friendly defaults */
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
     }
+    /* Ensure images and other content don't overflow */
+    img, svg, canvas, video, iframe { max-width: 100%; height: auto; }
+    /* Base responsive container */
+    body > * { max-width: 100%; }
     ${css}
   </style>
 </head>
@@ -1175,7 +1543,8 @@ export function buildPageTemplateDocument(
   page: SchemaPage,
   schema: CharacterSchema,
   values: Record<string, CharacterFieldValue>,
-  context?: TemplateContext
+  context?: TemplateContext,
+  baseUrl?: string
 ): string {
   if (!page.template) return "";
 
@@ -1193,7 +1562,8 @@ export function buildPageTemplateDocument(
   const processedHtml = processTemplate(
     page.template.html,
     allValues,
-    schema.resources
+    schema.resources,
+    baseUrl
   );
   const css = page.template.css || "";
   const js = page.template.js || "";
@@ -1201,12 +1571,16 @@ export function buildPageTemplateDocument(
   // Create values object for JS access (include context values)
   const valuesJson = JSON.stringify(allValues);
 
+  // Base URL for resolving relative paths (like /icons/...)
+  const baseTag = baseUrl ? `<base href="${baseUrl}" />` : "";
+
   return `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${baseTag}
   <style>
     * { box-sizing: border-box; }
     html, body { 
@@ -1217,7 +1591,15 @@ export function buildPageTemplateDocument(
       color: #e5e7eb;
       overflow: visible;
       height: auto;
+      /* Mobile-friendly defaults */
+      width: 100%;
+      max-width: 100%;
+      overflow-x: hidden;
     }
+    /* Ensure images and other content don't overflow */
+    img, svg, canvas, video, iframe { max-width: 100%; height: auto; }
+    /* Base responsive container */
+    body > * { max-width: 100%; }
     ${css}
   </style>
 </head>

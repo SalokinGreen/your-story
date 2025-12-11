@@ -414,7 +414,9 @@ function CustomTemplateRenderer({
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
   const htmlDoc = useMemo(() => {
-    return buildTemplateDocument(schema, data.values, context);
+    // Get base URL for resolving relative paths like /icons/...
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    return buildTemplateDocument(schema, data.values, context, baseUrl);
   }, [schema, data.values, context]);
 
   // Auto-resize iframe based on content via postMessage from iframe
@@ -574,7 +576,7 @@ function CustomTemplateRenderer({
           <iframe
             ref={iframeRef}
             srcDoc={htmlDoc}
-            sandbox="allow-scripts"
+            sandbox="allow-scripts allow-same-origin"
             className="w-full border-0 bg-transparent pointer-events-none"
             style={{
               height: `${contentHeight}px`,

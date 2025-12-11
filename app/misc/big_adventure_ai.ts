@@ -1016,7 +1016,7 @@ CRITICAL INSTRUCTIONS:
 1. Output ONLY valid JSON - no markdown, no explanations, no text before or after
 2. Follow the exact schema provided for this stage
 3. Be creative and thematic - every element should fit the adventure concept
-4. Use appropriate emoji symbols for all items, stats, abilities, etc.
+4. Do NOT use emojis anywhere - use descriptive text symbols if needed (e.g., "[+]" or "*" for bullets)
 5. Ensure mechanical balance appropriate for the RPG system
 6. Create interconnected elements that reference each other (lore triggers, variable conditions, etc.)`;
 
@@ -1595,16 +1595,18 @@ TEMPLATE SYNTAX (for all pages):
 - {{fieldId}} - Insert field value
 - {{fieldId.current}}/{{fieldId.max}} - Resource values  
 - {{percent fieldId}} - Resource as percentage (for progress bars)
+- {{modifier fieldId}} - D&D-style modifier with +/- prefix (e.g., +3 or -1)
+- {{subtract a b}} - Subtract b from a (also: {{add a b}}, {{mul a b}}, {{div a b}})
 - {{length fieldId}} - Get array length (e.g., Total Items: {{length inventory}})
-- {{#if fieldId}}...{{/if}} - Conditional display
-- {{#unless fieldId}}...{{/unless}} - Inverse conditional
+- {{#if fieldId}}...{{/if}} - Conditional display (truthy check)
+- {{#unless fieldId}}...{{/unless}} - Inverse conditional (falsy check)
 - {{#each fieldId}}...{{/each}} - List iteration
   - For string lists: {{this}} = the string value
   - For object lists: {{this.name}}, {{this.emoji}}, {{this.description}}, {{this.quantity}}
   - Position helpers: {{@index}}, {{@first}}, {{@last}}
   - Conditional: {{#unless @last}}, {{/unless}} for separators
 - {{#times N}}...{{/times}} - Repeat content N times ({{@index}} available inside)
-- {{#compare fieldId ">" "10"}}...{{/compare}} - Comparisons
+- {{#compare fieldId ">" "10"}}...{{/compare}} - Comparisons (operators: ==, !=, <, >, <=, >=)
   - Supports field.property refs: {{#compare hp.current "<" (div hp.max 2)}}
   - Expression functions: (div a b), (mul a b), (add a b), (sub a b), (min a b), (max a b)
 
@@ -3464,7 +3466,7 @@ ${
 OUTPUT ONLY valid JSON matching this schema:
 ${sectionPrompt.schema}
 
-Be creative and thematic. Ensure new content integrates well with existing elements. Use appropriate emoji symbols.`;
+Be creative and thematic. Ensure new content integrates well with existing elements. Do NOT use emojis.`;
 
   return [
     { role: "system", content: systemPrompt },
@@ -3834,7 +3836,7 @@ IMPORTANT:
 - Do NOT duplicate any existing items listed above
 - Make new items complement and expand on the existing content
 - Ensure new content fits the adventure's theme and tone
-- Use appropriate emoji symbols
+- Do NOT use emojis anywhere
 - Fill your entire output budget with quality content
 
 OUTPUT ONLY valid JSON matching this schema:

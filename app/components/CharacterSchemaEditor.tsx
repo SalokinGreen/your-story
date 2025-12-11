@@ -1126,9 +1126,10 @@ function PageEditor({
   const [activeTab, setActiveTab] = useState<"html" | "css" | "js">("html");
 
   const updateTemplate = (updates: Partial<SchemaTemplate>) => {
+    const baseTemplate = page.template || { html: "", css: "", js: "" };
     onUpdate({
       ...page,
-      template: { ...page.template, ...updates },
+      template: { ...baseTemplate, ...updates },
     });
   };
 
@@ -1142,10 +1143,10 @@ function PageEditor({
       const end = textarea.selectionEnd;
       const value =
         activeTab === "html"
-          ? page.template.html
+          ? page.template?.html || ""
           : activeTab === "css"
-          ? page.template.css
-          : page.template.js || "";
+          ? page.template?.css || ""
+          : page.template?.js || "";
       const newValue = value.slice(0, start) + placeholder + value.slice(end);
       updateTemplate({ [activeTab]: newValue });
     }
@@ -1328,10 +1329,10 @@ function PageEditor({
               id={`page-${page.id}-${activeTab}`}
               value={
                 activeTab === "html"
-                  ? page.template.html
+                  ? page.template?.html || ""
                   : activeTab === "css"
-                  ? page.template.css
-                  : page.template.js || ""
+                  ? page.template?.css || ""
+                  : page.template?.js || ""
               }
               onChange={(e) => updateTemplate({ [activeTab]: e.target.value })}
               placeholder={
