@@ -11,6 +11,7 @@ import {
   DND5E_SCHEMA,
   COC_SCHEMA,
   NARRATIVE_SCHEMA,
+  processTemplate,
 } from "../app/misc/characterSchema";
 
 describe("Character Schema System", () => {
@@ -506,6 +507,118 @@ describe("Character Schema System", () => {
 
     it("handles decimal numbers", () => {
       expect(evaluateFormula("3.5 + 1.5", {})).toBe(5);
+    });
+  });
+
+  // ============================================
+  // TEMPLATE PROCESSOR (processTemplate)
+  // ============================================
+
+  describe("processTemplate", () => {
+    it("handles field names with spaces using quotes", () => {
+      const values = { "Days in Captivity": 5 };
+
+      // Simple value substitution with quoted field name
+      expect(processTemplate('{{"Days in Captivity"}}', values)).toBe("5");
+
+      // If block with quoted field name
+      expect(
+        processTemplate('{{#if "Days in Captivity"}}SHOW{{/if}}', values)
+      ).toBe("SHOW");
+
+      // Unless block with quoted field name (value is truthy, so don't show)
+      expect(
+        processTemplate(
+          '{{#unless "Days in Captivity"}}HIDE{{/unless}}',
+          values
+        )
+      ).toBe("");
+    });
+
+    it("handles nested add expressions", () => {
+      const values = {
+        skill_athletics: 3,
+        skill_stealth: 2,
+        skill_acrobatics: 4,
+      };
+
+      // Nested add with s-expression syntax
+      expect(
+        processTemplate(
+          "{{(add (add skill_athletics skill_stealth) skill_acrobatics)}}",
+          values
+        )
+      ).toBe("9");
+
+      // Multiple args in add helper
+      expect(
+        processTemplate(
+          "{{add skill_athletics skill_stealth skill_acrobatics}}",
+          values
+        )
+      ).toBe("9");
+    });
+
+    it("handles compare blocks with field refs", () => {
+      const values = { skill_persuasion: 5, skill_intimidation: 3 };
+
+      // Compare two fields - persuasion > intimidation
+      expect(
+        processTemplate(
+          '{{#compare skill_persuasion ">=" skill_intimidation}}YES{{/compare}}',
+          values
+        )
+      ).toBe("YES");
+
+      // Compare two fields - intimidation < persuasion
+      expect(
+        processTemplate(
+          '{{#compare skill_intimidation "<" skill_persuasion}}YES{{/compare}}',
+          values
+        )
+      ).toBe("YES");
+
+      // Compare that should be false
+      expect(
+        processTemplate(
+          '{{#compare skill_intimidation ">" skill_persuasion}}NO{{/compare}}',
+          values
+        )
+      ).toBe("");
+    });
+
+    it("handles each with quoted field names", () => {
+      const values = { "My Items": ["Sword", "Shield", "Potion"] };
+
+      expect(
+        processTemplate('{{#each "My Items"}}{{this}},{{/each}}', values)
+      ).toBe("Sword,Shield,Potion,");
+    });
+
+    it("handles simple field substitution", () => {
+      const values = { name: "Hero", level: 5 };
+
+      expect(processTemplate("{{name}} - Level {{level}}", values)).toBe(
+        "Hero - Level 5"
+      );
+    });
+
+    it("handles resource current/max", () => {
+      const values = { health: { current: 30, max: 50 } };
+
+      expect(
+        processTemplate("HP: {{health.current}}/{{health.max}}", values)
+      ).toBe("HP: 30/50");
+    });
+
+    it("handles math helpers with nested s-expressions", () => {
+      const values = { a: 10, b: 5, c: 2 };
+
+      // (a + b) * c = (10 + 5) * 2 = 30
+      expect(processTemplate("{{(mul (add a b) c)}}", values)).toBe("30");
+
+      // subtract with nested
+      expect(processTemplate("{{subtract (add a b) c}}", values)).toBe("13");
     });
   });
 });

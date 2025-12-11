@@ -1529,9 +1529,9 @@ function PagesEditor({ pages, resources, fields, onChange }: PagesEditorProps) {
       {/* Info */}
       <div className="text-xs text-gray-500 p-3 bg-gray-800/50 rounded">
         <p>
-          <strong>Pages vs Template:</strong> If you have pages, they will
-          appear as separate tabs in the stats panel. The single &quot;Custom
-          Template&quot; is for legacy support or simple sheets.
+          <strong>Tip:</strong> Each page appears as a separate tab in the
+          character sheet. Use this to organize different aspects like Overview,
+          Combat, Skills, Inventory, etc.
         </p>
       </div>
     </div>
@@ -1550,9 +1550,9 @@ export default function CharacterSchemaEditor({
   onUploadResource?: (file: File) => Promise<string>;
 }) {
   const [showPresets, setShowPresets] = useState(!schema);
-  const [activeTab, setActiveTab] = useState<
-    "fields" | "pages" | "template" | "resources"
-  >("fields");
+  const [activeTab, setActiveTab] = useState<"fields" | "pages" | "resources">(
+    "fields"
+  );
 
   // Create empty schema if none exists
   const currentSchema: CharacterSchema = schema || {
@@ -1778,20 +1778,7 @@ export default function CharacterSchemaEditor({
             </span>
           )}
         </button>
-        <button
-          onClick={() => setActiveTab("template")}
-          className={`px-4 py-2 font-medium rounded-t flex items-center gap-2 whitespace-nowrap ${
-            activeTab === "template"
-              ? "bg-gray-800 text-white border-b-2 border-purple-500"
-              : "text-gray-400 hover:text-white"
-          }`}
-        >
-          <DynamicIcon name="Code" className="w-4 h-4" />
-          Template
-          {currentSchema.hasCustomJS && (
-            <span className="text-xs text-yellow-400">⚠</span>
-          )}
-        </button>
+
         <button
           onClick={() => setActiveTab("resources")}
           className={`px-4 py-2 font-medium rounded-t flex items-center gap-2 whitespace-nowrap ${
@@ -1855,38 +1842,6 @@ export default function CharacterSchemaEditor({
             resources={currentSchema.resources}
             fields={currentSchema.fields}
             onChange={(pages) => updateSchema({ pages })}
-          />
-        </div>
-      )}
-
-      {activeTab === "template" && (
-        <div>
-          <div className="mb-4">
-            <h4 className="text-lg font-bold text-white mb-2 flex items-center gap-2">
-              <DynamicIcon name="Code" className="w-5 h-5 text-purple-400" />
-              Custom Template (Legacy)
-            </h4>
-            <p className="text-sm text-gray-400">
-              {currentSchema.pages && currentSchema.pages.length > 0 ? (
-                <span className="text-yellow-400">
-                  ⚠ You have Pages defined. This single template is only used
-                  for backwards compatibility. Consider using Pages instead for
-                  a better multi-tab experience.
-                </span>
-              ) : (
-                <>
-                  Create a single custom HTML/CSS layout for your character
-                  sheet. For multi-tab support, use the <strong>Pages</strong>{" "}
-                  tab instead.
-                </>
-              )}
-            </p>
-          </div>
-          <TemplateEditor
-            template={currentSchema.template}
-            resources={currentSchema.resources}
-            fields={currentSchema.fields}
-            onChange={(template) => updateSchema({ template })}
           />
         </div>
       )}

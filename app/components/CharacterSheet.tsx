@@ -22,7 +22,9 @@ import {
   recalculateDerivedFields,
   getNumericValue,
   buildTemplateDocument,
+  buildPageTemplateDocument,
   TemplateContext,
+  SchemaPage,
 } from "@/app/misc/characterSchema";
 
 // ============================================
@@ -593,6 +595,192 @@ function CustomTemplateRenderer({
 }
 
 // ============================================
+// PAGE RENDERER (for multi-page schemas)
+// ============================================
+
+interface PageRendererProps {
+  page: SchemaPage;
+  schema: CharacterSchema;
+  values: Record<string, CharacterFieldValue>;
+  context?: TemplateContext;
+}
+
+function PageRenderer({ page, schema, values, context }: PageRendererProps) {
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [contentHeight, setContentHeight] = useState(400);
+
+  // Pan and zoom state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+
+  const htmlDoc = useMemo(() => {
+    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
+    return buildPageTemplateDocument(page, schema, values, context, baseUrl);
+  }, [page, schema, values, context]);
+
+  // Auto-resize iframe
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      if (
+        event.data?.type === "iframeHeight" &&
+        typeof event.data.height === "number"
+      ) {
+        const newHeight = event.data.height + 32;
+        setContentHeight((h) => Math.max(h, newHeight));
+      }
+    };
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
+  }, []);
+
+  const handlePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      if ((e.target as HTMLElement).closest("button")) return;
+      setIsDragging(true);
+      dragStart.current = {
+        x: e.clientX,
+        y: e.clientY,
+        panX: pan.x,
+        panY: pan.y,
+      };
+      (e.target as HTMLElement).setPointerCapture(e.pointerId);
+    },
+    [pan]
+  );
+
+  const handlePointerMove = useCallback(
+    (e: React.PointerEvent) => {
+      if (!isDragging) return;
+      const dx = e.clientX - dragStart.current.x;
+      const dy = e.clientY - dragStart.current.y;
+      setPan({
+        x: dragStart.current.panX + dx,
+        y: dragStart.current.panY + dy,
+      });
+    },
+    [isDragging]
+  );
+
+  const handlePointerUp = useCallback((e: React.PointerEvent) => {
+    setIsDragging(false);
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  }, []);
+
+  const handleZoomIn = useCallback(
+    () => setZoom((z) => Math.min(z + 0.25, 3)),
+    []
+  );
+  const handleZoomOut = useCallback(
+    () => setZoom((z) => Math.max(z - 0.25, 0.25)),
+    []
+  );
+  const handleResetView = useCallback(() => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  }, []);
+
+  return (
+    <div className="relative w-full">
+      {/* Zoom controls */}
+      <div className="absolute top-2 right-2 z-10 flex gap-1 bg-gray-800/90 rounded-lg p-1 shadow-lg">
+        <button
+          onClick={handleZoomOut}
+          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+          title="Zoom out"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M20 12H4"
+            />
+          </svg>
+        </button>
+        <button
+          onClick={handleResetView}
+          className="px-2 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors text-sm font-medium min-w-12"
+          title="Reset view"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button
+          onClick={handleZoomIn}
+          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
+          title="Zoom in"
+        >
+          <svg
+            className="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
+            />
+          </svg>
+        </button>
+      </div>
+
+      {/* Container */}
+      <div
+        ref={containerRef}
+        className={`relative w-full rounded-lg bg-gray-900/30 ${
+          zoom === 1 ? "overflow-visible" : "overflow-hidden"
+        }`}
+        style={{
+          height: zoom === 1 ? "auto" : `${contentHeight}px`,
+          minHeight: "200px",
+          cursor: zoom !== 1 ? (isDragging ? "grabbing" : "grab") : "default",
+          touchAction: zoom !== 1 ? "none" : "auto",
+        }}
+        onPointerDown={zoom !== 1 ? handlePointerDown : undefined}
+        onPointerMove={zoom !== 1 ? handlePointerMove : undefined}
+        onPointerUp={zoom !== 1 ? handlePointerUp : undefined}
+        onPointerCancel={zoom !== 1 ? handlePointerUp : undefined}
+      >
+        <div
+          style={{
+            transform:
+              zoom !== 1
+                ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
+                : "none",
+            transformOrigin: "top left",
+            width: "100%",
+            transition: isDragging ? "none" : "transform 0.1s ease-out",
+          }}
+        >
+          <iframe
+            ref={iframeRef}
+            srcDoc={htmlDoc}
+            sandbox="allow-scripts allow-same-origin"
+            className="w-full border-0 bg-transparent pointer-events-none"
+            style={{
+              height: `${contentHeight}px`,
+              minHeight: "200px",
+              overflow: "hidden",
+            }}
+            title={`Character Sheet - ${page.name}`}
+            scrolling="no"
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // CATEGORY GROUP
 // ============================================
 
@@ -739,8 +927,12 @@ export default function CharacterSheet({
   compact = false,
   context,
 }: CharacterSheetProps) {
-  // Check if schema has a custom template
+  // Check if schema has custom template or pages
   const hasCustomTemplate = Boolean(schema.template?.html);
+  const hasCustomPages = Boolean(schema.pages && schema.pages.length > 0);
+  const [activePageId, setActivePageId] = useState<string | null>(
+    hasCustomPages ? schema.pages![0].id : null
+  );
 
   // Handle field value changes
   const handleFieldChange = useCallback(
@@ -794,7 +986,42 @@ export default function CharacterSheet({
     );
   }, [schema.categories]);
 
-  // If there's a custom template, render it (read-only mode only for custom templates)
+  // If there are custom pages, render them with tabs
+  if (hasCustomPages) {
+    const pages = schema.pages!;
+    const activePage = pages.find((p) => p.id === activePageId) || pages[0];
+
+    return (
+      <div className={compact ? "text-sm" : ""}>
+        {/* Page tabs */}
+        <div className="flex gap-1 border-b border-gray-700 overflow-x-auto mb-0">
+          {pages.map((page) => (
+            <button
+              key={page.id}
+              onClick={() => setActivePageId(page.id)}
+              className={`px-3 py-2 text-sm font-medium whitespace-nowrap transition-colors ${
+                page.id === activePage.id
+                  ? "bg-gray-800 text-white border-b-2 border-blue-500"
+                  : "text-gray-400 hover:text-white hover:bg-gray-800/50"
+              }`}
+            >
+              {page.name}
+            </button>
+          ))}
+        </div>
+
+        {/* Active page content */}
+        <PageRenderer
+          page={activePage}
+          schema={schema}
+          values={data.values}
+          context={context}
+        />
+      </div>
+    );
+  }
+
+  // If there's a custom template (legacy), render it (read-only mode only for custom templates)
   if (hasCustomTemplate && readOnly) {
     return (
       <div className={compact ? "text-sm" : ""}>

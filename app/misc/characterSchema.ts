@@ -915,7 +915,10 @@ export function processTemplate(
     }
 
     // Not an expression, try to resolve as value reference or parse as number
-    const resolved = resolveValueRef(expr, contextValues);
+    // Support quoted "field names with spaces" by stripping quotes
+    const cleanExpr =
+      expr.startsWith('"') && expr.endsWith('"') ? expr.slice(1, -1) : expr;
+    const resolved = resolveValueRef(cleanExpr, contextValues);
     if (typeof resolved === "number") return resolved;
     if (typeof resolved === "string") {
       const num = parseFloat(resolved);
@@ -964,9 +967,11 @@ export function processTemplate(
   // Process {{#each fieldId}}...{{/each}} blocks
   // Supports both simple string arrays ({{this}}) and object arrays ({{this.property}})
   // Also supports dotted field access like {{#each harm.tracks}}
+  // Supports quoted "field names with spaces"
   result = result.replace(
-    /\{\{#each\s+([a-zA-Z_][a-zA-Z0-9_.]*)\.?\}\}([\s\S]*?)\{\{\/each\}\}/g,
-    (_, fieldPath, content) => {
+    /\{\{#each\s+(?:"([^"]+)"|([a-zA-Z_][a-zA-Z0-9_.]*))\.?\}\}([\s\S]*?)\{\{\/each\}\}/g,
+    (_, quotedFieldPath, simpleFieldPath, content) => {
+      const fieldPath = quotedFieldPath || simpleFieldPath;
       // Support dotted paths like "harm.tracks"
       const parts = fieldPath.split(".");
       let value: unknown = values[parts[0]];
@@ -1052,14 +1057,16 @@ export function processTemplate(
   );
 
   // Process {{#compare expr "op" expr}}...{{/compare}} blocks
-  // Supports field.property references and (func arg1 arg2) expressions
+  // Supports field.property references, (func arg1 arg2) expressions, and "quoted field names"
   // Accepts both single and double quotes around the operator
+  // Uses a smarter parser to handle nested expressions
   result = result.replace(
-    /\{\{#compare\s+([^\s"']+)\s+["']([^"']+)["']\s+([^}]+)\}\}([\s\S]*?)\{\{\/compare\}\}/g,
+    /\{\{#compare\s+([\s\S]+?)\s+["']([^"']+)["']\s+([\s\S]+?)\}\}([\s\S]*?)\{\{\/compare\}\}/g,
     (_, leftExpr, op, rightExpr, content) => {
-      return evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim())
-        ? content
-        : "";
+      // Clean up the expressions - remove leading/trailing whitespace but preserve quotes
+      const cleanLeft = leftExpr.trim();
+      const cleanRight = rightExpr.trim();
+      return evalCompareEnhanced(cleanLeft, op, cleanRight) ? content : "";
     }
   );
 
@@ -1152,9 +1159,11 @@ export function processTemplate(
   );
 
   // Process {{#if fieldId}}...{{/if}} blocks (simple truthy check)
+  // Supports both simple field names and quoted "field names with spaces"
   result = result.replace(
-    /\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_.]*)\}\}([\s\S]*?)\{\{\/if\}\}/g,
-    (_, fieldId, content) => {
+    /\{\{#if\s+(?:"([^"]+)"|([a-zA-Z_][a-zA-Z0-9_.]*))\}\}([\s\S]*?)\{\{\/if\}\}/g,
+    (_, quotedFieldId, simpleFieldId, content) => {
+      const fieldId = quotedFieldId || simpleFieldId;
       // Support field.property syntax in if checks
       // First check raw values for booleans/arrays before resolving
       const rawValue = values[fieldId.split(".")[0]];
@@ -1252,9 +1261,11 @@ export function processTemplate(
   result = processInlineUnlessComparisons(result);
 
   // Process {{#unless fieldId}}...{{/unless}} blocks
+  // Supports both simple field names and quoted "field names with spaces"
   result = result.replace(
-    /\{\{#unless\s+([a-zA-Z_][a-zA-Z0-9_.]*)\}\}([\s\S]*?)\{\{\/unless\}\}/g,
-    (_, fieldId, content) => {
+    /\{\{#unless\s+(?:"([^"]+)"|([a-zA-Z_][a-zA-Z0-9_.]*))\}\}([\s\S]*?)\{\{\/unless\}\}/g,
+    (_, quotedFieldId, simpleFieldId, content) => {
+      const fieldId = quotedFieldId || simpleFieldId;
       // Support field.property syntax in unless checks
       // First check raw values for booleans/arrays before resolving
       const rawValue = values[fieldId.split(".")[0]];
@@ -1352,45 +1363,108 @@ export function processTemplate(
     }
   );
 
-  // Process {{subtract a b}} - subtraction helper
+  // Process {{(expression)}} - general s-expression evaluation
+  // Handles any nested s-expression like {{(add (add x y) z)}} or {{(compare a ">" b)}}
+  // Must come BEFORE the simpler {{add a b}} patterns
+  result = result.replace(/\{\{(\([^}]*\))\}\}/g, (match, expr) => {
+    // Find the matching closing paren for nested expressions
+    let parenDepth = 0;
+    let exprEnd = 0;
+    for (let i = 0; i < expr.length; i++) {
+      if (expr[i] === "(") parenDepth++;
+      else if (expr[i] === ")") {
+        parenDepth--;
+        if (parenDepth === 0) {
+          exprEnd = i + 1;
+          break;
+        }
+      }
+    }
+    if (parenDepth !== 0) return match; // Malformed expression
+
+    const fullExpr = expr.slice(0, exprEnd);
+    const result = evalExpression(fullExpr);
+    return String(result);
+  });
+
+  // Helper to parse math helper arguments that may contain nested expressions
+  // e.g., "add (add x y) z" -> ["(add x y)", "z"]
+  const parseMathHelperArgs = (content: string): string[] => {
+    const args: string[] = [];
+    let current = "";
+    let depth = 0;
+
+    for (let i = 0; i < content.length; i++) {
+      const char = content[i];
+      if (char === "(") {
+        depth++;
+        current += char;
+      } else if (char === ")") {
+        depth--;
+        current += char;
+      } else if (char === " " && depth === 0) {
+        if (current.trim()) {
+          args.push(current.trim());
+        }
+        current = "";
+      } else {
+        current += char;
+      }
+    }
+    if (current.trim()) {
+      args.push(current.trim());
+    }
+
+    return args;
+  };
+
+  // Process {{subtract ...}} - subtraction helper (supports nested expressions)
+  result = result.replace(/\{\{subtract\s+([^}]+)\}\}/g, (_, argsStr) => {
+    const args = parseMathHelperArgs(argsStr.trim());
+    if (args.length < 2) return "0";
+    let resultVal = Number(evalExpression(args[0]));
+    for (let i = 1; i < args.length; i++) {
+      resultVal -= Number(evalExpression(args[i]));
+    }
+    return String(resultVal);
+  });
+
+  // Process {{add ...}} - addition helper (supports nested expressions and multiple args)
+  result = result.replace(/\{\{add\s+([^}]+)\}\}/g, (_, argsStr) => {
+    const args = parseMathHelperArgs(argsStr.trim());
+    let resultVal = 0;
+    for (const arg of args) {
+      resultVal += Number(evalExpression(arg));
+    }
+    return String(resultVal);
+  });
+
+  // Process {{multiply ...}} / {{mul ...}} - multiplication helper (supports nested expressions)
   result = result.replace(
-    /\{\{subtract\s+([^\s}]+)\s+([^\s}]+)\}\}/g,
-    (_, aExpr, bExpr) => {
-      const a = Number(evalExpression(aExpr));
-      const b = Number(evalExpression(bExpr));
-      return String(a - b);
+    /\{\{(?:multiply|mul)\s+([^}]+)\}\}/g,
+    (_, argsStr) => {
+      const args = parseMathHelperArgs(argsStr.trim());
+      if (args.length < 1) return "0";
+      let resultVal = 1;
+      for (const arg of args) {
+        resultVal *= Number(evalExpression(arg));
+      }
+      return String(resultVal);
     }
   );
 
-  // Process {{add a b}} - addition helper
-  result = result.replace(
-    /\{\{add\s+([^\s}]+)\s+([^\s}]+)\}\}/g,
-    (_, aExpr, bExpr) => {
-      const a = Number(evalExpression(aExpr));
-      const b = Number(evalExpression(bExpr));
-      return String(a + b);
+  // Process {{divide ...}} / {{div ...}} - division helper (supports nested expressions)
+  result = result.replace(/\{\{(?:divide|div)\s+([^}]+)\}\}/g, (_, argsStr) => {
+    const args = parseMathHelperArgs(argsStr.trim());
+    if (args.length < 2) return "0";
+    let resultVal = Number(evalExpression(args[0]));
+    for (let i = 1; i < args.length; i++) {
+      const divisor = Number(evalExpression(args[i]));
+      if (divisor === 0) return "0";
+      resultVal = Math.floor(resultVal / divisor);
     }
-  );
-
-  // Process {{multiply a b}} / {{mul a b}} - multiplication helper
-  result = result.replace(
-    /\{\{(?:multiply|mul)\s+([^\s}]+)\s+([^\s}]+)\}\}/g,
-    (_, aExpr, bExpr) => {
-      const a = Number(evalExpression(aExpr));
-      const b = Number(evalExpression(bExpr));
-      return String(a * b);
-    }
-  );
-
-  // Process {{divide a b}} / {{div a b}} - division helper
-  result = result.replace(
-    /\{\{(?:divide|div)\s+([^\s}]+)\s+([^\s}]+)\}\}/g,
-    (_, aExpr, bExpr) => {
-      const a = Number(evalExpression(aExpr));
-      const b = Number(evalExpression(bExpr));
-      return b !== 0 ? String(Math.floor(a / b)) : "0";
-    }
-  );
+    return String(resultVal);
+  });
 
   // Process {{fieldId.current}} and {{fieldId.max}} for resources
   result = result.replace(
@@ -1421,9 +1495,11 @@ export function processTemplate(
   );
 
   // Simple value substitution: {{fieldId}} or {{fieldId || 'fallback'}}
+  // Also supports quoted "field names with spaces"
   result = result.replace(
-    /\{\{([a-zA-Z_][a-zA-Z0-9_]*)\s*(?:\|\|\s*['"]([^'"]*)['"]\s*)?\}\}/g,
-    (_, fieldId, fallback) => {
+    /\{\{(?:"([^"]+)"|([a-zA-Z_][a-zA-Z0-9_]*))\s*(?:\|\|\s*['"]([^'"]*)['"]\s*)?\}\}/g,
+    (_, quotedFieldId, simpleFieldId, fallback) => {
+      const fieldId = quotedFieldId || simpleFieldId;
       const value = values[fieldId];
       if (value === undefined || value === null || value === "") {
         return fallback ?? "";
