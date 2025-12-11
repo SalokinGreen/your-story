@@ -77,19 +77,13 @@ describe("Formula Roll Tool", () => {
     expect(rollResult.margin).toBeGreaterThanOrEqual(6); // minimum 11-5=6
   });
 
-  it("should resolve variables from characterData", async () => {
-    const storyData = createMockStoryData({
-      characterData: {
-        values: {
-          Strength_mod: 4, // floor((18-10)/2) = 4
-          proficiency: 3,
-        },
-      },
-    });
+  it("should roll with direct numbers (variables removed)", async () => {
+    // Variable substitution has been removed - GM must provide actual numbers
+    const storyData = createMockStoryData();
     const toolCall = createToolCall("formula_roll", {
-      formula: "1d20+{{Strength_mod}}+{{proficiency}}", // 1d20 + 4 + 3
+      formula: "1d20+4+3", // Direct numbers instead of variables
       dc: 15,
-      reason: "Testing variable resolution",
+      reason: "Testing direct number roll",
     });
 
     const result = await executeGMTools([toolCall], storyData);
@@ -98,20 +92,39 @@ describe("Formula Roll Tool", () => {
     // Total should be 1-20 + 4 + 3 = 8-27
     expect(rollResult.total).toBeGreaterThanOrEqual(8);
     expect(rollResult.total).toBeLessThanOrEqual(27);
-    expect(rollResult.resolvedFormula).toContain("4"); // STR mod
-    expect(rollResult.resolvedFormula).toContain("3"); // proficiency
   });
 
-  it("should fallback to stats array when no characterData", async () => {
+  it("should error when using variable syntax (variables removed)", async () => {
+    // Variable substitution has been removed - {{var}} syntax should fail
     const storyData = createMockStoryData({
-      stats: [
-        { name: "Dexterity", value: 16, description: "", symbol: "🎯" },
-        { name: "Dexterity_mod", value: 3, description: "", symbol: "🎯" }, // floor((16-10)/2) = 3
-      ],
+      characterData: {
+        values: {
+          Strength_mod: 4,
+          proficiency: 3,
+        },
+      },
     });
     const toolCall = createToolCall("formula_roll", {
-      formula: "1d20+{{Dexterity_mod}}",
-      reason: "Testing stat fallback",
+      formula: "1d20+{{Strength_mod}}+{{proficiency}}", // This should fail now
+      dc: 15,
+      reason: "Testing that variables cause error",
+    });
+
+    const result = await executeGMTools([toolCall], storyData);
+
+    // Should fail because variables are no longer resolved
+    expect(result.results[0].success).toBe(false);
+    expect(result.storyContext).toContain("ERROR");
+  });
+
+  it("should handle formula without variable substitution", async () => {
+    // Even with characterData, formulas use direct numbers now
+    const storyData = createMockStoryData({
+      stats: [{ name: "Dexterity", value: 16, description: "", symbol: "🎯" }],
+    });
+    const toolCall = createToolCall("formula_roll", {
+      formula: "1d20+3", // Direct number, not variable
+      reason: "Testing direct number with stats present",
     });
 
     const result = await executeGMTools([toolCall], storyData);
@@ -323,7 +336,7 @@ describe("Formula Challenge Check Tool", () => {
     expect(result.modifiedStoryData.activeChallenge?.result).toBe("won");
   });
 
-  it("should use characterData for variable resolution", async () => {
+  it("should use direct numbers (variables removed)", async () => {
     const challenge: SceneChallenge = {
       id: "test_challenge",
       name: "Athletic Challenge",
@@ -336,14 +349,9 @@ describe("Formula Challenge Check Tool", () => {
     };
     const storyData = createMockStoryData({
       activeChallenge: challenge,
-      characterData: {
-        values: {
-          Athletics: 7,
-        },
-      },
     });
     const toolCall = createToolCall("formula_challenge_check", {
-      formula: "1d20+{{Athletics}}",
+      formula: "1d20+7", // Direct number instead of variable
       dc: 10,
       description: "Push through the barrier",
       display_name: "Athletics Check",
@@ -361,23 +369,16 @@ describe("Formula Challenge Check Tool", () => {
 
 describe("Mixed GM Tools", () => {
   it("should handle multiple formula tool calls in sequence", async () => {
-    const storyData = createMockStoryData({
-      characterData: {
-        values: {
-          Strength_mod: 3, // floor((16-10)/2)
-          Dexterity_mod: 2, // floor((14-10)/2)
-        },
-      },
-    });
+    const storyData = createMockStoryData();
 
     const toolCalls = [
       createToolCall("formula_roll", {
-        formula: "1d20+{{Strength_mod}}",
+        formula: "1d20+3", // Direct numbers
         dc: 15,
         reason: "Break down the door",
       }),
       createToolCall("formula_roll", {
-        formula: "1d20+{{Dexterity_mod}}",
+        formula: "1d20+2", // Direct numbers
         reason: "Tumble through",
       }),
     ];
@@ -392,11 +393,6 @@ describe("Mixed GM Tools", () => {
   it("should work alongside legacy skill_check tool", async () => {
     const storyData = createMockStoryData({
       stats: [{ name: "Perception", value: 50, description: "", symbol: "👁️" }],
-      characterData: {
-        values: {
-          Wisdom_mod: 2, // floor((14-10)/2)
-        },
-      },
     });
 
     const toolCalls = [
@@ -406,7 +402,7 @@ describe("Mixed GM Tools", () => {
         reason: "Spot the hidden door",
       }),
       createToolCall("formula_roll", {
-        formula: "1d20+{{Wisdom_mod}}",
+        formula: "1d20+2", // Direct number
         dc: 12,
         reason: "Understand the mechanism",
       }),

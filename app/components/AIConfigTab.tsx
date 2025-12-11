@@ -112,13 +112,8 @@ export default function AIConfigTab() {
     }
     return true;
   });
-  const [gmStageEnabled, setGmStageEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      // Default to true (enabled) - GM stage is now the default architecture
-      return localStorage.getItem("gmStageEnabled") !== "false";
-    }
-    return true;
-  });
+  // GM Stage is now always enabled - removed the toggle
+  // Keeping displayGMThinking for showing/hiding GM reasoning in UI
   const [displayGMThinking, setDisplayGMThinking] = useState(() => {
     if (typeof window !== "undefined") {
       // Default to false - GM thinking is hidden by default

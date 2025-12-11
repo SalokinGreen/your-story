@@ -349,6 +349,28 @@ export interface SceneChallenge {
 }
 
 // ============================================
+// COUNTDOWN TIMER SYSTEM
+// ============================================
+
+/**
+ * A countdown timer that ticks down over GM turns
+ * Used for deadlines, rituals, time-limited events
+ * Unlike challenges (which track successes), timers simply count down
+ */
+export interface CountdownTimer {
+  id: string; // Unique identifier
+  name: string; // Display name (e.g., "Ritual Completion", "Reinforcements Arrive")
+  description?: string; // What happens when timer reaches 0
+  totalTicks: number; // Maximum ticks (set at creation)
+  currentTicks: number; // Remaining ticks (counts down to 0)
+  autoAdvance: boolean; // If true, automatically decrements each GM turn
+  status: "active" | "paused" | "triggered" | "cancelled";
+  visibility: "visible" | "hidden"; // Whether player sees the countdown
+  createdAt: number; // Timestamp when timer was created
+  triggeredAt?: number; // Timestamp when timer reached 0
+}
+
+// ============================================
 // COMBAT SYSTEM
 // ============================================
 
@@ -555,6 +577,7 @@ export interface StoryData {
   conditions: Condition[]; // Active conditions/afflictions affecting the player
   gameOver?: GameOver; // Game over state if the player has permanently died/lost
   activeChallenge?: SceneChallenge; // Current scene challenge (progress clock)
+  timers?: CountdownTimer[]; // Countdown timers for deadlines/events
   combatState?: CombatState; // Active tactical combat state (turn-based combat tracking)
   threads?: StoryThread[]; // Active story threads/plotlines (independent of AGMT)
   author_notes?: string;

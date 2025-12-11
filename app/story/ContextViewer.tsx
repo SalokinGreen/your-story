@@ -846,8 +846,10 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
               .reverse()
               .find((p) => !p.user);
             if (
-              lastAssistantPart?.gmToolCalls &&
-              lastAssistantPart.gmToolCalls.length > 0
+              (lastAssistantPart?.gmToolCalls &&
+                lastAssistantPart.gmToolCalls.length > 0) ||
+              (lastAssistantPart?.gmThinking &&
+                lastAssistantPart.gmThinking.length > 0)
             ) {
               return (
                 <div className="mx-2 sm:mx-4 mb-4 p-4 bg-cyan-50 dark:bg-cyan-900/20 border-2 border-cyan-300 dark:border-cyan-700 rounded-lg">
@@ -856,32 +858,62 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                     GM Stage Results (Last Turn)
                   </h4>
                   <div className="space-y-3">
-                    {lastAssistantPart.gmToolCalls.map(
-                      (tool: any, i: number) => (
-                        <div
-                          key={i}
-                          className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-cyan-200 dark:border-cyan-800"
-                        >
-                          <div className="flex items-center gap-2 mb-2">
-                            <span
-                              className={`text-lg ${
-                                tool.success ? "text-green-500" : "text-red-500"
-                              }`}
-                            >
-                              {tool.success ? "✓" : "✗"}
-                            </span>
-                            <span className="font-mono font-semibold text-gray-900 dark:text-white">
-                              {tool.toolName}
-                            </span>
+                    {/* GM Thinking/Reasoning */}
+                    {lastAssistantPart.gmThinking &&
+                      lastAssistantPart.gmThinking.length > 0 && (
+                        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                          <h5 className="font-semibold text-purple-700 dark:text-purple-400 mb-2 flex items-center gap-1">
+                            <DynamicIcon name="Brain" className="w-4 h-4" />
+                            GM Reasoning ({
+                              lastAssistantPart.gmThinking.length
+                            }{" "}
+                            blocks)
+                          </h5>
+                          <div className="space-y-2">
+                            {lastAssistantPart.gmThinking.map(
+                              (thinking: string, i: number) => (
+                                <pre
+                                  key={i}
+                                  className="text-xs text-purple-800 dark:text-purple-300 whitespace-pre-wrap bg-purple-100 dark:bg-purple-900/30 p-2 rounded"
+                                >
+                                  {thinking}
+                                </pre>
+                              )
+                            )}
                           </div>
-                          {tool.contextForStory && (
-                            <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 p-2 rounded">
-                              {tool.contextForStory}
-                            </pre>
-                          )}
                         </div>
-                      )
-                    )}
+                      )}
+                    {/* Tool Calls */}
+                    {lastAssistantPart.gmToolCalls &&
+                      lastAssistantPart.gmToolCalls.length > 0 &&
+                      lastAssistantPart.gmToolCalls.map(
+                        (tool: any, i: number) => (
+                          <div
+                            key={i}
+                            className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-cyan-200 dark:border-cyan-800"
+                          >
+                            <div className="flex items-center gap-2 mb-2">
+                              <span
+                                className={`text-lg ${
+                                  tool.success
+                                    ? "text-green-500"
+                                    : "text-red-500"
+                                }`}
+                              >
+                                {tool.success ? "✓" : "✗"}
+                              </span>
+                              <span className="font-mono font-semibold text-gray-900 dark:text-white">
+                                {tool.toolName}
+                              </span>
+                            </div>
+                            {tool.contextForStory && (
+                              <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 p-2 rounded">
+                                {tool.contextForStory}
+                              </pre>
+                            )}
+                          </div>
+                        )
+                      )}
                   </div>
                   {lastAssistantPart.gmStoryContext && (
                     <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">

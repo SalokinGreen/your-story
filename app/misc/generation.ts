@@ -508,7 +508,9 @@ export async function generateStoryTurn(
         contextLength: gmStoryContext.length,
         thinkingCount: gmThinking.length,
       });
-    } else if (options.enableGMStage) {
+    } else {
+      // GM Stage is always enabled - legacy tool calling has been removed
+      // The enableGMStage option is now ignored and GM stage always runs
       callbacks.onGMStageStart?.();
       logger.action("Stage 0.5: Running GM stage for mechanics determination");
 
@@ -1155,13 +1157,16 @@ export async function generateStoryTurn(
     // STAGE 2 & 3: Tools + Choices (in parallel)
     // ========================================
 
-    // Helper function for tools generation
+    // Helper function for tools generation (DEPRECATED - GM Stage is now always used)
     const runToolGeneration = async (): Promise<void> => {
-      // Skip tools stage if GM stage handled everything
-      if (options.enableGMStage) {
-        logger.action("Skipping tools stage (GM stage handled state changes)");
-        return;
-      }
+      // GM Stage is always enabled - legacy tool calling has been removed
+      // The enableGMStage option is now ignored and this function always returns early
+      logger.action(
+        "Skipping legacy tools stage (GM stage handles all state changes)"
+      );
+      return;
+
+      /* LEGACY CODE - KEPT FOR REFERENCE BUT NEVER EXECUTED
       if (!options.enableTools) return;
 
       callbacks.onToolsStart?.();
@@ -1379,6 +1384,7 @@ export async function generateStoryTurn(
         responses: allToolResponses.length,
         stateChanges: allStateChanges.length,
       });
+      END OF LEGACY CODE */
     };
 
     // Helper function for choices generation
@@ -1534,6 +1540,7 @@ export async function generateStoryTurn(
       stateChanges: allStateChanges.length > 0 ? allStateChanges : undefined,
       gmToolCalls: gmResults.length > 0 ? gmResults : undefined,
       gmStoryContext: gmStoryContext || undefined,
+      gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
     };
 
     const result: GenerationResult = {

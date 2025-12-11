@@ -8,6 +8,7 @@
   getMemoryContent,
   CombatState,
   Combatant,
+  CountdownTimer,
 } from "@/app/misc/structs";
 import { getRPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
@@ -454,6 +455,39 @@ export function formatCombatState(
     lines.push("### RECENT COMBAT LOG");
     const recentLog = combatState.log.slice(-10);
     lines.push(recentLog.join("\n"));
+  }
+
+  return lines.join("\n");
+}
+
+/**
+ * Format countdown timers for AI context
+ */
+export function formatTimersState(
+  timers: CountdownTimer[] | undefined
+): string {
+  if (!timers || timers.length === 0) return "";
+
+  // Only show active or paused timers (not triggered/cancelled)
+  const activeTimers = timers.filter(
+    (t) => t.status === "active" || t.status === "paused"
+  );
+  if (activeTimers.length === 0) return "";
+
+  const lines: string[] = [];
+  lines.push(`## ⏱️ ACTIVE TIMERS`);
+
+  for (const timer of activeTimers) {
+    const statusIcon = timer.status === "paused" ? "⏸️" : "⏰";
+    const advanceNote = timer.autoAdvance ? " (auto)" : " (manual)";
+    const visibilityNote = timer.visibility === "hidden" ? " [HIDDEN]" : "";
+
+    lines.push(
+      `${statusIcon} **${timer.name}**: ${timer.currentTicks}/${timer.totalTicks} ticks${advanceNote}${visibilityNote}`
+    );
+    if (timer.description) {
+      lines.push(`   → When triggered: ${timer.description}`);
+    }
   }
 
   return lines.join("\n");
@@ -2261,6 +2295,9 @@ export function buildGMStagePrompt({
   // Format combat state for context
   const combatSection = formatCombatState(storyData.combatState);
 
+  // Format timers state for context
+  const timersSection = formatTimersState(storyData.timers);
+
   let systemPrompt: string;
   let toolsToUse: any[];
 
@@ -2460,7 +2497,9 @@ ${schema.description || "Custom character sheet system"}
 
 ## CURRENT CHARACTER
 ${characterSummary}
-${combatSection ? `\n${combatSection}` : ""}
+${combatSection ? `\n${combatSection}` : ""}${
+      timersSection ? `\n${timersSection}` : ""
+    }
 ⚠️ **CRITICAL: Use actual numeric values from the character sheet above!** When rolling dice, YOU must look up stat values and insert them directly (e.g., "1d20+3" not variables).
 
 ═══════════════════════════════════════════════════════════════
@@ -2519,6 +2558,23 @@ TOOL REFERENCE
 **npc_roll** - Roll for NPC: npc_roll(combatant="Goblin", formula="1d20+3", dc=14)
 **advance_turn** - Next in initiative order
 **end_combat** - End and sync player stats (outcome: victory/defeat/fled/truce)
+
+### ⏱️ COUNTDOWN TIMERS (for deadline tension)
+**create_timer** - Start a countdown: name, ticks, description, auto_advance (default true)
+  - Auto-advance: Ticks down each GM turn automatically
+  - Manual: Only ticks when you call advance_timer
+  - Visibility: "visible" (player sees) or "hidden" (DM only)
+**advance_timer** - Manually tick down: timer name, ticks (default 1)
+**pause_timer** / **resume_timer** - Temporarily halt a timer
+**cancel_timer** - End without triggering (threat neutralized)
+**trigger_timer** - Force early trigger (bomb detonates NOW)
+When timer reaches 0, you'll see "[⏰ TIMER TRIGGERED]" - narrate the consequence!
+
+### 🎲 GROUP CHECKS (party-wide tests)
+**group_check** - Multiple rolls, majority wins: stat, difficulty, participants, reason
+  - threshold: successes needed (default: majority, e.g., 3 of 5)
+  - show_individual_rolls: false to hide individual results
+Use for: stealth as a party, survival trek, group perception, social reception
 
 ### 🎮 FLOW CONTROL
 **start_challenge** - Begin multi-round challenge
@@ -2600,6 +2656,15 @@ IMPORTANT RULES
       "npc_roll",
       "advance_turn",
       "end_combat",
+      // Timer tools
+      "create_timer",
+      "advance_timer",
+      "pause_timer",
+      "resume_timer",
+      "cancel_timer",
+      "trigger_timer",
+      // Group check
+      "group_check",
       // Terminal
       "end_gm_thinking",
     ];
@@ -2795,7 +2860,9 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 **Resources:** ${resourceList || "None"}
 **Usable Items:** ${usableItems || "None"}
 **Ready Abilities:** ${readyAbilities || "None"}
-${combatSection ? `\n${combatSection}` : ""}
+${combatSection ? `\n${combatSection}` : ""}${
+      timersSection ? `\n${timersSection}` : ""
+    }
 ⚠️ **CRITICAL: You may ONLY use stats that appear in the Stats list above.** Do NOT invent stats like "Perception", "Stealth", etc. if they are not listed.
 
 ═══════════════════════════════════════════════════════════════
@@ -2854,6 +2921,23 @@ TOOL REFERENCE
 **npc_roll** - Roll for NPC: npc_roll(combatant="Goblin", formula="1d20+3", dc=14)
 **advance_turn** - Next in initiative order
 **end_combat** - End and sync player stats (outcome: victory/defeat/fled/truce)
+
+### ⏱️ COUNTDOWN TIMERS (for deadline tension)
+**create_timer** - Start a countdown: name, ticks, description, auto_advance (default true)
+  - Auto-advance: Ticks down each GM turn automatically
+  - Manual: Only ticks when you call advance_timer
+  - Visibility: "visible" (player sees) or "hidden" (DM only)
+**advance_timer** - Manually tick down: timer name, ticks (default 1)
+**pause_timer** / **resume_timer** - Temporarily halt a timer
+**cancel_timer** - End without triggering (threat neutralized)
+**trigger_timer** - Force early trigger (bomb detonates NOW)
+When timer reaches 0, you'll see "[⏰ TIMER TRIGGERED]" - narrate the consequence!
+
+### 🎲 GROUP CHECKS (party-wide tests)
+**group_check** - Multiple rolls, majority wins: stat, difficulty, participants, reason
+  - threshold: successes needed (default: majority, e.g., 3 of 5)
+  - show_individual_rolls: false to hide individual results
+Use for: stealth as a party, survival trek, group perception, social reception
 
 ### 🎮 FLOW CONTROL
 **start_challenge** - Begin multi-round challenge
@@ -2932,6 +3016,15 @@ IMPORTANT RULES
       "npc_roll",
       "advance_turn",
       "end_combat",
+      // Timer tools
+      "create_timer",
+      "advance_timer",
+      "pause_timer",
+      "resume_timer",
+      "cancel_timer",
+      "trigger_timer",
+      // Group check
+      "group_check",
       // Terminal
       "end_gm_thinking",
     ];

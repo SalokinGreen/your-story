@@ -2670,10 +2670,8 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("usePrefill") !== "false"
           : true;
-      const gmStageEnabled =
-        typeof window !== "undefined"
-          ? localStorage.getItem("gmStageEnabled") !== "false"
-          : true;
+      // GM Stage is always enabled - legacy tool calling is deprecated
+      const gmStageEnabled = true;
 
       // Track parallel completion of tools and choices
       let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -2904,10 +2902,8 @@ function StoryPageContent() {
 
     // Check if GM Stage is enabled - if so, skip action analysis
     // The GM Stage will determine mechanics during generation
-    const gmStageEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("gmStageEnabled") !== "false"
-        : true;
+    // GM Stage is always enabled - legacy tool calling is deprecated
+    const gmStageEnabled = true;
 
     if (gmStageEnabled) {
       logger.action("GM Stage enabled - skipping action analysis", {
@@ -4824,10 +4820,8 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("usePrefill") !== "false"
         : true;
-    const gmStageEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("gmStageEnabled") !== "false"
-        : true;
+    // GM Stage is always enabled - legacy tool calling is deprecated
+    const gmStageEnabled = true;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
@@ -5626,10 +5620,8 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("usePrefill") !== "false"
         : true;
-    const gmStageEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("gmStageEnabled") !== "false"
-        : true;
+    // GM Stage is always enabled - legacy tool calling is deprecated
+    const gmStageEnabled = true;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete

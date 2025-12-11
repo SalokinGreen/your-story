@@ -15,6 +15,7 @@ import {
   Ability,
   Combatant,
   CombatState,
+  CountdownTimer,
 } from "./structs";
 import {
   SkillCheckParams,
@@ -34,6 +35,15 @@ import {
   RequestContinuationParams,
   AskPlayerParams,
   RespondToPlayerParams,
+  // Timer tools
+  CreateTimerParams,
+  AdvanceTimerParams,
+  PauseTimerParams,
+  ResumeTimerParams,
+  CancelTimerParams,
+  TriggerTimerParams,
+  // Group check
+  GroupCheckParams,
   // Combat tools
   StartCombatParams,
   AddCombatantParams,
@@ -61,10 +71,7 @@ import {
 } from "./fuzzyMatch";
 import { getItemBonus } from "./itemSystem";
 import { getAbilityBonus } from "./abilitySystem";
-import {
-  rollFormula,
-  RollResult,
-} from "./diceFormula";
+import { rollFormula, RollResult } from "./diceFormula";
 import { executeTools as executeStateTools } from "./toolExecutor";
 
 // ============================================
@@ -93,6 +100,15 @@ export interface GMToolResult {
     | GMAskPlayerResult
     | GMEndGmThinkingResult
     | GMStateChangeResult
+    // Timer results
+    | GMCreateTimerResult
+    | GMAdvanceTimerResult
+    | GMPauseTimerResult
+    | GMResumeTimerResult
+    | GMCancelTimerResult
+    | GMTriggerTimerResult
+    // Group check result
+    | GMGroupCheckResult
     // Combat results
     | GMStartCombatResult
     | GMAddCombatantResult
@@ -470,6 +486,83 @@ export interface GMEndCombatResult {
 }
 
 // ============================================
+// TIMER RESULT INTERFACES
+// ============================================
+
+export interface GMCreateTimerResult {
+  type: "create_timer";
+  timer: {
+    id: string;
+    name: string;
+    description?: string;
+    totalTicks: number;
+    currentTicks: number;
+    autoAdvance: boolean;
+    visibility: "visible" | "hidden";
+  };
+}
+
+export interface GMAdvanceTimerResult {
+  type: "advance_timer";
+  timer: string;
+  previousTicks: number;
+  currentTicks: number;
+  ticksAdvanced: number;
+  triggered: boolean;
+}
+
+export interface GMPauseTimerResult {
+  type: "pause_timer";
+  timer: string;
+  wasPaused: boolean; // False if already paused
+}
+
+export interface GMResumeTimerResult {
+  type: "resume_timer";
+  timer: string;
+  wasResumed: boolean; // False if already active
+}
+
+export interface GMCancelTimerResult {
+  type: "cancel_timer";
+  timer: string;
+  reason?: string;
+  ticksRemaining: number;
+}
+
+export interface GMTriggerTimerResult {
+  type: "trigger_timer";
+  timer: string;
+  reason?: string;
+  ticksRemaining: number;
+  description?: string; // What the timer effect was
+}
+
+// ============================================
+// GROUP CHECK RESULT INTERFACE
+// ============================================
+
+export interface GMGroupCheckResult {
+  type: "group_check";
+  stat: string;
+  statValue: number;
+  difficulty: string;
+  dc: number;
+  participants: number;
+  threshold: number;
+  individualRolls: {
+    roll: number;
+    total: number;
+    success: boolean;
+  }[];
+  totalSuccesses: number;
+  totalFailures: number;
+  overallSuccess: boolean;
+  reason: string;
+  showIndividualRolls: boolean;
+}
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -765,6 +858,57 @@ export async function executeGMTools(
       case "end_combat":
         result = executeEndCombat(call.id, params as EndCombatParams, modified);
         break;
+      // Timer tools
+      case "create_timer":
+        result = executeCreateTimer(
+          call.id,
+          params as CreateTimerParams,
+          modified
+        );
+        break;
+      case "advance_timer":
+        result = executeAdvanceTimer(
+          call.id,
+          params as AdvanceTimerParams,
+          modified
+        );
+        break;
+      case "pause_timer":
+        result = executePauseTimer(
+          call.id,
+          params as PauseTimerParams,
+          modified
+        );
+        break;
+      case "resume_timer":
+        result = executeResumeTimer(
+          call.id,
+          params as ResumeTimerParams,
+          modified
+        );
+        break;
+      case "cancel_timer":
+        result = executeCancelTimer(
+          call.id,
+          params as CancelTimerParams,
+          modified
+        );
+        break;
+      case "trigger_timer":
+        result = executeTriggerTimer(
+          call.id,
+          params as TriggerTimerParams,
+          modified
+        );
+        break;
+      // Group check
+      case "group_check":
+        result = executeGroupCheck(
+          call.id,
+          params as GroupCheckParams,
+          modified
+        );
+        break;
       default:
         // Delegate to state tool executor for tools like modify_stat, add_item, etc.
         const stateToolCalls = [
@@ -859,6 +1003,37 @@ export async function executeGMTools(
       finalOutcome = respResult.outcome;
       narrativeHints = respResult.narrativeHints;
       dramaticMoment = respResult.dramaticMoment;
+    }
+  }
+
+  // Auto-advance timers when GM turn completes
+  if (isComplete && modified.timers && modified.timers.length > 0) {
+    const timerUpdates: string[] = [];
+    for (const timer of modified.timers) {
+      if (timer.status === "active" && timer.autoAdvance) {
+        const prevTicks = timer.currentTicks;
+        timer.currentTicks = Math.max(0, timer.currentTicks - 1);
+
+        if (timer.currentTicks === 0 && timer.status === "active") {
+          // Timer triggered!
+          timer.status = "triggered";
+          timer.triggeredAt = Date.now();
+          timerUpdates.push(
+            `[⏰ TIMER TRIGGERED: "${timer.name}" has reached 0!${
+              timer.description ? ` - ${timer.description}` : ""
+            }]`
+          );
+        } else if (timer.currentTicks !== prevTicks) {
+          // Just ticked down
+          timerUpdates.push(
+            `[Timer: "${timer.name}" ${prevTicks} → ${timer.currentTicks} ticks]`
+          );
+        }
+      }
+    }
+    // Add timer updates to context
+    if (timerUpdates.length > 0) {
+      contextParts.push(...timerUpdates);
     }
   }
 
@@ -3529,5 +3704,546 @@ function executeEndCombat(
             .join(", ")}`
         : ""
     }]`,
+  };
+}
+// ============================================
+// COUNTDOWN TIMER EXECUTORS
+// ============================================
+
+/**
+ * Find a timer by name or ID (case-insensitive name matching)
+ */
+function findTimer(
+  timers: CountdownTimer[] | undefined,
+  nameOrId: string
+): CountdownTimer | undefined {
+  if (!timers || timers.length === 0) return undefined;
+  const lower = nameOrId.toLowerCase();
+  return timers.find(
+    (t) => t.id === nameOrId || t.name.toLowerCase() === lower
+  );
+}
+
+/**
+ * Create a new countdown timer
+ */
+function executeCreateTimer(
+  toolCallId: string,
+  params: CreateTimerParams,
+  storyData: StoryData
+): GMToolResult {
+  // Initialize timers array if needed
+  if (!storyData.timers) {
+    storyData.timers = [];
+  }
+
+  // Check for duplicate name
+  const existingTimer = findTimer(storyData.timers, params.name);
+  if (existingTimer) {
+    return {
+      toolName: "create_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "create_timer",
+        timer: {
+          id: existingTimer.id,
+          name: existingTimer.name,
+          description: existingTimer.description,
+          totalTicks: existingTimer.totalTicks,
+          currentTicks: existingTimer.currentTicks,
+          autoAdvance: existingTimer.autoAdvance,
+          visibility: existingTimer.visibility,
+        },
+      } as GMCreateTimerResult,
+      contextForStory: `[Timer Error: Timer "${params.name}" already exists with ${existingTimer.currentTicks} ticks remaining]`,
+    };
+  }
+
+  // Create the timer
+  const timer: CountdownTimer = {
+    id: `timer_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    name: params.name,
+    description: params.description,
+    totalTicks: params.ticks,
+    currentTicks: params.ticks,
+    autoAdvance: params.auto_advance !== false,
+    status: "active",
+    visibility: params.visibility || "visible",
+    createdAt: Date.now(),
+  };
+
+  storyData.timers.push(timer);
+
+  const visibilityNote =
+    timer.visibility === "hidden" ? " (hidden from player)" : "";
+
+  return {
+    toolName: "create_timer",
+    toolCallId,
+    success: true,
+    result: {
+      type: "create_timer",
+      timer: {
+        id: timer.id,
+        name: timer.name,
+        description: timer.description,
+        totalTicks: timer.totalTicks,
+        currentTicks: timer.currentTicks,
+        autoAdvance: timer.autoAdvance,
+        visibility: timer.visibility,
+      },
+    } as GMCreateTimerResult,
+    contextForStory: `[Timer Created: "${timer.name}" - ${
+      timer.currentTicks
+    } ticks${timer.autoAdvance ? " (auto)" : " (manual)"}${visibilityNote}${
+      timer.description ? ` - ${timer.description}` : ""
+    }]`,
+  };
+}
+
+/**
+ * Advance a timer by specified ticks
+ */
+function executeAdvanceTimer(
+  toolCallId: string,
+  params: AdvanceTimerParams,
+  storyData: StoryData
+): GMToolResult {
+  const timer = findTimer(storyData.timers, params.timer);
+
+  if (!timer) {
+    return {
+      toolName: "advance_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "advance_timer",
+        timer: params.timer,
+        previousTicks: 0,
+        currentTicks: 0,
+        ticksAdvanced: 0,
+        triggered: false,
+      } as GMAdvanceTimerResult,
+      contextForStory: `[Timer Error: Timer "${params.timer}" not found]`,
+    };
+  }
+
+  if (timer.status === "paused") {
+    return {
+      toolName: "advance_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "advance_timer",
+        timer: timer.name,
+        previousTicks: timer.currentTicks,
+        currentTicks: timer.currentTicks,
+        ticksAdvanced: 0,
+        triggered: false,
+      } as GMAdvanceTimerResult,
+      contextForStory: `[Timer Error: Timer "${timer.name}" is paused - use resume_timer first]`,
+    };
+  }
+
+  if (timer.status !== "active") {
+    return {
+      toolName: "advance_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "advance_timer",
+        timer: timer.name,
+        previousTicks: timer.currentTicks,
+        currentTicks: timer.currentTicks,
+        ticksAdvanced: 0,
+        triggered: false,
+      } as GMAdvanceTimerResult,
+      contextForStory: `[Timer Error: Timer "${timer.name}" is ${timer.status}]`,
+    };
+  }
+
+  const ticksToAdvance = params.ticks || 1;
+  const previousTicks = timer.currentTicks;
+  timer.currentTicks = Math.max(0, timer.currentTicks - ticksToAdvance);
+
+  // Check if timer triggered
+  const triggered = timer.currentTicks === 0;
+  if (triggered) {
+    timer.status = "triggered";
+    timer.triggeredAt = Date.now();
+  }
+
+  return {
+    toolName: "advance_timer",
+    toolCallId,
+    success: true,
+    result: {
+      type: "advance_timer",
+      timer: timer.name,
+      previousTicks,
+      currentTicks: timer.currentTicks,
+      ticksAdvanced: ticksToAdvance,
+      triggered,
+    } as GMAdvanceTimerResult,
+    contextForStory: triggered
+      ? `[⏰ TIMER TRIGGERED: "${timer.name}" has reached 0!${
+          timer.description ? ` - ${timer.description}` : ""
+        }]`
+      : `[Timer: "${timer.name}" ${previousTicks} → ${timer.currentTicks} ticks remaining]`,
+  };
+}
+
+/**
+ * Pause a timer
+ */
+function executePauseTimer(
+  toolCallId: string,
+  params: PauseTimerParams,
+  storyData: StoryData
+): GMToolResult {
+  const timer = findTimer(storyData.timers, params.timer);
+
+  if (!timer) {
+    return {
+      toolName: "pause_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "pause_timer",
+        timer: params.timer,
+        wasPaused: false,
+      } as GMPauseTimerResult,
+      contextForStory: `[Timer Error: Timer "${params.timer}" not found]`,
+    };
+  }
+
+  if (timer.status !== "active") {
+    return {
+      toolName: "pause_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "pause_timer",
+        timer: timer.name,
+        wasPaused: false,
+      } as GMPauseTimerResult,
+      contextForStory: `[Timer Error: Timer "${timer.name}" is ${timer.status}, cannot pause]`,
+    };
+  }
+
+  timer.status = "paused";
+
+  return {
+    toolName: "pause_timer",
+    toolCallId,
+    success: true,
+    result: {
+      type: "pause_timer",
+      timer: timer.name,
+      wasPaused: true,
+    } as GMPauseTimerResult,
+    contextForStory: `[Timer Paused: "${timer.name}" at ${timer.currentTicks} ticks]`,
+  };
+}
+
+/**
+ * Resume a paused timer
+ */
+function executeResumeTimer(
+  toolCallId: string,
+  params: ResumeTimerParams,
+  storyData: StoryData
+): GMToolResult {
+  const timer = findTimer(storyData.timers, params.timer);
+
+  if (!timer) {
+    return {
+      toolName: "resume_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "resume_timer",
+        timer: params.timer,
+        wasResumed: false,
+      } as GMResumeTimerResult,
+      contextForStory: `[Timer Error: Timer "${params.timer}" not found]`,
+    };
+  }
+
+  if (timer.status !== "paused") {
+    return {
+      toolName: "resume_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "resume_timer",
+        timer: timer.name,
+        wasResumed: false,
+      } as GMResumeTimerResult,
+      contextForStory: `[Timer Error: Timer "${timer.name}" is ${timer.status}, not paused]`,
+    };
+  }
+
+  timer.status = "active";
+
+  return {
+    toolName: "resume_timer",
+    toolCallId,
+    success: true,
+    result: {
+      type: "resume_timer",
+      timer: timer.name,
+      wasResumed: true,
+    } as GMResumeTimerResult,
+    contextForStory: `[Timer Resumed: "${timer.name}" - ${timer.currentTicks} ticks remaining]`,
+  };
+}
+
+/**
+ * Cancel a timer without triggering
+ */
+function executeCancelTimer(
+  toolCallId: string,
+  params: CancelTimerParams,
+  storyData: StoryData
+): GMToolResult {
+  const timer = findTimer(storyData.timers, params.timer);
+
+  if (!timer) {
+    return {
+      toolName: "cancel_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "cancel_timer",
+        timer: params.timer,
+        reason: params.reason,
+        ticksRemaining: 0,
+      } as GMCancelTimerResult,
+      contextForStory: `[Timer Error: Timer "${params.timer}" not found]`,
+    };
+  }
+
+  if (timer.status === "triggered" || timer.status === "cancelled") {
+    return {
+      toolName: "cancel_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "cancel_timer",
+        timer: timer.name,
+        reason: params.reason,
+        ticksRemaining: timer.currentTicks,
+      } as GMCancelTimerResult,
+      contextForStory: `[Timer Error: Timer "${timer.name}" is already ${timer.status}]`,
+    };
+  }
+
+  const ticksRemaining = timer.currentTicks;
+  timer.status = "cancelled";
+
+  return {
+    toolName: "cancel_timer",
+    toolCallId,
+    success: true,
+    result: {
+      type: "cancel_timer",
+      timer: timer.name,
+      reason: params.reason,
+      ticksRemaining,
+    } as GMCancelTimerResult,
+    contextForStory: `[Timer Cancelled: "${timer.name}"${
+      params.reason ? ` - ${params.reason}` : ""
+    } (had ${ticksRemaining} ticks remaining)]`,
+  };
+}
+
+/**
+ * Manually trigger a timer early
+ */
+function executeTriggerTimer(
+  toolCallId: string,
+  params: TriggerTimerParams,
+  storyData: StoryData
+): GMToolResult {
+  const timer = findTimer(storyData.timers, params.timer);
+
+  if (!timer) {
+    return {
+      toolName: "trigger_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "trigger_timer",
+        timer: params.timer,
+        reason: params.reason,
+        ticksRemaining: 0,
+      } as GMTriggerTimerResult,
+      contextForStory: `[Timer Error: Timer "${params.timer}" not found]`,
+    };
+  }
+
+  if (timer.status === "triggered" || timer.status === "cancelled") {
+    return {
+      toolName: "trigger_timer",
+      toolCallId,
+      success: false,
+      result: {
+        type: "trigger_timer",
+        timer: timer.name,
+        reason: params.reason,
+        ticksRemaining: timer.currentTicks,
+      } as GMTriggerTimerResult,
+      contextForStory: `[Timer Error: Timer "${timer.name}" is already ${timer.status}]`,
+    };
+  }
+
+  const ticksRemaining = timer.currentTicks;
+  timer.currentTicks = 0;
+  timer.status = "triggered";
+  timer.triggeredAt = Date.now();
+
+  return {
+    toolName: "trigger_timer",
+    toolCallId,
+    success: true,
+    result: {
+      type: "trigger_timer",
+      timer: timer.name,
+      reason: params.reason,
+      ticksRemaining,
+      description: timer.description,
+    } as GMTriggerTimerResult,
+    contextForStory: `[⏰ TIMER TRIGGERED EARLY: "${timer.name}"${
+      params.reason ? ` - ${params.reason}` : ""
+    }${timer.description ? ` | Effect: ${timer.description}` : ""}]`,
+  };
+}
+
+// ============================================
+// GROUP CHECK EXECUTOR
+// ============================================
+
+/**
+ * Execute a group check - multiple rolls where majority wins
+ */
+function executeGroupCheck(
+  toolCallId: string,
+  params: GroupCheckParams,
+  storyData: StoryData
+): GMToolResult {
+  // Validate participants
+  const participants = Math.max(3, Math.min(10, params.participants));
+
+  // Get the stat
+  const statMatch = findStatMatch(params.stat, storyData.stats || []);
+  if (!statMatch) {
+    return {
+      toolName: "group_check",
+      toolCallId,
+      success: false,
+      result: {
+        type: "group_check",
+        stat: params.stat,
+        statValue: 0,
+        difficulty: params.difficulty,
+        dc: 0,
+        participants,
+        threshold: 0,
+        individualRolls: [],
+        totalSuccesses: 0,
+        totalFailures: 0,
+        overallSuccess: false,
+        reason: params.reason,
+        showIndividualRolls: true,
+      } as GMGroupCheckResult,
+      contextForStory: `[Group Check Error: Stat "${params.stat}" not found]`,
+    };
+  }
+
+  const statValue = statMatch.item?.value ?? 0;
+  const statName = statMatch.item?.name ?? params.stat;
+
+  // Get the RPG system and calculate DC
+  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+  const { dc, tierName } = parseDifficulty(params.difficulty, rpgSystem);
+
+  // Calculate threshold (default: majority)
+  const threshold = params.threshold || Math.ceil(participants / 2);
+
+  // Roll for each participant
+  const individualRolls: {
+    roll: number;
+    total: number;
+    success: boolean;
+    partial?: boolean;
+  }[] = [];
+
+  for (let i = 0; i < participants; i++) {
+    // Roll dice
+    const rollResult = rollDice(rpgSystem);
+    const roll = rollResult.total;
+
+    // Check success
+    const result = checkSuccess(
+      rpgSystem,
+      roll,
+      statValue,
+      dc,
+      0, // No penalty for group checks
+      rollResult.rolls,
+      storyData.reverseDC
+    );
+
+    individualRolls.push({
+      roll,
+      total: roll + statValue,
+      success: result.success,
+      partial: result.partial,
+    });
+  }
+
+  const totalSuccesses = individualRolls.filter((r) => r.success).length;
+  const totalFailures = individualRolls.filter((r) => !r.success).length;
+  const overallSuccess = totalSuccesses >= threshold;
+
+  const showIndividual = params.show_individual_rolls !== false;
+
+  // Build context string
+  let contextForStory = `[Group Check: ${params.reason} - ${statName} vs DC ${dc} (${tierName})]`;
+  if (showIndividual) {
+    const rollsStr = individualRolls
+      .map(
+        (r, i) =>
+          `#${i + 1}: ${r.total} ${r.success ? "✓" : r.partial ? "~" : "✗"}`
+      )
+      .join(", ");
+    contextForStory += `\n[Rolls: ${rollsStr}]`;
+  }
+  contextForStory += `\n[Result: ${totalSuccesses}/${participants} succeeded (needed ${threshold}) → ${
+    overallSuccess ? "OVERALL SUCCESS" : "OVERALL FAILURE"
+  }]`;
+
+  return {
+    toolName: "group_check",
+    toolCallId,
+    success: true,
+    result: {
+      type: "group_check",
+      stat: statName,
+      statValue,
+      difficulty: params.difficulty,
+      dc,
+      participants,
+      threshold,
+      individualRolls,
+      totalSuccesses,
+      totalFailures,
+      overallSuccess,
+      reason: params.reason,
+      showIndividualRolls: showIndividual,
+    } as GMGroupCheckResult,
+    contextForStory,
   };
 }

@@ -342,6 +342,78 @@ export interface EndCombatParams {
   sync_player_stats?: boolean; // Copy player combatant stats to resources (default: true)
 }
 
+// ============================================
+// COUNTDOWN TIMER INTERFACES
+// ============================================
+
+/**
+ * Create Timer - Start a countdown timer for a deadline or timed event
+ * Timers tick down automatically each GM turn (if autoAdvance is true)
+ */
+export interface CreateTimerParams {
+  name: string; // Display name (e.g., "Ritual Completion")
+  description?: string; // What happens when timer reaches 0
+  ticks: number; // Starting tick count (counts down to 0)
+  auto_advance?: boolean; // Decrement each GM turn? (default: true)
+  visibility?: "visible" | "hidden"; // Show to player? (default: visible)
+}
+
+/**
+ * Advance Timer - Manually tick a timer (use when autoAdvance is false)
+ * Can also tick auto timers for "time passes quickly" effects
+ */
+export interface AdvanceTimerParams {
+  timer: string; // Timer name or ID
+  ticks?: number; // How many ticks to advance (default: 1)
+}
+
+/**
+ * Pause Timer - Temporarily stop a timer from advancing
+ */
+export interface PauseTimerParams {
+  timer: string; // Timer name or ID
+}
+
+/**
+ * Resume Timer - Resume a paused timer
+ */
+export interface ResumeTimerParams {
+  timer: string; // Timer name or ID
+}
+
+/**
+ * Cancel Timer - Remove a timer without triggering its effect
+ */
+export interface CancelTimerParams {
+  timer: string; // Timer name or ID
+  reason?: string; // Why the timer was cancelled
+}
+
+/**
+ * Trigger Timer - Manually trigger a timer's effect early
+ */
+export interface TriggerTimerParams {
+  timer: string; // Timer name or ID
+  reason?: string; // Why the timer was triggered early
+}
+
+// ============================================
+// GROUP CHECK INTERFACES
+// ============================================
+
+/**
+ * Group Check - Multiple rolls where majority determines success
+ * Useful for party stealth, group negotiations, travel hazards
+ */
+export interface GroupCheckParams {
+  stat: string; // Stat to roll (e.g., "Stealth", "Endurance")
+  difficulty: string; // Difficulty tier or exact DC
+  participants: number; // How many are rolling (3-10)
+  reason: string; // What the group is attempting
+  threshold?: number; // Custom success threshold (default: majority = ceil(participants/2))
+  show_individual_rolls?: boolean; // Show each roll result (default: true)
+}
+
 // Union type for all GM tool parameters
 export type GMToolParams =
   | { name: "skill_check"; params: SkillCheckParams }
@@ -361,6 +433,15 @@ export type GMToolParams =
   | { name: "request_continuation"; params: RequestContinuationParams }
   | { name: "ask_player"; params: AskPlayerParams }
   | { name: "end_gm_thinking"; params: RespondToPlayerParams }
+  // Timer tools
+  | { name: "create_timer"; params: CreateTimerParams }
+  | { name: "advance_timer"; params: AdvanceTimerParams }
+  | { name: "pause_timer"; params: PauseTimerParams }
+  | { name: "resume_timer"; params: ResumeTimerParams }
+  | { name: "cancel_timer"; params: CancelTimerParams }
+  | { name: "trigger_timer"; params: TriggerTimerParams }
+  // Group check
+  | { name: "group_check"; params: GroupCheckParams }
   // Combat tools
   | { name: "start_combat"; params: StartCombatParams }
   | { name: "add_combatant"; params: AddCombatantParams }
@@ -860,8 +941,7 @@ Examples:
       properties: {
         player_formula: {
           type: "string",
-          description:
-            "Player's dice formula with actual numbers: '1d20+4'",
+          description: "Player's dice formula with actual numbers: '1d20+4'",
         },
         opponent_formula: {
           type: "string",
@@ -928,8 +1008,7 @@ This tool updates challenge progress (successes/failures) based on the roll resu
       properties: {
         formula: {
           type: "string",
-          description:
-            "Dice formula with actual numbers: '1d20+5'",
+          description: "Dice formula with actual numbers: '1d20+5'",
         },
         dc: {
           type: "number",
@@ -1682,6 +1761,252 @@ Don't just let combat "fade out" - explicitly end it.`,
 };
 
 // ============================================
+// COUNTDOWN TIMER TOOL SCHEMAS
+// ============================================
+
+const createTimerTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "create_timer",
+    description: `Create a countdown timer for deadlines, rituals, or timed events.
+
+Timers count down from their starting ticks toward 0. When they hit 0, they trigger.
+
+Use cases:
+- "The ritual completes in 5 rounds" (combat pacing)
+- "Reinforcements arrive in 3 turns" (tension building)
+- "The bomb explodes in 10 ticks" (urgent deadline)
+- "The sun sets in 2 ticks" (time passage)
+
+If auto_advance is true (default), the timer ticks down each GM turn.
+If false, you must manually call advance_timer.
+
+Multiple timers can exist simultaneously - useful for overlapping deadlines.`,
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "Timer display name (e.g., 'Ritual Completion', 'Reinforcements Arrive')",
+        },
+        description: {
+          type: "string",
+          description: "What happens when the timer reaches 0",
+        },
+        ticks: {
+          type: "number",
+          description: "Starting tick count (will count down to 0)",
+        },
+        auto_advance: {
+          type: "boolean",
+          description: "Automatically tick down each GM turn? (default: true)",
+        },
+        visibility: {
+          type: "string",
+          enum: ["visible", "hidden"],
+          description:
+            "Show timer to player? Use 'hidden' for secret countdowns (default: visible)",
+        },
+      },
+      required: ["name", "ticks"],
+    },
+  },
+};
+
+const advanceTimerTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "advance_timer",
+    description: `Manually tick a timer forward.
+
+Use when:
+- Timer has auto_advance=false and needs manual advancement
+- "Time passes quickly" - advance multiple ticks at once
+- Player action accelerates or triggers time passage
+
+If ticks would reduce currentTicks to 0 or below, the timer triggers.`,
+    parameters: {
+      type: "object",
+      properties: {
+        timer: {
+          type: "string",
+          description: "Timer name or ID to advance",
+        },
+        ticks: {
+          type: "number",
+          description: "How many ticks to advance (default: 1)",
+        },
+      },
+      required: ["timer"],
+    },
+  },
+};
+
+const pauseTimerTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "pause_timer",
+    description: `Pause a timer, stopping it from advancing.
+
+Use when:
+- Player action delays the countdown
+- Time is frozen narratively
+- Temporary reprieve from deadline
+
+Paused timers don't auto-advance and can't be manually advanced.
+Use resume_timer to restart.`,
+    parameters: {
+      type: "object",
+      properties: {
+        timer: {
+          type: "string",
+          description: "Timer name or ID to pause",
+        },
+      },
+      required: ["timer"],
+    },
+  },
+};
+
+const resumeTimerTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "resume_timer",
+    description: `Resume a paused timer.
+
+The timer continues from where it was paused.`,
+    parameters: {
+      type: "object",
+      properties: {
+        timer: {
+          type: "string",
+          description: "Timer name or ID to resume",
+        },
+      },
+      required: ["timer"],
+    },
+  },
+};
+
+const cancelTimerTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "cancel_timer",
+    description: `Cancel a timer without triggering its effect.
+
+Use when:
+- Player prevents the event (disarms bomb, stops ritual)
+- Timer is no longer relevant to the story
+- Circumstances have changed
+
+The timer is removed from tracking.`,
+    parameters: {
+      type: "object",
+      properties: {
+        timer: {
+          type: "string",
+          description: "Timer name or ID to cancel",
+        },
+        reason: {
+          type: "string",
+          description: "Why the timer was cancelled (for narrative)",
+        },
+      },
+      required: ["timer"],
+    },
+  },
+};
+
+const triggerTimerTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "trigger_timer",
+    description: `Manually trigger a timer's effect immediately.
+
+Use when:
+- Player action causes early triggering
+- Circumstances accelerate the event
+- Dramatic timing calls for immediate resolution
+
+The timer fires regardless of remaining ticks.`,
+    parameters: {
+      type: "object",
+      properties: {
+        timer: {
+          type: "string",
+          description: "Timer name or ID to trigger",
+        },
+        reason: {
+          type: "string",
+          description: "Why the timer triggered early",
+        },
+      },
+      required: ["timer"],
+    },
+  },
+};
+
+// ============================================
+// GROUP CHECK TOOL SCHEMA
+// ============================================
+
+const groupCheckTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "group_check",
+    description: `Roll multiple checks where majority success determines overall outcome.
+
+Use for party/group actions:
+- "Everyone tries to sneak past the guards"
+- "The group makes their way through the blizzard"
+- "We all try to persuade the king"
+
+How it works:
+1. Rolls the specified stat check N times (one per participant)
+2. Counts successes vs failures
+3. If successes >= threshold (default: majority), overall SUCCESS
+
+Unlike individual checks, uses the PLAYER'S stat for all rolls.
+Represents the party helping each other / averaging out luck.
+
+Results show each roll, total successes, and overall outcome.`,
+    parameters: {
+      type: "object",
+      properties: {
+        stat: {
+          type: "string",
+          description: "Stat to roll for each participant",
+        },
+        difficulty: {
+          type: "string",
+          description:
+            "Difficulty tier (trivial/easy/average/hard/very_hard/impossible) or exact DC",
+        },
+        participants: {
+          type: "number",
+          description: "Number of participants rolling (3-10)",
+        },
+        reason: {
+          type: "string",
+          description: "What the group is attempting",
+        },
+        threshold: {
+          type: "number",
+          description:
+            "Custom success threshold (default: majority = ceil(participants/2))",
+        },
+        show_individual_rolls: {
+          type: "boolean",
+          description: "Show each individual roll result (default: true)",
+        },
+      },
+      required: ["stat", "difficulty", "participants", "reason"],
+    },
+  },
+};
+
+// ============================================
 // EXPORT
 // ============================================
 
@@ -1708,6 +2033,15 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   searchMemoryTool,
   requestContinuationTool,
   askPlayerTool,
+  // Countdown timer tools
+  createTimerTool,
+  advanceTimerTool,
+  pauseTimerTool,
+  resumeTimerTool,
+  cancelTimerTool,
+  triggerTimerTool,
+  // Group check tool
+  groupCheckTool,
   // Combat tools
   startCombatTool,
   addCombatantTool,

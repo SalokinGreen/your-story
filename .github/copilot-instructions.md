@@ -431,6 +431,24 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Guidelines: Simple tasks = regular skill check, dangerous combat/chase = 3/3, boss fight = 5+ successes
   - Story prompt adapts based on challenge progress: low (initial clash), mid (tide turning), completed (conclusion)
   - ActionAnalysis includes challenge_handling field: { is_complex_event, challenge_name } for detecting when to start challenges
+- **Countdown Timers (Deadline System)**:
+  - Create tension with deadlines that tick down over GM turns (bomb, patrol returns, ritual completes)
+  - CountdownTimer interface: id, name, description, totalTicks, currentTicks, autoAdvance, status, visibility, createdAt, triggeredAt
+  - Status: "active" | "paused" | "triggered" | "cancelled"
+  - Visibility: "visible" (player sees in context) | "hidden" (GM/DM only)
+  - StoryData.timers stores array of all timers
+  - Auto-advance: When true, timer ticks down automatically at end of each GM turn; when false, only ticks via advance_timer tool
+  - Tools: create_timer, advance_timer, pause_timer, resume_timer, cancel_timer, trigger_timer
+  - When timer reaches 0, status becomes "triggered" and GM sees "[⏰ TIMER TRIGGERED]" message
+  - AI context shows active timers with ticks remaining and descriptions
+  - Use cases: bomb timers, patrol schedules, ritual countdowns, environmental hazards, deadlines
+- **Group Checks (Party-wide Tests)**:
+  - Roll multiple times where majority determines success (useful for party actions)
+  - Parameters: stat, difficulty, participants (3-10), reason, threshold (default: majority), show_individual_rolls
+  - Each participant rolls independently against the DC
+  - Overall success when totalSuccesses >= threshold
+  - Results show individual rolls (unless hidden) and overall outcome
+  - Use cases: party stealth, survival treks, group perception, social reception, coordinated efforts
 - **Rest System**:
   - Three rest types: quick (~30 min), short (4-8 hours sleep), long (several days time skip)
   - RestState interface: quickRestsUsed, shortRestsUsed, lastRestType, lastRestTimestamp
