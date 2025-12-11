@@ -1030,15 +1030,30 @@ NOW WRITE THE NARRATIVE.`;
     return sections.join("\n\n");
   };
 
-  for (let i = 0; i < storyData.scene.parts.length; i++) {
-    const part = storyData.scene.parts[i];
+  // Determine which parts to include in history
+  // If userChoice is provided, skip the last user part if it matches (to avoid duplication)
+  let partsToProcess = storyData.scene.parts;
+  if (userChoice && storyData.scene.parts.length > 0) {
+    const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+    if (lastPart.user) {
+      const lastPartContent = lastPart.content.replace(/^>\s*/, "").trim();
+      const userChoiceNormalized = userChoice.replace(/^>\s*/, "").trim();
+      if (lastPartContent === userChoiceNormalized) {
+        // Skip the last user part - it will be added below with GM reasoning
+        partsToProcess = storyData.scene.parts.slice(0, -1);
+      }
+    }
+  }
+
+  for (let i = 0; i < partsToProcess.length; i++) {
+    const part = partsToProcess[i];
     if (part.user) {
       // For user messages, check if the NEXT part (assistant) has GM reasoning
       // to append to this user message (for last 5 turns)
       let userContent = `[PLAYER] ${cleanString(part.content)}`;
 
       // Find the next assistant part to get its GM reasoning
-      const nextPart = storyData.scene.parts[i + 1];
+      const nextPart = partsToProcess[i + 1];
       if (nextPart && !nextPart.user && i >= stopThreshold - 1) {
         const gmReasoning = formatGMReasoning(nextPart);
         if (gmReasoning) {
@@ -1055,7 +1070,9 @@ NOW WRITE THE NARRATIVE.`;
       let assistantContent = part.raw || part.content;
 
       // Append [STOP] to last 5 assistant messages to train the model on stopping
-      if (i >= stopThreshold) {
+      // Use original scene.parts indices for threshold check
+      const originalIndex = storyData.scene.parts.indexOf(part);
+      if (originalIndex >= stopThreshold) {
         assistantContent = assistantContent + "\n[STOP]";
       }
 

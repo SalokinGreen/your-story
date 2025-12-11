@@ -1146,14 +1146,14 @@ export default function AIConfigTab() {
               onChange={(e) => {
                 setCustomOutputInput(e.target.value);
                 const val = parseInt(e.target.value, 10) || 0;
-                if (val > 0) {
+                if (val >= 1000) {
                   setCustomMaxOutput(val);
                   if (typeof window !== "undefined") {
                     localStorage.setItem("customMaxOutput", String(val));
                   }
                 }
               }}
-              min="500"
+              min="1000"
               step="500"
               placeholder="Enter tokens..."
               className="w-32 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -1163,6 +1163,10 @@ export default function AIConfigTab() {
         )}
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Lower = faster responses • Higher = longer story passages
+        </p>
+        <p className="text-xs text-amber-500/80 dark:text-amber-400/60 mt-1">
+          ⚠️ Minimum 1000 tokens recommended. Some providers count prefill
+          against output limit.
         </p>
       </div>
 

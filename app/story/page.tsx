@@ -5532,20 +5532,41 @@ function StoryPageContent() {
     setLoadingStage("story");
     setCanRetry(false);
 
-    //RemovethelastAIresponse
+    // Save GM context from the last AI response before popping it
+    // This preserves the dice rolls, skill checks, and reasoning for the regeneration
+    const lastAIPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+    const savedGMThinking = lastAIPart.gmThinking;
+    const savedGMStoryContext = lastAIPart.gmStoryContext;
+    const savedGMToolCalls = lastAIPart.gmToolCalls;
+
+    // Remove the last AI response
     storyData.scene.parts.pop();
 
-    //Gettheuserchoicepart
+    // Get the user choice part (now the last part after popping AI response)
     const userChoicePart =
       storyData.scene.parts[storyData.scene.parts.length - 1];
 
-    //Restorechoicesfromuser'schoicepart
-    if (userChoicePart.choices) {
-      setChoices({ choices: userChoicePart.choices });
+    // Get the user's choice content and choices for regeneration
+    const userChoiceContent = userChoicePart?.content || "";
+    const savedChoices = userChoicePart?.choices || [];
+
+    // Also pop the user choice part - we'll re-add it via generateStoryTurn
+    // This prevents duplicate user messages in the prompt
+    if (userChoicePart?.user) {
+      storyData.scene.parts.pop();
+    }
+
+    // Restore choices from the user's choice part
+    if (savedChoices.length > 0) {
+      setChoices({ choices: savedChoices });
     }
 
     addNotification("Regenerating response...", "info");
-    logger.action("User requested retry");
+    logger.action("User requested retry", {
+      hasGMThinking: !!savedGMThinking?.length,
+      hasGMStoryContext: !!savedGMStoryContext,
+      userChoice: userChoiceContent.substring(0, 100),
+    });
 
     const {
       storyModel,
@@ -5569,12 +5590,16 @@ function StoryPageContent() {
     });
 
     // Track partial scene part as we stream
+    // Preserve GM context from the popped part - this is the dice rolls and reasoning
     let partialPart: ScenePart = {
       content: "",
       imageUrl: "",
       user: false,
       role: "assistant",
       choices: [],
+      gmThinking: savedGMThinking,
+      gmStoryContext: savedGMStoryContext,
+      gmToolCalls: savedGMToolCalls,
     };
 
     const maxToolLoops =
@@ -5619,10 +5644,20 @@ function StoryPageContent() {
     // Create abort controller for this generation
     generationAbortRef.current = new AbortController();
 
+    // Re-add the user choice part before generation (matching normal flow)
+    // The prompt builder will deduplicate this when building the context
+    storyData.scene.parts.push({
+      content: userChoiceContent,
+      imageUrl: "",
+      user: true,
+      role: "user",
+      choices: savedChoices, // Preserve the choices from the original turn
+    });
+
     try {
       await generateStoryTurn(
         storyData,
-        "", // The context is already in storyData.scene.parts
+        userChoiceContent, // Use the user's original choice content
         {
           storyModel,
           toolsModel,
@@ -5643,8 +5678,10 @@ function StoryPageContent() {
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
           usePrefill,
-          enableGMStage: gmStageEnabled,
-          gmStageModel: toolsModel, // Use same model as tools stage
+          // Skip GM stage on retry - use the saved context from the popped part
+          enableGMStage: false, // Don't re-run GM stage
+          precomputedGMContext: savedGMStoryContext,
+          precomputedGMThinking: savedGMThinking,
           abortSignal: generationAbortRef.current.signal,
         },
         {

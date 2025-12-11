@@ -119,6 +119,7 @@ export interface GenerationOptions {
   enableGMStage?: boolean; // Use GM stage instead of ActionAnalysis JSON
   gmStageModel?: string; // Model to use for GM stage (defaults to toolsModel)
   precomputedGMContext?: string; // GM context from paused generation (player question flow)
+  precomputedGMThinking?: string[]; // GM thinking from paused generation or retry
   // Player answer continuation (after ask_player tool)
   playerAnswerContext?: string; // Player's answer to inject into GM continuation
   previousGMResults?: GMToolResult[]; // Results from before question was asked
@@ -499,8 +500,13 @@ export async function generateStoryTurn(
     // Use precomputed context if provided AND no player answer (skip GM stage entirely)
     if (options.precomputedGMContext && !options.playerAnswerContext) {
       gmStoryContext = options.precomputedGMContext;
-      logger.action("Using precomputed GM context from player question flow", {
+      // Also restore precomputed GM thinking if available
+      if (options.precomputedGMThinking) {
+        gmThinking = options.precomputedGMThinking;
+      }
+      logger.action("Using precomputed GM context (retry/resume flow)", {
         contextLength: gmStoryContext.length,
+        thinkingCount: gmThinking.length,
       });
     } else if (options.enableGMStage) {
       callbacks.onGMStageStart?.();
@@ -835,9 +841,13 @@ export async function generateStoryTurn(
     const storyModelName = useNovelAI ? "NovelAI GLM-4-6" : options.storyModel;
 
     // Calculate actual max output for NovelAI or standard models
-    const storyMaxOutput = useNovelAI
+    // Enforce minimum 1000 tokens to account for prefill overhead
+    // (Some providers like OpenRouter count prefill against output limit)
+    const MIN_OUTPUT_TOKENS = 1000;
+    const rawMaxOutput = useNovelAI
       ? options.customMaxOutput || 2000
       : options.customMaxOutput || 4000;
+    const storyMaxOutput = Math.max(rawMaxOutput, MIN_OUTPUT_TOKENS);
 
     const storyPrompt = buildStoryPrompt({
       storyData,
@@ -885,7 +895,7 @@ export async function generateStoryTurn(
         body: JSON.stringify({
           messages: storyPrompt.messages,
           novelaiKey: options.novelaiKey,
-          maxTokens: options.customMaxOutput || 2000,
+          maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
           temperature: options.novelaiTemperature ?? 1,
         }),
         signal: options.abortSignal,
@@ -896,7 +906,7 @@ export async function generateStoryTurn(
       const storyRequestBody: Record<string, unknown> = {
         messages: storyPrompt.messages,
         model: options.storyModel,
-        maxTokens: options.customMaxOutput || 4000,
+        maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
         temperature: options.samplingSettings?.temperature ?? 0.7,
         openRouterKey: options.openRouterKey,
         deepseekKey: options.deepseekKey,
@@ -925,7 +935,7 @@ export async function generateStoryTurn(
     // Debug: Log maxTokens being sent
     console.log(
       "[Generation] Story stage - maxTokens:",
-      options.customMaxOutput || 4000,
+      storyMaxOutput,
       "model:",
       options.storyModel
     );
@@ -944,20 +954,50 @@ export async function generateStoryTurn(
     let dividerStripped = false; // Track if we've stripped leading dividers
     let rawContent = ""; // Buffer for finding the marker
     let pendingContent = ""; // Buffer for stripping dividers after marker
+    let stopMarkerHit = false; // Track if we hit [STOP] during streaming
     const STORY_MARKER = "Writing the narrative now:";
+    const STOP_MARKER = "[STOP]";
 
     for await (const event of parseSSEStream(storyResponse)) {
       if (event.type === "error") {
         throw new Error(event.error || "Story generation failed");
       }
       if (event.type === "content" && event.content) {
+        // Skip all content after [STOP] is detected
+        if (stopMarkerHit) continue;
+
         if (prefillStripped && dividerStripped) {
           // Already past prefill and dividers, stream directly
-          storyContent += event.content;
-          callbacks.onStoryContent?.(event.content, storyContent);
+          // But check for [STOP] in the accumulated content
+          const newContent = storyContent + event.content;
+          const stopIndex = newContent.indexOf(STOP_MARKER);
+          if (stopIndex !== -1) {
+            // Found [STOP] - only emit content before it
+            const contentBeforeStop = newContent.slice(0, stopIndex).trimEnd();
+            const deltaToEmit = contentBeforeStop.slice(storyContent.length);
+            storyContent = contentBeforeStop;
+            if (deltaToEmit) {
+              callbacks.onStoryContent?.(deltaToEmit, storyContent);
+            }
+            stopMarkerHit = true;
+            logger.action(
+              "Hit [STOP] marker during streaming - stopping content emission"
+            );
+          } else {
+            storyContent += event.content;
+            callbacks.onStoryContent?.(event.content, storyContent);
+          }
         } else if (prefillStripped && !dividerStripped) {
           // Past prefill but still checking for dividers
           pendingContent += event.content;
+
+          // Check for [STOP] in pending content first
+          const stopIndex = pendingContent.indexOf(STOP_MARKER);
+          if (stopIndex !== -1) {
+            // Truncate at [STOP]
+            pendingContent = pendingContent.slice(0, stopIndex);
+            stopMarkerHit = true;
+          }
 
           // Strip ALL leading whitespace and dividers (loop to catch multiple)
           let cleaned = pendingContent.trimStart();
@@ -970,8 +1010,8 @@ export async function generateStoryTurn(
             dividerStripped = true;
             storyContent = cleaned;
             callbacks.onStoryContent?.(cleaned, storyContent);
-          } else if (pendingContent.length > 100) {
-            // After 100 chars, just emit whatever we have (increased buffer for multiple dividers)
+          } else if (pendingContent.length > 100 || stopMarkerHit) {
+            // After 100 chars or [STOP], just emit whatever we have
             dividerStripped = true;
             storyContent = cleaned || pendingContent.trimStart();
             if (storyContent) {
@@ -981,6 +1021,14 @@ export async function generateStoryTurn(
         } else {
           // Still looking for the marker
           rawContent += event.content;
+
+          // Check for [STOP] in raw content first
+          const stopIndex = rawContent.indexOf(STOP_MARKER);
+          if (stopIndex !== -1) {
+            // Truncate at [STOP]
+            rawContent = rawContent.slice(0, stopIndex);
+            stopMarkerHit = true;
+          }
 
           // Check if we've found the marker
           const markerIndex = rawContent.indexOf(STORY_MARKER);
@@ -1009,12 +1057,14 @@ export async function generateStoryTurn(
               // Content might be empty or just divider chars, buffer it
               pendingContent = contentAfterMarker;
             }
-          } else if (rawContent.length > 800) {
-            // Marker not found after 800 chars - assume no prefill, stream everything
+          } else if (rawContent.length > 800 || stopMarkerHit) {
+            // Marker not found after 800 chars or [STOP] hit - stream what we have
             storyContent = rawContent;
             prefillStripped = true;
             dividerStripped = true;
-            callbacks.onStoryContent?.(rawContent, storyContent);
+            if (rawContent) {
+              callbacks.onStoryContent?.(rawContent, storyContent);
+            }
           }
           // Otherwise keep buffering
         }
@@ -1042,7 +1092,10 @@ export async function generateStoryTurn(
     // Strip [STOP] marker and partial variants if the model added it
     // Handles: [STOP], [STOP, [STO, [ST, ---[STOP], ***[STOP], etc.
     // Also handles partial [GM State markers from stop sequences
+    // IMPORTANT: First strip everything AFTER [STOP] if it appears mid-content
+    // (stop sequences should prevent this, but some providers may not respect them)
     storyContent = storyContent
+      .replace(/\[STOP\][\s\S]*$/i, "") // Strip [STOP] and everything after it
       .replace(/\s*[-*_]{0,3}\s*\[STOP\]?\s*$/i, "")
       .replace(/\s*\[STO?P?\s*$/i, "")
       .replace(/\s*\[S\s*$/i, "")

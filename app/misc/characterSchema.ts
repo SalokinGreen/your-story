@@ -676,9 +676,9 @@ export function processTemplate(
   // This handles cases where < > are encoded as &lt; &gt; in HTML content
   result = result.replace(/\{\{([^}]+)\}\}/g, (match, content) => {
     const decoded = content
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&")
       .replace(/&quot;/g, '"')
       .replace(/&#39;/g, "'")
       .replace(/&apos;/g, "'");
@@ -1068,28 +1068,29 @@ export function processTemplate(
   // Must come BEFORE the s-expression and simple field patterns
   // Use a function to find the matching {{/if}} to handle nested blocks
   const processInlineIfComparisons = (input: string): string => {
-    const ifPattern = /\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s*(>=|<=|!=|==|>|<)\s*(\d+(?:\.\d+)?)\s*\}\}/g;
+    const ifPattern =
+      /\{\{#if\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s*(>=|<=|!=|==|>|<)\s*(\d+(?:\.\d+)?)\s*\}\}/g;
     let output = input;
     let match;
-    
+
     while ((match = ifPattern.exec(input)) !== null) {
       const fullMatch = match[0];
       const leftExpr = match[1];
       const op = match[2];
       const rightExpr = match[3];
       const startIdx = match.index;
-      
+
       // Find the matching {{/if}}
       let depth = 1;
       let searchIdx = startIdx + fullMatch.length;
       let endIdx = -1;
-      
+
       while (searchIdx < input.length && depth > 0) {
-        const nextIf = input.indexOf('{{#if', searchIdx);
-        const nextEndIf = input.indexOf('{{/if}}', searchIdx);
-        
+        const nextIf = input.indexOf("{{#if", searchIdx);
+        const nextEndIf = input.indexOf("{{/if}}", searchIdx);
+
         if (nextEndIf === -1) break;
-        
+
         if (nextIf !== -1 && nextIf < nextEndIf) {
           depth++;
           searchIdx = nextIf + 5;
@@ -1101,18 +1102,23 @@ export function processTemplate(
           searchIdx = nextEndIf + 7;
         }
       }
-      
+
       if (endIdx !== -1) {
         const content = input.slice(startIdx + fullMatch.length, endIdx);
-        const conditionResult = evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim());
-        const replacement = conditionResult ? content : '';
-        output = output.slice(0, startIdx) + replacement + output.slice(endIdx + 7);
+        const conditionResult = evalCompareEnhanced(
+          leftExpr.trim(),
+          op,
+          rightExpr.trim()
+        );
+        const replacement = conditionResult ? content : "";
+        output =
+          output.slice(0, startIdx) + replacement + output.slice(endIdx + 7);
         // Reset pattern to search from beginning since string changed
         ifPattern.lastIndex = 0;
         input = output;
       }
     }
-    
+
     return output;
   };
   result = processInlineIfComparisons(result);
@@ -1190,28 +1196,29 @@ export function processTemplate(
   // Process {{#unless field op value}}...{{/unless}} - inline comparison syntax
   // e.g., {{#unless sanity.current < 50}}, {{#unless health.current >= 100}}
   const processInlineUnlessComparisons = (input: string): string => {
-    const unlessPattern = /\{\{#unless\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s*(>=|<=|!=|==|>|<)\s*(\d+(?:\.\d+)?)\s*\}\}/g;
+    const unlessPattern =
+      /\{\{#unless\s+([a-zA-Z_][a-zA-Z0-9_.]*)\s*(>=|<=|!=|==|>|<)\s*(\d+(?:\.\d+)?)\s*\}\}/g;
     let output = input;
     let match;
-    
+
     while ((match = unlessPattern.exec(input)) !== null) {
       const fullMatch = match[0];
       const leftExpr = match[1];
       const op = match[2];
       const rightExpr = match[3];
       const startIdx = match.index;
-      
+
       // Find the matching {{/unless}}
       let depth = 1;
       let searchIdx = startIdx + fullMatch.length;
       let endIdx = -1;
-      
+
       while (searchIdx < input.length && depth > 0) {
-        const nextUnless = input.indexOf('{{#unless', searchIdx);
-        const nextEndUnless = input.indexOf('{{/unless}}', searchIdx);
-        
+        const nextUnless = input.indexOf("{{#unless", searchIdx);
+        const nextEndUnless = input.indexOf("{{/unless}}", searchIdx);
+
         if (nextEndUnless === -1) break;
-        
+
         if (nextUnless !== -1 && nextUnless < nextEndUnless) {
           depth++;
           searchIdx = nextUnless + 9;
@@ -1223,18 +1230,23 @@ export function processTemplate(
           searchIdx = nextEndUnless + 11;
         }
       }
-      
+
       if (endIdx !== -1) {
         const content = input.slice(startIdx + fullMatch.length, endIdx);
-        const conditionResult = evalCompareEnhanced(leftExpr.trim(), op, rightExpr.trim());
-        const replacement = !conditionResult ? content : '';
-        output = output.slice(0, startIdx) + replacement + output.slice(endIdx + 11);
+        const conditionResult = evalCompareEnhanced(
+          leftExpr.trim(),
+          op,
+          rightExpr.trim()
+        );
+        const replacement = !conditionResult ? content : "";
+        output =
+          output.slice(0, startIdx) + replacement + output.slice(endIdx + 11);
         // Reset pattern to search from beginning since string changed
         unlessPattern.lastIndex = 0;
         input = output;
       }
     }
-    
+
     return output;
   };
   result = processInlineUnlessComparisons(result);
