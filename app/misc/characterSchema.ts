@@ -672,6 +672,19 @@ export function processTemplate(
 ): string {
   let result = template;
 
+  // Decode HTML entities inside template expressions ({{...}})
+  // This handles cases where < > are encoded as &lt; &gt; in HTML content
+  result = result.replace(/\{\{([^}]+)\}\}/g, (match, content) => {
+    const decoded = content
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+      .replace(/&apos;/g, "'");
+    return `{{${decoded}}}`;
+  });
+
   // Icon resolution: #icon(name) - resolves to best-matching icon and renders as img
   // This allows AI-generated templates to use readable icon names that get
   // fuzzy-matched to actual icons from our icon database
