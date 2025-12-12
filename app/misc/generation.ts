@@ -548,6 +548,8 @@ export async function generateStoryTurn(
           toolResults?: unknown[];
         }[] = [];
         let isComplete = false;
+        let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
+        const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
 
         // If resuming from player answer, inject previous results and the answer
         if (options.playerAnswerContext) {
@@ -600,6 +602,12 @@ export async function generateStoryTurn(
               messagesWithHistory.push({
                 role: "user",
                 content: historyEntry.content, // Tool results formatted as user message
+              });
+            } else if (historyEntry.role === "user") {
+              // User messages (like continuation prompts) are added directly
+              messagesWithHistory.push({
+                role: "user",
+                content: historyEntry.content,
               });
             }
           }
@@ -781,8 +789,52 @@ export async function generateStoryTurn(
             continue;
           } else {
             // No tool calls - AI only produced thinking text without calling tools
-            // This likely means the AI couldn't determine what to do or the action
-            // doesn't require mechanics. Stop the GM stage here.
+            // Check if the content suggests the GM wants to continue (mentions rolling, attacking, etc.)
+            const wantsToContinue =
+              gmResult.content &&
+              (/let me roll|i('ll| will) roll|roll for|let's roll|rolling|attack roll|damage roll/i.test(
+                gmResult.content
+              ) ||
+                /now.*(the|they|it|enemy|enemies|creature|monster|npc)/i.test(
+                  gmResult.content
+                ) ||
+                /retaliate|counter.?attack|strike back|fight back/i.test(
+                  gmResult.content
+                ));
+
+            if (
+              wantsToContinue &&
+              gmRound < MAX_GM_ROUNDS &&
+              noToolCallPrompts < MAX_NO_TOOL_PROMPTS
+            ) {
+              // Prompt the GM to continue with tool calls or end
+              noToolCallPrompts++;
+              logger.action(
+                `GM seems to want to continue - prompting for action (attempt ${noToolCallPrompts}/${MAX_NO_TOOL_PROMPTS})`
+              );
+
+              // First add the assistant's response that had no tool calls
+              conversationHistory.push({
+                role: "assistant",
+                content: gmResult.content,
+              });
+
+              // Then add the continuation prompt as a user message
+              conversationHistory.push({
+                role: "user",
+                content: `You mentioned wanting to roll or take an action, but didn't call a tool. Please call the tool NOW:
+- Use formula_roll for attack/skill checks
+- Use npc_roll for enemy attacks
+- Use roll_dice for damage
+- Or call end_gm_thinking if you're done
+
+Call the tool:`,
+              });
+              continue;
+            }
+
+            // The GM didn't call tools and doesn't seem to want to continue
+            // This likely means the action doesn't require mechanics. Stop the GM stage here.
             logger.action(
               "GM stage returned no tool calls - stopping GM stage"
             );

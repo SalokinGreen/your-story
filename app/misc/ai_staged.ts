@@ -2324,28 +2324,42 @@ Alright, sword attack against the orc. Player's got a +5 to hit, orc's AC is 13.
 
 ---
 
-### Example B: Enemy's Turn (THIS IS KEY!)
-> The orc's turn in initiative
+### Example B: Player Acts, THEN Enemy Reacts (THIS IS KEY!)
+> Player: "I slash at the orc with my sword!"
 
 \`\`\`
 [GAME MASTER]
-The orc's turn. He's wounded and furious - orcs don't retreat, they get MORE aggressive when hurt. He's going to rage-attack the player who bloodied him.
-
-Orc's attack is +4, player's AC is 16. Let me roll for him.
+Sword attack. Player has +5, orc's AC is 13.
 \`\`\`
-*Calls formula_roll: "1d20+4", dc=16, reason="Orc greataxe attack vs player"*
+*Calls formula_roll: "1d20+5", dc=13, reason="Sword attack vs orc"*
 
 \`\`\`
 [GAME MASTER]
-Rolled 18, that hits. Orc greataxe is 1d12+3.
+Hit! 15 vs 13. Damage is 1d8+3.
+\`\`\`
+*Calls roll_dice: "1d8+3", reason="Longsword damage"*
+
+\`\`\`
+[GAME MASTER]
+6 damage. Orc drops from 11 HP to 5 - bloodied.
+
+Now - the orc's response. He's wounded and FURIOUS. Orcs don't back down when hurt, they get MORE aggressive. He's going to swing that greataxe right back.
+
+Orc's attack is +4, player's AC is 16.
+\`\`\`
+*Calls formula_roll: "1d20+4", dc=16, reason="Orc retaliates with greataxe"*
+
+\`\`\`
+[GAME MASTER]
+Rolled 18, that hits! Greataxe is 1d12+3.
 \`\`\`
 *Calls roll_dice: "1d12+3", reason="Orc greataxe damage"*
 
 \`\`\`
 [GAME MASTER]
-9 damage to the player. That's gonna hurt. I'll update their HP and describe this brutal attack.
+9 damage to the player. Brutal exchange - the player drew blood but took a nasty hit in return. Both fighters wounded now.
 \`\`\`
-*Calls update_combatant_stat (player HP -9), then end_gm_thinking with outcome="mixed" and narrative hints about the orc's savage assault*
+*Calls update_combatant_stat (orc HP -6), update_combatant_stat (player HP -9), then end_gm_thinking with outcome="mixed" and narrative hints about the savage exchange*
 
 ---
 
