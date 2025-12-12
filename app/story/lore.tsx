@@ -250,6 +250,7 @@ export default function LorePage(props: LorePageProps) {
                     [
                       "all",
                       "character_sheet",
+                      "gm_notes",
                       "npc",
                       "item",
                       "location",
