@@ -81,6 +81,7 @@ import {
   Variable,
   CustomTable,
 } from "@/app/misc/structs";
+import { parseTemplateFields } from "@/app/misc/characterSheetTemplate";
 import { AdventureVisualization } from "./AdventureVisualization";
 
 // Autosave Recovery Modal
@@ -2677,6 +2678,14 @@ ${result.description || ""}`;
         storyTemplate: result.storyTemplate,
         startingChoices: result.startingChoices,
         presets: result.storyTemplate?.presets,
+        characterSheetTemplate: result.characterSheetTemplate?.template
+          ? {
+              template: result.characterSheetTemplate.template,
+              fields: parseTemplateFields(
+                result.characterSheetTemplate.template
+              ),
+            }
+          : undefined,
         thumbnailUrl: thumbnailUrl || undefined,
         bannerUrl: bannerUrl || undefined,
         isPublished: false,
@@ -2750,6 +2759,14 @@ ${result.description || ""}`;
           storyTemplate: result.storyTemplate,
           startingChoices: result.startingChoices,
           presets: result.storyTemplate?.presets,
+          characterSheetTemplate: result.characterSheetTemplate?.template
+            ? {
+                template: result.characterSheetTemplate.template,
+                fields: parseTemplateFields(
+                  result.characterSheetTemplate.template
+                ),
+              }
+            : undefined,
           visibility: "private", // Private by default for quick start
           isPublished: false,
           isFeatured: false,
@@ -2929,16 +2946,6 @@ ${result.description || ""}`;
                     Generated in this stage:
                   </h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
-                    {previewStageData.partialResult.storyTemplate
-                      .characterSchema && (
-                      <div className="bg-blue-900/30 rounded px-3 py-2">
-                        <span className="text-amber-400 font-bold">
-                          {previewStageData.partialResult.storyTemplate
-                            .characterSchema.fields?.length || 0}
-                        </span>
-                        <span className="text-blue-300/60 ml-2">Fields</span>
-                      </div>
-                    )}
                     {previewStageData.partialResult.storyTemplate.lore &&
                       Array.isArray(
                         previewStageData.partialResult.storyTemplate.lore
@@ -4627,7 +4634,6 @@ ${result.description || ""}`;
                     <button
                       onClick={() => {
                         const allSections: RegenerateSection[] = [
-                          "characterSchema",
                           "mechanicsLore",
                           "lore",
                           "achievements",
@@ -4654,62 +4660,6 @@ ${result.description || ""}`;
                     </button>
                   </div>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    {/* Character Schema */}
-                    <ExpandableContentCard
-                      section="characterSchema"
-                      label="Character Schema"
-                      count={
-                        result.storyTemplate.characterSchema?.fields?.length ||
-                        0
-                      }
-                      color="amber"
-                      items={result.storyTemplate.characterSchema?.fields || []}
-                      isExpanded={expandedSections.has("characterSchema")}
-                      onToggleExpand={() =>
-                        toggleSectionExpanded("characterSchema")
-                      }
-                      onRegenerate={() =>
-                        handleRegenerateSection(
-                          "characterSchema",
-                          extensionInstructions
-                        )
-                      }
-                      onExtend={() =>
-                        handleExtendSection(
-                          "characterSchema",
-                          extensionOutputSize,
-                          extensionInstructions
-                        )
-                      }
-                      isRegenerating={regeneratingSections.has(
-                        "characterSchema"
-                      )}
-                      isExtending={extendingSections.has("characterSchema")}
-                      renderItem={(item) => {
-                        const field = item as {
-                          name: string;
-                          type: string;
-                          category?: string;
-                          description?: string;
-                        };
-                        return (
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-amber-300 truncate">
-                                {field.name}
-                              </div>
-                              <div className="text-xs text-blue-300/60 truncate">
-                                {field.description || field.category}
-                              </div>
-                            </div>
-                            <span className="text-amber-400 text-xs px-1.5 py-0.5 bg-amber-900/50 rounded">
-                              {field.type}
-                            </span>
-                          </div>
-                        );
-                      }}
-                    />
-
                     {/* Notes */}
                     <ExpandableContentCard
                       section="lore"

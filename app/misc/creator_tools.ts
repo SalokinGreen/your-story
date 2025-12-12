@@ -45,289 +45,6 @@ interface JSONSchemaProperty {
 }
 
 // ============================================
-// DEPRECATED: STATS TOOLS (Use Character Schema Fields instead)
-// These tools modify the legacy stats[] array which is deprecated.
-// Use add_schema_fields with type: "number" for attributes.
-// ============================================
-
-// DEPRECATED - kept for backwards compatibility but removed from CREATOR_TOOLS
-export const add_stats: ToolDefinition = {
-  name: "add_stats",
-  description:
-    "DEPRECATED: Use add_schema_fields instead. Add character attributes as schema fields with type 'number'.",
-  parameters: {
-    type: "object",
-    properties: {
-      stats: {
-        type: "array",
-        description: "Array of stats to add",
-        items: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "Stat name (e.g., 'Strength')",
-            },
-            value: { type: "number", description: "Starting value (1-100)" },
-            description: {
-              type: "string",
-              description: "What this stat represents",
-            },
-            symbol: {
-              type: "string",
-              description: "Emoji symbol (e.g., '💪')",
-            },
-          },
-          required: ["name", "value", "description", "symbol"],
-        },
-      },
-    },
-    required: ["stats"],
-  },
-};
-
-// DEPRECATED
-export const modify_stats: ToolDefinition = {
-  name: "modify_stats",
-  description: "DEPRECATED: Use modify_schema_fields instead.",
-  parameters: {
-    type: "object",
-    properties: {
-      stats: {
-        type: "array",
-        description: "Array of stat modifications",
-        items: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "Name of stat to modify (must match existing)",
-            },
-            new_name: { type: "string", description: "New name (if renaming)" },
-            value: { type: "number", description: "New value" },
-            description: { type: "string", description: "New description" },
-            symbol: { type: "string", description: "New symbol" },
-          },
-          required: ["name"],
-        },
-      },
-    },
-    required: ["stats"],
-  },
-};
-
-// DEPRECATED
-export const remove_stats: ToolDefinition = {
-  name: "remove_stats",
-  description: "DEPRECATED: Use remove_schema_fields instead.",
-  parameters: {
-    type: "object",
-    properties: {
-      names: {
-        type: "array",
-        description: "Names of stats to remove",
-        items: { type: "string" },
-      },
-    },
-    required: ["names"],
-  },
-};
-
-// ============================================
-// DEPRECATED: RESOURCES TOOLS (Use Character Schema Fields instead)
-// These tools modify the legacy resources[] array which is deprecated.
-// Use add_schema_fields with type: "resource" for pools with current/max.
-// ============================================
-
-// DEPRECATED
-export const add_resources: ToolDefinition = {
-  name: "add_resources",
-  description:
-    "DEPRECATED: Use add_schema_fields with type 'resource' instead.",
-  parameters: {
-    type: "object",
-    properties: {
-      resources: {
-        type: "array",
-        description: "Array of resources to add",
-        items: {
-          type: "object",
-          properties: {
-            name: {
-              type: "string",
-              description: "Resource name (e.g., 'Health')",
-            },
-            value: { type: "number", description: "Starting current value" },
-            maxValue: { type: "number", description: "Maximum value" },
-            description: {
-              type: "string",
-              description: "What this resource represents",
-            },
-            symbol: {
-              type: "string",
-              description: "Emoji symbol (e.g., '❤️')",
-            },
-          },
-          required: ["name", "value", "maxValue", "description", "symbol"],
-        },
-      },
-    },
-    required: ["resources"],
-  },
-};
-
-// DEPRECATED
-export const modify_resources: ToolDefinition = {
-  name: "modify_resources",
-  description: "DEPRECATED: Use modify_schema_fields instead.",
-  parameters: {
-    type: "object",
-    properties: {
-      resources: {
-        type: "array",
-        description: "Array of resource modifications",
-        items: {
-          type: "object",
-          properties: {
-            name: { type: "string", description: "Name of resource to modify" },
-            new_name: { type: "string", description: "New name (if renaming)" },
-            value: { type: "number", description: "New current value" },
-            maxValue: { type: "number", description: "New max value" },
-            description: { type: "string", description: "New description" },
-            symbol: { type: "string", description: "New symbol" },
-          },
-          required: ["name"],
-        },
-      },
-    },
-    required: ["resources"],
-  },
-};
-
-// DEPRECATED
-export const remove_resources: ToolDefinition = {
-  name: "remove_resources",
-  description: "DEPRECATED: Use remove_schema_fields instead.",
-  parameters: {
-    type: "object",
-    properties: {
-      names: {
-        type: "array",
-        description: "Names of resources to remove",
-        items: { type: "string" },
-      },
-    },
-    required: ["names"],
-  },
-};
-
-// ============================================
-// ITEMS TOOLS
-// ============================================
-
-export const add_items: ToolDefinition = {
-  name: "add_items",
-  description:
-    "Add items to the starting inventory. Types: normal (breaks on fail), consumable (used once), story (quest items), misc (no break).",
-  parameters: {
-    type: "object",
-    properties: {
-      items: {
-        type: "array",
-        description: "Array of items to add",
-        items: {
-          type: "object",
-          properties: {
-            name: { type: "string", description: "Item name" },
-            quantity: { type: "number", description: "Stack quantity" },
-            description: { type: "string", description: "Item description" },
-            type: {
-              type: "string",
-              enum: ["normal", "consumable", "story", "misc"],
-              description: "Item behavior type",
-            },
-            grade: {
-              type: "string",
-              enum: [
-                "common",
-                "uncommon",
-                "rare",
-                "epic",
-                "legendary",
-                "mythic",
-              ],
-              description: "Item rarity/grade",
-            },
-            stat: { type: "string", description: "Associated stat (optional)" },
-            symbol: { type: "string", description: "Emoji symbol" },
-          },
-          required: ["name", "quantity", "description", "type", "symbol"],
-        },
-      },
-    },
-    required: ["items"],
-  },
-};
-
-export const modify_items: ToolDefinition = {
-  name: "modify_items",
-  description: "Modify existing items by name.",
-  parameters: {
-    type: "object",
-    properties: {
-      items: {
-        type: "array",
-        description: "Array of item modifications",
-        items: {
-          type: "object",
-          properties: {
-            name: { type: "string", description: "Name of item to modify" },
-            new_name: { type: "string", description: "New name (if renaming)" },
-            quantity: { type: "number", description: "New quantity" },
-            description: { type: "string", description: "New description" },
-            type: {
-              type: "string",
-              enum: ["normal", "consumable", "story", "misc"],
-            },
-            grade: {
-              type: "string",
-              enum: [
-                "common",
-                "uncommon",
-                "rare",
-                "epic",
-                "legendary",
-                "mythic",
-              ],
-            },
-            stat: { type: "string", description: "New associated stat" },
-            symbol: { type: "string", description: "New symbol" },
-          },
-          required: ["name"],
-        },
-      },
-    },
-    required: ["items"],
-  },
-};
-
-export const remove_items: ToolDefinition = {
-  name: "remove_items",
-  description: "Remove items by name.",
-  parameters: {
-    type: "object",
-    properties: {
-      names: {
-        type: "array",
-        description: "Names of items to remove",
-        items: { type: "string" },
-      },
-    },
-    required: ["names"],
-  },
-};
-
-// ============================================
 // ABILITIES TOOLS
 // ============================================
 
@@ -461,73 +178,6 @@ export const remove_abilities: ToolDefinition = {
 // PASSIVES TOOLS
 // ============================================
 
-export const add_passives: ToolDefinition = {
-  name: "add_passives",
-  description:
-    "Add passive effects/traits. Passives are story/RP traits that influence narrative, difficulty, and NPC reactions - NOT direct mechanical bonuses. Examples: 'Wolf Slayer' makes wolves easier to fight, 'Noble Blood' makes nobles treat you with respect.",
-  parameters: {
-    type: "object",
-    properties: {
-      passives: {
-        type: "array",
-        description: "Array of passives to add",
-        items: {
-          type: "object",
-          properties: {
-            name: { type: "string", description: "Passive name" },
-            description: {
-              type: "string",
-              description: "What the passive does/represents",
-            },
-          },
-          required: ["name", "description"],
-        },
-      },
-    },
-    required: ["passives"],
-  },
-};
-
-export const modify_passives: ToolDefinition = {
-  name: "modify_passives",
-  description: "Modify existing passives by name.",
-  parameters: {
-    type: "object",
-    properties: {
-      passives: {
-        type: "array",
-        description: "Array of passive modifications",
-        items: {
-          type: "object",
-          properties: {
-            name: { type: "string", description: "Name of passive to modify" },
-            new_name: { type: "string", description: "New name (if renaming)" },
-            description: { type: "string", description: "New description" },
-          },
-          required: ["name"],
-        },
-      },
-    },
-    required: ["passives"],
-  },
-};
-
-export const remove_passives: ToolDefinition = {
-  name: "remove_passives",
-  description: "Remove passives by name.",
-  parameters: {
-    type: "object",
-    properties: {
-      names: {
-        type: "array",
-        description: "Names of passives to remove",
-        items: { type: "string" },
-      },
-    },
-    required: ["names"],
-  },
-};
-
 // ============================================
 // LORE TOOLS
 // ============================================
@@ -535,7 +185,7 @@ export const remove_passives: ToolDefinition = {
 export const add_lore: ToolDefinition = {
   name: "add_lore",
   description:
-    "Add lore entries. Lore provides world-building context to the AI. Can be triggered on/off by keywords or variables.",
+    "Add lore entries. Lore provides world-building context to the AI. Can be triggered on/off by keywords or variables. Use type='character_sheet' for character sheets (highest AI priority).",
   parameters: {
     type: "object",
     properties: {
@@ -549,6 +199,12 @@ export const add_lore: ToolDefinition = {
             content: {
               type: "string",
               description: "Full lore content (2-4 paragraphs recommended)",
+            },
+            type: {
+              type: "string",
+              enum: ["lore", "character_sheet", "mechanics"],
+              description:
+                "Note type. 'character_sheet' = highest priority (stats, HP, abilities, equipment), 'mechanics' = game rules, 'lore' = world-building (default)",
             },
             secret: {
               type: "boolean",
@@ -611,6 +267,11 @@ export const modify_lore: ToolDefinition = {
               description: "New title (if renaming)",
             },
             content: { type: "string" },
+            type: {
+              type: "string",
+              enum: ["lore", "character_sheet", "mechanics"],
+              description: "Note type priority",
+            },
             secret: { type: "boolean" },
             alwaysOn: { type: "boolean" },
             on_triggers: { type: "array", items: { type: "string" } },
@@ -1049,13 +710,10 @@ export const add_presets: ToolDefinition = {
             },
             description: { type: "string", description: "Preset description" },
             icon: { type: "string", description: "Emoji icon" },
-            playerName: {
+            characterSheet: {
               type: "string",
-              description: "Default character name (optional)",
-            },
-            playerSummary: {
-              type: "string",
-              description: "Character background summary",
+              description:
+                "Pre-filled character sheet in markdown format. This is added to the player's Notes when they select this preset.",
             },
             intro: {
               type: "string",
@@ -1134,7 +792,7 @@ export const add_presets: ToolDefinition = {
               },
             },
           },
-          required: ["id", "name", "description", "icon", "playerSummary"],
+          required: ["id", "name", "description", "icon", "characterSheet"],
         },
       },
     },
@@ -1160,8 +818,10 @@ export const modify_presets: ToolDefinition = {
             new_name: { type: "string" },
             description: { type: "string" },
             icon: { type: "string" },
-            playerName: { type: "string" },
-            playerSummary: { type: "string" },
+            characterSheet: {
+              type: "string",
+              description: "Pre-filled character sheet in markdown format",
+            },
             intro: { type: "string" },
             authorNotes: { type: "string" },
             stats: { type: "array" },
@@ -1203,6 +863,33 @@ export const remove_presets: ToolDefinition = {
       },
     },
     required: ["ids"],
+  },
+};
+
+// ============================================
+// CHARACTER SHEET TOOLS
+// ============================================
+
+export const update_character_sheet: ToolDefinition = {
+  name: "update_character_sheet",
+  description:
+    "Update the player's filled character sheet markdown. Use this to modify the player's current character information, stats displayed on the sheet, backstory, etc. The character sheet is a markdown document that gets added to AI context as the player's primary character information.",
+  parameters: {
+    type: "object",
+    properties: {
+      character_sheet: {
+        type: "string",
+        description:
+          "The complete character sheet in markdown format. Use headers (##, ###) to organize sections. Include key character info like name, class, race, stats, abilities, equipment, backstory, etc.",
+      },
+      mode: {
+        type: "string",
+        enum: ["replace", "append", "prepend"],
+        description:
+          "How to update the sheet. 'replace' (default) replaces the entire sheet, 'append' adds to the end, 'prepend' adds to the beginning.",
+      },
+    },
+    required: ["character_sheet"],
   },
 };
 
@@ -1481,7 +1168,7 @@ export const remove_custom_tables: ToolDefinition = {
 export const update_basic_info: ToolDefinition = {
   name: "update_basic_info",
   description:
-    "Update basic adventure info: story name, premise, default player name/summary, intro text, author notes.",
+    "Update basic adventure info: story name, premise, character sheet, intro text, author notes.",
   parameters: {
     type: "object",
     properties: {
@@ -1490,13 +1177,9 @@ export const update_basic_info: ToolDefinition = {
         type: "string",
         description: "Story premise/setting description",
       },
-      player_name: {
+      character_sheet: {
         type: "string",
-        description: "Default player character name",
-      },
-      player_summary: {
-        type: "string",
-        description: "Default player background",
+        description: "Player's character sheet in markdown format",
       },
       intro: { type: "string", description: "Opening narration text" },
       author_notes: {
@@ -1773,524 +1456,53 @@ export const remove_starting_choices: ToolDefinition = {
 };
 
 // ============================================
-// CHARACTER SCHEMA TOOLS
+// CHARACTER SHEET TOOLS
 // ============================================
 
-export const set_character_schema: ToolDefinition = {
-  name: "set_character_schema",
+export const update_character_sheet_template: ToolDefinition = {
+  name: "update_character_sheet_template",
   description:
-    "Create or replace the character schema. Defines the structure of the character sheet including all fields, categories, and optional custom template.",
+    "Update the adventure's character sheet template. Templates use {{FieldName | Description | DefaultValue}} syntax for fillable fields. The template is shown to players when they create a custom character.",
   parameters: {
     type: "object",
     properties: {
-      name: {
-        type: "string",
-        description: "Schema name (e.g., 'D&D 5e', 'Call of Cthulhu')",
-      },
-      description: {
-        type: "string",
-        description: "Description of the character system",
-      },
-      fields: {
-        type: "array",
-        description: "Field definitions for the character sheet",
-        items: {
-          type: "object",
-          properties: {
-            id: {
-              type: "string",
-              description: "Unique field ID (alphanumeric_underscore)",
-            },
-            name: { type: "string", description: "Display name" },
-            type: {
-              type: "string",
-              enum: [
-                "number",
-                "derived",
-                "resource",
-                "text",
-                "list",
-                "boolean",
-                "select",
-              ],
-              description: "Field type",
-            },
-            description: { type: "string", description: "Field description" },
-            category: {
-              type: "string",
-              description: "Category ID for grouping",
-            },
-            order: { type: "number", description: "Display order" },
-            hidden: { type: "boolean", description: "Hidden from player" },
-            readonly: {
-              type: "boolean",
-              description: "Read-only (calculated)",
-            },
-            defaultValue: {
-              type: "string",
-              description: "Default value (parsed based on type)",
-            },
-            min: { type: "number", description: "For numbers: minimum" },
-            max: { type: "number", description: "For numbers: maximum" },
-            step: { type: "number", description: "For numbers: step" },
-            formula: {
-              type: "string",
-              description:
-                "For derived: formula using {{fieldId}} syntax (e.g., 'floor(({{Strength}} - 10) / 2)')",
-            },
-            defaultMax: {
-              type: "number",
-              description: "For resources: default max value",
-            },
-            regenerates: {
-              type: "boolean",
-              description: "For resources: regenerates on rest",
-            },
-            maxLength: { type: "number", description: "For text: max length" },
-            multiline: {
-              type: "boolean",
-              description: "For text: use textarea",
-            },
-            placeholder: {
-              type: "string",
-              description: "For text: placeholder",
-            },
-            maxItems: { type: "number", description: "For lists: max items" },
-            options: {
-              type: "array",
-              description: "For lists/selects: predefined options",
-              items: { type: "string" },
-            },
-            selectOptions: {
-              type: "array",
-              description: "For select: options with values and labels",
-              items: {
-                type: "object",
-                properties: {
-                  value: { type: "string" },
-                  label: { type: "string" },
-                },
-              },
-            },
-            trueLabel: {
-              type: "string",
-              description: "For boolean: true label",
-            },
-            falseLabel: {
-              type: "string",
-              description: "For boolean: false label",
-            },
-          },
-          required: ["id", "name", "type"],
-        },
-      },
-      categories: {
-        type: "array",
-        description: "Category definitions for organizing fields",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Unique category ID" },
-            name: { type: "string", description: "Display name" },
-            order: { type: "number", description: "Display order" },
-            collapsed: {
-              type: "boolean",
-              description: "Start collapsed",
-            },
-          },
-          required: ["id", "name"],
-        },
-      },
-    },
-    required: ["name", "fields"],
-  },
-};
-
-export const add_schema_fields: ToolDefinition = {
-  name: "add_schema_fields",
-  description: "Add new fields to the character schema.",
-  parameters: {
-    type: "object",
-    properties: {
-      fields: {
-        type: "array",
-        description: "Fields to add (same structure as set_character_schema)",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string" },
-            name: { type: "string" },
-            type: {
-              type: "string",
-              enum: [
-                "number",
-                "derived",
-                "resource",
-                "text",
-                "list",
-                "boolean",
-                "select",
-              ],
-            },
-            description: { type: "string" },
-            category: { type: "string" },
-            order: { type: "number" },
-            hidden: { type: "boolean" },
-            readonly: { type: "boolean" },
-            defaultValue: { type: "string" },
-            min: { type: "number" },
-            max: { type: "number" },
-            formula: { type: "string" },
-            defaultMax: { type: "number" },
-            options: { type: "array", items: { type: "string" } },
-          },
-          required: ["id", "name", "type"],
-        },
-      },
-    },
-    required: ["fields"],
-  },
-};
-
-export const modify_schema_fields: ToolDefinition = {
-  name: "modify_schema_fields",
-  description: "Modify existing fields in the character schema by ID.",
-  parameters: {
-    type: "object",
-    properties: {
-      fields: {
-        type: "array",
-        description: "Field modifications",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Field ID to modify" },
-            new_id: { type: "string", description: "New ID (if renaming)" },
-            name: { type: "string" },
-            type: { type: "string" },
-            description: { type: "string" },
-            category: { type: "string" },
-            order: { type: "number" },
-            hidden: { type: "boolean" },
-            readonly: { type: "boolean" },
-            defaultValue: { type: "string" },
-            min: { type: "number" },
-            max: { type: "number" },
-            formula: { type: "string" },
-            defaultMax: { type: "number" },
-            options: { type: "array", items: { type: "string" } },
-          },
-          required: ["id"],
-        },
-      },
-    },
-    required: ["fields"],
-  },
-};
-
-export const remove_schema_fields: ToolDefinition = {
-  name: "remove_schema_fields",
-  description: "Remove fields from the character schema by ID.",
-  parameters: {
-    type: "object",
-    properties: {
-      ids: {
-        type: "array",
-        description: "Field IDs to remove",
-        items: { type: "string" },
-      },
-    },
-    required: ["ids"],
-  },
-};
-
-export const add_schema_categories: ToolDefinition = {
-  name: "add_schema_categories",
-  description: "Add categories to organize fields in the character sheet.",
-  parameters: {
-    type: "object",
-    properties: {
-      categories: {
-        type: "array",
-        description: "Categories to add",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Unique category ID" },
-            name: { type: "string", description: "Display name" },
-            order: { type: "number", description: "Display order" },
-            collapsed: { type: "boolean", description: "Start collapsed" },
-          },
-          required: ["id", "name"],
-        },
-      },
-    },
-    required: ["categories"],
-  },
-};
-
-export const modify_schema_categories: ToolDefinition = {
-  name: "modify_schema_categories",
-  description: "Modify existing categories by ID.",
-  parameters: {
-    type: "object",
-    properties: {
-      categories: {
-        type: "array",
-        description: "Category modifications",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Category ID to modify" },
-            new_id: { type: "string" },
-            name: { type: "string" },
-            order: { type: "number" },
-            collapsed: { type: "boolean" },
-          },
-          required: ["id"],
-        },
-      },
-    },
-    required: ["categories"],
-  },
-};
-
-export const remove_schema_categories: ToolDefinition = {
-  name: "remove_schema_categories",
-  description: "Remove categories from the schema by ID.",
-  parameters: {
-    type: "object",
-    properties: {
-      ids: {
-        type: "array",
-        description: "Category IDs to remove",
-        items: { type: "string" },
-      },
-    },
-    required: ["ids"],
-  },
-};
-
-export const set_schema_template: ToolDefinition = {
-  name: "set_schema_template",
-  description:
-    'Set the custom HTML/CSS/JS template for the main character sheet. Template syntax: {{fieldId}} for values, {{fieldId.current}}/{{fieldId.max}} for resources, {{percent fieldId}} for percentage, {{modifier fieldId}} for D&D-style modifier, {{#if fieldId}}...{{/if}}, {{#each fieldId}}...{{/each}}, {{#compare fieldId "op" value}}...{{/compare}}, {{resource:id}} for uploaded resource URLs.',
-  parameters: {
-    type: "object",
-    properties: {
-      html: {
+      template: {
         type: "string",
         description:
-          "HTML template with {{fieldId}} placeholders and conditionals",
+          "The new template content using {{FieldName | Description | DefaultValue}} syntax for fillable fields. Use markdown formatting.",
       },
-      css: {
+      preset_id: {
         type: "string",
         description:
-          "CSS styles for the template (can include @import for fonts)",
+          "Optional: Use a preset template. Options: 'generic', 'dnd5e', 'coc' (Call of Cthulhu), 'traveller', 'monsterhearts', 'fate', 'pbta', 'bitd' (Blades in the Dark), 'wod' (World of Darkness)",
       },
-      js: {
+    },
+    required: [],
+  },
+};
+
+export const update_preset_character_sheet: ToolDefinition = {
+  name: "update_preset_character_sheet",
+  description:
+    "Update a preset's pre-filled character sheet. This is the completed character sheet shown in the player's Notes when they select a preset. Use markdown formatting with the filled-in values (not template syntax).",
+  parameters: {
+    type: "object",
+    properties: {
+      preset_id: {
+        type: "string",
+        description: "ID of the preset to update",
+      },
+      preset_name: {
+        type: "string",
+        description: "Name of the preset (if ID not known)",
+      },
+      character_sheet: {
         type: "string",
         description:
-          "Optional JavaScript for interactivity (runs in sandboxed iframe, has access to window.characterData and window.getField(id))",
+          "The completed character sheet in markdown format. This should be a filled-in version of the template with actual values for this preset.",
       },
     },
-    required: ["html", "css"],
-  },
-};
-
-export const add_schema_pages: ToolDefinition = {
-  name: "add_schema_pages",
-  description:
-    "Add custom pages to the character sheet. Each page gets its own tab in the Stats view with custom HTML/CSS/JS template.",
-  parameters: {
-    type: "object",
-    properties: {
-      pages: {
-        type: "array",
-        description: "Pages to add",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Unique page ID" },
-            name: { type: "string", description: "Tab display name" },
-            icon: {
-              type: "string",
-              description:
-                "Icon name from lucide-react (e.g., 'Sword', 'Book')",
-            },
-            order: { type: "number", description: "Tab order" },
-            html: { type: "string", description: "HTML template" },
-            css: { type: "string", description: "CSS styles" },
-            js: { type: "string", description: "Optional JavaScript" },
-          },
-          required: ["id", "name", "html", "css"],
-        },
-      },
-    },
-    required: ["pages"],
-  },
-};
-
-export const modify_schema_pages: ToolDefinition = {
-  name: "modify_schema_pages",
-  description: "Modify existing schema pages by ID.",
-  parameters: {
-    type: "object",
-    properties: {
-      pages: {
-        type: "array",
-        description: "Page modifications",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Page ID to modify" },
-            new_id: { type: "string" },
-            name: { type: "string" },
-            icon: { type: "string" },
-            order: { type: "number" },
-            html: { type: "string" },
-            css: { type: "string" },
-            js: { type: "string" },
-          },
-          required: ["id"],
-        },
-      },
-    },
-    required: ["pages"],
-  },
-};
-
-export const remove_schema_pages: ToolDefinition = {
-  name: "remove_schema_pages",
-  description: "Remove custom pages from the schema by ID.",
-  parameters: {
-    type: "object",
-    properties: {
-      ids: {
-        type: "array",
-        description: "Page IDs to remove",
-        items: { type: "string" },
-      },
-    },
-    required: ["ids"],
-  },
-};
-
-export const add_schema_resources: ToolDefinition = {
-  name: "add_schema_resources",
-  description:
-    "Add uploaded resources (images, fonts) for use in schema templates. Resources can be referenced in templates using {{resource:id}}.",
-  parameters: {
-    type: "object",
-    properties: {
-      resources: {
-        type: "array",
-        description: "Resources to add",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Unique resource ID" },
-            name: { type: "string", description: "Display name" },
-            url: { type: "string", description: "URL to the resource" },
-            type: {
-              type: "string",
-              enum: ["image", "font", "other"],
-              description: "Resource type",
-            },
-          },
-          required: ["id", "name", "url", "type"],
-        },
-      },
-    },
-    required: ["resources"],
-  },
-};
-
-export const remove_schema_resources: ToolDefinition = {
-  name: "remove_schema_resources",
-  description: "Remove resources from the schema by ID.",
-  parameters: {
-    type: "object",
-    properties: {
-      ids: {
-        type: "array",
-        description: "Resource IDs to remove",
-        items: { type: "string" },
-      },
-    },
-    required: ["ids"],
-  },
-};
-
-export const set_character_values: ToolDefinition = {
-  name: "set_character_values",
-  description:
-    "Set or update character data values. Use this during gameplay to modify character sheet fields.",
-  parameters: {
-    type: "object",
-    properties: {
-      values: {
-        type: "object",
-        description:
-          "Object mapping field IDs to values. For resources use {current: number, max: number}.",
-      },
-    },
-    required: ["values"],
-  },
-};
-
-export const modify_character_values: ToolDefinition = {
-  name: "modify_character_values",
-  description:
-    "Modify specific character values by field ID. Can increment/decrement numbers or set values directly.",
-  parameters: {
-    type: "object",
-    properties: {
-      modifications: {
-        type: "array",
-        description: "Array of value modifications",
-        items: {
-          type: "object",
-          properties: {
-            field_id: { type: "string", description: "Field ID to modify" },
-            value: {
-              type: "string",
-              description: "New value (parsed based on field type)",
-            },
-            add: {
-              type: "number",
-              description: "For numbers: add this amount (can be negative)",
-            },
-            set_current: {
-              type: "number",
-              description: "For resources: set current value",
-            },
-            set_max: {
-              type: "number",
-              description: "For resources: set max value",
-            },
-            add_current: {
-              type: "number",
-              description: "For resources: add to current",
-            },
-            add_max: {
-              type: "number",
-              description: "For resources: add to max",
-            },
-            append: {
-              type: "string",
-              description: "For lists: add this item",
-            },
-            remove_item: {
-              type: "string",
-              description: "For lists: remove this item",
-            },
-          },
-          required: ["field_id"],
-        },
-      },
-    },
-    required: ["modifications"],
+    required: ["character_sheet"],
   },
 };
 
@@ -2299,29 +1511,10 @@ export const modify_character_values: ToolDefinition = {
 // ============================================
 
 export const CREATOR_TOOLS: ToolDefinition[] = [
-  // Character Schema (replaces deprecated stats/resources)
-  set_character_schema,
-  add_schema_fields,
-  modify_schema_fields,
-  remove_schema_fields,
-  add_schema_categories,
-  modify_schema_categories,
-  remove_schema_categories,
-  add_schema_pages,
-  modify_schema_pages,
-  remove_schema_pages,
-  set_schema_template,
-  // Items & Abilities
-  add_items,
-  modify_items,
-  remove_items,
+  // Abilities
   add_abilities,
   modify_abilities,
   remove_abilities,
-  // Passives
-  add_passives,
-  modify_passives,
-  remove_passives,
   // Lore
   add_lore,
   modify_lore,
@@ -2354,11 +1547,6 @@ export const CREATOR_TOOLS: ToolDefinition[] = [
   add_custom_tables,
   modify_custom_tables,
   remove_custom_tables,
-  // Character Schema values
-  set_character_values,
-  modify_character_values,
-  add_schema_resources,
-  remove_schema_resources,
   // Settings
   update_basic_info,
   update_adventure_metadata,
@@ -2370,6 +1558,10 @@ export const CREATOR_TOOLS: ToolDefinition[] = [
   add_starting_choices,
   modify_starting_choices,
   remove_starting_choices,
+  // Character Sheet
+  update_character_sheet,
+  update_character_sheet_template,
+  update_preset_character_sheet,
 ];
 
 /**

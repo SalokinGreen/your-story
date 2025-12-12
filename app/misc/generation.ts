@@ -486,6 +486,7 @@ export async function generateStoryTurn(
     // ========================================
     let gmResults: GMToolResult[] = [];
     let gmStoryContext = "";
+    let gmInterleavedConversation = ""; // NEW: Full interleaved GM conversation for story stage
     let gmMeta: GenerationMeta | undefined;
     let gmThinking: string[] = []; // Capture GM's "[GM]" reasoning text
     let playerQuestion:
@@ -537,6 +538,9 @@ export async function generateStoryTurn(
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         let gmRound = 0;
         let allGMContextParts: string[] = [];
+        // NEW: Build interleaved conversation log for story stage
+        // This preserves the exact order: thinking -> tool results -> thinking -> tool results
+        let gmInterleavedParts: string[] = [];
         let conversationHistory: {
           role: string;
           content: string;
@@ -565,9 +569,12 @@ export async function generateStoryTurn(
           logger.action(`GM stage round ${gmRound}`);
 
           // Build prompt - include conversation history for multi-turn
+          // GM Stage now receives customMaxContext (Memory Size slider) for context allocation
           const gmPrompt = buildGMStagePrompt({
             storyData,
             userChoice: gmUserChoice,
+            customMaxContext: options.customMaxContext, // Memory Size slider controls GM context
+            modelName: gmModel,
           });
 
           // Add conversation history from previous rounds
@@ -656,6 +663,13 @@ export async function generateStoryTurn(
           // Capture GM's thinking text (content before/with tool calls)
           if (gmResult.content) {
             gmThinking.push(gmResult.content);
+            // Add to interleaved parts with proper formatting
+            const formattedThinking =
+              gmResult.content.trim().startsWith("[GAME MASTER]") ||
+              gmResult.content.trim().startsWith("[GM]")
+                ? gmResult.content.trim().replace(/^\[GM\]/, "[GAME MASTER]")
+                : `[GAME MASTER]\n${gmResult.content.trim()}`;
+            gmInterleavedParts.push(formattedThinking);
             // Add to conversation history
             conversationHistory.push({
               role: "assistant",
@@ -675,6 +689,10 @@ export async function generateStoryTurn(
             gmResults.push(...gmExecution.results);
             if (gmExecution.storyContext) {
               allGMContextParts.push(gmExecution.storyContext);
+              // Add tool results to interleaved parts
+              gmInterleavedParts.push(
+                `[GAME MASTER]\n${gmExecution.storyContext}`
+              );
             }
 
             // Update storyData with any modifications from GM tools
@@ -703,19 +721,24 @@ export async function generateStoryTurn(
               // Put outcome FIRST so it's most prominent
               if (gmExecution.finalSummary) {
                 // Start with the authoritative outcome
-                allGMContextParts.push(
-                  `[FINAL OUTCOME: ${gmExecution.finalOutcome || "neutral"}]`
-                );
-                allGMContextParts.push(
-                  `[GAME MASTER Summary: ${gmExecution.finalSummary}]`
-                );
+                const finalOutcomePart = `[FINAL OUTCOME: ${
+                  gmExecution.finalOutcome || "neutral"
+                }]`;
+                allGMContextParts.push(finalOutcomePart);
+                gmInterleavedParts.push(finalOutcomePart);
+
+                const summaryPart = `[GAME MASTER Summary: ${gmExecution.finalSummary}]`;
+                allGMContextParts.push(summaryPart);
+                gmInterleavedParts.push(summaryPart);
+
                 if (gmExecution.narrativeHints) {
-                  allGMContextParts.push(
-                    `[Narrative Hints: ${gmExecution.narrativeHints}]`
-                  );
+                  const hintsPart = `[Narrative Hints: ${gmExecution.narrativeHints}]`;
+                  allGMContextParts.push(hintsPart);
+                  gmInterleavedParts.push(hintsPart);
                 }
                 if (gmExecution.dramaticMoment) {
                   allGMContextParts.push(`[DRAMATIC MOMENT]`);
+                  gmInterleavedParts.push(`[DRAMATIC MOMENT]`);
                 }
               }
               logger.action("GM stage complete - end_gm_thinking called", {
@@ -774,8 +797,10 @@ export async function generateStoryTurn(
           }
         }
 
-        // Combine all context parts from all rounds
+        // Combine all context parts from all rounds (for backward compat/logging)
         gmStoryContext = allGMContextParts.join("\n\n");
+        // Build interleaved conversation string for story stage
+        gmInterleavedConversation = gmInterleavedParts.join("\n\n");
 
         if (gmRound >= MAX_GM_ROUNDS && !isComplete) {
           logger.action(
@@ -860,8 +885,9 @@ export async function generateStoryTurn(
       customMaxOutput: storyMaxOutput,
       embeddingContext,
       usePrefill: options.usePrefill !== false, // Default to true
-      gmStoryContext: gmStoryContext || undefined, // GM stage tool results and final summary
-      gmThinking: gmThinking.length > 0 ? gmThinking : undefined, // Full GM reasoning chain
+      gmStoryContext: gmStoryContext || undefined, // DEPRECATED: Use gmInterleavedConversation
+      gmThinking: gmThinking.length > 0 ? gmThinking : undefined, // DEPRECATED: Use gmInterleavedConversation
+      gmInterleavedConversation: gmInterleavedConversation || undefined, // NEW: Full interleaved GM conversation
     });
 
     // Clear pending player actions after they've been included in the prompt

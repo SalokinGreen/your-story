@@ -188,6 +188,10 @@ describe("Lore Manipulation Commands", () => {
       resources: [],
       inventory: [],
       achievements: [],
+      abilities: [],
+      level: 1,
+      upgradesSpent: 0,
+      conditions: [],
       lore: [
         {
           title: "The Ancient Order",

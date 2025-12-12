@@ -4,6 +4,7 @@ import {
   Scene,
   ScenePart,
   StoryData,
+  StoryLore,
   Choices,
   Choice,
   Resource,
@@ -168,6 +169,7 @@ import {
   tickCooldowns,
   ABILITY_GRADE_CONFIG,
 } from "../misc/abilitySystem";
+import CharacterCreationForm from "./create-character/form";
 import { getSamplingSettings } from "../misc/samplingSettings";
 
 // Cryptographically secure random number generator
@@ -292,6 +294,7 @@ enum StoryState {
   MENU = "MENU",
   LOGS = "LOGS",
   CONTEXT = "CONTEXT",
+  CHARACTER_CREATION = "CHARACTER_CREATION",
 }
 
 export function processCommands(
@@ -1555,6 +1558,89 @@ function StoryPageContent() {
     message: "",
     onConfirm: () => {},
   });
+
+  const handleCharacterCreate = async (
+    characterData: Record<string, string>
+  ) => {
+    if (!storyData || !selectedPreset) return;
+    logger.action("User created custom character", { characterData });
+
+    const updatedStoryData = {
+      ...storyData,
+      characterData,
+      selected_preset: selectedPreset.id,
+    };
+
+    // For custom preset, generate a character sheet from the template and filled data
+    if (
+      updatedStoryData.characterSheetTemplate?.template &&
+      Object.keys(characterData).length > 0
+    ) {
+      let filledSheet = updatedStoryData.characterSheetTemplate.template;
+      // Replace placeholders with filled values
+      for (const [fieldName, value] of Object.entries(characterData)) {
+        // Match {{FieldName | Description | Default}} pattern
+        const regex = new RegExp(`\\{\\{${fieldName}\\s*\\|[^}]*\\}\\}`, "gi");
+        filledSheet = filledSheet.replace(regex, value || "");
+        // Also match simple {{FieldName}} pattern
+        const simpleRegex = new RegExp(`\\{\\{${fieldName}\\}\\}`, "gi");
+        filledSheet = filledSheet.replace(simpleRegex, value || "");
+      }
+      updatedStoryData.characterSheet = filledSheet;
+
+      // Add character sheet to lore as "character_sheet" type for AI context
+      const characterSheetLore: StoryLore = {
+        title: "Player Character Sheet",
+        content: filledSheet,
+        relatedCharacters: [],
+        relatedLocations: [],
+        secrtet: false,
+        keys: [],
+        type: "character_sheet",
+        on: true,
+        on_triggers: [],
+        off_triggers: [],
+        var_on_triggers: [],
+        var_off_triggers: [],
+      };
+      updatedStoryData.lore = [
+        ...(updatedStoryData.lore || []),
+        characterSheetLore,
+      ];
+    }
+
+    // Determine starting choices
+    const startingChoices = updatedStoryData.starting_choices?.length
+      ? updatedStoryData.starting_choices.map((sc) => ({
+          text: sc.text,
+          intro_override: sc.intro_override,
+        }))
+      : [{ text: "Start Story" }];
+
+    // Add starting scene part
+    updatedStoryData.scene.parts.push({
+      content: updatedStoryData.intro || "The story begins.",
+      imageUrl: "",
+      user: false,
+      role: "assistant",
+      choices: startingChoices,
+    });
+
+    setStoryData(updatedStoryData);
+    setShowPresetSelection(false);
+    setCurrentState(StoryState.STORY);
+    setStarted(true);
+
+    // Set story text and choices from the first part
+    const lastPart =
+      updatedStoryData.scene.parts[updatedStoryData.scene.parts.length - 1];
+    setStoryText(lastPart.content);
+    setChoices({ choices: lastPart.choices || [] });
+
+    // Save the story
+    await performSave(updatedStoryData);
+  };
+
   const [diceRoll, setDiceRoll] = useState<{
     show: boolean;
     rolls: number[];
@@ -2309,33 +2395,95 @@ function StoryPageContent() {
     if (!storyData) return;
     logger.action("User selected preset", { preset: preset.name });
 
-    // If custom preset, route to character creation page
-    if (preset.id === "custom") {
-      router.push(`/story/create-character?storyId=${storyDbId}`);
-      return;
+    // For custom preset with a character sheet template, redirect to character creation
+    const isCustom = preset.id === "custom";
+    if (isCustom) {
+      // Check if storyData has characterSheetTemplate with fields
+      let templateWithFields = storyData.characterSheetTemplate;
+
+      // If not in storyData, try to fetch from the source adventure
+      if (!templateWithFields?.fields?.length && sourceAdventureId) {
+        try {
+          const adventureRes = await fetch(
+            `/api/adventures/${sourceAdventureId}`
+          );
+          if (adventureRes.ok) {
+            const { adventure } = await adventureRes.json();
+            if (adventure?.characterSheetTemplate?.fields?.length) {
+              templateWithFields = adventure.characterSheetTemplate;
+              // Also update storyData so we have it for later
+              setStoryData((prev) =>
+                prev
+                  ? { ...prev, characterSheetTemplate: templateWithFields }
+                  : prev
+              );
+            }
+          }
+        } catch (error) {
+          console.error(
+            "Failed to fetch adventure for character template:",
+            error
+          );
+        }
+      }
+
+      if (templateWithFields?.fields?.length) {
+        setSelectedPreset(preset);
+        setCurrentState(StoryState.CHARACTER_CREATION);
+        setShowPresetSelection(false);
+        return;
+      }
     }
 
     const updatedStoryData = { ...storyData };
 
-    // Apply preset to story data
-    if (preset.playerName) updatedStoryData.player_name = preset.playerName;
-    if (preset.playerSummary)
-      updatedStoryData.player_summary = preset.playerSummary;
-    if (preset.stats?.length)
-      updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
-    if (preset.resources?.length)
-      updatedStoryData.resources = JSON.parse(JSON.stringify(preset.resources));
-    if (preset.inventory?.length)
-      updatedStoryData.inventory = JSON.parse(JSON.stringify(preset.inventory));
-    if (preset.relationships?.length)
-      updatedStoryData.relationships = JSON.parse(
-        JSON.stringify(preset.relationships)
-      );
-    if (preset.conditions?.length)
-      updatedStoryData.conditions = JSON.parse(
-        JSON.stringify(preset.conditions)
-      );
-    if (preset.authorNotes) updatedStoryData.author_notes = preset.authorNotes;
+    // For custom preset, use default values but don't apply any preset-specific overrides
+    // The user can customize via the menu after starting
+
+    // Apply preset to story data (skip for custom - use adventure defaults)
+    if (!isCustom) {
+      // Add character sheet to lore if preset has one
+      if (preset.characterSheet) {
+        const characterSheetLore: StoryLore = {
+          title: `${preset.name} - Character Sheet`,
+          content: preset.characterSheet,
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          type: "character_sheet",
+          on: true,
+          on_triggers: [],
+          off_triggers: [],
+          var_on_triggers: [],
+          var_off_triggers: [],
+        };
+        updatedStoryData.lore = [
+          ...(updatedStoryData.lore || []),
+          characterSheetLore,
+        ];
+      }
+      if (preset.stats?.length)
+        updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
+      if (preset.resources?.length)
+        updatedStoryData.resources = JSON.parse(
+          JSON.stringify(preset.resources)
+        );
+      if (preset.inventory?.length)
+        updatedStoryData.inventory = JSON.parse(
+          JSON.stringify(preset.inventory)
+        );
+      if (preset.relationships?.length)
+        updatedStoryData.relationships = JSON.parse(
+          JSON.stringify(preset.relationships)
+        );
+      if (preset.conditions?.length)
+        updatedStoryData.conditions = JSON.parse(
+          JSON.stringify(preset.conditions)
+        );
+      if (preset.authorNotes)
+        updatedStoryData.author_notes = preset.authorNotes;
+    }
 
     // Determine starting choices - use custom ones if available, otherwise default
     // Choices are now plain text only - GM stage handles all dice mechanics
@@ -2422,7 +2570,19 @@ function StoryPageContent() {
     setShowPresetSelection(false);
     setSelectedPreset(preset);
 
-    addNotification(`Character preset "${preset.name}" applied! ?`, "success");
+    // For custom preset, open the menu so user can customize their character
+    if (isCustom) {
+      setCurrentState(StoryState.MENU);
+      addNotification(
+        "Customize your character in the menu, then return to the story!",
+        "success"
+      );
+    } else {
+      addNotification(
+        `Character preset "${preset.name}" applied! ?`,
+        "success"
+      );
+    }
   };
 
   //Savestoryprogresstodatabase(debounced)
@@ -6729,6 +6889,12 @@ function StoryPageContent() {
           />
         )}
         {currentState === StoryState.STATS && <StatsPage {...storyData} />}
+        {currentState === StoryState.CHARACTER_CREATION && (
+          <CharacterCreationForm
+            storyData={storyData}
+            onCharacterCreate={handleCharacterCreate}
+          />
+        )}
         {currentState === StoryState.LORE && (
           <LorePage
             {...storyData}

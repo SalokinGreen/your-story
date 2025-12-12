@@ -7,9 +7,9 @@ export const DEFAULT_PRESET: Preset = {
   id: "custom",
   name: "Custom",
   description:
-    "Create your own character from scratch with no predefined attributes.",
+    "Create your own character from scratch using the character sheet template.",
   icon: "Sparkles",
-  playerSummary: "",
+  characterSheet: "",
   intro: "",
   stats: [],
   resources: [],
@@ -32,8 +32,7 @@ export function createPresetFromCurrentSettings(
   name: string,
   description: string,
   icon: string,
-  playerName: string,
-  playerSummary: string,
+  characterSheet: string,
   intro: string,
   stats: any[],
   resources: any[],
@@ -47,8 +46,7 @@ export function createPresetFromCurrentSettings(
     name,
     description,
     icon,
-    playerName,
-    playerSummary,
+    characterSheet,
     intro,
     stats: JSON.parse(JSON.stringify(stats)), // Deep clone
     resources: JSON.parse(JSON.stringify(resources)),
@@ -59,11 +57,10 @@ export function createPresetFromCurrentSettings(
   };
 }
 
-// Apply a preset to current settings
+// Apply a preset to current settings (for creator editing)
 export function applyPreset(
   preset: Preset,
-  setPlayerName: (val: string) => void,
-  setPlayerSummary: (val: string) => void,
+  setCharacterSheet: (val: string) => void,
   setIntro: (val: string) => void,
   setStats: (val: any[]) => void,
   setResources: (val: any[]) => void,
@@ -77,9 +74,8 @@ export function applyPreset(
     return;
   }
 
-  if (preset.playerName !== undefined) setPlayerName(preset.playerName);
-  if (preset.playerSummary !== undefined)
-    setPlayerSummary(preset.playerSummary);
+  if (preset.characterSheet !== undefined)
+    setCharacterSheet(preset.characterSheet);
   // Only set intro if it exists in the preset (for backward compatibility)
   if (preset.intro !== undefined) setIntro(preset.intro);
 

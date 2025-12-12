@@ -37,6 +37,10 @@ describe("processCommands", () => {
         },
       ],
       inventory: [],
+      abilities: [],
+      level: 1,
+      upgradesSpent: 0,
+      conditions: [],
       achievements: [
         {
           title: "First Victory",

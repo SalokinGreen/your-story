@@ -155,6 +155,7 @@ export async function GET(request: NextRequest) {
       selectedPreset: item.selected_preset,
       presets: item.presets,
       startingChoices: item.starting_choices,
+      characterSheetTemplate: item.character_sheet_template,
     }));
 
     return NextResponse.json({ adventures }, { status: 200 });
@@ -218,6 +219,7 @@ export async function POST(request: NextRequest) {
       selectedPreset,
       presets,
       startingChoices,
+      characterSheetTemplate,
     } = body;
 
     // Validate that the authorId matches the authenticated user
@@ -270,6 +272,7 @@ export async function POST(request: NextRequest) {
           selected_preset: selectedPreset || null,
           presets: presets || null,
           starting_choices: startingChoices || null,
+          character_sheet_template: characterSheetTemplate || null,
           popularity: 0,
           rating: 0,
           play_count: 0,
@@ -309,6 +312,7 @@ export async function POST(request: NextRequest) {
       selectedPreset: data.selected_preset,
       presets: data.presets,
       startingChoices: data.starting_choices,
+      characterSheetTemplate: data.character_sheet_template,
     };
 
     return NextResponse.json({ adventure }, { status: 201 });

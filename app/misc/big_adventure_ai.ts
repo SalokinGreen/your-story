@@ -2,17 +2,19 @@
  * Big Adventure AI - Full adventure generation from a single prompt
  *
  * Generates complete adventures in stages:
- * - Stage 1: Core concept (title, premise, intro, player summary, author notes)
- * - Stage 2: Mechanics (stats, resources, abilities, variables)
+ * - Stage 1: Core concept (title, premise, intro, author notes)
+ * - Stage 2: Mechanics Notes (game rules as lore entries)
+ * - Stage 2A: Abilities & Variables (character abilities and story variables)
+ * - Stage 2B: Character Sheet Template (fillable template with stats/resources)
  * - Stage 3: Content (inventory, lore, relationships, achievements, quests)
- * - Stage 4: Advanced (presets, agmt, custom tables, upgrades, starting choices)
+ * - Stage 4: Advanced (presets with filled character sheets, agmt, custom tables, upgrades, starting choices)
  * - Stage 5: Icons (assigns thematic icons to all elements)
  */
 
 import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 import { ALL_GAME_ICON_IDS } from "@/app/misc/gameIcons";
-import { SchemaPage } from "@/app/misc/characterSchema";
+import { CHARACTER_SHEET_PRESET_TEMPLATES } from "@/app/misc/characterSheetTemplate";
 import JSON5 from "json5";
 
 export type RPGSystemType =
@@ -504,8 +506,8 @@ export interface BigAdventureAutosave {
 // Note: "abilities" and "upgradeShop" are deprecated and removed
 export type RegenerateSection =
   | "title" // Regenerate title, shortDescription, description
-  | "intro" // Regenerate intro, premise, player_summary
-  | "characterSchema" // Regenerate character schema and data
+  | "intro" // Regenerate intro, premise
+  | "characterSheetTemplate" // Regenerate character sheet template
   | "variables" // Regenerate variables
   | "mechanicsLore" // Regenerate mechanics lore entries
   | "lore" // Regenerate lore entries
@@ -536,14 +538,14 @@ export const REGENERATE_SECTIONS: Record<
   },
   intro: {
     name: "Intro & Premise",
-    description: "Opening narrative and player background",
+    description: "Opening narrative",
     emoji: "📖",
     stage: "core",
   },
-  characterSchema: {
-    name: "Character Schema",
-    description: "Character fields and structure",
-    emoji: "📊",
+  characterSheetTemplate: {
+    name: "Character Sheet Template",
+    description: "Fillable character sheet template",
+    emoji: "📋",
     stage: "mechanics",
   },
   variables: {
@@ -739,8 +741,6 @@ export interface GenerationProgress {
 }
 
 export interface IconAssignments {
-  stats?: Record<string, string>;
-  resources?: Record<string, string>;
   inventory?: Record<string, string>;
   abilities?: Record<string, string>;
   achievements?: Record<string, string>;
@@ -758,8 +758,11 @@ export interface BigAdventureResult {
   storyTemplate: Partial<StoryData>;
   startingChoices?: StartingChoice[];
 
-  // Character sheet pages (from character-sheet stage, merged into characterSchema later)
-  characterSchemaPages?: SchemaPage[];
+  // Character sheet template (for custom character creation)
+  characterSheetTemplate?: {
+    template: string;
+    fields: { name: string; description: string; defaultValue: string }[];
+  };
 
   // Icon assignments (from icons stage)
   iconAssignments?: IconAssignments;
@@ -847,36 +850,36 @@ export function getStageInfo(stage: GenerationStage): {
       emoji: "📖",
     },
     mechanics: {
-      name: "Character System",
-      description: "Stats, skills, and character data",
+      name: "Abilities & Variables",
+      description: "Character abilities and story tracking",
       detailedDescription:
-        "Defines the character sheet structure: what attributes your character has, what resources to manage, class/archetype options, and hidden variables that track story progress. Uses the rules from the previous stage.",
+        "Creates character abilities (skills, spells, techniques) and hidden story variables. Abilities define what your character can do, while variables track story progress, relationships, and faction reputation behind the scenes.",
       generates: [
-        "Character stats (Strength, Charisma, etc.)",
-        "Resources (Health, Mana, Gold, etc.)",
-        "Class/archetype options",
-        "Skills and abilities",
-        "Hidden variables for story tracking",
+        "Character abilities (skills, spells, techniques)",
+        "Ability costs and cooldowns",
+        "Story tracking variables",
+        "Relationship scores",
+        "Faction reputation",
       ],
       instructionHint:
-        "Request specific stats, resource types, unique abilities, or special mechanics",
+        "Request specific abilities, magic systems, or story tracking variables",
       number: 3,
       emoji: "⚙️",
     },
     "character-sheet": {
       name: "Character Sheet",
-      description: "Visual character sheet design",
+      description: "Character stats and sheet template",
       detailedDescription:
-        "Creates the HTML/CSS/JS character sheet template with multiple pages. Designs the visual layout for displaying stats, resources, inventory, and other character data. Can include interactive JavaScript for collapsible sections, animated bars, and tooltips.",
+        "Creates the fillable character sheet template that defines ALL character data: stats, attributes, skills, health, mana, and other resources. Uses markdown with {{Field | Description | Default}} syntax for fillable fields. This is where character builds are defined.",
       generates: [
-        "Character sheet HTML template",
-        "CSS styling for dark theme",
-        "Multiple sheet pages (Overview, Combat, Skills, etc.)",
-        "Resource bars and stat displays",
-        "Optional interactive JavaScript",
+        "Character stats (Strength, Charisma, etc.)",
+        "Resources (Health, Mana, Gold, etc.)",
+        "Skills and proficiencies",
+        "Background and personality fields",
+        "Equipment and inventory slots",
       ],
       instructionHint:
-        "Customize sheet layout, page organization, visual styling, or interactive features",
+        "Customize sheet layout, stat types, resource pools, or add custom fields",
       number: 3,
       emoji: "📋",
     },
@@ -1034,8 +1037,6 @@ OUTPUT JSON SCHEMA:
   "description": "string - full multi-paragraph description (3-5 paragraphs)",
   "story_name": "string - in-game story title shown during gameplay",
   "premise": "string - the central conflict/situation (2-3 paragraphs)",
-  "player_name": "string - default player character name",
-  "player_summary": "string - player character background and description (2-3 paragraphs)",
   "intro": "string - opening narrative text shown at game start (3-5 paragraphs, immersive and atmospheric)",
   "author_notes": "string - private instructions for the AI narrator about tone, themes, dos and don'ts"
 }
@@ -1426,76 +1427,39 @@ Max rolls explode to next die size`,
 
     return `${basePrompt}
 
-STAGE 3: CHARACTER SYSTEM & DATA
-Create a complete character sheet structure based on the game rules established in the previous stage.
+STAGE 3: ABILITIES & VARIABLES
+Create abilities (skills, spells, techniques) and story variables based on the game rules established in the previous stage.
 ${mechanicsContext}
 
 RPG SYSTEM: ${rpgDescription}
 
 ${userSpecifiedSystem ? dcGuidelines[userSpecifiedSystem] : systemGuidance}
 
-IMPORTANT: The game rules have already been created. Your job is to design the CHARACTER SHEET that works with those rules.
-Focus on creating fields (stats, skills, resources) that align with the mechanics documentation.
+IMPORTANT: The game rules have already been created. Character stats and resources are defined in the Character Sheet Template (next stage).
+Your job is to create ABILITIES (active skills/spells) and VARIABLES (hidden story trackers).
 
 ═══════════════════════════════════════════════════════════════
-PART 1: CHARACTER SCHEMA
+ABILITIES ARRAY
 ═══════════════════════════════════════════════════════════════
 
-Design a complete character sheet with these REQUIRED elements:
+Create 4-8 starting abilities - active skills, spells, or techniques the character can use.
+Each ability has:
+- name: Display name (e.g., "Fireball", "Healing Touch", "Sneak Attack")
+- description: What this ability does and when to use it
+- grade: Proficiency level - "novice" | "apprentice" | "adept" | "expert" | "master" | "legendary"
+- cost: Array of costs to use (optional) - e.g., [{ "type": "variable", "name": "Mana", "amount": 10 }]
+- cooldown: Number of turns before ability can be used again (0 = no cooldown)
+- currentCooldown: Always start at 0
+- stat: Optional stat name this ability scales with (from character sheet)
+- symbol: Emoji icon for the ability
 
-A. CORE ATTRIBUTES:
-   Create the fundamental stats that define a character - as many as your system needs.
-   Examples: Strength, Dexterity, Intelligence, Charisma, Willpower, Perception
-   Type: "number" - use a scale appropriate to your RPG system (e.g., 3-18 for D&D-style, 1-10 for simple systems, percentile for d100)
-
-B. DERIVED STATS (optional):
-   Calculated from core attributes using formulas.
-   Formula syntax: "floor(({{attribute}} - 10) / 2)" or "{{stat1}} + {{stat2}}"
-   Examples: Attack Bonus, Defense Rating, Initiative Modifier
-
-C. SKILLS:
-   Specific trained abilities linked to attributes - include as many as appropriate for the system.
-   Type: "number" representing proficiency or bonus (scale should match your attribute system)
-   Examples: Athletics, Stealth, Persuasion, Arcana, Medicine, Investigation
-
-D. RESOURCES:
-   Pools that deplete and regenerate - as many as your system requires.
-   Type: "resource" with current/max values
-   Examples: Health, Mana, Stamina, Sanity, Stress, Luck Points
-
-E. CHARACTER IDENTITY:
-   - "select" type for class/archetype (REQUIRED - based on classes defined in game rules)
-   - "text" for character name, backstory
-   - "list" for inventory, languages, known spells
-   - "boolean" for special traits
-
-FIELD TYPE REFERENCE:
-- "number": Simple numeric (stats, skills)
-- "derived": Calculated via formula
-- "resource": Current/max pool (health, mana)
-- "text": Free text (name, notes)
-- "list": Array of items (inventory, languages) - supports both strings and objects!
-  - Simple: ["Sword", "Shield", "Potion"]
-  - Objects: [{ name: "Iron Sword", emoji: "⚔️", description: "A sturdy blade", quantity: 1 }]
-  - Mixed: ["Common Item", { name: "Special Item", emoji: "💎" }]
-- "boolean": True/false flags
-- "select": Dropdown with predefined options
+ABILITY GRADES (starting characters):
+- Most abilities: "novice" or "apprentice"
+- One signature ability: "adept"
+- Avoid "expert", "master", "legendary" at start
 
 ═══════════════════════════════════════════════════════════════
-PART 2: CLASSES/ARCHETYPES (REQUIRED)
-═══════════════════════════════════════════════════════════════
-
-Create distinct character classes/archetypes as a "select" field - as many as fit the setting.
-Each class should have:
-- Unique name and playstyle
-- Suggested stat priorities
-- Thematic abilities they'd focus on
-- Role in a group (combat, support, utility, social)
-
-Base the classes on those described in the game rules (Classes Overview lore entry).
-
-═══════════════════════════════════════════════════════════════
-PART 3: STORY VARIABLES
+STORY VARIABLES
 ═══════════════════════════════════════════════════════════════
 
 Create 3-6 hidden variables to track story progress:
@@ -1504,46 +1468,26 @@ Create 3-6 hidden variables to track story progress:
 - Story progress flags
 - Quest completion counts
 
-STARTING VALUES (Level 1 - START WEAK):
-- Core attributes: Most 20-35, one specialty at 50-60
-- Skills: Most 15-30, trained skills 35-50
-- Resources: Appropriate starting pools
+Variable types: "number" (default), "boolean", "string"
 
 CRITICAL: CREATE UNIQUE, ADVENTURE-SPECIFIC CONTENT!
-- Do NOT use generic fantasy items (no "Leather armor", "Short sword", "Torch")
-- Do NOT use D&D-style classes (no "Warrior/Mage/Rogue" unless it fits the specific setting)
-- All items, classes, abilities MUST be thematically specific to THIS adventure's setting
+- Abilities should match the adventure's theme and setting
+- Variables should track meaningful story progress
 
 OUTPUT JSON SCHEMA:
 {
-  "characterSchema": {
-    "version": 1,
-    "name": "string (unique system name for THIS adventure)",
-    "description": "string (brief system description)",
-    "fields": [
-      { "id": "stat_id", "name": "Stat Name", "type": "number", "category": "category_id", "description": "What this measures", "defaultValue": 30, "min": 1, "max": 100 },
-      { "id": "resource_id", "name": "Resource Name", "type": "resource", "category": "category_id", "description": "What this represents", "defaultValue": 25, "defaultMax": 25, "regenerates": true },
-      { "id": "derived_id", "name": "Derived Stat", "type": "derived", "category": "category_id", "formula": "floor(({{stat_id}} - 10) / 2)" },
-      { "id": "class_id", "name": "Background/Role/Class", "type": "select", "category": "category_id", "options": [
-        {"value": "option1", "label": "Role 1 - Description specific to setting"},
-        {"value": "option2", "label": "Role 2 - Description specific to setting"},
-        {"value": "option3", "label": "Role 3 - Description specific to setting"}
-      ], "defaultValue": "option1" },
-      { "id": "inventory", "name": "Inventory/Equipment/Gear", "type": "list", "category": "category_id", "defaultValue": ["Setting-appropriate item"] }
-    ],
-    "categories": [
-      { "id": "category_id", "name": "Category Name", "order": 0 }
-    ]
-  },
-  "characterData": {
-    "values": {
-      "stat_id": 30,
-      "resource_id": { "current": 25, "max": 25 },
-      "derived_id": 2,
-      "class_id": "option1",
-      "inventory": ["Item appropriate to setting and player background"]
+  "abilities": [
+    { 
+      "name": "Ability Name", 
+      "description": "What this does", 
+      "grade": "novice", 
+      "cost": [{ "type": "variable", "name": "ResourceName", "amount": 5 }],
+      "cooldown": 3,
+      "currentCooldown": 0,
+      "stat": "RelatedStatName",
+      "symbol": "🔥"
     }
-  },
+  ],
   "variables": [
     { "id": "var_story_id", "name": "Story Variable Name", "type": "number", "value": 1, "minValue": 1, "maxValue": 10 }
   ]
@@ -1552,189 +1496,65 @@ OUTPUT JSON SCHEMA:
 Remember: Output ONLY the JSON object, nothing else.`;
   }
 
-  // CHARACTER SHEET STAGE (runs after mechanics, in parallel with content)
+  // CHARACTER SHEET TEMPLATE STAGE - Generates the fillable template for the adventure
   if (stage === "character-sheet") {
-    // Get characterSchema from previous mechanics stage
-    const characterSchema = previousResults?.storyTemplate?.characterSchema;
-    const schemaContext = characterSchema
-      ? `The character system has these fields:\n${JSON.stringify(
-          characterSchema.fields?.map((f) => ({
-            id: f.id,
-            name: f.name,
-            type: f.type,
-            category: f.category,
-          })),
-          null,
-          2
-        )}\n\nCategories:\n${JSON.stringify(
-          characterSchema.categories,
-          null,
-          2
-        )}`
-      : "Use standard fantasy RPG fields: strength, dexterity, constitution, intelligence, wisdom, charisma as core stats, plus health/mana resources, and common skills.";
+    // Get list of available preset templates
+    const presetTemplatesList = CHARACTER_SHEET_PRESET_TEMPLATES.map(
+      (t) => `- ${t.id}: ${t.name} (${t.description})`
+    ).join("\n");
 
     return `${basePrompt}
 
-STAGE 2B: CHARACTER SHEET DESIGN
-Create the visual character sheet pages for the character system defined in the mechanics stage.
+STAGE 2B: CHARACTER SHEET TEMPLATE
+Generate a fillable character sheet template for this adventure. The template uses a special syntax for fillable fields.
 
-IMPORTANT: You are designing HTML/CSS templates that will display character data.
-The character fields have already been defined - your job is to create beautiful, functional visual pages.
+AVAILABLE PRESET TEMPLATES:
+You can reference these preset templates by ID, or create a custom template:
+${presetTemplatesList}
 
-CHARACTER SCHEMA CONTEXT:
-${schemaContext}
+TEMPLATE SYNTAX:
+Use {{FieldName | Description | Default Value}} for fillable fields.
+Example: {{Name | Your character's name | Unnamed Hero}}
 
-═══════════════════════════════════════════════════════════════
-CHARACTER SHEET PAGES (HTML/CSS)
-═══════════════════════════════════════════════════════════════
+Each field will be rendered as an input when players create their character.
 
-Create MULTIPLE CHARACTER SHEET PAGES for better organization.
-Each page gets its own tab in the player's Stats panel.
+TEMPLATE STRUCTURE:
+The template should be a markdown document with headers and sections that match your adventure's theme.
 
-TEMPLATE SYNTAX (for all pages):
-- {{fieldId}} - Insert field value
-- {{fieldId.current}}/{{fieldId.max}} - Resource values  
-- {{percent fieldId}} - Resource as percentage (for progress bars)
-- {{modifier fieldId}} - D&D-style modifier with +/- prefix (e.g., +3 or -1)
-- {{subtract a b}} - Subtract b from a (also: {{add a b}}, {{mul a b}}, {{div a b}})
-- {{length fieldId}} - Get array length (e.g., Total Items: {{length inventory}})
-- {{#if fieldId}}...{{/if}} - Conditional display (truthy check)
-- {{#unless fieldId}}...{{/unless}} - Inverse conditional (falsy check)
-- {{#each fieldId}}...{{/each}} - List iteration
-  - For string lists: {{this}} = the string value
-  - For object lists: {{this.name}}, {{this.emoji}}, {{this.description}}, {{this.quantity}}
-  - Position helpers: {{@index}}, {{@first}}, {{@last}}
-  - Conditional: {{#unless @last}}, {{/unless}} for separators
-- {{#times N}}...{{/times}} - Repeat content N times ({{@index}} available inside)
-- {{#compare fieldId ">" "10"}}...{{/compare}} - Comparisons (operators: ==, !=, <, >, <=, >=)
-  - Supports field.property refs: {{#compare hp.current "<" (div hp.max 2)}}
-  - Expression functions: (div a b), (mul a b), (add a b), (sub a b), (min a b), (max a b)
+FOR TTRPG-STYLE ADVENTURES:
+- Include stat blocks matching your RPG system (D&D, Call of Cthulhu, etc.)
+- Add skill sections appropriate to the setting
+- Include equipment/inventory sections
+- Add personality/background fields
 
-ICON HELPER (renders inline SVG icons):
-- #icon(sword) - Fuzzy matches "sword" to "crossed-swords" icon
-- #icon(health) - Matches to "heart-beats" icon  
-- #icon(magic) - Matches to "magic-swirl" icon
-- Works with any descriptive name - the system has 4000+ RPG icons and will find the best match!
-- Example: <span>#icon(armor)</span> Armor Class: {{ac}}
-
-JAVASCRIPT SUPPORT (optional but encouraged for interactive features):
-The "js" field can contain JavaScript that executes in the character sheet iframe.
-Available features:
-- document.querySelector/querySelectorAll for DOM manipulation
-- Add click handlers for collapsible sections
-- Add hover effects or tooltips
-- Animate progress bars
-- Toggle visibility of detail sections
-
-JS Examples:
-- Collapsible sections:
-  document.querySelectorAll('.section-header').forEach(h => h.onclick = () => h.nextElementSibling.classList.toggle('collapsed'));
-- Smooth progress bar animation:
-  document.querySelectorAll('.bar-fill').forEach(b => { b.style.transition = 'width 0.5s ease'; });
-- Tooltip on hover:
-  document.querySelectorAll('[data-tooltip]').forEach(el => { el.onmouseenter = e => showTooltip(e, el.dataset.tooltip); });
-
-REQUIRED PAGES (3-5 pages total):
-
-1. OVERVIEW PAGE (id: "overview", icon: "User"):
-   - Character identity (name, class, portrait placeholder)
-   - Core attributes as a compact grid
-   - Most important resources (HP, main resource) as prominent bars
-   - Brief summary info
-
-2. COMBAT PAGE (id: "combat", icon: "Swords"):
-   - Combat-relevant stats (attack, defense, initiative)
-   - All combat resources (HP, shields, armor)
-   - Combat skills
-   - Conditions display area
-
-3. SKILLS PAGE (id: "skills", icon: "BookOpen"):
-   - All skills organized by type
-   - Skill modifiers clearly shown
-   - Related attribute shown next to each skill
-
-4. INVENTORY PAGE (id: "inventory", icon: "Backpack"):
-   - Equipment lists
-   - Carried items
-   - Currency/wealth tracking
-   - Weight/encumbrance if applicable
-
-5. (OPTIONAL) MAGIC/ABILITIES PAGE (id: "magic", icon: "Sparkles"):
-   - If system has magic/powers, dedicate a page
-   - Mana/power points resource
-   - Spell/ability lists
-   - Cooldowns or slot tracking
-
-DESIGN REQUIREMENTS PER PAGE:
-- Dark theme with consistent accent colors across pages
-- Each page is self-contained (don't split related info across pages)
-- Progress bars for resources
-- Organized sections with borders/cards
-- Thematic styling matching the genre
-- Compact but readable layout
+FOR NARRATIVE ADVENTURES:
+- Focus on character description and backstory
+- Include personality traits and goals
+- Keep it simpler than mechanical systems
 
 OUTPUT JSON SCHEMA:
 {
-  "pages": [
-    {
-      "id": "overview",
-      "name": "Overview",
-      "icon": "User",
-      "order": 0,
-      "template": {
-        "html": "<!-- Full HTML for overview page with {{fieldId}} placeholders -->",
-        "css": "/* Complete CSS for this page */",
-        "js": "// Optional: interactive features like collapsible sections"
-      }
-    },
-    {
-      "id": "combat",
-      "name": "Combat",
-      "icon": "Swords",
-      "order": 1,
-      "template": {
-        "html": "<!-- Combat page HTML -->",
-        "css": "/* Combat page CSS */",
-        "js": "// Optional: hover effects, animated bars"
-      }
-    },
-    {
-      "id": "skills",
-      "name": "Skills", 
-      "icon": "BookOpen",
-      "order": 2,
-      "template": {
-        "html": "<!-- Skills page HTML -->",
-        "css": "/* Skills page CSS */",
-        "js": ""
-      }
-    },
-    {
-      "id": "inventory",
-      "name": "Inventory",
-      "icon": "Backpack",
-      "order": 3,
-      "template": {
-        "html": "<!-- Inventory page HTML -->",
-        "css": "/* Inventory page CSS */",
-        "js": ""
-      }
-    }
-  ]
+  "characterSheetTemplate": {
+    "template": "string (the full markdown template with {{field}} syntax)",
+    "preset_id": "optional string (if using a preset template, just provide the ID)"
+  }
 }
 
-NOTE: If ANY page has non-empty "js" content, the character schema will automatically be flagged with hasCustomJS=true.
+EXAMPLES:
 
-CRITICAL DESIGN NOTES:
-- Each page should be a complete, styled HTML document with its own CSS
-- Pages should NOT duplicate information - split content logically:
-  * Overview: Quick reference (identity, main stats, key resources)
-  * Combat: Everything combat-related (HP, attack, defense, conditions)
-  * Skills: All skills with modifiers and linked attributes
-  * Inventory: Equipment, items, currency, encumbrance
-- Use consistent colors/fonts across all pages for a unified feel
-- Progress bars use: style="width: {{percent fieldId}}%"
-- Each page's HTML should be self-contained and visually complete
+Using a preset:
+{
+  "characterSheetTemplate": {
+    "preset_id": "dnd5e"
+  }
+}
+
+Custom template:
+{
+  "characterSheetTemplate": {
+    "template": "# {{Name | Your character's name | Adventurer}}\\n\\n## Background\\n{{Background | A brief history | A wanderer seeking fortune}}\\n\\n## Appearance\\n{{Appearance | Physical description | A weathered traveler}}"
+  }
+}
 
 Remember: Output ONLY the JSON object, nothing else.`;
   }
@@ -1843,22 +1663,26 @@ Output an empty JSON object.`;
 STAGE 4A: CHARACTER PRESETS
 Generate several different character builds/classes appropriate for this adventure.
 
-Each preset offers a meaningfully different playstyle with unique character sheet values and abilities.
+Each preset offers a meaningfully different playstyle with unique character sheets, abilities, and starting equipment.
+
+CRITICAL - CHARACTER SHEET:
+Each preset MUST include a "characterSheet" field - a filled-out markdown character sheet for that specific character.
+Use the character sheet template from Stage 2B as a guide for the format, but fill in the values for this specific character.
+The characterSheet is what gets added to the player's Notes when they pick this preset.
+This is where ALL character stats, attributes, skills, health, mana, etc. are defined - in the markdown character sheet.
 
 IMPORTANT: Each preset MUST include abilities. Use abilities from the mechanics stage as a base.
-IMPORTANT: Presets modify the characterData.values, NOT the characterSchema. The schema is shared.
+IMPORTANT: Presets provide their own inventory and abilities arrays - these are the character's starting equipment and skills.
 
 CRITICAL - PRESET INTROS:
 The "intro" field is a COMPLETE REPLACEMENT for the default intro (3-5 paragraphs).
-The "playerSummary" is also a COMPLETE REPLACEMENT (2-3 paragraphs).
+This should set up the character's story and current situation.
 
 REQUIRED - "CUSTOM" PRESET:
 You MUST include a preset with id="preset-custom" and name="Custom" as the LAST preset.
 This is for players who want to create their own character (self-insert).
-- Use balanced starting values for character fields
-- Generic playerName like "Adventurer" or "Traveler"
-- playerSummary should be vague and open-ended ("A mysterious stranger...")
-- intro should be generic, letting the player define their own backstory
+- characterSheet should be the blank template with default values (not filled in)
+- Generic intro letting the player define their own backstory
 - Include basic starting gear in inventory and no special abilities beyond novice level
 
 CRITICAL - USE SETTING-APPROPRIATE ITEMS:
@@ -1868,7 +1692,7 @@ CRITICAL - USE SETTING-APPROPRIATE ITEMS:
 - Examples: A cyberpunk hacker might have "Data spike", "Neural interface", "Stimpack"
 - Examples: A Lovecraftian investigator might have "Dog-eared journal", "Revolver", "Strange amulet"
 
-CHARACTER FIELD VALUES FOR PRESETS (LEVEL 1 CHARACTERS - START WEAK):
+CHARACTER STATS IN CHARACTER SHEET (LEVEL 1 CHARACTERS - START WEAK):
 - Use values appropriate to your chosen stat scale (D&D 3-18, simple 1-10, percentile, etc.)
 - MOST stats should be below average (untrained/weak areas)
 - A FEW stats (2-3) should be slightly above average (developing skills)
@@ -1883,18 +1707,12 @@ OUTPUT JSON SCHEMA:
       "name": "string",
       "description": "string (1-2 sentence hook)",
       "icon": "emoji",
-      "playerName": "string",
-      "playerSummary": "string (2-3 paragraphs)",
-      "intro": "string (3-5 paragraphs - COMPLETE opening narrative)",
-      "characterData": {
-        "values": {
-          "fieldId1": number_or_value,
-          "fieldId2": { "current": number, "max": number },
-          "inventory": ["item1", "item2"]
-        }
-      },
-      "abilities": [{ "name": "string", "description": "string", "grade": "string", "cost": [], "cooldown": number, "currentCooldown": 0, "symbol": "emoji" }],
-      "authorNotes": "string"
+      "characterSheet": "string (FILLED character sheet in markdown format - includes all stats, attributes, skills, resources, backstory)",
+      "intro": "string (3-5 paragraphs - COMPLETE opening narrative for this character)",
+      "inventory": [{ "name": "string", "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|agmt" }],
+      "abilities": [{ "name": "string", "description": "string", "grade": "novice|apprentice|adept|expert|master|legendary", "cost": [], "cooldown": number, "currentCooldown": 0, "symbol": "emoji" }],
+      "relationships": [],
+      "authorNotes": "string (instructions for the AI narrator for this character)"
     }
   ]
 }
@@ -2076,7 +1894,7 @@ AVAILABLE ICONS (${ALL_GAME_ICON_IDS.length} total):
 ${iconList}
 
 ELEMENTS THAT NEED ICONS:
-You will receive a list of stats, resources, items, abilities, achievements, and relationships.
+You will receive a list of items, abilities, achievements, and relationships.
 For each element, choose the most thematically appropriate icon from the list above.
 
 GUIDELINES:
@@ -2090,8 +1908,6 @@ GUIDELINES:
 OUTPUT JSON SCHEMA:
 {
   "iconAssignments": {
-    "stats": { "StatName": "icon-id", ... },
-    "resources": { "ResourceName": "icon-id", ... },
     "inventory": { "ItemName": "icon-id", ... },
     "abilities": { "AbilityName": "icon-id", ... },
     "achievements": { "AchievementTitle": "icon-id", ... },
@@ -2138,42 +1954,6 @@ export function buildBigAdventureMessages(
       contextMessage += `Premise: ${previousResults.storyTemplate.premise}\n\n`;
     }
     if (
-      previousResults.storyTemplate?.stats &&
-      previousResults.storyTemplate.stats.length > 0
-    ) {
-      // For advanced-presets stage, include full stat details for preset creation
-      if (stage === "advanced-presets") {
-        contextMessage += `\nStats (use these for presets, adjust values per build):\n`;
-        previousResults.storyTemplate.stats.forEach((s) => {
-          contextMessage += `- ${s.name} (${s.symbol || "📊"}): ${
-            s.description || "No description"
-          } [Default: ${s.value}]\n`;
-        });
-      } else {
-        contextMessage += `Stats: ${previousResults.storyTemplate.stats
-          .map((s) => s.name)
-          .join(", ")}\n`;
-      }
-    }
-    if (
-      previousResults.storyTemplate?.resources &&
-      previousResults.storyTemplate.resources.length > 0
-    ) {
-      // For advanced-presets stage, include full resource details for preset creation
-      if (stage === "advanced-presets") {
-        contextMessage += `\nResources (use these for presets, adjust values per build):\n`;
-        previousResults.storyTemplate.resources.forEach((r) => {
-          contextMessage += `- ${r.name} (${r.symbol || "📦"}): ${
-            r.description || "No description"
-          } [Default: ${r.value}/${r.maxValue}]\n`;
-        });
-      } else {
-        contextMessage += `Resources: ${previousResults.storyTemplate.resources
-          .map((r) => r.name)
-          .join(", ")}\n`;
-      }
-    }
-    if (
       previousResults.storyTemplate?.abilities &&
       previousResults.storyTemplate.abilities.length > 0
     ) {
@@ -2217,26 +1997,6 @@ export function buildBigAdventureMessages(
   if (stage === "icons" && previousResults?.storyTemplate) {
     const template = previousResults.storyTemplate;
     let elementsMessage = "ELEMENTS THAT NEED ICONS:\n\n";
-
-    if (template.stats && template.stats.length > 0) {
-      elementsMessage += `STATS:\n`;
-      template.stats.forEach((s) => {
-        elementsMessage += `- "${s.name}": ${
-          s.description || "No description"
-        }\n`;
-      });
-      elementsMessage += "\n";
-    }
-
-    if (template.resources && template.resources.length > 0) {
-      elementsMessage += `RESOURCES:\n`;
-      template.resources.forEach((r) => {
-        elementsMessage += `- "${r.name}": ${
-          r.description || "No description"
-        }\n`;
-      });
-      elementsMessage += "\n";
-    }
 
     if (template.inventory && template.inventory.length > 0) {
       elementsMessage += `INVENTORY ITEMS:\n`;
@@ -2705,8 +2465,6 @@ export function parseBigAdventureStageOutput(
         storyTemplate: {
           story_name: parsed.story_name,
           premise: parsed.premise,
-          player_name: parsed.player_name,
-          player_summary: parsed.player_summary,
           intro: parsed.intro,
           author_notes: parsed.author_notes,
         },
@@ -2724,11 +2482,9 @@ export function parseBigAdventureStageOutput(
     }
 
     if (stage === "mechanics") {
-      // Character system stage - no mechanicsLore (comes from mechanics-notes stage)
+      // Character abilities and variables stage - stats/resources are in character sheet template
       return {
         storyTemplate: {
-          characterSchema: parsed.characterSchema,
-          characterData: parsed.characterData,
           abilities: parsed.abilities,
           variables: parsed.variables,
         },
@@ -2736,10 +2492,38 @@ export function parseBigAdventureStageOutput(
     }
 
     if (stage === "character-sheet") {
-      // Character sheet pages - returned at top level, merged into characterSchema later
-      return {
-        characterSchemaPages: parsed.pages,
-      };
+      // Character sheet template stage - generates fillable template for the adventure
+      const templateData = parsed.characterSheetTemplate;
+      if (!templateData) {
+        return {};
+      }
+
+      // If using a preset template ID, resolve it
+      if (templateData.preset_id) {
+        const presetTemplate = CHARACTER_SHEET_PRESET_TEMPLATES.find(
+          (t) => t.id === templateData.preset_id
+        );
+        if (presetTemplate) {
+          return {
+            characterSheetTemplate: {
+              template: presetTemplate.template,
+              fields: [], // Fields will be parsed on frontend
+            },
+          };
+        }
+      }
+
+      // Custom template provided
+      if (templateData.template) {
+        return {
+          characterSheetTemplate: {
+            template: templateData.template,
+            fields: [], // Fields will be parsed on frontend
+          },
+        };
+      }
+
+      return {};
     }
 
     // Content substages
@@ -2816,8 +2600,6 @@ export function mergeBigAdventureResults(
     storyTemplate: {
       story_name: "",
       premise: "",
-      player_name: "Adventurer",
-      player_summary: "",
       intro: "",
       memory: [],
       max_chapters: 10,
@@ -2830,8 +2612,6 @@ export function mergeBigAdventureResults(
       abilities: [],
       achievements: [],
       lore: [],
-      momentum: 0,
-      maxMomentum: 5,
       points: 0,
       earnedPointsFromChapters: [],
       quests: [],
@@ -2849,25 +2629,8 @@ export function mergeBigAdventureResults(
       merged.shortDescription = result.shortDescription;
     if (result.description) merged.description = result.description;
     if (result.startingChoices) merged.startingChoices = result.startingChoices;
-
-    // Merge characterSchemaPages into characterSchema
-    if (result.characterSchemaPages && result.characterSchemaPages.length > 0) {
-      if (!merged.storyTemplate.characterSchema) {
-        console.warn(
-          "characterSchemaPages received but no characterSchema exists"
-        );
-      } else {
-        // Check if any page has custom JS
-        const hasCustomJS = result.characterSchemaPages.some(
-          (page) => page.template?.js && page.template.js.trim().length > 0
-        );
-        merged.storyTemplate.characterSchema = {
-          ...merged.storyTemplate.characterSchema,
-          pages: result.characterSchemaPages,
-          hasCustomJS,
-        };
-      }
-    }
+    if (result.characterSheetTemplate)
+      merged.characterSheetTemplate = result.characterSheetTemplate;
 
     if (result.storyTemplate) {
       // Merge array fields by concatenation instead of replacement
@@ -2931,24 +2694,6 @@ export function mergeBigAdventureResults(
     if (result.iconAssignments) {
       const assignments = result.iconAssignments;
 
-      // Apply to stats
-      if (assignments.stats && merged.storyTemplate.stats) {
-        merged.storyTemplate.stats = merged.storyTemplate.stats.map((stat) => ({
-          ...stat,
-          symbol: assignments.stats![stat.name] || stat.symbol,
-        }));
-      }
-
-      // Apply to resources
-      if (assignments.resources && merged.storyTemplate.resources) {
-        merged.storyTemplate.resources = merged.storyTemplate.resources.map(
-          (resource) => ({
-            ...resource,
-            symbol: assignments.resources![resource.name] || resource.symbol,
-          })
-        );
-      }
-
       // Apply to inventory
       if (assignments.inventory && merged.storyTemplate.inventory) {
         merged.storyTemplate.inventory = merged.storyTemplate.inventory.map(
@@ -2999,14 +2744,6 @@ export function mergeBigAdventureResults(
             // Preset uses 'icon' field, not 'symbol'
             icon: assignments.presets![preset.name] || preset.icon,
             // Also update symbol fields on nested elements within the preset
-            stats: preset.stats?.map((stat) => ({
-              ...stat,
-              symbol: assignments.stats?.[stat.name] || stat.symbol,
-            })),
-            resources: preset.resources?.map((resource) => ({
-              ...resource,
-              symbol: assignments.resources?.[resource.name] || resource.symbol,
-            })),
             inventory: preset.inventory?.map((item) => ({
               ...item,
               symbol: assignments.inventory?.[item.name] || item.symbol,
@@ -3042,9 +2779,9 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
   if (stageConfigs.mechanics?.enabled !== false) {
     // Mechanics notes stage runs first (game rules documentation)
     stages.push("mechanics-notes");
-    // Then character system stage (stats, skills, etc.)
+    // Then abilities & variables stage
     stages.push("mechanics");
-    // Character sheet runs after mechanics (needs field definitions)
+    // Character sheet runs after mechanics (defines stats/resources)
     stages.push("character-sheet");
   }
 
@@ -3270,16 +3007,6 @@ DICE MECHANICS: The game uses a flexible formula-based dice system. The GM stage
 
 EXISTING CONTENT SUMMARY:`;
 
-  if (currentResult.storyTemplate?.stats?.length) {
-    context += `\n- Stats: ${currentResult.storyTemplate.stats
-      .map((s) => s.name)
-      .join(", ")}`;
-  }
-  if (currentResult.storyTemplate?.resources?.length) {
-    context += `\n- Resources: ${currentResult.storyTemplate.resources
-      .map((r) => r.name)
-      .join(", ")}`;
-  }
   if (currentResult.storyTemplate?.abilities?.length) {
     context += `\n- Abilities: ${currentResult.storyTemplate.abilities
       .map((a) => a.name)
@@ -3304,41 +3031,13 @@ EXISTING CONTENT SUMMARY:`;
     },
     intro: {
       instruction:
-        "Generate a new opening intro (3-5 paragraphs), premise (2-3 paragraphs), and player summary (2-3 paragraphs).",
-      schema: `{ "intro": "string", "premise": "string", "player_summary": "string" }`,
+        "Generate a new opening intro (3-5 paragraphs) and premise (2-3 paragraphs).",
+      schema: `{ "intro": "string", "premise": "string" }`,
     },
-    characterSchema: {
-      instruction: `Generate a complete character schema with as many fields as appropriate for this adventure, organized categories, and a custom HTML/CSS character sheet template.
-
-REQUIRED FIELD TYPES:
-- Core attributes (4-6): Strength, Intelligence, etc. - type "number"
-- Derived stats (2-4): Calculated via formula - type "derived"  
-- Resources (2-4): Health, Mana, etc. - type "resource"
-- Skills (4-8): Trained abilities - type "number"
-- Class/Archetype: Required "select" field with 4-6 options
-- Inventory: Required "list" field for items
-
-FIELD TYPE REFERENCE:
-- number: Plain numeric (Strength: 30)
-- derived: Formula-based, use {{fieldId}} syntax (Modifier: floor(({{strength}} - 10) / 2))
-- resource: Current/max pair (Health: 25/50)
-- text: Free text (Background, Notes)
-- list: Array of strings (Inventory, Languages)
-- boolean: True/false (HasMagic, IsNoble)
-- select: Dropdown with label/value options
-
-TEMPLATE REQUIREMENTS:
-Generate a custom HTML/CSS template for the character sheet.
-- Use {{fieldId}} to insert values
-- Use {{percent fieldId}} for resource bars (0-100)
-- Use {{length fieldId}} for array counts
-- Use {{#each fieldId}}{{this}}{{/each}} for lists
-- Use {{#times N}}...{{/times}} to repeat elements N times
-- Dark theme with genre-appropriate styling
-- Clear visual hierarchy with sections
-
-CATEGORIES: Group fields logically (Attributes, Combat, Skills, Equipment, Background).`,
-      schema: `{ "characterSchema": { "fields": [...], "categories": [...], "template": { "html": "<div class='sheet'>...</div>", "css": ".sheet { background: #1a1a2e; ... }", "js": "" }, "hasCustomJS": false }, "characterData": { "values": { "field_id": value } } }`,
+    characterSheetTemplate: {
+      instruction:
+        "Generate a fillable character sheet template appropriate for this adventure. Use {{FieldName | Description | Default}} syntax for fillable fields. Consider using a preset ID (dnd5e, coc, traveller, monsterhearts, fate, pbta, bitd, wod) or create a custom template.",
+      schema: `{ "characterSheetTemplate": { "preset_id": "string (optional)", "template": "string (markdown with {{field}} syntax)" } }`,
     },
     variables: {
       instruction:
@@ -3397,12 +3096,12 @@ TRIGGERS - CRITICAL:
       schema: `{ "quests": [{ "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }] }`,
     },
     presets: {
-      instruction: `Generate character presets with unique character data and abilities. Create as many as appropriate to give players meaningful choices.
+      instruction: `Generate character presets with unique character sheets and abilities. Create as many as appropriate to give players meaningful choices.
 
-CRITICAL: Each preset's "intro" is a COMPLETE REPLACEMENT (3-5 paragraphs) for the default intro, NOT an addition.
-Each preset's "playerSummary" is a COMPLETE REPLACEMENT (2-3 paragraphs) for the default player background.
+CRITICAL: Each preset MUST include a "characterSheet" field - a filled-out markdown character sheet that defines ALL stats, attributes, skills, and resources for that character.
+Each preset's "intro" is a COMPLETE REPLACEMENT (3-5 paragraphs) for the default intro, NOT an addition.
 Write full, standalone content - not fragments!`,
-      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "characterData": { "values": { "field_id": value } }, "abilities": [...], "authorNotes": "string" }] }`,
+      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "characterSheet": "string (filled character sheet in markdown with all stats/resources)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "inventory": [...], "abilities": [...], "relationships": [], "authorNotes": "string" }] }`,
     },
     agmt: {
       instruction: "Generate Advanced RPG Tools initial state for solo play.",
@@ -3435,7 +3134,7 @@ Match icons to element themes:
 - Social: conversation, handshake, crown
 - Movement: running-shoe, wingfoot, sprint
 - Stealth: hidden, cloak, shadow`,
-      schema: `{ "iconAssignments": { "stats": { "StatName": "icon-id" }, "resources": { "ResourceName": "icon-id" }, "inventory": { "ItemName": "icon-id" }, "abilities": { "AbilityName": "icon-id" }, "achievements": { "AchievementTitle": "icon-id" }, "relationships": { "NPCName": "icon-id" }, "presets": { "PresetName": "icon-id" } } }`,
+      schema: `{ "iconAssignments": { "inventory": { "ItemName": "icon-id" }, "abilities": { "AbilityName": "icon-id" }, "achievements": { "AchievementTitle": "icon-id" }, "relationships": { "NPCName": "icon-id" }, "presets": { "PresetName": "icon-id" } } }`,
     },
   };
 
@@ -3538,16 +3237,31 @@ export function parseRegenerateSectionOutput(
           storyTemplate: {
             intro: parsed.intro,
             premise: parsed.premise,
-            player_summary: parsed.player_summary,
           },
         };
-      case "characterSchema":
-        return {
-          storyTemplate: {
-            characterSchema: parsed.characterSchema,
-            characterData: parsed.characterData,
-          },
-        };
+      case "characterSheetTemplate":
+        if (parsed.characterSheetTemplate?.preset_id) {
+          const presetTemplate = CHARACTER_SHEET_PRESET_TEMPLATES.find(
+            (t) => t.id === parsed.characterSheetTemplate.preset_id
+          );
+          if (presetTemplate) {
+            return {
+              characterSheetTemplate: {
+                template: presetTemplate.template,
+                fields: [],
+              },
+            };
+          }
+        }
+        if (parsed.characterSheetTemplate?.template) {
+          return {
+            characterSheetTemplate: {
+              template: parsed.characterSheetTemplate.template,
+              fields: [],
+            },
+          };
+        }
+        return null;
       case "variables":
         return { storyTemplate: { variables: parsed.variables } };
       case "mechanicsLore":
@@ -3583,7 +3297,6 @@ export function parseRegenerateSectionOutput(
  * Sections that support "Add More" functionality
  */
 export const EXTENDABLE_SECTIONS: RegenerateSection[] = [
-  "characterSchema",
   "mechanicsLore",
   "lore",
   "achievements",
@@ -3618,12 +3331,6 @@ export function buildExtendSectionMessages(
   if (existingResult.storyTemplate) {
     const template = existingResult.storyTemplate;
     switch (section) {
-      case "characterSchema": {
-        const fields = template.characterSchema?.fields || [];
-        existingItems = fields as { name?: string; title?: string }[];
-        existingItemsPreview = fields.map((f) => f.name).join(", ");
-        break;
-      }
       case "mechanicsLore": {
         const mechLore = (template.lore || []).filter(
           (l) => l.type === "mechanics"
@@ -3724,10 +3431,7 @@ ${existingItemsPreview || "(none)"}`;
   > = {
     title: { instruction: "", schema: "" },
     intro: { instruction: "", schema: "" },
-    characterSchema: {
-      instruction: `Generate NEW character schema fields that complement the existing ones. Avoid duplicating existing fields. Generate as many as possible.`,
-      schema: `{ "characterSchema": { "fields": [{ "id": "field_xxx", "name": "string", "type": "number|derived|resource|text|list|boolean|select", "category": "string", "description": "string", "defaultValue": any }], "categories": [{ "id": "cat_xxx", "name": "string", "order": number }] } }`,
-    },
+    characterSheetTemplate: { instruction: "", schema: "" },
     variables: {
       instruction: `Generate NEW variables. Generate as many as possible.`,
       schema: `{ "variables": [{ "name": "string", "value": number, "symbol": "emoji" }] }`,
@@ -3774,12 +3478,12 @@ Ensure new lore references and connects to existing lore entries.`,
       schema: `{ "quests": [{ "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }] }`,
     },
     presets: {
-      instruction: `Generate NEW character presets with unique character data and abilities. Generate as many as the output budget allows.
+      instruction: `Generate NEW character presets with unique character sheets and abilities. Generate as many as the output budget allows.
 
-CRITICAL: Each preset's "intro" is a COMPLETE REPLACEMENT (3-5 paragraphs) for the default intro, NOT an addition.
-Each preset's "playerSummary" is a COMPLETE REPLACEMENT (2-3 paragraphs) for the default player background.
+CRITICAL: Each preset MUST include a "characterSheet" field - a filled-out markdown character sheet for that specific character that defines ALL stats, attributes, skills, and resources.
+Each preset's "intro" is a COMPLETE REPLACEMENT (3-5 paragraphs) for the default intro, NOT an addition.
 Write full, standalone content - not fragments!`,
-      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "playerName": "string", "playerSummary": "string (2-3 paragraphs)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "characterData": { "values": { "field_id": value } }, "abilities": [...], "authorNotes": "string" }] }`,
+      schema: `{ "presets": [{ "id": "preset-xxx", "name": "string", "description": "string", "icon": "emoji", "characterSheet": "string (filled character sheet in markdown with all stats/resources)", "intro": "string (3-5 paragraphs - COMPLETE replacement)", "inventory": [...], "abilities": [...], "relationships": [], "authorNotes": "string" }] }`,
     },
     agmt: {
       instruction: "",
@@ -3906,35 +3610,6 @@ export function parseExtendSectionOutput(
 
     // Merge new content with existing
     switch (section) {
-      case "characterSchema": {
-        // Merge fields and categories intelligently
-        const existingSchema = template.characterSchema || {
-          version: 1,
-          name: "Custom",
-          fields: [],
-          categories: [],
-        };
-        const newFields = parsed.characterSchema?.fields || [];
-        const newCategories = parsed.characterSchema?.categories || [];
-        const existingCategories = existingSchema.categories || [];
-        return {
-          storyTemplate: {
-            characterSchema: {
-              ...existingSchema,
-              fields: [...existingSchema.fields, ...newFields],
-              categories: [
-                ...existingCategories,
-                ...newCategories.filter(
-                  (nc: { id: string }) =>
-                    !existingCategories.some(
-                      (ec: { id: string }) => ec.id === nc.id
-                    )
-                ),
-              ],
-            },
-          },
-        };
-      }
       case "variables":
         return {
           storyTemplate: {

@@ -7,9 +7,6 @@
 
 import {
   StoryData,
-  Stat,
-  Resource,
-  InventoryItem,
   Ability,
   Achievement,
   StoryLore,
@@ -27,18 +24,15 @@ import {
   UpgradeSettings,
   LevelingSettings,
   StartingChoice,
-  ItemGrade,
   AbilityGrade,
   NodeEffects,
-  CharacterSchema,
-  CharacterData,
-  SchemaField,
-  SchemaCategory,
-  SchemaPage,
-  SchemaResource,
-  CharacterFieldValue,
+  CharacterSheetTemplate,
 } from "@/app/misc/structs";
 import { getCumulativeXPForLevel } from "@/app/misc/leveling";
+import {
+  CHARACTER_SHEET_PRESET_TEMPLATES,
+  parseTemplateFields,
+} from "@/app/misc/characterSheetTemplate";
 
 // Tool call from AI response
 export interface CreatorToolCall {
@@ -62,9 +56,6 @@ export interface CreatorToolResult {
 // Data structure for tracking all changes
 export interface CreatorChanges {
   // Story data changes
-  stats?: Stat[];
-  resources?: Resource[];
-  inventory?: InventoryItem[];
   abilities?: Ability[];
   nodeEffects?: NodeEffects;
   lore?: StoryLore[];
@@ -77,14 +68,12 @@ export interface CreatorChanges {
   customTables?: CustomTable[];
   upgradeSettings?: Partial<UpgradeSettings>;
   levelingSettings?: Partial<LevelingSettings>;
-  characterSchema?: CharacterSchema;
-  characterData?: CharacterData;
+  characterSheetTemplate?: CharacterSheetTemplate;
+  characterSheet?: string;
 
   // Basic info changes
   story_name?: string;
   premise?: string;
-  player_name?: string;
-  player_summary?: string;
   intro?: string;
   author_notes?: string;
 
@@ -140,250 +129,6 @@ export function executeCreatorTool(
 
   try {
     switch (name) {
-      // ============================================
-      // STATS (DEPRECATED - use schema fields with type: "number")
-      // ============================================
-      case "add_stats": {
-        changesList.push(
-          "⚠️ DEPRECATED: add_stats is deprecated. Use add_schema_fields with type: 'number' instead."
-        );
-        const stats = args.stats as Stat[];
-        const existingStats = [...(currentState.storyData.stats || [])];
-        for (const stat of stats) {
-          const existing = existingStats.find(
-            (s) => s.name.toLowerCase() === stat.name.toLowerCase()
-          );
-          if (existing) {
-            changesList.push(`Stat "${stat.name}" already exists, skipped`);
-          } else {
-            existingStats.push({
-              name: stat.name,
-              value: stat.value,
-              description: stat.description,
-              symbol: stat.symbol,
-            });
-            changesList.push(`Added stat: ${stat.name} (${stat.value})`);
-          }
-        }
-        changes.stats = existingStats;
-        break;
-      }
-
-      case "modify_stats": {
-        changesList.push(
-          "⚠️ DEPRECATED: modify_stats is deprecated. Use modify_schema_fields instead."
-        );
-        const modifications = args.stats as Array<{
-          name: string;
-          new_name?: string;
-          value?: number;
-          description?: string;
-          symbol?: string;
-        }>;
-        const existingStats = [...(currentState.storyData.stats || [])];
-        for (const mod of modifications) {
-          const idx = existingStats.findIndex(
-            (s) => s.name.toLowerCase() === mod.name.toLowerCase()
-          );
-          if (idx === -1) {
-            changesList.push(`Stat "${mod.name}" not found, skipped`);
-            continue;
-          }
-          if (mod.new_name !== undefined)
-            existingStats[idx].name = mod.new_name;
-          if (mod.value !== undefined) existingStats[idx].value = mod.value;
-          if (mod.description !== undefined)
-            existingStats[idx].description = mod.description;
-          if (mod.symbol !== undefined) existingStats[idx].symbol = mod.symbol;
-          changesList.push(`Modified stat: ${mod.name}`);
-        }
-        changes.stats = existingStats;
-        break;
-      }
-
-      case "remove_stats": {
-        changesList.push(
-          "⚠️ DEPRECATED: remove_stats is deprecated. Use remove_schema_fields instead."
-        );
-        const names = args.names as string[];
-        const existingStats = [...(currentState.storyData.stats || [])];
-        const remaining = existingStats.filter(
-          (s) => !names.some((n) => n.toLowerCase() === s.name.toLowerCase())
-        );
-        const removed = existingStats.length - remaining.length;
-        changesList.push(`Removed ${removed} stat(s)`);
-        changes.stats = remaining;
-        break;
-      }
-
-      // ============================================
-      // RESOURCES (DEPRECATED - use schema fields with type: "resource")
-      // ============================================
-      case "add_resources": {
-        changesList.push(
-          "⚠️ DEPRECATED: add_resources is deprecated. Use add_schema_fields with type: 'resource' instead."
-        );
-        const resources = args.resources as Resource[];
-        const existingResources = [...(currentState.storyData.resources || [])];
-        for (const resource of resources) {
-          const existing = existingResources.find(
-            (r) => r.name.toLowerCase() === resource.name.toLowerCase()
-          );
-          if (existing) {
-            changesList.push(
-              `Resource "${resource.name}" already exists, skipped`
-            );
-          } else {
-            existingResources.push({
-              name: resource.name,
-              value: resource.value,
-              maxValue: resource.maxValue,
-              description: resource.description,
-              symbol: resource.symbol,
-            });
-            changesList.push(
-              `Added resource: ${resource.name} (${resource.value}/${resource.maxValue})`
-            );
-          }
-        }
-        changes.resources = existingResources;
-        break;
-      }
-
-      case "modify_resources": {
-        changesList.push(
-          "⚠️ DEPRECATED: modify_resources is deprecated. Use modify_schema_fields instead."
-        );
-        const modifications = args.resources as Array<{
-          name: string;
-          new_name?: string;
-          value?: number;
-          maxValue?: number;
-          description?: string;
-          symbol?: string;
-        }>;
-        const existingResources = [...(currentState.storyData.resources || [])];
-        for (const mod of modifications) {
-          const idx = existingResources.findIndex(
-            (r) => r.name.toLowerCase() === mod.name.toLowerCase()
-          );
-          if (idx === -1) {
-            changesList.push(`Resource "${mod.name}" not found, skipped`);
-            continue;
-          }
-          if (mod.new_name !== undefined)
-            existingResources[idx].name = mod.new_name;
-          if (mod.value !== undefined) existingResources[idx].value = mod.value;
-          if (mod.maxValue !== undefined)
-            existingResources[idx].maxValue = mod.maxValue;
-          if (mod.description !== undefined)
-            existingResources[idx].description = mod.description;
-          if (mod.symbol !== undefined)
-            existingResources[idx].symbol = mod.symbol;
-          changesList.push(`Modified resource: ${mod.name}`);
-        }
-        changes.resources = existingResources;
-        break;
-      }
-
-      case "remove_resources": {
-        changesList.push(
-          "⚠️ DEPRECATED: remove_resources is deprecated. Use remove_schema_fields instead."
-        );
-        const names = args.names as string[];
-        const existingResources = [...(currentState.storyData.resources || [])];
-        const remaining = existingResources.filter(
-          (r) => !names.some((n) => n.toLowerCase() === r.name.toLowerCase())
-        );
-        const removed = existingResources.length - remaining.length;
-        changesList.push(`Removed ${removed} resource(s)`);
-        changes.resources = remaining;
-        break;
-      }
-
-      // ============================================
-      // ITEMS
-      // ============================================
-      case "add_items": {
-        const items = args.items as InventoryItem[];
-        const existingItems = [...(currentState.storyData.inventory || [])];
-        for (const item of items) {
-          const existing = existingItems.find(
-            (i) => i.name.toLowerCase() === item.name.toLowerCase()
-          );
-          if (existing) {
-            existing.quantity += item.quantity || 1;
-            changesList.push(
-              `Added ${item.quantity || 1} to existing item: ${item.name}`
-            );
-          } else {
-            const newItem: InventoryItem = {
-              name: item.name,
-              quantity: item.quantity || 1,
-              description: item.description,
-              type: item.type || "normal",
-              symbol: item.symbol,
-            };
-            if (item.grade) newItem.grade = item.grade as ItemGrade;
-            if (item.stat) newItem.stat = item.stat;
-            existingItems.push(newItem);
-            changesList.push(`Added item: ${item.name} x${item.quantity || 1}`);
-          }
-        }
-        changes.inventory = existingItems;
-        break;
-      }
-
-      case "modify_items": {
-        const modifications = args.items as Array<{
-          name: string;
-          new_name?: string;
-          quantity?: number;
-          description?: string;
-          type?: string;
-          grade?: string;
-          stat?: string;
-          symbol?: string;
-        }>;
-        const existingItems = [...(currentState.storyData.inventory || [])];
-        for (const mod of modifications) {
-          const idx = existingItems.findIndex(
-            (i) => i.name.toLowerCase() === mod.name.toLowerCase()
-          );
-          if (idx === -1) {
-            changesList.push(`Item "${mod.name}" not found, skipped`);
-            continue;
-          }
-          if (mod.new_name !== undefined)
-            existingItems[idx].name = mod.new_name;
-          if (mod.quantity !== undefined)
-            existingItems[idx].quantity = mod.quantity;
-          if (mod.description !== undefined)
-            existingItems[idx].description = mod.description;
-          if (mod.type !== undefined)
-            existingItems[idx].type = mod.type as InventoryItem["type"];
-          if (mod.grade !== undefined)
-            existingItems[idx].grade = mod.grade as ItemGrade;
-          if (mod.stat !== undefined) existingItems[idx].stat = mod.stat;
-          if (mod.symbol !== undefined) existingItems[idx].symbol = mod.symbol;
-          changesList.push(`Modified item: ${mod.name}`);
-        }
-        changes.inventory = existingItems;
-        break;
-      }
-
-      case "remove_items": {
-        const names = args.names as string[];
-        const existingItems = [...(currentState.storyData.inventory || [])];
-        const remaining = existingItems.filter(
-          (i) => !names.some((n) => n.toLowerCase() === i.name.toLowerCase())
-        );
-        const removed = existingItems.length - remaining.length;
-        changesList.push(`Removed ${removed} item(s)`);
-        changes.inventory = remaining;
-        break;
-      }
-
       // ============================================
       // ABILITIES
       // ============================================
@@ -469,139 +214,6 @@ export function executeCreatorTool(
       }
 
       // ============================================
-      // PASSIVES
-      // ============================================
-      case "add_passives": {
-        const passives = args.passives as Array<{
-          name: string;
-          description: string;
-        }>;
-
-        // Validate input
-        if (!passives || !Array.isArray(passives)) {
-          changesList.push("Invalid input: 'passives' must be an array");
-          break;
-        }
-
-        const existingNodeEffects = currentState.storyData.nodeEffects || {
-          statBonuses: [],
-          resourceBonuses: [],
-          passives: [],
-        };
-        const existingPassives = [...(existingNodeEffects.passives || [])];
-        for (const passive of passives) {
-          // Validate each passive entry
-          if (
-            !passive ||
-            typeof passive.name !== "string" ||
-            !passive.name.trim()
-          ) {
-            changesList.push("Skipped invalid passive: missing name");
-            continue;
-          }
-
-          const existing = existingPassives.find(
-            (p) => p.name.toLowerCase() === passive.name.toLowerCase()
-          );
-          if (existing) {
-            changesList.push(
-              `Passive "${passive.name}" already exists, skipped`
-            );
-          } else {
-            existingPassives.push({
-              name: passive.name,
-              description: passive.description || "",
-              nodeId: "ai", // AI-added passives use "ai" as nodeId
-            });
-            changesList.push(`Added passive: ${passive.name}`);
-          }
-        }
-        changes.nodeEffects = {
-          ...existingNodeEffects,
-          passives: existingPassives,
-        };
-        break;
-      }
-
-      case "modify_passives": {
-        const modifications = args.passives as Array<{
-          name: string;
-          new_name?: string;
-          description?: string;
-        }>;
-
-        // Validate input
-        if (!modifications || !Array.isArray(modifications)) {
-          changesList.push("Invalid input: 'passives' must be an array");
-          break;
-        }
-
-        const existingNodeEffects = currentState.storyData.nodeEffects || {
-          statBonuses: [],
-          resourceBonuses: [],
-          passives: [],
-        };
-        const existingPassives = [...(existingNodeEffects.passives || [])];
-        for (const mod of modifications) {
-          // Validate each modification entry
-          if (!mod || typeof mod.name !== "string" || !mod.name.trim()) {
-            changesList.push("Skipped invalid modification: missing name");
-            continue;
-          }
-
-          const idx = existingPassives.findIndex(
-            (p) => p.name.toLowerCase() === mod.name.toLowerCase()
-          );
-          if (idx === -1) {
-            changesList.push(`Passive "${mod.name}" not found, skipped`);
-            continue;
-          }
-          if (mod.new_name !== undefined)
-            existingPassives[idx].name = mod.new_name;
-          if (mod.description !== undefined)
-            existingPassives[idx].description = mod.description;
-          changesList.push(`Modified passive: ${mod.name}`);
-        }
-        changes.nodeEffects = {
-          ...existingNodeEffects,
-          passives: existingPassives,
-        };
-        break;
-      }
-
-      case "remove_passives": {
-        const names = args.names as string[];
-
-        // Validate input
-        if (!names || !Array.isArray(names)) {
-          changesList.push("Invalid input: 'names' must be an array");
-          break;
-        }
-
-        const existingNodeEffects = currentState.storyData.nodeEffects || {
-          statBonuses: [],
-          resourceBonuses: [],
-          passives: [],
-        };
-        const existingPassives = [...(existingNodeEffects.passives || [])];
-        const remaining = existingPassives.filter(
-          (p) =>
-            !names.some(
-              (n) =>
-                typeof n === "string" &&
-                n.toLowerCase() === p.name.toLowerCase()
-            )
-        );
-        const removed = existingPassives.length - remaining.length;
-        changesList.push(`Removed ${removed} passive(s)`);
-        changes.nodeEffects = {
-          ...existingNodeEffects,
-          passives: remaining,
-        };
-        break;
-      }
-
-      // ============================================
       // LORE
       // ============================================
       case "add_lore": {
@@ -617,6 +229,7 @@ export function executeCreatorTool(
             existingLore.push({
               title: lore.title,
               content: lore.content,
+              type: lore.type || "lore",
               secrtet: (lore as any).secret || false,
               relatedCharacters: [],
               relatedLocations: [],
@@ -628,7 +241,11 @@ export function executeCreatorTool(
               var_off_triggers: lore.var_off_triggers,
               trigger_lores: lore.trigger_lores,
             });
-            changesList.push(`Added lore: ${lore.title}`);
+            changesList.push(
+              `Added lore: ${lore.title}${
+                lore.type === "character_sheet" ? " (character sheet)" : ""
+              }`
+            );
           }
         }
         changes.lore = existingLore;
@@ -640,6 +257,7 @@ export function executeCreatorTool(
           title: string;
           new_title?: string;
           content?: string;
+          type?: string;
           secret?: boolean;
           alwaysOn?: boolean;
           on_triggers?: string[];
@@ -661,6 +279,8 @@ export function executeCreatorTool(
             existingLore[idx].title = mod.new_title;
           if (mod.content !== undefined)
             existingLore[idx].content = mod.content;
+          if (mod.type !== undefined)
+            existingLore[idx].type = mod.type as StoryLore["type"];
           if (mod.secret !== undefined) existingLore[idx].secrtet = mod.secret;
           if (mod.alwaysOn !== undefined)
             existingLore[idx].alwaysOn = mod.alwaysOn;
@@ -1122,8 +742,7 @@ export function executeCreatorTool(
               name: preset.name,
               description: preset.description,
               icon: preset.icon,
-              playerName: preset.playerName,
-              playerSummary: preset.playerSummary,
+              characterSheet: preset.characterSheet,
               intro: preset.intro,
               authorNotes: preset.authorNotes || "",
               stats: preset.stats || [],
@@ -1147,7 +766,6 @@ export function executeCreatorTool(
             name?: string;
             new_id?: string;
             new_name?: string;
-            characterData?: { values?: Record<string, unknown> };
           }
         >;
         const existingPresets = [...(currentState.storyData.presets || [])];
@@ -1168,9 +786,8 @@ export function executeCreatorTool(
           if (mod.new_name !== undefined) p.name = mod.new_name;
           if (mod.description !== undefined) p.description = mod.description;
           if (mod.icon !== undefined) p.icon = mod.icon;
-          if (mod.playerName !== undefined) p.playerName = mod.playerName;
-          if (mod.playerSummary !== undefined)
-            p.playerSummary = mod.playerSummary;
+          if (mod.characterSheet !== undefined)
+            p.characterSheet = mod.characterSheet;
           if (mod.intro !== undefined) p.intro = mod.intro;
           if (mod.authorNotes !== undefined) p.authorNotes = mod.authorNotes;
           if (mod.stats !== undefined) p.stats = mod.stats;
@@ -1179,19 +796,6 @@ export function executeCreatorTool(
           if (mod.abilities !== undefined) p.abilities = mod.abilities;
           if (mod.relationships !== undefined)
             p.relationships = mod.relationships;
-          // Handle characterData modifications (for character schema fields)
-          if (mod.characterData !== undefined) {
-            if (!p.characterData) {
-              p.characterData = { values: {} };
-            }
-            if (mod.characterData.values) {
-              // Merge values - replace any fields that are specified
-              p.characterData.values = {
-                ...p.characterData.values,
-                ...mod.characterData.values,
-              };
-            }
-          }
           changesList.push(`Modified preset: ${p.name}`);
         }
         changes.presets = existingPresets;
@@ -1428,13 +1032,9 @@ export function executeCreatorTool(
           changes.premise = args.premise as string;
           changesList.push(`Updated premise`);
         }
-        if (args.player_name !== undefined) {
-          changes.player_name = args.player_name as string;
-          changesList.push(`Updated player name`);
-        }
-        if (args.player_summary !== undefined) {
-          changes.player_summary = args.player_summary as string;
-          changesList.push(`Updated player summary`);
+        if (args.character_sheet !== undefined) {
+          changes.characterSheet = args.character_sheet as string;
+          changesList.push(`Updated character sheet`);
         }
         if (args.intro !== undefined) {
           changes.intro = args.intro as string;
@@ -1666,466 +1266,101 @@ export function executeCreatorTool(
       }
 
       // ============================================
-      // CHARACTER SCHEMA
+      // CHARACTER SHEET TOOLS
       // ============================================
-      case "set_character_schema": {
-        // Args come as direct properties (name, fields, categories, etc.), not nested in schema
-        const name = (args.name as string) || "Custom";
-        const fields = (args.fields as SchemaField[]) || [];
-        const categories = (args.categories as SchemaCategory[]) || [];
-        const description = (args.description as string) || "";
-        changes.characterSchema = {
-          version: 1,
-          name,
-          description,
-          fields,
-          categories,
-          template: undefined,
-          pages: [],
-          resources: [],
-          hasCustomJS: false,
-        };
-        changesList.push(`Set character schema: ${name}`);
+      case "update_character_sheet": {
+        const characterSheet = args.character_sheet as string;
+        const mode = (args.mode as string) || "replace";
+
+        if (!characterSheet) {
+          changesList.push(`No character sheet content provided, skipped`);
+          break;
+        }
+
+        const existingSheet = currentState.storyData.characterSheet || "";
+
+        switch (mode) {
+          case "append":
+            changes.characterSheet = existingSheet + "\n\n" + characterSheet;
+            changesList.push(`Appended content to character sheet`);
+            break;
+          case "prepend":
+            changes.characterSheet = characterSheet + "\n\n" + existingSheet;
+            changesList.push(`Prepended content to character sheet`);
+            break;
+          case "replace":
+          default:
+            changes.characterSheet = characterSheet;
+            changesList.push(`Updated character sheet`);
+            break;
+        }
         break;
       }
 
-      case "add_schema_fields": {
-        const fields = args.fields as SchemaField[];
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingFields = [...existingSchema.fields];
+      case "update_character_sheet_template": {
+        let newTemplate: string | undefined;
 
-        for (const field of fields) {
-          const existing = existingFields.find(
-            (f) =>
-              f.id === field.id ||
-              f.name.toLowerCase() === field.name.toLowerCase()
+        // Check if using a preset template
+        if (args.preset_id) {
+          const preset = CHARACTER_SHEET_PRESET_TEMPLATES.find(
+            (t) => t.id === args.preset_id
           );
-          if (existing) {
-            changesList.push(`Field "${field.name}" already exists, skipped`);
-          } else {
-            existingFields.push(field);
+          if (preset) {
+            newTemplate = preset.template;
             changesList.push(
-              `Added schema field: ${field.name} [${field.type}]`
+              `Set character sheet template to ${preset.name} preset`
+            );
+          } else {
+            changesList.push(
+              `Preset "${args.preset_id}" not found, using custom template if provided`
             );
           }
         }
 
-        changes.characterSchema = {
-          ...existingSchema,
-          fields: existingFields,
-        };
-        break;
-      }
-
-      case "modify_schema_fields": {
-        const modifications = args.fields as Array<
-          Partial<SchemaField> & { id: string }
-        >;
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingFields = [...existingSchema.fields];
-
-        for (const mod of modifications) {
-          const idx = existingFields.findIndex((f) => f.id === mod.id);
-          if (idx === -1) {
-            changesList.push(`Field "${mod.id}" not found, skipped`);
-            continue;
-          }
-          // Use type assertion for the merge since we know the types match
-          existingFields[idx] = {
-            ...existingFields[idx],
-            ...mod,
-          } as SchemaField;
-          changesList.push(
-            `Modified schema field: ${existingFields[idx].name}`
-          );
+        // Use custom template if provided and no preset was found
+        if (!newTemplate && args.template) {
+          newTemplate = args.template as string;
+          changesList.push(`Updated character sheet template`);
         }
 
-        changes.characterSchema = {
-          ...existingSchema,
-          fields: existingFields,
-        };
-        break;
-      }
-
-      case "remove_schema_fields": {
-        const ids = args.ids as string[];
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingFields = [...existingSchema.fields];
-        const remaining = existingFields.filter((f) => !ids.includes(f.id));
-        const removed = existingFields.length - remaining.length;
-        changesList.push(`Removed ${removed} schema field(s)`);
-
-        changes.characterSchema = {
-          ...existingSchema,
-          fields: remaining,
-        };
-        break;
-      }
-
-      case "add_schema_categories": {
-        const categories = args.categories as SchemaCategory[];
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingCategories = [...(existingSchema.categories || [])];
-
-        for (const cat of categories) {
-          const existing = existingCategories.find(
-            (c) =>
-              c.id === cat.id || c.name.toLowerCase() === cat.name.toLowerCase()
-          );
-          if (existing) {
-            changesList.push(`Category "${cat.name}" already exists, skipped`);
-          } else {
-            existingCategories.push(cat);
-            changesList.push(`Added schema category: ${cat.name}`);
-          }
-        }
-
-        changes.characterSchema = {
-          ...existingSchema,
-          categories: existingCategories,
-        };
-        break;
-      }
-
-      case "modify_schema_categories": {
-        const modifications = args.categories as Array<
-          Partial<SchemaCategory> & { id: string }
-        >;
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingCategories = [...(existingSchema.categories || [])];
-
-        for (const mod of modifications) {
-          const idx = existingCategories.findIndex((c) => c.id === mod.id);
-          if (idx === -1) {
-            changesList.push(`Category "${mod.id}" not found, skipped`);
-            continue;
-          }
-          existingCategories[idx] = { ...existingCategories[idx], ...mod };
-          changesList.push(
-            `Modified schema category: ${existingCategories[idx].name}`
-          );
-        }
-
-        changes.characterSchema = {
-          ...existingSchema,
-          categories: existingCategories,
-        };
-        break;
-      }
-
-      case "remove_schema_categories": {
-        const ids = args.ids as string[];
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingCategories = [...(existingSchema.categories || [])];
-        const remaining = existingCategories.filter((c) => !ids.includes(c.id));
-        const removed = existingCategories.length - remaining.length;
-        changesList.push(`Removed ${removed} schema category/categories`);
-
-        changes.characterSchema = {
-          ...existingSchema,
-          categories: remaining,
-        };
-        break;
-      }
-
-      case "set_schema_template": {
-        // Args come as direct properties (html, css, js), not nested in template
-        const html = args.html as string;
-        const css = args.css as string;
-        const js = args.js as string | undefined;
-        const template = { html, css, js };
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-
-        changes.characterSchema = {
-          ...existingSchema,
-          template,
-          hasCustomJS: !!js,
-        };
-        changesList.push("Set character sheet template");
-        break;
-      }
-
-      case "add_schema_pages": {
-        // AI sends flat structure (html, css, js), we need nested template
-        const rawPages = args.pages as Array<{
-          id: string;
-          name: string;
-          icon?: string;
-          order?: number;
-          html?: string;
-          css?: string;
-          js?: string;
-          template?: { html: string; css: string; js?: string };
-        }>;
-        const pages: SchemaPage[] = rawPages.map((p) => ({
-          id: p.id,
-          name: p.name,
-          icon: p.icon || "FileText",
-          order: p.order ?? 0,
-          // If AI already provided nested template, use it; otherwise construct from flat fields
-          template: p.template || {
-            html: p.html || "",
-            css: p.css || "",
-            js: p.js || "",
-          },
-        }));
-
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingPages = [...(existingSchema.pages || [])];
-
-        for (const page of pages) {
-          const existing = existingPages.find(
-            (p) =>
-              p.id === page.id ||
-              p.name.toLowerCase() === page.name.toLowerCase()
-          );
-          if (existing) {
-            changesList.push(`Page "${page.name}" already exists, skipped`);
-          } else {
-            existingPages.push(page);
-            changesList.push(`Added schema page: ${page.name}`);
-          }
-        }
-
-        changes.characterSchema = {
-          ...existingSchema,
-          pages: existingPages,
-        };
-        break;
-      }
-
-      case "modify_schema_pages": {
-        // AI sends flat structure (html, css, js), we need to merge into nested template
-        const rawMods = args.pages as Array<{
-          id: string;
-          new_id?: string;
-          name?: string;
-          icon?: string;
-          order?: number;
-          html?: string;
-          css?: string;
-          js?: string;
-          template?: { html?: string; css?: string; js?: string };
-        }>;
-
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingPages = [...(existingSchema.pages || [])];
-
-        for (const mod of rawMods) {
-          const idx = existingPages.findIndex((p) => p.id === mod.id);
-          if (idx === -1) {
-            changesList.push(`Page "${mod.id}" not found, skipped`);
-            continue;
-          }
-
-          const existing = existingPages[idx];
-          const baseTemplate = existing.template || {
-            html: "",
-            css: "",
-            js: "",
+        if (newTemplate) {
+          changes.characterSheetTemplate = {
+            template: newTemplate,
+            fields: parseTemplateFields(newTemplate),
           };
+        }
+        break;
+      }
 
-          // Build template updates from flat fields or nested template
-          const templateUpdates: { html?: string; css?: string; js?: string } =
-            {};
-          if (mod.html !== undefined) templateUpdates.html = mod.html;
-          if (mod.css !== undefined) templateUpdates.css = mod.css;
-          if (mod.js !== undefined) templateUpdates.js = mod.js;
-          if (mod.template) {
-            if (mod.template.html !== undefined)
-              templateUpdates.html = mod.template.html;
-            if (mod.template.css !== undefined)
-              templateUpdates.css = mod.template.css;
-            if (mod.template.js !== undefined)
-              templateUpdates.js = mod.template.js;
-          }
+      case "update_preset_character_sheet": {
+        const presetId = args.preset_id as string | undefined;
+        const presetName = args.preset_name as string | undefined;
+        const characterSheet = args.character_sheet as string;
 
-          existingPages[idx] = {
-            ...existing,
-            ...(mod.new_id && { id: mod.new_id }),
-            ...(mod.name && { name: mod.name }),
-            ...(mod.icon && { icon: mod.icon }),
-            ...(mod.order !== undefined && { order: mod.order }),
-            template: { ...baseTemplate, ...templateUpdates },
-          };
-          changesList.push(`Modified schema page: ${existingPages[idx].name}`);
+        if (!characterSheet) {
+          changesList.push(`No character sheet content provided, skipped`);
+          break;
         }
 
-        changes.characterSchema = {
-          ...existingSchema,
-          pages: existingPages,
-        };
-        break;
-      }
+        const existingPresets = [...(currentState.storyData.presets || [])];
+        const idx = existingPresets.findIndex(
+          (p) =>
+            (presetId && p.id === presetId) ||
+            (presetName && p.name.toLowerCase() === presetName.toLowerCase())
+        );
 
-      case "remove_schema_pages": {
-        const ids = args.ids as string[];
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingPages = [...(existingSchema.pages || [])];
-        const remaining = existingPages.filter((p) => !ids.includes(p.id));
-        const removed = existingPages.length - remaining.length;
-        changesList.push(`Removed ${removed} schema page(s)`);
-
-        changes.characterSchema = {
-          ...existingSchema,
-          pages: remaining,
-        };
-        break;
-      }
-
-      case "add_schema_resources": {
-        const resources = args.resources as SchemaResource[];
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingResources = [...(existingSchema.resources || [])];
-
-        for (const resource of resources) {
-          const existing = existingResources.find(
-            (r) =>
-              r.id === resource.id ||
-              r.name.toLowerCase() === resource.name.toLowerCase()
+        if (idx === -1) {
+          changesList.push(
+            `Preset "${presetId || presetName}" not found, skipped`
           );
-          if (existing) {
-            changesList.push(
-              `Resource "${resource.name}" already exists, skipped`
-            );
-          } else {
-            existingResources.push(resource);
-            changesList.push(
-              `Added schema resource: ${resource.name} [${resource.type}]`
-            );
-          }
+          break;
         }
 
-        changes.characterSchema = {
-          ...existingSchema,
-          resources: existingResources,
-        };
-        break;
-      }
-
-      case "remove_schema_resources": {
-        const ids = args.ids as string[];
-        const existingSchema: CharacterSchema = currentState.storyData
-          .characterSchema || {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-        };
-        const existingResources = [...(existingSchema.resources || [])];
-        const remaining = existingResources.filter((r) => !ids.includes(r.id));
-        const removed = existingResources.length - remaining.length;
-        changesList.push(`Removed ${removed} schema resource(s)`);
-
-        changes.characterSchema = {
-          ...existingSchema,
-          resources: remaining,
-        };
-        break;
-      }
-
-      // ============================================
-      // CHARACTER DATA
-      // ============================================
-      case "set_character_values": {
-        const values = args.values as Record<string, unknown>;
-        changes.characterData = { values } as CharacterData;
-        const count = Object.keys(values).length;
-        changesList.push(`Set ${count} character value(s)`);
-        break;
-      }
-
-      case "modify_character_values": {
-        const modifications = args.values as Record<string, unknown>;
-        const existingData = currentState.storyData.characterData || {
-          values: {},
-        };
-        const existingValues = { ...existingData.values };
-
-        for (const [key, value] of Object.entries(modifications)) {
-          existingValues[key] = value as CharacterFieldValue;
-          changesList.push(`Set ${key} = ${JSON.stringify(value)}`);
-        }
-
-        changes.characterData = { values: existingValues };
+        existingPresets[idx].characterSheet = characterSheet;
+        changes.presets = existingPresets;
+        changesList.push(
+          `Updated character sheet for preset: ${existingPresets[idx].name}`
+        );
         break;
       }
 
@@ -2191,13 +1426,6 @@ export function executeCreatorTools(
         ...runningState,
         storyData: {
           ...runningState.storyData,
-          ...(changes.stats !== undefined && { stats: changes.stats }),
-          ...(changes.resources !== undefined && {
-            resources: changes.resources,
-          }),
-          ...(changes.inventory !== undefined && {
-            inventory: changes.inventory,
-          }),
           ...(changes.abilities !== undefined && {
             abilities: changes.abilities,
           }),
@@ -2223,11 +1451,8 @@ export function executeCreatorTools(
             story_name: changes.story_name,
           }),
           ...(changes.premise !== undefined && { premise: changes.premise }),
-          ...(changes.player_name !== undefined && {
-            player_name: changes.player_name,
-          }),
-          ...(changes.player_summary !== undefined && {
-            player_summary: changes.player_summary,
+          ...(changes.characterSheet !== undefined && {
+            characterSheet: changes.characterSheet,
           }),
           ...(changes.intro !== undefined && { intro: changes.intro }),
           ...(changes.author_notes !== undefined && {
@@ -2249,7 +1474,7 @@ export function executeCreatorTools(
         },
       };
 
-      // Merge into final changes
+      // Merge changes
       mergedChanges = {
         ...mergedChanges,
         ...changes,

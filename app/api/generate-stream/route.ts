@@ -460,16 +460,25 @@ export async function POST(req: NextRequest) {
             if (m.tool_calls) {
               // Re-serialize tool call arguments to strings if they're objects
               // (AI APIs expect arguments as JSON strings, not parsed objects)
-              msg.tool_calls = m.tool_calls.map((tc: any) => ({
-                ...tc,
-                function: {
-                  ...tc.function,
-                  arguments:
-                    typeof tc.function.arguments === "string"
-                      ? tc.function.arguments
-                      : JSON.stringify(tc.function.arguments),
-                },
-              }));
+              // Filter out any malformed tool calls that don't have the required structure
+              msg.tool_calls = m.tool_calls
+                .filter((tc: any) => tc && tc.function && tc.function.name)
+                .map((tc: any) => ({
+                  ...tc,
+                  function: {
+                    ...tc.function,
+                    arguments:
+                      typeof tc.function.arguments === "string"
+                        ? tc.function.arguments
+                        : tc.function.arguments
+                        ? JSON.stringify(tc.function.arguments)
+                        : "{}",
+                  },
+                }));
+              // Remove tool_calls if empty after filtering
+              if (msg.tool_calls.length === 0) {
+                delete msg.tool_calls;
+              }
             }
             if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
             // For Mistral/DeepSeek: only add prefix: true for non-tool calls (story generation)

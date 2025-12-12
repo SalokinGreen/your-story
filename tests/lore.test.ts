@@ -15,6 +15,10 @@ describe("processLoreTriggers", () => {
     resources: [],
     inventory: [],
     achievements: [],
+    abilities: [],
+    level: 1,
+    upgradesSpent: 0,
+    conditions: [],
     lore: lore,
     memory: [],
     scene: {

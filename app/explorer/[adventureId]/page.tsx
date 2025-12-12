@@ -309,6 +309,8 @@ export default function AdventureDetailPage() {
           // Points will be reset to 0 after character creation is complete
           level: 1,
           upgradesSpent: 0,
+          // Copy character sheet template for custom character creation
+          characterSheetTemplate: adventure.characterSheetTemplate,
         } as unknown as StoryData; // Cast to StoryData as template should be valid
 
         await saveLocalStory(localId, newStoryData);
@@ -350,6 +352,8 @@ export default function AdventureDetailPage() {
             // Points will be reset to 0 after character creation is complete
             level: 1,
             upgradesSpent: 0,
+            // Copy character sheet template for custom character creation
+            characterSheetTemplate: adventure.characterSheetTemplate,
           },
           isPublic: false,
         }),

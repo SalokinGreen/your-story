@@ -2014,14 +2014,14 @@ Results show each roll, total successes, and overall outcome.`,
  * All GM stage tool schemas
  */
 export const GM_TOOL_SCHEMAS: ToolSchema[] = [
-  skillCheckTool,
-  challengeCheckTool,
+  // DEPRECATED: skillCheckTool - use formulaRollTool instead
+  // DEPRECATED: challengeCheckTool - use formulaChallengeCheckTool instead
+  // DEPRECATED: opposedCheckTool - use opposedFormulaTool instead
   startChallengeTool,
-  opposedCheckTool,
   rollDiceTool,
   calculateTool,
   takeRestTool,
-  // Formula-based tools (for custom character schemas)
+  // Formula-based tools (primary dice mechanics)
   formulaRollTool,
   opposedFormulaTool,
   formulaChallengeCheckTool,

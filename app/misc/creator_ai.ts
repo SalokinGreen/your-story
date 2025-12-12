@@ -1,9 +1,6 @@
 import {
   StoryData,
   StartingChoice,
-  Stat,
-  Resource,
-  InventoryItem,
   Ability,
   Achievement,
   StoryLore,
@@ -15,8 +12,6 @@ import {
   CustomTable,
   Preset,
   getMemoryContent,
-  CharacterSchema,
-  CharacterData,
 } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 import { getCreatorToolsForAPI } from "@/app/misc/creator_tools";
@@ -40,18 +35,10 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
   const sections: string[] = [];
 
   // Basic info
-  if (
-    data.story_name ||
-    data.premise ||
-    data.player_name ||
-    data.player_summary
-  ) {
+  if (data.story_name || data.premise || data.characterSheet) {
     const basic: string[] = ["## Basic Info"];
     if (data.story_name) basic.push(`- **Story Name:** ${data.story_name}`);
     if (data.premise) basic.push(`- **Premise:** ${data.premise}`);
-    if (data.player_name) basic.push(`- **Player Name:** ${data.player_name}`);
-    if (data.player_summary)
-      basic.push(`- **Player Summary:** ${data.player_summary}`);
     if (data.intro)
       basic.push(
         `- **Intro:** ${data.intro.substring(0, 200)}${
@@ -63,16 +50,15 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push(basic.join("\n"));
   }
 
-  // Points & Momentum
+  // Character Sheet
+  if (data.characterSheet) {
+    sections.push("## Character Sheet\n" + data.characterSheet);
+  }
+
+  // Points
   const progression: string[] = [];
   if (data.points !== undefined && data.points > 0)
     progression.push(`- **Points:** ${data.points}`);
-  if (data.momentum !== undefined)
-    progression.push(
-      `- **Momentum:** ${data.momentum}${
-        data.maxMomentum ? `/${data.maxMomentum}` : ""
-      }`
-    );
   if (progression.length > 0) {
     sections.push("## Progression\n" + progression.join("\n"));
   }
@@ -87,57 +73,6 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     settings.push(`- **NSFW:** ${data.nsfw ? "Yes" : "No"}`);
   if (settings.length > 0) {
     sections.push("## Game Settings\n" + settings.join("\n"));
-  }
-
-  // Stats
-  if (data.stats && data.stats.length > 0) {
-    const statsSection = ["## Stats"];
-    data.stats.forEach((stat: Stat) => {
-      statsSection.push(
-        `- **${stat.name}:** ${stat.value} ${
-          stat.symbol ? `(${stat.symbol})` : ""
-        }`
-      );
-      if (stat.description) statsSection.push(`  - ${stat.description}`);
-    });
-    sections.push(statsSection.join("\n"));
-  }
-
-  // Resources
-  if (data.resources && data.resources.length > 0) {
-    const resourcesSection = ["## Resources"];
-    data.resources.forEach((resource: Resource) => {
-      resourcesSection.push(
-        `- **${resource.name}:** ${resource.value}/${resource.maxValue} ${
-          resource.symbol ? `(${resource.symbol})` : ""
-        }`
-      );
-      if (resource.description)
-        resourcesSection.push(`  - ${resource.description}`);
-    });
-    sections.push(resourcesSection.join("\n"));
-  }
-
-  // Inventory
-  if (data.inventory && data.inventory.length > 0) {
-    const invSection = ["## Inventory"];
-    data.inventory.forEach((item: InventoryItem) => {
-      const typeStr = item.type !== "normal" ? ` [${item.type}]` : "";
-      const gradeStr =
-        item.grade && item.grade !== "common" ? ` (${item.grade})` : "";
-      const durStr =
-        item.durability !== undefined && item.maxDurability
-          ? ` - Durability: ${item.durability}/${item.maxDurability}`
-          : "";
-      invSection.push(
-        `- **${item.name}** x${item.quantity}${typeStr}${gradeStr}${durStr} ${
-          item.symbol || ""
-        }`
-      );
-      if (item.description) invSection.push(`  - ${item.description}`);
-      if (item.stat) invSection.push(`  - Affects: ${item.stat}`);
-    });
-    sections.push(invSection.join("\n"));
   }
 
   // Abilities
@@ -164,17 +99,6 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
         abilitiesSection.push(`  - Associated stat: ${ability.stat}`);
     });
     sections.push(abilitiesSection.join("\n"));
-  }
-
-  // Passives (from nodeEffects)
-  if (data.nodeEffects?.passives && data.nodeEffects.passives.length > 0) {
-    const passivesSection = ["## Passives"];
-    data.nodeEffects.passives.forEach((passive) => {
-      passivesSection.push(`- **${passive.name}**`);
-      if (passive.description)
-        passivesSection.push(`  - ${passive.description}`);
-    });
-    sections.push(passivesSection.join("\n"));
   }
 
   // Achievements
@@ -357,49 +281,12 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     data.presets.forEach((preset: Preset) => {
       presetsSection.push(`### ${preset.name} ${preset.icon || ""}`);
       presetsSection.push(`*${preset.description}*`);
-      if (preset.playerName)
-        presetsSection.push(`- Default name: ${preset.playerName}`);
-      if (preset.playerSummary)
-        presetsSection.push(`- Summary: ${preset.playerSummary}`);
-      if (preset.stats && preset.stats.length > 0) {
+      if (preset.characterSheet)
         presetsSection.push(
-          `- Stats: ${preset.stats
-            .map((s) => `${s.name}: ${s.value}`)
-            .join(", ")}`
+          `- Character sheet: ${preset.characterSheet.substring(0, 200)}${
+            preset.characterSheet.length > 200 ? "..." : ""
+          }`
         );
-      }
-      if (preset.resources && preset.resources.length > 0) {
-        presetsSection.push(
-          `- Resources: ${preset.resources
-            .map((r) => `${r.name}: ${r.value}/${r.maxValue}`)
-            .join(", ")}`
-        );
-      }
-      if (preset.inventory && preset.inventory.length > 0) {
-        presetsSection.push(
-          `- Starting items (legacy): ${preset.inventory
-            .map((i) => `${i.name} x${i.quantity}`)
-            .join(", ")}`
-        );
-      }
-      // Character schema field values (modern approach)
-      if (preset.characterData?.values) {
-        const values = preset.characterData.values;
-        const listFields = Object.entries(values).filter(
-          ([, v]) => Array.isArray(v) && v.length > 0
-        );
-        if (listFields.length > 0) {
-          listFields.forEach(([fieldId, fieldValue]) => {
-            const items = fieldValue as Array<string | { name?: string }>;
-            const itemNames = items.map((item) =>
-              typeof item === "string"
-                ? item
-                : item.name || JSON.stringify(item)
-            );
-            presetsSection.push(`- ${fieldId}: ${itemNames.join(", ")}`);
-          });
-        }
-      }
       if (preset.abilities && preset.abilities.length > 0) {
         presetsSection.push(
           `- Starting abilities: ${preset.abilities
@@ -450,84 +337,10 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push(levelingSection.join("\n"));
   }
 
-  // Character Schema
-  if (data.characterSchema) {
-    const schema = data.characterSchema;
-    const schemaSection = ["## Character Schema"];
-    schemaSection.push(`- **Name:** ${schema.name}`);
-    if (schema.description)
-      schemaSection.push(`- **Description:** ${schema.description}`);
-    schemaSection.push(`- **Fields:** ${schema.fields?.length || 0} defined`);
-    if (schema.fields && schema.fields.length > 0) {
-      const fieldsByType: Record<string, number> = {};
-      schema.fields.forEach((f: { type: string }) => {
-        fieldsByType[f.type] = (fieldsByType[f.type] || 0) + 1;
-      });
-      schemaSection.push(
-        `  - Types: ${Object.entries(fieldsByType)
-          .map(([t, c]) => `${t}(${c})`)
-          .join(", ")}`
-      );
-    }
-    if (schema.categories && schema.categories.length > 0) {
-      schemaSection.push(
-        `- **Categories:** ${schema.categories
-          .map((c: { name: string }) => c.name)
-          .join(", ")}`
-      );
-    }
-    if (schema.template?.html) {
-      schemaSection.push(
-        `- **Custom Template:** Yes (${
-          schema.template.html.length
-        } chars HTML, ${schema.template.css?.length || 0} chars CSS${
-          schema.template.js ? `, ${schema.template.js.length} chars JS` : ""
-        })`
-      );
-    }
-    if (schema.pages && schema.pages.length > 0) {
-      schemaSection.push(
-        `- **Custom Pages:** ${schema.pages
-          .map((p: { name: string }) => p.name)
-          .join(", ")}`
-      );
-    }
-    if (schema.resources && schema.resources.length > 0) {
-      schemaSection.push(
-        `- **Resources:** ${schema.resources.length} uploaded`
-      );
-    }
-    sections.push(schemaSection.join("\n"));
-  }
-
-  // Character Data (if schema exists)
-  if (data.characterData && data.characterSchema) {
-    const charDataSection = ["## Character Data Values"];
-    const values = data.characterData.values || {};
-    const entries = Object.entries(values).slice(0, 20); // Show first 20
-    entries.forEach(([key, value]) => {
-      if (typeof value === "object" && value !== null && "current" in value) {
-        charDataSection.push(`- **${key}:** ${value.current}/${value.max}`);
-      } else if (Array.isArray(value)) {
-        charDataSection.push(`- **${key}:** [${value.join(", ")}]`);
-      } else {
-        charDataSection.push(`- **${key}:** ${value}`);
-      }
-    });
-    if (Object.keys(values).length > 20) {
-      charDataSection.push(
-        `*(${Object.keys(values).length - 20} more fields...)*`
-      );
-    }
-    sections.push(charDataSection.join("\n"));
-  }
-
   // Progress info (simplified - removed XP/level/upgrades)
   const progress: string[] = [];
   if (data.points !== undefined && data.points > 0)
     progress.push(`- **Points:** ${data.points}`);
-  if (data.momentum !== undefined)
-    progress.push(`- **Momentum:** ${data.momentum}/${data.maxMomentum || 3}`);
   if (data.currentChapter !== undefined)
     progress.push(`- **Current Chapter:** ${data.currentChapter}`);
   if (progress.length > 0) {
@@ -625,9 +438,9 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - It should be wrapped in \`\`\`json ... \`\`\` code blocks.
 - **CRITICAL: You may only include ONE JSON block per response.** All changes must be combined into a single JSON object. The app cannot process multiple JSON blocks.
 - You can return a PARTIAL StoryData object. Only include the fields you want to change or add.
-- **CRITICAL: ONLY include fields the user EXPLICITLY requested.** Do NOT add extra fields "for convenience" or "best practice". If user asks for skill trees, ONLY output skillTrees. Do NOT also output upgradeSettings, stats, resources, or anything else unless specifically asked.
-- Arrays (like 'inventory', 'stats', 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
-- Scalar fields (like 'story_name', 'premise', 'player_name', 'title', 'shortDescription', 'description') will be REPLACED.
+- **CRITICAL: ONLY include fields the user EXPLICITLY requested.** Do NOT add extra fields "for convenience" or "best practice". If user asks for skill trees, ONLY output skillTrees. Do NOT also output upgradeSettings or anything else unless specifically asked.
+- Arrays (like 'abilities', 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
+- Scalar fields (like 'story_name', 'premise', 'characterSheet', 'title', 'shortDescription', 'description') will be REPLACED.
 
 ### IMPORTANT: Item Commands
 You can control how items in arrays are applied using the **_command** field:
@@ -647,45 +460,24 @@ You can control how items in arrays are applied using the **_command** field:
 
 \`\`\`json
 {
-  "characterSchema": {
-    "fields": [
-      {
-        "id": "strength",
-        "name": "Strength",
-        "type": "number",
-        "description": "Raw physical power",
-        "defaultValue": 80,
-        "_command": "replace"
-      },
-      {
-        "id": "old_unused_field",
-        "_command": "delete"
-      },
-      {
-        "id": "agility",
-        "name": "Agility",
-        "type": "number",
-        "defaultValue": 70
-      }
-    ]
-  },
-  "characterData": {
-    "values": {
-      "strength": 80,
-      "agility": 70
-    }
-  },
-  "inventory": [
+  "abilities": [
     {
-      "name": "Rusty Sword",
-      "_command": "delete"
+      "name": "Fireball",
+      "description": "Launch a ball of fire",
+      "grade": "adept",
+      "cost": [{"type": "variable", "name": "mana", "amount": 10}],
+      "_command": "replace"
     },
     {
-      "name": "Legendary Blade",
-      "description": "A powerful enchanted sword",
-      "type": "normal",
-      "symbol": "⚔️",
-      "quantity": 1,
+      "name": "Old Ability",
+      "_command": "delete"
+    }
+  ],
+  "lore": [
+    {
+      "title": "The Ancient Tower",
+      "content": "A mysterious tower that appeared overnight...",
+      "secret": false,
       "_command": "add"
     }
   ]
@@ -697,8 +489,8 @@ You can control how items in arrays are applied using the **_command** field:
 - To ADD new items to an array, ONLY list the NEW items. DO NOT include existing items unless you want to modify/delete them.
 - To MODIFY existing items: List an item with the SAME 'name' (or 'title' or 'id') as an existing one, and your new values will merge/replace based on _command.
 - **For DELETE commands:** You MUST include the identifier field (name/title/id) along with "_command": "delete". Example: {"id": "old_field", "_command": "delete"} NOT just {"_command": "delete"}
-- Example: If there are 3 schema fields already and user asks to "add a Luck attribute", your JSON should ONLY contain the new Luck field in characterSchema.fields, not all 4 fields.
-- When user says "delete X" or "remove X", use: {"id": "x", "_command": "delete"}
+- Example: If there are 3 abilities already and user asks to "add a Fireball ability", your JSON should ONLY contain the new Fireball ability, not all 4 abilities.
+- When user says "delete X" or "remove X", use: {"name": "x", "_command": "delete"}
 - When user says "replace X with Y" or "redesign X", use "_command": "replace" for item X.
 
 ### Available Fields:
@@ -711,45 +503,9 @@ You can control how items in arrays are applied using the **_command** field:
 **StoryData Fields** (these define the actual gameplay scenario):
 - story_name (string) - The in-game story title (shown to player during gameplay)
 - premise (string) - Story premise/conflict summary
-- player_name (string) - Default player character name
-- player_summary (string) - Player character background/description
+- characterSheet (string) - The player's filled character sheet in markdown format (stats, abilities, backstory, etc.)
 - intro (string) - Opening narrative text shown at game start
 - author_notes (string) - Private instructions/notes for the AI narrator
-- characterSchema.fields (Array of schema fields) - **PRIMARY way to define character attributes and resources**. Use the add_schema_fields tool to add these.
-  - **type: "number"** - Simple numeric attributes (replaces legacy "stats")
-    - id: Unique identifier (e.g., "strength", "intelligence") 
-    - name: Display name (e.g., "Strength", "Intelligence")
-    - type: "number" (required)
-    - description: What the attribute represents
-    - category: Category for grouping (e.g., "Attributes", "Skills", "Combat")
-    - defaultValue: Starting value, 1-100 where 50 is average
-    - min/max: Optional limits
-  - **type: "resource"** - Pools with current/max values (replaces legacy "resources")
-    - id: Unique identifier (e.g., "health", "mana")
-    - name: Display name (e.g., "Health", "Mana")
-    - type: "resource" (required)
-    - description: What the resource represents
-    - category: Category for grouping
-    - defaultValue: Starting current value
-    - defaultMax: Maximum capacity
-    - regenerates: Whether it restores on rest (boolean)
-    - regenRates: { quick: %, short: %, long: % } - regeneration per rest type
-  - **type: "derived"** - Calculated fields using formulas
-    - id: Unique identifier (e.g., "str_mod")
-    - name: Display name (e.g., "STR Modifier")
-    - type: "derived" (required)
-    - formula: Math expression using {{fieldId}} syntax (e.g., "floor(({{strength}} - 10) / 2)")
-  - **type: "text"** - String values (e.g., character background)
-  - **type: "boolean"** - True/false flags (e.g., isConcentrating)
-  - **type: "list"** - Arrays of strings (e.g., known languages)
-  - **type: "select"** - Single choice from predefined options
-- characterSchema.categories (Array of { id, name, order }) - Organize fields into collapsible sections
-- characterData.values (Object) - Actual field values. Keys are field IDs, values match field type:
-  - Number fields: numeric value
-  - Resource fields: { current: number, max: number }
-  - Derived fields: auto-calculated, don't set directly
-  - Text/boolean/select: appropriate value type
-  - List: array of strings
 - variables (Array of variable objects) - **IMPORTANT: Custom state tracking for counters, flags, strings, and lists**. Four types:
   - **Number Variables**: { id, name, description, type: "number", value, minValue?, maxValue? }
     - id: Unique identifier (e.g., "var_gold", "var_time")
@@ -779,31 +535,17 @@ You can control how items in arrays are applied using the **_command** field:
     - type: "list" (required - must be exactly this string)
     - items: Array of strings
     - maxSize: Optional max items
-- inventory (Array of { name, quantity, description, type, symbol, grade, durability, maxDurability })
-  - name: Item name
-  - quantity: Number of items
-  - description: Item description
-  - type: "normal" (advantage, breaks on fail), "consumable" (advantage, consumed on use), "story" (advantage, never breaks/consumed), "misc" (prevents disadvantage, never breaks/consumed)
-  - symbol: Icon name as words (e.g., "sword", "potion", "shield", "scroll")
-  - grade: Item quality tier - "common" (dur 8, +0 bonus), "uncommon" (dur 13, +1), "rare" (dur 20, +2), "epic" (dur 30, +3), "legendary" (dur 50, +4), "mythic" (infinite dur, +5)
-  - durability: Current durability points (auto-set from grade if omitted)
-  - maxDurability: Maximum durability (auto-set from grade if omitted)
-- abilities (Array of { name, description, grade, cost, cooldown, currentCooldown, stat, symbol })
+- abilities (Array of { name, description, grade, cost, cooldown, currentCooldown, symbol })
   - name: Ability name (e.g., "Fireball", "Power Attack", "Healing Touch")
   - description: What the ability does
   - grade: Skill tier - "novice" (+0 bonus), "apprentice" (+1), "adept" (+2), "expert" (+3), "master" (+4), "legendary" (+5)
   - cost: Array of { type, name, amount } - costs to use the ability
-    - type: "resource" (deducts from a resource) or "variable" (deducts from a number variable)
-    - name: Name of the resource/variable to deduct from
+    - type: "variable" (deducts from a number variable)
+    - name: Name of the variable to deduct from
     - amount: How much to deduct
   - cooldown: Turns until ability can be used again after use (0 = no cooldown)
   - currentCooldown: Current cooldown remaining (usually 0 for new abilities)
-  - stat: Optional stat name this ability is associated with (for skill checks)
   - symbol: Icon name as words (e.g., "fireball", "sword-clash", "healing")
-- nodeEffects.passives (Array of { name, description, nodeId })
-  - name: Passive name (e.g., "Wolf Slayer", "Noble Blood", "Dragon Eye")
-  - description: What the passive does narratively (influences story, NPC reactions, difficulty)
-  - nodeId: Source of the passive - "manual" (user-created), "ai" (AI-created), or a skill tree node ID
 - lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, var_on_triggers, var_off_triggers })
   - title: Lore entry title
   - content: Full lore text (see THREAT PROFILES below for combat encounters)
@@ -856,7 +598,7 @@ You can control how items in arrays are applied using the **_command** field:
   - points: Points awarded upon completion
   - active: Whether quest is currently visible/active
   - fulfilled: Whether quest has been completed
-- presets (Array of { id, name, description, icon, playerName, playerSummary, characterData, inventory, abilities, authorNotes })
+- presets (Array of { id, name, description, icon, playerName, playerSummary, abilities, authorNotes })
   - id: Unique identifier (use "preset-" + timestamp for new ones)
   - name: Preset display name
   - description: What this preset/build represents
@@ -864,47 +606,18 @@ You can control how items in arrays are applied using the **_command** field:
   - playerName: Default character name for this preset
   - playerSummary: Character background for this preset
   - intro: Unique opening narrative for this preset
-  - characterData: Object containing character schema field values
-    - values: Object with field IDs as keys. For list fields (inventory, equipment), use arrays of strings or objects
-    - Example: { "values": { "strength": 16, "health": { "current": 50, "max": 50 }, "inventory": ["Sword", { "name": "Shield", "emoji": "🛡️", "description": "A sturdy shield" }] } }
-  - inventory: (LEGACY - prefer characterData.values for list fields) Array of starting items
   - abilities: Array of starting abilities for this preset
   - authorNotes: Private notes about this preset
 - upgradeSettings (Object with upgrade shop configuration) - **NOTE: Prefer skillTrees over upgradeSettings for progression**
   - enabled: Boolean - master toggle for the entire upgrade system
-  - statShopEnabled: Boolean - whether stat shop is available (adds new number fields to character)
-  - resourceShopEnabled: Boolean - whether resource shop is available (adds new resource fields)
-  - itemShopEnabled: Boolean - whether item shop is available
   - abilityShopEnabled: Boolean - whether ability shop is available
-  - statShop: Array of { name, description, symbol, startingValue, cost } - new number fields players can unlock
-    - name: Name of the new field to unlock
-    - description: What the field represents
-    - symbol: Icon name as words (e.g., "biceps", "brain")
-    - startingValue: Initial value when unlocked (1-100, 50 = average)
-    - cost: Progression points required to unlock
-  - resourceShop: Array of { name, description, symbol, startingValue, startingMaxValue, cost } - new resource fields players can unlock
-    - name: Name of the new resource to unlock
-    - description: What the resource represents
-    - symbol: Icon name as words (e.g., "heart", "lightning")
-    - startingValue: Initial current value when unlocked
-    - startingMaxValue: Initial maximum value when unlocked
-    - cost: Progression points required to unlock
-  - itemShop: Array of { name, description, type, symbol, quantity, cost, grade } - items players can purchase
-    - name: Item name
-    - description: Item description
-    - type: "normal" | "consumable" | "story" | "misc"
-    - symbol: Emoji/icon representing the item
-    - quantity: How many of this item to grant
-    - cost: Progression points required to purchase
-    - grade: Optional item grade - "common", "uncommon", "rare", "epic", "legendary", "mythic" (default: "common")
-  - abilityShop: Array of { name, description, grade, cost, abilityCost, cooldown, stat, symbol } - abilities players can unlock
+  - abilityShop: Array of { name, description, grade, cost, abilityCost, cooldown, symbol } - abilities players can unlock
     - name: Ability name
     - description: What the ability does
     - grade: "novice", "apprentice", "adept", "expert", "master", "legendary"
     - cost: Progression points required to unlock
-    - abilityCost: Array of { type, name, amount } - resource/variable costs to use
+    - abilityCost: Array of { type, name, amount } - variable costs to use
     - cooldown: Turns until can be used again (0 = no cooldown)
-    - stat: Optional associated stat
     - symbol: Emoji/icon
 - agmtState (Object with Advanced RPG Tools state - if provided, AGMT system will be enabled for this adventure)
   - chaosFactor: Number 1-9 representing narrative chaos/unpredictability
@@ -980,10 +693,8 @@ You can control how items in arrays are applied using the **_command** field:
   - startingUpgrades: Object { easy?: number, medium?: number, hard?: number, expert?: number } - Starting upgrade points per difficulty. Since 1 point = 1 skill tree node, giving 5-10 starting points lets players customize their build immediately.
 
 Notes:
-- All characters should share the same stats and resources, but they may have different values.
-- **ICONS**: Use the 'symbol' field with descriptive WORDS like "heart", "sword", "shield", "fire", "brain", "lightning", "coin", "skull", "potion", "book", "eye", "moon" - NOT emoji characters. We fuzzy-match these words to our icon library automatically. Examples: "broken-heart" for health loss, "fire" for fire magic, "shield" for defense stats.
+- **ICONS**: Use the 'symbol' field with descriptive WORDS like "heart", "sword", "shield", "fire", "brain", "lightning", "coin", "skull", "potion", "book", "eye", "moon" - NOT emoji characters. We fuzzy-match these words to our icon library automatically. Examples: "broken-heart" for loss, "fire" for fire magic, "shield" for defense.
 - Be creative and thematic in your additions/modifications based on the story setting.
-- When creating stat/resource shop items, these are NEW stats/resources that players can unlock, not upgrades to existing ones.
 - Advanced RPG Tools is enabled by providing a agmtState object. If you want to enable AGMT, simply include agmtState with at least chaosFactor.
 - AGMT chaos factor must be between 1-9, scene count must be >= 0.
 - Thread and character IDs are auto-generated if not provided, so you can omit them for new entries.
@@ -992,31 +703,8 @@ Notes:
 
 ### Example Responses:
 
-**Example 1 - Adding Items with Grades:**
-User: "Create a fire sword item and a strength stat."
-Assistant:
-"Here is a fire sword and a strength attribute for your game.
-
-\`\`\`json
-{
-  "characterSchema": {
-    "fields": [
-      { "id": "strength", "name": "Strength", "type": "number", "description": "Physical power", "category": "Attributes", "defaultValue": 10 }
-    ]
-  },
-  "characterData": {
-    "values": {
-      "strength": 10
-    }
-  },
-  "inventory": [
-    { "name": "Fire Sword", "quantity": 1, "description": "A blade wreathed in eternal flame.", "type": "normal", "symbol": "fire-sword", "grade": "rare" }
-  ]
-}
-\`\`\`"
-
-**Example 2 - Adding Abilities:**
-User: "Create a Fireball spell that costs 10 Mana and a basic Kick ability."
+**Example 1 - Adding Abilities:**
+User: "Create a Fireball spell and a basic Kick ability."
 Assistant:
 "I've created two abilities for your adventure.
 
@@ -1027,10 +715,9 @@ Assistant:
       "name": "Fireball",
       "description": "Hurl a ball of fire at enemies, dealing massive damage",
       "grade": "adept",
-      "cost": [{ "type": "resource", "name": "Mana", "amount": 10 }],
+      "cost": [],
       "cooldown": 2,
       "currentCooldown": 0,
-      "stat": "Intelligence",
       "symbol": "fireball"
     },
     {
@@ -1040,14 +727,13 @@ Assistant:
       "cost": [],
       "cooldown": 0,
       "currentCooldown": 0,
-      "stat": "Strength",
       "symbol": "boot-stomp"
     }
   ]
 }
 \`\`\`"
 
-**Example 3 - Variables (counters, flags, lists):**
+**Example 2 - Variables (counters, flags, lists):**
 User: "Add a gold counter, a night boolean, and a list for tracking visited places."
 Assistant:
 "I've created variables to track gold, time of day, and visited locations.
@@ -1081,64 +767,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 4 - Deleting Items:**
-User: "Remove the Rusty Sword and Old Potion from inventory."
-Assistant:
-"I'll remove those items from your inventory.
-
-\`\`\`json
-{
-  "inventory": [
-    { "name": "Rusty Sword", "_command": "delete" },
-    { "name": "Old Potion", "_command": "delete" }
-  ]
-}
-\`\`\`"
-
-**Example 5 - Deleting Schema Fields:**
-User: "Delete the Intelligence attribute."
-Assistant:
-"I'll remove the Intelligence field from the character schema.
-
-\`\`\`json
-{
-  "characterSchema": {
-    "fields": [
-      { "id": "intelligence", "_command": "delete" }
-    ]
-  }
-}
-\`\`\`"
-
-**Example 6 - Modifying Schema Fields:**
-User: "Completely redesign the Strength attribute with new values."
-Assistant:
-"I've updated the Strength field with new properties.
-
-\`\`\`json
-{
-  "characterSchema": {
-    "fields": [
-      {
-        "id": "strength",
-        "name": "Strength",
-        "type": "number",
-        "description": "Pure physical might that crushes all opposition",
-        "category": "Attributes",
-        "defaultValue": 85,
-        "_command": "replace"
-      }
-    ]
-  },
-  "characterData": {
-    "values": {
-      "strength": 85
-    }
-  }
-}
-\`\`\`"
-
-**Example 7 - Mixed Operations:**
+**Example 3 - Mixed Operations:**
 User: "Delete the Old Quest, update Main Quest description, and add a Secret Quest."
 Assistant:
 "I've made those changes to your quest list.
@@ -1164,7 +793,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 8 - Relationships:**
+**Example 4 - Relationships:**
 User: "Add a relationship with the King's Guard (allies) and the Shadow Syndicate (enemies)."
 Assistant:
 "I've added two key relationships to your adventure.
@@ -1178,41 +807,32 @@ Assistant:
 }
 \`\`\`"
 
-**Example 9 - Upgrade Shops:**
-User: "Enable upgrades and create a shop with a new Magic stat (10 points) and a Health Potion item (5 points)."
+**Example 5 - Upgrade Shops:**
+User: "Enable upgrades and create an ability shop with a Fireball spell (10 points)."
 Assistant:
-"I've enabled upgrades and created shop items.
+"I've enabled upgrades and created an ability shop.
 
 \`\`\`json
 {
   "upgradeSettings": {
     "enabled": true,
-    "statShopEnabled": true,
-    "itemShopEnabled": true,
-    "statShop": [
+    "abilityShopEnabled": true,
+    "abilityShop": [
       {
-        "name": "Magic",
-        "description": "Arcane power and spell effectiveness",
-        "symbol": "✨",
-        "startingValue": 50,
-        "cost": 10
-      }
-    ],
-    "itemShop": [
-      {
-        "name": "Health Potion",
-        "description": "Restores health when consumed",
-        "type": "consumable",
-        "symbol": "🧪",
-        "quantity": 1,
-        "cost": 5
+        "name": "Fireball",
+        "description": "Hurl a ball of fire at enemies",
+        "grade": "adept",
+        "cost": 10,
+        "abilityCost": [],
+        "cooldown": 2,
+        "symbol": "fireball"
       }
     ]
   }
 }
 \`\`\`"
 
-**Example 10 - Advanced RPG Tools:**
+**Example 6 - Advanced RPG Tools:**
 User: "Enable AGMT with chaos 5, add a thread about finding the ancient temple, and an NPC named Elara."
 Assistant:
 "I've enabled Advanced RPG Tools with your settings.
@@ -1239,7 +859,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 11 - Managing AGMT Threads:**
+**Example 7 - Managing AGMT Threads:**
 User: "Close the temple thread and add a new thread about the dragon awakening."
 Assistant:
 "I've updated the AGMT threads.
@@ -1262,7 +882,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 12 - Custom Random Tables:**
+**Example 8 - Custom Random Tables:**
 User: "Create a weather table with sunny, cloudy, rainy, and stormy options."
 Assistant:
 "I've created a weather random table for your adventure.
@@ -1285,7 +905,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 13 - Editing Custom Tables:**
+**Example 9 - Editing Custom Tables:**
 User: "Add a 'foggy' option to the weather table and delete the encounter table."
 Assistant:
 "I've updated your tables.
@@ -1312,7 +932,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 14 - Starting Choices:**
+**Example 10 - Starting Choices:**
 User: "Create custom starting choices: one for sneaking in (Stealth check), one for fighting through (Strength check), and one that uses a Disguise item."
 Assistant:
 "I've created three different ways to begin the adventure.
@@ -1341,7 +961,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 15 - Starting Choices with AGMT:**
+**Example 11 - Starting Choices with AGMT:**
 User: "Add a starting choice that asks fate if there's a secret passage, and rolls on the locations table."
 Assistant:
 "I've added a AGMT-powered starting choice.
@@ -1358,7 +978,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 16 - Deleting Starting Choices:**
+**Example 12 - Deleting Starting Choices:**
 User: "Remove the sneak option from starting choices."
 Assistant:
 "I've removed that starting choice.
@@ -1374,7 +994,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 17 - Creating a Skill Tree:**
+**Example 13 - Creating a Skill Tree:**
 User: "Create a warrior skill tree with power attack, defensive stance, and a passive that gives damage reduction."
 Assistant:
 "I've created a Warrior skill tree with combat abilities.
@@ -1467,7 +1087,7 @@ Assistant:
 }
 \`\`\`"
 
-**Example 18 - Adding Nodes to Existing Skill Tree:**
+**Example 14 - Adding Nodes to Existing Skill Tree:**
 User: "Add a 'Berserker Rage' ability node to the warrior tree that requires Iron Skin."
 Assistant:
 "I've added the Berserker Rage node to your Warrior tree.
@@ -1700,7 +1320,7 @@ export function parseCreatorOutput(content: string): {
   // Second try: look for raw JSON (no code fence) - common with some models
   // Find JSON object that starts with { and contains typical story data keys
   const rawJsonMatch = content.match(
-    /(\{[\s\S]*(?:"inventory"|"stats"|"lore"|"achievements"|"resources"|"quests"|"relationships"|"variables"|"abilities"|"customTables"|"skillTrees"|"upgradeSettings"|"levelingSettings"|"presets")[\s\S]*\})/
+    /(\{[\s\S]*(?:"lore"|"achievements"|"quests"|"relationships"|"variables"|"abilities"|"customTables"|"skillTrees"|"upgradeSettings"|"levelingSettings"|"presets")[\s\S]*\})/
   );
 
   if (rawJsonMatch) {
@@ -1781,24 +1401,15 @@ When the user asks you to create or modify parts of the scenario (like "create a
 
 ### Tool Categories:
 
-**Character Schema (PRIMARY - defines character sheet structure):**
-- set_character_schema - Create/replace entire character schema with fields, categories, template
-- add_schema_fields, modify_schema_fields, remove_schema_fields - Manage schema field definitions
-  - Use type: "number" for attributes (Strength, Intelligence, etc.)
-  - Use type: "resource" for pools (Health, Mana, Stamina)
-  - Use type: "derived" for calculated values (modifiers, totals)
-- add_schema_categories, modify_schema_categories, remove_schema_categories - Organize fields into UI tabs
-- set_schema_template - Set main character sheet HTML/CSS/JS template
-- add_schema_pages, modify_schema_pages, remove_schema_pages - Add custom tabs with their own templates
-- add_schema_resources, remove_schema_resources - Upload images/fonts for custom templates
-- set_character_values, modify_character_values - Set/update character data values at runtime
-
-**Items & Abilities:**
-- add_items, modify_items, remove_items - Manage inventory items with grades, types
+**Abilities:**
 - add_abilities, modify_abilities, remove_abilities - Manage skills/spells with costs, cooldowns
 
 **Story Content:**
 - add_lore, modify_lore, remove_lore - Manage world-building entries with triggers
+  **LORE TYPES:** Use the 'type' field to set note priority:
+  - "character_sheet" - HIGHEST PRIORITY. Use this for the player's character sheet! Contains stats, attributes, skills, HP, abilities, equipment, etc. Appears at the very top of AI context so the narrator always knows the character's capabilities.
+  - "mechanics" - Game rules and systems. Second priority.
+  - "lore" (default) - World-building, NPCs, locations, history.
   **THREAT PROFILES:** When creating lore for enemies/threats, include in the content:
   - Challenge Difficulty (Easy/Medium/Hard/Boss)
   - Approach DCs (e.g., "Combat: hard, Stealth: average")
@@ -1817,105 +1428,24 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - add_custom_tables, modify_custom_tables, remove_custom_tables - Manage random tables
 
 **Settings:**
-- update_basic_info - Update story_name, premise, player_name, player_summary, intro, author_notes
+- update_basic_info - Update story_name, premise, characterSheet, intro, author_notes
 - update_adventure_metadata - Update title, shortDescription, description
 - update_upgrade_settings - Configure progression shop system
 - update_leveling_settings - Configure XP curve and level caps
 
+**Character Sheet:**
+- update_character_sheet - Update the player's filled character sheet markdown
+- update_character_sheet_template - Set the adventure's fillable template
+- update_preset_character_sheet - Update a preset's pre-filled character sheet
+
 **Starting Choices:**
 - add_starting_choices, modify_starting_choices, remove_starting_choices - Custom game starts
 
-## Character Schema System
-
-The Character Schema defines what fields appear on character sheets and how they're displayed.
-
-### Field Types:
-- **number**: Simple numeric value (Strength: 14)
-- **derived**: Calculated from formula using other fields (Modifier: floor((Strength-10)/2))
-- **resource**: Has current/max values (HP: 45/50, Mana: 20/30)
-- **text**: String value (Background: "Orphan raised by wolves")
-- **list**: Array of strings (Languages: ["Common", "Elvish", "Draconic"])
-- **boolean**: True/false flag (Inspiration: true)
-- **select**: Pick from predefined options (Class: "Warrior" from ["Warrior", "Mage", "Rogue"])
-
-### Schema Field Structure:
-\`\`\`json
-{
-  "id": "strength",        // Unique identifier (used in templates as {{strength}})
-  "name": "Strength",      // Display name
-  "type": "number",        // Field type
-  "defaultValue": 10,      // Starting value
-  "min": 1,                // Optional: minimum allowed
-  "max": 30,               // Optional: maximum allowed
-  "category": "attributes" // Optional: groups fields in UI
-}
-\`\`\`
-
-### Derived Field Example:
-\`\`\`json
-{
-  "id": "str_mod",
-  "name": "STR Modifier",
-  "type": "derived",
-  "formula": "floor(({{strength}} - 10) / 2)",
-  "category": "modifiers"
-}
-\`\`\`
-
-### Resource Field Example:
-\`\`\`json
-{
-  "id": "hp",
-  "name": "Hit Points",
-  "type": "resource",
-  "defaultValue": { "current": 10, "max": 10 },
-  "category": "vitals"
-}
-\`\`\`
-
-### Categories:
-Categories organize fields into tabs in the UI:
-\`\`\`json
-{
-  "id": "attributes",
-  "name": "Attributes",
-  "icon": "user",
-  "order": 0
-}
-\`\`\`
-
-### Custom Templates:
-For full visual control, use HTML/CSS/JS templates:
-- Templates render in a sandboxed iframe
-- Use {{fieldId}} for value substitution
-- Use {{fieldId.current}}/{{fieldId.max}} for resources
-- Use {{percent fieldId}} for percentage (0-100)
-- Use {{modifier fieldId}} for D&D-style +/- prefix
-- Use {{resource:id}} for uploaded image/font URLs
-- Conditionals: {{#if condition}}...{{/if}}, {{#unless}}...{{/unless}}
-- Loops: {{#each items}}...{{/each}} with {{.}} for current item
-- Comparisons: {{#compare a op b}}...{{/compare}} (==, !=, <, >, <=, >=)
-
-### Multi-Page Templates:
-Add custom tabs with separate templates:
-\`\`\`json
-{
-  "id": "spells",
-  "name": "Spellbook",
-  "icon": "book-open",
-  "order": 1,
-  "template": {
-    "html": "<div class='spell-list'>{{#each known_spells}}<div>{{.}}</div>{{/each}}</div>",
-    "css": ".spell-list { display: grid; gap: 8px; }"
-  }
-}
-\`\`\`
-
 ## Important Guidelines:
 
-1. **Only modify what the user asks for.** If they say "add a sword", only call add_items - don't also add stats or abilities.
+1. **Only modify what the user asks for.** If they say "add an ability", only call add_abilities - don't also add other things.
 
-2. **Use batch operations.** If adding multiple items, call add_items once with all items, not multiple times.
+2. **Use batch operations.** If adding multiple abilities, call add_abilities once with all abilities, not multiple times.
 
 3. **Maintain consistency.** If the user has a fantasy setting, use appropriate names and descriptions.
 
@@ -1924,15 +1454,12 @@ Add custom tabs with separate templates:
 5. **Icons:** Use descriptive WORDS like "heart", "sword", "shield", "fire" for symbols - we fuzzy-match to our icon library.
 
 6. **Be conversational and friendly!** You're their creative buddy helping them build something cool. After using tools, write a brief but warm response about what you did - share your creative thinking, point out cool details you added, or ask follow-up questions. Don't just say "I made the changes" - be personable! Examples:
-   - "Added your fire sword! I gave it that molten aesthetic you mentioned - thought the 'burns through armor' effect would be a nice touch. Want me to add a matching flame shield?"
+   - "Added your Fireball spell! I set it as an 'adept' grade ability with a 2-turn cooldown - should feel powerful but not spammable."
    - "Got those three NPCs set up! I especially like how the merchant's backstory ties into the thieves guild - could make for some interesting drama later."
-   - "Done! Your stamina system is ready to go. I set the regen rate pretty low since you mentioned wanting resource management to feel tense."
+   - "Done! Here's your new ability. I kept the cost low since you mentioned wanting it available early."
 
 7. **Grades & Tiers:**
-   - Items: "common" (+0), "uncommon" (+1), "rare" (+2), "epic" (+3), "legendary" (+4), "mythic" (+5)
    - Abilities: "novice" (+0), "apprentice" (+1), "adept" (+2), "expert" (+3), "master" (+4), "legendary" (+5)
-
-7. **Stat values:** 1-100 scale where 50 is average human.
 
 8. **Relationship values:** -100 (sworn enemy) to +100 (devoted ally).
 

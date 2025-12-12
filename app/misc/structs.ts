@@ -1,24 +1,28 @@
 // Collection of the various structs used throughout the application
 
-// Re-export character schema types for convenience
-export type {
-  CharacterSchema,
-  CharacterData,
-  CharacterFieldValue,
-  SchemaField,
-  SchemaFieldType,
-  SchemaCategory,
-  SchemaPage,
-  SchemaResource,
-  SchemaTemplate,
-} from "./characterSchema";
-
 export interface User {
   id: string;
   name: string;
   email: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// ============================================
+// CHARACTER SHEET TEMPLATE SYSTEM
+// ============================================
+
+// A field in the character sheet template
+export interface CharacterSheetField {
+  name: string; // Field name/label (e.g., "Name", "Class", "Background")
+  description: string; // Help text shown to player (e.g., "Your character's full name")
+  defaultValue: string; // Default value if player doesn't fill it in
+}
+
+// Character sheet template for an adventure
+export interface CharacterSheetTemplate {
+  template: string; // Markdown template with {{FieldName | Description | Default}} placeholders
+  fields: CharacterSheetField[]; // Extracted fields for form rendering
 }
 
 export interface Stat {
@@ -156,7 +160,7 @@ export interface CommandResponse {
 }
 
 // Lore types: "lore" is standard world-building, "mechanics" is game rules (prioritized in context)
-export type LoreType = "lore" | "mechanics";
+export type LoreType = "lore" | "mechanics" | "character_sheet";
 
 export interface StoryLore {
   title: string;
@@ -165,7 +169,7 @@ export interface StoryLore {
   relatedLocations: string[];
   secrtet: boolean;
   keys: string[];
-  type?: LoreType; // "lore" (default) or "mechanics" (rules - prioritized first in context)
+  type?: LoreType; // "lore" (default), "mechanics" (rules), or "character_sheet" (highest priority - character details)
   alwaysOn?: boolean; // If true, lore is always visible regardless of triggers
   enabled?: boolean; // If false, lore is never visible/checked. Defaults to true.
   on_triggers?: string[]; // Word triggers to turn lore on
@@ -421,8 +425,7 @@ export interface Preset {
   name: string;
   description: string;
   icon: string;
-  playerName?: string; // Optional default name for the character
-  playerSummary: string;
+  characterSheet?: string; // Pre-written character sheet markdown for this preset
   intro?: string; // Unique intro text for this preset (optional for backward compatibility)
   stats: Stat[];
   resources: Resource[];
@@ -431,7 +434,6 @@ export interface Preset {
   relationships: Relationship[];
   conditions?: Condition[]; // Starting conditions/afflictions for this preset
   variables?: Variable[]; // Starting variables for this preset
-  characterData?: import("./characterSchema").CharacterData; // Character schema values for this preset
   authorNotes: string;
 }
 
@@ -553,6 +555,7 @@ export interface StoryData {
   premise: string;
   player_name: string;
   player_summary: string;
+  characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;
   memory: (string | MemoryEntry)[]; // Supports both legacy string[] and new MemoryEntry[] format
   max_chapters: number;
@@ -620,9 +623,11 @@ export interface StoryData {
   // Rest System
   restState?: RestState; // Tracks rest usage and cooldowns
 
-  // Custom Character Schema System (replaces hard-coded stats)
-  characterSchema?: import("./characterSchema").CharacterSchema; // Adventure-defined character structure
-  characterData?: import("./characterSchema").CharacterData; // Runtime character values
+  // Character Sheet Template (copied from Adventure for custom character creation)
+  characterSheetTemplate?: CharacterSheetTemplate;
+
+  // Filled character data from custom character creation
+  characterData?: Record<string, string>;
 }
 
 // Advanced RPG Tools state tracking
@@ -873,8 +878,7 @@ export interface Adventure {
   selectedPreset?: string; // ID of the preset used
   presets?: Preset[]; // Adventure-specific character presets
   startingChoices?: StartingChoice[]; // Optional custom starting choices (if empty, shows "Start Story")
-  // Custom Character Schema System
-  characterSchema?: import("./characterSchema").CharacterSchema; // Adventure-defined character structure
+  characterSheetTemplate?: CharacterSheetTemplate; // Template for custom character creation (fillable fields)
 }
 
 export interface AdventureFilter {

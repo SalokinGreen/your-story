@@ -317,9 +317,13 @@ export function estimateTokens(text: string): number {
 }
 
 // Token budgets for different stages (these are for scene history only)
+// GM Stage uses customMaxContext (Memory Size slider) - it does the heavy lifting
+// Story Stage uses fixed smaller budget - it's just a translator now
 export const TOOL_STAGE_TOKEN_BUDGET = 12000; // ~12k tokens for tool stage history
 export const CHOICES_STAGE_TOKEN_BUDGET = 4000; // ~4k tokens for choices stage history
-export const ACTION_ANALYSIS_TOKEN_BUDGET = 4000; // ~4k tokens for action analysis
+export const ACTION_ANALYSIS_TOKEN_BUDGET = 4000; // ~4k tokens for action analysis (legacy)
+export const STORY_STAGE_TOKEN_BUDGET = 16000; // ~16k fixed budget for story stage (translator mode)
+export const GM_STAGE_DEFAULT_BUDGET = 36000; // Default GM context if no customMaxContext set
 
 /**
  * Get scene parts that fit within a token budget, taking most recent first
@@ -612,20 +616,31 @@ export function buildInfoMessage(
   // Build lore section - use embeddings if available, otherwise fallback to trigger-based
   const currentPartIndex = storyData.scene.parts.length;
 
-  // Separate mechanics lore (always included, prioritized first in context)
+  // Character sheet notes - highest priority, always at the very top
+  const characterSheetLore = storyData.lore.filter(
+    (l) => l.enabled !== false && l.type === "character_sheet"
+  );
+  const characterSheetSection = characterSheetLore.length
+    ? `## Character Sheet\nThe player's character details. Reference these for personality, abilities, and backstory.\n${characterSheetLore
+        .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
+        .join("\n")}`
+    : "";
+
+  // Separate mechanics lore (always included, prioritized after character sheet)
   const mechanicsLore = storyData.lore.filter(
     (l) => l.enabled !== false && l.type === "mechanics"
   );
   const mechanicsSection = mechanicsLore.length
-    ? `## Game Mechanics\nThese are the rules for this adventure. Follow them precisely.\n----\n${mechanicsLore
+    ? `## Game Mechanics\nThese are the rules for this adventure. Follow them precisely.\n${mechanicsLore
         .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
-        .join("\n----\n")}`
+        .join("\n")}`
     : "";
 
-  // Always-on lore is always included (excluding mechanics)
+  // Always-on lore is always included (excluding mechanics and character_sheet)
   const alwaysOnLore = storyData.lore.filter((l) => {
     if (l.enabled === false) return false;
     if (l.type === "mechanics") return false; // Handled separately
+    if (l.type === "character_sheet") return false; // Handled separately
     return l.alwaysOn === true;
   });
 
@@ -640,6 +655,7 @@ export function buildInfoMessage(
       (l) =>
         l.enabled !== false &&
         l.type !== "mechanics" && // Mechanics handled separately
+        l.type !== "character_sheet" && // Character sheet handled separately
         !l.alwaysOn && // Not already in alwaysOnLore
         embeddingLoreTitles.has(l.title.toLowerCase())
     );
@@ -651,6 +667,7 @@ export function buildInfoMessage(
     const baseLore = storyData.lore.filter((l) => {
       if (l.enabled === false) return false;
       if (l.type === "mechanics") return false; // Mechanics handled separately
+      if (l.type === "character_sheet") return false; // Character sheet handled separately
       if (l.alwaysOn) return true;
       const wasRevealed = storyData.scene.parts.some((p) =>
         p.revealedLore?.some(
@@ -663,6 +680,7 @@ export function buildInfoMessage(
     const triggerLore = storyData.lore.filter((l) => {
       if (l.enabled === false) return false;
       if (l.type === "mechanics") return false; // Mechanics handled separately
+      if (l.type === "character_sheet") return false; // Character sheet handled separately
       if (l.alwaysOn) return false; // Already in baseLore
       const wasRevealed = storyData.scene.parts.some((p) =>
         p.revealedLore?.some(
@@ -680,9 +698,9 @@ export function buildInfoMessage(
   }
 
   const loreSection = activeLore.length
-    ? `## Notes/Lore\n----\n${activeLore
+    ? `## Notes/Lore\n${activeLore
         .map((l) => `${l.title}\n${cleanString(l.content)}`)
-        .join("\n----\n")}`
+        .join("\n")}`
     : "";
 
   // Build memory section - use embeddings if available
@@ -795,140 +813,6 @@ ${
 }`
       : "";
 
-  // Build character schema section if using new system
-  let characterSchemaSection = "";
-  if (storyData.characterSchema && storyData.characterData) {
-    const schema = storyData.characterSchema;
-    const charData = storyData.characterData;
-
-    // Group fields by category
-    const fieldsByCategory: Record<string, string[]> = {};
-    const uncategorized: string[] = [];
-
-    // Get category order from schema.categories
-    const categoryOrder: Record<string, number> = {};
-    if (schema.categories) {
-      schema.categories.forEach((cat, index) => {
-        categoryOrder[cat.id] = cat.order ?? index;
-      });
-    }
-
-    // Helper to format a field value with optional description
-    const formatField = (
-      field: (typeof schema.fields)[0],
-      value: unknown
-    ): string | null => {
-      const desc = field.description ? ` (${field.description})` : "";
-      switch (field.type) {
-        case "number": {
-          return `${field.name}: ${value}${desc}`;
-        }
-        case "derived": {
-          const numVal = typeof value === "number" ? value : 0;
-          const displayVal = numVal >= 0 ? `+${numVal}` : String(numVal);
-          return `${field.name}: ${displayVal}${desc}`;
-        }
-        case "resource":
-          if (typeof value === "object" && value && "current" in value) {
-            const res = value as { current: number; max: number };
-            return `${field.name}: ${res.current}/${res.max}${desc}`;
-          }
-          return null;
-        case "boolean":
-          return `${field.name}: ${value ? "Yes" : "No"}${desc}`;
-        case "list":
-          if (Array.isArray(value) && value.length > 0) {
-            // For lists, put description before the items
-            const header = `${field.name}${desc}:`;
-            return `${header}\n${value
-              .map((item) => {
-                if (typeof item === "object" && item !== null) {
-                  // Format object items nicely: use 'name' field if available, else show key-value pairs
-                  const obj = item as Record<string, unknown>;
-                  if (obj.name) {
-                    // Show name plus any other relevant fields
-                    const extras: string[] = [];
-                    if (obj.description) extras.push(String(obj.description));
-                    if (obj.quantity && Number(obj.quantity) > 1)
-                      extras.push(`x${obj.quantity}`);
-                    if (obj.stat) extras.push(`+${obj.stat}`);
-                    return `  • ${obj.name}${
-                      extras.length ? ` (${extras.join(", ")})` : ""
-                    }`;
-                  }
-                  // Fallback: show key-value pairs
-                  const pairs = Object.entries(obj)
-                    .filter(
-                      ([_, v]) => v !== undefined && v !== null && v !== ""
-                    )
-                    .map(([k, v]) => `${k}: ${v}`)
-                    .join(", ");
-                  return `  • ${pairs}`;
-                }
-                return `  • ${item}`;
-              })
-              .join("\n")}`;
-          }
-          return null;
-        case "select":
-        case "text":
-          if (value) return `${field.name}: ${value}${desc}`;
-          return null;
-        default:
-          return null;
-      }
-    };
-
-    for (const field of schema.fields) {
-      const value = charData.values[field.id];
-      if (value === undefined) continue;
-
-      const formatted = formatField(field, value);
-      if (!formatted) continue;
-
-      if (field.category) {
-        if (!fieldsByCategory[field.category]) {
-          fieldsByCategory[field.category] = [];
-        }
-        fieldsByCategory[field.category].push(formatted);
-      } else {
-        uncategorized.push(formatted);
-      }
-    }
-
-    // Build the section with categories as h3 headers
-    const sectionParts: string[] = [];
-    sectionParts.push(`## Character (${schema.name})`);
-
-    // Sort categories by order
-    const sortedCategories = Object.keys(fieldsByCategory).sort((a, b) => {
-      const orderA = categoryOrder[a] ?? 999;
-      const orderB = categoryOrder[b] ?? 999;
-      return orderA - orderB;
-    });
-
-    // Add categorized fields
-    for (const categoryId of sortedCategories) {
-      const categoryName =
-        schema.categories?.find((c) => c.id === categoryId)?.name || categoryId;
-      const fields = fieldsByCategory[categoryId];
-      sectionParts.push(`### ${categoryName}`);
-      sectionParts.push(fields.join("\n"));
-    }
-
-    // Add uncategorized fields at the end
-    if (uncategorized.length > 0) {
-      if (sortedCategories.length > 0) {
-        sectionParts.push(`### Other`);
-      }
-      sectionParts.push(uncategorized.join("\n"));
-    }
-
-    if (sortedCategories.length > 0 || uncategorized.length > 0) {
-      characterSchemaSection = sectionParts.join("\n");
-    }
-  }
-
   // Combine all sections
   const sections = [
     `# ${cleanString(storyData.story_name || "Untitled Story")}`,
@@ -938,15 +822,13 @@ ${
         ? ` - ${cleanString(storyData.player_summary)}`
         : ""
     }`,
-    // Only show RPG system if NOT using character schema (legacy mode)
-    !storyData.characterSchema && rpgSystem.id !== "3d6"
+    rpgSystem.id !== "3d6"
       ? `**RPG System:** ${rpgSystem.name} - ${rpgSystem.description}`
       : "",
-    characterSchemaSection, // New character schema section (if using new system)
-    mechanicsSection, // Mechanics lore entries - prioritized first
-    // Only show legacy stats/resources if NOT using character schema
-    !storyData.characterSchema ? statsSection : "",
-    !storyData.characterSchema ? resourcesSection : "",
+    characterSheetSection, // Character sheet - highest priority, at the very top
+    mechanicsSection, // Mechanics lore entries - prioritized second
+    statsSection,
+    resourcesSection,
     achievementsSection,
     loreSection,
     memorySection,
@@ -976,50 +858,50 @@ ${
 }
 
 // Stage 1: Story narration only
-// Uses 75% of available context for story history, 25% for info (lore, memory, stats, etc.)
+// Story Stage is now a "translator" - GM Stage does the heavy lifting
+// Uses fixed smaller context budget since it just needs recent parts + GM output
 export function buildStoryPrompt({
   storyData,
   userChoice,
   commandResponses,
   modelName = "Deepseek Chat",
-  customMaxContext,
+  customMaxContext, // DEPRECATED: Story stage now uses fixed budget. Kept for backward compat.
   customMaxOutput,
   embeddingContext,
   usePrefill = true,
   gmStoryContext,
   gmThinking,
+  gmInterleavedConversation, // NEW: Full interleaved GM conversation (preferred over gmThinking + gmStoryContext)
 }: {
   storyData: StoryData;
   userChoice?: string;
   commandResponses?: CommandResponse[];
   modelName?: string;
-  customMaxContext?: number;
+  customMaxContext?: number; // Deprecated - story stage uses fixed budget now
   customMaxOutput?: number;
   embeddingContext?: EmbeddingContext;
   usePrefill?: boolean;
-  gmStoryContext?: string; // Context from GM stage (tool results, final summary)
-  gmThinking?: string[]; // Full GM reasoning chain of thought
+  gmStoryContext?: string; // DEPRECATED: Context from GM stage (tool results, final summary)
+  gmThinking?: string[]; // DEPRECATED: Full GM reasoning chain of thought
+  gmInterleavedConversation?: string; // NEW: Full interleaved GM conversation (thinking + tool results + summary)
 }): { messages: ChatMessage[]; prunedParts: number } {
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
-  // Get model's context limit
+  // Get model's context limit (used as ceiling only)
   const modelConfig = getModelConfig(modelName);
-  let effectiveMaxTokens = modelConfig.maxTokens;
+  const modelMaxTokens = modelConfig.maxTokens;
 
-  // Apply custom max context if set and smaller than model's limit
-  if (
-    customMaxContext &&
-    customMaxContext > 0 &&
-    customMaxContext < effectiveMaxTokens
-  ) {
-    effectiveMaxTokens = customMaxContext;
-  }
+  // Story stage uses FIXED smaller context - it's just a translator now
+  // The Memory Size slider now controls GM Stage context, not Story Stage
+  // Use the smaller of: fixed budget OR model's actual limit
+  const effectiveMaxTokens = Math.min(STORY_STAGE_TOKEN_BUDGET, modelMaxTokens);
 
   // Use custom max output if provided, otherwise use model's default
   const actualMaxOutput = customMaxOutput || modelConfig.maxOutputTokens;
   const maxContextTokens = effectiveMaxTokens - actualMaxOutput;
 
-  // Allocate 75% for story history, 25% for info (system prompt + info message)
+  // Allocate 75% for story history, 25% for info (system prompt + GM context)
+  // Note: Most "info" now comes from GM Stage, so this is lighter than before
   const storyBudget = Math.floor(maxContextTokens * 0.75);
   const infoBudget = Math.floor(maxContextTokens * 0.25);
 
@@ -1311,38 +1193,48 @@ NOW WRITE THE NARRATIVE.`;
     // Player's action with [PLAYER] tag (matches older turn format)
     choiceMessage += `[PLAYER] ${userChoice}`;
 
-    // Append full GAME MASTER reasoning chain (the thinking/chain of thought)
-    // This is crucial - the story stage needs to see the full reasoning to understand context
-    if (gmThinking && gmThinking.length > 0) {
-      const formattedThinking = gmThinking
-        .map((t) => {
-          const trimmed = t.trim();
-          // Only add [GAME MASTER] prefix if not already present
-          return trimmed.startsWith("[GAME MASTER]") ||
-            trimmed.startsWith("[GM]")
-            ? trimmed.replace(/^\[GM\]/, "[GAME MASTER]")
-            : `[GAME MASTER]\n${trimmed}`;
-        })
-        .join("\n\n");
-      choiceMessage += `\n\n${formattedThinking}`;
-    }
+    // NEW: Use interleaved conversation if available (preferred)
+    // This preserves the exact order: thinking -> tool results -> thinking -> tool results -> summary
+    if (gmInterleavedConversation) {
+      choiceMessage += `\n\n${gmInterleavedConversation}`;
+      console.log(
+        `[buildStoryPrompt] User message with interleaved GM conversation: ${gmInterleavedConversation.length} chars`
+      );
+    } else {
+      // LEGACY FALLBACK: Use separate gmThinking + gmStoryContext (old behavior)
+      // Append full GAME MASTER reasoning chain (the thinking/chain of thought)
+      // This is crucial - the story stage needs to see the full reasoning to understand context
+      if (gmThinking && gmThinking.length > 0) {
+        const formattedThinking = gmThinking
+          .map((t) => {
+            const trimmed = t.trim();
+            // Only add [GAME MASTER] prefix if not already present
+            return trimmed.startsWith("[GAME MASTER]") ||
+              trimmed.startsWith("[GM]")
+              ? trimmed.replace(/^\[GM\]/, "[GAME MASTER]")
+              : `[GAME MASTER]\n${trimmed}`;
+          })
+          .join("\n\n");
+        choiceMessage += `\n\n${formattedThinking}`;
+      }
 
-    // Append tool results and final summary from gmStoryContext
-    if (gmStoryContext) {
-      // Ensure it has the [GAME MASTER] header
-      const formattedContext = gmStoryContext.startsWith("[GAME MASTER]")
-        ? gmStoryContext
-        : gmStoryContext.startsWith("[GM")
-        ? gmStoryContext.replace(/^\[GM[^\]]*\]/, "[GAME MASTER]")
-        : `[GAME MASTER]\n${gmStoryContext}`;
-      choiceMessage += `\n\n${formattedContext}`;
-    }
+      // Append tool results and final summary from gmStoryContext
+      if (gmStoryContext) {
+        // Ensure it has the [GAME MASTER] header
+        const formattedContext = gmStoryContext.startsWith("[GAME MASTER]")
+          ? gmStoryContext
+          : gmStoryContext.startsWith("[GM")
+          ? gmStoryContext.replace(/^\[GM[^\]]*\]/, "[GAME MASTER]")
+          : `[GAME MASTER]\n${gmStoryContext}`;
+        choiceMessage += `\n\n${formattedContext}`;
+      }
 
-    console.log(
-      `[buildStoryPrompt] User message with GM context - Thinking blocks: ${
-        gmThinking?.length || 0
-      }, StoryContext: ${gmStoryContext?.length || 0} chars`
-    );
+      console.log(
+        `[buildStoryPrompt] User message with GM context (legacy) - Thinking blocks: ${
+          gmThinking?.length || 0
+        }, StoryContext: ${gmStoryContext?.length || 0} chars`
+      );
+    }
 
     historyMessages.push({
       role: "user",
@@ -1393,7 +1285,7 @@ NOW WRITE THE NARRATIVE.`;
       `[buildStoryPrompt] Pruned ${prunedParts} oldest parts to fit context budget. Kept ${prunedHistory.length} parts.`
     );
     console.log(
-      `[buildStoryPrompt] Token budget: ${actualStoryBudget}, Used: ${currentTokens}, Info: ${infoTokens}`
+      `[buildStoryPrompt] Token budget: ${actualStoryBudget} (fixed ${STORY_STAGE_TOKEN_BUDGET}), Used: ${currentTokens}, Info: ${infoTokens}`
     );
   }
 
@@ -2242,43 +2134,76 @@ const GM_FEW_SHOT_END_TOOL_CALL = {
  * Build the GM stage prompt for determining game mechanics
  * This stage runs BEFORE the story stage and uses tool calls instead of JSON output
  *
- * Supports two modes:
- * 1. Legacy mode: Uses rpgSystem + stats for skill_check, opposed_check, etc.
- * 2. Schema mode: Uses characterSchema + characterData for formula_roll, opposed_formula, etc.
+ * Uses formula_roll, opposed_formula, etc. for dice mechanics with character sheet data.
+ *
+ * The GM Stage is the "brain" - it gets the Memory Size slider context (customMaxContext)
+ * because it needs to read mechanics notes, character sheets, lore, and understand the story.
  */
 export function buildGMStagePrompt({
   storyData,
   userChoice,
+  customMaxContext,
+  modelName = "Deepseek Chat",
 }: {
   storyData: StoryData;
   userChoice: string;
+  customMaxContext?: number; // Memory Size slider - this is the main context control now
+  modelName?: string; // Used to get model's actual context limit
 }): { messages: ChatMessage[]; tools: any[] } {
   const difficulty = storyData.difficulty || "medium";
 
   // Import GM tools dynamically to avoid circular deps
   const { GM_TOOL_SCHEMAS } = require("./gmTools");
 
-  // Detect which mode we're in
-  const hasCharacterSchema = !!storyData.characterSchema;
-  const hasCharacterData = !!storyData.characterData;
-  const useSchemaMode = hasCharacterSchema && hasCharacterData;
+  // Calculate GM context budget from customMaxContext (Memory Size slider)
+  // This is where the real context allocation happens now
+  const modelConfig = getModelConfig(modelName);
+  const modelMaxTokens = modelConfig.maxTokens;
+  const maxOutputTokens = modelConfig.maxOutputTokens || 4000;
 
-  // Get recent story parts for context
-  const recentParts = getPartsWithinTokenBudget(
-    storyData.scene.parts,
-    ACTION_ANALYSIS_TOKEN_BUDGET
+  // Use customMaxContext if set, otherwise default budget, capped by model limit
+  const effectiveMaxTokens = Math.min(
+    customMaxContext && customMaxContext > 0
+      ? customMaxContext
+      : GM_STAGE_DEFAULT_BUDGET,
+    modelMaxTokens
   );
 
-  // Build lore/notes section for GM stage (mechanics and always-on lore)
-  // GM needs to know game rules and important world details for setting DCs
+  // GM Stage gets all context minus output tokens
+  // Allocate: 60% for story history, 40% for lore/mechanics/game state
+  const totalContextBudget = effectiveMaxTokens - maxOutputTokens;
+  const historyBudget = Math.floor(totalContextBudget * 0.6);
+  const infoBudget = Math.floor(totalContextBudget * 0.4);
+
+  // Get recent story parts for context - now uses the calculated history budget
+  const recentParts = getPartsWithinTokenBudget(
+    storyData.scene.parts,
+    historyBudget
+  );
+
+  // Build lore/notes section for GM stage (character sheet, mechanics, and always-on lore)
+  // GM needs to know character details, game rules and important world details for setting DCs
+  const characterSheetLore = (storyData.lore || []).filter(
+    (l) => l.enabled !== false && l.type === "character_sheet"
+  );
   const mechanicsLore = (storyData.lore || []).filter(
     (l) => l.enabled !== false && l.type === "mechanics"
   );
   const alwaysOnLore = (storyData.lore || []).filter(
-    (l) => l.enabled !== false && l.type !== "mechanics" && l.alwaysOn === true
+    (l) =>
+      l.enabled !== false &&
+      l.type !== "mechanics" &&
+      l.type !== "character_sheet" &&
+      l.alwaysOn === true
   );
 
   let loreSection = "";
+  if (characterSheetLore.length > 0) {
+    loreSection += `## CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\n`;
+    for (const l of characterSheetLore) {
+      loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
+    }
+  }
   if (mechanicsLore.length > 0) {
     loreSection += `## GAME RULES & MECHANICS\nThese rules define how the game works. Use them to set appropriate DCs and determine what actions are possible.\n`;
     for (const l of mechanicsLore) {
@@ -2298,494 +2223,56 @@ export function buildGMStagePrompt({
   // Format timers state for context
   const timersSection = formatTimersState(storyData.timers);
 
-  let systemPrompt: string;
-  let toolsToUse: any[];
+  // Use stat-based tools with RPG system
+  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
-  if (useSchemaMode) {
-    // ============================================
-    // SCHEMA MODE: Use formula-based tools
-    // ============================================
-    const schema = storyData.characterSchema!;
-    const charData = storyData.characterData!;
+  // Build stat list with descriptions
+  const statList = (storyData.stats || [])
+    .map(
+      (s) =>
+        `${s.name}: ${s.value}${s.description ? ` (${s.description})` : ""}`
+    )
+    .join(", ");
 
-    // Build character data summary for the AI - with categories and descriptions
-    // Group fields by category
-    const fieldsByCategory: Record<string, string[]> = {};
-    const uncategorized: string[] = [];
+  // Build resource list with descriptions
+  const resourceList = (storyData.resources || [])
+    .map(
+      (r) =>
+        `${r.name}: ${r.value}/${r.maxValue}${
+          r.description ? ` (${r.description})` : ""
+        }`
+    )
+    .join(", ");
 
-    // Get category order from schema.categories
-    const categoryOrder: Record<string, number> = {};
-    if (schema.categories) {
-      schema.categories.forEach((cat, index) => {
-        categoryOrder[cat.id] = cat.order ?? index;
-      });
-    }
+  // Build inventory list (only items that could be used in checks)
+  const usableItems = (storyData.inventory || [])
+    .filter((i) => i.type !== "misc" && i.quantity > 0)
+    .map((i) => {
+      const parts = [i.name];
+      if (i.grade && i.grade !== "common") parts.push(`(${i.grade})`);
+      if (i.durability !== undefined && i.maxDurability)
+        parts.push(`[${i.durability}/${i.maxDurability}]`);
+      return parts.join(" ");
+    })
+    .join(", ");
 
-    // Helper to format list items (handles objects properly)
-    const formatListItem = (item: unknown): string => {
-      if (typeof item === "object" && item !== null) {
-        const obj = item as Record<string, unknown>;
-        if (obj.name) {
-          // Show name plus any other relevant fields
-          const extras: string[] = [];
-          if (obj.description) extras.push(String(obj.description));
-          if (obj.quantity && Number(obj.quantity) > 1)
-            extras.push(`x${obj.quantity}`);
-          if (obj.stat) extras.push(`+${obj.stat}`);
-          if (obj.grade && obj.grade !== "common")
-            extras.push(String(obj.grade));
-          return `${obj.name}${extras.length ? ` (${extras.join(", ")})` : ""}`;
-        }
-        // Fallback: show key-value pairs
-        const pairs = Object.entries(obj)
-          .filter(([_, v]) => v !== undefined && v !== null && v !== "")
-          .map(([k, v]) => `${k}: ${v}`)
-          .join(", ");
-        return pairs;
+  // Build ability list (only ready abilities)
+  const readyAbilities = (storyData.abilities || [])
+    .filter((a) => !a.currentCooldown || a.currentCooldown === 0)
+    .map((a) => {
+      const parts = [a.name];
+      if (a.grade && a.grade !== "novice") parts.push(`(${a.grade})`);
+      if (a.cost && a.cost.length > 0) {
+        const costs = a.cost.map((c) => `${c.amount} ${c.name}`).join(", ");
+        parts.push(`[costs: ${costs}]`);
       }
-      return String(item);
-    };
+      return parts.join(" ");
+    })
+    .join(", ");
 
-    for (const field of schema.fields) {
-      const value = charData.values[field.id];
-      if (value === undefined) continue;
-
-      const desc = field.description ? ` (${field.description})` : "";
-      let formatted: string | null = null;
-
-      switch (field.type) {
-        case "number":
-        case "derived":
-          formatted = `${field.name}: ${value}${desc}`;
-          break;
-        case "resource":
-          if (typeof value === "object" && "current" in value) {
-            formatted = `${field.name}: ${value.current}/${value.max}${desc}`;
-          }
-          break;
-        case "boolean":
-          if (value === true) formatted = `${field.name}: ✓${desc}`;
-          break;
-        case "list":
-          if (Array.isArray(value) && value.length > 0) {
-            const items = value.map(formatListItem).join(", ");
-            formatted = `${field.name}: ${items}${desc}`;
-          }
-          break;
-        case "select":
-        case "text":
-          if (value) formatted = `${field.name}: ${value}${desc}`;
-          break;
-      }
-
-      if (formatted) {
-        if (field.category) {
-          if (!fieldsByCategory[field.category]) {
-            fieldsByCategory[field.category] = [];
-          }
-          fieldsByCategory[field.category].push(formatted);
-        } else {
-          uncategorized.push(formatted);
-        }
-      }
-    }
-
-    // Build the character section with category headers
-    const characterParts: string[] = [];
-
-    // Sort categories by order
-    const sortedCategories = Object.keys(fieldsByCategory).sort((a, b) => {
-      const orderA = categoryOrder[a] ?? 999;
-      const orderB = categoryOrder[b] ?? 999;
-      return orderA - orderB;
-    });
-
-    // Add categorized fields with headers
-    for (const categoryId of sortedCategories) {
-      const categoryName =
-        schema.categories?.find((c) => c.id === categoryId)?.name || categoryId;
-      const fields = fieldsByCategory[categoryId];
-      characterParts.push(`### ${categoryName}`);
-      characterParts.push(fields.join("\n"));
-    }
-
-    // Add uncategorized fields at the end
-    if (uncategorized.length > 0) {
-      if (sortedCategories.length > 0) {
-        characterParts.push(`### Other`);
-      }
-      characterParts.push(uncategorized.join("\n"));
-    }
-
-    const characterSummary =
-      characterParts.length > 0
-        ? characterParts.join("\n")
-        : "No character data";
-
-    systemPrompt = `You are an expert GAME MASTER AI for a custom RPG using the "${
-      schema.name
-    }" character system at ${difficulty} difficulty.
-
-You reason through complex situations with depth, fairness, and creativity. Your role is to analyze player actions, determine outcomes through dice mechanics, and orchestrate a living world.
-
-═══════════════════════════════════════════════════════════════
-CORE PRINCIPLES
-═══════════════════════════════════════════════════════════════
-
-• **Player Agency First** - Prioritize meaningful choice consequences over predetermined outcomes
-• **Chain-of-Thought Reasoning** - Use clear, step-by-step reasoning to justify all decisions
-• **Internal Consistency** - Honor established world rules, character histories, and prior decisions
-• **Fair Challenge** - Balance difficulty with fairness; avoid arbitrary punishments
-• **Probabilistic Thinking** - Weight outcomes toward narrative sense based on character capability
-• **Interesting Failure** - Generate failure modes that create new opportunities, not dead ends
-
-═══════════════════════════════════════════════════════════════
-YOUR REASONING PROCESS
-═══════════════════════════════════════════════════════════════
-
-When the player acts, reason through these steps IN YOUR THINKING:
-
-**1. UNDERSTAND THE ACTION**
-- What is the player actually trying to accomplish?
-- What are their explicit and implicit goals?
-- What skills, items, or traits are relevant to success?
-- What environmental factors could modify the outcome?
-
-**2. DETERMINE DIFFICULTY & PROBABILITY**
-- How challenging should this action be? (Trivial → Impossible)
-- Calculate success probability based on character capability and circumstances
-- Consider both success AND interesting failure modes
-- Does the action even require a roll? (Routine actions may auto-succeed)
-
-**3. PLAN CONSEQUENCES & BRANCHES**
-- If successful: What positive outcome occurs? What new complications arise?
-- If failed: Is this a simple failure or failure with twist? What opportunities emerge?
-- Consider short-term (immediate scene) and long-term (story ripples) consequences
-- Failure should reveal world truth, advance arcs, or deepen relationships
-
-**4. GENERATE NPC REACTIONS (if relevant)**
-- Their immediate emotional response
-- How their personality, goals, and relationships shape their reaction
-- What they do or say as a result
-- Whether this changes their dynamic with the player
-
-**5. CRAFT ENVIRONMENTAL CONSEQUENCES**
-- How does the world respond physically?
-- What sensory details emerge?
-- What new opportunities or threats are revealed?
-
-═══════════════════════════════════════════════════════════════
-⚠️ CRITICAL: READ THE GAME RULES FIRST!
-═══════════════════════════════════════════════════════════════
-
-**CAREFULLY READ the GAME RULES & MECHANICS section below.** Look for:
-1. **Roll direction**: Is success "roll UNDER skill" or "roll OVER DC"?
-   - Roll-under (BRP/CoC style): Use \`reverse_dc: true\` on formula_roll
-   - Roll-over (D&D style): Use \`reverse_dc: false\` or omit it
-2. **Difficulty modifiers**: How does the system handle easy/hard tasks?
-3. **Critical ranges**: What rolls trigger crits or fumbles?
-4. **Attribute bonuses**: How do stats modify rolls?
-5. **What to roll AGAINST**: Fixed DC or skill value itself?
-
-⚠️ **MANY CUSTOM SYSTEMS USE ROLL-UNDER!** Check the notes before rolling.
-⚠️ **FOLLOW CUSTOM RULES EXACTLY** - Don't substitute D&D/PbtA conventions.
-${loreSection ? `\n${loreSection}` : ""}
-═══════════════════════════════════════════════════════════════
-CHARACTER SYSTEM: ${schema.name}
-═══════════════════════════════════════════════════════════════
-${schema.description || "Custom character sheet system"}
-
-## CURRENT CHARACTER
-${characterSummary}
-${combatSection ? `\n${combatSection}` : ""}${
-      timersSection ? `\n${timersSection}` : ""
-    }
-⚠️ **CRITICAL: Use actual numeric values from the character sheet above!** When rolling dice, YOU must look up stat values and insert them directly (e.g., "1d20+3" not variables).
-
-═══════════════════════════════════════════════════════════════
-HOW THIS WORKS
-═══════════════════════════════════════════════════════════════
-
-1. **Think out loud** in [GAME MASTER] blocks - reason through the situation
-2. **Call tools** to roll dice, modify state, etc.
-3. **See results** and continue thinking/calling more tools if needed
-4. **Call end_gm_thinking** to finish and trigger the Story stage
-
-**Batch Wisely:**
-- ✅ GOOD: Roll attack AND damage together (independent)
-- ✅ GOOD: Roll multiple fate questions at once
-- ❌ BAD: Roll dice AND modify stats together (wait to see the outcome!)
-
-═══════════════════════════════════════════════════════════════
-TOOL REFERENCE
-═══════════════════════════════════════════════════════════════
-
-### 🎲 ROLLING TOOLS
-
-**formula_roll** - Roll dice formula vs optional DC
-- Example: "1d20+5+2" vs DC 15 (look up stat values and insert them)
-- **reverse_dc**: Set \`true\` for roll-under systems
-- Set stakes: low/medium/high/deadly (affects condition severity on failure)
-
-**formula_challenge_check** - Roll as part of active challenge
-**opposed_formula** - Player vs NPC contest
-**roll_dice** - Simple roll (damage, tables): "2d6+3", "1d100"
-**fate_question** - Yes/no oracle (likelihood: fifty_fifty, likely, unlikely, etc.)
-**roll_table** - Roll on custom adventure table
-
-### 🧮 CALCULATOR
-**calculate** - Evaluate math ("15 + 7" → 22). Use for all arithmetic!
-
-### 🔍 LOOKUP
-**search_notes** - Search mechanics notes (patterns: ["roll under", "bonus"])
-**search_memory** - Search story memory for past events
-
-### 📝 STATE (call AFTER seeing roll results)
-**Quests:** create_quest, complete_quest, fail_quest, update_quest, delete_quest
-**Fields:** modify_field, set_field, add_list_item, remove_list_item
-**Abilities:** add_ability, remove_ability, modify_ability, upgrade_ability, reset_ability_cooldown
-**Conditions:** upgrade_condition, downgrade_condition, remove_condition, modify_condition
-**Lore:** create_lore, show_lore, hide_lore, update_lore, delete_lore
-**Memory:** add_memory
-**Variables:** set_variable, modify_variable, toggle_variable, create_variable, delete_variable
-
-### ⚔️ COMBAT (for tactical multi-round fights)
-**start_combat** - Initialize tracking (NOT for quick narrative fights)
-**add_combatant** - Add participant with custom stats: { HP: 30, AC: 14 }
-**remove_combatant** - Remove from combat (dead/fled)
-**update_combatant_stat** - Modify stat: value=-8 (delta), "=20" (absolute)
-**add_combatant_condition** / **remove_combatant_condition** - Status effects
-**npc_roll** - Roll for NPC: npc_roll(combatant="Goblin", formula="1d20+3", dc=14)
-**advance_turn** - Next in initiative order
-**end_combat** - End and sync player stats (outcome: victory/defeat/fled/truce)
-
-### ⏱️ COUNTDOWN TIMERS (for deadline tension)
-**create_timer** - Start a countdown: name, ticks, description, auto_advance (default true)
-  - Auto-advance: Ticks down each GM turn automatically
-  - Manual: Only ticks when you call advance_timer
-  - Visibility: "visible" (player sees) or "hidden" (DM only)
-**advance_timer** - Manually tick down: timer name, ticks (default 1)
-**pause_timer** / **resume_timer** - Temporarily halt a timer
-**cancel_timer** - End without triggering (threat neutralized)
-**trigger_timer** - Force early trigger (bomb detonates NOW)
-When timer reaches 0, you'll see "[⏰ TIMER TRIGGERED]" - narrate the consequence!
-
-### 🎲 GROUP CHECKS (party-wide tests)
-**group_check** - Multiple rolls, majority wins: stat, difficulty, participants, reason
-  - threshold: successes needed (default: majority, e.g., 3 of 5)
-  - show_individual_rolls: false to hide individual results
-Use for: stealth as a party, survival trek, group perception, social reception
-
-### 🎮 FLOW CONTROL
-**start_challenge** - Begin multi-round challenge
-**take_rest** - Player rests (quick/short/long)
-**ask_player** - Need player input before proceeding
-
-### ✅ TERMINAL (required to finish)
-**end_gm_thinking** - Summarize results, set outcome (success/failure/mixed/neutral)
-
-═══════════════════════════════════════════════════════════════
-EXAMPLE GAME MASTER TURN
-═══════════════════════════════════════════════════════════════
-
-\`\`\`
-[GAME MASTER]
-**1. UNDERSTANDING THE ACTION**
-The player wants to attack the goblin with their sword. This is straightforward melee combat.
-
-**2. DETERMINING DIFFICULTY**
-The goblin is AC 14 (leather armor, small and agile). Looking at the character sheet:
-- STR is 16, so STR modifier = floor((16-10)/2) = +3
-- Proficiency bonus is +2
-Total attack bonus: +5
-
-**3. PLANNING CONSEQUENCES**
-- Success: The sword connects. I'll roll damage (1d8+3) and describe the wound.
-- Failure: The goblin dodges or parries. It will counterattack on its turn.
-
-Rolling attack and damage together since I need both for the narrative:
-\`\`\`
-
-*Calls: formula_roll("1d20+5", dc=14, reason="Attack goblin"), roll_dice("1d8+3", reason="Longsword damage")*
-
-\`\`\`
-[GAME MASTER]
-Attack: 18 vs DC 14 = HIT (+4 margin)
-Damage: 7 slashing
-
-The goblin had 6 HP - it's down. A clean kill with the decisive blow.
-\`\`\`
-
-*Calls: end_gm_thinking(summary="Attack hit (18 vs 14), dealt 7 damage, goblin defeated", outcome="success")*
-
-═══════════════════════════════════════════════════════════════
-IMPORTANT RULES
-═══════════════════════════════════════════════════════════════
-
-• **Always call end_gm_thinking** to finish - the loop continues without it
-• **Batch rolling tools** when results don't affect each other
-• **Don't batch state changes with rolls** - wait to see outcomes first
-• **Use calculate** for any math - don't do arithmetic in your head
-• **Passives lower difficulty**, they don't add numerical bonuses`;
-
-    // Filter tools for schema mode - include GM tools + state tools
-    const schemaToolNames = [
-      // Rolling tools
-      "formula_roll",
-      "opposed_formula",
-      "formula_challenge_check",
-      "roll_dice",
-      "fate_question",
-      "roll_table",
-      // Calculator
-      "calculate",
-      // Lookup
-      "search_notes",
-      "search_memory",
-      // Flow control
-      "start_challenge",
-      "take_rest",
-      "ask_player",
-      // Combat tools
-      "start_combat",
-      "add_combatant",
-      "remove_combatant",
-      "update_combatant_stat",
-      "add_combatant_condition",
-      "remove_combatant_condition",
-      "npc_roll",
-      "advance_turn",
-      "end_combat",
-      // Timer tools
-      "create_timer",
-      "advance_timer",
-      "pause_timer",
-      "resume_timer",
-      "cancel_timer",
-      "trigger_timer",
-      // Group check
-      "group_check",
-      // Terminal
-      "end_gm_thinking",
-    ];
-
-    // Import state tools to merge with GM tools
-    const { TOOL_SCHEMAS } = require("./toolSchemas");
-    const stateToolNames = [
-      // Quest tools
-      "create_quest",
-      "complete_quest",
-      "fail_quest",
-      "update_quest",
-      "delete_quest",
-      // Ability tools
-      "add_ability",
-      "remove_ability",
-      "modify_ability",
-      "upgrade_ability",
-      "reset_ability_cooldown",
-      // Passive tools
-      "add_passive",
-      "remove_passive",
-      "modify_passive",
-      // Character field tools (schema mode)
-      "modify_field",
-      "set_field",
-      "add_list_item",
-      "remove_list_item",
-      // Achievement
-      "trigger_achievement",
-      // Lore tools
-      "create_lore",
-      "delete_lore",
-      "show_lore",
-      "hide_lore",
-      "update_lore",
-      // Memory
-      "add_memory",
-      // Condition tools (no add_condition - that happens via stakes)
-      "upgrade_condition",
-      "downgrade_condition",
-      "remove_condition",
-      "modify_condition",
-      // Variable tools
-      "set_variable",
-      "modify_variable",
-      "toggle_variable",
-      "add_to_list",
-      "remove_from_list",
-      "clear_list",
-      "create_variable",
-      "delete_variable",
-      // Thread tools
-      "create_thread",
-      "update_thread",
-      "resolve_thread",
-      "abandon_thread",
-      // Momentum
-      "modify_momentum",
-    ];
-
-    const gmTools = GM_TOOL_SCHEMAS.filter((t: any) =>
-      schemaToolNames.includes(t.function.name)
-    );
-    const stateTools = TOOL_SCHEMAS.filter((t: any) =>
-      stateToolNames.includes(t.function.name)
-    );
-    toolsToUse = [...gmTools, ...stateTools];
-  } else {
-    // ============================================
-    // LEGACY MODE: Use stat-based tools
-    // ============================================
-    const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
-
-    // Build stat list with descriptions
-    const statList = (storyData.stats || [])
-      .map(
-        (s) =>
-          `${s.name}: ${s.value}${s.description ? ` (${s.description})` : ""}`
-      )
-      .join(", ");
-
-    // Build resource list with descriptions
-    const resourceList = (storyData.resources || [])
-      .map(
-        (r) =>
-          `${r.name}: ${r.value}/${r.maxValue}${
-            r.description ? ` (${r.description})` : ""
-          }`
-      )
-      .join(", ");
-
-    // Build inventory list (only items that could be used in checks)
-    const usableItems = (storyData.inventory || [])
-      .filter((i) => i.type !== "misc" && i.quantity > 0)
-      .map((i) => {
-        const parts = [i.name];
-        if (i.grade && i.grade !== "common") parts.push(`(${i.grade})`);
-        if (i.durability !== undefined && i.maxDurability)
-          parts.push(`[${i.durability}/${i.maxDurability}]`);
-        return parts.join(" ");
-      })
-      .join(", ");
-
-    // Build ability list (only ready abilities)
-    const readyAbilities = (storyData.abilities || [])
-      .filter((a) => !a.currentCooldown || a.currentCooldown === 0)
-      .map((a) => {
-        const parts = [a.name];
-        if (a.grade && a.grade !== "novice") parts.push(`(${a.grade})`);
-        if (a.cost && a.cost.length > 0) {
-          const costs = a.cost.map((c) => `${c.amount} ${c.name}`).join(", ");
-          parts.push(`[costs: ${costs}]`);
-        }
-        return parts.join(" ");
-      })
-      .join(", ");
-
-    systemPrompt = `You are an expert GAME MASTER AI for a ${rpgSystem.name} (${
-      rpgSystem.id
-    }) game at ${difficulty} difficulty.
+  const systemPrompt = `You are an expert GAME MASTER AI for a ${
+    rpgSystem.name
+  } (${rpgSystem.id}) game at ${difficulty} difficulty.
 
 You reason through complex situations with depth, fairness, and creativity. Your role is to analyze player actions, determine outcomes through dice mechanics, and orchestrate a living world.
 
@@ -2861,8 +2348,8 @@ ${rpgSystem.aiInstructions.dcGuidelines}
 **Usable Items:** ${usableItems || "None"}
 **Ready Abilities:** ${readyAbilities || "None"}
 ${combatSection ? `\n${combatSection}` : ""}${
-      timersSection ? `\n${timersSection}` : ""
-    }
+    timersSection ? `\n${timersSection}` : ""
+  }
 ⚠️ **CRITICAL: You may ONLY use stats that appear in the Stats list above.** Do NOT invent stats like "Perception", "Stealth", etc. if they are not listed.
 
 ═══════════════════════════════════════════════════════════════
@@ -2885,12 +2372,13 @@ TOOL REFERENCE
 
 ### 🎲 ROLLING TOOLS
 
-**skill_check** - Player attempts something risky
-- Match stat to action, set difficulty tier or DC
-- Set stakes: low/medium/high/deadly (affects condition severity on failure)
+**formula_roll** - Player attempts something risky
+- Build dice formula with character data values (e.g., "1d20+3+2" for attack)
+- Set dc, stakes (low/medium/high/deadly), consequences
+- Use reverse_dc=true for roll-under systems (BRP, CoC)
 
-**challenge_check** - Roll as part of active challenge
-**opposed_check** - Player vs NPC (opponent skill: 30=novice, 50=competent, 70=skilled, 90=master)
+**formula_challenge_check** - Roll as part of active challenge
+**opposed_formula** - Player vs NPC contested roll (both sides roll formulas)
 **roll_dice** - Simple roll (damage, tables): "2d6+3", "1d100"
 **fate_question** - Yes/no oracle (likelihood: fifty_fifty, likely, unlikely, etc.)
 **roll_table** - Roll on custom adventure table
@@ -2906,7 +2394,6 @@ TOOL REFERENCE
 **Quests:** create_quest, complete_quest, fail_quest, update_quest, delete_quest
 **Items:** add_item, remove_item
 **Abilities:** add_ability, remove_ability, modify_ability, upgrade_ability, reset_ability_cooldown
-**Stats/Resources:** modify_stat, modify_resource
 **Conditions:** upgrade_condition, downgrade_condition, remove_condition, modify_condition
 **Lore:** create_lore, show_lore, hide_lore, update_lore, delete_lore
 **Memory:** add_memory
@@ -2958,24 +2445,25 @@ The player wants to pick the lock on the merchant's strongbox. They're trying to
 
 **2. DETERMINING DIFFICULTY**
 - The lock is a standard commercial lock, not a masterwork
-- They have Dexterity: 65, which is quite capable
+- Character has Dexterity 16, which gives +3 modifier
+- They're proficient (+2) in Thieves' Tools
 - It's nighttime and quiet - failure could be noisy
-- Difficulty: Average - a competent thief should manage this
+- DC 12 seems appropriate for a standard lock
 
 **3. PLANNING CONSEQUENCES**
 - Success: The lock opens silently. They gain access to the contents.
 - Failure: The lock holds. Worse, the picks scrape loudly - do guards hear?
 \`\`\`
 
-*Calls: skill_check(stat="Dexterity", difficulty="average", reason="Pick the lock silently")*
+*Calls: formula_roll(formula="1d20+3+2", dc=12, reason="Pick the lock silently", stakes="medium", consequences={success: "Lock opens", failure: "Lock holds, makes noise"})*
 
 \`\`\`
 [GAME MASTER]
-Roll: 42 vs DC 50 = SUCCESS (+8 margin)
+Roll: 17 vs DC 12 = SUCCESS (+5 margin)
 Clean work - the lock clicks open without a sound. Now they can see what's inside.
 \`\`\`
 
-*Calls: end_gm_thinking(summary="Lockpicking succeeded (42 vs 50), strongbox opens silently", outcome="success")*
+*Calls: end_gm_thinking(summary="Lockpicking succeeded (17 vs 12), strongbox opens silently", outcome="success")*
 
 ═══════════════════════════════════════════════════════════════
 IMPORTANT RULES
@@ -2988,110 +2476,109 @@ IMPORTANT RULES
 • **Passives lower difficulty**, they don't add numerical bonuses
 • **Item/Ability bonuses are calculated by the frontend** - just specify what's used`;
 
-    // Use legacy tools + state tools
-    const legacyToolNames = [
-      // Rolling tools
-      "skill_check",
-      "challenge_check",
-      "opposed_check",
-      "roll_dice",
-      "fate_question",
-      "roll_table",
-      // Calculator
-      "calculate",
-      // Lookup
-      "search_notes",
-      "search_memory",
-      // Flow control
-      "start_challenge",
-      "take_rest",
-      "ask_player",
-      // Combat tools
-      "start_combat",
-      "add_combatant",
-      "remove_combatant",
-      "update_combatant_stat",
-      "add_combatant_condition",
-      "remove_combatant_condition",
-      "npc_roll",
-      "advance_turn",
-      "end_combat",
-      // Timer tools
-      "create_timer",
-      "advance_timer",
-      "pause_timer",
-      "resume_timer",
-      "cancel_timer",
-      "trigger_timer",
-      // Group check
-      "group_check",
-      // Terminal
-      "end_gm_thinking",
-    ];
+  // Use tools + state tools
+  const legacyToolNames = [
+    // Rolling tools (formula-based)
+    "formula_roll",
+    "formula_challenge_check",
+    "opposed_formula",
+    "roll_dice",
+    "fate_question",
+    "roll_table",
+    // Calculator
+    "calculate",
+    // Lookup
+    "search_notes",
+    "search_memory",
+    // Flow control
+    "start_challenge",
+    "take_rest",
+    "ask_player",
+    // Combat tools
+    "start_combat",
+    "add_combatant",
+    "remove_combatant",
+    "update_combatant_stat",
+    "add_combatant_condition",
+    "remove_combatant_condition",
+    "npc_roll",
+    "advance_turn",
+    "end_combat",
+    // Timer tools
+    "create_timer",
+    "advance_timer",
+    "pause_timer",
+    "resume_timer",
+    "cancel_timer",
+    "trigger_timer",
+    // Group check
+    "group_check",
+    // Terminal
+    "end_gm_thinking",
+  ];
 
-    // Import state tools to merge with GM tools
-    const { TOOL_SCHEMAS } = require("./toolSchemas");
-    const stateToolNames = [
-      // Quest tools
-      "create_quest",
-      "complete_quest",
-      "fail_quest",
-      "update_quest",
-      "delete_quest",
-      // Item tools
-      "add_item",
-      "remove_item",
-      // Ability tools
-      "add_ability",
-      "remove_ability",
-      "modify_ability",
-      "upgrade_ability",
-      "reset_ability_cooldown",
-      // Passive tools
-      "add_passive",
-      "remove_passive",
-      "modify_passive",
-      // Achievement
-      "trigger_achievement",
-      // Lore tools
-      "create_lore",
-      "delete_lore",
-      "show_lore",
-      "hide_lore",
-      "update_lore",
-      // Memory
-      "add_memory",
-      // Condition tools (no add_condition - that happens via stakes)
-      "upgrade_condition",
-      "downgrade_condition",
-      "remove_condition",
-      "modify_condition",
-      // Variable tools
-      "set_variable",
-      "modify_variable",
-      "toggle_variable",
-      "add_to_list",
-      "remove_from_list",
-      "clear_list",
-      "create_variable",
-      "delete_variable",
-      // Thread tools
-      "create_thread",
-      "update_thread",
-      "resolve_thread",
-      "abandon_thread",
-      // Momentum
-      "modify_momentum",
-    ];
+  // Import state tools to merge with GM tools
+  const { TOOL_SCHEMAS } = require("./toolSchemas");
+  const stateToolNames = [
+    // Quest tools
+    "create_quest",
+    "complete_quest",
+    "fail_quest",
+    "update_quest",
+    "delete_quest",
+    // Item tools
+    "add_item",
+    "remove_item",
+    // Ability tools
+    "add_ability",
+    "remove_ability",
+    "modify_ability",
+    "upgrade_ability",
+    "reset_ability_cooldown",
+    // Passive tools
+    "add_passive",
+    "remove_passive",
+    "modify_passive",
+    // Achievement
+    "trigger_achievement",
+    // Lore tools
+    "create_lore",
+    "delete_lore",
+    "show_lore",
+    "hide_lore",
+    "update_lore",
+    // Memory
+    "add_memory",
+    // Condition tools (no add_condition - that happens via stakes)
+    "upgrade_condition",
+    "downgrade_condition",
+    "remove_condition",
+    "modify_condition",
+    // Variable tools
+    "set_variable",
+    "modify_variable",
+    "toggle_variable",
+    "add_to_list",
+    "remove_from_list",
+    "clear_list",
+    "create_variable",
+    "delete_variable",
+    // Thread tools
+    "create_thread",
+    "update_thread",
+    "resolve_thread",
+    "abandon_thread",
+    // Momentum
+    "modify_momentum",
+  ];
 
-    const gmTools = GM_TOOL_SCHEMAS.filter((t: any) =>
-      legacyToolNames.includes(t.function.name)
-    );
-    const stateTools = TOOL_SCHEMAS.filter((t: any) =>
-      stateToolNames.includes(t.function.name)
-    );
-    toolsToUse = [...gmTools, ...stateTools];
-  }
+  const gmTools = GM_TOOL_SCHEMAS.filter((t: any) =>
+    legacyToolNames.includes(t.function.name)
+  );
+  const stateTools = TOOL_SCHEMAS.filter((t: any) =>
+    stateToolNames.includes(t.function.name)
+  );
+  const toolsToUse = [...gmTools, ...stateTools];
 
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
@@ -3138,61 +2625,225 @@ Now here is the ACTUAL game you are GMing. Read the mechanics notes carefully!`)
   });
 
   // Build chat history from scene parts
-  // This gives the GM better context about the ongoing story
-  // IMPORTANT: Exclude the last user part since userChoice is added separately below
-  // This prevents the player's action from appearing twice in the context
+  // GM Stage needs to see its own reasoning and tool calls from previous turns
+  // Format: user choice → GM thinking + tool calls → story output (summarized)
+  // Then next user choice continues the pattern
   const partsToInclude = [...recentParts];
+
+  // Helper to normalize user choice for comparison
+  // Strips >, [Voice Input...] tags, skill check brackets, etc.
+  const normalizeForComparison = (text: string) => {
+    return text
+      .replace(/^>\s*/, "") // Remove leading >
+      .replace(/\[Voice Input[^\]]*\]/gi, "") // Remove voice input tag
+      .replace(/\[[^\]]+:\s*[^\]]+\]/g, "") // Remove skill check brackets like [Perception: 25]
+      .trim()
+      .split("\n")[0] // Just the first line (the actual action)
+      .trim();
+  };
+
+  // Remove the last user part if it matches current userChoice (will be added separately)
   if (
     partsToInclude.length > 0 &&
     partsToInclude[partsToInclude.length - 1].user
   ) {
-    // Check if the last part matches the current user choice
     const lastPart = partsToInclude[partsToInclude.length - 1];
-    const lastPartContent = lastPart.content.replace(/^>\s*/, "").trim();
-    const userChoiceNormalized = userChoice.replace(/^>\s*/, "").trim();
-    if (lastPartContent === userChoiceNormalized) {
-      partsToInclude.pop(); // Remove the duplicate user part
+    const lastPartNormalized = normalizeForComparison(lastPart.content);
+    const userChoiceNormalized = normalizeForComparison(userChoice);
+    if (lastPartNormalized === userChoiceNormalized) {
+      partsToInclude.pop();
     }
   }
 
-  for (const part of partsToInclude) {
+  // Process parts in pairs: user choice followed by assistant story
+  // We need to reconstruct the full GM conversation flow
+  for (let i = 0; i < partsToInclude.length; i++) {
+    const part = partsToInclude[i];
+
     if (part.user) {
-      messages.push({
-        role: "user",
-        content: cleanString(part.content),
-      });
+      // User choice - look ahead for the story response to build proper context
+      const nextPart = partsToInclude[i + 1];
+      const storyOutput = nextPart && !nextPart.user ? nextPart.content : null;
+
+      // Format: previous story output (truncated) + "> user action"
+      // This gives the GM context of what the player saw before acting
+      if (i > 0) {
+        // Find the previous story output (full text, not truncated)
+        const prevPart = partsToInclude[i - 1];
+        if (prevPart && !prevPart.user) {
+          messages.push({
+            role: "user",
+            content: cleanString(
+              `[Story so far...]\n${
+                prevPart.content
+              }\n\n> ${part.content.replace(/^>\s*/, "")}`
+            ),
+          });
+        } else {
+          messages.push({
+            role: "user",
+            content: cleanString(`> ${part.content.replace(/^>\s*/, "")}`),
+          });
+        }
+      } else {
+        // First user action in history
+        messages.push({
+          role: "user",
+          content: cleanString(`> ${part.content.replace(/^>\s*/, "")}`),
+        });
+      }
     } else {
-      // For assistant (story) messages, include a summary
-      // Full content would be too long, but we need narrative context
-      const storyContent =
-        part.content.length > 500
-          ? part.content.slice(0, 500) + "..."
-          : part.content;
-      messages.push({
-        role: "assistant",
-        content: cleanString(`[Story narration]\n${storyContent}`),
-      });
+      // Assistant (story) part - reconstruct GM's thinking and tool calls
+      // This is the key improvement: GM sees its own reasoning from past turns
+
+      // Add GM thinking if available (the reasoning text)
+      if (part.gmThinking && part.gmThinking.length > 0) {
+        // GM's reasoning - each thinking entry corresponds to a separate GM round
+        // We need to pair each thinking with its tool call results
+        
+        // gmToolCalls contains GMToolResult[] objects, not raw tool_calls
+        // Each entry has: toolName, toolCallId, success, contextForStory
+        const gmToolResults = (part.gmToolCalls || []) as Array<{
+          toolName: string;
+          toolCallId: string;
+          success: boolean;
+          contextForStory: string;
+        }>;
+
+        // If we have tool results, reconstruct the conversation properly
+        if (gmToolResults.length > 0) {
+          // Group thinking entries - each thinking entry is one GM round
+          // Group tool results by their index (approximate round matching)
+          const thinkingEntries = part.gmThinking;
+          
+          // For proper API compliance, we need:
+          // 1. Assistant message with tool_calls
+          // 2. Tool message with matching tool_call_id for each tool_call
+          
+          // Simple approach: One assistant message per GM round, with its tool responses
+          // If we have N thinking entries and M tool results, pair them 1:1 where possible
+          for (let roundIdx = 0; roundIdx < thinkingEntries.length; roundIdx++) {
+            const thinking = thinkingEntries[roundIdx];
+            const toolResult = gmToolResults[roundIdx];
+            
+            if (toolResult) {
+              // Create synthetic tool_call object for this round
+              const syntheticToolCall = {
+                id: toolResult.toolCallId || `call_${i}_${roundIdx}_${toolResult.toolName}`,
+                type: "function",
+                function: {
+                  name: toolResult.toolName,
+                  arguments: "{}" // We don't have the original args, but this is for context
+                }
+              };
+              
+              // Assistant message with this round's thinking and tool call
+              messages.push({
+                role: "assistant",
+                content: cleanString(thinking),
+                tool_calls: [syntheticToolCall],
+              });
+              
+              // Tool response with matching ID
+              messages.push({
+                role: "tool",
+                content: toolResult.contextForStory || `[Tool: ${toolResult.toolName}] ${toolResult.success ? "Success" : "Failed"}`,
+                tool_call_id: syntheticToolCall.id,
+              });
+            } else {
+              // No tool result for this thinking entry - just add as assistant
+              messages.push({
+                role: "assistant",
+                content: cleanString(`[GAME MASTER]\n${thinking}`),
+              });
+            }
+          }
+          
+          // Handle any remaining tool results that didn't have matching thinking
+          for (let toolIdx = thinkingEntries.length; toolIdx < gmToolResults.length; toolIdx++) {
+            const toolResult = gmToolResults[toolIdx];
+            const syntheticToolCall = {
+              id: toolResult.toolCallId || `call_${i}_${toolIdx}_${toolResult.toolName}`,
+              type: "function",
+              function: {
+                name: toolResult.toolName,
+                arguments: "{}"
+              }
+            };
+            
+            messages.push({
+              role: "assistant",
+              content: `[GAME MASTER] Executing ${toolResult.toolName}`,
+              tool_calls: [syntheticToolCall],
+            });
+            
+            messages.push({
+              role: "tool",
+              content: toolResult.contextForStory || `[Tool: ${toolResult.toolName}] ${toolResult.success ? "Success" : "Failed"}`,
+              tool_call_id: syntheticToolCall.id,
+            });
+          }
+        } else {
+          // Just thinking, no tool calls - combine into single assistant message
+          const thinkingText = part.gmThinking.join("\n\n");
+          messages.push({
+            role: "assistant",
+            content: cleanString(`[GAME MASTER]\n${thinkingText}`),
+          });
+        }
+      } else if (part.gmStoryContext) {
+        // No thinking but has GM context - include as assistant summary
+        messages.push({
+          role: "assistant",
+          content: cleanString(`[GAME MASTER]\n${part.gmStoryContext}`),
+        });
+      }
+
+      // DON'T add the story output as a separate message - it will be included
+      // with the next user action as "[Story so far...]\n> action"
     }
   }
 
   // Add the current player action as the final user message
-  // Include explicit instruction to think first (since prefill may be stripped for tool calling)
+  // Include the most recent story output for context (full text, not truncated)
+  const lastStoryPart = partsToInclude
+    .slice()
+    .reverse()
+    .find((p) => !p.user);
+  const recentStory = lastStoryPart ? lastStoryPart.content : null;
+
+  const playerActionMessage = recentStory
+    ? `[Story so far...]\n${recentStory}\n\n> ${userChoice.replace(
+        /^>\s*/,
+        ""
+      )}\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GAME MASTER] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`
+    : `> ${userChoice.replace(
+        /^>\s*/,
+        ""
+      )}\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GAME MASTER] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`;
+
   messages.push({
     role: "user",
-    content: cleanString(
-      `## PLAYER'S ACTION\n"${userChoice}"\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GAME MASTER] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`
-    ),
+    content: cleanString(playerActionMessage),
   });
 
   // Add prefill for tool calling (may be stripped by API for some providers)
   messages.push({ role: "assistant", content: GM_STAGE_AFFIRMATION });
 
+  // Count how many parts have GM history
+  const partsWithGMHistory = partsToInclude.filter(
+    (p) => !p.user && (p.gmThinking?.length || p.gmToolCalls?.length)
+  ).length;
+
   // Debug logging
+  console.log(`[buildGMStagePrompt] RPG System: ${rpgSystem.name}`);
   console.log(
-    `[buildGMStagePrompt] Mode: ${useSchemaMode ? "schema" : "legacy"}`
+    `  - Context budget: ${totalContextBudget} tokens (history: ${historyBudget}, info: ${infoBudget})`
   );
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
-  console.log(`  - Chat history: ${recentParts.length} parts`);
+  console.log(
+    `  - Chat history: ${recentParts.length} parts (${partsWithGMHistory} with GM thinking/tools)`
+  );
   console.log(`  - Available tools: ${toolsToUse.length}`);
 
   return {

@@ -36,6 +36,7 @@ import {
   SkillTree,
   STARTING_UPGRADES_BY_DIFFICULTY,
   AdventureDifficulty,
+  CharacterSheetTemplate,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -82,25 +83,20 @@ import {
 } from "@/app/misc/ai_prices";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import SkillTreeEditor from "@/app/components/SkillTreeEditor";
+import CharacterSheetTemplateEditor from "@/app/components/CharacterSheetTemplateEditor";
+import {
+  createCharacterSheetTemplate,
+  DEFAULT_CHARACTER_SHEET_TEMPLATE,
+} from "@/app/misc/characterSheetTemplate";
 import { createEmptyTree } from "@/app/misc/skillTree";
 import { DEFAULT_LEVELING_SETTINGS } from "@/app/misc/leveling";
-import CharacterSchemaEditor from "@/app/components/CharacterSchemaEditor";
-import CharacterSheet from "@/app/components/CharacterSheet";
-import {
-  CharacterSchema,
-  CharacterData,
-  SchemaPage,
-  createDefaultCharacterData,
-  PRESET_SCHEMAS,
-} from "@/app/misc/characterSchema";
 
 type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 type DeepInfraImageModelKey = keyof typeof DEEPINFRA_IMAGE_MODELS;
 type CreatorStep =
   | "basic"
+  | "character-sheet"
   | "preset"
-  | "character-schema"
-  | "character-values"
   | "premise"
   | "starting-choices"
   | "lore"
@@ -763,8 +759,7 @@ function AdventureCreatorContent() {
 
   // Store custom values before switching to a preset so we can restore them
   const [savedCustomValues, setSavedCustomValues] = useState<{
-    playerName: string;
-    playerSummary: string;
+    characterSheet: string;
     intro: string;
     stats: Stat[];
     resources: Resource[];
@@ -1230,8 +1225,6 @@ function AdventureCreatorContent() {
     if (data.story_name) setTitle(data.story_name);
     if (data.premise) setPremise(data.premise);
     if (data.nsfw !== undefined) setNsfw(data.nsfw);
-    if (data.player_name) setPlayerName(data.player_name);
-    if (data.player_summary) setPlayerSummary(data.player_summary);
     if (data.intro) setIntro(data.intro);
     if (data.author_notes) setAuthorNotes(data.author_notes);
 
@@ -1535,88 +1528,9 @@ function AdventureCreatorContent() {
       );
     }
 
-    // Apply character schema (including template)
-    if (data.characterSchema) {
-      setCharacterSchema((prev) => {
-        const defaultSchema: CharacterSchema = {
-          version: 1,
-          name: "Custom",
-          description: "",
-          fields: [],
-          categories: [],
-          pages: [],
-          resources: [],
-        };
-        const base = prev || defaultSchema;
-        // Cast to Partial<CharacterSchema> to access optional fields
-        const incoming = data.characterSchema as Partial<CharacterSchema>;
-
-        // Transform pages from flat AI format (html, css, js) to nested template format
-        const transformPages = (pages: any[]): SchemaPage[] => {
-          return pages.map((p: any) => ({
-            id: p.id,
-            name: p.name,
-            icon: p.icon || "FileText",
-            order: p.order ?? 0,
-            // If AI already provided nested template, use it; otherwise construct from flat fields
-            template: p.template || {
-              html: p.html || "",
-              css: p.css || "",
-              js: p.js || "",
-            },
-          }));
-        };
-
-        // Smart merge: don't overwrite non-empty arrays with empty arrays
-        // This prevents tool-populated data from being wiped by raw AI response
-        const merged: CharacterSchema = {
-          ...base,
-          ...incoming,
-          // Preserve existing arrays if incoming is empty but existing has data
-          fields:
-            incoming.fields && incoming.fields.length > 0
-              ? incoming.fields
-              : base.fields || [],
-          categories:
-            incoming.categories && incoming.categories.length > 0
-              ? incoming.categories
-              : base.categories || [],
-          pages:
-            incoming.pages && incoming.pages.length > 0
-              ? transformPages(incoming.pages)
-              : base.pages || [],
-          resources:
-            incoming.resources && incoming.resources.length > 0
-              ? incoming.resources
-              : base.resources || [],
-        };
-
-        console.log("[AI] Set character schema:", merged.name);
-        console.log(
-          "[AI] Fields:",
-          merged.fields?.length || 0,
-          "Categories:",
-          merged.categories?.length || 0,
-          "Pages:",
-          merged.pages?.length || 0
-        );
-        if (merged.template) {
-          console.log(
-            "[AI] Template included - HTML:",
-            merged.template.html?.length || 0,
-            "chars, CSS:",
-            merged.template.css?.length || 0,
-            "chars"
-          );
-        }
-        return merged;
-      });
-    }
-
-    // Apply character data
-    if (data.characterData) {
-      setCharacterData(data.characterData);
-      console.log("[AI] Set character data");
+    // Apply character sheet template
+    if (data.characterSheetTemplate) {
+      setCharacterSheetTemplate(data.characterSheetTemplate);
     }
 
     addNotification("AI changes applied successfully!", "success");
@@ -1697,8 +1611,6 @@ function AdventureCreatorContent() {
 
         // Load story template data
         const template = adventure.storyTemplate;
-        setPlayerName(template.player_name || "");
-        setPlayerSummary(template.player_summary || "");
         setPremise(template.premise || "");
         setIntro(template.intro || "");
         setMaxChapters(template.max_chapters || 8);
@@ -1707,6 +1619,11 @@ function AdventureCreatorContent() {
           template.selected_preset || adventure.selectedPreset || "custom"
         );
         setPresets(template.presets || adventure.presets || [DEFAULT_PRESET]);
+
+        // Load character sheet template
+        if (adventure.characterSheetTemplate) {
+          setCharacterSheetTemplate(adventure.characterSheetTemplate);
+        }
 
         // Load stats, resources, inventory, etc.
         setStats(template.stats || []);
@@ -1727,22 +1644,6 @@ function AdventureCreatorContent() {
         });
         setLevelingSettings(cloneLevelingSettings(template.levelingSettings));
         setSkillTrees(template.skillTrees || []);
-
-        // Load character schema if present
-        if (template.characterSchema) {
-          setCharacterSchema(template.characterSchema);
-          setCharacterData(
-            createDefaultCharacterData(template.characterSchema)
-          );
-        } else {
-          setCharacterSchema(null);
-          setCharacterData(null);
-        }
-
-        // Load points and momentum
-        setPoints(template.points || 0);
-        setMomentum(template.momentum || 0);
-        setMaxMomentum(template.maxMomentum || 5);
 
         // Load Advanced RPG Tools state
         if (template.agmtState) {
@@ -1864,19 +1765,15 @@ function AdventureCreatorContent() {
     if (saved.selectedPreset !== undefined)
       setSelectedPreset(saved.selectedPreset);
     if (Array.isArray(saved.presets)) setPresets(saved.presets);
-    if (saved.playerName !== undefined) setPlayerName(saved.playerName);
-    if (saved.playerSummary !== undefined)
-      setPlayerSummary(saved.playerSummary);
+    if (saved.characterSheetTemplate)
+      setCharacterSheetTemplate(saved.characterSheetTemplate);
+    if (saved.characterSheet !== undefined)
+      setCharacterSheet(saved.characterSheet);
     if (saved.premise !== undefined) setPremise(saved.premise);
     if (saved.intro !== undefined) setIntro(saved.intro);
     if (typeof saved.maxChapters === "number")
       setMaxChapters(saved.maxChapters);
     if (saved.authorNotes !== undefined) setAuthorNotes(saved.authorNotes);
-
-    if (typeof saved.points === "number") setPoints(saved.points);
-    if (typeof saved.momentum === "number") setMomentum(saved.momentum);
-    if (typeof saved.maxMomentum === "number")
-      setMaxMomentum(saved.maxMomentum);
 
     if (Array.isArray(saved.stats)) setStats(saved.stats);
     if (Array.isArray(saved.resources)) setResources(saved.resources);
@@ -1977,11 +1874,14 @@ function AdventureCreatorContent() {
         // Load starting choices from adventure
         setStartingChoices(adventure.startingChoices || []);
 
+        // Load character sheet template
+        if (adventure.characterSheetTemplate) {
+          setCharacterSheetTemplate(adventure.characterSheetTemplate);
+        }
+
         // Load story template data
         const template = adventure.storyTemplate;
         if (template) {
-          setPlayerName(template.player_name || "");
-          setPlayerSummary(template.player_summary || "");
           setPremise(template.premise || "");
           setIntro(template.intro || "");
           setMaxChapters(template.max_chapters || 8);
@@ -2010,22 +1910,6 @@ function AdventureCreatorContent() {
           });
           setSkillTrees(template.skillTrees || []);
 
-          // Load character schema if present
-          if (template.characterSchema) {
-            setCharacterSchema(template.characterSchema);
-            setCharacterData(
-              createDefaultCharacterData(template.characterSchema)
-            );
-          } else {
-            setCharacterSchema(null);
-            setCharacterData(null);
-          }
-
-          // Load points and momentum
-          setPoints(template.points || 0);
-          setMomentum(template.momentum || 0);
-          setMaxMomentum(template.maxMomentum || 5);
-
           // Load Advanced RPG Tools state
           if (template.agmtState) {
             setAGMTEnabled(true);
@@ -2053,18 +1937,20 @@ function AdventureCreatorContent() {
     loadCopiedAdventure();
   }, [isCopyMode, authLoading, user, editAdventureId, router, addNotification]);
 
+  // Character Sheet Template (for custom characters)
+  const [characterSheetTemplate, setCharacterSheetTemplate] =
+    useState<CharacterSheetTemplate>(() =>
+      createCharacterSheetTemplate(DEFAULT_CHARACTER_SHEET_TEMPLATE)
+    );
+
+  // Character Sheet (for presets - pre-written)
+  const [characterSheet, setCharacterSheet] = useState("");
+
   // Story Data
-  const [playerName, setPlayerName] = useState("");
-  const [playerSummary, setPlayerSummary] = useState("");
   const [premise, setPremise] = useState("");
   const [intro, setIntro] = useState("");
   const [maxChapters, setMaxChapters] = useState(8);
   const [authorNotes, setAuthorNotes] = useState("");
-
-  // Points and Momentum
-  const [points, setPoints] = useState(0);
-  const [momentum, setMomentum] = useState(0);
-  const [maxMomentum, setMaxMomentum] = useState(5);
 
   // Stats
   const [stats, setStats] = useState<Stat[]>([]);
@@ -2144,12 +2030,6 @@ function AdventureCreatorContent() {
   >([]);
   const [newPassive, setNewPassive] = useState({ name: "", description: "" });
 
-  // Character Schema (defines character structure)
-  const [characterSchema, setCharacterSchema] =
-    useState<CharacterSchema | null>(null);
-  const [characterData, setCharacterData] = useState<CharacterData | null>(
-    null
-  );
   const [editingPassiveIndex, setEditingPassiveIndex] = useState<number | null>(
     null
   );
@@ -2354,13 +2234,8 @@ function AdventureCreatorContent() {
 
   const steps: { id: CreatorStep; label: string; icon: string }[] = [
     { id: "basic", label: "Basic Info", icon: "FileText" },
-    { id: "preset", label: "Character Preset", icon: "User" },
-    {
-      id: "character-schema",
-      label: "Character Schema",
-      icon: "FileSpreadsheet",
-    },
-    { id: "character-values", label: "Starting Values", icon: "Sliders" },
+    { id: "character-sheet", label: "Character Sheet", icon: "User" },
+    { id: "preset", label: "Character Preset", icon: "Users" },
     { id: "premise", label: "Story Setup", icon: "BookOpen" },
     { id: "starting-choices", label: "Starting Choices", icon: "Play" },
     { id: "lore", label: "Notes", icon: "Scroll" },
@@ -2401,19 +2276,15 @@ function AdventureCreatorContent() {
       if (saved.selectedPreset !== undefined)
         setSelectedPreset(saved.selectedPreset);
       if (Array.isArray(saved.presets)) setPresets(saved.presets);
-      if (saved.playerName !== undefined) setPlayerName(saved.playerName);
-      if (saved.playerSummary !== undefined)
-        setPlayerSummary(saved.playerSummary);
+      if (saved.characterSheet !== undefined)
+        setCharacterSheet(saved.characterSheet);
+      if (saved.characterSheetTemplate !== undefined)
+        setCharacterSheetTemplate(saved.characterSheetTemplate);
       if (saved.premise !== undefined) setPremise(saved.premise);
       if (saved.intro !== undefined) setIntro(saved.intro);
       if (typeof saved.maxChapters === "number")
         setMaxChapters(saved.maxChapters);
       if (saved.authorNotes !== undefined) setAuthorNotes(saved.authorNotes);
-
-      if (typeof saved.points === "number") setPoints(saved.points);
-      if (typeof saved.momentum === "number") setMomentum(saved.momentum);
-      if (typeof saved.maxMomentum === "number")
-        setMaxMomentum(saved.maxMomentum);
 
       if (Array.isArray(saved.stats)) setStats(saved.stats);
       if (Array.isArray(saved.resources)) setResources(saved.resources);
@@ -2439,13 +2310,6 @@ function AdventureCreatorContent() {
       if (saved.agmtState) setAGMTState(saved.agmtState);
       if (Array.isArray(saved.startingChoices))
         setStartingChoices(saved.startingChoices);
-      if (saved.characterSchema) {
-        setCharacterSchema(saved.characterSchema);
-        setCharacterData(
-          saved.characterData ||
-            createDefaultCharacterData(saved.characterSchema)
-        );
-      }
 
       if (
         typeof saved.currentStep === "string" &&
@@ -2494,15 +2358,12 @@ function AdventureCreatorContent() {
       bannerUrl,
       selectedPreset,
       presets,
-      playerName,
-      playerSummary,
+      characterSheet,
+      characterSheetTemplate,
       premise,
       intro,
       maxChapters,
       authorNotes,
-      points,
-      momentum,
-      maxMomentum,
       stats,
       resources,
       inventory,
@@ -2521,8 +2382,6 @@ function AdventureCreatorContent() {
       agmtEnabled,
       agmtState,
       startingChoices,
-      characterSchema,
-      characterData,
       currentStep,
       updatedAt: Date.now(),
     };
@@ -2548,15 +2407,12 @@ function AdventureCreatorContent() {
     bannerUrl,
     selectedPreset,
     presets,
-    playerName,
-    playerSummary,
+    characterSheet,
+    characterSheetTemplate,
     premise,
     intro,
     maxChapters,
     authorNotes,
-    points,
-    momentum,
-    maxMomentum,
     stats,
     resources,
     inventory,
@@ -2575,8 +2431,6 @@ function AdventureCreatorContent() {
     upgradeSettings,
     skillTrees,
     startingChoices,
-    characterSchema,
-    characterData,
     currentStep,
   ]);
 
@@ -3538,8 +3392,6 @@ ${description || ""}`;
     const storyData: Partial<StoryData> = {
       story_name: title,
       premise,
-      player_name: playerName || "Hero",
-      player_summary: playerSummary || "An adventurer",
       intro: intro,
       memory: [],
       max_chapters: maxChapters,
@@ -3558,9 +3410,6 @@ ${description || ""}`;
       customTables,
       variables,
       earnedPointsFromQuests: [],
-      momentum,
-      maxMomentum,
-      points,
       earnedPointsFromChapters: [],
       author_notes: authorNotes,
       selected_preset: selectedPreset,
@@ -3576,14 +3425,6 @@ ${description || ""}`;
               resourceBonuses: [],
               passives: passives,
             }
-          : undefined,
-      // Character schema - defines the character sheet structure and starting values
-      characterSchema: characterSchema || undefined,
-      characterData:
-        characterSchema && characterData
-          ? characterData
-          : characterSchema
-          ? createDefaultCharacterData(characterSchema)
           : undefined,
     };
 
@@ -3601,6 +3442,11 @@ ${description || ""}`;
         estimatedDuration: "1-2 hours",
         storyTemplate: storyData,
         presets: presets,
+        characterSheetTemplate:
+          characterSheetTemplate.template.trim() ||
+          characterSheetTemplate.fields.length > 0
+            ? characterSheetTemplate
+            : undefined,
         startingChoices:
           startingChoices.length > 0 ? startingChoices : undefined,
       };
@@ -3655,15 +3501,12 @@ ${description || ""}`;
       setTags([]);
       setThumbnailUrl("");
       setBannerUrl("");
-      setPlayerName("");
-      setPlayerSummary("");
+      setCharacterSheet("");
+      setCharacterSheetTemplate({ template: "", fields: [] });
       setPremise("");
       setIntro("");
       setMaxChapters(8);
       setAuthorNotes("");
-      setPoints(0);
-      setMomentum(0);
-      setMaxMomentum(5);
       setStats([]);
       setResources([]);
       setInventory([]);
@@ -3719,8 +3562,6 @@ ${description || ""}`;
       const storyData: Partial<StoryData> = {
         story_name: title,
         premise,
-        player_name: playerName || "Hero",
-        player_summary: playerSummary || "An adventurer",
         intro: intro,
         memory: [],
         max_chapters: maxChapters,
@@ -3739,9 +3580,6 @@ ${description || ""}`;
         customTables,
         variables,
         earnedPointsFromQuests: [],
-        momentum,
-        maxMomentum,
-        points,
         earnedPointsFromChapters: [],
         author_notes: authorNotes,
         selected_preset: selectedPreset,
@@ -3757,14 +3595,6 @@ ${description || ""}`;
                 resourceBonuses: [],
                 passives: passives,
               }
-            : undefined,
-        // Character schema - defines the character sheet structure and starting values
-        characterSchema: characterSchema || undefined,
-        characterData:
-          characterSchema && characterData
-            ? characterData
-            : characterSchema
-            ? createDefaultCharacterData(characterSchema)
             : undefined,
       };
 
@@ -3793,6 +3623,11 @@ ${description || ""}`;
         storyTemplate: storyData,
         selectedPreset: selectedPreset,
         presets: presets,
+        characterSheetTemplate:
+          characterSheetTemplate.template.trim() ||
+          characterSheetTemplate.fields.length > 0
+            ? characterSheetTemplate
+            : undefined,
         startingChoices:
           startingChoices.length > 0 ? startingChoices : undefined,
       };
@@ -3877,8 +3712,6 @@ ${description || ""}`;
     const storyData: Partial<StoryData> = {
       story_name: title,
       premise,
-      player_name: playerName || "Hero",
-      player_summary: playerSummary || "An adventurer",
       intro: intro,
       memory: [],
       max_chapters: maxChapters,
@@ -3897,9 +3730,6 @@ ${description || ""}`;
       customTables,
       variables,
       earnedPointsFromQuests: [],
-      momentum,
-      maxMomentum,
-      points,
       earnedPointsFromChapters: [],
       author_notes: authorNotes,
       selected_preset: selectedPreset,
@@ -3915,14 +3745,6 @@ ${description || ""}`;
               resourceBonuses: [],
               passives: passives,
             }
-          : undefined,
-      // Character schema - defines the character sheet structure and starting values
-      characterSchema: characterSchema || undefined,
-      characterData:
-        characterSchema && characterData
-          ? characterData
-          : characterSchema
-          ? createDefaultCharacterData(characterSchema)
           : undefined,
     };
 
@@ -3946,6 +3768,11 @@ ${description || ""}`;
           storyTemplate: storyData,
           selectedPreset: selectedPreset,
           presets: presets,
+          characterSheetTemplate:
+            characterSheetTemplate.template.trim() ||
+            characterSheetTemplate.fields.length > 0
+              ? characterSheetTemplate
+              : undefined,
           startingChoices:
             startingChoices.length > 0 ? startingChoices : undefined,
         };
@@ -4004,6 +3831,11 @@ ${description || ""}`;
         storyTemplate: storyData,
         selectedPreset: selectedPreset,
         presets: presets,
+        characterSheetTemplate:
+          characterSheetTemplate.template.trim() ||
+          characterSheetTemplate.fields.length > 0
+            ? characterSheetTemplate
+            : undefined,
         startingChoices:
           startingChoices.length > 0 ? startingChoices : undefined,
       };
@@ -4474,6 +4306,47 @@ ${description || ""}`;
           </div>
         );
 
+      case "character-sheet":
+        return (
+          <div className="space-y-6">
+            <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4 mb-6">
+              <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
+                <DynamicIcon name="FileText" className="w-5 h-5" />
+                Character Sheet Template
+              </h3>
+              <p className="text-sm text-blue-300">
+                Create a template for custom characters. Use the{" "}
+                <code className="bg-blue-800/50 px-1 rounded">
+                  {"{{FieldName | Description | Default}}"}
+                </code>{" "}
+                syntax to create fillable fields. When players pick
+                &quot;Custom&quot; preset, they&apos;ll fill out this template
+                to create their character sheet.
+              </p>
+            </div>
+
+            <CharacterSheetTemplateEditor
+              template={characterSheetTemplate}
+              onChange={setCharacterSheetTemplate}
+            />
+
+            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4">
+              <p className="text-sm text-purple-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-4 h-4 mt-0.5 shrink-0 text-purple-400"
+                />
+                <span>
+                  <strong>Tip:</strong> For preset characters, you&apos;ll write
+                  the completed character sheet directly in each preset. This
+                  template is only used when players choose to create a custom
+                  character.
+                </span>
+              </p>
+            </div>
+          </div>
+        );
+
       case "preset":
         return (
           <div className="space-y-6">
@@ -4494,11 +4367,16 @@ ${description || ""}`;
               <h4 className="text-lg font-bold text-white">Your Presets</h4>
               <button
                 onClick={() => {
-                  setShowPresetForm(!showPresetForm);
+                  const isOpening = !showPresetForm;
+                  setShowPresetForm(isOpening);
                   setEditingPresetId(null);
                   setNewPresetName("");
                   setNewPresetDescription("");
                   setNewPresetIcon("Star");
+                  // When opening form for new preset, load the template
+                  if (isOpening) {
+                    setCharacterSheet(characterSheetTemplate.template);
+                  }
                 }}
                 className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg transition-colors"
               >
@@ -4550,6 +4428,41 @@ ${description || ""}`;
                     />
                   </div>
 
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-sm font-semibold text-blue-200">
+                        Character Sheet
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCharacterSheet(characterSheetTemplate.template)
+                        }
+                        className="text-xs px-2 py-1 bg-blue-700/40 hover:bg-blue-700/60 text-blue-200 rounded transition-colors"
+                      >
+                        Load Template
+                      </button>
+                    </div>
+                    <p className="text-xs text-blue-300/60 mb-2">
+                      Fill out the template fields to create a complete
+                      character sheet for this preset. This will be added to the
+                      player&apos;s Notes when they pick this preset.
+                    </p>
+                    <textarea
+                      value={characterSheet}
+                      onChange={(e) => setCharacterSheet(e.target.value)}
+                      placeholder={`**Name:** Sir Aldric the Bold
+**Class:** Knight
+**Background:** A noble warrior sworn to protect the realm
+
+**Appearance:** Tall and muscular with silver-streaked hair...
+
+**Personality:** Honorable, protective, sometimes overly proud...`}
+                      rows={12}
+                      className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors resize-y font-mono text-sm"
+                    />
+                  </div>
+
                   <div className="bg-yellow-900/20 border border-yellow-800/50 rounded-lg p-3">
                     <p className="text-xs text-yellow-300">
                       <DynamicIcon
@@ -4557,9 +4470,9 @@ ${description || ""}`;
                         className="w-4 h-4 inline mr-2 text-yellow-400"
                       />{" "}
                       <strong>Tip:</strong> The preset will copy your current
-                      Player Name, Player Summary, Intro, Stats, Resources,
-                      Inventory, and Author Notes. Make sure they&apos;re
-                      configured as you want before saving!
+                      Character Sheet, Intro, Stats, Resources, Inventory, and
+                      Author Notes. Make sure they&apos;re configured as you
+                      want before saving!
                     </p>
                   </div>
 
@@ -4587,8 +4500,7 @@ ${description || ""}`;
                                     name: newPresetName,
                                     description: newPresetDescription,
                                     icon: newPresetIcon,
-                                    playerName,
-                                    playerSummary,
+                                    characterSheet,
                                     intro,
                                     stats: JSON.parse(JSON.stringify(stats)),
                                     resources: JSON.parse(
@@ -4615,8 +4527,7 @@ ${description || ""}`;
                             newPresetName,
                             newPresetDescription,
                             newPresetIcon,
-                            playerName,
-                            playerSummary,
+                            characterSheet,
                             intro,
                             stats,
                             resources,
@@ -4680,8 +4591,7 @@ ${description || ""}`;
                           preset.id !== "custom"
                         ) {
                           setSavedCustomValues({
-                            playerName,
-                            playerSummary,
+                            characterSheet,
                             intro,
                             stats: [...stats],
                             resources: [...resources],
@@ -4698,8 +4608,7 @@ ${description || ""}`;
                         if (preset.id !== "custom") {
                           applyPreset(
                             preset,
-                            setPlayerName,
-                            setPlayerSummary,
+                            setCharacterSheet,
                             setIntro,
                             setStats,
                             setResources,
@@ -4715,8 +4624,7 @@ ${description || ""}`;
                         } else {
                           // Restore saved custom values when switching back to custom
                           if (savedCustomValues) {
-                            setPlayerName(savedCustomValues.playerName);
-                            setPlayerSummary(savedCustomValues.playerSummary);
+                            setCharacterSheet(savedCustomValues.characterSheet);
                             setIntro(savedCustomValues.intro);
                             setStats(savedCustomValues.stats);
                             setResources(savedCustomValues.resources);
@@ -4774,6 +4682,15 @@ ${description || ""}`;
                             <DynamicIcon name="Package" className="w-3 h-3" />{" "}
                             {preset.inventory?.length || 0} starting items
                           </div>
+                          {preset.characterSheet && (
+                            <div className="flex items-center gap-1 text-green-300/60">
+                              <DynamicIcon
+                                name="FileText"
+                                className="w-3 h-3"
+                              />{" "}
+                              Has character sheet
+                            </div>
+                          )}
                           {(preset.conditions?.length || 0) > 0 && (
                             <div className="flex items-center gap-1 text-rose-300/60">
                               <DynamicIcon
@@ -4879,8 +4796,7 @@ ${description || ""}`;
                             });
                             applyPreset(
                               preset,
-                              setPlayerName,
-                              setPlayerSummary,
+                              setCharacterSheet,
                               setIntro,
                               setStats,
                               setResources,
@@ -4911,32 +4827,6 @@ ${description || ""}`;
       case "premise":
         return (
           <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-semibold text-blue-200 mb-2">
-                Player Character Name
-              </label>
-              <input
-                type="text"
-                value={playerName}
-                onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="e.g., Aria"
-                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-blue-200 mb-2">
-                Player Character Summary
-              </label>
-              <textarea
-                value={playerSummary}
-                onChange={(e) => setPlayerSummary(e.target.value)}
-                placeholder="A brief description of who the player character is..."
-                rows={3}
-                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
-              />
-            </div>
-
             <div>
               <label className="block text-sm font-semibold text-blue-200 mb-2">
                 Story Premise *
@@ -4974,92 +4864,6 @@ ${description || ""}`;
                 rows={4}
                 className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
               />
-            </div>
-
-            <div className="bg-purple-900/20 border border-purple-800/50 rounded-lg p-4">
-              <p className="text-sm text-purple-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="Lightbulb"
-                  className="w-4 h-4 mt-0.5 shrink-0 text-purple-400"
-                />
-                <span>
-                  <strong>What are these?</strong> <strong>Points</strong> are
-                  currency players earn and spend on upgrades (like stat boosts
-                  or new abilities).
-                  <strong> Momentum</strong> is a bonus resource that builds up
-                  from dramatic actions - when it hits max, players can spend it
-                  for powerful bonuses on dice rolls.
-                </span>
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-semibold text-blue-200 mb-2 flex items-center gap-1">
-                  Starting Points
-                  <span
-                    className="text-xs text-blue-400"
-                    title="Used to buy upgrades like stat increases"
-                  >
-                    💰
-                  </span>
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="99999"
-                  value={points}
-                  onChange={(e) =>
-                    setPoints(clampNumber(parseInt(e.target.value), 0, 99999))
-                  }
-                  className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
-                />
-                <p className="text-xs text-blue-300/60 mt-1">
-                  Points players start with
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-blue-200 mb-2">
-                  Starting Momentum
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max={maxMomentum}
-                  value={momentum}
-                  onChange={(e) =>
-                    setMomentum(
-                      clampNumber(parseInt(e.target.value), 0, maxMomentum)
-                    )
-                  }
-                  className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
-                />
-                <p className="text-xs text-blue-300/60 mt-1">
-                  Current momentum value
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold text-blue-200 mb-2">
-                  Max Momentum
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="999"
-                  value={maxMomentum}
-                  onChange={(e) =>
-                    setMaxMomentum(
-                      clampNumber(parseInt(e.target.value), 1, 999)
-                    )
-                  }
-                  className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
-                />
-                <p className="text-xs text-blue-300/60 mt-1">
-                  Maximum momentum capacity
-                </p>
-              </div>
             </div>
 
             {/* Point Allocation Settings */}
@@ -9106,151 +8910,6 @@ ${description || ""}`;
           </div>
         );
 
-      case "character-schema":
-        return (
-          <div className="space-y-6">
-            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="FileSpreadsheet"
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                />
-                <span>
-                  <strong>Character Schema</strong> defines the structure of
-                  your character sheet - what attributes, resources, and derived
-                  values your characters have. Choose a preset or create your
-                  own.
-                </span>
-              </p>
-            </div>
-
-            {/* Preset Schema Selection */}
-            <div className="space-y-3">
-              <h3 className="font-semibold text-white">Choose a Preset</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {Object.entries(PRESET_SCHEMAS).map(([key, schema]) => (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      setCharacterSchema(schema);
-                      setCharacterData(createDefaultCharacterData(schema));
-                    }}
-                    className={`p-4 rounded-lg border text-left transition-all ${
-                      characterSchema?.name === schema.name
-                        ? "border-purple-500 bg-purple-900/30"
-                        : "border-gray-700 bg-gray-800/50 hover:border-gray-600"
-                    }`}
-                  >
-                    <div className="font-semibold text-white mb-1">
-                      {schema.name}
-                    </div>
-                    <div className="text-sm text-gray-400">
-                      {schema.description}
-                    </div>
-                    <div className="text-xs text-gray-500 mt-2">
-                      {schema.fields.length} fields
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Divider */}
-            <div className="flex items-center gap-4">
-              <div className="flex-1 border-t border-gray-700" />
-              <span className="text-gray-500 text-sm">or customize</span>
-              <div className="flex-1 border-t border-gray-700" />
-            </div>
-
-            {/* Schema Editor */}
-            <CharacterSchemaEditor
-              schema={characterSchema}
-              onChange={(newSchema) => {
-                setCharacterSchema(newSchema);
-                if (newSchema) {
-                  setCharacterData(createDefaultCharacterData(newSchema));
-                } else {
-                  setCharacterData(null);
-                }
-              }}
-            />
-
-            {/* Character Sheet Preview */}
-            {characterSchema &&
-              characterData &&
-              (characterSchema.template || characterSchema.pages) && (
-                <div className="space-y-3 mt-6">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-white flex items-center gap-2">
-                      <DynamicIcon name="Eye" className="w-4 h-4" />
-                      Character Sheet Preview
-                    </h3>
-                    <span className="text-xs text-gray-500">
-                      {characterSchema.pages?.length || 1} page
-                      {(characterSchema.pages?.length || 1) > 1 ? "s" : ""}
-                      {characterSchema.hasCustomJS && (
-                        <span className="ml-2 text-amber-400">
-                          (has custom JS)
-                        </span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="border border-gray-700 rounded-lg overflow-hidden bg-gray-900">
-                    <CharacterSheet
-                      schema={characterSchema}
-                      data={characterData}
-                      onChange={setCharacterData}
-                      readOnly={false}
-                      context={{
-                        playerName: playerName || "Test Character",
-                        playerSummary: playerSummary || "A brave adventurer.",
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-          </div>
-        );
-
-      case "character-values":
-        return (
-          <div className="space-y-6">
-            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300 flex items-start gap-2">
-                <DynamicIcon
-                  name="Sliders"
-                  className="w-4 h-4 mt-0.5 shrink-0"
-                />
-                <span>
-                  <strong>Starting Values</strong> - Set the initial values for
-                  your character sheet fields. These are the values players will
-                  start with.
-                </span>
-              </p>
-            </div>
-
-            {characterSchema && characterData ? (
-              <CharacterSheet
-                schema={characterSchema}
-                data={characterData}
-                onChange={setCharacterData}
-                readOnly={false}
-              />
-            ) : (
-              <div className="text-center py-12 text-gray-500">
-                <DynamicIcon
-                  name="FileSpreadsheet"
-                  className="w-12 h-12 mx-auto mb-3 opacity-50"
-                />
-                <p>No character schema defined yet.</p>
-                <p className="text-sm mt-2">
-                  Go back to the Character Schema step to create or select one.
-                </p>
-              </div>
-            )}
-          </div>
-        );
-
       case "preview":
         return (
           <div className="space-y-6">
@@ -9326,18 +8985,6 @@ ${description || ""}`;
                     <span className="text-blue-300/60">Tags:</span>
                     <span className="ml-2 font-semibold text-white">
                       {tags.length}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-blue-300/60">Starting Points:</span>
-                    <span className="ml-2 font-semibold text-white">
-                      {points}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-blue-300/60">Momentum:</span>
-                    <span className="ml-2 font-semibold text-white">
-                      {momentum}/{maxMomentum}
                     </span>
                   </div>
                 </div>
@@ -9537,8 +9184,6 @@ ${description || ""}`;
                             storyTemplate: {
                               story_name: title,
                               premise,
-                              player_name: playerName || "Hero",
-                              player_summary: playerSummary || "An adventurer",
                               intro,
                               memory: [],
                               max_chapters: maxChapters,
@@ -9556,9 +9201,6 @@ ${description || ""}`;
                               customTables,
                               variables,
                               earnedPointsFromQuests: [],
-                              momentum,
-                              maxMomentum,
-                              points,
                               earnedPointsFromChapters: [],
                               author_notes: authorNotes,
                               selected_preset: selectedPreset,
@@ -9570,6 +9212,11 @@ ${description || ""}`;
                                 skillTrees.length > 0 ? skillTrees : undefined,
                             },
                             presets: presets,
+                            characterSheetTemplate:
+                              characterSheetTemplate.template.trim() ||
+                              characterSheetTemplate.fields.length > 0
+                                ? characterSheetTemplate
+                                : undefined,
                             startingChoices:
                               startingChoices.length > 0
                                 ? startingChoices
@@ -9808,8 +9455,7 @@ ${description || ""}`;
                               preset.id !== "custom"
                             ) {
                               setSavedCustomValues({
-                                playerName,
-                                playerSummary,
+                                characterSheet,
                                 intro,
                                 stats: [...stats],
                                 resources: [...resources],
@@ -9824,8 +9470,7 @@ ${description || ""}`;
                             if (preset.id !== "custom") {
                               applyPreset(
                                 preset,
-                                setPlayerName,
-                                setPlayerSummary,
+                                setCharacterSheet,
                                 setIntro,
                                 setStats,
                                 setResources,
@@ -9841,9 +9486,8 @@ ${description || ""}`;
                             } else {
                               // Restore saved custom values when switching back to custom
                               if (savedCustomValues) {
-                                setPlayerName(savedCustomValues.playerName);
-                                setPlayerSummary(
-                                  savedCustomValues.playerSummary
+                                setCharacterSheet(
+                                  savedCustomValues.characterSheet
                                 );
                                 setIntro(savedCustomValues.intro);
                                 setStats(savedCustomValues.stats);
@@ -10231,8 +9875,6 @@ ${description || ""}`;
         currentStoryData={{
           story_name: title,
           premise,
-          player_name: playerName,
-          player_summary: playerSummary,
           intro: intro,
           author_notes: authorNotes,
           stats,

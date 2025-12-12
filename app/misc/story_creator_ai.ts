@@ -40,13 +40,8 @@ export function buildStoryCreatorMessages({
   const storyDataForCreator: Partial<StoryData> = {
     story_name: storyData.story_name,
     premise: storyData.premise,
-    player_name: storyData.player_name,
-    player_summary: storyData.player_summary,
     intro: storyData.intro,
     author_notes: storyData.author_notes,
-    stats: storyData.stats,
-    resources: storyData.resources,
-    inventory: storyData.inventory,
     abilities: storyData.abilities,
     achievements: storyData.achievements,
     lore: storyData.lore,
@@ -60,12 +55,9 @@ export function buildStoryCreatorMessages({
     levelingSettings: storyData.levelingSettings,
     skillTrees: storyData.skillTrees,
     rpgSystem: storyData.rpgSystem,
-    momentum: storyData.momentum,
-    maxMomentum: storyData.maxMomentum,
     points: storyData.points,
     conditions: storyData.conditions,
-    characterSchema: storyData.characterSchema,
-    characterData: storyData.characterData,
+    characterSheet: storyData.characterSheet,
   };
 
   // Build the base creator messages
@@ -174,45 +166,16 @@ export function applyCreatorChangesToStoryData(
   // Scalar fields - direct replacement
   if (changes.story_name !== undefined) updates.story_name = changes.story_name;
   if (changes.premise !== undefined) updates.premise = changes.premise;
-  if (changes.player_name !== undefined)
-    updates.player_name = changes.player_name;
-  if (changes.player_summary !== undefined)
-    updates.player_summary = changes.player_summary;
   if (changes.intro !== undefined) updates.intro = changes.intro;
   if (changes.author_notes !== undefined)
     updates.author_notes = changes.author_notes;
   if (changes.rpgSystem !== undefined)
     updates.rpgSystem = changes.rpgSystem as StoryData["rpgSystem"];
-  if (changes.momentum !== undefined) updates.momentum = changes.momentum;
-  if (changes.maxMomentum !== undefined)
-    updates.maxMomentum = changes.maxMomentum;
   if (changes.points !== undefined) updates.points = changes.points;
+  if (changes.characterSheet !== undefined)
+    updates.characterSheet = changes.characterSheet;
 
   // Array fields - handle merge/replace/delete/add commands
-  if (changes.stats) {
-    updates.stats = mergeArrayWithCommands(
-      storyData.stats || [],
-      changes.stats,
-      "name"
-    );
-  }
-
-  if (changes.resources) {
-    updates.resources = mergeArrayWithCommands(
-      storyData.resources || [],
-      changes.resources,
-      "name"
-    );
-  }
-
-  if (changes.inventory) {
-    updates.inventory = mergeArrayWithCommands(
-      storyData.inventory || [],
-      changes.inventory,
-      "name"
-    );
-  }
-
   if (changes.abilities) {
     updates.abilities = mergeArrayWithCommands(
       storyData.abilities || [],
@@ -348,67 +311,6 @@ export function applyCreatorChangesToStoryData(
           );
       }
       updates.levelingSettings = changes.levelingSettings;
-    }
-  }
-
-  // Character Schema - complex object with deep merge
-  if ((changes as any).characterSchema !== undefined) {
-    const incomingSchema = (changes as any).characterSchema;
-    if (storyData.characterSchema && incomingSchema) {
-      // Deep merge schema
-      updates.characterSchema = {
-        ...storyData.characterSchema,
-        ...incomingSchema,
-        // Merge arrays by id
-        fields:
-          incomingSchema.fields !== undefined
-            ? mergeArrayWithCommands(
-                storyData.characterSchema.fields || [],
-                incomingSchema.fields,
-                "id" as any
-              )
-            : storyData.characterSchema.fields,
-        categories:
-          incomingSchema.categories !== undefined
-            ? mergeArrayWithCommands(
-                storyData.characterSchema.categories || [],
-                incomingSchema.categories,
-                "id" as any
-              )
-            : storyData.characterSchema.categories,
-        pages:
-          incomingSchema.pages !== undefined
-            ? mergeArrayWithCommands(
-                storyData.characterSchema.pages || [],
-                incomingSchema.pages,
-                "id" as any
-              )
-            : storyData.characterSchema.pages,
-        resources:
-          incomingSchema.resources !== undefined
-            ? mergeArrayWithCommands(
-                storyData.characterSchema.resources || [],
-                incomingSchema.resources,
-                "id" as any
-              )
-            : storyData.characterSchema.resources,
-      };
-    } else {
-      updates.characterSchema = incomingSchema;
-    }
-  }
-
-  // Character Data - direct replacement (runtime values)
-  if ((changes as any).characterData !== undefined) {
-    const incomingData = (changes as any).characterData;
-    if (storyData.characterData && incomingData) {
-      // Merge character data values
-      updates.characterData = {
-        ...storyData.characterData,
-        ...incomingData,
-      };
-    } else {
-      updates.characterData = incomingData;
     }
   }
 
@@ -585,15 +487,11 @@ export function summarizeChanges(changes: CreatorOutputData): string[] {
   // Scalar changes
   if (changes.story_name) summaries.push(`Story name: "${changes.story_name}"`);
   if (changes.premise) summaries.push("Updated premise");
-  if (changes.player_name)
-    summaries.push(`Player name: "${changes.player_name}"`);
-  if (changes.player_summary) summaries.push("Updated player summary");
   if (changes.intro) summaries.push("Updated intro");
   if (changes.author_notes) summaries.push("Updated author notes");
   if (changes.rpgSystem) summaries.push(`RPG system: ${changes.rpgSystem}`);
-  if (changes.momentum !== undefined)
-    summaries.push(`Momentum: ${changes.momentum}`);
   if (changes.points !== undefined) summaries.push(`Points: ${changes.points}`);
+  if (changes.characterSheet) summaries.push("Updated character sheet");
 
   // Array changes with command awareness
   const describeArrayChanges = (
@@ -628,9 +526,6 @@ export function summarizeChanges(changes: CreatorOutputData): string[] {
     }
   };
 
-  describeArrayChanges(changes.stats, "Stats", "name");
-  describeArrayChanges(changes.resources, "Resources", "name");
-  describeArrayChanges(changes.inventory, "Inventory", "name");
   describeArrayChanges(changes.abilities, "Abilities", "name");
   describeArrayChanges(changes.achievements, "Achievements", "title");
   describeArrayChanges(changes.lore, "Lore", "title");
@@ -728,8 +623,7 @@ export function buildStoryCreatorMessagesWithTools(
 
 ## YOUR ROLE
 You help players by using tools to make precise changes to their story's data. You have access to a comprehensive set of tools for modifying:
-- **Stats & Resources** - Character attributes, health, mana, etc.
-- **Character Schema** - Stats, resources, abilities all defined through character schema
+- **Abilities** - Skills, spells, techniques
 - **Lore & Achievements** - World-building entries, unlockable achievements
 - **Quests** - Active objectives
 - **Variables & Conditions** - Story flags, character afflictions
@@ -743,20 +637,15 @@ You help players by using tools to make precise changes to their story's data. Y
 5. **Explain what you did** after making changes
 
 ## TOOL CATEGORIES
-### Character Schema (defines character sheet structure)
-- set_character_schema - Create/replace entire character schema with fields, categories, template
-- add_schema_fields, modify_schema_fields, remove_schema_fields - Manage schema field definitions
-- add_schema_categories, modify_schema_categories, remove_schema_categories - Organize fields into UI tabs
-- set_schema_template - Set main character sheet HTML/CSS/JS template
-- add_schema_pages, modify_schema_pages, remove_schema_pages - Add custom tabs with their own templates
-- add_schema_resources, remove_schema_resources - Upload images/fonts for custom templates
-- set_character_values, modify_character_values - Set/update character data values at runtime
-
 ### Abilities  
 - add_ability, modify_ability, remove_ability
 
 ### Lore & Story
 - add_lore, modify_lore, remove_lore
+  **LORE TYPES:** Use the 'type' field to set note priority:
+  - "character_sheet" - HIGHEST PRIORITY. Use for the player's character sheet! Contains stats, attributes, HP, abilities, equipment. Appears at top of AI context.
+  - "mechanics" - Game rules. Second priority.
+  - "lore" (default) - World-building, NPCs, locations.
   **THREAT PROFILES:** When creating lore for enemies/threats, include in the content:
   - Challenge Difficulty (Easy/Medium/Hard/Boss)
   - Approach DCs (e.g., "Combat: hard, Stealth: average")
@@ -772,39 +661,18 @@ You help players by using tools to make precise changes to their story's data. Y
 - add_variable, modify_variable, remove_variable
 - add_condition, modify_condition, remove_condition
 
+### Character Presets & Character Sheets
+- add_presets, modify_presets, remove_presets - Character builds/classes
+- update_character_sheet - Update the player's active character sheet markdown (replace, append, or prepend content)
+- update_character_sheet_template - Set the adventure's fillable template (supports D&D 5e, Call of Cthulhu, Traveller, Monsterhearts, Fate, PbtA, Blades in the Dark, World of Darkness styles)
+- update_preset_character_sheet - Update a preset's pre-filled character sheet
+
 ### Game Configuration
 - update_settings (rpgSystem, difficulty, etc.)
 - update_leveling_settings, update_upgrade_settings
 
 ### Player Progression
 - set_progression - Set player points directly for rewards, etc.
-
-## CHARACTER SCHEMA SYSTEM (for advanced customization)
-
-The Character Schema defines what fields appear on character sheets and how they're displayed.
-
-**Field Types:**
-- **number**: Simple numeric value (Strength: 14)
-- **derived**: Calculated from formula using other fields (Modifier: floor((Strength-10)/2))
-- **resource**: Has current/max values (HP: 45/50, Mana: 20/30)
-- **text**: String value (Background: "Orphan raised by wolves")
-- **list**: Array of strings (Languages: ["Common", "Elvish", "Draconic"])
-- **boolean**: True/false flag (Inspiration: true)
-- **select**: Pick from predefined options (Class: "Warrior" from ["Warrior", "Mage", "Rogue"])
-
-**Template Syntax (for custom HTML/CSS templates):**
-- Use {{fieldId}} for value substitution
-- Use {{fieldId.current}}/{{fieldId.max}} for resources
-- Use {{percent fieldId}} for percentage (0-100)
-- Use {{modifier fieldId}} for D&D-style +/- prefix
-- Conditionals: {{#if condition}}...{{/if}}
-- Loops: {{#each items}}...{{/each}} with {{.}} for current item
-
-**When to use schema tools:**
-- Player wants to fundamentally change their character's structure
-- Adding new derived stats or custom calculations
-- Creating a completely custom character sheet layout
-- Adding new pages/tabs to the character sheet
 
 ## STORY CONTEXT
 The player is currently in an active story. Here's what's been happening recently:
@@ -827,9 +695,9 @@ ${formatStoryDataAsMarkdown(storyData)}
 4. Keep responses concise but engaging - a sentence or two of friendly commentary goes a long way!
 
 Examples of good responses after tool calls:
-- "Bumped your Strength to 75 - you're definitely hitting harder now! That goblin chief won't know what hit him."
-- "Added that cursed amulet to your inventory. Fair warning: I set it as a 'story' item so you can't just drop it... the curse has to be dealt with properly!"
-- "Healed you up and cleared that poison condition. You were cutting it close there!"`;
+- "Added that Fireball ability - now you can really bring the heat! Just watch your mana usage."
+- "Created a new lore entry for the Shadow Council. I've set it as secret for now since the player hasn't discovered them yet."
+- "Cleared that poison condition. You were cutting it close there!"`;
 
   const messages: ChatMessage[] = [
     { role: "system", content: systemPrompt },

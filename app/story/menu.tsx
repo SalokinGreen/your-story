@@ -52,11 +52,6 @@ import {
   getAbilityBonus,
 } from "../misc/abilitySystem";
 import { getRPGSystem, type RPGSystemType } from "../misc/rpgSystems";
-import CharacterSheet from "../components/CharacterSheet";
-import {
-  recalculateDerivedFields,
-  CharacterData,
-} from "../misc/characterSchema";
 
 // Basic Settings Component
 interface BasicSettingsForm {
@@ -2788,6 +2783,42 @@ function LoreEditor({
                   placeholder="Note content (supports Markdown)"
                   className="w-full h-32 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
                 />
+                {/* Note Type Selector */}
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-2">
+                    <DynamicIcon
+                      name="FileType"
+                      className="inline-block w-4 h-4 mr-1"
+                    />
+                    Note Type
+                  </label>
+                  <select
+                    value={editLore.type || "lore"}
+                    onChange={(e) =>
+                      setEditLore({
+                        ...editLore,
+                        type: e.target.value as
+                          | "lore"
+                          | "mechanics"
+                          | "character_sheet",
+                      })
+                    }
+                    className="w-full px-3 py-2 text-sm bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  >
+                    <option value="lore">📜 Lore (Standard note)</option>
+                    <option value="character_sheet">
+                      🧙 Character Sheet (Highest priority - character details)
+                    </option>
+                    <option value="mechanics">⚙️ Mechanics (Game rules)</option>
+                  </select>
+                  <p className="text-xs text-blue-300/60 mt-1">
+                    {editLore.type === "character_sheet"
+                      ? "Character sheet notes appear at the very top of AI context for character details."
+                      : editLore.type === "mechanics"
+                      ? "Mechanics notes are prioritized and always visible to the AI for game rules."
+                      : "Standard lore notes are shown based on triggers and visibility."}
+                  </p>
+                </div>
                 <LoreImageGenerator
                   loreTitle={editLore.title}
                   loreContent={editLore.content}
@@ -3380,6 +3411,25 @@ function LoreEditor({
                     >
                       {loreItem.on ? "ON" : "OFF"}
                     </button>
+                    {/* Type Badge */}
+                    {loreItem.type && loreItem.type !== "lore" && (
+                      <span
+                        className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                          loreItem.type === "character_sheet"
+                            ? "bg-purple-600 text-white"
+                            : "bg-amber-600 text-white"
+                        }`}
+                        title={
+                          loreItem.type === "character_sheet"
+                            ? "Character sheet - highest priority"
+                            : "Mechanics/Rules"
+                        }
+                      >
+                        {loreItem.type === "character_sheet"
+                          ? "🧙 CHAR"
+                          : "⚙️ RULES"}
+                      </span>
+                    )}
                   </div>
                   {loreItem.thumbnailUrl && (
                     <img
@@ -4931,14 +4981,9 @@ export default function MenuPage({
   const [editingInventory, setEditingInventory] = useState(false);
   const [editingAchievements, setEditingAchievements] = useState(false);
   const [editingLore, setEditingLore] = useState(false);
-  // Check if using character schema mode
-  const hasCharacterSchema = !!(
-    storyData.characterSchema && storyData.characterData
-  );
 
   const [activeTab, setActiveTab] = useState<
     | "basic"
-    | "character" // New: for character schema editing
     | "stats"
     | "inventory"
     | "abilities"
@@ -5706,16 +5751,7 @@ export default function MenuPage({
             >
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
-                // Show "Character" tab when using schema mode, otherwise "Stats & Resources"
-                ...(hasCharacterSchema
-                  ? [{ id: "character", label: "Character", icon: "User" }]
-                  : [
-                      {
-                        id: "stats",
-                        label: "Stats & Resources",
-                        icon: "BarChart2",
-                      },
-                    ]),
+                { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
                 { id: "inventory", label: "Inventory", icon: "Backpack" },
                 { id: "abilities", label: "Abilities", icon: "Wand2" },
                 { id: "passives", label: "Passives", icon: "Sparkles" },
@@ -5757,38 +5793,6 @@ export default function MenuPage({
                   <BasicSettings
                     form={settingsForm}
                     onChange={setSettingsForm}
-                  />
-                </div>
-              )}
-
-              {/* Character Tab (Schema Mode) */}
-              {activeTab === "character" && hasCharacterSchema && (
-                <div className="mt-4">
-                  <div className="mb-4 p-3 bg-blue-900/30 rounded-lg border border-blue-700/40">
-                    <div className="flex items-center gap-2 text-blue-200 text-sm">
-                      <DynamicIcon name="Info" className="w-4 h-4" />
-                      <span>
-                        Edit your character sheet values. Derived fields are
-                        calculated automatically.
-                      </span>
-                    </div>
-                  </div>
-                  <CharacterSheet
-                    schema={storyData.characterSchema!}
-                    data={storyData.characterData!}
-                    onChange={(newData: CharacterData) => {
-                      // Recalculate derived fields before saving
-                      const updatedValues = { ...newData.values };
-                      recalculateDerivedFields(
-                        storyData.characterSchema!,
-                        updatedValues
-                      );
-                      onUpdateStoryData({
-                        characterData: { values: updatedValues },
-                      });
-                    }}
-                    readOnly={false}
-                    compact={false}
                   />
                 </div>
               )}

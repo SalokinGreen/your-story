@@ -1,12 +1,6 @@
 "use client";
 
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useMemo,
-  useCallback,
-} from "react";
+import React, { useState } from "react";
 import {
   StoryData,
   Condition,
@@ -28,296 +22,29 @@ import {
   getResourceBonusFromNodes,
   getActivePassives,
 } from "../misc/skillTree";
-import CharacterSheet from "../components/CharacterSheet";
-import {
-  buildPageTemplateDocument,
-  SchemaPage,
-  TemplateContext,
-} from "../misc/characterSchema";
 
 // Built-in tab types
-type BuiltInTab =
-  | "character"
-  | "stats"
-  | "resources"
-  | "abilities"
-  | "quests"
-  | "variables";
-
-// Custom page renderer component with pan/zoom
-function CustomPageRenderer({
-  page,
-  storyData,
-}: {
-  page: SchemaPage;
-  storyData: StoryData;
-}) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(400);
-
-  // Pan and zoom state
-  const [zoom, setZoom] = useState(1);
-  const [pan, setPan] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-
-  const context: TemplateContext = useMemo(
-    () => ({
-      playerName: storyData.player_name,
-      playerSummary: storyData.player_summary,
-    }),
-    [storyData.player_name, storyData.player_summary]
-  );
-
-  const htmlDoc = useMemo(() => {
-    if (!storyData.characterSchema || !storyData.characterData) return "";
-    // Get base URL for resolving relative paths like /icons/...
-    const baseUrl = typeof window !== "undefined" ? window.location.origin : "";
-    return buildPageTemplateDocument(
-      page,
-      storyData.characterSchema,
-      storyData.characterData.values,
-      context,
-      baseUrl
-    );
-  }, [page, storyData.characterSchema, storyData.characterData, context]);
-
-  // Auto-resize iframe based on content via postMessage from iframe
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      if (
-        event.data?.type === "iframeHeight" &&
-        typeof event.data.height === "number"
-      ) {
-        const newHeight = event.data.height + 32; // Add padding
-        setHeight((h) => Math.max(h, newHeight)); // Only grow, never shrink unexpectedly
-      }
-    };
-
-    window.addEventListener("message", handleMessage);
-    return () => window.removeEventListener("message", handleMessage);
-  }, []);
-
-  // Handle mouse/touch drag for panning
-  const handlePointerDown = useCallback(
-    (e: React.PointerEvent) => {
-      if ((e.target as HTMLElement).closest("button")) return;
-
-      setIsDragging(true);
-      dragStart.current = {
-        x: e.clientX,
-        y: e.clientY,
-        panX: pan.x,
-        panY: pan.y,
-      };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-    },
-    [pan]
-  );
-
-  const handlePointerMove = useCallback(
-    (e: React.PointerEvent) => {
-      if (!isDragging) return;
-
-      const dx = e.clientX - dragStart.current.x;
-      const dy = e.clientY - dragStart.current.y;
-
-      setPan({
-        x: dragStart.current.panX + dx,
-        y: dragStart.current.panY + dy,
-      });
-    },
-    [isDragging]
-  );
-
-  const handlePointerUp = useCallback((e: React.PointerEvent) => {
-    setIsDragging(false);
-    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-  }, []);
-
-  const handleZoomIn = useCallback(() => {
-    setZoom((z) => Math.min(z + 0.25, 3));
-  }, []);
-
-  const handleZoomOut = useCallback(() => {
-    setZoom((z) => Math.max(z - 0.25, 0.25));
-  }, []);
-
-  const handleResetView = useCallback(() => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  }, []);
-
-  return (
-    <div className="relative w-full">
-      {/* Zoom controls */}
-      <div className="absolute top-2 right-2 z-10 flex gap-1 bg-gray-800/90 rounded-lg p-1 shadow-lg">
-        <button
-          onClick={handleZoomOut}
-          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-          title="Zoom out"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M20 12H4"
-            />
-          </svg>
-        </button>
-        <button
-          onClick={handleResetView}
-          className="px-2 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors text-sm font-medium min-w-12"
-          title="Reset view"
-        >
-          {Math.round(zoom * 100)}%
-        </button>
-        <button
-          onClick={handleZoomIn}
-          className="w-8 h-8 flex items-center justify-center rounded hover:bg-gray-700 text-gray-300 hover:text-white transition-colors"
-          title="Zoom in"
-        >
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 4v16m8-8H4"
-            />
-          </svg>
-        </button>
-      </div>
-
-      {/* Drag hint */}
-      {!isDragging && zoom !== 1 && (
-        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-10 text-xs text-gray-400 bg-gray-800/80 px-2 py-1 rounded pointer-events-none">
-          Drag to pan
-        </div>
-      )}
-
-      {/* Container - scrollable at 100% zoom, pannable when zoomed */}
-      <div
-        ref={containerRef}
-        className={`relative w-full rounded-lg bg-gray-900/30 ${
-          zoom === 1 ? "overflow-visible" : "overflow-hidden"
-        }`}
-        style={{
-          height: zoom === 1 ? "auto" : `${height}px`,
-          minHeight: "200px",
-          cursor: zoom !== 1 ? (isDragging ? "grabbing" : "grab") : "default",
-          touchAction: zoom !== 1 ? "none" : "auto",
-        }}
-        onPointerDown={zoom !== 1 ? handlePointerDown : undefined}
-        onPointerMove={zoom !== 1 ? handlePointerMove : undefined}
-        onPointerUp={zoom !== 1 ? handlePointerUp : undefined}
-        onPointerCancel={zoom !== 1 ? handlePointerUp : undefined}
-      >
-        <div
-          style={{
-            transform:
-              zoom !== 1
-                ? `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`
-                : "none",
-            transformOrigin: "top left",
-            width: "100%",
-            transition: isDragging ? "none" : "transform 0.1s ease-out",
-          }}
-        >
-          <iframe
-            ref={iframeRef}
-            srcDoc={htmlDoc}
-            sandbox="allow-scripts allow-same-origin"
-            className="w-full border-0 bg-transparent pointer-events-none"
-            style={{
-              height: `${height}px`,
-              minHeight: "200px",
-              overflow: "hidden",
-            }}
-            title={page.name}
-            scrolling="no"
-          />
-        </div>
-      </div>
-    </div>
-  );
-}
+type BuiltInTab = "stats" | "resources" | "abilities" | "quests" | "variables";
 
 export default function StatsPage(storyData: StoryData) {
-  // Check if using new character schema system
-  const hasCharacterSchema = !!(
-    storyData.characterSchema && storyData.characterData
-  );
-
-  // Get custom pages from schema
-  const customPages = storyData.characterSchema?.pages || [];
-
-  // Check if schema has main template (legacy single-page) vs pages (new multi-page)
-  const hasMainTemplate = !!storyData.characterSchema?.template?.html;
-  const hasCustomPages = customPages.length > 0;
-
-  const [activeTab, setActiveTab] = useState<string>(() => {
+  const [activeTab, setActiveTab] = useState<BuiltInTab>(() => {
     if (typeof window !== "undefined") {
       const saved = localStorage.getItem("statsActiveTab");
-      // If saved tab is "character" but we have pages instead, use first page
+      // Validate saved tab is a valid BuiltInTab
       if (
-        hasCharacterSchema &&
-        saved === "character" &&
-        hasCustomPages &&
-        !hasMainTemplate
+        saved === "stats" ||
+        saved === "resources" ||
+        saved === "abilities" ||
+        saved === "quests" ||
+        saved === "variables"
       ) {
-        return `page:${customPages[0]?.id || "overview"}`;
+        return saved;
       }
-      // If using schema mode and saved tab is stats/resources, redirect appropriately
-      if (hasCharacterSchema && (saved === "stats" || saved === "resources")) {
-        if (hasCustomPages && !hasMainTemplate) {
-          return `page:${customPages[0]?.id || "overview"}`;
-        }
-        return "character";
-      }
-      // If saved tab is "character" but not in schema mode, use "stats"
-      if (!hasCharacterSchema && saved === "character") {
-        return "stats";
-      }
-      // If saved tab is a page that no longer exists, fallback
-      if (
-        saved?.startsWith("page:") &&
-        !customPages.find((p) => `page:${p.id}` === saved)
-      ) {
-        return hasCharacterSchema
-          ? hasCustomPages && !hasMainTemplate
-            ? `page:${customPages[0]?.id}`
-            : "character"
-          : "stats";
-      }
-      return (
-        saved ||
-        (hasCharacterSchema
-          ? hasCustomPages && !hasMainTemplate
-            ? `page:${customPages[0]?.id}`
-            : "character"
-          : "stats")
-      );
     }
-    return hasCharacterSchema
-      ? hasCustomPages && !hasMainTemplate
-        ? `page:${customPages[0]?.id}`
-        : "character"
-      : "stats";
+    return "stats";
   });
 
-  const handleTabChange = (tab: string) => {
+  const handleTabChange = (tab: BuiltInTab) => {
     setActiveTab(tab);
     if (typeof window !== "undefined") {
       localStorage.setItem("statsActiveTab", tab);
@@ -344,33 +71,27 @@ export default function StatsPage(storyData: StoryData) {
         {/* Tab Navigation */}
         <div className="flex gap-1 px-3 pt-2 pb-1 border-b border-blue-800/30 overflow-x-auto scrollbar-hide">
           {[
-            // Show "Character" tab when using schema with main template (legacy single-page)
-            // Don't show it if we only have pages (new multi-page system)
-            ...(hasCharacterSchema && hasMainTemplate && !hasCustomPages
-              ? [{ id: "character", label: "Character", icon: "User" }]
-              : []),
-            // If no schema at all, show legacy Stats/Resources tabs
-            ...(!hasCharacterSchema
-              ? [
-                  { id: "stats", label: "Stats", icon: "BarChart2" },
-                  { id: "resources", label: "Resources", icon: "Zap" },
-                ]
-              : []),
-            // Add custom pages from schema (these replace the Character tab in new system)
-            ...customPages
-              .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-              .map((page) => ({
-                id: `page:${page.id}`,
-                label: page.name,
-                icon: page.icon || "FileText",
-              })),
+            { id: "stats" as BuiltInTab, label: "Stats", icon: "BarChart2" },
+            { id: "resources" as BuiltInTab, label: "Resources", icon: "Zap" },
             // Show abilities tab if character has abilities
             ...(storyData.abilities && storyData.abilities.length > 0
-              ? [{ id: "abilities", label: "Abilities", icon: "Sparkles" }]
+              ? [
+                  {
+                    id: "abilities" as BuiltInTab,
+                    label: "Abilities",
+                    icon: "Sparkles",
+                  },
+                ]
               : []),
-            { id: "quests", label: "Quests", icon: "Scroll" },
+            { id: "quests" as BuiltInTab, label: "Quests", icon: "Scroll" },
             ...(storyData.variables && storyData.variables.length > 0
-              ? [{ id: "variables", label: "Variables", icon: "Variable" }]
+              ? [
+                  {
+                    id: "variables" as BuiltInTab,
+                    label: "Variables",
+                    icon: "Variable",
+                  },
+                ]
               : []),
           ].map((tab) => (
             <button
@@ -390,22 +111,6 @@ export default function StatsPage(storyData: StoryData) {
 
         {/* Tab Content */}
         <div className="p-4 overflow-visible">
-          {/* Character Tab (Schema Mode) */}
-          {activeTab === "character" && hasCharacterSchema && (
-            <div className={hasMainTemplate ? "-m-4" : ""}>
-              <CharacterSheet
-                schema={storyData.characterSchema!}
-                data={storyData.characterData!}
-                readOnly={true}
-                compact={true}
-                context={{
-                  playerName: storyData.player_name,
-                  playerSummary: storyData.player_summary,
-                }}
-              />
-            </div>
-          )}
-
           {/* Stats Tab */}
           {activeTab === "stats" && (
             <div>
@@ -1178,19 +883,6 @@ export default function StatsPage(storyData: StoryData) {
                 </div>
               </div>
             )}
-
-          {/* Custom Pages from Schema */}
-          {activeTab.startsWith("page:") &&
-            (() => {
-              const pageId = activeTab.replace("page:", "");
-              const page = customPages.find((p) => p.id === pageId);
-              if (!page) return null;
-              return (
-                <div className="-m-4">
-                  <CustomPageRenderer page={page} storyData={storyData} />
-                </div>
-              );
-            })()}
         </div>
       </div>
     </div>

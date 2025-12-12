@@ -96,14 +96,7 @@ describe("Formula Roll Tool", () => {
 
   it("should error when using variable syntax (variables removed)", async () => {
     // Variable substitution has been removed - {{var}} syntax should fail
-    const storyData = createMockStoryData({
-      characterData: {
-        values: {
-          Strength_mod: 4,
-          proficiency: 3,
-        },
-      },
-    });
+    const storyData = createMockStoryData();
     const toolCall = createToolCall("formula_roll", {
       formula: "1d20+{{Strength_mod}}+{{proficiency}}", // This should fail now
       dc: 15,
@@ -170,15 +163,9 @@ describe("Formula Roll Tool", () => {
 
 describe("Opposed Formula Tool", () => {
   it("should roll opposed formulas and determine winner", async () => {
-    const storyData = createMockStoryData({
-      characterData: {
-        values: {
-          Stealth: 8,
-        },
-      },
-    });
+    const storyData = createMockStoryData();
     const toolCall = createToolCall("opposed_formula", {
-      player_formula: "1d20+{{Stealth}}",
+      player_formula: "1d20+8",
       opponent_formula: "1d20+5",
       opponent_name: "Guard",
       reason: "Sneaking past the guard",
@@ -189,7 +176,7 @@ describe("Opposed Formula Tool", () => {
     expect(result.results).toHaveLength(1);
     const oppResult = result.results[0].result as any;
     expect(oppResult.type).toBe("opposed_formula");
-    expect(oppResult.playerFormula).toBe("1d20+{{Stealth}}");
+    expect(oppResult.playerFormula).toBe("1d20+8");
     expect(oppResult.opponentName).toBe("Guard");
     expect(["player", "opponent", "tie"]).toContain(oppResult.winner);
     expect(oppResult.margin).toBeGreaterThanOrEqual(0);

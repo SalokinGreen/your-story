@@ -233,25 +233,8 @@ describe("parseBigAdventureStageOutput", () => {
 
   describe("mechanics stage", () => {
     it("should parse valid mechanics stage output", () => {
+      // Mechanics stage now only outputs abilities and variables (not stats/resources)
       const content = JSON.stringify({
-        characterSchema: {
-          version: 1,
-          name: "Test Schema",
-          fields: [
-            {
-              id: "field_strength",
-              name: "Strength",
-              type: "number",
-              category: "Attributes",
-              defaultValue: 50,
-              description: "Physical power",
-            },
-          ],
-          categories: [{ id: "cat_attr", name: "Attributes", order: 0 }],
-        },
-        characterData: {
-          values: { field_strength: 50 },
-        },
         abilities: [
           {
             name: "Strike",
@@ -266,60 +249,44 @@ describe("parseBigAdventureStageOutput", () => {
         variables: [
           { id: "var_001", name: "Quest Progress", type: "number", value: 0 },
         ],
-        lore: [], // mechanics lore
       });
 
       const result = parseBigAdventureStageOutput(content, "mechanics");
       expect(result).not.toBeNull();
-      expect(result?.storyTemplate?.characterSchema?.fields).toHaveLength(1);
       expect(result?.storyTemplate?.abilities).toHaveLength(1);
+      expect(result?.storyTemplate?.variables).toHaveLength(1);
     });
 
     it("should handle mechanics with malformed property name", () => {
+      // Mechanics stage now only outputs abilities and variables (not stats/resources)
       const content = `{
-        "characterSchema": {
-          "version": 1,
-          "name": "Test",
-          "fields": [
-            { "id": "f1", "name": "Strength", "type": "number", "defaultValue": 50 },
-            { " "id": "f2", "name": "Dexterity", "type": "number", "defaultValue": 45 }
-          ],
-          "categories": []
-        },
-        "characterData": { "values": {} },
-        "abilities": [],
-        "variables": [],
-        "lore": []
+        "abilities": [
+          { "name": "Strength Strike", "description": "Power attack", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "💪" },
+          { " "name": "Quick Dodge", "description": "Agility move", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "🎯" }
+        ],
+        "variables": []
       }`;
 
       const result = parseBigAdventureStageOutput(content, "mechanics");
       expect(result).not.toBeNull();
-      expect(result?.storyTemplate?.characterSchema?.fields).toHaveLength(2);
+      expect(result?.storyTemplate?.abilities).toHaveLength(2);
     });
 
     it("should handle truncated mechanics output", () => {
+      // Mechanics stage now only outputs abilities and variables (not stats/resources)
       const content = `{
-        "characterSchema": {
-          "version": 1,
-          "name": "Test",
-          "fields": [
-            { "id": "f1", "name": "Strength", "type": "number", "defaultValue": 50, "description": "Power" },
-            { "id": "f2", "name": "Dexterity", "type": "number", "defaultValue": 45, "description": "Agility" }
-          ],
-          "categories": []
-        },
-        "characterData": { "values": { "f1": 50, "f2": 45 } },
         "abilities": [
-          { "name": "Strike", "description": "Basic attack", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "⚔️" }
+          { "name": "Strike", "description": "Basic attack", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "⚔️" },
+          { "name": "Defend", "description": "Defensive stance", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "🛡️" }
         ],
         "variables": [
           { "id": "var_001", "name": "Quest", "type": "number", "value": 0`;
 
       const result = parseBigAdventureStageOutput(content, "mechanics");
       expect(result).not.toBeNull();
-      expect(
-        result?.storyTemplate?.characterSchema?.fields?.length
-      ).toBeGreaterThanOrEqual(1);
+      expect(result?.storyTemplate?.abilities?.length).toBeGreaterThanOrEqual(
+        1
+      );
     });
   });
 
@@ -407,89 +374,65 @@ describe("parseBigAdventureStageOutput", () => {
 
   describe("real-world AI mistakes", () => {
     it('should handle the " "name" mistake from production', () => {
+      // Mechanics stage now only outputs abilities and variables (not stats/resources)
       const content = `\`\`\`json
 {
-  "characterSchema": {
-    "version": 1,
-    "name": "Custom",
-    "fields": [
-      {
-        "id": "f1",
-        "name": "Neural Agility",
-        "type": "number",
-        "defaultValue": 65,
-        "description": "Your ability to navigate digital landscapes"
-      },
-      {
-        " "id": "f2",
-        "name": "Street Smarts",
-        "type": "number",
-        "defaultValue": 55,
-        "description": "Your knowledge of the underworld"
-      }
-    ],
-    "categories": []
-  },
-  "characterData": { "values": {} },
-  "abilities": [],
-  "variables": [],
-  "lore": []
+  "abilities": [
+    {
+      "name": "Neural Strike",
+      "description": "Your ability to attack digital systems",
+      "grade": "novice",
+      "cost": [],
+      "cooldown": 0,
+      "currentCooldown": 0,
+      "symbol": "🧠"
+    },
+    {
+      " "name": "Street Sense",
+      "description": "Your knowledge of the underworld",
+      "grade": "novice",
+      "cost": [],
+      "cooldown": 0,
+      "currentCooldown": 0,
+      "symbol": "🎮"
+    }
+  ],
+  "variables": []
 }
 \`\`\``;
 
       const result = parseBigAdventureStageOutput(content, "mechanics");
       expect(result).not.toBeNull();
-      expect(result?.storyTemplate?.characterSchema?.fields).toHaveLength(2);
-      expect(result?.storyTemplate?.characterSchema?.fields?.[1].name).toBe(
-        "Street Smarts"
-      );
+      expect(result?.storyTemplate?.abilities).toHaveLength(2);
+      expect(result?.storyTemplate?.abilities?.[1].name).toBe("Street Sense");
     });
 
     it("should handle early cutoff with complete items", () => {
+      // Mechanics stage now only outputs abilities and variables (not stats/resources)
       const content = `{
-  "characterSchema": {
-    "version": 1,
-    "name": "Custom",
-    "fields": [
-      {"id": "f1", "name": "Strength", "type": "number", "defaultValue": 50, "description": "Physical power"},
-      {"id": "f2", "name": "Intelligence", "type": "number", "defaultValue": 60, "description": "Mental acuity"},
-      {"id": "f3", "name": "Charisma", "type": "number", "defaultValue": 45, "description": "Social skills"}
-    ],
-    "categories": []
-  },
-  "characterData": { "values": { "f1": 50, "f2": 60, "f3": 45 } },
   "abilities": [
-    {"name": "Fireball", "description": "Launch a ball of fire", "grade": "adept", "cost": [{"type": "resource", "name": "Mana", "amount": 10}], "cooldown": 2, "currentCooldown": 0, "symbol": "🔥"}
+    {"name": "Fireball", "description": "Launch a ball of fire", "grade": "adept", "cost": [{"type": "variable", "name": "Mana", "amount": 10}], "cooldown": 2, "currentCooldown": 0, "symbol": "🔥"},
+    {"name": "Ice Shard", "description": "Hurl a shard of ice", "grade": "novice", "cost": [], "cooldown": 1, "currentCooldown": 0, "symbol": "❄️"}
   ],
   "variables": [
     {"id": "var_001", "name": "Main Quest Progress", "type": "number", "value": 0, "minValue": 0, "maxValue": 100`;
 
       const result = parseBigAdventureStageOutput(content, "mechanics");
       expect(result).not.toBeNull();
-      // Should have at least the complete items
-      expect(
-        result?.storyTemplate?.characterSchema?.fields?.length
-      ).toBeGreaterThanOrEqual(3);
+      // Should have at least the complete abilities
       expect(result?.storyTemplate?.abilities?.length).toBeGreaterThanOrEqual(
-        1
+        2
       );
     });
 
     it("should handle AI adding explanation text before JSON", () => {
+      // Mechanics stage now only outputs abilities and variables (not stats/resources)
       const content = `Here's the mechanics for your adventure:
 
 \`\`\`json
 {
-  "characterSchema": {
-    "version": 1,
-    "name": "Custom",
-    "fields": [{"id": "f1", "name": "Power", "type": "number", "defaultValue": 50, "description": "Strength"}],
-    "categories": []
-  },
-  "characterData": { "values": {} },
-  "abilities": [],
-  "variables": [],
-  "lore": []
+  "abilities": [{"name": "Power Strike", "description": "A powerful attack", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "💪"}],
+  "variables": []
 }
 \`\`\`
 
@@ -497,9 +440,7 @@ I hope this works for your adventure!`;
 
       const result = parseBigAdventureStageOutput(content, "mechanics");
       expect(result).not.toBeNull();
-      expect(result?.storyTemplate?.characterSchema?.fields?.[0].name).toBe(
-        "Power"
-      );
+      expect(result?.storyTemplate?.abilities?.[0].name).toBe("Power Strike");
     });
 
     it("should handle unquoted emoji values", () => {

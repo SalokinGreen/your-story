@@ -56,6 +56,10 @@ describe("AI Context Building", () => {
     maxMomentum: 10,
     earnedPointsFromChapters: [],
     earnedPointsFromQuests: [],
+    abilities: [],
+    level: 1,
+    upgradesSpent: 0,
+    conditions: [],
   };
 
   describe("storyDataToString", () => {

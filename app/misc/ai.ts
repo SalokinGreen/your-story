@@ -529,9 +529,21 @@ export function storyDataToString(storyData: StoryData): string {
     }
   }
 
+  // Character Sheet notes - highest priority, always at the top
+  const characterSheetLore = storyData.lore.filter(
+    (lore) => lore.type === "character_sheet" && lore.enabled !== false
+  );
+  if (characterSheetLore.length > 0) {
+    result += `\n## Character Sheet:\n`;
+    characterSheetLore.forEach((lore) => {
+      result += `----\n${lore.title}\n${lore.content}\n`;
+    });
+  }
+
   // Lore - only include always-on lore or recently triggered lore (last 10 parts)
   const currentPartIndex = storyData.scene.parts.length;
   const activeLore = storyData.lore.filter((lore) => {
+    if (lore.type === "character_sheet") return false; // Handled above
     if (lore.on === false || lore.enabled === false) return false; // Explicitly disabled
     if (lore.alwaysOn) return true; // Always include always-on lore
     if (!lore.lastTriggeredIndex)

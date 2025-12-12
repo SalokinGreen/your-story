@@ -2594,9 +2594,13 @@ function executeSearchNotes(
       matches.length === 1 ? "entry" : "entries"
     }]`;
     for (const match of matches) {
-      contextForStory += `\n\n---\n### ${match.title}${
-        match.type === "mechanics" ? " (Rules)" : ""
-      }\n${match.content}`;
+      const typeSuffix =
+        match.type === "mechanics"
+          ? " (Rules)"
+          : match.type === "character_sheet"
+          ? " (Character)"
+          : "";
+      contextForStory += `\n\n---\n### ${match.title}${typeSuffix}\n${match.content}`;
     }
     contextForStory += `\n---`;
   }
