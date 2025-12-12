@@ -2,9 +2,11 @@
 
 import { StoryData, StoryLore, LoreType } from "../misc/structs";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { useState, useMemo } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
 import LoreImageGenerator from "../components/LoreImageGenerator";
+import { preprocessMarkdown } from "../misc/markdownUtils";
 
 interface LorePageProps extends StoryData {
   onUpdateLore?: (updatedLore: StoryLore[]) => void;
@@ -59,12 +61,9 @@ export default function LorePage(props: LorePageProps) {
   const [editContent, setEditContent] = useState("");
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
 
-  // Filter lore based on search term AND visibility (only show entries that are ON)
+  // Filter lore based on search term and type
   const filteredLore = useMemo(() => {
     return storyData.lore.filter((loreItem) => {
-      // Hide lore entries that are turned OFF
-      if (loreItem.on === false) return false;
-
       // Type filter
       if (selectedType === "secrets") {
         if (!loreItem.secrtet) return false;
@@ -104,7 +103,6 @@ export default function LorePage(props: LorePageProps) {
     };
 
     storyData.lore.forEach((item) => {
-      if (item.on === false) return;
       if (item.secrtet) {
         counts.secrets++;
       } else {
@@ -273,9 +271,9 @@ export default function LorePage(props: LorePageProps) {
       </div>
 
       {/* Main Content - Two Column Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* Lore List */}
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 p-4 xl:col-span-2">
+        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 p-3 lg:col-span-1 xl:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-blue-100 flex items-center gap-2">
               <DynamicIcon
@@ -319,11 +317,12 @@ export default function LorePage(props: LorePageProps) {
             </div>
           )}
 
-          <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-blue-800/50 scrollbar-track-transparent">
+          <div className="space-y-1 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-blue-800/50 scrollbar-track-transparent">
             {filteredLore.map((loreItem, index) => {
               const itemType = loreItem.type || "lore";
               const isSecret = loreItem.secrtet;
               const isSelected = selectedLore?.title === loreItem.title;
+              const isInactive = loreItem.on === false;
 
               return (
                 <button
@@ -333,22 +332,22 @@ export default function LorePage(props: LorePageProps) {
                     setIsEditing(false);
                     setShowImageGen(false);
                   }}
-                  className={`w-full text-left p-3 rounded-xl border transition-all group ${
+                  className={`w-full text-left p-2 rounded-lg border transition-all group ${
                     isSelected
                       ? isSecret
-                        ? "border-amber-500/50 bg-linear-to-r from-amber-500/15 to-orange-500/10 shadow-lg shadow-amber-500/5"
-                        : "border-purple-500/50 bg-linear-to-r from-purple-500/15 to-blue-500/10 shadow-lg shadow-purple-500/5"
+                        ? "border-amber-500/50 bg-linear-to-r from-amber-500/15 to-orange-500/10"
+                        : "border-purple-500/50 bg-linear-to-r from-purple-500/15 to-blue-500/10"
                       : isSecret
                       ? "border-amber-800/30 hover:border-amber-600/40 hover:bg-amber-500/5"
-                      : "border-blue-800/30 hover:border-blue-600/40 hover:bg-blue-500/5"
-                  }`}
+                      : "border-blue-800/20 hover:border-blue-600/40 hover:bg-blue-500/5"
+                  } ${isInactive ? "opacity-50" : ""}`}
                 >
-                  <div className="flex items-start gap-3">
+                  <div className="flex items-center gap-2">
                     {loreItem.thumbnailUrl ? (
                       <img
                         src={loreItem.thumbnailUrl}
                         alt={loreItem.title}
-                        className={`w-14 h-14 rounded-lg object-cover border ${
+                        className={`w-8 h-8 rounded object-cover border shrink-0 ${
                           isSecret
                             ? "border-amber-700/30"
                             : "border-blue-700/30"
@@ -356,7 +355,7 @@ export default function LorePage(props: LorePageProps) {
                       />
                     ) : (
                       <div
-                        className={`w-14 h-14 rounded-lg flex items-center justify-center ${
+                        className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${
                           isSecret
                             ? "bg-amber-900/30 border border-amber-700/30"
                             : `${TYPE_CONFIG[itemType].bgColor} border border-blue-700/30`
@@ -364,7 +363,7 @@ export default function LorePage(props: LorePageProps) {
                       >
                         <DynamicIcon
                           name={isSecret ? "Lock" : TYPE_CONFIG[itemType].icon}
-                          className={`w-6 h-6 ${
+                          className={`w-4 h-4 ${
                             isSecret
                               ? "text-amber-400/60"
                               : TYPE_CONFIG[itemType].color
@@ -374,33 +373,23 @@ export default function LorePage(props: LorePageProps) {
                     )}
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h4 className="font-medium text-sm text-white truncate flex-1">
-                          {loreItem.title}
-                        </h4>
-                        {isSecret && (
-                          <DynamicIcon
-                            name="Lock"
-                            className="w-3.5 h-3.5 text-amber-400 shrink-0"
-                          />
-                        )}
-                      </div>
-
-                      <p className="text-xs text-blue-200/50 line-clamp-2 mb-2">
-                        {(loreItem.content || "").substring(0, 100)}
-                        {(loreItem.content || "").length > 100 ? "..." : ""}
-                      </p>
-
-                      <div className="flex items-center gap-2">
-                        {!isSecret && getTypeBadge(loreItem)}
-                        {loreItem.relatedCharacters?.length > 0 && (
-                          <span className="text-xs px-1.5 py-0.5 bg-blue-500/15 text-blue-300/70 rounded flex items-center gap-0.5">
-                            <DynamicIcon name="Users" className="w-3 h-3" />
-                            {loreItem.relatedCharacters.length}
-                          </span>
-                        )}
-                      </div>
+                      <h4 className="font-medium text-sm text-white truncate">
+                        {loreItem.title}
+                      </h4>
                     </div>
+
+                    {isSecret ? (
+                      <DynamicIcon
+                        name="Lock"
+                        className="w-3 h-3 text-amber-400 shrink-0"
+                      />
+                    ) : (
+                      <span
+                        className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${TYPE_CONFIG[itemType].bgColor} ${TYPE_CONFIG[itemType].color}`}
+                      >
+                        <DynamicIcon name={TYPE_CONFIG[itemType].icon} className="w-3 h-3" />
+                      </span>
+                    )}
                   </div>
                 </button>
               );
@@ -409,7 +398,7 @@ export default function LorePage(props: LorePageProps) {
         </div>
 
         {/* Lore Detail */}
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 xl:col-span-3 flex flex-col">
+        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 lg:col-span-2 xl:col-span-4 flex flex-col">
           {!selectedLore ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="text-center">
@@ -551,7 +540,9 @@ export default function LorePage(props: LorePageProps) {
                   </div>
                 ) : (
                   <div className="prose prose-sm prose-invert max-w-none text-blue-50/90 prose-headings:text-white prose-strong:text-white prose-a:text-purple-400">
-                    <ReactMarkdown>{selectedLore.content}</ReactMarkdown>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {preprocessMarkdown(selectedLore.content || "")}
+                    </ReactMarkdown>
                   </div>
                 )}
 

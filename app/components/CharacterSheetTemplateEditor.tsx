@@ -15,6 +15,8 @@ import {
 } from "@/app/misc/characterSheetTemplate";
 import { DynamicIcon } from "./DynamicIcon";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { preprocessMarkdown } from "@/app/misc/markdownUtils";
 
 interface CharacterSheetTemplateEditorProps {
   template?: CharacterSheetTemplate;
@@ -202,7 +204,9 @@ export default function CharacterSheetTemplateEditor({
             Preview with default values:
           </p>
           <div className="prose prose-sm prose-invert max-w-none text-blue-50/90 prose-headings:text-white prose-strong:text-white">
-            <ReactMarkdown>{preview}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              {preprocessMarkdown(preview)}
+            </ReactMarkdown>
           </div>
         </div>
       ) : (
