@@ -4,11 +4,14 @@
  * Generates complete adventures in stages:
  * - Stage 1: Core concept (title, premise, intro, author notes)
  * - Stage 2: Mechanics Notes (game rules as lore entries)
- * - Stage 2A: Abilities & Variables (character abilities and story variables)
  * - Stage 2B: Character Sheet Template (fillable template with stats/resources)
- * - Stage 3: Content (inventory, lore, relationships, achievements, quests)
- * - Stage 4: Advanced (presets with filled character sheets, agmt, custom tables, upgrades, starting choices)
+ * - Stage 3: Content (lore, achievements, quests)
+ * - Stage 4: Advanced (presets with filled character sheets, agmt, custom tables, starting choices)
  * - Stage 5: Icons (assigns thematic icons to all elements)
+ *
+ * NOTE: Abilities, passives, and inventory are DEPRECATED.
+ * Powers/spells/skills should be defined in mechanics lore entries.
+ * Items should be described in the character sheet template and world lore.
  */
 
 import { StoryData, StartingChoice } from "@/app/misc/structs";
@@ -31,10 +34,10 @@ export type RPGSystemType =
 export type ComplexityLevel = "simple" | "moderate" | "complex";
 
 // Generation stages - content and advanced are split into substages to avoid timeout
+// NOTE: "mechanics" stage (abilities & variables) is DEPRECATED - abilities/passives should be in lore
 export type GenerationStage =
   | "core"
   | "mechanics-notes"
-  | "mechanics"
   | "character-sheet"
   | "content-lore"
   | "content-achievements"
@@ -49,11 +52,7 @@ export type LegacyStage = "core" | "mechanics" | "content" | "advanced";
 // Map substage to its parent legacy stage
 export function getParentStage(stage: GenerationStage): LegacyStage {
   if (stage === "core") return "core";
-  if (
-    stage === "mechanics-notes" ||
-    stage === "mechanics" ||
-    stage === "character-sheet"
-  )
+  if (stage === "mechanics-notes" || stage === "character-sheet")
     return "mechanics";
   if (stage.startsWith("content-")) return "content";
   if (stage === "icons") return "advanced"; // Icons stage uses advanced config
@@ -740,8 +739,7 @@ export interface GenerationProgress {
 }
 
 export interface IconAssignments {
-  inventory?: Record<string, string>;
-  abilities?: Record<string, string>;
+  // NOTE: inventory and abilities fields are DEPRECATED - removed
   achievements?: Record<string, string>;
   relationships?: Record<string, string>;
   presets?: Record<string, string>;
@@ -848,23 +846,7 @@ export function getStageInfo(stage: GenerationStage): {
       number: 2,
       emoji: "📖",
     },
-    mechanics: {
-      name: "Abilities & Variables",
-      description: "Character abilities and story tracking",
-      detailedDescription:
-        "Creates character abilities (skills, spells, techniques) and hidden story variables. Abilities define what your character can do, while variables track story progress, relationships, and faction reputation behind the scenes.",
-      generates: [
-        "Character abilities (skills, spells, techniques)",
-        "Ability costs and cooldowns",
-        "Story tracking variables",
-        "Relationship scores",
-        "Faction reputation",
-      ],
-      instructionHint:
-        "Request specific abilities, magic systems, or story tracking variables",
-      number: 3,
-      emoji: "⚙️",
-    },
+    // NOTE: "mechanics" stage is DEPRECATED - abilities/passives should be defined in mechanics lore and world lore
     "character-sheet": {
       name: "Character Sheet",
       description: "Character stats and sheet template",
@@ -875,7 +857,7 @@ export function getStageInfo(stage: GenerationStage): {
         "Resources (Health, Mana, Gold, etc.)",
         "Skills and proficiencies",
         "Background and personality fields",
-        "Equipment and inventory slots",
+        "Equipment section",
       ],
       instructionHint:
         "Customize sheet layout, stat types, resource pools, or add custom fields",
@@ -914,11 +896,11 @@ export function getStageInfo(stage: GenerationStage): {
       name: "Character Presets",
       description: "Pre-made character builds",
       detailedDescription:
-        "Creates alternative character builds players can choose from, each with unique character sheet values and abilities.",
+        "Creates alternative character builds players can choose from, each with unique character sheet values and backstory.",
       generates: [
         "Character presets/classes",
         "Unique character sheet values",
-        "Preset-specific abilities",
+        "Preset backstories and intros",
       ],
       instructionHint:
         "Shape class archetypes, playstyle variety, or build uniqueness",
@@ -959,11 +941,11 @@ export function getStageInfo(stage: GenerationStage): {
       name: "Icon Assignment",
       description: "Assigns thematic icons to all elements",
       detailedDescription:
-        "Reviews all character sheet fields, abilities, achievements, and lore entries to assign appropriate icons from the game-icons.net library.",
+        "Reviews achievements, lore entries, and relationships to assign appropriate icons from the game-icons.net library.",
       generates: [
-        "Icons for character sheet fields",
-        "Icons for abilities",
-        "Icons for achievements and lore",
+        "Icons for achievements",
+        "Icons for relationships",
+        "Icons for presets",
       ],
       instructionHint:
         "The AI will automatically choose thematic icons for each element",
@@ -1219,85 +1201,10 @@ OUTPUT JSON SCHEMA:
 Remember: Output ONLY the JSON object, nothing else.`;
   }
 
-  if (stage === "mechanics") {
-    // Get mechanics lore from previous stage for context
-    const mechanicsLore = previousResults?.storyTemplate?.lore || [];
-    const mechanicsContext =
-      mechanicsLore.length > 0
-        ? `\n\nREFERENCE - Game rules from previous stage (DO NOT regenerate these):\n${mechanicsLore
-            .map((l) => `- ${l.title}`)
-            .join("\n")}`
-        : "";
-
-    return `${basePrompt}
-
-STAGE 3: ABILITIES & VARIABLES
-Create abilities (skills, spells, techniques) and story variables based on the game rules established in the previous stage.
-${mechanicsContext}
-
-⚠️ CRITICAL: The GAME RULES & MECHANICS have already been defined in the previous stage.
-Use the stat names, resource names, and tier systems from those mechanics - do NOT invent new ones.
-
-IMPORTANT: Character stats and resources are defined in the Character Sheet Template (next stage).
-Your job is to create ABILITIES (active skills/spells) and VARIABLES (hidden story trackers).
-
-═══════════════════════════════════════════════════════════════
-ABILITIES ARRAY
-═══════════════════════════════════════════════════════════════
-
-Create 4-8 starting abilities - active skills, spells, or techniques the character can use.
-Each ability has:
-- name: Display name (e.g., "Fireball", "Healing Touch", "Sneak Attack")
-- description: What this ability does and when to use it
-- grade: Proficiency level (use the tier system from GAME RULES & MECHANICS)
-- cost: Array of costs to use (optional) - e.g., [{ "type": "variable", "name": "Mana", "amount": 10 }]
-- cooldown: Number of turns before ability can be used again (0 = no cooldown)
-- currentCooldown: Always start at 0
-- stat: Optional stat name this ability scales with (must match a stat from mechanics)
-- symbol: Emoji icon for the ability
-
-ABILITY GRADES FOR STARTING CHARACTERS:
-- Most abilities should be at the lowest tiers of your grade system
-- One signature ability can be at a middle tier
-- Avoid giving top-tier abilities at character creation
-
-═══════════════════════════════════════════════════════════════
-STORY VARIABLES
-═══════════════════════════════════════════════════════════════
-
-Create 3-6 hidden variables to track story progress:
-- Relationship scores with key NPCs
-- Faction reputation
-- Story progress flags
-- Quest completion counts
-
-Variable types: "number" (default), "boolean", "string"
-
-CRITICAL: CREATE UNIQUE, ADVENTURE-SPECIFIC CONTENT!
-- Abilities should match the adventure's theme and setting
-- Variables should track meaningful story progress
-
-OUTPUT JSON SCHEMA:
-{
-  "abilities": [
-    { 
-      "name": "Ability Name", 
-      "description": "What this does", 
-      "grade": "novice", 
-      "cost": [{ "type": "variable", "name": "ResourceName", "amount": 5 }],
-      "cooldown": 3,
-      "currentCooldown": 0,
-      "stat": "RelatedStatName",
-      "symbol": "🔥"
-    }
-  ],
-  "variables": [
-    { "id": "var_story_id", "name": "Story Variable Name", "type": "number", "value": 1, "minValue": 1, "maxValue": 10 }
-  ]
-}
-
-Remember: Output ONLY the JSON object, nothing else.`;
-  }
+  // NOTE: The "mechanics" stage (abilities & variables) has been DEPRECATED and removed
+  // from the GenerationStage type. Abilities and passives should be defined in mechanics
+  // lore and world lore instead. If old configs still reference this stage, they'll
+  // fall through to the default empty prompt.
 
   // CHARACTER SHEET TEMPLATE STAGE - Generates the fillable template for the adventure
   if (stage === "character-sheet") {
@@ -1423,6 +1330,60 @@ LORE TRIGGERS (make lore dynamic):
 
 CRITICAL: EVERY lore entry MUST have on_triggers with 3-5 variations OR set alwaysOn=true!
 
+═══════════════════════════════════════════════════════════════
+NOTE WRITING GUIDELINES (by Category)
+═══════════════════════════════════════════════════════════════
+
+Write notes like entries from a great RPG sourcebook — evocative details, practical reference, and just enough mystery to inspire.
+
+**🐉 ENEMY / CREATURE / MONSTER**
+When combat-capable beings appear, track their capabilities:
+- **Appearance** — Physical description, sensory details, what makes them memorable
+- **Game Statistics** — HP, attacks, defenses, special abilities (use the adventure's system)
+- **Combat Behavior** — Tactics, preferred attacks, retreat triggers
+- **Weaknesses** — Exploitable flaws, elemental vulnerabilities
+- **World Connection** — Faction ties, ecological role, lore hooks
+
+**👤 NPC (Non-Combat)**
+For characters the player interacts with socially:
+- **Appearance & Mannerisms** — How they look, speak, move
+- **Personality** — Key traits, quirks, values they hold dear
+- **Motivation** — What do they want? What do they fear?
+- **Secrets** — What are they hiding? What leverage exists?
+- **Relationships** — Connections to other NPCs, factions, the player
+
+**📍 LOCATION**
+For places worth remembering:
+- **Atmosphere** — Sights, sounds, smells, the "feel" of the place
+- **Layout** — Key areas, entrances/exits, notable features
+- **Dangers** — Hazards, enemies, traps, environmental threats
+- **Opportunities** — Resources, secrets, things to discover
+- **History** — What happened here? Why does it matter?
+
+**⚔️ ITEM / ARTIFACT**
+For significant objects:
+- **Description** — Appearance, weight, notable features
+- **Properties** — What does it do? Mechanical effects?
+- **History** — Who made it? Who owned it? Why is it special?
+- **Quirks** — Curses, requirements, personality (if sentient)
+
+**📜 LORE / WORLD DETAIL**
+For broader world information:
+- **Core Facts** — The essential truth of this subject
+- **Common Knowledge** — What most people believe
+- **Hidden Truth** — Secrets, contradictions, deeper meaning
+- **Connections** — How this ties to other world elements
+
+**🏛️ FACTION / ORGANIZATION**
+For groups with influence:
+- **Purpose** — Why do they exist? What do they want?
+- **Structure** — Leadership, ranks, how they operate
+- **Resources** — What power do they wield?
+- **Relationships** — Allies, enemies, neutral parties
+- **Secrets** — Hidden agendas, internal conflicts
+
+**Quality standard:** Write as if each entry appears in a published sourcebook. Rich enough to roleplay, concise enough to reference mid-scene.
+
 OUTPUT JSON SCHEMA:
 {
   "lore": [
@@ -1485,17 +1446,14 @@ Output an empty JSON object.`;
 STAGE 4A: CHARACTER PRESETS
 Generate several different character builds/classes appropriate for this adventure.
 
-Each preset offers a meaningfully different playstyle with unique character sheets, abilities, and starting equipment.
+Each preset offers a meaningfully different playstyle with unique character sheets and starting situation.
 
 CRITICAL - CHARACTER SHEET:
 Each preset MUST include a "characterSheet" field - a filled-out markdown character sheet for that specific character.
 ⚠️ The CHARACTER SHEET TEMPLATE has been provided in the context above. Use its EXACT FORMAT but fill in specific values for each preset character.
 The characterSheet is what gets added to the player's Notes when they pick this preset.
-This is where ALL character stats, attributes, skills, health, mana, etc. are defined - in the markdown character sheet.
+This is where ALL character stats, attributes, skills, health, mana, equipment, powers, etc. are defined - in the markdown character sheet.
 ⚠️ Follow the stat names, skills, and resources defined in the GAME RULES & MECHANICS above.
-
-IMPORTANT: Each preset MUST include abilities. Use abilities from the mechanics stage as a base.
-IMPORTANT: Presets provide their own inventory and abilities arrays - these are the character's starting equipment and skills.
 
 CRITICAL - PRESET INTROS:
 The "intro" field is a COMPLETE REPLACEMENT for the default intro (3-5 paragraphs).
@@ -1506,14 +1464,6 @@ You MUST include a preset with id="preset-custom" and name="Custom" as the LAST 
 This is for players who want to create their own character (self-insert).
 - characterSheet should be the blank template with default values (not filled in)
 - Generic intro letting the player define their own backstory
-- Include basic starting gear in inventory and no special abilities beyond novice level
-
-CRITICAL - USE SETTING-APPROPRIATE ITEMS:
-- Each preset's inventory MUST contain items thematically appropriate to THIS adventure's setting
-- Do NOT use generic fantasy items (no "Leather armor", "Short sword", "Torch", "Healing potion")
-- Items should reflect the character's background and the world they live in
-- Examples: A cyberpunk hacker might have "Data spike", "Neural interface", "Stimpack"
-- Examples: A Lovecraftian investigator might have "Dog-eared journal", "Revolver", "Strange amulet"
 
 CHARACTER STATS IN CHARACTER SHEET (LEVEL 1 CHARACTERS - START WEAK):
 - Use values appropriate to your stat scale as defined in GAME RULES & MECHANICS
@@ -1522,10 +1472,9 @@ CHARACTER STATS IN CHARACTER SHEET (LEVEL 1 CHARACTERS - START WEAK):
 - Only ONE or TWO stats should be notably high (natural talent/specialty)
 - Starting characters should feel capable but not overpowered
 
-ITEM AND ABILITY SYSTEMS:
-- Item types and grades should match what's defined in GAME RULES & MECHANICS
-- Ability grades/tiers should match what's defined in GAME RULES & MECHANICS
-- If the mechanics don't define these, use simple descriptive strings
+DEPRECATED: abilities[] and inventory[] arrays are NO LONGER USED.
+- Character equipment should be listed in the characterSheet markdown
+- Powers/abilities should be defined in mechanics lore and tracked in the characterSheet
 
 OUTPUT JSON SCHEMA:
 {
@@ -1535,10 +1484,8 @@ OUTPUT JSON SCHEMA:
       "name": "string",
       "description": "string (1-2 sentence hook)",
       "icon": "emoji",
-      "characterSheet": "string (FILLED character sheet in markdown format - includes all stats, attributes, skills, resources, backstory)",
+      "characterSheet": "string (FILLED character sheet in markdown format - includes all stats, attributes, skills, resources, equipment, powers, backstory)",
       "intro": "string (3-5 paragraphs - COMPLETE opening narrative for this character)",
-      "inventory": [{ "name": "string", "description": "string", "type": "string (match mechanics)", "grade": "string (match mechanics)" }],
-      "abilities": [{ "name": "string", "description": "string", "grade": "string (match mechanics)", "cost": [], "cooldown": number, "currentCooldown": 0, "symbol": "emoji" }],
       "relationships": [],
       "authorNotes": "string (instructions for the AI narrator for this character)"
     }
@@ -1689,22 +1636,22 @@ AVAILABLE ICONS (${ALL_GAME_ICON_IDS.length} total):
 ${iconList}
 
 ELEMENTS THAT NEED ICONS:
-You will receive a list of items, abilities, achievements, and relationships.
+You will receive a list of achievements, relationships, and presets.
 For each element, choose the most thematically appropriate icon from the list above.
 
+NOTE: Inventory and abilities are DEPRECATED and not included.
+
 GUIDELINES:
-- Match icons to the element's theme/function (e.g., "Health" → "heart", "Strength" → "muscle-up")
-- For weapons, use specific weapon icons (e.g., "sword", "bow-arrow", "axe")
-- For magic, use mystical icons (e.g., "magic-swirl", "crystal-ball", "spell-book")
-- For creatures, use creature icons (e.g., "dragon-head", "wolf-head", "skull")
+- Match icons to the element's theme/function (e.g., "Warrior" preset → "sword", "Mage" → "spell-book")
+- For achievements, use icons that represent the accomplishment
+- For relationships, use icons that represent the character's role or personality
+- For presets (character builds), use icons that represent the class/archetype
 - Be creative but thematic - the icon should represent what the element does
 - If no perfect match exists, choose the closest thematic option
 
 OUTPUT JSON SCHEMA:
 {
   "iconAssignments": {
-    "inventory": { "ItemName": "icon-id", ... },
-    "abilities": { "AbilityName": "icon-id", ... },
     "achievements": { "AchievementTitle": "icon-id", ... },
     "relationships": { "NPCName": "icon-id", ... },
     "presets": { "PresetName": "icon-id", ... }
@@ -1812,25 +1759,7 @@ export function buildBigAdventureMessages(
     const template = previousResults.storyTemplate;
     let elementsMessage = "ELEMENTS THAT NEED ICONS:\n\n";
 
-    if (template.inventory && template.inventory.length > 0) {
-      elementsMessage += `INVENTORY ITEMS:\n`;
-      template.inventory.forEach((i) => {
-        elementsMessage += `- "${i.name}": ${
-          i.description || "No description"
-        } (${i.type})\n`;
-      });
-      elementsMessage += "\n";
-    }
-
-    if (template.abilities && template.abilities.length > 0) {
-      elementsMessage += `ABILITIES:\n`;
-      template.abilities.forEach((a) => {
-        elementsMessage += `- "${a.name}": ${
-          a.description || "No description"
-        }\n`;
-      });
-      elementsMessage += "\n";
-    }
+    // NOTE: inventory and abilities icon assignment is DEPRECATED - removed
 
     if (template.achievements && template.achievements.length > 0) {
       elementsMessage += `ACHIEVEMENTS:\n`;
@@ -2295,15 +2224,8 @@ export function parseBigAdventureStageOutput(
       };
     }
 
-    if (stage === "mechanics") {
-      // Character abilities and variables stage - stats/resources are in character sheet template
-      return {
-        storyTemplate: {
-          abilities: parsed.abilities,
-          variables: parsed.variables,
-        },
-      };
-    }
+    // NOTE: The "mechanics" stage parser has been DEPRECATED and removed
+    // Old configs that somehow still reference this stage will fall through to empty result
 
     if (stage === "character-sheet") {
       // Character sheet template stage - generates fillable template for the adventure
@@ -2447,16 +2369,15 @@ export function mergeBigAdventureResults(
 
     if (result.storyTemplate) {
       // Merge array fields by concatenation instead of replacement
+      // NOTE: abilities and inventory are DEPRECATED - not included here
       const arrayFields = [
         "lore",
-        "abilities",
         "achievements",
         "quests",
         "presets",
         "customTables",
         "variables",
         "relationships",
-        "inventory",
         "stats",
         "resources",
         "conditions",
@@ -2507,25 +2428,7 @@ export function mergeBigAdventureResults(
     if (result.iconAssignments) {
       const assignments = result.iconAssignments;
 
-      // Apply to inventory
-      if (assignments.inventory && merged.storyTemplate.inventory) {
-        merged.storyTemplate.inventory = merged.storyTemplate.inventory.map(
-          (item) => ({
-            ...item,
-            symbol: assignments.inventory![item.name] || item.symbol,
-          })
-        );
-      }
-
-      // Apply to abilities
-      if (assignments.abilities && merged.storyTemplate.abilities) {
-        merged.storyTemplate.abilities = merged.storyTemplate.abilities.map(
-          (ability) => ({
-            ...ability,
-            symbol: assignments.abilities![ability.name] || ability.symbol,
-          })
-        );
-      }
+      // NOTE: inventory and abilities icon assignments are DEPRECATED - removed
 
       // Apply to achievements
       if (assignments.achievements && merged.storyTemplate.achievements) {
@@ -2549,22 +2452,13 @@ export function mergeBigAdventureResults(
           }));
       }
 
-      // Apply to presets (icon field + nested symbol fields)
+      // Apply to presets (icon field)
       if (assignments.presets && merged.storyTemplate.presets) {
         merged.storyTemplate.presets = merged.storyTemplate.presets.map(
           (preset) => ({
             ...preset,
             // Preset uses 'icon' field, not 'symbol'
             icon: assignments.presets![preset.name] || preset.icon,
-            // Also update symbol fields on nested elements within the preset
-            inventory: preset.inventory?.map((item) => ({
-              ...item,
-              symbol: assignments.inventory?.[item.name] || item.symbol,
-            })),
-            abilities: preset.abilities?.map((ability) => ({
-              ...ability,
-              symbol: assignments.abilities?.[ability.name] || ability.symbol,
-            })),
           })
         );
       }
@@ -2592,9 +2486,8 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
   if (stageConfigs.mechanics?.enabled !== false) {
     // Mechanics notes stage runs first (game rules documentation)
     stages.push("mechanics-notes");
-    // Then abilities & variables stage
-    stages.push("mechanics");
-    // Character sheet runs after mechanics (defines stats/resources)
+    // NOTE: "mechanics" stage (abilities & variables) is DEPRECATED - removed
+    // Character sheet runs after mechanics notes (defines stats/resources)
     stages.push("character-sheet");
   }
 
@@ -2654,10 +2547,10 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
     config.contentIterations || DEFAULT_CONTENT_ITERATIONS;
 
   // Rough estimates for input tokens per stage
+  // NOTE: "mechanics" stage is deprecated and removed
   const inputEstimates: Record<GenerationStage, number> = {
     core: 2000,
     "mechanics-notes": 3500, // Expanded prompt with foundational systems
-    mechanics: 3000,
     "character-sheet": 2500,
     "content-lore": 3500,
     "content-achievements": 3000,
@@ -2942,7 +2835,7 @@ Match icons to element themes:
 - Social: conversation, handshake, crown
 - Movement: running-shoe, wingfoot, sprint
 - Stealth: hidden, cloak, shadow`,
-      schema: `{ "iconAssignments": { "inventory": { "ItemName": "icon-id" }, "abilities": { "AbilityName": "icon-id" }, "achievements": { "AchievementTitle": "icon-id" }, "relationships": { "NPCName": "icon-id" }, "presets": { "PresetName": "icon-id" } } }`,
+      schema: `{ "iconAssignments": { "achievements": { "AchievementTitle": "icon-id" }, "relationships": { "NPCName": "icon-id" }, "presets": { "PresetName": "icon-id" } } }`,
     },
   };
 

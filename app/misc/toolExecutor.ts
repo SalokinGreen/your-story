@@ -18,6 +18,7 @@ import {
   RestType,
   REST_CONFIG,
   StoryThread,
+  StoryLore,
 } from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
@@ -540,6 +541,589 @@ export function executeTools(
           command: toolCall.function.name,
           success: true,
           message: successMsg,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for edit_lore_replace
+      if (toolCall.function.name === "edit_lore_replace") {
+        logger.action("Special handling: edit_lore_replace", {
+          toolCallId: toolId,
+        });
+
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: "No lore entries defined.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(args.title, storyData.lore, (l) => l.title);
+        if (!match) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find lore entry matching "${args.title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const lore = match.item;
+
+        const findStr = args.find as string;
+        const replaceStr = args.replace as string;
+        const replaceAll = args.replaceAll === true;
+
+        // Case-insensitive search
+        const regex = new RegExp(
+          findStr.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+          replaceAll ? "gi" : "i"
+        );
+
+        if (!regex.test(lore.content)) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find "${findStr}" in lore entry "${lore.title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const oldContent = lore.content;
+        lore.content = lore.content.replace(regex, replaceStr);
+        lore.embedded = false; // Mark for re-embedding
+
+        const count = (oldContent.match(regex) || []).length;
+        const stateChange = `📝 Updated note "${lore.title}": replaced ${
+          replaceAll ? `all ${count} occurrences of` : ""
+        }"${findStr}" with "${replaceStr}"`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for edit_lore_append
+      if (toolCall.function.name === "edit_lore_append") {
+        logger.action("Special handling: edit_lore_append", {
+          toolCallId: toolId,
+        });
+
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: "No lore entries defined.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(args.title, storyData.lore, (l) => l.title);
+        if (!match) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find lore entry matching "${args.title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const lore = match.item;
+
+        const separator = args.separator ?? "\n";
+        const appendContent = args.content as string;
+        lore.content = lore.content + separator + appendContent;
+        lore.embedded = false; // Mark for re-embedding
+
+        const preview =
+          appendContent.length > 50
+            ? appendContent.substring(0, 47) + "..."
+            : appendContent;
+        const stateChange = `📝 Appended to note "${lore.title}": "${preview}"`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for edit_lore_prepend
+      if (toolCall.function.name === "edit_lore_prepend") {
+        logger.action("Special handling: edit_lore_prepend", {
+          toolCallId: toolId,
+        });
+
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: "No lore entries defined.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(args.title, storyData.lore, (l) => l.title);
+        if (!match) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find lore entry matching "${args.title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const lore = match.item;
+
+        const separator = args.separator ?? "\n";
+        const prependContent = args.content as string;
+        lore.content = prependContent + separator + lore.content;
+        lore.embedded = false; // Mark for re-embedding
+
+        const preview =
+          prependContent.length > 50
+            ? prependContent.substring(0, 47) + "..."
+            : prependContent;
+        const stateChange = `📝 Prepended to note "${lore.title}": "${preview}"`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for toggle_lore
+      if (toolCall.function.name === "toggle_lore") {
+        logger.action("Special handling: toggle_lore", {
+          toolCallId: toolId,
+        });
+
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: "No lore entries defined.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(args.title, storyData.lore, (l) => l.title);
+        if (!match) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find lore entry matching "${args.title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const lore = match.item;
+
+        const wasOn = lore.on !== false;
+        lore.on = !wasOn;
+
+        const stateChange = wasOn
+          ? `📝 Hid note "${lore.title}"`
+          : `📝 Revealed note "${lore.title}"`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for edit_lore_insert
+      if (toolCall.function.name === "edit_lore_insert") {
+        logger.action("Special handling: edit_lore_insert", {
+          toolCallId: toolId,
+        });
+
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: "No lore entries defined.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(args.title, storyData.lore, (l) => l.title);
+        if (!match) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find lore entry matching "${args.title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const lore = match.item;
+        const searchPattern = args.search_line as string;
+        const newContent = args.content as string;
+        const position = (args.position as "above" | "below") || "below";
+
+        // Split content into lines
+        const lines = lore.content.split("\n");
+        let foundIndex = -1;
+
+        // Find the line that matches (case-insensitive contains)
+        for (let i = 0; i < lines.length; i++) {
+          if (lines[i].toLowerCase().includes(searchPattern.toLowerCase())) {
+            foundIndex = i;
+            break;
+          }
+        }
+
+        if (foundIndex === -1) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find line containing "${searchPattern}" in note "${lore.title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Insert content above or below the found line
+        if (position === "above") {
+          lines.splice(foundIndex, 0, newContent);
+        } else {
+          lines.splice(foundIndex + 1, 0, newContent);
+        }
+
+        lore.content = lines.join("\n");
+        lore.embedded = false; // Mark for re-embedding
+
+        const preview =
+          newContent.length > 40
+            ? newContent.substring(0, 37) + "..."
+            : newContent;
+        const stateChange = `📝 Inserted "${preview}" ${position} line in "${lore.title}"`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for merge_lore
+      if (toolCall.function.name === "merge_lore") {
+        logger.action("Special handling: merge_lore", {
+          toolCallId: toolId,
+        });
+
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: "No lore entries defined.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const sourceTitles = args.source_titles as string[];
+        const targetTitle = args.target_title as string;
+        const separator = (args.separator as string) || "\n\n---\n\n";
+        const deleteSourcesFlag = args.delete_sources !== false; // Default true
+
+        if (!sourceTitles || sourceTitles.length < 2) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: "Need at least 2 source titles to merge.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Find all source lore entries
+        const sourceLore: { item: StoryLore; index: number }[] = [];
+        const notFound: string[] = [];
+
+        for (const title of sourceTitles) {
+          const match = findBestMatch(title, storyData.lore, (l) => l.title);
+          if (match) {
+            const index = storyData.lore.indexOf(match.item);
+            sourceLore.push({ item: match.item, index });
+          } else {
+            notFound.push(title);
+          }
+        }
+
+        if (notFound.length > 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find lore entries: ${notFound.join(", ")}`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Merge content
+        const mergedContent = sourceLore
+          .map((s) => `## ${s.item.title}\n\n${s.item.content}`)
+          .join(separator);
+
+        // Create new merged lore entry
+        const newLore: StoryLore = {
+          title: targetTitle,
+          content: mergedContent,
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: sourceLore.some((s) => s.item.secrtet),
+          keys: [],
+          on: sourceLore.every((s) => s.item.on !== false),
+          embedded: false,
+        };
+
+        // Add the merged entry
+        storyData.lore.push(newLore);
+
+        // Delete source entries if requested (in reverse order to preserve indices)
+        if (deleteSourcesFlag) {
+          const indices = sourceLore.map((s) => s.index).sort((a, b) => b - a);
+          for (const idx of indices) {
+            storyData.lore.splice(idx, 1);
+          }
+        }
+
+        const stateChange = `📝 Merged ${
+          sourceTitles.length
+        } notes into "${targetTitle}"${
+          deleteSourcesFlag ? " (sources deleted)" : ""
+        }`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for duplicate_lore
+      if (toolCall.function.name === "duplicate_lore") {
+        logger.action("Special handling: duplicate_lore", {
+          toolCallId: toolId,
+        });
+
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: "No lore entries defined.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(
+          args.source_title,
+          storyData.lore,
+          (l) => l.title
+        );
+        if (!match) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find lore entry matching "${args.source_title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const sourceLore = match.item;
+        const newTitle = args.new_title as string;
+
+        // Check if new title already exists
+        const existingMatch = findBestMatch(
+          newTitle,
+          storyData.lore,
+          (l) => l.title
+        );
+        if (existingMatch && existingMatch.score > 0.9) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `A note with title "${newTitle}" already exists`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Create duplicate with new title
+        const newLore: StoryLore = {
+          title: newTitle,
+          content: sourceLore.content,
+          relatedCharacters: sourceLore.relatedCharacters
+            ? [...sourceLore.relatedCharacters]
+            : [],
+          relatedLocations: sourceLore.relatedLocations
+            ? [...sourceLore.relatedLocations]
+            : [],
+          secrtet: sourceLore.secrtet,
+          keys: sourceLore.keys ? [...sourceLore.keys] : [],
+          on: sourceLore.on,
+          on_triggers: sourceLore.on_triggers
+            ? [...sourceLore.on_triggers]
+            : undefined,
+          off_triggers: sourceLore.off_triggers
+            ? [...sourceLore.off_triggers]
+            : undefined,
+          var_on_triggers: sourceLore.var_on_triggers
+            ? [...sourceLore.var_on_triggers]
+            : undefined,
+          var_off_triggers: sourceLore.var_off_triggers
+            ? [...sourceLore.var_off_triggers]
+            : undefined,
+          type: sourceLore.type,
+          tags: sourceLore.tags ? [...sourceLore.tags] : undefined,
+          folder: sourceLore.folder,
+          embedded: false, // New copy needs embedding
+        };
+
+        storyData.lore.push(newLore);
+
+        const stateChange = `📝 Duplicated "${sourceLore.title}" as "${newTitle}"`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for search_lore_content (read-only)
+      if (toolCall.function.name === "search_lore_content") {
+        logger.action("Special handling: search_lore_content", {
+          toolCallId: toolId,
+        });
+
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: true,
+            message: "No lore entries to search.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const query = (args.query as string).toLowerCase();
+        const caseSensitive = args.case_sensitive === true;
+        const maxResults = (args.max_results as number) || 10;
+
+        const searchQuery = caseSensitive ? (args.query as string) : query;
+        const results: { title: string; excerpt: string; lineNum: number }[] =
+          [];
+
+        for (const lore of storyData.lore) {
+          const content = caseSensitive
+            ? lore.content
+            : lore.content.toLowerCase();
+          const lines = lore.content.split("\n");
+
+          for (let i = 0; i < lines.length; i++) {
+            const line = caseSensitive ? lines[i] : lines[i].toLowerCase();
+            if (line.includes(searchQuery)) {
+              // Get context (the matching line)
+              const excerpt =
+                lines[i].length > 80
+                  ? lines[i].substring(0, 77) + "..."
+                  : lines[i];
+              results.push({
+                title: lore.title,
+                excerpt: excerpt.trim(),
+                lineNum: i + 1,
+              });
+
+              if (results.length >= maxResults) break;
+            }
+          }
+          if (results.length >= maxResults) break;
+        }
+
+        const message =
+          results.length > 0
+            ? `Found ${results.length} match${
+                results.length === 1 ? "" : "es"
+              }:\n${results
+                .map((r) => `• "${r.title}" (L${r.lineNum}): ${r.excerpt}`)
+                .join("\n")}`
+            : `No matches found for "${args.query}"`;
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: message,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -2502,6 +3086,38 @@ function convertToolToCommand(
         : "";
       return `/lore_update: ${args.title} | ${newTitle} | ${content} | ${on} | ${onTriggersStr} | ${offTriggersStr}`;
     }
+
+    case "edit_lore_replace":
+      // Handled directly in executeTools
+      return null;
+
+    case "edit_lore_append":
+      // Handled directly in executeTools
+      return null;
+
+    case "edit_lore_prepend":
+      // Handled directly in executeTools
+      return null;
+
+    case "toggle_lore":
+      // Handled directly in executeTools
+      return null;
+
+    case "edit_lore_insert":
+      // Handled directly in executeTools
+      return null;
+
+    case "merge_lore":
+      // Handled directly in executeTools
+      return null;
+
+    case "duplicate_lore":
+      // Handled directly in executeTools
+      return null;
+
+    case "search_lore_content":
+      // Handled directly in executeTools
+      return null;
 
     // Momentum
     case "modify_momentum":

@@ -928,6 +928,237 @@ const updateLoreTool: ToolSchema = {
   },
 };
 
+// Lore Editing Tools (fine-grained content manipulation)
+const editLoreReplaceTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "edit_lore_replace",
+    description:
+      "Replace a specific string in a lore entry's content. Use for surgical edits without rewriting the entire entry. Supports case-insensitive matching.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Lore entry title (fuzzy matching supported)",
+        },
+        find: {
+          type: "string",
+          description: "Text to find (case-insensitive, first occurrence)",
+        },
+        replace: {
+          type: "string",
+          description: "Replacement text",
+        },
+        replaceAll: {
+          type: "boolean",
+          description:
+            "Replace all occurrences instead of just the first (default: false)",
+        },
+      },
+      required: ["title", "find", "replace"],
+    },
+  },
+};
+
+const editLoreAppendTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "edit_lore_append",
+    description:
+      "Append content to the end of a lore entry. Use for adding new information to existing notes.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Lore entry title (fuzzy matching supported)",
+        },
+        content: {
+          type: "string",
+          description: "Content to append at the end",
+        },
+        separator: {
+          type: "string",
+          description:
+            "Separator between existing and new content (default: newline)",
+        },
+      },
+      required: ["title", "content"],
+    },
+  },
+};
+
+const editLorePrependTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "edit_lore_prepend",
+    description:
+      "Prepend content to the beginning of a lore entry. Use for adding important updates at the top.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Lore entry title (fuzzy matching supported)",
+        },
+        content: {
+          type: "string",
+          description: "Content to prepend at the beginning",
+        },
+        separator: {
+          type: "string",
+          description:
+            "Separator between new and existing content (default: newline)",
+        },
+      },
+      required: ["title", "content"],
+    },
+  },
+};
+
+const toggleLoreTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "toggle_lore",
+    description:
+      "Toggle a lore entry's visibility (on→off or off→on). Simpler than show_lore/hide_lore when you don't know current state.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Lore entry title (fuzzy matching supported)",
+        },
+      },
+      required: ["title"],
+    },
+  },
+};
+
+const editLoreInsertTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "edit_lore_insert",
+    description:
+      "Find a line matching a pattern in a lore entry and insert new content above or below it. Useful for inserting new sections or updating specific parts of structured notes.",
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Lore entry title (fuzzy matching supported)",
+        },
+        pattern: {
+          type: "string",
+          description:
+            "Text or regex pattern to match a line (case-insensitive). First matching line is used.",
+        },
+        content: {
+          type: "string",
+          description: "Content to insert",
+        },
+        position: {
+          type: "string",
+          enum: ["above", "below"],
+          description:
+            "Insert above or below the matching line (default: below)",
+        },
+        isRegex: {
+          type: "boolean",
+          description: "Treat pattern as regex (default: false, plain text)",
+        },
+      },
+      required: ["title", "pattern", "content"],
+    },
+  },
+};
+
+const mergeLoreTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "merge_lore",
+    description:
+      "Merge multiple lore entries into one. The target entry receives all content from source entries, which are then deleted.",
+    parameters: {
+      type: "object",
+      properties: {
+        targetTitle: {
+          type: "string",
+          description:
+            "Title of the entry to merge INTO (fuzzy matching supported)",
+        },
+        sourcesTitles: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Titles of entries to merge FROM (will be deleted after merge)",
+        },
+        separator: {
+          type: "string",
+          description:
+            "Separator between merged content (default: two newlines)",
+        },
+      },
+      required: ["targetTitle", "sourcesTitles"],
+    },
+  },
+};
+
+const duplicateLoreTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "duplicate_lore",
+    description:
+      "Create a copy of a lore entry with a new title. Useful for creating variations or templates.",
+    parameters: {
+      type: "object",
+      properties: {
+        sourceTitle: {
+          type: "string",
+          description: "Title of entry to copy (fuzzy matching supported)",
+        },
+        newTitle: {
+          type: "string",
+          description: "Title for the new copy (must be unique)",
+        },
+      },
+      required: ["sourceTitle", "newTitle"],
+    },
+  },
+};
+
+const searchLoreContentTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "search_lore_content",
+    description:
+      "Search through all lore entries for content matching a pattern. Returns matching excerpts with context. Use to find information before updating notes.",
+    parameters: {
+      type: "object",
+      properties: {
+        pattern: {
+          type: "string",
+          description: "Text or regex pattern to search for (case-insensitive)",
+        },
+        isRegex: {
+          type: "boolean",
+          description: "Treat pattern as regex (default: false, plain text)",
+        },
+        includeHidden: {
+          type: "boolean",
+          description: "Include hidden (on=false) lore entries (default: true)",
+        },
+        maxResults: {
+          type: "number",
+          description: "Maximum number of matches to return (default: 10)",
+        },
+      },
+      required: ["pattern"],
+    },
+  },
+};
+
 // Momentum Tool
 const modifyMomentumTool: ToolSchema = {
   type: "function",
@@ -1886,13 +2117,21 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Achievement (1 tool)
   triggerAchievementTool,
 
-  // Lore Management (6 tools)
+  // Lore Management (10 tools)
   createLoreTool,
   deleteLoreTool,
   showLoreTool,
   hideLoreTool,
   updateLoreTool,
   listInactiveLoreTool,
+  editLoreReplaceTool,
+  editLoreAppendTool,
+  editLorePrependTool,
+  toggleLoreTool,
+  editLoreInsertTool,
+  mergeLoreTool,
+  duplicateLoreTool,
+  searchLoreContentTool,
 
   // Momentum (1 tool)
   modifyMomentumTool,

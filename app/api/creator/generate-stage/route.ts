@@ -53,14 +53,7 @@ function getMinimalFallbackJSON(stage: GenerationStage): string {
         intro: "Your story is about to begin...",
         author_notes: "",
       });
-    case "mechanics":
-      return JSON.stringify({
-        characterSchema: null,
-        characterData: null,
-        abilities: [],
-        variables: [],
-        lore: [], // mechanics lore
-      });
+    // NOTE: "mechanics" stage (abilities) is DEPRECATED - removed from GenerationStage
     case "content-lore":
       return JSON.stringify({
         lore: [],

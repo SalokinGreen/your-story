@@ -27,12 +27,8 @@ const TIMEOUT_THRESHOLD_MS = 280000; // 4 min 40 sec - slightly less than Vercel
 const HEARTBEAT_TIMEOUT_MS = 90000; // If no heartbeat for 90 seconds, assume timeout (increased for slow starts)
 const MAX_RETRY_ATTEMPTS = 1; // On timeout, get 1 retry that asks AI to finish JSON immediately
 
-// Stages that must run sequentially (core and mechanics are required by later stages)
-const SEQUENTIAL_STAGES: GenerationStage[] = [
-  "core",
-  "mechanics-notes",
-  "mechanics",
-];
+// Stages that must run sequentially (core is required by later stages)
+const SEQUENTIAL_STAGES: GenerationStage[] = ["core", "mechanics-notes"];
 
 // Stages that can run in parallel (only depend on core + mechanics, not each other)
 const PARALLELIZABLE_STAGES: GenerationStage[] = [

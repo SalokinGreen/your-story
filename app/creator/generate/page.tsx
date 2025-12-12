@@ -163,11 +163,14 @@ function StageToggle({
   disabled?: boolean;
 }) {
   // Map legacy stage to first substage for getStageInfo
+  // NOTE: "mechanics" maps to "mechanics-notes" (abilities stage is deprecated)
   const substage: GenerationStage =
     stage === "content"
       ? "content-lore"
       : stage === "advanced"
       ? "advanced-presets"
+      : stage === "mechanics"
+      ? "mechanics-notes"
       : stage;
   const info = getStageInfo(substage);
 
@@ -4247,11 +4250,14 @@ ${result.description || ""}`;
                             getModelMaxTokens()
                           );
                           // Map legacy stage to first substage for getStageInfo
+                          // NOTE: "mechanics" maps to "mechanics-notes" (abilities stage is deprecated)
                           const substage: GenerationStage =
                             stage === "content"
                               ? "content-lore"
                               : stage === "advanced"
                               ? "advanced-presets"
+                              : stage === "mechanics"
+                              ? "mechanics-notes"
                               : stage;
                           return (
                             <div
@@ -4302,11 +4308,14 @@ ${result.description || ""}`;
                           ] as LegacyStage[]
                         ).map((stage) => {
                           // Map legacy stage to first substage for getStageInfo
+                          // NOTE: "mechanics" maps to "mechanics-notes" (abilities stage is deprecated)
                           const substage: GenerationStage =
                             stage === "content"
                               ? "content-lore"
                               : stage === "advanced"
                               ? "advanced-presets"
+                              : stage === "mechanics"
+                              ? "mechanics-notes"
                               : stage;
                           const info = getStageInfo(substage);
                           const legacyNames: Record<LegacyStage, string> = {
