@@ -159,8 +159,17 @@ export interface CommandResponse {
   toolCallId?: string; // Optional: links response to specific tool call for conversation coherency
 }
 
-// Lore types: "lore" is standard world-building, "mechanics" is game rules (prioritized in context)
-export type LoreType = "lore" | "mechanics" | "character_sheet";
+// Lore types for categorizing notes
+export type LoreType =
+  | "lore" // General world-building
+  | "mechanics" // Game rules (prioritized in context)
+  | "character_sheet" // Player character details (highest priority)
+  | "gm_notes" // Game Master guidance (how to run the adventure)
+  | "npc" // Non-player characters
+  | "item" // Items, artifacts, equipment
+  | "location" // Places, regions, buildings
+  | "faction" // Organizations, groups, guilds
+  | "event"; // Historical events, plot points
 
 export interface StoryLore {
   title: string;
@@ -169,7 +178,7 @@ export interface StoryLore {
   relatedLocations: string[];
   secrtet: boolean;
   keys: string[];
-  type?: LoreType; // "lore" (default), "mechanics" (rules), or "character_sheet" (highest priority - character details)
+  type?: LoreType; // Note category - defaults to "lore"
   alwaysOn?: boolean; // If true, lore is always visible regardless of triggers
   enabled?: boolean; // If false, lore is never visible/checked. Defaults to true.
   on_triggers?: string[]; // Word triggers to turn lore on
@@ -253,6 +262,7 @@ export interface ScenePart {
   gmThinking?: string[]; // GM stage "[GM]" reasoning text for UI display
   revealedLore?: string[]; // Lore titles manually revealed by AI in this part
   stateChanges?: string[]; // Human-readable game state changes from tool calls (for story context)
+  npcReactions?: NPCReaction[]; // NPC reactions to show as notifications (e.g., "Lisa liked this")
   endChapter?: boolean;
   endStory?: boolean;
   gameOver?: boolean;
@@ -307,6 +317,45 @@ export interface Quest {
   points: number; // Points awarded upon completion
   createdAt?: Date; // When the quest was created (for ordering)
 }
+// NPC Status - alive, dead, missing, unknown, departed
+export type NPCStatus = "alive" | "dead" | "missing" | "unknown" | "departed";
+
+// NPC Attitude - how they generally treat the player
+export type NPCAttitude =
+  | "hostile"
+  | "unfriendly"
+  | "neutral"
+  | "friendly"
+  | "allied";
+
+// NPC/Character tracking (enhanced relationship system)
+export interface NPC {
+  id: string; // Unique identifier
+  name: string; // NPC name
+  description: string; // Who they are, appearance, personality
+  role: string; // Their role in the story (e.g., "Village Elder", "Antagonist", "Love Interest")
+  status: NPCStatus; // alive, dead, missing, unknown, departed
+  relationship: string; // Custom text description (e.g., "Trusted mentor", "Bitter rival", "Complicated")
+  attitude: NPCAttitude; // hostile, unfriendly, neutral, friendly, allied
+  lastSeen?: string; // Where/when last encountered
+  faction?: string; // What group they belong to
+  symbol?: string; // Emoji icon
+  custom_symbol_url?: string; // Custom image URL (for reactions)
+  notes?: string; // GM/player notes
+  createdAt: number; // Timestamp
+}
+
+// NPC Reaction - shown as toast notification (like "Lisa liked this")
+export interface NPCReaction {
+  npcId: string; // Which NPC is reacting
+  npcName: string; // NPC name (for display)
+  npcImage?: string; // NPC image URL
+  reaction: string; // The reaction text (e.g., "liked this", "is disappointed", "gained respect")
+  emoji?: string; // Optional emoji (e.g., "❤️", "😠", "🤔")
+  context?: string; // What triggered the reaction
+}
+
+// Legacy alias for backward compatibility
 export interface Relationship {
   name: string; // Character/faction name
   value: number; // Relationship level (-100 to 100)
@@ -431,7 +480,8 @@ export interface Preset {
   resources: Resource[];
   inventory: InventoryItem[];
   abilities?: Ability[]; // Starting abilities for this preset
-  relationships: Relationship[];
+  relationships: Relationship[]; // Legacy
+  npcs?: NPC[]; // Starting NPCs for this preset
   conditions?: Condition[]; // Starting conditions/afflictions for this preset
   variables?: Variable[]; // Starting variables for this preset
   authorNotes: string;
@@ -576,7 +626,8 @@ export interface StoryData {
   earnedPointsFromChapters: number[];
   quests: Quest[]; // Quest system
   earnedPointsFromQuests: string[]; // Array of quest IDs that have awarded points
-  relationships: Relationship[]; // Relationship tracking system
+  relationships: Relationship[]; // Legacy relationship tracking (deprecated)
+  npcs: NPC[]; // NPC tracking system (enhanced relationships)
   conditions: Condition[]; // Active conditions/afflictions affecting the player
   gameOver?: GameOver; // Game over state if the player has permanently died/lost
   activeChallenge?: SceneChallenge; // Current scene challenge (progress clock)

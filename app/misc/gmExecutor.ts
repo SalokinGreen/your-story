@@ -16,6 +16,10 @@ import {
   Combatant,
   CombatState,
   CountdownTimer,
+  NPC,
+  NPCReaction,
+  NPCStatus,
+  NPCAttitude,
 } from "./structs";
 import {
   SkillCheckParams,
@@ -54,6 +58,11 @@ import {
   NPCRollParams,
   AdvanceTurnParams,
   EndCombatParams,
+  // NPC management tools
+  AddNPCParams,
+  UpdateNPCParams,
+  RemoveNPCParams,
+  NPCReactionParams,
 } from "./gmTools";
 import {
   getRPGSystem,
@@ -118,7 +127,12 @@ export interface GMToolResult {
     | GMRemoveCombatantConditionResult
     | GMNPCRollResult
     | GMAdvanceTurnResult
-    | GMEndCombatResult;
+    | GMEndCombatResult
+    // NPC management results
+    | GMAddNPCResult
+    | GMUpdateNPCResult
+    | GMRemoveNPCResult
+    | GMNPCReactionResult;
   contextForStory: string; // Formatted bracket notation for story stage
 }
 
@@ -563,6 +577,36 @@ export interface GMGroupCheckResult {
 }
 
 // ============================================
+// NPC MANAGEMENT RESULT INTERFACES
+// ============================================
+
+export interface GMAddNPCResult {
+  type: "add_npc";
+  npc: NPC;
+  message: string;
+}
+
+export interface GMUpdateNPCResult {
+  type: "update_npc";
+  npc: NPC;
+  changes: string[];
+  message: string;
+}
+
+export interface GMRemoveNPCResult {
+  type: "remove_npc";
+  npcName: string;
+  reason?: string;
+  message: string;
+}
+
+export interface GMNPCReactionResult {
+  type: "npc_reaction";
+  reaction: NPCReaction;
+  message: string;
+}
+
+// ============================================
 // HELPER FUNCTIONS
 // ============================================
 
@@ -906,6 +950,23 @@ export async function executeGMTools(
         result = executeGroupCheck(
           call.id,
           params as GroupCheckParams,
+          modified
+        );
+        break;
+      // NPC management tools
+      case "add_npc":
+        result = executeAddNPC(call.id, params as AddNPCParams, modified);
+        break;
+      case "update_npc":
+        result = executeUpdateNPC(call.id, params as UpdateNPCParams, modified);
+        break;
+      case "remove_npc":
+        result = executeRemoveNPC(call.id, params as RemoveNPCParams, modified);
+        break;
+      case "npc_reaction":
+        result = executeNPCReaction(
+          call.id,
+          params as NPCReactionParams,
           modified
         );
         break;
@@ -4249,5 +4310,312 @@ function executeGroupCheck(
       showIndividualRolls: showIndividual,
     } as GMGroupCheckResult,
     contextForStory,
+  };
+}
+
+// ============================================
+// NPC MANAGEMENT TOOL EXECUTION
+// ============================================
+
+/**
+ * Execute add_npc tool - Register a new NPC in the story
+ */
+function executeAddNPC(
+  toolCallId: string,
+  params: AddNPCParams,
+  storyData: StoryData
+): GMToolResult {
+  // Initialize NPCs array if it doesn't exist
+  if (!storyData.npcs) {
+    storyData.npcs = [];
+  }
+
+  // Check if NPC already exists
+  const existingNPC = storyData.npcs.find(
+    (npc) => npc.name.toLowerCase() === params.name.toLowerCase()
+  );
+
+  if (existingNPC) {
+    return {
+      toolName: "add_npc",
+      toolCallId,
+      success: false,
+      result: {
+        type: "add_npc",
+        npc: existingNPC,
+        message: `NPC "${params.name}" already exists`,
+      } as GMAddNPCResult,
+      contextForStory: `[NPC Error: "${params.name}" already exists in character tracker]`,
+    };
+  }
+
+  // Create new NPC
+  const newNPC: NPC = {
+    id: `npc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+    name: params.name,
+    description: params.description,
+    role: params.role,
+    status: (params.status as NPCStatus) || "alive",
+    relationship: params.relationship || "Stranger",
+    attitude: (params.attitude as NPCAttitude) || "neutral",
+    faction: params.faction,
+    symbol: params.symbol,
+    custom_symbol_url: params.image_url,
+    createdAt: Date.now(),
+  };
+
+  storyData.npcs.push(newNPC);
+
+  const attitudeEmoji = {
+    hostile: "⚔️",
+    unfriendly: "😒",
+    neutral: "😐",
+    friendly: "🙂",
+    allied: "🤝",
+  }[newNPC.attitude];
+
+  return {
+    toolName: "add_npc",
+    toolCallId,
+    success: true,
+    result: {
+      type: "add_npc",
+      npc: newNPC,
+      message: `Added NPC: ${newNPC.name} (${newNPC.role})`,
+    } as GMAddNPCResult,
+    contextForStory: `[NPC Added: ${newNPC.name} ${attitudeEmoji} - ${
+      newNPC.role
+    }${newNPC.relationship !== "Stranger" ? ` (${newNPC.relationship})` : ""}]`,
+  };
+}
+
+/**
+ * Execute update_npc tool - Modify an existing NPC's details
+ */
+function executeUpdateNPC(
+  toolCallId: string,
+  params: UpdateNPCParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.npcs || storyData.npcs.length === 0) {
+    return {
+      toolName: "update_npc",
+      toolCallId,
+      success: false,
+      result: {
+        type: "update_npc",
+        npc: {} as NPC,
+        changes: [],
+        message: "No NPCs exist to update",
+      } as GMUpdateNPCResult,
+      contextForStory: `[NPC Error: No NPCs in character tracker]`,
+    };
+  }
+
+  // Find the NPC by name or ID
+  const npcIndex = storyData.npcs.findIndex(
+    (npc) =>
+      npc.name.toLowerCase() === params.npc.toLowerCase() ||
+      npc.id === params.npc
+  );
+
+  if (npcIndex === -1) {
+    return {
+      toolName: "update_npc",
+      toolCallId,
+      success: false,
+      result: {
+        type: "update_npc",
+        npc: {} as NPC,
+        changes: [],
+        message: `NPC "${params.npc}" not found`,
+      } as GMUpdateNPCResult,
+      contextForStory: `[NPC Error: "${params.npc}" not found in character tracker]`,
+    };
+  }
+
+  const npc = storyData.npcs[npcIndex];
+  const changes: string[] = [];
+
+  // Apply updates
+  if (params.name && params.name !== npc.name) {
+    changes.push(`name: ${npc.name} → ${params.name}`);
+    npc.name = params.name;
+  }
+  if (params.description && params.description !== npc.description) {
+    changes.push(`description updated`);
+    npc.description = params.description;
+  }
+  if (params.role && params.role !== npc.role) {
+    changes.push(`role: ${npc.role} → ${params.role}`);
+    npc.role = params.role;
+  }
+  if (params.status && params.status !== npc.status) {
+    changes.push(`status: ${npc.status} → ${params.status}`);
+    npc.status = params.status as NPCStatus;
+  }
+  if (params.relationship && params.relationship !== npc.relationship) {
+    changes.push(`relationship: ${npc.relationship} → ${params.relationship}`);
+    npc.relationship = params.relationship;
+  }
+  if (params.attitude && params.attitude !== npc.attitude) {
+    changes.push(`attitude: ${npc.attitude} → ${params.attitude}`);
+    npc.attitude = params.attitude as NPCAttitude;
+  }
+  if (params.faction !== undefined) {
+    if (params.faction !== npc.faction) {
+      changes.push(
+        `faction: ${npc.faction || "none"} → ${params.faction || "none"}`
+      );
+      npc.faction = params.faction;
+    }
+  }
+  if (params.last_seen) {
+    changes.push(`last seen: ${params.last_seen}`);
+    npc.lastSeen = params.last_seen;
+  }
+  if (params.notes) {
+    changes.push(`notes updated`);
+    npc.notes = params.notes;
+  }
+
+  if (changes.length === 0) {
+    return {
+      toolName: "update_npc",
+      toolCallId,
+      success: true,
+      result: {
+        type: "update_npc",
+        npc,
+        changes: [],
+        message: `No changes made to ${npc.name}`,
+      } as GMUpdateNPCResult,
+      contextForStory: `[NPC: ${npc.name} - no changes]`,
+    };
+  }
+
+  return {
+    toolName: "update_npc",
+    toolCallId,
+    success: true,
+    result: {
+      type: "update_npc",
+      npc,
+      changes,
+      message: `Updated ${npc.name}: ${changes.join(", ")}`,
+    } as GMUpdateNPCResult,
+    contextForStory: `[NPC Updated: ${npc.name} - ${changes.join(", ")}]`,
+  };
+}
+
+/**
+ * Execute remove_npc tool - Remove an NPC from tracking
+ */
+function executeRemoveNPC(
+  toolCallId: string,
+  params: RemoveNPCParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.npcs || storyData.npcs.length === 0) {
+    return {
+      toolName: "remove_npc",
+      toolCallId,
+      success: false,
+      result: {
+        type: "remove_npc",
+        npcName: params.npc,
+        reason: params.reason,
+        message: "No NPCs exist to remove",
+      } as GMRemoveNPCResult,
+      contextForStory: `[NPC Error: No NPCs in character tracker]`,
+    };
+  }
+
+  // Find the NPC by name or ID
+  const npcIndex = storyData.npcs.findIndex(
+    (npc) =>
+      npc.name.toLowerCase() === params.npc.toLowerCase() ||
+      npc.id === params.npc
+  );
+
+  if (npcIndex === -1) {
+    return {
+      toolName: "remove_npc",
+      toolCallId,
+      success: false,
+      result: {
+        type: "remove_npc",
+        npcName: params.npc,
+        reason: params.reason,
+        message: `NPC "${params.npc}" not found`,
+      } as GMRemoveNPCResult,
+      contextForStory: `[NPC Error: "${params.npc}" not found in character tracker]`,
+    };
+  }
+
+  const removedNPC = storyData.npcs[npcIndex];
+  storyData.npcs.splice(npcIndex, 1);
+
+  return {
+    toolName: "remove_npc",
+    toolCallId,
+    success: true,
+    result: {
+      type: "remove_npc",
+      npcName: removedNPC.name,
+      reason: params.reason,
+      message: `Removed ${removedNPC.name} from character tracker${
+        params.reason ? ` (${params.reason})` : ""
+      }`,
+    } as GMRemoveNPCResult,
+    contextForStory: `[NPC Removed: ${removedNPC.name}${
+      params.reason ? ` - ${params.reason}` : ""
+    }]`,
+  };
+}
+
+/**
+ * Execute npc_reaction tool - Show a social media style reaction notification
+ */
+function executeNPCReaction(
+  toolCallId: string,
+  params: NPCReactionParams,
+  storyData: StoryData
+): GMToolResult {
+  // Find the NPC (optional - reaction can work even if NPC not in tracker)
+  let npc: NPC | undefined;
+  if (storyData.npcs && storyData.npcs.length > 0) {
+    npc = storyData.npcs.find(
+      (n) =>
+        n.name.toLowerCase() === params.npc.toLowerCase() || n.id === params.npc
+    );
+  }
+
+  // Create the reaction object
+  const reaction: NPCReaction = {
+    npcId: npc?.id || params.npc,
+    npcName: npc?.name || params.npc,
+    npcImage: npc?.custom_symbol_url,
+    reaction: params.reaction,
+    emoji: params.emoji,
+    context: params.context,
+  };
+
+  // Construct display string
+  const emoji = params.emoji ? ` ${params.emoji}` : "";
+  const displayStr = `${reaction.npcName} ${reaction.reaction}${emoji}`;
+
+  return {
+    toolName: "npc_reaction",
+    toolCallId,
+    success: true,
+    result: {
+      type: "npc_reaction",
+      reaction,
+      message: displayStr,
+    } as GMNPCReactionResult,
+    contextForStory: `[💬 ${displayStr}${
+      params.context ? ` — ${params.context}` : ""
+    }]`,
   };
 }

@@ -2,7 +2,6 @@
   StoryData,
   Choice,
   CommandResponse,
-  AbilityGrade,
   StoryLore,
   REST_CONFIG,
   getMemoryContent,
@@ -10,10 +9,8 @@
   Combatant,
   CountdownTimer,
 } from "@/app/misc/structs";
-import { getRPGSystem } from "@/app/misc/rpgSystems";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
-import { ABILITY_GRADE_CONFIG } from "@/app/misc/abilitySystem";
 
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
@@ -546,63 +543,12 @@ function getStatDescriptor(value: number): string {
 
 // Build info message - shared across all stages
 // Optional embeddingContext allows embedding-enhanced lore/memory retrieval
+// Note: Stats, resources, abilities, and rpgSystem are DEPRECATED.
+// All mechanics are now defined in "mechanics" type lore entries and handled by GM stage formula_roll.
 export function buildInfoMessage(
   storyData: StoryData,
   embeddingContext?: EmbeddingContext
 ): string {
-  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
-
-  // Build stats section
-  const statsSection = storyData.stats.length
-    ? `## Stats\n${storyData.stats
-        .map(
-          (s) =>
-            `- ${s.name}: ${getStatDescriptor(s.value)}${
-              s.description ? ` (${s.description})` : ""
-            }`
-        )
-        .join("\n")}`
-    : "";
-
-  // Build resources section
-  const resourcesSection = storyData.resources.length
-    ? `## Resources\n${storyData.resources
-        .map(
-          (r) =>
-            `- ${r.name}: ${r.value}/${r.maxValue}${
-              r.description ? ` (${r.description})` : ""
-            }`
-        )
-        .join("\n")}`
-    : "";
-
-  // Build abilities section with grade, cooldown, and cost info
-  const abilitiesSection = storyData.abilities?.length
-    ? `## Abilities\n${storyData.abilities
-        .map((a) => {
-          const gradeLabel = a.grade
-            ? ` (${
-                ABILITY_GRADE_CONFIG[a.grade as AbilityGrade]?.label || a.grade
-              })`
-            : "";
-          const cooldownInfo =
-            (a.cooldown || 0) > 0
-              ? ` [cooldown: ${a.currentCooldown || 0}/${a.cooldown}]`
-              : "";
-          const costInfo = a.cost?.length
-            ? ` [costs: ${a.cost
-                .map((c) => `${c.amount} ${c.name}`)
-                .join(", ")}]`
-            : "";
-          const statInfo = a.stat ? ` [${a.stat}]` : "";
-          const desc = a.description ? ` - ${a.description}` : "";
-          const readyStatus =
-            (a.currentCooldown || 0) > 0 ? " (on cooldown)" : " (ready)";
-          return `- ${a.name}${gradeLabel}${statInfo}${cooldownInfo}${costInfo}${readyStatus}${desc}`;
-        })
-        .join("\n")}`
-    : "";
-
   // Build achievements section - show LOCKED achievements with ai_hint
   const lockedAchievements = storyData.achievements.filter(
     (a) => !a.dateAchieved
@@ -814,6 +760,8 @@ ${
       : "";
 
   // Combine all sections
+  // Note: statsSection, resourcesSection, abilitiesSection are DEPRECATED
+  // All character data is now in character_sheet lore entries
   const sections = [
     `# ${cleanString(storyData.story_name || "Untitled Story")}`,
     storyData.premise ? `**Premise:** ${cleanString(storyData.premise)}` : "",
@@ -822,13 +770,8 @@ ${
         ? ` - ${cleanString(storyData.player_summary)}`
         : ""
     }`,
-    rpgSystem.id !== "3d6"
-      ? `**RPG System:** ${rpgSystem.name} - ${rpgSystem.description}`
-      : "",
     characterSheetSection, // Character sheet - highest priority, at the very top
     mechanicsSection, // Mechanics lore entries - prioritized second
-    statsSection,
-    resourcesSection,
     achievementsSection,
     loreSection,
     memorySection,
@@ -885,7 +828,7 @@ export function buildStoryPrompt({
   gmThinking?: string[]; // DEPRECATED: Full GM reasoning chain of thought
   gmInterleavedConversation?: string; // NEW: Full interleaved GM conversation (thinking + tool results + summary)
 }): { messages: ChatMessage[]; prunedParts: number } {
-  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+  // Note: rpgSystem is DEPRECATED - all dice mechanics are now in "mechanics" type lore entries
 
   // Get model's context limit (used as ceiling only)
   const modelConfig = getModelConfig(modelName);
@@ -1019,11 +962,6 @@ SECTION 5: OUTPUT FORMAT
 - Complex action, multiple NPCs: 400-700 words
 - Combat, emotional climax, revelation: 600-900 words
 - Match pacing to stakes—don't over-describe routine actions
-
-═══════════════════════════════════════════════════════════════
-SECTION 6: RPG SYSTEM REFERENCE
-═══════════════════════════════════════════════════════════════
-${rpgSystem.aiInstructions.diceSystem}
 
 NOW WRITE THE NARRATIVE.`;
 
@@ -1319,7 +1257,7 @@ export function buildToolPrompt({
   embeddingContext?: EmbeddingContext;
   usePrefill?: boolean;
 }): { messages: ChatMessage[] } {
-  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+  // Note: rpgSystem is DEPRECATED - all mechanics are in "mechanics" type lore entries
 
   const systemPrompt = `You are the Game State Manager.
 Your role is to read the latest narrative output and ensure the Game Database matches the story exactly.
@@ -1757,7 +1695,7 @@ export function buildActionAnalysisPrompt({
   storyData: StoryData;
   userAction: string;
 }): { messages: ChatMessage[] } {
-  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
+  // Note: rpgSystem is DEPRECATED - all mechanics are in "mechanics" type lore entries
 
   // Build unified table list - custom tables first, then agmt tables
   const customTableNames = storyData.customTables?.map((t) => t.name) || [];
@@ -2033,7 +1971,7 @@ Let me review the GAME RULES section to make sure I handle this correctly:
 // These examples teach the GM stage workflow with tool calling.
 // They use a generic roll-under system to demonstrate reading mechanics notes.
 
-const GM_FEW_SHOT_SYSTEM_INTRO = `You are the GAME MASTER. Below is an example of how to process a player action.
+const GM_FEW_SHOT_SYSTEM_INTRO = `You are the GAME MASTER. Below is an example of how to process a player action with thorough reasoning.
 
 ---
 ## EXAMPLE (Different game - showing the workflow)
@@ -2044,18 +1982,32 @@ const GM_FEW_SHOT_INFO = `## GAME RULES & MECHANICS
 ### Shadow Protocol System
 In this system, resolution uses 1d100 percentile dice. Roll UNDER your skill value to succeed.
 - **Success**: Roll ≤ skill value (after modifiers)
-- **Critical**: Roll 01-05 (exceptional success)
-- **Fumble**: Roll 96-100 (complication occurs)
+- **Critical**: Roll 01-05 (exceptional success, bonus effect)
+- **Fumble**: Roll 96-100 (complication occurs regardless of skill)
 - **Difficulty**: Easy (+20%), Normal (no mod), Hard (-20%), Extreme (-40%)
 - **High Stats Bonus**: For every 10 points a skill exceeds 50%, add +5% to the roll target
+- **Pushing**: After a failed roll, you may "push" to reroll, but failure on a push always causes a complication
+
+### Combat Rules
+- Initiative: Highest REF acts first
+- Attacks: Roll under Combat skill
+- Damage: Weapon damage - target's armor
+- Wounds: Taking damage over Toughness threshold causes wound levels
 
 ## CHARACTER
+- Name: Alex Chen
 - Infiltration: 55%
 - Combat: 40%
-- Tech: 60%`;
+- Tech: 60%
+- Persuasion: 45%
+- Toughness: 8
+
+## KNOWN NPCS
+- Marcus Webb (security chief) [unfriendly] - Suspects something is off
+- Dr. Elena Vance [neutral] - Works late in the lab, potential witness`;
 
 const GM_FEW_SHOT_USER = `## PLAYER'S ACTION
-"I'll hack into the security terminal to disable the cameras."
+"I'll hack into the security terminal to disable the cameras before the guard patrol comes back."
 
 **INSTRUCTIONS:**
 1. First, check the GAME RULES section - is this roll-under or roll-over?
@@ -2065,28 +2017,84 @@ const GM_FEW_SHOT_USER = `## PLAYER'S ACTION
 You MUST call at least one tool function in this response.`;
 
 const GM_FEW_SHOT_ASSISTANT_THINKING = `[GAME MASTER]
-Let me READ THE MECHANICS NOTES carefully.
+Let me work through this carefully.
 
-**Step 1: What does the GAME RULES section say?**
-- This is a ROLL-UNDER system: "Roll UNDER your skill value to succeed"
-- Success = roll ≤ skill value
-- So I need to use \`reverse_dc: true\` on the formula_roll!
-- Critical on 01-05, Fumble on 96-100
+**1. READING THE MECHANICS**
+First, I MUST check what kind of system this is:
+- "Roll UNDER your skill value to succeed" - this is a ROLL-UNDER system!
+- That means I need \`reverse_dc: true\` on formula_roll
+- Critical on 01-05 (great!), Fumble on 96-100 (always bad)
 - High Stats Bonus: "For every 10 points a skill exceeds 50%, add +5%"
-  - Tech is 60%, which is 10 points over 50%, so +5% bonus
-  - Final target: 60% + 5% = 65%
 
-**Step 2: What is the player trying to do?**
-Hacking into a security terminal. This clearly uses the Tech skill (60%).
-The terminal is standard corporate security - I'll call this "Normal" difficulty (no modifier).
-So the target is 60% + 5% bonus = 65%.
+**2. UNDERSTANDING THE ACTION**
+What is the player really trying to do?
+- **Immediate goal**: Disable security cameras
+- **Why**: They mentioned the guard patrol - they're on a timer
+- **Approach**: Technical solution (hacking) rather than physical (destroying)
+- **Implied planning**: They're thinking ahead, being methodical
 
-**Step 3: Call the tool**
-I'll use formula_roll with:
-- formula: "1d100" 
-- dc: 65 (Tech 60% + 5% high stat bonus)
-- reverse_dc: TRUE (because roll-under system!)
-- reason: "Hack security terminal"`;
+This tells me the player values stealth and precision. Good - I should reward that thinking.
+
+**3. CHARACTER ASSESSMENT**
+Looking at Alex Chen's capabilities:
+- Tech: 60% - This is their best skill! They're a technician at heart.
+- High Stats Bonus applies: 60% is 10 points over 50%, so +5%
+- Final target: 60% + 5% = 65%
+
+Alex is GOOD at this. With a 65% chance of success on a normal difficulty task, they should feel competent. This is their specialty.
+
+**4. DIFFICULTY ASSESSMENT**
+What kind of security system is this?
+- Corporate facility (established in scene) - professional but not military
+- Standard security terminal, not a hardened server room
+- The player hasn't encountered any special countermeasures yet
+
+This feels like NORMAL difficulty (no modifier). If it were cutting-edge tech or Alex was stressed/injured, I'd apply penalties. But right now? Standard corporate security vs a skilled hacker.
+
+**5. ENVIRONMENTAL FACTORS & TIMING**
+The player mentioned the guard patrol:
+- This creates natural tension without me needing to add artificial pressure
+- If they succeed, they have time to explore
+- If they fail, they might still have options (hide, bluff, fight)
+- Either way, the patrol return is a looming deadline
+
+I should note this timing element for the story stage.
+
+**6. STAKES & CONSEQUENCES**
+What happens on success vs failure?
+
+*Success (roll ≤ 65):*
+- Cameras go dark in this sector
+- Alex has a window of opportunity
+- Security might notice the blackout eventually (future tension)
+- This ENABLES their next move without guaranteeing overall success
+
+*Failure (roll > 65):*
+- The terminal rejects access - but WHY?
+- Maybe it logs the attempt (silent alarm?)
+- Maybe it locks Alex out (forcing another approach)
+- Maybe it just fails and they can try again (but time is passing...)
+- I should plan for interesting failure, not just "nothing happens"
+
+*Critical (01-05):*
+- Not just success - Alex finds something extra
+- Maybe access to more than just cameras?
+- Or discovers something about the facility's secrets?
+
+*Fumble (96-100):*
+- Even with 65% skill, fumbles happen
+- This could trigger an immediate alarm
+- Or corrupt something important
+- Complications should be dramatic but not campaign-ending
+
+**7. FINAL ASSESSMENT**
+- Skill: Tech
+- Target: 65% (60% base + 5% high stat bonus)
+- Difficulty: Normal (standard corporate terminal)
+- Roll type: d100 roll-under (MUST use reverse_dc: true!)
+- Stakes: Medium (failure creates complications but isn't lethal)
+
+Let me make the roll.`;
 
 // Simulated tool call and response for few-shot
 const GM_FEW_SHOT_TOOL_CALL = {
@@ -2098,22 +2106,53 @@ const GM_FEW_SHOT_TOOL_CALL = {
       formula: "1d100",
       dc: 65,
       reverse_dc: true,
-      reason: "Hack security terminal to disable cameras",
+      reason: "Hack security terminal to disable cameras before patrol returns",
       stakes: "medium",
+      consequences: {
+        success: "Cameras in this sector go dark. Alex has a window to move freely.",
+        failure: "Terminal rejects access and may log the attempt. Time pressure increases.",
+        fumble: "Security alert triggered - the situation escalates immediately."
+      }
     }),
   },
 };
 
 const GM_FEW_SHOT_TOOL_RESPONSE = `[GAME MASTER]
 ✓ formula_roll: 1d100 → [42] = 42 vs DC 65 (roll-under) → SUCCESS (margin: 23)
-[Reason: Hack security terminal to disable cameras]
+[Reason: Hack security terminal to disable cameras before patrol returns]
 [Stakes: medium]`;
 
 const GM_FEW_SHOT_ASSISTANT_FINAL = `[GAME MASTER]
-The hack succeeded with a roll of 42 vs target 65 (Tech 60% + 5% high stat bonus). Good margin of 23.
-The player gains access to the camera system. I should note this opens up infiltration options.
+**INTERPRETING THE RESULT**
 
-Now I'll call end_gm_thinking to summarize for the story stage.`;
+Roll of 42 vs target 65 = Success with a margin of 23. Let me think about what this means:
+
+**Degree of Success:**
+- This wasn't just success - it was COMFORTABLE success
+- 42 is well under 65, showing Alex's expertise
+- Not a critical (needed 01-05), but still clean work
+- Alex should feel competent and in control here
+
+**What Actually Happens:**
+- The security cameras in this sector go dark
+- Alex has achieved their immediate goal
+- The terminal didn't fight back or raise flags
+- They now have freedom to move
+
+**Future Implications:**
+- The security team WILL eventually notice cameras are down
+- This creates a countdown (when does someone check?)
+- Marcus Webb (security chief) is already suspicious - this might confirm his hunches
+- Dr. Vance working late could be a witness if Alex gets careless
+
+**For the Story Stage:**
+I want to convey:
+- The satisfaction of a clean hack
+- The screens going dark
+- A moment of triumph... but also the clock ticking
+- Alex is skilled at this - their confidence should show
+
+Now I'll hand off to the story stage with this context.`;
 
 const GM_FEW_SHOT_END_TOOL_CALL = {
   id: "call_example_002",
@@ -2121,11 +2160,9 @@ const GM_FEW_SHOT_END_TOOL_CALL = {
   function: {
     name: "end_gm_thinking",
     arguments: JSON.stringify({
-      summary:
-        "Tech check succeeded (42 vs 65, roll-under). Player hacked the security terminal and can now disable cameras.",
+      summary: "Tech check succeeded cleanly (42 vs 65, roll-under). Alex hacked the security terminal and disabled the cameras in this sector. They have a window to move, but the blackout will eventually be noticed.",
       outcome: "success",
-      narrative_hints:
-        "Describe the terminal interface, the satisfaction of bypassing corporate security, and the camera feeds flickering off.",
+      narrative_hints: "Emphasize Alex's expertise - fingers dancing across keys, the satisfying moment when camera feeds flicker to static. Include sensory details: the hum of electronics, the glow of the terminal in the dark room. End with awareness that this window won't last forever - the patrol will return, and someone will notice the cameras are down."
     }),
   },
 };
@@ -2223,56 +2260,21 @@ export function buildGMStagePrompt({
   // Format timers state for context
   const timersSection = formatTimersState(storyData.timers);
 
-  // Use stat-based tools with RPG system
-  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
-
-  // Build stat list with descriptions
-  const statList = (storyData.stats || [])
-    .map(
-      (s) =>
-        `${s.name}: ${s.value}${s.description ? ` (${s.description})` : ""}`
-    )
-    .join(", ");
-
-  // Build resource list with descriptions
-  const resourceList = (storyData.resources || [])
-    .map(
-      (r) =>
-        `${r.name}: ${r.value}/${r.maxValue}${
-          r.description ? ` (${r.description})` : ""
-        }`
-    )
-    .join(", ");
-
-  // Build inventory list (only items that could be used in checks)
-  const usableItems = (storyData.inventory || [])
-    .filter((i) => i.type !== "misc" && i.quantity > 0)
-    .map((i) => {
-      const parts = [i.name];
-      if (i.grade && i.grade !== "common") parts.push(`(${i.grade})`);
-      if (i.durability !== undefined && i.maxDurability)
-        parts.push(`[${i.durability}/${i.maxDurability}]`);
+  // Build NPC list (tracked characters with relationship info)
+  const npcList = (storyData.npcs || [])
+    .filter((n) => n.status !== "departed") // Don't show departed NPCs
+    .map((n) => {
+      const parts = [n.name];
+      if (n.role) parts.push(`(${n.role})`);
+      if (n.attitude && n.attitude !== "neutral") parts.push(`[${n.attitude}]`);
+      if (n.relationship && n.relationship !== "Stranger")
+        parts.push(`- ${n.relationship}`);
+      if (n.status && n.status !== "alive") parts.push(`{${n.status}}`);
       return parts.join(" ");
     })
-    .join(", ");
+    .join("\n- ");
 
-  // Build ability list (only ready abilities)
-  const readyAbilities = (storyData.abilities || [])
-    .filter((a) => !a.currentCooldown || a.currentCooldown === 0)
-    .map((a) => {
-      const parts = [a.name];
-      if (a.grade && a.grade !== "novice") parts.push(`(${a.grade})`);
-      if (a.cost && a.cost.length > 0) {
-        const costs = a.cost.map((c) => `${c.amount} ${c.name}`).join(", ");
-        parts.push(`[costs: ${costs}]`);
-      }
-      return parts.join(" ");
-    })
-    .join(", ");
-
-  const systemPrompt = `You are an expert GAME MASTER AI for a ${
-    rpgSystem.name
-  } (${rpgSystem.id}) game at ${difficulty} difficulty.
+  const systemPrompt = `You are an expert GAME MASTER AI for an interactive story at ${difficulty} difficulty.
 
 You reason through complex situations with depth, fairness, and creativity. Your role is to analyze player actions, determine outcomes through dice mechanics, and orchestrate a living world.
 
@@ -2326,7 +2328,7 @@ When the player acts, reason through these steps IN YOUR THINKING:
 ⚠️ CRITICAL: READ THE GAME RULES FIRST!
 ═══════════════════════════════════════════════════════════════
 
-**CAREFULLY READ the GAME RULES & MECHANICS section below.** Look for:
+**CAREFULLY READ the Character Sheet and Game Mechanics sections in your context.** Look for:
 1. **Roll direction**: Is success "roll UNDER skill" or "roll OVER DC"?
 2. **Difficulty modifiers**: How does the system handle easy/hard tasks?
 3. **Critical ranges**: What rolls trigger crits or fumbles?
@@ -2334,23 +2336,12 @@ When the player acts, reason through these steps IN YOUR THINKING:
 
 ⚠️ **FOLLOW CUSTOM RULES EXACTLY** - Don't substitute standard conventions.
 ${loreSection ? `\n${loreSection}` : ""}
-═══════════════════════════════════════════════════════════════
-RPG SYSTEM: ${rpgSystem.name}
-═══════════════════════════════════════════════════════════════
-${rpgSystem.aiInstructions.diceSystem}
-
-## DIFFICULTY GUIDELINES
-${rpgSystem.aiInstructions.dcGuidelines}
 
 ## CURRENT GAME STATE
-**Stats:** ${statList || "None"}
-**Resources:** ${resourceList || "None"}
-**Usable Items:** ${usableItems || "None"}
-**Ready Abilities:** ${readyAbilities || "None"}
+${npcList ? `**Known NPCs:** ${npcList}` : ""}
 ${combatSection ? `\n${combatSection}` : ""}${
     timersSection ? `\n${timersSection}` : ""
   }
-⚠️ **CRITICAL: You may ONLY use stats that appear in the Stats list above.** Do NOT invent stats like "Perception", "Stealth", etc. if they are not listed.
 
 ═══════════════════════════════════════════════════════════════
 HOW THIS WORKS
@@ -2392,9 +2383,6 @@ TOOL REFERENCE
 
 ### 📝 STATE (call AFTER seeing roll results)
 **Quests:** create_quest, complete_quest, fail_quest, update_quest, delete_quest
-**Items:** add_item, remove_item
-**Abilities:** add_ability, remove_ability, modify_ability, upgrade_ability, reset_ability_cooldown
-**Conditions:** upgrade_condition, downgrade_condition, remove_condition, modify_condition
 **Lore:** create_lore, show_lore, hide_lore, update_lore, delete_lore
 **Memory:** add_memory
 **Variables:** set_variable, modify_variable, toggle_variable, create_variable, delete_variable
@@ -2408,6 +2396,17 @@ TOOL REFERENCE
 **npc_roll** - Roll for NPC: npc_roll(combatant="Goblin", formula="1d20+3", dc=14)
 **advance_turn** - Next in initiative order
 **end_combat** - End and sync player stats (outcome: victory/defeat/fled/truce)
+
+### 👥 NPC MANAGEMENT (relationship tracking)
+**add_npc** - Register a new character: name, description, role, relationship, attitude
+  - attitude: hostile/unfriendly/neutral/friendly/allied
+  - relationship: Custom text like "Trusted mentor", "Bitter rival", "Suspicious ally"
+**update_npc** - Modify: npc (name or ID), then any field to change
+**remove_npc** - Remove from tracking: npc (name or ID)
+**npc_reaction** - Show social media style notification: npc, reaction, emoji, context
+  - Shows toast like "Lisa liked this ❤️" or "Marcus will remember this 👁️"
+  - Use to communicate NPC emotional responses without exposition
+  - Great for relationship impact, personality reinforcement, world reactivity
 
 ### ⏱️ COUNTDOWN TIMERS (for deadline tension)
 **create_timer** - Start a countdown: name, ticks, description, auto_advance (default true)
@@ -2435,35 +2434,108 @@ Use for: stealth as a party, survival trek, group perception, social reception
 **end_gm_thinking** - Summarize results, set outcome (success/failure/mixed/neutral)
 
 ═══════════════════════════════════════════════════════════════
-EXAMPLE GAME MASTER TURN
+EXAMPLE GAME MASTER TURN (Detailed)
 ═══════════════════════════════════════════════════════════════
 
 \`\`\`
 [GAME MASTER]
 **1. UNDERSTANDING THE ACTION**
-The player wants to pick the lock on the merchant's strongbox. They're trying to get inside without alerting anyone.
+The player wants to pick the lock on the merchant's strongbox. Let me think about what's really happening here:
 
-**2. DETERMINING DIFFICULTY**
-- The lock is a standard commercial lock, not a masterwork
-- Character has Dexterity 16, which gives +3 modifier
-- They're proficient (+2) in Thieves' Tools
-- It's nighttime and quiet - failure could be noisy
-- DC 12 seems appropriate for a standard lock
+- **Surface goal**: Get the strongbox open
+- **Deeper goal**: Access whatever's inside (money? documents? evidence?)
+- **Context**: They're in the merchant's office at night, which means they're already trespassing
+- **Stakes**: If caught, they face criminal charges AND blow their investigation
 
-**3. PLANNING CONSEQUENCES**
-- Success: The lock opens silently. They gain access to the contents.
-- Failure: The lock holds. Worse, the picks scrape loudly - do guards hear?
+The player chose stealth over force - they're being careful. I should honor that approach.
+
+**2. CHARACTER ASSESSMENT**
+Looking at their character:
+- Dexterity 16 (+3 modifier) - they're nimble
+- Proficiency in Thieves' Tools (+2) - they have training
+- Total modifier: +5
+
+This character is COMPETENT at this. A trained lockpick with good dexterity shouldn't struggle with routine locks. But is this lock routine?
+
+**3. DETERMINING DIFFICULTY**
+What kind of lock is this?
+- A merchant's strongbox is his livelihood - he'd invest in decent security
+- But it's a small-town merchant, not a bank vault
+- The strongbox is old (I established this earlier in the scene)
+- Old locks can be tricky - worn mechanisms, but also known designs
+
+I'll set DC 12: A moderate challenge. With +5, they succeed on a 7+ (70% chance). That feels right for a competent thief vs a decent-but-not-exceptional lock.
+
+**4. ENVIRONMENTAL FACTORS**
+- It's nighttime: Good for stealth, but working by moonlight/candle?
+- The merchant's family sleeps upstairs
+- A guard patrols outside (established earlier)
+- The wooden floor creaks (also established)
+
+These don't change the DC, but they inform what happens on failure.
+
+**5. PLANNING CONSEQUENCES**
+*If they succeed:*
+- The lock opens with a satisfying click
+- They've proven their skills - confidence boost
+- Now they face a NEW choice: what's inside, and do they take it?
+
+*If they fail (the interesting part):*
+- The lock doesn't just "not open" - that's boring
+- The pick could SNAP, leaving evidence of tampering
+- The scraping noise could wake someone
+- Or... they realize this lock has a TRAP mechanism they almost triggered
+
+I want failure to CREATE a new situation, not just say "try again."
+
+**6. STAKES ASSESSMENT**
+This is MEDIUM stakes:
+- Success: Investigation progresses
+- Failure: Potential discovery, but not immediately lethal
+- Not LOW: They could get caught
+- Not HIGH: Nobody dies if they fail a lockpick
 \`\`\`
 
-*Calls: formula_roll(formula="1d20+3+2", dc=12, reason="Pick the lock silently", stakes="medium", consequences={success: "Lock opens", failure: "Lock holds, makes noise"})*
+*Calls: formula_roll(formula="1d20+5", dc=12, reason="Pick the merchant's strongbox lock", stakes="medium", consequences={success: "Lock opens silently, player accesses contents", failure: "Pick scrapes loudly against worn mechanism, risk of waking household"})*
 
 \`\`\`
 [GAME MASTER]
 Roll: 17 vs DC 12 = SUCCESS (+5 margin)
-Clean work - the lock clicks open without a sound. Now they can see what's inside.
+
+Excellent margin of success. With +5 over the DC, this wasn't just success - it was SMOOTH. The character's expertise shows. They should feel competent here.
+
+Let me think about what this success MEANS:
+- The strongbox is now open
+- No noise was made
+- They have time to examine contents
+- The merchant doesn't know his box has been compromised
+
+This opens up future tension: will the merchant discover the tampering later?
 \`\`\`
 
-*Calls: end_gm_thinking(summary="Lockpicking succeeded (17 vs 12), strongbox opens silently", outcome="success")*
+*Calls: end_gm_thinking(summary="Lockpicking succeeded cleanly (17 vs DC 12, +5 margin). The strongbox clicks open without a sound. Character demonstrates expertise.", outcome="success", narrative_hints="Emphasize the satisfying click of tumblers falling into place, the character's practiced hands, moonlight glinting on the strongbox contents. Leave what's inside as a reveal moment.")*
+
+═══════════════════════════════════════════════════════════════
+EXAMPLE: HANDLING FAILURE INTERESTINGLY
+═══════════════════════════════════════════════════════════════
+
+What if that roll had been a 6 (total 11, FAILURE by 1)?
+
+\`\`\`
+[GAME MASTER]
+Roll: 6 vs DC 12 = FAILURE (by 1)
+
+Hmm, they failed by just ONE. That's not incompetence - that's bad luck on a reasonable attempt. The failure should reflect this: close, but something went wrong.
+
+Options for interesting failure:
+1. The pick ALMOST turns the lock, then slips - making a scraping noise
+2. They feel the lock start to give, then a secondary mechanism catches
+3. The lock opens... but something else happens (a bell? a loose floorboard?)
+
+I'll go with option 1: The noise creates immediate tension without instant capture. Now the player must decide: freeze and wait? Flee? Hide?
+
+This failure ADVANCES the story rather than blocking it.
+\`\`\`
 
 ═══════════════════════════════════════════════════════════════
 IMPORTANT RULES
@@ -2472,9 +2544,7 @@ IMPORTANT RULES
 • **Always call end_gm_thinking** to finish - the loop continues without it
 • **Batch rolling tools** when results don't affect each other
 • **Don't batch state changes with rolls** - wait to see outcomes first
-• **Use calculate** for any math - don't do arithmetic in your head
-• **Passives lower difficulty**, they don't add numerical bonuses
-• **Item/Ability bonuses are calculated by the frontend** - just specify what's used`;
+• **Use calculate** for any math - don't do arithmetic in your head`;
 
   // Use tools + state tools
   const legacyToolNames = [
@@ -2504,6 +2574,11 @@ IMPORTANT RULES
     "npc_roll",
     "advance_turn",
     "end_combat",
+    // NPC management tools
+    "add_npc",
+    "update_npc",
+    "remove_npc",
+    "npc_reaction",
     // Timer tools
     "create_timer",
     "advance_timer",
@@ -2700,7 +2775,7 @@ Now here is the ACTUAL game you are GMing. Read the mechanics notes carefully!`)
       if (part.gmThinking && part.gmThinking.length > 0) {
         // GM's reasoning - each thinking entry corresponds to a separate GM round
         // We need to pair each thinking with its tool call results
-        
+
         // gmToolCalls contains GMToolResult[] objects, not raw tool_calls
         // Each entry has: toolName, toolCallId, success, contextForStory
         const gmToolResults = (part.gmToolCalls || []) as Array<{
@@ -2715,39 +2790,49 @@ Now here is the ACTUAL game you are GMing. Read the mechanics notes carefully!`)
           // Group thinking entries - each thinking entry is one GM round
           // Group tool results by their index (approximate round matching)
           const thinkingEntries = part.gmThinking;
-          
+
           // For proper API compliance, we need:
           // 1. Assistant message with tool_calls
           // 2. Tool message with matching tool_call_id for each tool_call
-          
+
           // Simple approach: One assistant message per GM round, with its tool responses
           // If we have N thinking entries and M tool results, pair them 1:1 where possible
-          for (let roundIdx = 0; roundIdx < thinkingEntries.length; roundIdx++) {
+          for (
+            let roundIdx = 0;
+            roundIdx < thinkingEntries.length;
+            roundIdx++
+          ) {
             const thinking = thinkingEntries[roundIdx];
             const toolResult = gmToolResults[roundIdx];
-            
+
             if (toolResult) {
               // Create synthetic tool_call object for this round
               const syntheticToolCall = {
-                id: toolResult.toolCallId || `call_${i}_${roundIdx}_${toolResult.toolName}`,
+                id:
+                  toolResult.toolCallId ||
+                  `call_${i}_${roundIdx}_${toolResult.toolName}`,
                 type: "function",
                 function: {
                   name: toolResult.toolName,
-                  arguments: "{}" // We don't have the original args, but this is for context
-                }
+                  arguments: "{}", // We don't have the original args, but this is for context
+                },
               };
-              
+
               // Assistant message with this round's thinking and tool call
               messages.push({
                 role: "assistant",
                 content: cleanString(thinking),
                 tool_calls: [syntheticToolCall],
               });
-              
+
               // Tool response with matching ID
               messages.push({
                 role: "tool",
-                content: toolResult.contextForStory || `[Tool: ${toolResult.toolName}] ${toolResult.success ? "Success" : "Failed"}`,
+                content:
+                  toolResult.contextForStory ||
+                  `[Tool: ${toolResult.toolName}] ${
+                    toolResult.success ? "Success" : "Failed"
+                  }`,
                 tool_call_id: syntheticToolCall.id,
               });
             } else {
@@ -2758,28 +2843,38 @@ Now here is the ACTUAL game you are GMing. Read the mechanics notes carefully!`)
               });
             }
           }
-          
+
           // Handle any remaining tool results that didn't have matching thinking
-          for (let toolIdx = thinkingEntries.length; toolIdx < gmToolResults.length; toolIdx++) {
+          for (
+            let toolIdx = thinkingEntries.length;
+            toolIdx < gmToolResults.length;
+            toolIdx++
+          ) {
             const toolResult = gmToolResults[toolIdx];
             const syntheticToolCall = {
-              id: toolResult.toolCallId || `call_${i}_${toolIdx}_${toolResult.toolName}`,
+              id:
+                toolResult.toolCallId ||
+                `call_${i}_${toolIdx}_${toolResult.toolName}`,
               type: "function",
               function: {
                 name: toolResult.toolName,
-                arguments: "{}"
-              }
+                arguments: "{}",
+              },
             };
-            
+
             messages.push({
               role: "assistant",
               content: `[GAME MASTER] Executing ${toolResult.toolName}`,
               tool_calls: [syntheticToolCall],
             });
-            
+
             messages.push({
               role: "tool",
-              content: toolResult.contextForStory || `[Tool: ${toolResult.toolName}] ${toolResult.success ? "Success" : "Failed"}`,
+              content:
+                toolResult.contextForStory ||
+                `[Tool: ${toolResult.toolName}] ${
+                  toolResult.success ? "Success" : "Failed"
+                }`,
               tool_call_id: syntheticToolCall.id,
             });
           }
@@ -2836,9 +2931,8 @@ Now here is the ACTUAL game you are GMing. Read the mechanics notes carefully!`)
   ).length;
 
   // Debug logging
-  console.log(`[buildGMStagePrompt] RPG System: ${rpgSystem.name}`);
   console.log(
-    `  - Context budget: ${totalContextBudget} tokens (history: ${historyBudget}, info: ${infoBudget})`
+    `[buildGMStagePrompt] Context budget: ${totalContextBudget} tokens (history: ${historyBudget}, info: ${infoBudget})`
   );
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
   console.log(

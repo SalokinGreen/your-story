@@ -14,6 +14,7 @@ import {
   CommandResponse,
   getMemoryContent,
   deduplicateMemories,
+  NPCReaction,
 } from "../misc/structs";
 import {
   getRPGSystem,
@@ -43,6 +44,7 @@ import StatsPage from "./stats";
 import LorePage from "./lore";
 import QuestsPage from "./quests";
 import AchievementsPage from "./achievements";
+import NPCsPage from "./npcs";
 import MenuPage from "./menu";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
@@ -160,7 +162,11 @@ import {
 } from "../misc/fuzzyMatch";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn, analyzeAction } from "../misc/generation";
-import { GMToolResult, GMCheckResult } from "../misc/gmExecutor";
+import {
+  GMToolResult,
+  GMCheckResult,
+  GMNPCReactionResult,
+} from "../misc/gmExecutor";
 import {
   canAffordAbility,
   deductAbilityCost,
@@ -170,6 +176,7 @@ import {
   ABILITY_GRADE_CONFIG,
 } from "../misc/abilitySystem";
 import CharacterCreationForm from "./create-character/form";
+import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
 
 // Cryptographically secure random number generator
@@ -289,6 +296,7 @@ enum StoryState {
   STATS = "STATS",
   INVENTORY = "INVENTORY",
   LORE = "LORE",
+  NPCS = "NPCS",
   QUESTS = "QUESTS",
   ACHIEVEMENTS = "ACHIEVEMENTS",
   MENU = "MENU",
@@ -1689,6 +1697,11 @@ function StoryPageContent() {
     conditionPenalty?: number; // Condition penalty modifier (negative number like -2, -4)
   } | null>(null);
 
+  // NPC Reaction notifications (social media style)
+  const [pendingNPCReactions, setPendingNPCReactions] = useState<NPCReaction[]>(
+    []
+  );
+
   // YZE: Stress dice selection state
   const [yzeStressDiceChoice, setYzeStressDiceChoice] = useState<number>(0);
   const [yzeAwaitingStressChoice, setYzeAwaitingStressChoice] =
@@ -2894,6 +2907,25 @@ function StoryPageContent() {
             if (thinking && thinking.length > 0) {
               partialPart.gmThinking = thinking;
             }
+
+            // Extract NPC reactions from GM results and show as toast notifications
+            const npcReactionResults = gmResults.filter(
+              (r) => r.toolName === "npc_reaction"
+            );
+            if (npcReactionResults.length > 0) {
+              const newReactions = npcReactionResults
+                .map((r) => (r.result as GMNPCReactionResult)?.reaction)
+                .filter((r): r is NPCReaction => r !== undefined);
+
+              if (newReactions.length > 0) {
+                setPendingNPCReactions((prev) => [...prev, ...newReactions]);
+                if (!partialPart.npcReactions) {
+                  partialPart.npcReactions = [];
+                }
+                partialPart.npcReactions.push(...newReactions);
+              }
+            }
+
             setLoadingStage("story");
           },
           onStoryContent: (chunk: string, fullContent: string) => {
@@ -5239,6 +5271,32 @@ function StoryPageContent() {
                 );
               }
 
+              // Extract NPC reactions from GM results and show as toast notifications
+              const npcReactionResults = gmResults.filter(
+                (r) => r.toolName === "npc_reaction"
+              );
+              if (npcReactionResults.length > 0) {
+                const newReactions = npcReactionResults
+                  .map((r) => (r.result as GMNPCReactionResult)?.reaction)
+                  .filter((r): r is NPCReaction => r !== undefined);
+
+                if (newReactions.length > 0) {
+                  // Add reactions to the pending list (they'll auto-dismiss)
+                  setPendingNPCReactions((prev) => [...prev, ...newReactions]);
+
+                  // Also store in the scene part for persistence
+                  if (!partialPart.npcReactions) {
+                    partialPart.npcReactions = [];
+                  }
+                  partialPart.npcReactions.push(...newReactions);
+
+                  logger.action("NPC reactions triggered", {
+                    count: newReactions.length,
+                    npcs: newReactions.map((r) => r.npcName),
+                  });
+                }
+              }
+
               setLoadingStage("story");
             },
             onStoryContent: (chunk: string, fullContent: string) => {
@@ -6834,6 +6892,7 @@ function StoryPageContent() {
                 label: "Character",
               },
               { state: StoryState.LORE, icon: "Scroll", label: "Notes" },
+              { state: StoryState.NPCS, icon: "Users", label: "NPCs" },
               { state: StoryState.QUESTS, icon: "Target", label: "Quests" },
               {
                 state: StoryState.ACHIEVEMENTS,
@@ -6900,6 +6959,14 @@ function StoryPageContent() {
             {...storyData}
             onUpdateLore={(updatedLore) =>
               updateStoryData({ lore: updatedLore })
+            }
+          />
+        )}
+        {currentState === StoryState.NPCS && (
+          <NPCsPage
+            {...storyData}
+            onUpdateNPCs={(updatedNPCs) =>
+              updateStoryData({ npcs: updatedNPCs })
             }
           />
         )}
@@ -7144,6 +7211,14 @@ function StoryPageContent() {
           onComplete={() => setDiceRoll(null)}
         />
       )}
+
+      {/* NPC Reaction Notifications (social media style) */}
+      <NPCReactionContainer
+        reactions={pendingNPCReactions}
+        onDismissReaction={(index) => {
+          setPendingNPCReactions((prev) => prev.filter((_, i) => i !== index));
+        }}
+      />
     </div>
   );
 }

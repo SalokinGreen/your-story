@@ -15,7 +15,8 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
 - app/story/story.tsx: Presentational story component. Receives full StoryData via spread props, renders scenes with choices. Includes custom input toggle, retry button, and momentum mode selection.
 - app/story/stats.tsx: Stats display component showing character stats, resources, inventory, achievements.
 - app/story/lore.tsx: Lore display component, filters by `on` state (only shows active lore).
-- app/story/menu.tsx: In-game editor for story state (stats, resources, inventory, abilities, passives, achievements, lore). Feature parity with creator for all systems. Includes AI Config tab with model selection and TTS settings. PassivesEditor component distinguishes manual vs skill-tree-sourced passives.
+- app/story/npcs.tsx: NPC/character tracking display. Shows encountered NPCs with filtering by status/attitude, search, and detail view with relationship text, description, notes.
+- app/story/menu.tsx: In-game editor for story state (stats, resources, inventory, abilities, passives, achievements, lore, NPCs). Feature parity with creator for all systems. Includes AI Config tab with model selection and TTS settings. PassivesEditor component distinguishes manual vs skill-tree-sourced passives. NPCEditor allows manual NPC creation/editing.
 - app/story/upgrades.tsx: Character upgrade shop for spending progression points.
 - app/library/page.tsx: Library page showing user's stories and adventures with authenticated fetch.
 - app/creator/page.tsx: Adventure creation interface with full editing capabilities for all story elements including passives.
@@ -30,14 +31,27 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Ability**: Skills/spells/techniques with `name`, `description`, `grade` (AbilityGrade), `cost` (AbilityCost[]), `cooldown`, `currentCooldown`, `stat` (optional), `symbol`.
   - **AbilityCost**: { type: "resource" | "variable", name: string, amount: number }
   - **AbilityGrade**: "novice" | "apprentice" | "adept" | "expert" | "master" | "legendary"
+  - **NPC**: Character tracking with `id`, `name`, `description`, `role`, `status` (alive/dead/missing/unknown/departed), `relationship` (custom text like "Trusted mentor"), `attitude` (hostile/unfriendly/neutral/friendly/allied), `faction`, `lastSeen`, `symbol`, `custom_symbol_url`, `notes`, `createdAt`. Stored in `StoryData.npcs`.
+  - **NPCReaction**: Social media style notifications with `npcId`, `npcName`, `npcImage`, `reaction` (e.g., "liked this"), `emoji`, `context`. Stored in `ScenePart.npcReactions` and displayed as toast notifications.
   - **StoryLore**: Includes `on` (boolean), `on_triggers` (string[]), `off_triggers` (string[]), `var_on_triggers` (string[]), `var_off_triggers` (string[]) for dynamic visibility. Also includes `embedded?: boolean` to track embedding state for efficient re-embedding. Organization fields `tags?: string[]` and `folder?: string` are for creator UI filtering only (not visible during gameplay). **`type?: LoreType`** controls note priority: "lore" (default), "character_sheet" (highest priority - appears at top of AI context for character details), "mechanics" (game rules - second priority).
   - **MemoryEntry**: Memory entries can be either `string` (legacy) or `{ content: string, embedded?: boolean }`. Use `getMemoryContent(entry)` helper to extract content. StoryData.memory is `(string | MemoryEntry)[]`. Use `deduplicateMemories()` to remove exact duplicates and very similar entries (differing only by punctuation/whitespace).
   - **ScenePart**: Includes optional `toolCalls` (ToolCall[]) and `toolResponses` (CommandResponse[]) for preserving tool calling conversation history. Also includes `stateChanges` (string[]) for human-readable game state modifications that are sent to the story stage.
   - **CommandResponse**: Includes optional `toolCallId` for linking responses to specific tool calls in conversation history.
   - **Condition**: Afflictions/injuries with tiers I-VI that penalize skill checks. Includes `id`, `name`, `tier` (1-6), `description`, `affects` (array of stat names), `affectsAll` (boolean), `source`, `permanent`, `createdAt`.
   - **GameOver**: State for permanent character death/loss with `reason`, `condition` (optional), `timestamp`.
-- app/misc/rpgSystems.ts: RPG system configurations and mechanics. Exports 9 systems (3d6, 1d20, 1d100, percentile, pbta, fate, yze, explosive, narrative) with dice rolling, DC calculation, and success checking. Key exports: getRPGSystem(), rollDice(), checkSuccess(), calculateResourceRequirements(), getConditionPenalty(). Each system has unique mechanics (PbtA partial success, Fate ladder/style, YZE stress/panic, Explosive dice chains) and conditionPenalties configuration.
+- app/misc/rpgSystems.ts: **DEPRECATED for AI prompts** - The rpgSystem selection is no longer sent to AI. All dice mechanics are now defined in "mechanics" type lore entries and handled by the GM stage's formula_roll tool. The file still exports types and utility functions for backward compatibility. New adventures should define their dice system in mechanics notes instead of using rpgSystem.
 - app/misc/starter_stories.ts: Example datasets for testing and development.
+
+### Deprecated AI Prompt Fields
+
+The following fields are **DEPRECATED** and no longer sent to AI prompts:
+
+- **stats/statsSection**: Character stats are now in "character_sheet" type lore entries
+- **resources/resourcesSection**: Character resources are now in "character_sheet" type lore entries
+- **abilities/abilitiesSection**: Character abilities are now in "character_sheet" type lore entries
+- **rpgSystem**: Dice system is now defined in "mechanics" type lore entries, all rolls use formula_roll
+
+The GM stage reads mechanics from lore entries and uses formula_roll with custom formulas. Character data should be in character_sheet lore entries.
 
 ### Auth & Tokens
 
@@ -55,24 +69,18 @@ This project is a Next.js 16 app-router project written in TypeScript using Reac
   - **Achievement display**: Shows only locked achievements using `ai_hint || description` for precise triggering.
   - **Robust parsing**: Handles responses with or without `<story>` tags via fallback extraction logic.
   - **Item types**: Provides AI with type-specific behavior descriptions (normal, consumable, story, misc).
-  - **Resource System**: Dynamic DC-based resource requirements - Required: DC÷10 (min 5), Success recovery: DC÷20 (min 1), Failure penalty: DC÷10 (min 5). Insufficient resources apply -DC÷10 dice penalty.
-  - **RPG System Context**: Sends rich roll results to AI for narrative calibration:
-    - PbtA: `[Technique: partial success (7-9)]` signals AI to add complications/costs
-    - Fate: `[Diplomacy: tie (margin 0)]` or `[Combat: success with style (+5)]` for narrative impact
-    - Explosive: `[Acrobatics: success (d8 exploded x2)]` shows dramatic lucky moments
-    - YZE: `[Mechanics: success (3 successes vs 2)]` calibrates tension and panic context
-    - All systems include skill name, result (success/failure/partial/tie/style), and system-specific details
   - **Tool Call History**: Preserves complete conversation history including tool calls and responses:
     - Stores `toolCalls` array and `toolResponses` array in each ScenePart
     - `buildMessages` reconstructs tool_calls in assistant messages and tool role messages with proper tool_call_id linking
     - Enables AI self-reference ("I just gave you that sword") and multi-turn tool interactions
     - Tool responses marked with ✓ (success), ✗ (failure), ⚠ (partial success)
 - app/misc/ai_staged.ts: Staged generation prompt builders. Exports buildStoryPrompt(), buildToolPrompt(), buildChoicesPrompt(), buildGMStagePrompt() - each returns specialized prompts without XML wrappers.
-  - **GM Stage is the "brain"**: buildGMStagePrompt accepts `customMaxContext` (Memory Size slider) and gets the large context allocation. It reads mechanics notes, character sheets, lore, and determines outcomes.
+  - **GM Stage is the "brain"**: buildGMStagePrompt accepts `customMaxContext` (Memory Size slider) and gets the large context allocation. It reads mechanics notes (type: "mechanics" lore), character sheets (type: "character_sheet" lore), and determines outcomes using formula_roll.
   - **Story Stage is the "translator"**: buildStoryPrompt uses fixed smaller context (STORY_STAGE_TOKEN_BUDGET = 16k). It only needs recent story + GM output to write prose.
   - **Context allocation**: GM Stage gets 60% history / 40% info from Memory Size. Story Stage uses fixed 16k budget regardless of slider.
   - **GM History Preservation**: buildGMStagePrompt reconstructs full GM conversation history from `ScenePart.gmThinking` and `ScenePart.gmToolCalls`. User input formatted as `[Story so far...]\nstory output\n\n> player action` so GM sees narrative context.
   - **State Changes in Context**: buildStoryPrompt prepends `stateChanges` from the previous assistant part to the user's choice message, informing the story stage about mechanical game state updates.
+  - **DEPRECATED fields**: stats, resources, abilities, rpgSystem are no longer sent to AI. Character data is in character_sheet lore, mechanics in mechanics lore.
 - app/misc/toolExecutor.ts: Executes tool calls from AI responses locally on the frontend, mapping AI tool names to XML command format. Modifies storyData directly and returns `{ responses: CommandResponse[], stateChanges: string[] }`. The `stateChanges` array contains human-readable descriptions of game state modifications for tools like stat/resource changes, item updates, conditions, etc.
 - app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter, Mistral). Includes getModelConfig() helper for dynamic model selection. Exports AI_MODELS constant with models from multiple providers:
   - **BYOK providers** (user provides API key): OpenRouter, DeepSeek, NovelAI

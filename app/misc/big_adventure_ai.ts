@@ -127,7 +127,6 @@ export interface BigAdventureConfig {
   complexity: ComplexityLevel;
   nsfw: boolean;
   includeAGMT: boolean;
-  includeUpgradeShop: boolean;
   includeCustomTables: boolean;
   includePresets: boolean;
   includeStartingChoices: boolean;
@@ -1090,13 +1089,22 @@ Explosive Dice - Best for: over-the-top action, Savage Worlds style
    Formula example: 1d{{dieSize}}! (exploding)
 
 Narrative (no dice) - Best for: pure storytelling, journaling games
-   AI determines outcomes based on character abilities and context`;
+   AI determines outcomes based on character abilities and context
+
+⚠️ IMPORTANT: Choose the system that BEST FITS the adventure concept!
+- Fantasy/D&D-style adventures → 1d20
+- Horror/Investigation (CoC-style) → 1d100/Percentile (roll under)
+- Narrative/Story-first → 2d6 (PbtA) or Fate (4dF)
+- Survival/Gritty → Year Zero Engine
+- Action/Over-the-top → Explosive Dice
+- Realistic/Grounded → 3d6 (bell curve makes extreme results rare)
+- Pure storytelling → Narrative (no dice)`;
 
     const systemGuidance = userSpecifiedSystem
       ? `DICE SYSTEM: ${rpgDescription}
 Use this system for all mechanics. Design DCs, skills, and abilities accordingly.`
-      : `DICE SYSTEM: Choose the most appropriate system based on the adventure concept.
-Consider the genre, tone, and user's prompt when selecting.
+      : `⚠️ CRITICAL: SELECT THE BEST DICE SYSTEM FOR THIS ADVENTURE!
+Do NOT default to 3d6. Choose based on the genre and tone:
 
 ${allDCGuidelines}`;
 
@@ -1116,150 +1124,65 @@ ${systemGuidance}
 MECHANICS LORE ENTRIES (Required)
 ═══════════════════════════════════════════════════════════════
 
-Create 10-15 detailed lore entries covering these REQUIRED topics:
+Create detailed lore entries (as many as needed) covering these topics. The AI has COMPLETE FREEDOM to design mechanics appropriate for this setting:
 
-FOUNDATIONAL SYSTEMS (must define first):
-1. "Character Stats" - What attributes define characters in this setting
-   - List 4-8 core stats with setting-appropriate names (NOT generic STR/DEX/INT)
-   - What each stat represents and when it's used
-   - Starting value ranges (typically 20-60, with 40 being average)
-   - How stats affect dice rolls (modifier = stat value, added to roll)
-   - Example: "Nerve" for courage checks, "Chrome" for tech skills, "Edge" for combat reflexes
+FOUNDATIONAL SYSTEMS:
+1. "Character Stats/Attributes" - Define what attributes characters have
+   - Choose stat names that fit the setting (fantasy might use STR/DEX, sci-fi might use REFLEX/TECH)
+   - Explain what each stat represents and when it's used
+   - Define value ranges and what they mean (you choose the scale)
+   - Explain how stats affect dice rolls
 
-2. "Skills System" - How skills work (if applicable)
-   - Are there separate skills, or just stats?
-   - If skills exist: list 10-15 skills with their governing stat
-   - Skill ranks: untrained (-10), novice (+0), competent (+10), expert (+20), master (+30)
-   - When to use skills vs raw stat checks
-   - Example skill list for THIS setting (e.g., "Netrunning (Chrome)", "Street Cred (Edge)")
+2. "Dice Rolling Mechanics" - How checks work in this system
+   - Define your chosen dice system formula (e.g., "1d20+mod", "3d6", "2d6+stat", etc.)
+   - Explain difficulty tiers with examples
+   - Define success/failure/partial success thresholds
+   - Cover critical success/failure if applicable
 
-3. "Resources & Pools" - What expendable resources characters have
-   - Health/HP equivalent: name, starting amount, what depletes it
-   - Energy/Mana equivalent: name, starting amount, what it powers
-   - Any unique resources for this setting (Sanity, Stress, Reputation, Ammo, etc.)
-   - Maximum values and how they scale with progression
-   - What happens at 0 for each resource (death, breakdown, narrative consequences)
+3. "Resources & Pools" - What expendable resources exist
+   - Health/vitality equivalent
+   - Energy/mana/stamina equivalent (if applicable)  
+   - Any unique resources for this setting
+   - What happens when resources hit 0
 
-4. "Dice Rolling Mechanics" - Detailed explanation of the dice system
-   - Step-by-step: how to resolve a check from start to finish
-   - Formula breakdown: what dice + what modifiers + compared to what
-   - Advantage/Disadvantage system: how bonuses stack, what grants them
-   - Contested rolls: how to handle opposed checks
-   - Group checks: when multiple characters attempt something together
-
-PLAYER-FACING RULES:
-5. "How Skill Checks Work" - Practical guide for players
-   - When the GM calls for a check
-   - Difficulty tiers with examples from THIS setting
-   - What constitutes success, partial success, failure
-   - Critical successes/failures and their effects
-   - How items and abilities modify checks
-
-6. "Combat Rules" - How combat works in this system
+4. "Combat Rules" - How fighting works
    - Initiative and turn order
-   - Attack rolls and damage calculation
-   - Defense, armor, and taking damage
-   - Conditions (stunned, wounded, etc.) and their effects
-   - Death, defeat, and consequences
+   - Attack and damage mechanics
+   - Defense and damage reduction
+   - Defeat and death consequences
 
-7. "Classes/Archetypes Overview" - 4-6 character archetypes for this setting
-   - Each class's theme and playstyle
-   - Primary and secondary stats
-   - Signature abilities and playstyle
-   - Role in a group (combat, support, utility, social)
-   - MUST be unique to THIS setting (not generic fantasy classes)
+5. "Character Progression" - How characters grow
+   - How experience/points are earned
+   - What can be upgraded
+   - Cost scaling (if applicable)
 
-8. "Character Progression" - How characters grow
-   - How progression points are earned (completing quests, story beats, challenges)
-   - What can be upgraded: stats, skills, abilities, resources
-   - Upgrade point costs and scaling
-   - Milestone achievements and their rewards
-
-9. "Rest & Recovery" - How resources regenerate IN THIS WORLD
-   - MUST be thematically unique to the setting!
-   - Quick rest (30 min): Setting-appropriate recovery method
-   - Short rest (4-8 hours): Sleep/recovery specific to this world
-   - Long rest (days): Extended downtime activities
-   - Examples: cyber-meditation, prayer rituals, alchemical restoration, dream-walking
-
-GM-FACING GUIDELINES (for AI Game Master):
-10. "Creating NPCs & Enemies" - How to stat NPCs/monsters
-    - Typical stat ranges by enemy tier (weak: 20-35, average: 40-55, strong: 60-75, boss: 80+)
-    - HP guidelines (minions: 10-30, regular: 50-100, elite: 150-250, boss: 300+)
-    - How enemy abilities scale with player level
-    - Example stat blocks for 3-4 common enemy types SPECIFIC TO THIS SETTING
-
-11. "Item System Guidelines" - How items work mechanically
-    - Create UNIQUE item categories that fit the setting (not generic fantasy items!)
-    - Item grades: common (+0), uncommon (+1), rare (+2), epic (+3), legendary (+5)
-    - Durability system (items can break on failed checks)
-    - Consumable vs equipment vs story items
-    - How to create balanced custom items
-    - Example items at each tier FOR THIS WORLD
-
-12. "Encounter Design" - How to build balanced encounters
-    - Single enemy vs group tactics
-    - When to use scene challenges vs single skill checks
-    - Environmental hazards specific to this setting
-    - Non-combat resolution options
-
-OPTIONAL ADDITIONAL ENTRIES (add 2-4 more based on setting):
-- Magic/Power System (if applicable) - Spell costs, casting rules, schools of magic
-- Faction Relations - Reputation mechanics, faction standings
-- Economy & Trading - Currency, typical prices, bartering rules
-- Crafting Rules - Materials, recipes, crafting checks
-- Vehicle/Mount Combat - Chase rules, mounted combat modifiers
-- Social Encounter Rules - Persuasion, deception, intimidation mechanics
-- Investigation/Mystery Mechanics - Clue gathering, deduction rules
+OPTIONAL ENTRIES (add what fits the setting):
+- Skills/Proficiencies system
+- Character classes/archetypes  
+- Magic/Powers system
+- Crafting rules
+- Social mechanics
+- Investigation/mystery mechanics
+- Rest and recovery
+- Item/equipment guidelines
+- Enemy/NPC guidelines
 
 ═══════════════════════════════════════════════════════════════
 CRITICAL REQUIREMENTS
 ═══════════════════════════════════════════════════════════════
 
-1. ALL entries MUST have "alwaysOn": true (mechanics are always visible to players)
+1. ALL mechanics entries MUST have "alwaysOn": true and "type": "mechanics"
 2. Each entry should be 2-4 detailed paragraphs with CONCRETE EXAMPLES
-3. Content must be SPECIFIC to this adventure's setting, not generic RPG rules
-4. Include concrete examples using the setting's themes
-5. GM guidelines should help the AI make consistent rulings
-
-═══════════════════════════════════════════════════════════════
-EXAMPLE ENTRIES (for a Cyberpunk setting)
-═══════════════════════════════════════════════════════════════
-
-EXAMPLE "Character Stats" entry:
-"In Night City, six attributes define who you are. EDGE represents combat reflexes, street smarts, and reaction time - used for gunfights, dodging, and quick-draw situations. CHROME measures cybernetic integration and technical aptitude - roll this when hacking, interfacing with tech, or using cyberware. NERVE is raw courage and willpower - test it when facing fear, resisting manipulation, or maintaining composure under fire. COOL covers social grace, intimidation, and negotiation - your face-to-face stat. BODY represents physical strength, endurance, and toughness - for lifting, brawling, and soaking damage. INTEL covers perception, investigation, and reasoning - spot clues, analyze situations, see through lies.
-
-Starting characters have 40 in each stat (human average). Stats range from 20 (impaired) to 60 (exceptional) at character creation, scaling to 80+ with cyberware and progression. Your stat value is your modifier added to dice rolls."
-
-EXAMPLE "Dice Rolling Mechanics" entry:
-"All checks use 3d6 + stat modifier vs a target DC. Roll three six-sided dice, sum them (averaging 10.5), add your relevant stat (typically 30-50), and compare to the difficulty. Success means you roll equal to or higher than the DC.
-
-Step-by-step: 1) GM names the stat and DC based on difficulty, 2) Apply any advantages (+1d6, take best 3) or disadvantages (-1d6, take worst 3), 3) Roll and add stat, 4) Compare to DC. Example: Hacking a security terminal (DC 55) with Chrome 45 means rolling 3d6+45, needing 55+ to succeed.
-
-Advantage sources: appropriate items (+1d6), relevant abilities (+1d6), story circumstances (+1d6). Disadvantage sources: injuries (-1d6), poor conditions (-1d6), missing tools (-1d6). Multiple advantages/disadvantages stack (roll more dice, keep best/worst 3)."
-
-EXAMPLE "Creating NPCs & Enemies" entry:
-"Scale NPC stats to create appropriate challenges. Street punks: 25-35 in combat stats, 20-40 HP. Corporate security: 40-50 stats, 60-80 HP. Elite operatives: 55-65 stats, 100-150 HP. Boss-tier enemies: 70-80 stats, 200-300 HP.
-
-Example stat blocks:
-- STREET THUG: Edge 30, Body 35, HP 30. Armed with a cheap pistol (1d6 damage). Fights dirty, flees when hurt.
-- CORPORATE GUARD: Edge 45, Chrome 40, Body 45, HP 70. Smartgun (+1d6 to attacks), body armor (-3 damage). Professional, calls backup.
-- NETRUNNER ELITE: Chrome 65, Intel 60, HP 50. Neural interface lets them attack through the Net. Fragile but dangerous.
-- CYBORG ENFORCER (Boss): Edge 75, Body 70, Chrome 60, HP 250. Integrated weapons deal 2d6+10 damage. Armor plating reduces damage by 5. Ruthless and relentless."
-
-EXAMPLE "Character Progression" entry:
-"Earn Progression Points (PP) through gameplay: 5 PP for minor story beats, 10 PP for completing a quest, 25 PP for chapter conclusions, 50 PP for major story milestones. Points can be spent between scenes.
-
-Costs scale with power: Raising a stat costs (current value ÷ 10) PP. So going from 40→41 costs 4 PP, while 60→61 costs 6 PP. New abilities cost 10-30 PP based on power. Upgrading resources (max HP, etc.) costs 5 PP per +10.
-
-Example progression path for a Solo: Start with Edge 50, Chrome 40. After first chapter (25 PP): Raise Edge to 55 (24 PP), save 1 PP. After completing 'Data Heist' quest (+10 PP): Buy 'Chrome Reflexes' ability (10 PP) for +1d6 on initiative. After major story event (+50 PP): Raise Chrome to 50 (44 PP), raise Edge to 56 (5 PP), 1 PP saved."
+3. Content must be SPECIFIC to this adventure's setting
+4. You have COMPLETE FREEDOM to design the mechanics - there are no hardcoded systems
+5. The GM stage will use formula_roll with whatever dice formula you define
 
 OUTPUT JSON SCHEMA:
 {
   "mechanicsLore": [
     {
       "title": "Character Stats",
-      "content": "string (2-4 paragraphs defining 4-8 stats with setting-appropriate names)",
+      "content": "string (detailed explanation of the stat system)",
       "type": "mechanics",
       "secret": false,
       "on": true,
@@ -1297,125 +1220,6 @@ Remember: Output ONLY the JSON object, nothing else.`;
   }
 
   if (stage === "mechanics") {
-    // Get RPG system info - if user specified one, use it; otherwise let AI choose
-    const userSpecifiedSystem = config.rpgSystem;
-    const rpgDescription = userSpecifiedSystem
-      ? RPG_SYSTEM_DESCRIPTIONS[userSpecifiedSystem]
-      : null;
-
-    // DC guidelines for all systems (shown to AI so it can pick appropriately)
-    const allDCGuidelines = `
-DICE SYSTEM OPTIONS (choose the most appropriate for the adventure concept):
-
-1d20 (D&D-style) - Best for: heroic fantasy, tactical combat, class-based RPGs
-   DC 5: Trivial | DC 10: Easy | DC 15: Average | DC 20: Hard | DC 25: Very Hard | DC 30+: Legendary
-   Formula example: 1d20+{{modifier}}
-
-3d6 (Bell curve) - Best for: realistic settings, GURPS-style, skill-focused games  
-   DC 6: Trivial | DC 8: Easy | DC 10: Average | DC 13: Hard | DC 16: Very Hard | DC 18+: Impossible
-   Formula example: 3d6+{{modifier}}
-
-2d6 (PbtA-style) - Best for: narrative games, City of Mist, Apocalypse World
-   6-: Failure | 7-9: Partial success | 10-11: Full success | 12+: Critical
-   Formula example: 2d6+{{modifier}} (modifiers typically -2 to +3)
-
-1d100/Percentile - Best for: Call of Cthulhu, horror, investigation-focused games
-   Roll under skill value. Modifiers adjust target number.
-   Formula example: 1d100 vs {{skill}}
-
-4dF (Fate) - Best for: narrative-first games, collaborative storytelling
-   Compare to opposition ladder: Mediocre (+0) to Legendary (+8)
-   Formula example: 4dF+{{skill}}
-
-Year Zero Engine - Best for: survival games, Alien RPG, Forbidden Lands
-   Dice pool (count 6s), push mechanic with stress
-   Formula example: {{attribute}}d6
-
-Explosive Dice - Best for: over-the-top action, Savage Worlds style
-   Dice chain d4→d6→d8→d10→d12, max rolls explode
-   Formula example: 1d{{dieSize}}! (exploding)
-
-Narrative (no dice) - Best for: pure storytelling, journaling games
-   AI determines outcomes based on character abilities and context`;
-
-    // If user specified a system, show only that one prominently
-    const systemGuidance = userSpecifiedSystem
-      ? `
-DICE SYSTEM: ${rpgDescription}
-Use this system for all mechanics. Design DCs, skills, and abilities accordingly.`
-      : `
-DICE SYSTEM: Choose the most appropriate system based on the adventure concept.
-Consider the genre, tone, and user's prompt when selecting. Common choices:
-- D&D/fantasy adventure → 1d20 system
-- Realistic/skill-based → 3d6 system  
-- Narrative/story-focused → 2d6 (PbtA) or Narrative
-- Horror/investigation → 1d100 percentile
-- Survival/gritty → Year Zero Engine
-- Over-the-top action → Explosive dice
-
-${allDCGuidelines}`;
-
-    // DC guidelines based on system (kept for backward compatibility)
-    const dcGuidelines: Record<string, string> = {
-      "3d6": `DC GUIDELINES (3d6 system - roll 3d6, add modifier, compare to DC):
-- Trivial (DC 6): Almost automatic, basic tasks
-- Easy (DC 8): Simple tasks most can do
-- Average (DC 10): Requires some skill or luck
-- Hard (DC 13): Challenging, requires training
-- Very Hard (DC 16): Expert-level difficulty
-- Impossible (DC 18+): Near-miraculous feats`,
-      "1d20": `DC GUIDELINES (d20 system - roll 1d20, add modifier, compare to DC):
-- Trivial (DC 5): Almost automatic
-- Easy (DC 10): Simple, most succeed
-- Average (DC 15): Moderate challenge
-- Hard (DC 20): Difficult, trained individuals
-- Very Hard (DC 25): Expert difficulty
-- Impossible (DC 30+): Legendary feats`,
-      "1d100": `DC GUIDELINES (d100 percentile - roll under skill):
-- Trivial: +40 to skill
-- Easy: +20 to skill
-- Average: No modifier
-- Hard: -20 to skill
-- Very Hard: -40 to skill
-- Impossible: -60 to skill`,
-      percentile: `DC GUIDELINES (Percentile - roll under skill):
-- Trivial: +40 to skill
-- Easy: +20 to skill
-- Average: No modifier  
-- Hard: -20 to skill
-- Very Hard: -40 to skill
-- Impossible: -60 to skill`,
-      pbta: `DC GUIDELINES (PbtA - 2d6 + modifier):
-- 6 or less: Failure (bad consequences)
-- 7-9: Partial success (succeed with cost/complication)
-- 10-11: Full success
-- 12+: Critical success (extra benefit)
-Modifiers typically range from -2 to +3`,
-      fate: `DC GUIDELINES (Fate - 4dF + skill, compare to opposition):
-- +0 Mediocre: Average task
-- +2 Fair: Requires some skill
-- +4 Great: Professional level
-- +6 Fantastic: Expert level
-- +8 Legendary: Near impossible`,
-      yze: `DC GUIDELINES (Year Zero Engine - count 6s in dice pool):
-- 1 success needed: Standard task
-- 2 successes: Challenging
-- 3 successes: Difficult
-- 4+ successes: Extreme difficulty
-Push mechanic: Re-roll non-6s but take stress`,
-      explosive: `DC GUIDELINES (Explosive Dice - dice chain d4→d6→d8→d10→d12):
-- Easy: Beat 3
-- Average: Beat 5
-- Hard: Beat 7
-- Very Hard: Beat 9
-- Extreme: Beat 11+
-Max rolls explode to next die size`,
-      narrative: `OUTCOME GUIDELINES (Narrative - no dice):
-- AI determines outcomes based on character abilities and situation
-- Consider character strengths, weaknesses, and story context
-- Failures should create interesting complications, not dead ends`,
-    };
-
     // Get mechanics lore from previous stage for context
     const mechanicsLore = previousResults?.storyTemplate?.lore || [];
     const mechanicsContext =
@@ -1431,11 +1235,10 @@ STAGE 3: ABILITIES & VARIABLES
 Create abilities (skills, spells, techniques) and story variables based on the game rules established in the previous stage.
 ${mechanicsContext}
 
-RPG SYSTEM: ${rpgDescription}
+⚠️ CRITICAL: The GAME RULES & MECHANICS have already been defined in the previous stage.
+Use the stat names, resource names, and tier systems from those mechanics - do NOT invent new ones.
 
-${userSpecifiedSystem ? dcGuidelines[userSpecifiedSystem] : systemGuidance}
-
-IMPORTANT: The game rules have already been created. Character stats and resources are defined in the Character Sheet Template (next stage).
+IMPORTANT: Character stats and resources are defined in the Character Sheet Template (next stage).
 Your job is to create ABILITIES (active skills/spells) and VARIABLES (hidden story trackers).
 
 ═══════════════════════════════════════════════════════════════
@@ -1446,17 +1249,17 @@ Create 4-8 starting abilities - active skills, spells, or techniques the charact
 Each ability has:
 - name: Display name (e.g., "Fireball", "Healing Touch", "Sneak Attack")
 - description: What this ability does and when to use it
-- grade: Proficiency level - "novice" | "apprentice" | "adept" | "expert" | "master" | "legendary"
+- grade: Proficiency level (use the tier system from GAME RULES & MECHANICS)
 - cost: Array of costs to use (optional) - e.g., [{ "type": "variable", "name": "Mana", "amount": 10 }]
 - cooldown: Number of turns before ability can be used again (0 = no cooldown)
 - currentCooldown: Always start at 0
-- stat: Optional stat name this ability scales with (from character sheet)
+- stat: Optional stat name this ability scales with (must match a stat from mechanics)
 - symbol: Emoji icon for the ability
 
-ABILITY GRADES (starting characters):
-- Most abilities: "novice" or "apprentice"
-- One signature ability: "adept"
-- Avoid "expert", "master", "legendary" at start
+ABILITY GRADES FOR STARTING CHARACTERS:
+- Most abilities should be at the lowest tiers of your grade system
+- One signature ability can be at a middle tier
+- Avoid giving top-tier abilities at character creation
 
 ═══════════════════════════════════════════════════════════════
 STORY VARIABLES
@@ -1508,6 +1311,12 @@ Remember: Output ONLY the JSON object, nothing else.`;
 STAGE 2B: CHARACTER SHEET TEMPLATE
 Generate a fillable character sheet template for this adventure. The template uses a special syntax for fillable fields.
 
+⚠️ CRITICAL: The GAME RULES & MECHANICS have been provided in the context above.
+Your character sheet template MUST match the mechanics defined there:
+- Use the SAME stat names defined in the mechanics
+- Include the SAME resources (health, mana, etc.) defined in the mechanics
+- Reference the SAME skill system defined in the mechanics
+
 AVAILABLE PRESET TEMPLATES:
 You can reference these preset templates by ID, or create a custom template:
 ${presetTemplatesList}
@@ -1520,10 +1329,11 @@ Each field will be rendered as an input when players create their character.
 
 TEMPLATE STRUCTURE:
 The template should be a markdown document with headers and sections that match your adventure's theme.
+The stats, skills, and resources in this template MUST match what was defined in the Game Mechanics stage.
 
 FOR TTRPG-STYLE ADVENTURES:
-- Include stat blocks matching your RPG system (D&D, Call of Cthulhu, etc.)
-- Add skill sections appropriate to the setting
+- Include stat blocks matching the mechanics notes
+- Add skill sections that match the skills defined in mechanics
 - Include equipment/inventory sections
 - Add personality/background fields
 
@@ -1594,6 +1404,17 @@ REQUIRED LORE CATEGORIES (create appropriate number for each):
 6. WORLD LORE:
    - Magic systems, religions, customs, creatures, artifacts
 
+7. GAME MASTER NOTES (type: "gm_notes"):
+   Create 2-4 entries with guidance for running this adventure:
+   
+   - "GM Guide: Running This Adventure" - Overview of tone, pacing, key themes to emphasize
+   - "GM Guide: NPCs & Roleplay" - How to portray key NPCs, their voices, mannerisms, motivations
+   - "GM Guide: Combat & Challenges" - How to balance encounters, when to use dice vs narrative resolution
+   - "GM Guide: Player Agency" - How to handle player creativity, improvisation tips, branching paths
+   
+   These entries help the AI GM (or human GM) understand HOW to run this specific setting effectively.
+   Mark all GM notes as alwaysOn=true and type="gm_notes".
+
 LORE TRIGGERS (make lore dynamic):
 - on_triggers: words/phrases that reveal this lore when mentioned
   IMPORTANT: Include variations for word boundaries ["gun", "guns", "pistol", "pistols"]
@@ -1608,6 +1429,7 @@ OUTPUT JSON SCHEMA:
     {
       "title": "string",
       "content": "string (2-4 DETAILED paragraphs)",
+      "type": "lore | npc | item | location | faction | event | gm_notes",
       "secrtet": false,
       "on": false,
       "alwaysOn": false,
@@ -1667,9 +1489,10 @@ Each preset offers a meaningfully different playstyle with unique character shee
 
 CRITICAL - CHARACTER SHEET:
 Each preset MUST include a "characterSheet" field - a filled-out markdown character sheet for that specific character.
-Use the character sheet template from Stage 2B as a guide for the format, but fill in the values for this specific character.
+⚠️ The CHARACTER SHEET TEMPLATE has been provided in the context above. Use its EXACT FORMAT but fill in specific values for each preset character.
 The characterSheet is what gets added to the player's Notes when they pick this preset.
 This is where ALL character stats, attributes, skills, health, mana, etc. are defined - in the markdown character sheet.
+⚠️ Follow the stat names, skills, and resources defined in the GAME RULES & MECHANICS above.
 
 IMPORTANT: Each preset MUST include abilities. Use abilities from the mechanics stage as a base.
 IMPORTANT: Presets provide their own inventory and abilities arrays - these are the character's starting equipment and skills.
@@ -1693,11 +1516,16 @@ CRITICAL - USE SETTING-APPROPRIATE ITEMS:
 - Examples: A Lovecraftian investigator might have "Dog-eared journal", "Revolver", "Strange amulet"
 
 CHARACTER STATS IN CHARACTER SHEET (LEVEL 1 CHARACTERS - START WEAK):
-- Use values appropriate to your chosen stat scale (D&D 3-18, simple 1-10, percentile, etc.)
+- Use values appropriate to your stat scale as defined in GAME RULES & MECHANICS
 - MOST stats should be below average (untrained/weak areas)
 - A FEW stats (2-3) should be slightly above average (developing skills)
 - Only ONE or TWO stats should be notably high (natural talent/specialty)
 - Starting characters should feel capable but not overpowered
+
+ITEM AND ABILITY SYSTEMS:
+- Item types and grades should match what's defined in GAME RULES & MECHANICS
+- Ability grades/tiers should match what's defined in GAME RULES & MECHANICS
+- If the mechanics don't define these, use simple descriptive strings
 
 OUTPUT JSON SCHEMA:
 {
@@ -1709,8 +1537,8 @@ OUTPUT JSON SCHEMA:
       "icon": "emoji",
       "characterSheet": "string (FILLED character sheet in markdown format - includes all stats, attributes, skills, resources, backstory)",
       "intro": "string (3-5 paragraphs - COMPLETE opening narrative for this character)",
-      "inventory": [{ "name": "string", "description": "string", "type": "normal|consumable|story|misc", "grade": "common|uncommon|rare|epic|agmt" }],
-      "abilities": [{ "name": "string", "description": "string", "grade": "novice|apprentice|adept|expert|master|legendary", "cost": [], "cooldown": number, "currentCooldown": 0, "symbol": "emoji" }],
+      "inventory": [{ "name": "string", "description": "string", "type": "string (match mechanics)", "grade": "string (match mechanics)" }],
+      "abilities": [{ "name": "string", "description": "string", "grade": "string (match mechanics)", "cost": [], "cooldown": number, "currentCooldown": 0, "symbol": "emoji" }],
       "relationships": [],
       "authorNotes": "string (instructions for the AI narrator for this character)"
     }
@@ -1806,39 +1634,6 @@ Configure how quickly players level up and how many upgrade points they receive.
     "upgradeOverrides": [{ "level": number, "upgrades": number }],
     "startingUpgrades": { "easy": number, "medium": number, "hard": number, "expert": number }
   }`);
-
-    if (config.includeUpgradeShop) {
-      instructions += `
-UPGRADE SHOP:
-Configure the progression/upgrade system where players spend points.
-
-CRITICAL - SETTING-SPECIFIC SHOP ITEMS:
-- All shop items MUST be thematically appropriate to THIS adventure's setting
-- Do NOT use generic fantasy items (no "Healing Potion", "Sword", "Shield", "Rations")
-- Item names and descriptions should reflect the world's technology, magic system, culture
-- Example: Sci-fi might have "Stim-injector", "Plasma cutter", "Personal shield emitter"
-- Example: Victorian horror might have "Laudanum tincture", "Silver-tipped cane", "Spirit ward"
-`;
-      schemaFields.push(`"upgradeSettings": {
-    "enabled": true,
-    "allowStatUpgrade": true,
-    "allowResourceUpgrade": true,
-    "allowAddItem": true,
-    "statUpgradeCost": 10,
-    "statUpgradeAmount": 1,
-    "resourceUpgradeCost": 15,
-    "resourceUpgradeAmount": 10,
-    "addItemCost": 20,
-    "statShopEnabled": boolean,
-    "resourceShopEnabled": boolean,
-    "itemShopEnabled": boolean,
-    "abilityShopEnabled": boolean,
-    "statShop": [{ "name": "string", "description": "string", "symbol": "emoji", "startingValue": number, "cost": number }],
-    "resourceShop": [{ "name": "string", "description": "string", "symbol": "emoji", "startingValue": number, "startingMaxValue": number, "cost": number }],
-    "itemShop": [{ "name": "string", "description": "string", "type": "string", "symbol": "emoji", "quantity": number, "cost": number, "grade": "string" }],
-    "abilityShop": [{ "name": "string", "description": "string", "symbol": "emoji", "grade": "string", "cost": number, "abilityCost": [], "cooldown": number }]
-  }`);
-    }
 
     if (config.includeStartingChoices) {
       instructions += `
@@ -1953,6 +1748,25 @@ export function buildBigAdventureMessages(
     if (previousResults.storyTemplate?.premise) {
       contextMessage += `Premise: ${previousResults.storyTemplate.premise}\n\n`;
     }
+
+    // Include mechanics lore (game rules) - CRITICAL for later stages to reference
+    const mechanicsLore = previousResults.storyTemplate?.lore?.filter(
+      (l) => l.type === "mechanics"
+    );
+    if (mechanicsLore && mechanicsLore.length > 0) {
+      contextMessage += `\n## GAME RULES & MECHANICS:\n`;
+      mechanicsLore.forEach((l) => {
+        contextMessage += `\n### ${l.title}\n${l.content}\n`;
+      });
+      contextMessage += `\n`;
+    }
+
+    // Include character sheet template - CRITICAL for presets stage
+    if (previousResults.characterSheetTemplate?.template) {
+      contextMessage += `\n## CHARACTER SHEET TEMPLATE:\n`;
+      contextMessage += `\`\`\`\n${previousResults.characterSheetTemplate.template}\n\`\`\`\n\n`;
+    }
+
     if (
       previousResults.storyTemplate?.abilities &&
       previousResults.storyTemplate.abilities.length > 0
@@ -2565,7 +2379,6 @@ export function parseBigAdventureStageOutput(
     if (stage === "advanced-other") {
       return {
         storyTemplate: {
-          upgradeSettings: parsed.upgradeSettings,
           levelingSettings: parsed.levelingSettings,
         },
         startingChoices: parsed.startingChoices,
@@ -2802,10 +2615,7 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
   if (advancedEnabled && (config.includeAGMT || config.includeCustomTables)) {
     stages.push("advanced-tables");
   }
-  if (
-    advancedEnabled &&
-    (config.includeUpgradeShop || config.includeStartingChoices)
-  ) {
+  if (advancedEnabled && config.includeStartingChoices) {
     stages.push("advanced-other");
   }
 
@@ -3050,17 +2860,15 @@ EXISTING CONTENT SUMMARY:`;
 CRITICAL: ALL mechanics lore entries MUST have "alwaysOn": true!
 Mechanics are rules references that players need access to at all times - never hidden behind triggers.
 
-REQUIRED MECHANICS TOPICS:
-- How skill checks work (dice system, modifiers, DCs)
+You have COMPLETE FREEDOM to design the mechanics. Define:
+- How skill checks work (dice system, modifiers, difficulty tiers)
 - Combat rules (initiative, attacks, damage, conditions)
 - Character progression (leveling, XP, upgrades)
 - Rest & recovery (how resources regenerate)
-- Death & defeat (what happens at 0 HP)
-
-CRITICAL GM GUIDELINES (also required):
-- "Creating NPCs & Enemies" - Stat ranges (weak: 20-35, average: 40-55, strong: 60-75, boss: 80+), HP guidelines, damage scaling, example stat blocks
-- "Item Guidelines" - Grade bonuses, durability system, consumable vs equipment, creating balanced items
-- "Encounter Design" - Single vs group enemies, scene challenges, environmental hazards
+- Death & defeat (what happens at 0 HP/equivalent)
+- NPC/enemy guidelines (stat ranges, health scaling, example stat blocks)
+- Item guidelines (types, grades/tiers if applicable, durability if applicable)
+- Encounter design principles
 
 Write for players AND the AI GM who need to understand how the game works.`,
       schema: `{ "lore": [{ "title": "string", "content": "string (2-3 paragraphs explaining the mechanic)", "type": "mechanics", "alwaysOn": true, "secret": false }] }`,

@@ -28,6 +28,7 @@ const kids_on_machines: StoryData = {
   quests: [],
   earnedPointsFromQuests: [],
   relationships: [],
+  npcs: [],
   conditions: [],
   abilities: [],
 };
@@ -159,6 +160,7 @@ const goblin_layer: StoryData = {
   quests: [],
   earnedPointsFromQuests: [],
   relationships: [],
+  npcs: [],
   conditions: [],
   abilities: [],
   author_notes:

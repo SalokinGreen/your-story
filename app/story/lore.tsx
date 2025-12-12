@@ -24,25 +24,61 @@ const TYPE_CONFIG: Record<
     bgColor: "bg-blue-500/20",
   },
   character_sheet: {
-    label: "Character Sheet",
+    label: "Character",
     icon: "User",
     color: "text-emerald-300",
     bgColor: "bg-emerald-500/20",
   },
+  gm_notes: {
+    label: "GM Notes",
+    icon: "BookMarked",
+    color: "text-indigo-300",
+    bgColor: "bg-indigo-500/20",
+  },
+  npc: {
+    label: "NPC",
+    icon: "Users",
+    color: "text-pink-300",
+    bgColor: "bg-pink-500/20",
+  },
+  item: {
+    label: "Item",
+    icon: "Package",
+    color: "text-orange-300",
+    bgColor: "bg-orange-500/20",
+  },
+  location: {
+    label: "Location",
+    icon: "MapPin",
+    color: "text-green-300",
+    bgColor: "bg-green-500/20",
+  },
+  faction: {
+    label: "Faction",
+    icon: "Shield",
+    color: "text-red-300",
+    bgColor: "bg-red-500/20",
+  },
+  event: {
+    label: "Event",
+    icon: "Calendar",
+    color: "text-yellow-300",
+    bgColor: "bg-yellow-500/20",
+  },
   mechanics: {
-    label: "Game Mechanics",
+    label: "Mechanics",
     icon: "Cog",
     color: "text-cyan-300",
     bgColor: "bg-cyan-500/20",
   },
   lore: {
-    label: "World Lore",
+    label: "Lore",
     icon: "Globe",
     color: "text-purple-300",
     bgColor: "bg-purple-500/20",
   },
   secrets: {
-    label: "Hidden Secrets",
+    label: "Secrets",
     icon: "Lock",
     color: "text-amber-300",
     bgColor: "bg-amber-500/20",
@@ -97,6 +133,12 @@ export default function LorePage(props: LorePageProps) {
     const counts: Record<string, number> = {
       all: 0,
       character_sheet: 0,
+      gm_notes: 0,
+      npc: 0,
+      item: 0,
+      location: 0,
+      faction: 0,
+      event: 0,
       mechanics: 0,
       lore: 0,
       secrets: 0,
@@ -108,7 +150,11 @@ export default function LorePage(props: LorePageProps) {
       } else {
         counts.all++;
         const type = item.type || "lore";
-        counts[type]++;
+        if (counts[type] !== undefined) {
+          counts[type]++;
+        } else {
+          counts.lore++; // Fallback for unknown types
+        }
       }
     });
 
@@ -199,11 +245,16 @@ export default function LorePage(props: LorePageProps) {
                   className="fixed inset-0 z-40"
                   onClick={() => setIsTypeDropdownOpen(false)}
                 />
-                <div className="absolute right-0 mt-2 w-56 bg-blue-950 border border-blue-700/50 rounded-xl shadow-xl z-50 overflow-hidden">
+                <div className="absolute right-0 mt-2 w-56 bg-blue-950 border border-blue-700/50 rounded-xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
                   {(
                     [
                       "all",
                       "character_sheet",
+                      "npc",
+                      "item",
+                      "location",
+                      "faction",
+                      "event",
                       "mechanics",
                       "lore",
                       "secrets",
@@ -387,7 +438,10 @@ export default function LorePage(props: LorePageProps) {
                       <span
                         className={`text-xs px-1.5 py-0.5 rounded shrink-0 ${TYPE_CONFIG[itemType].bgColor} ${TYPE_CONFIG[itemType].color}`}
                       >
-                        <DynamicIcon name={TYPE_CONFIG[itemType].icon} className="w-3 h-3" />
+                        <DynamicIcon
+                          name={TYPE_CONFIG[itemType].icon}
+                          className="w-3 h-3"
+                        />
                       </span>
                     )}
                   </div>

@@ -414,6 +414,60 @@ export interface GroupCheckParams {
   show_individual_rolls?: boolean; // Show each roll result (default: true)
 }
 
+// ============================================
+// NPC MANAGEMENT INTERFACES
+// ============================================
+
+/**
+ * Add NPC - Register a new NPC in the story
+ */
+export interface AddNPCParams {
+  name: string; // NPC's name
+  description: string; // Who they are, appearance, personality
+  role: string; // Their role (e.g., "Quest Giver", "Antagonist", "Ally")
+  status?: "alive" | "dead" | "missing" | "unknown" | "departed"; // Default: alive
+  relationship?: string; // Relationship with player (e.g., "Trusted friend", "Bitter rival")
+  attitude?: "hostile" | "unfriendly" | "neutral" | "friendly" | "allied"; // Default: neutral
+  faction?: string; // Group they belong to
+  symbol?: string; // Emoji icon
+  image_url?: string; // Image for reactions
+}
+
+/**
+ * Update NPC - Modify an existing NPC's details
+ */
+export interface UpdateNPCParams {
+  npc: string; // NPC name or ID to update
+  name?: string; // New name
+  description?: string; // Updated description
+  role?: string; // Updated role
+  status?: "alive" | "dead" | "missing" | "unknown" | "departed";
+  relationship?: string; // Updated relationship text
+  attitude?: "hostile" | "unfriendly" | "neutral" | "friendly" | "allied";
+  faction?: string; // Updated faction
+  last_seen?: string; // Where/when last seen
+  notes?: string; // GM/player notes
+}
+
+/**
+ * Remove NPC - Remove an NPC from tracking (not necessarily dead)
+ */
+export interface RemoveNPCParams {
+  npc: string; // NPC name or ID to remove
+  reason?: string; // Why they're being removed
+}
+
+/**
+ * NPC Reaction - Show a social media style reaction notification
+ * Use to communicate NPC emotional responses to player actions
+ */
+export interface NPCReactionParams {
+  npc: string; // NPC name or ID
+  reaction: string; // The reaction text (e.g., "liked this", "is disappointed", "gained respect")
+  emoji?: string; // Optional emoji (e.g., "❤️", "😠", "🤔")
+  context?: string; // What triggered the reaction (shown as subtext)
+}
+
 // Union type for all GM tool parameters
 export type GMToolParams =
   | { name: "skill_check"; params: SkillCheckParams }
@@ -454,7 +508,12 @@ export type GMToolParams =
     }
   | { name: "npc_roll"; params: NPCRollParams }
   | { name: "advance_turn"; params: AdvanceTurnParams }
-  | { name: "end_combat"; params: EndCombatParams };
+  | { name: "end_combat"; params: EndCombatParams }
+  // NPC management tools
+  | { name: "add_npc"; params: AddNPCParams }
+  | { name: "update_npc"; params: UpdateNPCParams }
+  | { name: "remove_npc"; params: RemoveNPCParams }
+  | { name: "npc_reaction"; params: NPCReactionParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -2007,6 +2066,215 @@ Results show each roll, total successes, and overall outcome.`,
 };
 
 // ============================================
+// NPC MANAGEMENT TOOL SCHEMAS
+// ============================================
+
+const addNPCTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "add_npc",
+    description: `Register a new NPC in the story's character tracker.
+
+Use when:
+- A new significant character is introduced
+- A character becomes important enough to track
+- Player asks about NPCs and you want to formalize tracking
+
+NPCs are tracked separately from lore for quick reference and reactions.
+Include enough detail for the player to remember who this character is.`,
+    parameters: {
+      type: "object",
+      properties: {
+        name: {
+          type: "string",
+          description:
+            "NPC's name (e.g., 'Captain Harwick', 'The Masked Woman')",
+        },
+        description: {
+          type: "string",
+          description:
+            "Who they are - appearance, personality, background (2-3 sentences)",
+        },
+        role: {
+          type: "string",
+          description:
+            "Their role in the story (e.g., 'Quest Giver', 'Antagonist', 'Love Interest', 'Mentor', 'Rival')",
+        },
+        status: {
+          type: "string",
+          enum: ["alive", "dead", "missing", "unknown", "departed"],
+          description: "Current status (default: alive)",
+        },
+        relationship: {
+          type: "string",
+          description:
+            "Relationship with player as custom text (e.g., 'Trusted mentor', 'Bitter rival', 'Former lover', 'Suspicious ally')",
+        },
+        attitude: {
+          type: "string",
+          enum: ["hostile", "unfriendly", "neutral", "friendly", "allied"],
+          description: "General disposition toward player (default: neutral)",
+        },
+        faction: {
+          type: "string",
+          description: "Group or organization they belong to",
+        },
+        symbol: {
+          type: "string",
+          description: "Emoji icon for this NPC",
+        },
+        image_url: {
+          type: "string",
+          description: "Image URL for reaction notifications",
+        },
+      },
+      required: ["name", "description", "role"],
+    },
+  },
+};
+
+const updateNPCTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "update_npc",
+    description: `Update an existing NPC's details.
+
+Use when:
+- NPC's status changes (dies, goes missing, leaves)
+- Relationship with player changes significantly
+- New information is revealed about them
+- Their role in the story evolves
+
+Only provide fields you want to change.`,
+    parameters: {
+      type: "object",
+      properties: {
+        npc: {
+          type: "string",
+          description: "NPC name or ID to update",
+        },
+        name: {
+          type: "string",
+          description: "New name (if revealed/changed)",
+        },
+        description: {
+          type: "string",
+          description: "Updated description",
+        },
+        role: {
+          type: "string",
+          description: "Updated role",
+        },
+        status: {
+          type: "string",
+          enum: ["alive", "dead", "missing", "unknown", "departed"],
+          description: "New status",
+        },
+        relationship: {
+          type: "string",
+          description: "Updated relationship text",
+        },
+        attitude: {
+          type: "string",
+          enum: ["hostile", "unfriendly", "neutral", "friendly", "allied"],
+          description: "New disposition",
+        },
+        faction: {
+          type: "string",
+          description: "Updated faction",
+        },
+        last_seen: {
+          type: "string",
+          description: "Where/when they were last seen",
+        },
+        notes: {
+          type: "string",
+          description: "GM notes about this NPC",
+        },
+      },
+      required: ["npc"],
+    },
+  },
+};
+
+const removeNPCTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "remove_npc",
+    description: `Remove an NPC from tracking.
+
+Use when:
+- NPC is no longer relevant to the story
+- Character was temporary/minor
+- Cleaning up the NPC list
+
+Note: For deceased NPCs, prefer update_npc with status="dead" to preserve history.`,
+    parameters: {
+      type: "object",
+      properties: {
+        npc: {
+          type: "string",
+          description: "NPC name or ID to remove",
+        },
+        reason: {
+          type: "string",
+          description: "Why they're being removed from tracking",
+        },
+      },
+      required: ["npc"],
+    },
+  },
+};
+
+const npcReactionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "npc_reaction",
+    description: `Show a social-media style reaction notification from an NPC.
+
+Creates a toast notification like "Lisa liked this 👍" or "Marcus is disappointed 😔"
+
+Use when:
+- An NPC would have a notable emotional response to player's action
+- You want to show relationship impact without exposition
+- Reinforcing NPC personality through reactions
+- Making the world feel more alive and responsive
+
+Keep reactions short and punchy. The notification includes the NPC's image if available.
+
+Examples:
+- { npc: "Elara", reaction: "appreciated that", emoji: "❤️" }
+- { npc: "The Baron", reaction: "will remember this", emoji: "👁️" }
+- { npc: "Grak", reaction: "is offended", emoji: "😤", context: "You refused his gift" }`,
+    parameters: {
+      type: "object",
+      properties: {
+        npc: {
+          type: "string",
+          description: "NPC name or ID (must exist in NPCs list)",
+        },
+        reaction: {
+          type: "string",
+          description:
+            "The reaction text (e.g., 'liked this', 'is disappointed', 'gained respect', 'will remember this')",
+        },
+        emoji: {
+          type: "string",
+          description:
+            "Optional emoji for the reaction (e.g., '❤️', '😠', '🤔', '👍')",
+        },
+        context: {
+          type: "string",
+          description:
+            "Optional context shown as subtext (e.g., 'You defended her honor')",
+        },
+      },
+      required: ["npc", "reaction"],
+    },
+  },
+};
+
+// ============================================
 // EXPORT
 // ============================================
 
@@ -2052,6 +2320,11 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   npcRollTool,
   advanceTurnTool,
   endCombatTool,
+  // NPC management tools
+  addNPCTool,
+  updateNPCTool,
+  removeNPCTool,
+  npcReactionTool,
   // Terminal tool - ends GM loop
   endGmThinkingTool,
 ];
