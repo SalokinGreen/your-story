@@ -2430,8 +2430,7 @@ IMPORTANT
 • **Create notes for new threats** - ensures consistency
 • **Think naturally** - you're a DM, not a formula
 • **Use calculate** for math - don't do arithmetic in your head
-• **End combat properly** - call end_combat, reward victory or apply defeat consequences
-• **Death is real** - if a player reaches 0 HP with no way out, they die. Use game_over tool.`;
+• **End combat properly** - call end_combat, reward victory or apply defeat consequences`;
 
   // Use tools + state tools
   const legacyToolNames = [
