@@ -77,6 +77,24 @@ const TYPE_CONFIG: Record<
     color: "text-purple-300",
     bgColor: "bg-purple-500/20",
   },
+  secret: {
+    label: "Secret",
+    icon: "Lock",
+    color: "text-amber-300",
+    bgColor: "bg-amber-500/20",
+  },
+  dm_instructions: {
+    label: "DM Guide",
+    icon: "BookMarked",
+    color: "text-indigo-300",
+    bgColor: "bg-indigo-500/20",
+  },
+  story_instructions: {
+    label: "Story Guide",
+    icon: "Feather",
+    color: "text-rose-300",
+    bgColor: "bg-rose-500/20",
+  },
   secrets: {
     label: "Secrets",
     icon: "Lock",

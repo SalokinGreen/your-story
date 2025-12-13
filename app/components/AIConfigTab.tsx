@@ -112,6 +112,18 @@ export default function AIConfigTab() {
     }
     return true;
   });
+  // Storyteller Mode: narrator (literary prose) vs dm (inline mechanics)
+  const [storytellerMode, setStorytellerMode] = useState<"narrator" | "dm">(
+    () => {
+      if (typeof window !== "undefined") {
+        return (
+          (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
+          "narrator"
+        );
+      }
+      return "narrator";
+    }
+  );
   // GM Stage is now always enabled - removed the toggle
   // Keeping displayGMThinking for showing/hiding GM reasoning in UI
   const [displayGMThinking, setDisplayGMThinking] = useState(() => {
@@ -325,6 +337,13 @@ export default function AIConfigTab() {
       localStorage.setItem("byokMode", byokMode.toString());
     }
   }, [byokMode]);
+
+  // Persist Storyteller Mode
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("storytellerMode", storytellerMode);
+    }
+  }, [storytellerMode]);
 
   // Auto-save context settings to cloud when they change (after initial load)
   useEffect(() => {
@@ -1816,6 +1835,89 @@ export default function AIConfigTab() {
               rules...&rdquo; before generation. This technique improves output
               consistency by making the AI &ldquo;commit&rdquo; to constraints.
               Disable for A/B testing.
+            </span>
+          </p>
+        </div>
+      </div>
+
+      {/* Storyteller Mode Section */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+          <DynamicIcon name="BookOpen" className="w-4 h-4" />
+          Storyteller Mode
+        </h4>
+
+        <div className="space-y-3">
+          <button
+            onClick={() => setStorytellerMode("narrator")}
+            className={`w-full flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+              storytellerMode === "narrator"
+                ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
+            }`}
+          >
+            <div
+              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                storytellerMode === "narrator"
+                  ? "border-purple-500 bg-purple-500"
+                  : "border-gray-400"
+              }`}
+            >
+              {storytellerMode === "narrator" && (
+                <div className="w-2 h-2 rounded-full bg-white" />
+              )}
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                📖 Literary Narrator
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Immersive prose with no mechanical echoes. The AI writes like a
+                novel author, showing outcomes through vivid description rather
+                than announcing game mechanics.
+              </p>
+            </div>
+          </button>
+
+          <button
+            onClick={() => setStorytellerMode("dm")}
+            className={`w-full flex items-start gap-3 p-3 rounded-lg border transition-colors ${
+              storytellerMode === "dm"
+                ? "bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700"
+                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-700"
+            }`}
+          >
+            <div
+              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
+                storytellerMode === "dm"
+                  ? "border-orange-500 bg-orange-500"
+                  : "border-gray-400"
+              }`}
+            >
+              {storytellerMode === "dm" && (
+                <div className="w-2 h-2 rounded-full bg-white" />
+              )}
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
+                🎲 Dungeon Master
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Weaves mechanics into the narrative. You&apos;ll see dice
+                results, damage numbers, and skill checks announced inline like
+                a tabletop GM would narrate them.
+              </p>
+            </div>
+          </button>
+        </div>
+
+        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+          <p className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-1.5">
+            <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+            <span>
+              {storytellerMode === "narrator"
+                ? "Narrator mode writes pure story prose. Roll results and state changes still happen behind the scenes."
+                : 'DM mode announces mechanics in-line, e.g., "He swings! **Hit!** You take **5 damage**, dropping you to 12 HP."'}
             </span>
           </p>
         </div>

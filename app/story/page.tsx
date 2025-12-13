@@ -2843,6 +2843,11 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("usePrefill") !== "false"
           : true;
+      const storytellerMode =
+        typeof window !== "undefined"
+          ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
+            "narrator"
+          : "narrator";
       // GM Stage is always enabled - legacy tool calling is deprecated
       const gmStageEnabled = true;
 
@@ -2881,6 +2886,7 @@ function StoryPageContent() {
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
           usePrefill,
+          storytellerMode,
           enableGMStage: gmStageEnabled,
           gmStageModel: toolsModel, // Use same model as tools stage
           abortSignal: generationAbortRef.current.signal,
@@ -5012,6 +5018,11 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("usePrefill") !== "false"
         : true;
+    const storytellerMode =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
+          "narrator"
+        : "narrator";
     // GM Stage is always enabled - legacy tool calling is deprecated
     const gmStageEnabled = true;
 
@@ -5144,6 +5155,7 @@ function StoryPageContent() {
             embeddingThreshold,
             samplingSettings: getSamplingSettings(),
             usePrefill,
+            storytellerMode,
             enableGMStage: gmStageEnabled,
             gmStageModel: toolsModel, // Use same model as tools stage
           },
@@ -5574,6 +5586,11 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("usePrefill") !== "false"
         : true;
+    const storytellerMode =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
+          "narrator"
+        : "narrator";
 
     // Add the player's answer to pending actions so it's included in the story prompt
     // Format: "[Player answered: <question>: <answer>]"
@@ -5628,6 +5645,7 @@ function StoryPageContent() {
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
           usePrefill,
+          storytellerMode,
           // Resume GM stage with player answer - it will continue making tool calls
           enableGMStage: true,
           gmStageModel: toolsModel, // Use same model as tools stage
@@ -5838,6 +5856,11 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("usePrefill") !== "false"
         : true;
+    const storytellerMode =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
+          "narrator"
+        : "narrator";
     // GM Stage is always enabled - legacy tool calling is deprecated
     const gmStageEnabled = true;
 
@@ -5888,6 +5911,7 @@ function StoryPageContent() {
           embeddingThreshold,
           samplingSettings: getSamplingSettings(),
           usePrefill,
+          storytellerMode,
           // Skip GM stage on retry - use the saved context from the popped part
           enableGMStage: false, // Don't re-run GM stage
           precomputedGMContext: savedGMStoryContext,

@@ -160,11 +160,24 @@ export interface CommandResponse {
 }
 
 // Lore types for categorizing notes
+// PINNED types are always loaded in full:
+//   - dm_instructions: GM guidance (how to run the adventure) - read every turn
+//   - character_sheet: Player character details - read every turn
+//   - mechanics: Game rules - read every turn
+// FOLDER types show only titles (use read_notes tool to view content):
+//   - lore: General world-building (default)
+//   - secret: Hidden from player (GM-only notes)
+// LEGACY types (treated as "lore" for folder display):
+//   - gm_notes, npc, item, location, faction, event
 export type LoreType =
-  | "lore" // General world-building
-  | "mechanics" // Game rules (prioritized in context)
-  | "character_sheet" // Player character details (highest priority)
-  | "gm_notes" // Game Master guidance (how to run the adventure)
+  | "lore" // 📁 World Lore - titles only, default type
+  | "secret" // 🔒 Secrets - titles only, hidden from player view
+  | "dm_instructions" // 📌 GM Stage only - guidance for running the adventure
+  | "story_instructions" // 📌 Story Stage only - narrator guidance for prose style
+  | "mechanics" // 📌 GM Stage only - Game rules for dice/checks
+  | "character_sheet" // 📌 Both stages - Player character details for voice and mechanics
+  // Legacy types (backward compat - treated as "lore" for display)
+  | "gm_notes" // Alias for dm_instructions (deprecated)
   | "npc" // Non-player characters
   | "item" // Items, artifacts, equipment
   | "location" // Places, regions, buildings

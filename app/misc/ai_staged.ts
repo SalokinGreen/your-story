@@ -19,29 +19,86 @@ export type ChatMessage = {
   tool_call_id?: string;
 };
 
+// Storyteller mode: "narrator" (literary prose) vs "dm" (game master with inline mechanics)
+export type StorytellerMode = "narrator" | "dm";
+
 // ============================================
 // ROLE AFFIRMATION MESSAGES (Prefills)
 // ============================================
 // These "fake" assistant messages prime the model to follow output constraints
 // by making it appear the model has already committed to the rules.
 
-export const STORY_AFFIRMATION = `Understood. I am the NARRATOR. The GAME MASTER has already resolved the mechanics.
+// Story affirmation is now dynamic - built with GM thinking as reasoning block
+// The GM's reasoning appears in <thinking> tags like a reasoning model's internal process
+export const STORY_AFFIRMATION_TEMPLATE = `<thinking>
+{{GM_REASONING}}
+</thinking>
 
-**My contract:**
-1. **[PLAYER] action** → I narrate EXACTLY what they chose. No substitutions.
-2. **[GAME MASTER] outcome** → The dice have spoken. I describe the result, not change it.
-   - [Outcome: success] = Player SUCCEEDS. I show their triumph.
-   - [Outcome: failure] = Player FAILS. I show meaningful consequences.
-3. **My freedom** → HOW I describe it: sensory details, NPC reactions, pacing, atmosphere.
-
-**Craft priorities:**
-- Sensory grounding first: 1-2 vivid details (sight, sound, smell, touch)
-- Show emotion through physical sensation and body language
-- NPC reactions through dialogue subtext and mannerism
-- End on a decision point or moment of tension
-
-Writing the narrative now:
+I am the NARRATOR. The GAME MASTER has determined the outcome. Now I write the story.
 `;
+
+// Fallback when no GM reasoning is available
+// NOTE: Must end with same marker as STORY_AFFIRMATION_TEMPLATE for consistent stripping
+export const STORY_AFFIRMATION_FALLBACK = `I am the NARRATOR. No mechanical resolution was needed this turn. Now I write the story.
+`;
+
+/**
+ * Build the story stage prefill with GM reasoning as a "thinking" block
+ * This mimics reasoning model behavior where the AI processes internally before responding
+ *
+ * @param gmInterleavedConversation - Full interleaved GM conversation (preferred)
+ * @param gmThinking - Array of GM thinking blocks (legacy fallback)
+ * @param gmStoryContext - Tool results and summary (legacy fallback)
+ */
+export function buildStoryAffirmation(
+  gmInterleavedConversation?: string,
+  gmThinking?: string[],
+  gmStoryContext?: string
+): string {
+  let gmReasoning = "";
+
+  // NEW: Use interleaved conversation if available (preferred)
+  if (gmInterleavedConversation) {
+    gmReasoning = gmInterleavedConversation;
+  } else {
+    // LEGACY FALLBACK: Combine gmThinking + gmStoryContext
+    const parts: string[] = [];
+
+    if (gmThinking && gmThinking.length > 0) {
+      const formattedThinking = gmThinking
+        .map((t) => {
+          const trimmed = t.trim();
+          // Normalize [GM] to [GAME MASTER]
+          return trimmed.startsWith("[GM]")
+            ? trimmed.replace(/^\[GM\]/, "[GAME MASTER]")
+            : trimmed;
+        })
+        .join("\n\n");
+      parts.push(formattedThinking);
+    }
+
+    if (gmStoryContext) {
+      // Normalize headers
+      const formattedContext = gmStoryContext.startsWith("[GM")
+        ? gmStoryContext.replace(/^\[GM[^\]]*\]/, "[GAME MASTER]")
+        : gmStoryContext;
+      parts.push(formattedContext);
+    }
+
+    gmReasoning = parts.join("\n\n");
+  }
+
+  // If no GM reasoning, use fallback
+  if (!gmReasoning.trim()) {
+    return STORY_AFFIRMATION_FALLBACK;
+  }
+
+  // Build the prefill with GM reasoning in thinking tags
+  return STORY_AFFIRMATION_TEMPLATE.replace(
+    "{{GM_REASONING}}",
+    gmReasoning.trim()
+  );
+}
 
 export const TOOLS_AFFIRMATION = `Understood. I will audit the narrative for game state changes:
 - **Accuracy:** I will use EXACT string matching for items, stats, and quest names.
@@ -220,29 +277,105 @@ const FEW_SHOT_TOOL_RESPONSES = [
   },
 ];
 
+// ============================================
+// DM MODE FEW-SHOT EXAMPLES
+// ============================================
+// These examples show the "Dungeon Master" storytelling style where
+// mechanics are woven into the narrative with clear roll announcements
+
+const DM_FEW_SHOT_STORY_EXAMPLE_1 = {
+  gmReasoning: FEW_SHOT_GM_REASONING_1,
+  gmTools: FEW_SHOT_GM_TOOLS_1,
+  user: `[PLAYER] I'll check the merchant's stall for the stolen amulet.`,
+  userWithContext: `[PLAYER] I'll check the merchant's stall for the stolen amulet.
+
+${FEW_SHOT_GM_REASONING_1}
+
+${FEW_SHOT_GM_TOOLS_1}`,
+  assistant: `The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear.
+
+**Perception check to spot the hidden amulet... you rolled a 12, plus your +1 bonus = 13 against DC 10. Success!**
+
+Your trained eye catches what others would miss. There—beneath that bolt of silk, a flash of silver. The amulet, your client's family heirloom, its sapphire eye winking in the lamplight.
+
+But Farouk noticed you noticing. His smile doesn't reach his eyes.
+
+"Something catch your interest, friend?"
+
+Behind you, two men in dark robes have stopped at the neighboring stall. Their gazes are too casual, too fixed.
+
+*You've found the amulet, but you're not the only one watching.*
+[STOP]`,
+  stateChanges: [
+    "Memory added: The stolen amulet is at Farouk's spice stall, hidden under silk",
+    "Lore updated: Added details about Farouk's suspicious behavior",
+  ],
+};
+
+const DM_FEW_SHOT_STORY_EXAMPLE_2 = {
+  gmReasoning: FEW_SHOT_GM_REASONING_2,
+  gmTools: FEW_SHOT_GM_TOOLS_2,
+  user: `[PLAYER] Distract the merchant and grab the amulet.`,
+  userWithContext: `[PLAYER] Distract the merchant and grab the amulet.
+
+${FEW_SHOT_GM_REASONING_2}
+
+${FEW_SHOT_GM_TOOLS_2}`,
+  assistant: `"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
+
+**Persuasion check to fool Farouk... you rolled a 7, no bonus. Against DC 14? That's a failure by 7.**
+
+Farouk's hand shoots out like a striking cobra. His fingers close around your wrist like iron.
+
+"You think me a fool?" His voice drops to a dangerous hiss. "I *know* what you're reaching for, thief."
+
+The two robed figures are moving now—cutting through the crowd with purpose. One of them has a hand beneath his cloak.
+
+**You've been caught. Farouk's got your wrist, and you've attracted unwanted attention.**
+
+Your curved dagger presses against your hip. The exit is three stalls away, blocked by a cart of melons. The rooftops—if you could reach them—offer another path.
+
+"Now," Farouk growls. "We talk price. Or we talk to the Caliph's men."
+
+*What do you do?*
+[STOP]`,
+  stateChanges: [
+    "Condition added: Compromised Position (Tier I) - Farouk has you by the wrist",
+  ],
+};
+
 /**
  * Build few-shot example messages for the story stage
  * Shows the workflow: [PLAYER] action + [GAME MASTER] reasoning → story that honors both
+ * @param mode - "narrator" for literary prose, "dm" for game master with inline mechanics
  */
-export function buildStoryFewShotMessages(): ChatMessage[] {
+export function buildStoryFewShotMessages(
+  mode: StorytellerMode = "narrator"
+): ChatMessage[] {
+  // Select examples based on mode
+  const example1 =
+    mode === "dm" ? DM_FEW_SHOT_STORY_EXAMPLE_1 : FEW_SHOT_STORY_EXAMPLE_1;
+  const example2 =
+    mode === "dm" ? DM_FEW_SHOT_STORY_EXAMPLE_2 : FEW_SHOT_STORY_EXAMPLE_2;
+
   return [
     // Example info message
     { role: "user", content: FEW_SHOT_INFO_MESSAGE },
     // First turn - user choice with GAME MASTER context appended
-    { role: "user", content: FEW_SHOT_STORY_EXAMPLE_1.userWithContext },
-    { role: "assistant", content: FEW_SHOT_STORY_EXAMPLE_1.assistant },
+    { role: "user", content: example1.userWithContext },
+    { role: "assistant", content: example1.assistant },
     {
       role: "assistant",
-      content: `[GAME MASTER State Update]\n${FEW_SHOT_STORY_EXAMPLE_1.stateChanges
+      content: `[GAME MASTER State Update]\n${example1.stateChanges
         .map((s) => `• ${s}`)
         .join("\n")}`,
     },
     // Second turn - user choice with GAME MASTER context appended
-    { role: "user", content: FEW_SHOT_STORY_EXAMPLE_2.userWithContext },
-    { role: "assistant", content: FEW_SHOT_STORY_EXAMPLE_2.assistant },
+    { role: "user", content: example2.userWithContext },
+    { role: "assistant", content: example2.assistant },
     {
       role: "assistant",
-      content: `[GAME MASTER State Update]\n${FEW_SHOT_STORY_EXAMPLE_2.stateChanges
+      content: `[GAME MASTER State Update]\n${example2.stateChanges
         .map((s) => `• ${s}`)
         .join("\n")}`,
     },
@@ -541,13 +674,16 @@ function getStatDescriptor(value: number): string {
   return "exceptional";
 }
 
-// Build info message - shared across all stages
-// Optional embeddingContext allows embedding-enhanced lore/memory retrieval
+// Build info message for GM Stage
 // Note: Stats, resources, abilities, and rpgSystem are DEPRECATED.
 // All mechanics are now defined in "mechanics" type lore entries and handled by GM stage formula_roll.
+// AGENTIC NOTE SYSTEM:
+// - Pinned types (dm_instructions, character_sheet, mechanics): Always loaded in full
+// - Folder types (lore, secret): Show titles only, use read_notes tool
+// - story_instructions: NOT included here (only used by Story Stage)
 export function buildInfoMessage(
   storyData: StoryData,
-  embeddingContext?: EmbeddingContext
+  embeddingContext?: EmbeddingContext // DEPRECATED - kept for backward compat but ignored
 ): string {
   // Build achievements section - show LOCKED achievements with ai_hint
   const lockedAchievements = storyData.achievements.filter(
@@ -559,111 +695,97 @@ export function buildInfoMessage(
         .join("\n")}`
     : "";
 
-  // Build lore section - use embeddings if available, otherwise fallback to trigger-based
-  const currentPartIndex = storyData.scene.parts.length;
+  // ============================================
+  // AGENTIC NOTE SYSTEM - Folder-based approach
+  // ============================================
+  // GM Stage pinned types: dm_instructions, character_sheet, mechanics
+  // Story Stage pinned types: story_instructions, character_sheet (see buildStoryInfoMessage)
+  // Folder types: lore, secret (show titles only, use read_notes tool)
 
-  // Character sheet notes - highest priority, always at the very top
+  // Helper to check if a note type is "pinned" for GM Stage (always loaded in full)
+  const isPinnedType = (type?: string): boolean => {
+    return (
+      type === "dm_instructions" ||
+      type === "character_sheet" ||
+      type === "mechanics" ||
+      type === "gm_notes" // Legacy alias for dm_instructions
+      // NOTE: story_instructions is NOT pinned for GM Stage (only Story Stage uses it)
+    );
+  };
+
+  // Helper to check if a note type should be excluded from World Lore folder
+  const isExcludedFromWorldLore = (type?: string): boolean => {
+    return (
+      isPinnedType(type) || type === "secret" || type === "story_instructions" // Excluded - only for Story Stage
+    );
+  };
+
+  // Helper to check if a note type is "secret" (hidden from player)
+  const isSecretType = (type?: string): boolean => {
+    return type === "secret";
+  };
+
+  // 📌 DM Instructions - Always loaded in full (read every turn like copilot-instructions.md)
+  const dmInstructionsLore = storyData.lore.filter(
+    (l) =>
+      l.enabled !== false &&
+      (l.type === "dm_instructions" || l.type === "gm_notes")
+  );
+  const dmInstructionsSection = dmInstructionsLore.length
+    ? `## 📌 DM Instructions\nGuidelines for running this adventure. Follow these precisely.\n${dmInstructionsLore
+        .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
+        .join("\n\n")}`
+    : "";
+
+  // 📌 Character Sheet - Always loaded in full
   const characterSheetLore = storyData.lore.filter(
     (l) => l.enabled !== false && l.type === "character_sheet"
   );
   const characterSheetSection = characterSheetLore.length
-    ? `## Character Sheet\nThe player's character details. Reference these for personality, abilities, and backstory.\n${characterSheetLore
+    ? `## 📌 Character Sheet\nThe player's character details. Reference these for personality, abilities, and backstory.\n${characterSheetLore
         .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
-        .join("\n")}`
+        .join("\n\n")}`
     : "";
 
-  // Separate mechanics lore (always included, prioritized after character sheet)
+  // 📌 Game Mechanics - Always loaded in full
   const mechanicsLore = storyData.lore.filter(
     (l) => l.enabled !== false && l.type === "mechanics"
   );
   const mechanicsSection = mechanicsLore.length
-    ? `## Game Mechanics\nThese are the rules for this adventure. Follow them precisely.\n${mechanicsLore
+    ? `## 📌 Game Mechanics\nThese are the rules for this adventure. Follow them precisely.\n${mechanicsLore
         .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
-        .join("\n")}`
+        .join("\n\n")}`
     : "";
 
-  // Always-on lore is always included (excluding mechanics and character_sheet)
-  const alwaysOnLore = storyData.lore.filter((l) => {
+  // 📁 World Lore - Titles only (use read_notes to view content)
+  // Includes: lore (default), npc, item, location, faction, event, and untyped notes
+  const worldLoreNotes = storyData.lore.filter((l) => {
     if (l.enabled === false) return false;
-    if (l.type === "mechanics") return false; // Handled separately
-    if (l.type === "character_sheet") return false; // Handled separately
-    return l.alwaysOn === true;
+    if (isExcludedFromWorldLore(l.type)) return false; // Not pinned, secret, or story-stage-only types
+    return true; // Everything else goes in World Lore
   });
-
-  // If we have embedding context, use embedding-based selection
-  let activeLore: StoryLore[];
-  if (embeddingContext && embeddingContext.loreTitles.length > 0) {
-    // Get lore entries matching embedding-retrieved titles
-    const embeddingLoreTitles = new Set(
-      embeddingContext.loreTitles.map((t) => t.toLowerCase())
-    );
-    const embeddingLore = storyData.lore.filter(
-      (l) =>
-        l.enabled !== false &&
-        l.type !== "mechanics" && // Mechanics handled separately
-        l.type !== "character_sheet" && // Character sheet handled separately
-        !l.alwaysOn && // Not already in alwaysOnLore
-        embeddingLoreTitles.has(l.title.toLowerCase())
-    );
-    // Embedding mode: only alwaysOn + embedding-matched lore
-    activeLore = [...alwaysOnLore, ...embeddingLore];
-  } else {
-    // Fallback to trigger-based logic (for small lore sets or no embeddings)
-    // Start with always-on and manually revealed lore
-    const baseLore = storyData.lore.filter((l) => {
-      if (l.enabled === false) return false;
-      if (l.type === "mechanics") return false; // Mechanics handled separately
-      if (l.type === "character_sheet") return false; // Character sheet handled separately
-      if (l.alwaysOn) return true;
-      const wasRevealed = storyData.scene.parts.some((p) =>
-        p.revealedLore?.some(
-          (title) => title.toLowerCase() === l.title.toLowerCase()
-        )
-      );
-      return wasRevealed;
-    });
-
-    const triggerLore = storyData.lore.filter((l) => {
-      if (l.enabled === false) return false;
-      if (l.type === "mechanics") return false; // Mechanics handled separately
-      if (l.type === "character_sheet") return false; // Character sheet handled separately
-      if (l.alwaysOn) return false; // Already in baseLore
-      const wasRevealed = storyData.scene.parts.some((p) =>
-        p.revealedLore?.some(
-          (title) => title.toLowerCase() === l.title.toLowerCase()
-        )
-      );
-      if (wasRevealed) return false; // Already in baseLore
-
-      // Standard trigger-based logic
-      if (l.on === false) return false;
-      if (!l.lastTriggeredIndex) return l.on === true;
-      return currentPartIndex - l.lastTriggeredIndex <= 15;
-    });
-    activeLore = [...baseLore, ...triggerLore];
-  }
-
-  const loreSection = activeLore.length
-    ? `## Notes/Lore\n${activeLore
-        .map((l) => `${l.title}\n${cleanString(l.content)}`)
+  const worldLoreSection = worldLoreNotes.length
+    ? `## 📁 World Lore (use read_notes to view)\n${worldLoreNotes
+        .map((l) => `- ${l.title}`)
         .join("\n")}`
     : "";
 
-  // Build memory section - use embeddings if available
-  let memorySection: string;
-  if (embeddingContext && embeddingContext.memories.length > 0) {
-    // Use embedding-retrieved memories
-    memorySection = `## Memory\n${embeddingContext.memories
-      .map((m) => `- ${m}`)
-      .join("\n")}`;
-  } else {
-    // Use all memories for smaller sets (or when no embeddings)
-    memorySection = storyData.memory.length
-      ? `## Memory\n${storyData.memory
-          .map((m) => `- ${getMemoryContent(m)}`)
-          .join("\n")}`
+  // 🔒 Secrets - Titles only (hidden from player, use read_notes to view)
+  const secretNotes = storyData.lore.filter(
+    (l) => l.enabled !== false && isSecretType(l.type)
+  );
+  const secretsSection = secretNotes.length
+    ? `## 🔒 Secrets (use read_notes to view)\n${secretNotes
+        .map((l) => `- ${l.title}`)
+        .join("\n")}`
+    : "";
+
+  // 🧠 Memory - Summary only (use search_memory to find specific facts)
+  const memoryCount = storyData.memory.length;
+  const memorySection =
+    memoryCount > 0
+      ? `## 🧠 Memory (${memoryCount} entries - use search_memory to find specific facts)`
       : "";
-  }
 
   // Build quests section if any exist
   const activeQuests =
@@ -770,11 +892,17 @@ ${
         ? ` - ${cleanString(storyData.player_summary)}`
         : ""
     }`,
-    characterSheetSection, // Character sheet - highest priority, at the very top
-    mechanicsSection, // Mechanics lore entries - prioritized second
-    achievementsSection,
-    loreSection,
+    // Pinned notes - always loaded in full
+    dmInstructionsSection, // DM Instructions - highest priority, read every turn
+    characterSheetSection, // Character sheet - player details
+    mechanicsSection, // Game mechanics - rules
+    // Folder notes - titles only, use read_notes tool
+    worldLoreSection, // World Lore folder
+    secretsSection, // Secrets folder
+    // Memory - summary only, use search_memory tool
     memorySection,
+    // Other game state
+    achievementsSection,
     questsSection,
     variablesSection,
     threadsSection,
@@ -800,55 +928,92 @@ ${
   return cleanString(sections);
 }
 
-// Stage 1: Story narration only
-// Story Stage is now a "translator" - GM Stage does the heavy lifting
-// Uses fixed smaller context budget since it just needs recent parts + GM output
-export function buildStoryPrompt({
-  storyData,
-  userChoice,
-  commandResponses,
-  modelName = "Deepseek Chat",
-  customMaxContext, // DEPRECATED: Story stage now uses fixed budget. Kept for backward compat.
-  customMaxOutput,
-  embeddingContext,
-  usePrefill = true,
-  gmStoryContext,
-  gmThinking,
-  gmInterleavedConversation, // NEW: Full interleaved GM conversation (preferred over gmThinking + gmStoryContext)
-}: {
-  storyData: StoryData;
-  userChoice?: string;
-  commandResponses?: CommandResponse[];
-  modelName?: string;
-  customMaxContext?: number; // Deprecated - story stage uses fixed budget now
-  customMaxOutput?: number;
-  embeddingContext?: EmbeddingContext;
-  usePrefill?: boolean;
-  gmStoryContext?: string; // DEPRECATED: Context from GM stage (tool results, final summary)
-  gmThinking?: string[]; // DEPRECATED: Full GM reasoning chain of thought
-  gmInterleavedConversation?: string; // NEW: Full interleaved GM conversation (thinking + tool results + summary)
-}): { messages: ChatMessage[]; prunedParts: number } {
-  // Note: rpgSystem is DEPRECATED - all dice mechanics are now in "mechanics" type lore entries
+/**
+ * Build a minimal info message for the Story Stage
+ *
+ * The Story Stage is just a "translator" - it takes GM output and writes prose.
+ * It does NOT need:
+ * - World lore (GM already read and incorporated them)
+ * - Mechanics (GM already resolved them)
+ * - Memory (GM already searched if needed)
+ * - Secrets (GM already used them)
+ * - DM Instructions (those are for the GM Stage)
+ *
+ * It only needs:
+ * - Story name and premise (for tone/setting)
+ * - Story Instructions (narrator-specific guidance)
+ * - Character Sheet (for character voice and personality)
+ * - Active quests/threads (for narrative continuity)
+ * - Author notes (for style guidance)
+ */
+export function buildStoryInfoMessage(storyData: StoryData): string {
+  // 📌 Story Instructions - Always loaded (narrator-specific guidance)
+  const storyInstructionsLore = storyData.lore.filter(
+    (l) => l.enabled !== false && l.type === "story_instructions"
+  );
+  const storyInstructionsSection = storyInstructionsLore.length
+    ? `## 📌 Story Instructions\nGuidance for writing the narrative. Follow these precisely.\n${storyInstructionsLore
+        .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
+        .join("\n\n")}`
+    : "";
 
-  // Get model's context limit (used as ceiling only)
-  const modelConfig = getModelConfig(modelName);
-  const modelMaxTokens = modelConfig.maxTokens;
+  // 📌 Character Sheet - Always loaded (for character voice and personality)
+  const characterSheetLore = storyData.lore.filter(
+    (l) => l.enabled !== false && l.type === "character_sheet"
+  );
+  const characterSheetSection = characterSheetLore.length
+    ? `## 📌 Character Sheet\nThe player's character. Use this for voice, personality, and mannerisms.\n${characterSheetLore
+        .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
+        .join("\n\n")}`
+    : "";
 
-  // Story stage uses FIXED smaller context - it's just a translator now
-  // The Memory Size slider now controls GM Stage context, not Story Stage
-  // Use the smaller of: fixed budget OR model's actual limit
-  const effectiveMaxTokens = Math.min(STORY_STAGE_TOKEN_BUDGET, modelMaxTokens);
+  // Active quests only - for narrative continuity
+  const activeQuests =
+    storyData.quests?.filter((q) => q.active && !q.fulfilled) || [];
+  const questsSection = activeQuests.length
+    ? `## Active Quests\n${activeQuests
+        .map((q) => `- ${q.title}: ${q.description}`)
+        .join("\n")}`
+    : "";
 
-  // Use custom max output if provided, otherwise use model's default
-  const actualMaxOutput = customMaxOutput || modelConfig.maxOutputTokens;
-  const maxContextTokens = effectiveMaxTokens - actualMaxOutput;
+  // Build threads section - show active storylines only
+  const activeThreads =
+    storyData.threads?.filter((t) => t.status === "active") || [];
+  const truncateDesc = (desc: string, max = 150) =>
+    desc.length > max ? desc.slice(0, max).trim() + "..." : desc;
+  const threadsSection = activeThreads.length
+    ? `## Story Threads\n${activeThreads
+        .map((t) => `- **${t.title}**: ${truncateDesc(t.description)}`)
+        .join("\n")}`
+    : "";
 
-  // Allocate 75% for story history, 25% for info (system prompt + GM context)
-  // Note: Most "info" now comes from GM Stage, so this is lighter than before
-  const storyBudget = Math.floor(maxContextTokens * 0.75);
-  const infoBudget = Math.floor(maxContextTokens * 0.25);
+  const sections = [
+    `# ${cleanString(storyData.story_name || "Untitled Story")}`,
+    storyData.premise ? `**Premise:** ${cleanString(storyData.premise)}` : "",
+    storyInstructionsSection,
+    characterSheetSection,
+    questsSection,
+    threadsSection,
+    storyData.author_notes
+      ? `## Author Notes\n${cleanString(storyData.author_notes)}`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 
-  const systemPrompt = `You are the NARRATOR for an interactive story. Your prose should feel literary, immediate, and deeply grounded in sensory reality.
+  return cleanString(sections);
+}
+
+// ============================================
+// STORYTELLER MODE SYSTEM PROMPTS
+// ============================================
+
+/**
+ * Narrator mode system prompt - literary prose, no mechanical details shown
+ * Focuses on immersive, sensory-rich storytelling
+ */
+function getNarratorSystemPrompt(): string {
+  return `You are the NARRATOR for an interactive story. Your prose should feel literary, immediate, and deeply grounded in sensory reality.
 
 The GAME MASTER handles all mechanics. Your job: Transform those decisions into vivid, emotionally resonant narrative.
 
@@ -964,8 +1129,192 @@ SECTION 5: OUTPUT FORMAT
 - Match pacing to stakes—don't over-describe routine actions
 
 NOW WRITE THE NARRATIVE.`;
+}
 
-  const infoMessage = buildInfoMessage(storyData, embeddingContext);
+/**
+ * DM (Dungeon Master) mode system prompt - mechanics woven into narrative
+ * Shows dice rolls, damage numbers, and game state inline with engaging prose
+ */
+function getDMSystemPrompt(): string {
+  return `You are a DUNGEON MASTER narrating an interactive adventure. Your style blends engaging storytelling with clear mechanical feedback—like a great tabletop GM who makes dice rolls feel exciting.
+
+The GAME MASTER has already determined outcomes. Your job: Narrate the action AND communicate the mechanical results clearly.
+
+═══════════════════════════════════════════════════════════════
+SECTION 1: THE CONTRACT (NON-NEGOTIABLE)
+═══════════════════════════════════════════════════════════════
+
+**[PLAYER] = What the player chose to do**
+- Narrate EXACTLY that action. No substitutions, no "better ideas."
+
+**[GAME MASTER] = The authoritative ruling**
+- Read the dice rolls, DCs, and outcomes carefully.
+- **[Outcome: success]** → The player SUCCEEDS.
+- **[Outcome: failure]** → The player FAILS.
+- **[Outcome: mixed]** → Partial success with complications.
+- **NEVER contradict the outcome.** The dice have spoken.
+
+═══════════════════════════════════════════════════════════════
+SECTION 2: MECHANICAL PRESENTATION
+═══════════════════════════════════════════════════════════════
+
+**Announce Rolls Inline**
+When a skill check or roll happens, announce it clearly within the narrative:
+- **"Perception check... you rolled a 15 plus your +2 bonus = 17 against DC 12. Success!"**
+- **"Stealth check—rolled an 8. Against DC 14? That's a failure."**
+- **"Attack roll: natural 18! Plus 5 to hit, that's 23 versus AC 15. Hit!"**
+
+**Announce Damage & Effects**
+Make damage feel impactful:
+- **"The goblin's blade bites into your arm—6 slashing damage!"**
+- **"Your fireball engulfs the group. 24 fire damage to all three!"**
+- **"He misses! His sword sparks against the stone beside your head."**
+
+**Show NPC Turns in Combat**
+When enemies act, make it clear:
+- **"The bandit leader goes next. He swings at you with his greatsword... rolled a 19 to hit. That lands! You take 11 damage."**
+- **"The wolves circle. Wolf A lunges—16 to hit, misses your AC 17. Wolf B snaps at your leg—rolled a 21! 7 piercing damage."**
+
+**Summarize State Changes**
+Call out important mechanical shifts:
+- **"You're at 14/30 HP now—bloodied but still standing."**
+- **"That brings the orc down to 8 HP. He's looking rough."**
+- **"Condition gained: Poisoned. You'll have disadvantage on attack rolls."**
+
+═══════════════════════════════════════════════════════════════
+SECTION 3: NARRATIVE BALANCE
+═══════════════════════════════════════════════════════════════
+
+**Don't Let Mechanics Kill the Story**
+Weave mechanical announcements INTO descriptive prose:
+
+BAD (boring):
+> "You roll Stealth. 14. DC was 12. Success. You sneak past."
+
+GOOD (engaging):
+> You press yourself against the shadowed alcove, holding your breath.
+>
+> **Stealth check... 14 versus DC 12. You slip past unnoticed.**
+>
+> The guard's torch sweeps past, missing you by inches.
+
+**Keep Energy High**
+- Use short, punchy sentences during action
+- Bold the mechanical results for easy scanning
+- Let tension breathe between dice announcements
+
+**Show Don't Just Tell**
+Even with mechanics visible, describe the fiction:
+- Don't just say "You hit for 8 damage"
+- Say "Your blade catches him across the ribs—**8 slashing damage**—and he staggers back with a snarl."
+
+═══════════════════════════════════════════════════════════════
+SECTION 4: THE LIVING WORLD
+═══════════════════════════════════════════════════════════════
+
+**NPCs Have Personality**
+- Give enemies and allies distinct voices and behavior
+- Make their actions feel motivated, not just mechanical
+- "The goblin shrieks and throws a wild swing—more desperation than skill"
+
+**Environment Matters**
+- Call out environmental features that affect play
+- "The wet stones are slippery—Acrobatics checks at disadvantage here"
+- Let the world feel interactive and dynamic
+
+**Pacing**
+- Combat: Keep it snappy, emphasize the stakes
+- Exploration: Take time for atmosphere and discovery
+- Social: Let dialogue breathe, show NPC reactions
+
+═══════════════════════════════════════════════════════════════
+SECTION 5: OUTPUT FORMAT
+═══════════════════════════════════════════════════════════════
+
+- **Bold** for mechanical announcements (rolls, damage, conditions)
+- *Italics* for internal thoughts, whispers, emphasis
+- Keep paragraphs short during action
+- End on a moment of decision with **[STOP]**
+
+**Length Guidelines**
+- Simple action: 150-300 words
+- Combat round: 200-400 words
+- Complex scene: 400-600 words
+
+**Example Combat Flow:**
+> The orc roars and charges!
+>
+> **His attack roll: 16 + 4 = 20 versus your AC 16. Hit!**
+>
+> His axe crashes into your shield, driving you back a step. **8 slashing damage.** Your arm goes numb from the impact.
+>
+> **You're at 22/30 HP. Your turn.**
+>
+> What do you do?
+> [STOP]
+
+NOW NARRATE THE ACTION.`;
+}
+
+// Stage 1: Story narration only
+// Story Stage is now a "translator" - GM Stage does the heavy lifting
+// Uses fixed smaller context budget since it just needs recent parts + GM output
+// NOTE: Story Stage no longer needs notes/lore - GM Stage handles all that context
+export function buildStoryPrompt({
+  storyData,
+  userChoice,
+  commandResponses,
+  modelName = "Deepseek Chat",
+  customMaxContext, // DEPRECATED: Story stage now uses fixed budget. Kept for backward compat.
+  customMaxOutput,
+  embeddingContext, // DEPRECATED: Story stage no longer uses embeddings - it's just a translator
+  usePrefill = true,
+  gmStoryContext,
+  gmThinking,
+  gmInterleavedConversation, // NEW: Full interleaved GM conversation (preferred over gmThinking + gmStoryContext)
+  storytellerMode = "narrator", // "narrator" for literary prose, "dm" for game master with inline mechanics
+}: {
+  storyData: StoryData;
+  userChoice?: string;
+  commandResponses?: CommandResponse[];
+  modelName?: string;
+  customMaxContext?: number; // Deprecated - story stage uses fixed budget now
+  customMaxOutput?: number;
+  embeddingContext?: EmbeddingContext; // Deprecated - story stage is just a translator now
+  usePrefill?: boolean;
+  gmStoryContext?: string; // DEPRECATED: Context from GM stage (tool results, final summary)
+  gmThinking?: string[]; // DEPRECATED: Full GM reasoning chain of thought
+  gmInterleavedConversation?: string; // NEW: Full interleaved GM conversation (thinking + tool results + summary)
+  storytellerMode?: StorytellerMode; // "narrator" for literary prose, "dm" for inline mechanics
+}): { messages: ChatMessage[]; prunedParts: number } {
+  // Note: rpgSystem is DEPRECATED - all dice mechanics are now in "mechanics" type lore entries
+  // Note: embeddingContext is DEPRECATED - story stage doesn't need notes/lore, GM Stage handles that
+
+  // Get model's context limit (used as ceiling only)
+  const modelConfig = getModelConfig(modelName);
+  const modelMaxTokens = modelConfig.maxTokens;
+
+  // Story stage uses FIXED smaller context - it's just a translator now
+  // The Memory Size slider now controls GM Stage context, not Story Stage
+  // Use the smaller of: fixed budget OR model's actual limit
+  const effectiveMaxTokens = Math.min(STORY_STAGE_TOKEN_BUDGET, modelMaxTokens);
+
+  // Use custom max output if provided, otherwise use model's default
+  const actualMaxOutput = customMaxOutput || modelConfig.maxOutputTokens;
+  const maxContextTokens = effectiveMaxTokens - actualMaxOutput;
+
+  // Allocate 75% for story history, 25% for info (system prompt + GM context)
+  // Note: Most "info" now comes from GM Stage, so this is lighter than before
+  const storyBudget = Math.floor(maxContextTokens * 0.75);
+  const infoBudget = Math.floor(maxContextTokens * 0.25);
+
+  // Select system prompt based on storyteller mode
+  const systemPrompt =
+    storytellerMode === "dm" ? getDMSystemPrompt() : getNarratorSystemPrompt();
+
+  // Story Stage uses MINIMAL info - it's just a translator
+  // GM Stage already processed notes, mechanics, memory, etc.
+  const infoMessage = buildStoryInfoMessage(storyData);
   const cleanedSystemPrompt = cleanString(systemPrompt);
   const cleanedInfoMessage = cleanString(infoMessage);
 
@@ -987,9 +1336,9 @@ NOW WRITE THE NARRATIVE.`;
   // This teaches the model the expected format before the actual story begins
   const useFewShot = storyData.scene.parts.length < FEW_SHOT_THRESHOLD;
   if (useFewShot) {
-    messages.push(...buildStoryFewShotMessages());
+    messages.push(...buildStoryFewShotMessages(storytellerMode));
     console.log(
-      `[buildStoryPrompt] Using few-shot examples (${storyData.scene.parts.length} parts < ${FEW_SHOT_THRESHOLD} threshold)`
+      `[buildStoryPrompt] Using few-shot examples (${storyData.scene.parts.length} parts < ${FEW_SHOT_THRESHOLD} threshold, mode: ${storytellerMode})`
     );
   }
 
@@ -1113,8 +1462,8 @@ NOW WRITE THE NARRATIVE.`;
 
   // Add user choice to history if present
   if (userChoice) {
-    // Build the user message with the player action and full GAME MASTER reasoning
-    // This matches the format used for older turns (from formatGMReasoning)
+    // Build the user message with ONLY the player action
+    // GM reasoning is now added as assistant prefill (thinking block) instead
     let choiceMessage = "";
 
     // Include pending player actions (level ups, skill tree purchases, etc.)
@@ -1131,48 +1480,9 @@ NOW WRITE THE NARRATIVE.`;
     // Player's action with [PLAYER] tag (matches older turn format)
     choiceMessage += `[PLAYER] ${userChoice}`;
 
-    // NEW: Use interleaved conversation if available (preferred)
-    // This preserves the exact order: thinking -> tool results -> thinking -> tool results -> summary
-    if (gmInterleavedConversation) {
-      choiceMessage += `\n\n${gmInterleavedConversation}`;
-      console.log(
-        `[buildStoryPrompt] User message with interleaved GM conversation: ${gmInterleavedConversation.length} chars`
-      );
-    } else {
-      // LEGACY FALLBACK: Use separate gmThinking + gmStoryContext (old behavior)
-      // Append full GAME MASTER reasoning chain (the thinking/chain of thought)
-      // This is crucial - the story stage needs to see the full reasoning to understand context
-      if (gmThinking && gmThinking.length > 0) {
-        const formattedThinking = gmThinking
-          .map((t) => {
-            const trimmed = t.trim();
-            // Only add [GAME MASTER] prefix if not already present
-            return trimmed.startsWith("[GAME MASTER]") ||
-              trimmed.startsWith("[GM]")
-              ? trimmed.replace(/^\[GM\]/, "[GAME MASTER]")
-              : `[GAME MASTER]\n${trimmed}`;
-          })
-          .join("\n\n");
-        choiceMessage += `\n\n${formattedThinking}`;
-      }
-
-      // Append tool results and final summary from gmStoryContext
-      if (gmStoryContext) {
-        // Ensure it has the [GAME MASTER] header
-        const formattedContext = gmStoryContext.startsWith("[GAME MASTER]")
-          ? gmStoryContext
-          : gmStoryContext.startsWith("[GM")
-          ? gmStoryContext.replace(/^\[GM[^\]]*\]/, "[GAME MASTER]")
-          : `[GAME MASTER]\n${gmStoryContext}`;
-        choiceMessage += `\n\n${formattedContext}`;
-      }
-
-      console.log(
-        `[buildStoryPrompt] User message with GM context (legacy) - Thinking blocks: ${
-          gmThinking?.length || 0
-        }, StoryContext: ${gmStoryContext?.length || 0} chars`
-      );
-    }
+    // NOTE: GM reasoning is NO LONGER appended to the user message
+    // Instead, it's included in the assistant prefill as a <thinking> block
+    // This mimics reasoning model behavior where AI processes internally before responding
 
     historyMessages.push({
       role: "user",
@@ -1180,9 +1490,22 @@ NOW WRITE THE NARRATIVE.`;
     });
   }
 
+  // Build the prefill early so we can account for its tokens in pruning
+  const affirmation = usePrefill
+    ? buildStoryAffirmation(
+        gmInterleavedConversation,
+        gmThinking,
+        gmStoryContext
+      )
+    : "";
+  const prefillTokens = estimateTokens(affirmation);
+
   // Calculate tokens for each history message
   const historyTokens = historyMessages.map((m) => estimateTokens(m.content));
   const totalHistoryTokens = historyTokens.reduce((sum, t) => sum + t, 0);
+
+  // Adjust story budget to account for the prefill (which now contains GM reasoning)
+  const adjustedStoryBudget = actualStoryBudget - prefillTokens;
 
   // Prune from the front (oldest first) if over budget
   let prunedParts = 0;
@@ -1190,7 +1513,7 @@ NOW WRITE THE NARRATIVE.`;
   let startIndex = 0;
 
   while (
-    currentTokens > actualStoryBudget &&
+    currentTokens > adjustedStoryBudget &&
     startIndex < historyMessages.length - 2
   ) {
     // Always keep at least the last 2 messages for context
@@ -1223,17 +1546,20 @@ NOW WRITE THE NARRATIVE.`;
       `[buildStoryPrompt] Pruned ${prunedParts} oldest parts to fit context budget. Kept ${prunedHistory.length} parts.`
     );
     console.log(
-      `[buildStoryPrompt] Token budget: ${actualStoryBudget} (fixed ${STORY_STAGE_TOKEN_BUDGET}), Used: ${currentTokens}, Info: ${infoTokens}`
+      `[buildStoryPrompt] Token budget: ${adjustedStoryBudget} (base ${actualStoryBudget} - prefill ${prefillTokens}), Used: ${currentTokens}, Info: ${infoTokens}`
     );
   }
 
-  // Add role affirmation (prefill) if enabled
-  // This primes the model to follow output constraints by appearing as if it already committed
-  if (usePrefill) {
+  // Add the pre-built prefill with GM reasoning as <thinking> block
+  // This mimics reasoning model behavior - the AI "thinks through" the GM's ruling before writing
+  if (usePrefill && affirmation) {
     messages.push({
       role: "assistant",
-      content: STORY_AFFIRMATION,
+      content: affirmation,
     });
+    console.log(
+      `[buildStoryPrompt] Added prefill with GM reasoning (${affirmation.length} chars, ~${prefillTokens} tokens)`
+    );
   }
 
   return { messages, prunedParts };
@@ -2094,40 +2420,93 @@ export function buildGMStagePrompt({
     historyBudget
   );
 
-  // Build lore/notes section for GM stage (character sheet, mechanics, and always-on lore)
-  // GM needs to know character details, game rules and important world details for setting DCs
+  // ============================================
+  // AGENTIC NOTE SYSTEM for GM Stage
+  // ============================================
+  // Helper to check if a note type is "pinned" (always loaded in full)
+  const isPinnedType = (type?: string): boolean => {
+    return (
+      type === "dm_instructions" ||
+      type === "character_sheet" ||
+      type === "mechanics" ||
+      type === "gm_notes" // Legacy alias for dm_instructions
+    );
+  };
+
+  // Helper to check if a note type is "secret" (hidden from player)
+  const isSecretType = (type?: string): boolean => {
+    return type === "secret";
+  };
+
+  // 📌 DM Instructions - Always loaded in full
+  const dmInstructionsLore = (storyData.lore || []).filter(
+    (l) =>
+      l.enabled !== false &&
+      (l.type === "dm_instructions" || l.type === "gm_notes")
+  );
+
+  // 📌 Character Sheet - Always loaded in full
   const characterSheetLore = (storyData.lore || []).filter(
     (l) => l.enabled !== false && l.type === "character_sheet"
   );
+
+  // 📌 Game Mechanics - Always loaded in full
   const mechanicsLore = (storyData.lore || []).filter(
     (l) => l.enabled !== false && l.type === "mechanics"
   );
-  const alwaysOnLore = (storyData.lore || []).filter(
-    (l) =>
-      l.enabled !== false &&
-      l.type !== "mechanics" &&
-      l.type !== "character_sheet" &&
-      l.alwaysOn === true
+
+  // 📁 World Lore - Titles only (use read_notes to view)
+  const worldLoreNotes = (storyData.lore || []).filter((l) => {
+    if (l.enabled === false) return false;
+    if (isPinnedType(l.type)) return false;
+    if (isSecretType(l.type)) return false;
+    return true;
+  });
+
+  // 🔒 Secrets - Titles only (use read_notes to view)
+  const secretNotes = (storyData.lore || []).filter(
+    (l) => l.enabled !== false && isSecretType(l.type)
   );
 
+  // Build the lore/notes section
   let loreSection = "";
+
+  // Pinned notes: Full content
+  if (dmInstructionsLore.length > 0) {
+    loreSection += `## 📌 DM INSTRUCTIONS\nRead these guidelines every turn. They define how to run this adventure.\n`;
+    for (const l of dmInstructionsLore) {
+      loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
+    }
+  }
   if (characterSheetLore.length > 0) {
-    loreSection += `## CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\n`;
+    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\n`;
     for (const l of characterSheetLore) {
       loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
     }
   }
   if (mechanicsLore.length > 0) {
-    loreSection += `## GAME RULES & MECHANICS\nThese rules define how the game works. Use them to set appropriate DCs and determine what actions are possible.\n`;
+    loreSection += `\n## 📌 GAME RULES & MECHANICS\nThese rules define how the game works. Use them to set appropriate DCs and determine what actions are possible.\n`;
     for (const l of mechanicsLore) {
       loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
     }
   }
-  if (alwaysOnLore.length > 0) {
-    loreSection += `\n## IMPORTANT WORLD DETAILS\n`;
-    for (const l of alwaysOnLore) {
-      loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
-    }
+
+  // Folder notes: Titles only
+  if (worldLoreNotes.length > 0) {
+    loreSection += `\n## 📁 WORLD LORE (use read_notes to view)\n`;
+    loreSection += worldLoreNotes.map((l) => `- ${l.title}`).join("\n");
+    loreSection += "\n";
+  }
+  if (secretNotes.length > 0) {
+    loreSection += `\n## 🔒 SECRETS (use read_notes to view)\n`;
+    loreSection += secretNotes.map((l) => `- ${l.title}`).join("\n");
+    loreSection += "\n";
+  }
+
+  // Memory count
+  const memoryCount = storyData.memory.length;
+  if (memoryCount > 0) {
+    loreSection += `\n## 🧠 MEMORY (${memoryCount} entries - use search_memory to find specific facts)\n`;
   }
 
   // Format combat state for context
@@ -2255,7 +2634,9 @@ ${loreSection ? `\n${loreSection}` : ""}
 
 ## CURRENT GAME STATE
 ${npcList ? `**Known NPCs:**\n- ${npcList}` : ""}
-${combatSection ? `\n${combatSection}` : ""}${timersSection ? `\n${timersSection}` : ""}
+${combatSection ? `\n${combatSection}` : ""}${
+    timersSection ? `\n${timersSection}` : ""
+  }
 
 ═══════════════════════════════════════════════════════════════
 HOW THIS WORKS
@@ -2297,7 +2678,8 @@ TOOL QUICK REFERENCE
 
 **🔧 OTHER**
 • calculate - Do math (don't calculate in your head)
-• search_notes / search_memory - Find information
+• read_notes - Read note content by title (see 📁 folders above)
+• search_memory - Find specific facts in memory
 • create_timer / advance_timer - Countdowns and deadlines
 • start_challenge - Multi-roll challenges
 • end_gm_thinking - **REQUIRED** to finish and trigger story stage

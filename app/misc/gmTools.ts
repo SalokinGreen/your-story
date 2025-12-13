@@ -219,12 +219,11 @@ export interface AskPlayerParams {
 }
 
 /**
- * Search Notes - Search through mechanics/rules notes using patterns
- * Helps the GM find relevant rules without scanning everything
+ * Read Notes - Fetch note content by exact titles
+ * Used by GM to read notes from World Lore and Secrets folders
  */
-export interface SearchNotesParams {
-  patterns: string[]; // Array of search patterns (case-insensitive substring match)
-  include_lore?: boolean; // Also search regular lore (default: false, only mechanics)
+export interface ReadNotesParams {
+  titles: string[]; // Exact titles of notes to read
 }
 
 /**
@@ -271,6 +270,21 @@ export interface AddCombatantParams {
   initiative: string; // "1d20+2" (formula) or "10" (fixed value)
   lore_ref?: string; // Optional lore entry title for full NPC details
   notes?: string; // Behavior notes (e.g., "Cowardly - flees below 25% HP")
+}
+
+/**
+ * Add Multiple Combatants - Add several combatants at once
+ * Each combatant uses the same structure as AddCombatantParams
+ */
+export interface AddMultipleCombatantsParams {
+  combatants: Array<{
+    name: string;
+    type: "player" | "ally" | "enemy" | "neutral";
+    stats: Record<string, number>;
+    initiative: string;
+    lore_ref?: string;
+    notes?: string;
+  }>;
 }
 
 /**
@@ -482,7 +496,7 @@ export type GMToolParams =
   | { name: "formula_challenge_check"; params: FormulaChallengeCheckParams }
   | { name: "fate_question"; params: FateQuestionParams }
   | { name: "roll_table"; params: RollTableParams }
-  | { name: "search_notes"; params: SearchNotesParams }
+  | { name: "read_notes"; params: ReadNotesParams }
   | { name: "search_memory"; params: SearchMemoryParams }
   | { name: "request_continuation"; params: RequestContinuationParams }
   | { name: "ask_player"; params: AskPlayerParams }
@@ -499,6 +513,7 @@ export type GMToolParams =
   // Combat tools
   | { name: "start_combat"; params: StartCombatParams }
   | { name: "add_combatant"; params: AddCombatantParams }
+  | { name: "add_multiple_combatants"; params: AddMultipleCombatantsParams }
   | { name: "remove_combatant"; params: RemoveCombatantParams }
   | { name: "update_combatant_stat"; params: UpdateCombatantStatParams }
   | { name: "add_combatant_condition"; params: AddCombatantConditionParams }
@@ -1346,45 +1361,41 @@ DO NOT call if:
   },
 };
 
-const searchNotesTool: ToolSchema = {
+const readNotesTool: ToolSchema = {
   type: "function",
   function: {
-    name: "search_notes",
-    description: `Search through game rules and mechanics notes to find relevant information.
+    name: "read_notes",
+    description: `Read the content of one or more notes by their exact titles.
 
-Use this when you need to look up specific rules before making a roll or decision.
+The info message shows you available notes organized by folder:
+- 📁 World Lore - General world-building notes
+- 🔒 Secrets - GM-only notes hidden from player
+
+Use this tool to fetch the full content of notes you need for the current situation.
 
 WHEN TO USE:
-- You need to find rules about a specific mechanic (combat, magic, skills)
-- You want to check how modifiers or bonuses are calculated
-- You're unsure about success/failure conditions
-- Looking for critical hit/fumble rules
-- Need to find difficulty scaling or DC calculation rules
+- Before an encounter, read relevant location/enemy notes
+- When an NPC is mentioned, read their note for details
+- When the player asks about something, check if there's a note about it
+- Before rolling, check creature/enemy notes for their stats
 
-The search is case-insensitive and matches partial words.
-Provide multiple patterns to search for different relevant terms.
+TIPS:
+- Read multiple related notes at once (e.g., location + enemy for a dungeon room)
+- Note titles are shown in the info message - use exact titles
+- If a note doesn't exist, you'll get a "not found" message
 
-Example patterns:
-- ["roll under", "success"] - Find roll-under success rules
-- ["critical", "fumble"] - Find crit/fumble rules
-- ["bonus", "modifier", "+5%"] - Find bonus calculation rules
-- ["difficulty", "hard", "DC"] - Find difficulty rules`,
+Example: read_notes({ titles: ["City of Thornwall", "The Shadow Guild"] })`,
     parameters: {
       type: "object",
       properties: {
-        patterns: {
+        titles: {
           type: "array",
           items: { type: "string" },
           description:
-            "Search patterns to look for (case-insensitive). Use multiple patterns to find related rules.",
-        },
-        include_lore: {
-          type: "boolean",
-          description:
-            "Also search regular lore entries, not just mechanics notes (default: false)",
+            "Exact titles of notes to read. Use the titles shown in the info message.",
         },
       },
-      required: ["patterns"],
+      required: ["titles"],
     },
   },
 };
@@ -1535,6 +1546,73 @@ Their stats will sync back to their character resources when combat ends.`,
         },
       },
       required: ["name", "type", "stats", "initiative"],
+    },
+  },
+};
+
+const addMultipleCombatantsTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "add_multiple_combatants",
+    description: `Add multiple combatants to combat at once.
+
+**USE THIS** when adding 2+ enemies, allies, or NPCs to a fight.
+Much more efficient than calling add_combatant multiple times.
+
+Each combatant needs:
+- name: Unique identifier (duplicates get auto-suffixed: "Goblin" → "Goblin B")
+- type: "player" | "ally" | "enemy" | "neutral"
+- stats: Custom stats object { HP: 30, AC: 14 }
+- initiative: Dice formula "1d20+2" or fixed "10"
+
+Example: Adding a pack of wolves
+{ combatants: [
+  { name: "Alpha Wolf", type: "enemy", stats: { HP: 40, AC: 13, Attack: 6 }, initiative: "1d20+2" },
+  { name: "Wolf", type: "enemy", stats: { HP: 20, AC: 12, Attack: 4 }, initiative: "1d20+2" },
+  { name: "Wolf", type: "enemy", stats: { HP: 20, AC: 12, Attack: 4 }, initiative: "1d20+2" },
+  { name: "Wolf", type: "enemy", stats: { HP: 20, AC: 12, Attack: 4 }, initiative: "1d20+2" }
+]}`,
+    parameters: {
+      type: "object",
+      properties: {
+        combatants: {
+          type: "array",
+          description: "Array of combatants to add",
+          items: {
+            type: "object",
+            properties: {
+              name: {
+                type: "string",
+                description: "Combatant name (duplicates get auto-suffixed)",
+              },
+              type: {
+                type: "string",
+                enum: ["player", "ally", "enemy", "neutral"],
+                description: "Combatant type",
+              },
+              stats: {
+                type: "object",
+                additionalProperties: { type: "number" },
+                description: "Custom stats object { HP: 30, AC: 14 }",
+              },
+              initiative: {
+                type: "string",
+                description: "Initiative: dice formula or fixed number",
+              },
+              lore_ref: {
+                type: "string",
+                description: "Optional lore entry reference",
+              },
+              notes: {
+                type: "string",
+                description: "Optional behavior notes",
+              },
+            },
+            required: ["name", "type", "stats", "initiative"],
+          },
+        },
+      },
+      required: ["combatants"],
     },
   },
 };
@@ -2296,8 +2374,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Oracle & utility tools
   fateQuestionTool,
   rollTableTool,
-  // Lookup tools
-  searchNotesTool,
+  // Note & memory lookup tools
+  readNotesTool,
   searchMemoryTool,
   requestContinuationTool,
   askPlayerTool,
@@ -2313,6 +2391,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Combat tools
   startCombatTool,
   addCombatantTool,
+  addMultipleCombatantsTool,
   removeCombatantTool,
   updateCombatantStatTool,
   addCombatantConditionTool,

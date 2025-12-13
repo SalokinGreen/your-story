@@ -26,7 +26,6 @@ import {
   buildGMStagePrompt,
   ChatMessage,
   EmbeddingContext,
-  STORY_AFFIRMATION,
   TOOLS_AFFIRMATION,
   CHOICES_AFFIRMATION,
   GM_STAGE_AFFIRMATION,
@@ -128,6 +127,8 @@ export interface GenerationOptions {
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
   usePrefill?: boolean; // Default: true
+  // Storyteller mode - "narrator" (literary) or "dm" (inline mechanics)
+  storytellerMode?: "narrator" | "dm";
   // Abort signal for cancelling generation
   abortSignal?: AbortSignal;
 }
@@ -427,10 +428,21 @@ export async function generateStoryTurn(
 
   try {
     // ========================================
-    // STAGE 0: Embedding-based context retrieval (if enabled)
+    // STAGE 0: Embedding-based context retrieval
+    // DISABLED: Now using agentic model where GM uses read_notes and search_memory tools
+    // The embedding system is preserved but disabled - GM pulls notes on demand
     // ========================================
-    let embeddingContext: EmbeddingContext | undefined;
+    const embeddingContext: EmbeddingContext | undefined = undefined;
 
+    // NOTE: Embedding code preserved below but disabled.
+    // Instead of automatic embedding retrieval, the GM now:
+    // - Sees note titles in the info message (World Lore, Secrets folders)
+    // - Uses read_notes({ titles: [...] }) to fetch note content on demand
+    // - Uses search_memory({ patterns: [...] }) to search through memories
+    // This gives the GM explicit control over what context to load.
+
+    /*
+    // DISABLED: Old embedding-based retrieval
     if (options.enableEmbeddings && options.storyId) {
       logger.action("Stage 0: Retrieving embedding context");
 
@@ -478,6 +490,7 @@ export async function generateStoryTurn(
         });
       }
     }
+    */
 
     // ========================================
     // STAGE 0.5: GM Stage (if enabled)
@@ -940,6 +953,7 @@ Call the tool:`,
       gmStoryContext: gmStoryContext || undefined, // DEPRECATED: Use gmInterleavedConversation
       gmThinking: gmThinking.length > 0 ? gmThinking : undefined, // DEPRECATED: Use gmInterleavedConversation
       gmInterleavedConversation: gmInterleavedConversation || undefined, // NEW: Full interleaved GM conversation
+      storytellerMode: options.storytellerMode || "narrator", // Default to narrator mode
     });
 
     // Clear pending player actions after they've been included in the prompt
@@ -1029,13 +1043,16 @@ Call the tool:`,
 
     // Process story stream with real-time prefill stripping
     // We buffer content until we find the marker, then stream only the actual story
+    // The prefill now contains <thinking>GM reasoning</thinking> followed by an affirmation
     const usePrefill = options.usePrefill !== false;
     let prefillStripped = !usePrefill; // If prefill disabled, consider it already "stripped"
     let dividerStripped = false; // Track if we've stripped leading dividers
     let rawContent = ""; // Buffer for finding the marker
     let pendingContent = ""; // Buffer for stripping dividers after marker
     let stopMarkerHit = false; // Track if we hit [STOP] during streaming
-    const STORY_MARKER = "Writing the narrative now:";
+    // Look for end of thinking block OR the affirmation line (whichever comes last)
+    const THINKING_END = "</thinking>";
+    const STORY_MARKER = "Now I write the story.";
     const STOP_MARKER = "[STOP]";
 
     for await (const event of parseSSEStream(storyResponse)) {
@@ -1558,8 +1575,12 @@ Call the tool:`,
     console.log("[Generation] All parallel tasks complete");
 
     // ========================================
-    // STAGE 4: Sync new memories to embeddings (background, non-blocking)
+    // STAGE 4: Sync new memories to embeddings
+    // DISABLED: Now using agentic model where GM uses search_memory tool
+    // Memory syncing is preserved but disabled - memories are searched on demand
     // ========================================
+    /*
+    // DISABLED: Old embedding-based memory sync
     if (
       options.enableEmbeddings &&
       options.storyId &&
@@ -1602,6 +1623,7 @@ Call the tool:`,
           logger.action("Memory embedding sync failed", { error: err.message });
         });
     }
+    */
 
     // ========================================
     // BUILD SCENE PART

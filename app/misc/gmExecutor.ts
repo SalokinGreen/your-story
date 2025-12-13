@@ -34,7 +34,7 @@ import {
   FormulaChallengeCheckParams,
   FateQuestionParams,
   RollTableParams,
-  SearchNotesParams,
+  ReadNotesParams,
   SearchMemoryParams,
   RequestContinuationParams,
   AskPlayerParams,
@@ -51,6 +51,7 @@ import {
   // Combat tools
   StartCombatParams,
   AddCombatantParams,
+  AddMultipleCombatantsParams,
   RemoveCombatantParams,
   UpdateCombatantStatParams,
   AddCombatantConditionParams,
@@ -103,7 +104,7 @@ export interface GMToolResult {
     | GMFormulaChallengeResult
     | GMFateQuestionResult
     | GMRollTableResult
-    | GMSearchNotesResult
+    | GMReadNotesResult
     | GMSearchMemoryResult
     | GMRequestContinuationResult
     | GMAskPlayerResult
@@ -121,6 +122,7 @@ export interface GMToolResult {
     // Combat results
     | GMStartCombatResult
     | GMAddCombatantResult
+    | GMAddMultipleCombatantsResult
     | GMRemoveCombatantResult
     | GMUpdateCombatantStatResult
     | GMAddCombatantConditionResult
@@ -378,10 +380,11 @@ export interface GMRollTableResult {
   tableNotFound?: boolean;
 }
 
-export interface GMSearchNotesResult {
-  type: "search_notes";
-  matchCount: number;
-  matches: string[]; // Titles of matching entries
+export interface GMReadNotesResult {
+  type: "read_notes";
+  readCount: number;
+  titles: string[]; // Titles of notes that were read
+  notFoundTitles?: string[]; // Titles that weren't found
 }
 
 export interface GMSearchMemoryResult {
@@ -432,6 +435,18 @@ export interface GMAddCombatantResult {
   initiativeRoll?: number;
   loreRef?: string;
   notes?: string;
+}
+
+export interface GMAddMultipleCombatantsResult {
+  type: "add_multiple_combatants";
+  added: Array<{
+    name: string;
+    type: string;
+    stats: Record<string, number>;
+    initiative: number;
+  }>;
+  failed?: string[];
+  count?: number;
 }
 
 export interface GMRemoveCombatantResult {
@@ -820,12 +835,8 @@ export async function executeGMTools(
       case "roll_table":
         result = executeRollTable(call.id, params as RollTableParams, modified);
         break;
-      case "search_notes":
-        result = executeSearchNotes(
-          call.id,
-          params as SearchNotesParams,
-          modified
-        );
+      case "read_notes":
+        result = executeReadNotes(call.id, params as ReadNotesParams, modified);
         break;
       case "search_memory":
         result = executeSearchMemory(
@@ -858,6 +869,13 @@ export async function executeGMTools(
         result = executeAddCombatant(
           call.id,
           params as AddCombatantParams,
+          modified
+        );
+        break;
+      case "add_multiple_combatants":
+        result = executeAddMultipleCombatants(
+          call.id,
+          params as AddMultipleCombatantsParams,
           modified
         );
         break;
@@ -2596,84 +2614,89 @@ function executeRollTable(
 }
 
 /**
- * Execute a search through mechanics/lore notes
+ * Read notes by exact title - used by GM to fetch note content
+ * Notes are from the World Lore and Secrets folders
  */
-function executeSearchNotes(
+function executeReadNotes(
   toolCallId: string,
-  params: SearchNotesParams,
+  params: ReadNotesParams,
   storyData: StoryData
 ): GMToolResult {
-  const { patterns, include_lore = false } = params;
+  const { titles } = params;
 
-  if (!patterns || patterns.length === 0) {
+  if (!titles || titles.length === 0) {
     return {
-      toolName: "search_notes",
+      toolName: "read_notes",
       toolCallId,
       success: false,
       result: {
-        type: "search_notes",
-        matchCount: 0,
-        matches: [],
+        type: "read_notes",
+        readCount: 0,
+        titles: [],
       },
-      contextForStory: "[Search Notes: No patterns provided]",
+      contextForStory: "[Read Notes: No titles provided]",
     };
   }
 
-  // Search through lore entries
+  // Search through lore entries for matching titles
   const loreEntries = storyData.lore || [];
-  const matches: Array<{ title: string; content: string; type: string }> = [];
+  const foundNotes: Array<{ title: string; content: string; type: string }> =
+    [];
+  const notFoundTitles: string[] = [];
 
-  for (const entry of loreEntries) {
-    // Skip disabled lore
-    if (entry.enabled === false) continue;
-
-    // If not including regular lore, only search mechanics type
-    const isMechanics = entry.type === "mechanics";
-    if (!include_lore && !isMechanics) continue;
-
-    // Check if any pattern matches title or content (case-insensitive)
-    const searchText = `${entry.title} ${entry.content}`.toLowerCase();
-    const matchedPatterns = patterns.filter((pattern) =>
-      searchText.includes(pattern.toLowerCase())
+  for (const requestedTitle of titles) {
+    // Find entry with matching title (case-insensitive)
+    const entry = loreEntries.find(
+      (e) =>
+        e.title.toLowerCase() === requestedTitle.toLowerCase() &&
+        e.enabled !== false
     );
 
-    if (matchedPatterns.length > 0) {
-      matches.push({
+    if (entry) {
+      foundNotes.push({
         title: entry.title,
         content: entry.content,
         type: entry.type || "lore",
       });
+    } else {
+      notFoundTitles.push(requestedTitle);
     }
   }
 
   // Build context for the GM
-  let contextForStory = `[Search Notes: ${patterns.join(", ")}]`;
-  if (matches.length === 0) {
-    contextForStory += `\n[No matching rules found]`;
+  let contextForStory = `[Read Notes: ${titles.join(", ")}]`;
+
+  if (foundNotes.length === 0) {
+    contextForStory += `\n[No notes found with those titles]`;
+    if (notFoundTitles.length > 0) {
+      contextForStory += `\n[Not found: ${notFoundTitles.join(", ")}]`;
+    }
   } else {
-    contextForStory += `\n[Found ${matches.length} matching ${
-      matches.length === 1 ? "entry" : "entries"
-    }]`;
-    for (const match of matches) {
+    contextForStory += `\n[Found ${foundNotes.length} of ${titles.length} notes]`;
+    if (notFoundTitles.length > 0) {
+      contextForStory += `\n[Not found: ${notFoundTitles.join(", ")}]`;
+    }
+    for (const note of foundNotes) {
       const typeSuffix =
-        match.type === "mechanics"
+        note.type === "secret"
+          ? " (Secret)"
+          : note.type === "mechanics"
           ? " (Rules)"
-          : match.type === "character_sheet"
-          ? " (Character)"
           : "";
-      contextForStory += `\n\n---\n### ${match.title}${typeSuffix}\n${match.content}`;
+      contextForStory += `\n\n---\n### ${note.title}${typeSuffix}\n${note.content}`;
     }
     contextForStory += `\n---`;
   }
 
   return {
-    toolName: "search_notes",
+    toolName: "read_notes",
     toolCallId,
-    success: matches.length > 0,
+    success: foundNotes.length > 0,
     result: {
-      type: "search_notes",
-      matchCount: matches.length,
-      matches: matches.map((m) => m.title),
+      type: "read_notes",
+      readCount: foundNotes.length,
+      titles: foundNotes.map((n) => n.title),
+      notFoundTitles: notFoundTitles.length > 0 ? notFoundTitles : undefined,
     },
     contextForStory,
   };
@@ -2992,21 +3015,25 @@ function executeAddCombatant(
     };
   }
 
-  // Check for duplicate name
+  // Auto-generate unique name if duplicate exists (Name → Name B → Name C → ...)
+  let finalName = params.name;
   if (findCombatant(storyData.combatState, params.name)) {
-    return {
-      toolName: "add_combatant",
-      toolCallId,
-      success: false,
-      result: {
-        type: "add_combatant",
-        name: params.name,
-        combatantType: params.type,
-        stats: params.stats,
-        initiative: params.initiative,
-      } as GMAddCombatantResult,
-      contextForStory: `[Combat Error: Combatant "${params.name}" already exists]`,
-    };
+    // Find a unique suffix
+    const letters = "BCDEFGHIJKLMNOPQRSTUVWXYZ";
+    for (const letter of letters) {
+      const candidateName = `${params.name} ${letter}`;
+      if (!findCombatant(storyData.combatState, candidateName)) {
+        finalName = candidateName;
+        break;
+      }
+    }
+    // If all letters exhausted (unlikely), use timestamp
+    if (finalName === params.name) {
+      finalName = `${params.name} ${Date.now()
+        .toString(36)
+        .slice(-4)
+        .toUpperCase()}`;
+    }
   }
 
   // Roll initiative
@@ -3015,7 +3042,7 @@ function executeAddCombatant(
   // Create the combatant
   const combatant: Combatant = {
     id: `combatant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    name: params.name,
+    name: finalName,
     type: params.type,
     stats: params.stats,
     conditions: [],
@@ -3037,7 +3064,7 @@ function executeAddCombatant(
     .join(", ");
   logCombat(
     storyData.combatState,
-    `${params.name} (${params.type}) joined combat with ${statsStr}. Initiative: ${initiativeRoll}`
+    `${finalName} (${params.type}) joined combat with ${statsStr}. Initiative: ${initiativeRoll}`
   );
 
   return {
@@ -3046,7 +3073,7 @@ function executeAddCombatant(
     success: true,
     result: {
       type: "add_combatant",
-      name: params.name,
+      name: finalName,
       combatantType: params.type,
       stats: params.stats,
       initiative: params.initiative,
@@ -3054,7 +3081,141 @@ function executeAddCombatant(
       loreRef: params.lore_ref,
       notes: params.notes,
     } as GMAddCombatantResult,
-    contextForStory: `[Combatant Added: ${params.name} (${params.type}) - ${statsStr} - Initiative: ${initiativeRoll}]`,
+    contextForStory: `[Combatant Added: ${finalName} (${params.type}) - ${statsStr} - Initiative: ${initiativeRoll}]`,
+  };
+}
+
+/**
+ * Add multiple combatants to active combat at once
+ * More efficient than calling add_combatant multiple times
+ */
+function executeAddMultipleCombatants(
+  toolCallId: string,
+  params: AddMultipleCombatantsParams,
+  storyData: StoryData
+): GMToolResult {
+  if (!storyData.combatState?.active) {
+    return {
+      toolName: "add_multiple_combatants",
+      toolCallId,
+      success: false,
+      result: {
+        type: "add_multiple_combatants",
+        added: [],
+        failed: params.combatants.map((c) => c.name),
+      } as GMAddMultipleCombatantsResult,
+      contextForStory: `[Combat Error: No active combat - cannot add combatants]`,
+    };
+  }
+
+  if (!params.combatants || params.combatants.length === 0) {
+    return {
+      toolName: "add_multiple_combatants",
+      toolCallId,
+      success: false,
+      result: {
+        type: "add_multiple_combatants",
+        added: [],
+        failed: [],
+      } as GMAddMultipleCombatantsResult,
+      contextForStory: `[Combat Error: No combatants provided]`,
+    };
+  }
+
+  const addedCombatants: Array<{
+    name: string;
+    type: string;
+    stats: Record<string, number>;
+    initiative: number;
+  }> = [];
+
+  // Track names we've added this batch (for auto-suffixing within the same call)
+  const usedNames = new Set<string>(
+    storyData.combatState.combatants.map((c) => c.name.toLowerCase())
+  );
+
+  for (const combatantParams of params.combatants) {
+    // Auto-generate unique name if duplicate exists
+    let finalName = combatantParams.name;
+    if (usedNames.has(finalName.toLowerCase())) {
+      const letters = "BCDEFGHIJKLMNOPQRSTUVWXYZ";
+      for (const letter of letters) {
+        const candidateName = `${combatantParams.name} ${letter}`;
+        if (!usedNames.has(candidateName.toLowerCase())) {
+          finalName = candidateName;
+          break;
+        }
+      }
+      // If all letters exhausted, use timestamp
+      if (finalName === combatantParams.name) {
+        finalName = `${combatantParams.name} ${Date.now()
+          .toString(36)
+          .slice(-4)
+          .toUpperCase()}`;
+      }
+    }
+
+    // Track this name for subsequent combatants in the same batch
+    usedNames.add(finalName.toLowerCase());
+
+    // Roll initiative
+    const initiativeRoll = rollInitiative(combatantParams.initiative);
+
+    // Create the combatant
+    const combatant: Combatant = {
+      id: `combatant_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: finalName,
+      type: combatantParams.type,
+      stats: combatantParams.stats,
+      conditions: [],
+      initiative: combatantParams.initiative,
+      initiativeRoll,
+      loreRef: combatantParams.lore_ref,
+      isActive: true,
+      notes: combatantParams.notes,
+    };
+
+    storyData.combatState.combatants.push(combatant);
+    addedCombatants.push({
+      name: finalName,
+      type: combatantParams.type,
+      stats: combatantParams.stats,
+      initiative: initiativeRoll,
+    });
+
+    // Log the addition
+    const statsStr = Object.entries(combatantParams.stats)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ");
+    logCombat(
+      storyData.combatState,
+      `${finalName} (${combatantParams.type}) joined combat with ${statsStr}. Initiative: ${initiativeRoll}`
+    );
+  }
+
+  // Update turn order once after all additions
+  updateTurnOrder(storyData.combatState);
+
+  // Build summary for context
+  const summaryLines = addedCombatants.map((c) => {
+    const statsStr = Object.entries(c.stats)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(", ");
+    return `${c.name} (${c.type}): ${statsStr}, Init: ${c.initiative}`;
+  });
+
+  return {
+    toolName: "add_multiple_combatants",
+    toolCallId,
+    success: true,
+    result: {
+      type: "add_multiple_combatants",
+      added: addedCombatants,
+      count: addedCombatants.length,
+    } as GMAddMultipleCombatantsResult,
+    contextForStory: `[${
+      addedCombatants.length
+    } Combatants Added]\n${summaryLines.join("\n")}`,
   };
 }
 
