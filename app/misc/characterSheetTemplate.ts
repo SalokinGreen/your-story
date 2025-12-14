@@ -26,8 +26,12 @@ import {
 const FIELD_REGEX =
   /\{\{\s*([^|{}]+?)\s*\|\s*([^|{}]*?)\s*\|\s*([^|{}]*?)\s*\}\}/g;
 
+// Regex to extract category from field name: "FieldName (Category)" -> name: "FieldName", category: "Category"
+const CATEGORY_REGEX = /^(.+?)\s*\(([^)]+)\)$/;
+
 /**
  * Parse a template string and extract all fields
+ * Supports "FieldName (Category)" syntax to extract categories
  */
 export function parseTemplateFields(template: string): CharacterSheetField[] {
   const fields: CharacterSheetField[] = [];
@@ -37,14 +41,23 @@ export function parseTemplateFields(template: string): CharacterSheetField[] {
   const regex = new RegExp(FIELD_REGEX.source, "g");
 
   while ((match = regex.exec(template)) !== null) {
-    const name = match[1].trim();
+    const rawName = match[1].trim();
     const description = match[2].trim();
     const defaultValue = match[3].trim();
+
+    // Extract category from "FieldName (Category)" pattern
+    let name = rawName;
+    let category: string | undefined;
+    const categoryMatch = rawName.match(CATEGORY_REGEX);
+    if (categoryMatch) {
+      name = categoryMatch[1].trim();
+      category = categoryMatch[2].trim();
+    }
 
     // Avoid duplicate fields (same name)
     if (!seen.has(name.toLowerCase())) {
       seen.add(name.toLowerCase());
-      fields.push({ name, description, defaultValue });
+      fields.push({ name, description, defaultValue, category });
     }
   }
 
@@ -66,7 +79,7 @@ export function createCharacterSheetTemplate(
 /**
  * Fill a template with provided values
  * @param template The template string with {{FieldName | Description | Default}} placeholders
- * @param values A map of field names to their values
+ * @param values A map of field names to their values (use clean names without category)
  * @returns The filled template string
  */
 export function fillTemplate(
@@ -76,7 +89,10 @@ export function fillTemplate(
   return template.replace(
     FIELD_REGEX,
     (match, name, description, defaultValue) => {
-      const fieldName = name.trim();
+      const rawName = name.trim();
+      // Extract clean name without category for lookup
+      const categoryMatch = rawName.match(CATEGORY_REGEX);
+      const fieldName = categoryMatch ? categoryMatch[1].trim() : rawName;
       const value = values[fieldName];
       // Use provided value, fall back to default, then empty string
       return value !== undefined && value !== ""

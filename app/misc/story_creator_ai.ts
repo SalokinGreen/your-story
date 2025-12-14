@@ -619,7 +619,7 @@ export function buildStoryCreatorMessagesWithTools(
   // Build system prompt with tools focus and story context
   const systemPrompt = `You are an expert game master and story editor assistant. The player is currently in an active story/game and needs help modifying the game state, mechanics, or story elements.
 
-**STYLE RULE: Do NOT use emojis in any content you generate.** Use #icon(name) syntax for icons in templates, or text symbols where appropriate. Emojis look unprofessional in game content.
+**STYLE RULE: Do NOT use emojis in any content you generate.** Use :icon: syntax for icons (e.g., :sword:, :fire:, :shield:), or text symbols where appropriate. Emojis look unprofessional in game content.
 
 ## YOUR ROLE
 You help players by using tools to make precise changes to their story's data. You have access to a comprehensive set of tools for modifying:
@@ -637,9 +637,6 @@ You help players by using tools to make precise changes to their story's data. Y
 5. **Explain what you did** after making changes
 
 ## TOOL CATEGORIES
-### Abilities  
-- add_ability, modify_ability, remove_ability
-
 ### Lore & Story
 - add_lore, modify_lore, remove_lore
   **LORE TYPES:** Use the 'type' field to set note priority:

@@ -75,31 +75,7 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push("## Game Settings\n" + settings.join("\n"));
   }
 
-  // Abilities
-  if (data.abilities && data.abilities.length > 0) {
-    const abilitiesSection = ["## Abilities"];
-    data.abilities.forEach((ability: Ability) => {
-      const costStr =
-        ability.cost.length > 0
-          ? ` - Cost: ${ability.cost
-              .map((c) => `${c.amount} ${c.name}`)
-              .join(", ")}`
-          : "";
-      const cooldownStr = ability.cooldown
-        ? ` - Cooldown: ${ability.cooldown} turns`
-        : "";
-      abilitiesSection.push(
-        `- **${ability.name}** [${ability.grade}]${costStr}${cooldownStr} ${
-          ability.symbol || ""
-        }`
-      );
-      if (ability.description)
-        abilitiesSection.push(`  - ${ability.description}`);
-      if (ability.stat)
-        abilitiesSection.push(`  - Associated stat: ${ability.stat}`);
-    });
-    sections.push(abilitiesSection.join("\n"));
-  }
+  // NOTE: Abilities section removed - abilities are deprecated and should be in character_sheet lore
 
   // Achievements
   if (data.achievements && data.achievements.length > 0) {
@@ -429,7 +405,7 @@ export function buildCreatorMessages({
 Your goal is to help the user design a text adventure game scenario.
 You can brainstorm ideas, write content, and most importantly, GENERATE SCENARIO DATA.
 
-**STYLE RULE: Do NOT use emojis in any content you generate.** Use #icon(name) syntax for icons in templates, or text symbols where appropriate. Emojis look unprofessional in game content.
+**STYLE RULE: Do NOT use emojis in any content you generate.** Use :icon: syntax for icons (e.g., :sword:, :fire:, :shield:), or text symbols where appropriate. Emojis look unprofessional in game content.
 
 When the user asks you to create or modify parts of the scenario (like "create a dragon boss", "make a sci-fi setting", "add a healing potion"), you MUST include a JSON block in your response containing the structured data.
 
@@ -439,7 +415,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - **CRITICAL: You may only include ONE JSON block per response.** All changes must be combined into a single JSON object. The app cannot process multiple JSON blocks.
 - You can return a PARTIAL StoryData object. Only include the fields you want to change or add.
 - **CRITICAL: ONLY include fields the user EXPLICITLY requested.** Do NOT add extra fields "for convenience" or "best practice". If user asks for skill trees, ONLY output skillTrees. Do NOT also output upgradeSettings or anything else unless specifically asked.
-- Arrays (like 'abilities', 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
+- Arrays (like 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
 - Scalar fields (like 'story_name', 'premise', 'characterSheet', 'title', 'shortDescription', 'description') will be REPLACED.
 
 ### IMPORTANT: Item Commands
@@ -460,25 +436,23 @@ You can control how items in arrays are applied using the **_command** field:
 
 \`\`\`json
 {
-  "abilities": [
-    {
-      "name": "Fireball",
-      "description": "Launch a ball of fire",
-      "grade": "adept",
-      "cost": [{"type": "variable", "name": "mana", "amount": 10}],
-      "_command": "replace"
-    },
-    {
-      "name": "Old Ability",
-      "_command": "delete"
-    }
-  ],
   "lore": [
     {
       "title": "The Ancient Tower",
       "content": "A mysterious tower that appeared overnight...",
       "secret": false,
       "_command": "add"
+    },
+    {
+      "title": "Old Lore Entry",
+      "_command": "delete"
+    }
+  ],
+  "quests": [
+    {
+      "title": "Main Quest",
+      "description": "Updated quest description",
+      "_command": "replace"
     }
   ]
 }
@@ -489,7 +463,7 @@ You can control how items in arrays are applied using the **_command** field:
 - To ADD new items to an array, ONLY list the NEW items. DO NOT include existing items unless you want to modify/delete them.
 - To MODIFY existing items: List an item with the SAME 'name' (or 'title' or 'id') as an existing one, and your new values will merge/replace based on _command.
 - **For DELETE commands:** You MUST include the identifier field (name/title/id) along with "_command": "delete". Example: {"id": "old_field", "_command": "delete"} NOT just {"_command": "delete"}
-- Example: If there are 3 abilities already and user asks to "add a Fireball ability", your JSON should ONLY contain the new Fireball ability, not all 4 abilities.
+- Example: If there are 3 lore entries already and user asks to "add a new location", your JSON should ONLY contain the new lore entry, not all 4 entries.
 - When user says "delete X" or "remove X", use: {"name": "x", "_command": "delete"}
 - When user says "replace X with Y" or "redesign X", use "_command": "replace" for item X.
 
@@ -535,17 +509,6 @@ You can control how items in arrays are applied using the **_command** field:
     - type: "list" (required - must be exactly this string)
     - items: Array of strings
     - maxSize: Optional max items
-- abilities (Array of { name, description, grade, cost, cooldown, currentCooldown, symbol })
-  - name: Ability name (e.g., "Fireball", "Power Attack", "Healing Touch")
-  - description: What the ability does
-  - grade: Skill tier - "novice" (+0 bonus), "apprentice" (+1), "adept" (+2), "expert" (+3), "master" (+4), "legendary" (+5)
-  - cost: Array of { type, name, amount } - costs to use the ability
-    - type: "variable" (deducts from a number variable)
-    - name: Name of the variable to deduct from
-    - amount: How much to deduct
-  - cooldown: Turns until ability can be used again after use (0 = no cooldown)
-  - currentCooldown: Current cooldown remaining (usually 0 for new abilities)
-  - symbol: Icon name as words (e.g., "fireball", "sword-clash", "healing")
 - lore (Array of { title, content, secrtet, on, alwaysOn, on_triggers, off_triggers, trigger_lores, untrigger_lores, var_on_triggers, var_off_triggers })
   - title: Lore entry title
   - content: Full lore text (see THREAT PROFILES below for combat encounters)
@@ -584,7 +547,7 @@ You can control how items in arrays are applied using the **_command** field:
   - name: Character, faction, or organization name
   - value: Relationship level from -100 (hostile enemy) to +100 (strong ally)
   - description: Current state/context of the relationship
-  - symbol: Emoji representing the relationship (auto-assigned based on value: ⚔️ enemy, 💔 hostile, 😠 unfriendly, 😐 distant, 🤝 neutral, 😊 friendly, 💙 ally, 💚 strong ally)
+  - symbol: Icon name as words (e.g., "heart", "skull", "shield", "handshake")
 - achievements (Array of { title, description, points, symbol, ai_hint })
   - title: Achievement name
   - description: Public description shown to player
@@ -703,31 +666,26 @@ Notes:
 
 ### Example Responses:
 
-**Example 1 - Adding Abilities:**
-User: "Create a Fireball spell and a basic Kick ability."
+**Example 1 - Adding Lore:**
+User: "Create a location entry for The Crimson Tavern and a character entry for the barkeep."
 Assistant:
-"I've created two abilities for your adventure.
+"I've created two lore entries for your adventure.
 
 \`\`\`json
 {
-  "abilities": [
+  "lore": [
     {
-      "name": "Fireball",
-      "description": "Hurl a ball of fire at enemies, dealing massive damage",
-      "grade": "adept",
-      "cost": [],
-      "cooldown": 2,
-      "currentCooldown": 0,
-      "symbol": "fireball"
+      "title": "The Crimson Tavern",
+      "content": "A smoky establishment at the crossroads of the merchant district. Known for its strong ale and stronger rumors. The regulars here include off-duty guards, traveling merchants, and the occasional adventurer seeking work.",
+      "secret": false,
+      "on": true
     },
     {
-      "name": "Kick",
-      "description": "A powerful kick to knock enemies back",
-      "grade": "novice",
-      "cost": [],
-      "cooldown": 0,
-      "currentCooldown": 0,
-      "symbol": "boot-stomp"
+      "title": "Barkeep Greta",
+      "content": "The stout, no-nonsense owner of The Crimson Tavern. She has connections throughout the city and trades in information as readily as drinks.",
+      "secret": false,
+      "on": true,
+      "on_triggers": ["tavern", "Crimson Tavern"]
     }
   ]
 }
@@ -801,34 +759,31 @@ Assistant:
 \`\`\`json
 {
   "relationships": [
-    { "name": "King's Guard", "value": 60, "description": "Loyal protectors of the realm who trust you", "symbol": "💙" },
-    { "name": "Shadow Syndicate", "value": -80, "description": "Criminal organization that wants you dead", "symbol": "💔" }
+    { "name": "King's Guard", "value": 60, "description": "Loyal protectors of the realm who trust you", "symbol": "shield" },
+    { "name": "Shadow Syndicate", "value": -80, "description": "Criminal organization that wants you dead", "symbol": "skull" }
   ]
 }
 \`\`\`"
 
-**Example 5 - Upgrade Shops:**
-User: "Enable upgrades and create an ability shop with a Fireball spell (10 points)."
+**Example 5 - Custom Tables:**
+User: "Create an encounter table for the forest with wolves, bandits, and a rare unicorn."
 Assistant:
-"I've enabled upgrades and created an ability shop.
+"I've created a custom encounter table for forest travel.
 
 \`\`\`json
 {
-  "upgradeSettings": {
-    "enabled": true,
-    "abilityShopEnabled": true,
-    "abilityShop": [
-      {
-        "name": "Fireball",
-        "description": "Hurl a ball of fire at enemies",
-        "grade": "adept",
-        "cost": 10,
-        "abilityCost": [],
-        "cooldown": 2,
-        "symbol": "fireball"
-      }
-    ]
-  }
+  "customTables": [
+    {
+      "id": "table-forest-encounters",
+      "name": "Forest Encounters",
+      "description": "Random encounters when traveling through the forest",
+      "entries": [
+        { "text": "A pack of hungry wolves blocks your path", "weight": 3 },
+        { "text": "Bandits emerge from the underbrush demanding toll", "weight": 2 },
+        { "text": "You spot a majestic unicorn in a moonlit clearing", "weight": 1 }
+      ]
+    }
+  ]
 }
 \`\`\`"
 
@@ -1006,13 +961,13 @@ Assistant:
       "id": "warrior-path",
       "name": "Warrior's Path",
       "description": "Master the art of combat through strength and discipline",
-      "symbol": "⚔️",
+      "symbol": "sword",
       "nodes": [
         {
           "id": "basic-training",
           "name": "Basic Training",
           "description": "+5 Strength from foundational combat training",
-          "symbol": "💪",
+          "symbol": "muscle",
           "type": "stat",
           "position": { "x": 50, "y": 15 },
           "prerequisites": [],
@@ -1024,7 +979,7 @@ Assistant:
           "id": "power-attack",
           "name": "Power Attack",
           "description": "Learn a devastating attack that deals massive damage",
-          "symbol": "⚡",
+          "symbol": "lightning",
           "type": "ability",
           "position": { "x": 25, "y": 40 },
           "prerequisites": ["basic-training"],
@@ -1040,7 +995,7 @@ Assistant:
                 "cooldown": 2,
                 "currentCooldown": 0,
                 "stat": "Strength",
-                "symbol": "⚡"
+                "symbol": "lightning"
               }
             }
           ]
@@ -1049,7 +1004,7 @@ Assistant:
           "id": "defensive-stance",
           "name": "Defensive Stance",
           "description": "Learn to protect yourself and allies",
-          "symbol": "🛡️",
+          "symbol": "shield",
           "type": "ability",
           "position": { "x": 75, "y": 40 },
           "prerequisites": ["basic-training"],
@@ -1064,7 +1019,7 @@ Assistant:
                 "cost": [{ "type": "resource", "name": "Stamina", "amount": 10 }],
                 "cooldown": 3,
                 "currentCooldown": 0,
-                "symbol": "🛡️"
+                "symbol": "shield"
               }
             }
           ]
@@ -1073,7 +1028,7 @@ Assistant:
           "id": "iron-skin",
           "name": "Iron Skin",
           "description": "Your skin hardens through combat experience",
-          "symbol": "🪨",
+          "symbol": "rock",
           "type": "passive",
           "position": { "x": 50, "y": 65 },
           "prerequisites": ["power-attack", "defensive-stance"],
@@ -1102,7 +1057,7 @@ Assistant:
           "id": "berserker-rage",
           "name": "Berserker Rage",
           "description": "Unleash unstoppable fury in combat",
-          "symbol": "🔥",
+          "symbol": "fire",
           "type": "ability",
           "position": { "x": 50, "y": 85 },
           "prerequisites": ["iron-skin"],
@@ -1119,7 +1074,7 @@ Assistant:
                 "cooldown": 5,
                 "currentCooldown": 0,
                 "stat": "Strength",
-                "symbol": "🔥"
+                "symbol": "fire"
               }
             }
           ],
@@ -1390,7 +1345,7 @@ export function buildCreatorMessagesWithTools({
 Your goal is to help the user design a text adventure game scenario.
 You can brainstorm ideas, write content, and modify the scenario using the available tools.
 
-**STYLE RULE: Do NOT use emojis in any content you generate.** Use #icon(name) syntax for icons in templates, or text symbols where appropriate. Emojis look unprofessional in game content.
+**STYLE RULE: Do NOT use emojis in any content you generate.** Use :icon: syntax for icons (e.g., :sword:, :fire:, :shield:), or text symbols where appropriate. Emojis look unprofessional in game content.
 
 ## How to Use Tools
 
@@ -1400,9 +1355,6 @@ When the user asks you to create or modify parts of the scenario (like "create a
 3. Explain what you did in your response
 
 ### Tool Categories:
-
-**Abilities:**
-- add_abilities, modify_abilities, remove_abilities - Manage skills/spells with costs, cooldowns
 
 **Story Content:**
 - add_lore, modify_lore, remove_lore - Manage world-building entries with triggers

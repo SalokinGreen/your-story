@@ -144,6 +144,7 @@ import {
 } from "../misc/embeddings";
 import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
+import { fillTemplate } from "../misc/characterSheetTemplate";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { DiceVisualizer } from "../components/DiceVisualizer";
 import {
@@ -1584,16 +1585,11 @@ function StoryPageContent() {
       updatedStoryData.characterSheetTemplate?.template &&
       Object.keys(characterData).length > 0
     ) {
-      let filledSheet = updatedStoryData.characterSheetTemplate.template;
-      // Replace placeholders with filled values
-      for (const [fieldName, value] of Object.entries(characterData)) {
-        // Match {{FieldName | Description | Default}} pattern
-        const regex = new RegExp(`\\{\\{${fieldName}\\s*\\|[^}]*\\}\\}`, "gi");
-        filledSheet = filledSheet.replace(regex, value || "");
-        // Also match simple {{FieldName}} pattern
-        const simpleRegex = new RegExp(`\\{\\{${fieldName}\\}\\}`, "gi");
-        filledSheet = filledSheet.replace(simpleRegex, value || "");
-      }
+      // Use the proper fillTemplate function that handles "FieldName (Category)" syntax
+      const filledSheet = fillTemplate(
+        updatedStoryData.characterSheetTemplate.template,
+        characterData
+      );
       updatedStoryData.characterSheet = filledSheet;
 
       // Add character sheet to lore as "character_sheet" type for AI context

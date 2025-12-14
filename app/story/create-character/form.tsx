@@ -6,6 +6,7 @@ import {
   CharacterSheetTemplate,
   CharacterSheetField,
 } from "@/app/misc/structs";
+import { parseTemplateFields } from "@/app/misc/characterSheetTemplate";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 
 interface CharacterCreationFormProps {
@@ -15,7 +16,7 @@ interface CharacterCreationFormProps {
   sourceAdventureId?: string | null;
 }
 
-// Smart categorization based on common field patterns
+// Smart categorization - uses explicit field.category first, falls back to pattern matching
 function categorizeFields(fields: CharacterSheetField[]): {
   category: string;
   icon: string;
@@ -26,6 +27,34 @@ function categorizeFields(fields: CharacterSheetField[]): {
     { icon: string; fields: CharacterSheetField[] }
   > = {};
 
+  // Icon mapping for common category names
+  const categoryIcons: Record<string, string> = {
+    identity: "User",
+    appearance: "Eye",
+    background: "BookOpen",
+    personality: "Heart",
+    attributes: "BarChart2",
+    stats: "BarChart2",
+    skills: "Zap",
+    resources: "Battery",
+    relationships: "Users",
+    standing: "Award",
+    equipment: "Backpack",
+    inventory: "Backpack",
+    preferences: "Star",
+    combat: "Swords",
+    magic: "Sparkles",
+    social: "MessageCircle",
+    other: "FileText",
+  };
+
+  // Get icon for a category name
+  const getIconForCategory = (categoryName: string): string => {
+    const normalized = categoryName.toLowerCase();
+    return categoryIcons[normalized] || "FileText";
+  };
+
+  // Fallback patterns for fields without explicit category
   const categoryPatterns: {
     pattern: RegExp;
     category: string;
@@ -107,47 +136,79 @@ function categorizeFields(fields: CharacterSheetField[]): {
 
   // Categorize each field
   for (const field of fields) {
-    let assigned = false;
-    const fieldNameLower = field.name.toLowerCase();
-    const descLower = (field.description || "").toLowerCase();
+    let categoryName = "Other";
+    let icon = "FileText";
 
-    for (const { pattern, category, icon } of categoryPatterns) {
-      if (pattern.test(fieldNameLower) || pattern.test(descLower)) {
-        if (!categories[category]) {
-          categories[category] = { icon, fields: [] };
+    // First, check if field has an explicit category from template syntax
+    if (field.category) {
+      categoryName = field.category;
+      icon = getIconForCategory(field.category);
+    } else {
+      // Fall back to pattern matching
+      const fieldNameLower = field.name.toLowerCase();
+      const descLower = (field.description || "").toLowerCase();
+
+      for (const { pattern, category, icon: patternIcon } of categoryPatterns) {
+        if (pattern.test(fieldNameLower) || pattern.test(descLower)) {
+          categoryName = category;
+          icon = patternIcon;
+          break;
         }
-        categories[category].fields.push(field);
-        assigned = true;
-        break;
       }
     }
 
-    // Default to "Other" if no pattern matched
-    if (!assigned) {
-      if (!categories["Other"]) {
-        categories["Other"] = { icon: "FileText", fields: [] };
-      }
-      categories["Other"].fields.push(field);
+    if (!categories[categoryName]) {
+      categories[categoryName] = { icon, fields: [] };
     }
+    categories[categoryName].fields.push(field);
   }
 
-  // Convert to array and sort with preferred order
-  const categoryOrder = [
+  // Get all category names and sort them
+  const allCategoryNames = Object.keys(categories);
+
+  // Preferred order for common categories (explicit categories come first in their natural order)
+  const preferredOrder = [
     "Identity",
     "Appearance",
     "Background",
     "Personality",
     "Attributes",
+    "Stats",
     "Skills",
     "Resources",
     "Relationships",
     "Standing",
     "Equipment",
+    "Inventory",
     "Preferences",
-    "Other",
+    "Combat",
+    "Magic",
+    "Social",
   ];
 
-  return categoryOrder
+  // Sort: preferred order first, then alphabetical, "Other" always last
+  const sortedCategories = allCategoryNames.sort((a, b) => {
+    if (a === "Other") return 1;
+    if (b === "Other") return -1;
+
+    const aIndex = preferredOrder.findIndex(
+      (p) => p.toLowerCase() === a.toLowerCase()
+    );
+    const bIndex = preferredOrder.findIndex(
+      (p) => p.toLowerCase() === b.toLowerCase()
+    );
+
+    // Both in preferred list - use preferred order
+    if (aIndex !== -1 && bIndex !== -1) return aIndex - bIndex;
+    // Only a in preferred list - a comes first
+    if (aIndex !== -1) return -1;
+    // Only b in preferred list - b comes first
+    if (bIndex !== -1) return 1;
+    // Neither in preferred list - alphabetical
+    return a.localeCompare(b);
+  });
+
+  return sortedCategories
     .filter((cat) => categories[cat]?.fields.length)
     .map((cat) => ({
       category: cat,
@@ -199,7 +260,18 @@ export default function CharacterCreationForm({
     {}
   );
   const [currentPage, setCurrentPage] = useState(0);
-  const template = storyData.characterSheetTemplate;
+  const [justNavigated, setJustNavigated] = useState(false);
+  const rawTemplate = storyData.characterSheetTemplate;
+
+  // Re-parse fields from template string to ensure category extraction works
+  // (handles templates saved before category syntax was implemented)
+  const template = useMemo((): CharacterSheetTemplate | undefined => {
+    if (!rawTemplate?.template) return rawTemplate;
+    return {
+      ...rawTemplate,
+      fields: parseTemplateFields(rawTemplate.template),
+    };
+  }, [rawTemplate]);
 
   // Categorize fields
   const categorizedFields = useMemo(() => {
@@ -231,12 +303,23 @@ export default function CharacterCreationForm({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Prevent accidental submission right after navigating to last page
+    // (e.g., user pressing Enter to navigate, which then triggers submit)
+    if (justNavigated) {
+      return;
+    }
+
     onCharacterCreate(characterData);
   };
 
   const handleNext = () => {
     if (currentPage < categorizedFields.length - 1) {
+      // Set flag to prevent accidental form submission when landing on last page
+      setJustNavigated(true);
       setCurrentPage((p) => p + 1);
+      // Clear the flag after a short delay
+      setTimeout(() => setJustNavigated(false), 300);
     }
   };
 
@@ -273,6 +356,17 @@ export default function CharacterCreationForm({
   const currentCategory = categorizedFields[currentPage];
   const isLastPage = currentPage === categorizedFields.length - 1;
   const isFirstPage = currentPage === 0;
+
+  // Handle Ctrl+Enter to navigate pages
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      if (!isLastPage) {
+        handleNext();
+      }
+      // On last page, Ctrl+Enter does nothing special - user must click Begin Adventure
+    }
+  };
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-8 px-4">
@@ -337,7 +431,7 @@ export default function CharacterCreationForm({
         </div>
 
         {/* Main Form Card */}
-        <form onSubmit={handleSubmit}>
+        <form onSubmit={handleSubmit} onKeyDown={handleKeyDown}>
           <div className="bg-gray-900/60 backdrop-blur-xl rounded-2xl border border-gray-700/50 shadow-2xl overflow-hidden">
             {/* Category Header */}
             <div className="px-6 py-4 bg-linear-to-r from-blue-600/10 to-purple-600/10 border-b border-gray-700/50">

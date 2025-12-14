@@ -27,6 +27,27 @@ body {
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
 
+/* Prose typography overrides - inherit text color for bold/italic/etc */
+.prose strong,
+.prose b {
+  color: inherit;
+  font-weight: 700;
+}
+
+.prose em,
+.prose i {
+  color: inherit;
+}
+
+.prose a {
+  color: #a78bfa; /* violet-400 for links */
+  text-decoration: underline;
+}
+
+.prose a:hover {
+  color: #c4b5fd; /* violet-300 on hover */
+}
+
 /* CSS Containment for better performance */
 .contain-layout {
   contain: layout;

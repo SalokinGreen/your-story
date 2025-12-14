@@ -17,6 +17,7 @@ export interface CharacterSheetField {
   name: string; // Field name/label (e.g., "Name", "Class", "Background")
   description: string; // Help text shown to player (e.g., "Your character's full name")
   defaultValue: string; // Default value if player doesn't fill it in
+  category?: string; // Optional category extracted from "FieldName (Category)" syntax
 }
 
 // Character sheet template for an adventure

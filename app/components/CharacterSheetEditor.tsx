@@ -6,6 +6,7 @@ import {
   fillTemplate,
   getDefaultValues,
   previewFilledTemplate,
+  parseTemplateFields,
 } from "@/app/misc/characterSheetTemplate";
 import { DynamicIcon } from "./DynamicIcon";
 import ReactMarkdown from "react-markdown";
@@ -20,11 +21,21 @@ interface CharacterSheetEditorProps {
 }
 
 export default function CharacterSheetEditor({
-  template,
+  template: rawTemplate,
   initialValues,
   onSave,
   onCancel,
 }: CharacterSheetEditorProps) {
+  // Re-parse fields from template string to ensure category extraction works
+  // (handles templates saved before category syntax was implemented)
+  const template = useMemo((): CharacterSheetTemplate => {
+    if (!rawTemplate?.template) return rawTemplate;
+    return {
+      ...rawTemplate,
+      fields: parseTemplateFields(rawTemplate.template),
+    };
+  }, [rawTemplate]);
+
   // Initialize values from props or defaults
   const [values, setValues] = useState<Record<string, string>>(() => {
     const defaults = getDefaultValues(template);

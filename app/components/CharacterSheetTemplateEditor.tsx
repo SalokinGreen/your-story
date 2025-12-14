@@ -159,6 +159,17 @@ export default function CharacterSheetTemplateEditor({
               {"# {{Name | Your character's name | Hero}}"}
             </code>
           </div>
+          <div className="mt-3 p-2 bg-purple-900/30 rounded-lg border border-purple-700/30">
+            <p className="text-xs text-purple-200/60 mb-1">Category Syntax:</p>
+            <p className="text-xs text-purple-100/80 mb-2">
+              Add{" "}
+              <code className="bg-purple-900/50 px-1 rounded">(Category)</code>{" "}
+              to group fields:
+            </p>
+            <code className="text-xs text-purple-100">
+              {"{{Strength (Attribute) | Physical power | 10}}"}
+            </code>
+          </div>
         </div>
       )}
 
@@ -224,30 +235,62 @@ export default function CharacterSheetTemplateEditor({
         </div>
       )}
 
-      {/* Extracted Fields Summary */}
+      {/* Extracted Fields Summary - Grouped by Category */}
       {fields.length > 0 && (
         <div className="bg-blue-950/40 rounded-xl border border-blue-800/30 p-4">
           <h4 className="text-sm font-medium text-blue-200 mb-3 flex items-center gap-2">
             <DynamicIcon name="List" className="w-4 h-4" />
             Detected Fields ({fields.length})
           </h4>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {fields.map((field, index) => (
-              <div
-                key={field.name}
-                className="flex items-start gap-2 p-2 bg-blue-900/30 rounded-lg"
-              >
-                <span className="text-emerald-400 font-medium text-sm">
-                  {field.name}
-                </span>
-                {field.description && (
-                  <span className="text-blue-300/50 text-xs truncate">
-                    {field.description}
-                  </span>
-                )}
+          {(() => {
+            // Group fields by category
+            const grouped = fields.reduce((acc, field) => {
+              const cat = field.category || "Other";
+              if (!acc[cat]) acc[cat] = [];
+              acc[cat].push(field);
+              return acc;
+            }, {} as Record<string, typeof fields>);
+
+            // Sort categories: named categories first (alphabetically), "Other" last
+            const sortedCategories = Object.keys(grouped).sort((a, b) => {
+              if (a === "Other") return 1;
+              if (b === "Other") return -1;
+              return a.localeCompare(b);
+            });
+
+            return (
+              <div className="space-y-4">
+                {sortedCategories.map((category) => (
+                  <div key={category}>
+                    <h5 className="text-xs font-medium text-purple-300/80 uppercase tracking-wider mb-2 flex items-center gap-2">
+                      <DynamicIcon name="Folder" className="w-3 h-3" />
+                      {category}
+                      <span className="text-blue-400/50 normal-case">
+                        ({grouped[category].length})
+                      </span>
+                    </h5>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {grouped[category].map((field) => (
+                        <div
+                          key={field.name}
+                          className="flex items-start gap-2 p-2 bg-blue-900/30 rounded-lg"
+                        >
+                          <span className="text-emerald-400 font-medium text-sm">
+                            {field.name}
+                          </span>
+                          {field.description && (
+                            <span className="text-blue-300/50 text-xs truncate">
+                              {field.description}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            );
+          })()}
         </div>
       )}
     </div>
