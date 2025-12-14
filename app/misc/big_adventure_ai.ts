@@ -1232,10 +1232,21 @@ TEMPLATE SYNTAX:
 Use {{FieldName | Description | Default Value}} for fillable fields.
 Optionally, use {{FieldName (Category) | Description | Default Value}} to group fields into pages.
 
-Examples:
-- Basic: {{Name | Your character's name | Unnamed Hero}}
-- With category: {{Strength (Stats) | Physical power | 10}}
-- With category: {{Background (Story) | Your character's history | A wanderer}}
+⚠️ CRITICAL: The field syntax is DATA BINDING ONLY - the FieldName and Description are NOT DISPLAYED!
+You MUST write visible labels explicitly in the markdown around the field placeholder.
+
+WRONG (no visible label):
+- {{Strength (Stats) | Physical power | 10}}
+
+CORRECT (with visible label):
+- **Strength**: {{Strength (Stats) | Physical power | 10}}
+
+The {{...}} gets replaced by just the VALUE (e.g., "10"). Without "Strength:" before it, players won't know what the number means!
+
+MORE EXAMPLES:
+- **Name**: {{Name | Your character's name | Unnamed Hero}}
+- **Strength**: {{Strength (Stats) | Physical power | 10}}
+- **Background**: {{Background (Story) | Your character's history | A wanderer}}
 
 Fields with the same category will appear together on the same page in the character creation wizard.
 Fields without a category will appear on the first page.
@@ -1274,10 +1285,10 @@ Using a preset:
   }
 }
 
-Custom template:
+Custom template (NOTICE: visible labels like "**Name**:", "**Strength**:" before each field):
 {
   "characterSheetTemplate": {
-    "template": "# {{Name | Your character's name | Adventurer}}\\n\\n## Background\\n{{Background | A brief history | A wanderer seeking fortune}}\\n\\n## Appearance\\n{{Appearance | Physical description | A weathered traveler}}"
+    "template": "# **Name**: {{Name | Your character's name | Adventurer}}\\n\\n## Stats\\n- **Strength**: {{Strength (Stats) | Physical power | 10}}\\n- **Agility**: {{Agility (Stats) | Speed and reflexes | 10}}\\n\\n## Background\\n{{Background (Story) | Your character's history | A wanderer seeking fortune}}"
   }
 }
 
@@ -2747,8 +2758,8 @@ EXISTING CONTENT SUMMARY:`;
     },
     characterSheetTemplate: {
       instruction:
-        "Generate a fillable character sheet template appropriate for this adventure. Use {{FieldName | Description | Default}} syntax for fillable fields. Consider using a preset ID (dnd5e, coc, traveller, monsterhearts, fate, pbta, bitd, wod) or create a custom template.",
-      schema: `{ "characterSheetTemplate": { "preset_id": "string (optional)", "template": "string (markdown with {{field}} syntax)" } }`,
+        "Generate a fillable character sheet template appropriate for this adventure. Use {{FieldName | Description | Default}} syntax for fillable fields. IMPORTANT: Include visible labels before each field (e.g., '**Strength**: {{Strength | ...}}' NOT just '{{Strength | ...}}'). Consider using a preset ID (dnd5e, coc, traveller, monsterhearts, fate, pbta, bitd, wod) or create a custom template.",
+      schema: `{ "characterSheetTemplate": { "preset_id": "string (optional)", "template": "string (markdown with visible labels and {{field}} syntax)" } }`,
     },
     variables: {
       instruction:

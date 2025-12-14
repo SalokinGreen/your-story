@@ -1462,14 +1462,14 @@ export const remove_starting_choices: ToolDefinition = {
 export const update_character_sheet_template: ToolDefinition = {
   name: "update_character_sheet_template",
   description:
-    "Update the adventure's character sheet template. Templates use {{FieldName | Description | DefaultValue}} syntax for fillable fields. Use {{FieldName (Category) | Description | DefaultValue}} to group fields into pages (e.g., 'Stats', 'Story', 'Equipment'). The template is shown to players when they create a custom character.",
+    "Update the adventure's character sheet template. Templates use {{FieldName | Description | DefaultValue}} syntax for fillable fields. Use {{FieldName (Category) | Description | DefaultValue}} to group fields into pages (e.g., 'Stats', 'Story', 'Equipment'). IMPORTANT: The FieldName and Description are NOT displayed - they are metadata only! You MUST include visible labels in the markdown. Example: '- **Strength**: {{Strength (Stats) | Physical power | 10}}' NOT just '- {{Strength (Stats) | Physical power | 10}}'",
   parameters: {
     type: "object",
     properties: {
       template: {
         type: "string",
         description:
-          "The new template content using {{FieldName | Description | DefaultValue}} or {{FieldName (Category) | Description | DefaultValue}} syntax. Fields with the same category appear on the same page. Use markdown formatting.",
+          "The new template content using {{FieldName | Description | DefaultValue}} or {{FieldName (Category) | Description | DefaultValue}} syntax. Fields with the same category appear on the same page. Use markdown formatting. ALWAYS include visible labels before fields (e.g., '**Strength**: {{Strength...').",
       },
       preset_id: {
         type: "string",

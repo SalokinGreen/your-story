@@ -58,6 +58,7 @@ export function buildStoryCreatorMessages({
     points: storyData.points,
     conditions: storyData.conditions,
     characterSheet: storyData.characterSheet,
+    characterSheetTemplate: storyData.characterSheetTemplate,
   };
 
   // Build the base creator messages
@@ -661,7 +662,7 @@ You help players by using tools to make precise changes to their story's data. Y
 ### Character Presets & Character Sheets
 - add_presets, modify_presets, remove_presets - Character builds/classes
 - update_character_sheet - Update the player's active character sheet markdown (replace, append, or prepend content)
-- update_character_sheet_template - Set the adventure's fillable template. Use {{FieldName (Category) | Description | Default}} syntax to group fields into pages (e.g., 'Stats', 'Story'). Supports preset styles: D&D 5e, Call of Cthulhu, Traveller, Monsterhearts, Fate, PbtA, Blades in the Dark, World of Darkness
+- update_character_sheet_template - Set the adventure's fillable template. Use {{FieldName (Category) | Description | Default}} syntax. IMPORTANT: Include visible labels (e.g., '**Strength**: {{Strength...}}' NOT just '{{Strength...}}'). Supports preset styles: D&D 5e, Call of Cthulhu, Traveller, Monsterhearts, Fate, PbtA, Blades in the Dark, World of Darkness
 - update_preset_character_sheet - Update a preset's pre-filled character sheet
 
 ### Game Configuration

@@ -8,7 +8,12 @@
 
 import { NextRequest } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { getModelConfig } from "@/app/misc/ai_prices";
+import {
+  getModelConfig,
+  calculateTokenCost,
+  calculateCostFromEstimatedCost,
+} from "@/app/misc/ai_prices";
+import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { logger } from "@/app/misc/logger";
 import {
   BigAdventureConfig,
@@ -103,6 +108,7 @@ async function streamAIResponse(
   content: string;
   promptTokens: number;
   completionTokens: number;
+  estimatedCost?: number; // DeepInfra provides this
 }> {
   // Handle NovelAI separately (uses completions API, not chat)
   if (modelConfig.provider === "novelai") {
@@ -196,6 +202,7 @@ async function streamAIResponse(
   let fullContent = "";
   let promptTokens = 0;
   let completionTokens = 0;
+  let estimatedCost: number | undefined; // DeepInfra provides this
 
   while (true) {
     const { done, value } = await reader.read();
@@ -237,6 +244,10 @@ async function streamAIResponse(
         if (parsed.usage) {
           promptTokens = parsed.usage.prompt_tokens || 0;
           completionTokens = parsed.usage.completion_tokens || 0;
+          // DeepInfra provides estimated_cost in dollars
+          if (parsed.usage.estimated_cost !== undefined) {
+            estimatedCost = parsed.usage.estimated_cost;
+          }
         }
       } catch {
         // Skip malformed JSON
@@ -364,6 +375,7 @@ async function generateStage(
   promptTokens: number;
   completionTokens: number;
   rawContent: string;
+  estimatedCost?: number; // Total estimated cost from DeepInfra
 }> {
   const stageInfo = getStageInfo(stage);
 
@@ -392,6 +404,7 @@ async function generateStage(
   let fullContent = "";
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
+  let totalEstimatedCost = 0; // Accumulate DeepInfra costs
 
   // Initial generation
   const initialResult = await streamAIResponse(
@@ -408,6 +421,8 @@ async function generateStage(
   fullContent = initialResult.content;
   totalPromptTokens += initialResult.promptTokens;
   totalCompletionTokens += initialResult.completionTokens;
+  if (initialResult.estimatedCost)
+    totalEstimatedCost += initialResult.estimatedCost;
 
   // Check if JSON is incomplete
   let incompleteCheck = detectIncompleteJSON(fullContent);
@@ -479,6 +494,8 @@ async function generateStage(
           }
           totalPromptTokens += continuationResult.promptTokens;
           totalCompletionTokens += continuationResult.completionTokens;
+          if (continuationResult.estimatedCost)
+            totalEstimatedCost += continuationResult.estimatedCost;
 
           incompleteCheck = detectIncompleteJSON(fullContent);
         } catch (error) {
@@ -532,6 +549,8 @@ async function generateStage(
           promptTokens: totalPromptTokens,
           completionTokens: totalCompletionTokens,
           rawContent: fullContent,
+          estimatedCost:
+            totalEstimatedCost > 0 ? totalEstimatedCost : undefined,
         };
       }
     }
@@ -561,6 +580,7 @@ async function generateStage(
     promptTokens: totalPromptTokens,
     completionTokens: totalCompletionTokens,
     rawContent: fullContent,
+    estimatedCost: totalEstimatedCost > 0 ? totalEstimatedCost : undefined,
   };
 }
 
@@ -679,6 +699,30 @@ export async function POST(req: NextRequest) {
           return;
         }
 
+        // Check token balance for Coins mode providers (Mistral/DeepInfra) before starting
+        const isCoinsMode =
+          modelConfig.provider === "mistral" ||
+          modelConfig.provider === "deepinfra";
+        if (isCoinsMode) {
+          const balance = await getUserTokenBalance(user.id, supabase);
+          // Estimate minimum cost (adventure generation uses many tokens)
+          const estimatedMinCost = Math.max(50, (modelConfig.cost || 1) * 5);
+          const currentBalance = balance?.total ?? 0;
+          if (currentBalance < estimatedMinCost) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  error: `Insufficient coins. Adventure generation requires at least ${estimatedMinCost} coins. Current balance: ${currentBalance}`,
+                  code: "INSUFFICIENT_BALANCE",
+                })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
+        }
+
         // Send initial info
         controller.enqueue(
           encoder.encode(
@@ -689,6 +733,7 @@ export async function POST(req: NextRequest) {
                 stage: s,
                 ...getStageInfo(s),
               })),
+              isCoinsMode,
             })}\n\n`
           )
         );
@@ -697,6 +742,7 @@ export async function POST(req: NextRequest) {
         const stageResults: (Partial<BigAdventureResult> | null)[] = [];
         let totalPromptTokens = 0;
         let totalCompletionTokens = 0;
+        let totalEstimatedCost = 0; // Accumulate DeepInfra costs
         const rawOutputs: Record<string, string> = {};
 
         // Initialize with existing results if resuming
@@ -731,20 +777,26 @@ export async function POST(req: NextRequest) {
               : undefined;
 
           try {
-            const { result, promptTokens, completionTokens, rawContent } =
-              await generateStage(
-                config,
-                stage,
-                previousResults,
-                modelConfig,
-                apiKey,
-                controller,
-                encoder
-              );
+            const {
+              result,
+              promptTokens,
+              completionTokens,
+              rawContent,
+              estimatedCost,
+            } = await generateStage(
+              config,
+              stage,
+              previousResults,
+              modelConfig,
+              apiKey,
+              controller,
+              encoder
+            );
 
             stageResults.push(result);
             totalPromptTokens += promptTokens;
             totalCompletionTokens += completionTokens;
+            if (estimatedCost) totalEstimatedCost += estimatedCost;
             rawOutputs[stage] = rawContent;
           } catch (stageError) {
             const errorMessage =
@@ -779,7 +831,41 @@ export async function POST(req: NextRequest) {
           finalResult.storyTemplate.nsfw = config.nsfw;
         }
 
-        // All providers use BYOK - no token billing
+        // Deduct coins for Coins mode providers (Mistral/DeepInfra)
+        let tokenCost = 0;
+        let newBalance: number | undefined;
+        if (
+          isCoinsMode &&
+          (totalPromptTokens > 0 ||
+            totalCompletionTokens > 0 ||
+            totalEstimatedCost > 0)
+        ) {
+          // Use estimated_cost from DeepInfra if available, otherwise calculate from tokens
+          if (modelConfig.provider === "deepinfra" && totalEstimatedCost > 0) {
+            tokenCost = calculateCostFromEstimatedCost(totalEstimatedCost);
+          } else {
+            tokenCost = calculateTokenCost(
+              model,
+              totalPromptTokens,
+              totalCompletionTokens
+            );
+          }
+          const deductResult = await deductTokens(user.id, tokenCost, supabase);
+          if (!deductResult.success) {
+            logger.warn(
+              "Failed to deduct tokens for big adventure generation",
+              {
+                userId: user.id,
+                provider: modelConfig.provider,
+                tokenCost,
+                error: deductResult.error,
+              }
+            );
+          } else {
+            const balanceResult = await getUserTokenBalance(user.id, supabase);
+            newBalance = balanceResult?.total;
+          }
+        }
 
         logger.action("Big adventure generation complete", {
           userId: user.id,
@@ -788,6 +874,8 @@ export async function POST(req: NextRequest) {
           stages: stages.length,
           totalPromptTokens,
           totalCompletionTokens,
+          tokenCost,
+          isCoinsMode,
           adventureTitle: finalResult.title,
         });
 
@@ -807,8 +895,9 @@ export async function POST(req: NextRequest) {
                   completionTokens: totalCompletionTokens,
                   totalTokens: totalPromptTokens + totalCompletionTokens,
                 },
-                tokenCost: 0, // BYOK mode - no token cost
-                isByok: true,
+                tokenCost: tokenCost > 0 ? tokenCost : undefined,
+                balance: newBalance,
+                isByok: !isCoinsMode,
               },
             })}\n\n`
           )

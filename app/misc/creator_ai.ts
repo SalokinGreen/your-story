@@ -50,9 +50,23 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push(basic.join("\n"));
   }
 
-  // Character Sheet
+  // Character Sheet (the player's filled sheet)
   if (data.characterSheet) {
-    sections.push("## Character Sheet\n" + data.characterSheet);
+    sections.push(
+      "## Character Sheet (Player's Current)\n" + data.characterSheet
+    );
+  }
+
+  // Character Sheet Template (the fillable template for new characters)
+  if (data.characterSheetTemplate?.template) {
+    sections.push(
+      "## Character Sheet Template (Fillable)\n" +
+        "This is the template used when creating new characters. Fields use {{FieldName | Description | Default}} syntax.\n" +
+        "**IMPORTANT:** Visible labels must be written before each field (e.g., '**Strength**: {{Strength...}}').\n\n" +
+        "```\n" +
+        data.characterSheetTemplate.template +
+        "\n```"
+    );
   }
 
   // Points
@@ -256,6 +270,7 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     const presetsSection = ["## Character Presets"];
     data.presets.forEach((preset: Preset) => {
       presetsSection.push(`### ${preset.name} ${preset.icon || ""}`);
+      presetsSection.push(`- **ID:** ${preset.id}`);
       presetsSection.push(`*${preset.description}*`);
       if (preset.characterSheet)
         presetsSection.push(
@@ -1387,7 +1402,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
 
 **Character Sheet:**
 - update_character_sheet - Update the player's filled character sheet markdown
-- update_character_sheet_template - Set the adventure's fillable template. Use {{FieldName (Category) | Description | Default}} syntax to group fields into pages
+- update_character_sheet_template - Set the adventure's fillable template. Use {{FieldName (Category) | Description | Default}} syntax. IMPORTANT: Include visible labels before fields (e.g., '**Strength**: {{Strength (Stats) | ... | 10}}' NOT just '{{Strength...}}')
 - update_preset_character_sheet - Update a preset's pre-filled character sheet
 
 **Starting Choices:**

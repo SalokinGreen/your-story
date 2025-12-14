@@ -2388,7 +2388,93 @@ function AdventureCreatorContent() {
 
     try {
       if (typeof window !== "undefined") {
-        window.localStorage.setItem(draftKey, JSON.stringify(payload));
+        const jsonPayload = JSON.stringify(payload);
+
+        // Try to save the draft
+        try {
+          window.localStorage.setItem(draftKey, jsonPayload);
+        } catch (quotaError) {
+          // If quota exceeded, try to free up space by removing old creator drafts
+          if (
+            quotaError instanceof DOMException &&
+            (quotaError.name === "QuotaExceededError" || quotaError.code === 22)
+          ) {
+            console.warn(
+              "localStorage quota exceeded, cleaning up old drafts..."
+            );
+
+            // Find and remove old creator drafts (keep current one)
+            const keysToRemove: string[] = [];
+            for (let i = 0; i < window.localStorage.length; i++) {
+              const key = window.localStorage.key(i);
+              if (
+                key &&
+                key.startsWith("your-story:creator-draft:") &&
+                key !== draftKey
+              ) {
+                keysToRemove.push(key);
+              }
+            }
+
+            // Remove old drafts (oldest first based on updatedAt)
+            const draftsWithTime: { key: string; time: number }[] = [];
+            for (const key of keysToRemove) {
+              try {
+                const data = JSON.parse(
+                  window.localStorage.getItem(key) || "{}"
+                );
+                draftsWithTime.push({ key, time: data.updatedAt || 0 });
+              } catch {
+                // If we can't parse it, mark it for removal
+                draftsWithTime.push({ key, time: 0 });
+              }
+            }
+
+            // Sort by time (oldest first) and remove
+            draftsWithTime.sort((a, b) => a.time - b.time);
+            for (const { key } of draftsWithTime) {
+              window.localStorage.removeItem(key);
+              console.log(`Removed old draft: ${key}`);
+
+              // Try to save again after each removal
+              try {
+                window.localStorage.setItem(draftKey, jsonPayload);
+                console.log("Successfully saved draft after cleanup");
+                return; // Success!
+              } catch {
+                // Still not enough space, continue cleaning
+              }
+            }
+
+            // If still failing, the payload itself might be too large
+            // Try saving a minimal version without large fields
+            console.warn(
+              "Draft too large even after cleanup, saving minimal version"
+            );
+            const minimalPayload = {
+              ...payload,
+              lore: payload.lore?.slice(0, 10), // Keep only first 10 lore entries
+              presets: payload.presets?.map((p) => ({
+                ...p,
+                characterSheet: undefined,
+              })), // Remove preset sheets
+              characterSheet: undefined, // Remove filled sheet (template is more important)
+            };
+            try {
+              window.localStorage.setItem(
+                draftKey,
+                JSON.stringify(minimalPayload)
+              );
+              console.log("Saved minimal draft version");
+            } catch {
+              console.error(
+                "Failed to save even minimal draft - localStorage may be completely full"
+              );
+            }
+          } else {
+            throw quotaError;
+          }
+        }
       }
     } catch (err) {
       console.error("Failed to save creator draft", err);

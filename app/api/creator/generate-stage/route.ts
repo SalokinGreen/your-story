@@ -24,7 +24,12 @@ import {
   detectIncompleteJSON,
   cleanContinuationContent,
 } from "@/app/misc/big_adventure_ai";
-import { getModelConfig } from "@/app/misc/ai_prices";
+import {
+  getModelConfig,
+  calculateTokenCost,
+  calculateCostFromEstimatedCost,
+} from "@/app/misc/ai_prices";
+import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -163,6 +168,7 @@ async function streamAIResponse(
   content: string;
   promptTokens: number;
   completionTokens: number;
+  estimatedCost?: number; // DeepInfra provides this
 }> {
   // Handle NovelAI separately (uses completions API, not chat)
   if (modelConfig.provider === "novelai") {
@@ -257,6 +263,7 @@ async function streamAIResponse(
   let fullContent = "";
   let promptTokens = 0;
   let completionTokens = 0;
+  let estimatedCost: number | undefined; // DeepInfra provides this
 
   while (true) {
     const { done, value } = await reader.read();
@@ -301,6 +308,10 @@ async function streamAIResponse(
         if (parsed.usage) {
           promptTokens = parsed.usage.prompt_tokens || 0;
           completionTokens = parsed.usage.completion_tokens || 0;
+          // DeepInfra provides estimated_cost in dollars
+          if (parsed.usage.estimated_cost !== undefined) {
+            estimatedCost = parsed.usage.estimated_cost;
+          }
         }
       } catch {
         // Skip malformed JSON
@@ -308,7 +319,12 @@ async function streamAIResponse(
     }
   }
 
-  return { content: fullContent, promptTokens, completionTokens };
+  return {
+    content: fullContent,
+    promptTokens,
+    completionTokens,
+    estimatedCost,
+  };
 }
 
 // NovelAI-specific streaming function (uses completions API)
@@ -562,6 +578,30 @@ export async function POST(req: NextRequest) {
           return;
         }
 
+        // Check token balance for Coins mode providers (Mistral/DeepInfra) before starting
+        const isCoinsMode =
+          modelConfig.provider === "mistral" ||
+          modelConfig.provider === "deepinfra";
+        if (isCoinsMode) {
+          const balance = await getUserTokenBalance(user.id, supabase);
+          // Estimate minimum cost for a single stage
+          const estimatedMinCost = Math.max(10, modelConfig.cost || 1);
+          const currentBalance = balance?.total ?? 0;
+          if (currentBalance < estimatedMinCost) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "error",
+                  error: `Insufficient coins. Stage generation requires at least ${estimatedMinCost} coins. Current balance: ${currentBalance}`,
+                  code: "INSUFFICIENT_BALANCE",
+                })}\n\n`
+              )
+            );
+            controller.close();
+            return;
+          }
+        }
+
         const stageInfo = getStageInfo(stage);
         const stageConfig = getSubstageConfig(stage, config.stageConfigs);
         const maxOutputTokens =
@@ -592,6 +632,7 @@ export async function POST(req: NextRequest) {
         let fullContent = "";
         let totalPromptTokens = 0;
         let totalCompletionTokens = 0;
+        let totalEstimatedCost = 0; // Accumulate DeepInfra costs
 
         // Handle "Finish Early" request
         if (finishEarly) {
@@ -664,6 +705,8 @@ export async function POST(req: NextRequest) {
             fullContent += wrapUpResult.content;
             totalPromptTokens += wrapUpResult.promptTokens;
             totalCompletionTokens += wrapUpResult.completionTokens;
+            if (wrapUpResult.estimatedCost)
+              totalEstimatedCost += wrapUpResult.estimatedCost;
           }
         } else if (continueFrom && continueFrom.trim()) {
           // Resume from existing content - just use it as-is
@@ -694,6 +737,8 @@ export async function POST(req: NextRequest) {
           fullContent = initialResult.content;
           totalPromptTokens += initialResult.promptTokens;
           totalCompletionTokens += initialResult.completionTokens;
+          if (initialResult.estimatedCost)
+            totalEstimatedCost += initialResult.estimatedCost;
         }
 
         // Check if JSON is incomplete
@@ -770,6 +815,8 @@ export async function POST(req: NextRequest) {
                   }
                   totalPromptTokens += continuationResult.promptTokens;
                   totalCompletionTokens += continuationResult.completionTokens;
+                  if (continuationResult.estimatedCost)
+                    totalEstimatedCost += continuationResult.estimatedCost;
 
                   incompleteCheck = detectIncompleteJSON(fullContent);
                 } catch (error) {
@@ -821,6 +868,42 @@ export async function POST(req: NextRequest) {
                 // Clear heartbeat and send done
                 if (heartbeatInterval) clearInterval(heartbeatInterval);
 
+                // Deduct coins for Coins mode providers (Mistral/DeepInfra)
+                let tokenCost = 0;
+                let newBalance: number | undefined;
+                if (
+                  isCoinsMode &&
+                  (totalPromptTokens > 0 ||
+                    totalCompletionTokens > 0 ||
+                    totalEstimatedCost > 0)
+                ) {
+                  if (
+                    modelConfig.provider === "deepinfra" &&
+                    totalEstimatedCost > 0
+                  ) {
+                    tokenCost =
+                      calculateCostFromEstimatedCost(totalEstimatedCost);
+                  } else {
+                    tokenCost = calculateTokenCost(
+                      model,
+                      totalPromptTokens,
+                      totalCompletionTokens
+                    );
+                  }
+                  const deductResult = await deductTokens(
+                    user.id,
+                    tokenCost,
+                    supabase
+                  );
+                  if (deductResult.success) {
+                    const balanceResult = await getUserTokenBalance(
+                      user.id,
+                      supabase
+                    );
+                    newBalance = balanceResult?.total;
+                  }
+                }
+
                 controller.enqueue(
                   encoder.encode(
                     `data: ${JSON.stringify({
@@ -838,6 +921,9 @@ export async function POST(req: NextRequest) {
                           totalTokens:
                             totalPromptTokens + totalCompletionTokens,
                         },
+                        tokenCost: tokenCost > 0 ? tokenCost : undefined,
+                        balance: newBalance,
+                        isByok: !isCoinsMode,
                       },
                     })}\n\n`
                   )
@@ -878,6 +964,39 @@ export async function POST(req: NextRequest) {
           success: result !== null,
         });
 
+        // Deduct coins for Coins mode providers (Mistral/DeepInfra)
+        let tokenCost = 0;
+        let newBalance: number | undefined;
+        if (
+          isCoinsMode &&
+          (totalPromptTokens > 0 ||
+            totalCompletionTokens > 0 ||
+            totalEstimatedCost > 0)
+        ) {
+          // Use estimated_cost from DeepInfra if available, otherwise calculate from tokens
+          if (modelConfig.provider === "deepinfra" && totalEstimatedCost > 0) {
+            tokenCost = calculateCostFromEstimatedCost(totalEstimatedCost);
+          } else {
+            tokenCost = calculateTokenCost(
+              model,
+              totalPromptTokens,
+              totalCompletionTokens
+            );
+          }
+          const deductResult = await deductTokens(user.id, tokenCost, supabase);
+          if (!deductResult.success) {
+            logger.warn("Failed to deduct tokens for stage generation", {
+              userId: user.id,
+              provider: modelConfig.provider,
+              tokenCost,
+              error: deductResult.error,
+            });
+          } else {
+            const balanceResult = await getUserTokenBalance(user.id, supabase);
+            newBalance = balanceResult?.total;
+          }
+        }
+
         // Send done event
         controller.enqueue(
           encoder.encode(
@@ -895,6 +1014,9 @@ export async function POST(req: NextRequest) {
                   completionTokens: totalCompletionTokens,
                   totalTokens: totalPromptTokens + totalCompletionTokens,
                 },
+                tokenCost: tokenCost > 0 ? tokenCost : undefined,
+                balance: newBalance,
+                isByok: !isCoinsMode,
               },
             })}\n\n`
           )
