@@ -53,6 +53,7 @@ import {
   deleteHistoryEntry,
   clearGenerationHistory,
   mergeBigAdventureResults,
+  parseBigAdventureStageOutput,
 } from "@/app/misc/big_adventure_ai";
 import {
   generateAdventureSequential,
@@ -144,6 +145,191 @@ function AutosaveRecoveryModal({
           >
             Resume
           </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// JSON Repair Modal - allows manual fixing of broken JSON output
+function JsonRepairModal({
+  isOpen,
+  stage,
+  content,
+  error,
+  onClose,
+  onSave,
+}: {
+  isOpen: boolean;
+  stage: GenerationStage | null;
+  content: string;
+  error: string;
+  onClose: () => void;
+  onSave: (fixedContent: string, stage: GenerationStage) => void;
+}) {
+  const [editedContent, setEditedContent] = useState(content);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [isParsing, setIsParsing] = useState(false);
+
+  // Update editedContent when content prop changes
+  useEffect(() => {
+    setEditedContent(content);
+    setParseError(null);
+  }, [content]);
+
+  if (!isOpen || !stage) return null;
+
+  const stageName = getStageInfo(stage).name;
+
+  const handleValidate = () => {
+    setParseError(null);
+    try {
+      const result = parseBigAdventureStageOutput(editedContent, stage);
+      if (result) {
+        setParseError(null);
+        return true;
+      } else {
+        setParseError("Parsed successfully but no valid data found");
+        return false;
+      }
+    } catch (e) {
+      setParseError(e instanceof Error ? e.message : "Invalid JSON");
+      return false;
+    }
+  };
+
+  const handleSave = () => {
+    setIsParsing(true);
+    const isValid = handleValidate();
+    if (isValid) {
+      onSave(editedContent, stage);
+    }
+    setIsParsing(false);
+  };
+
+  // Try to format JSON nicely
+  const handleFormat = () => {
+    try {
+      // Extract JSON from content
+      let jsonContent = editedContent.trim();
+      const jsonBlockMatch = jsonContent.match(
+        /```(?:json)?\s*([\s\S]*?)\s*```/
+      );
+      if (jsonBlockMatch) {
+        jsonContent = jsonBlockMatch[1].trim();
+      }
+      jsonContent = jsonContent
+        .replace(/```json\s*/gi, "")
+        .replace(/```\s*/g, "");
+
+      const startIndex = jsonContent.indexOf("{");
+      const endIndex = jsonContent.lastIndexOf("}");
+      if (startIndex !== -1 && endIndex !== -1) {
+        jsonContent = jsonContent.slice(startIndex, endIndex + 1);
+      }
+
+      const parsed = JSON.parse(jsonContent);
+      setEditedContent(JSON.stringify(parsed, null, 2));
+      setParseError(null);
+    } catch (e) {
+      setParseError(
+        "Cannot format - JSON is not valid. Try fixing the errors first."
+      );
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+      <div className="bg-blue-950 border border-blue-700/50 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-blue-700/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+              <span className="text-xl">🔧</span>
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-white">Fix JSON Output</h3>
+              <p className="text-sm text-blue-300/60">Stage: {stageName}</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-blue-300/60 hover:text-white transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Error message */}
+        <div className="px-4 py-2 bg-red-900/20 border-b border-red-700/30">
+          <p className="text-sm text-red-300">
+            <span className="font-semibold">Error:</span> {error}
+          </p>
+          <p className="text-xs text-red-300/70 mt-1">
+            The AI output couldn&apos;t be parsed. You can try to fix the JSON
+            manually below.
+          </p>
+        </div>
+
+        {/* Editor area */}
+        <div className="flex-1 p-4 overflow-hidden flex flex-col min-h-0">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm text-blue-300/60">
+              Raw output ({editedContent.length.toLocaleString()} chars)
+            </span>
+            <button
+              onClick={handleFormat}
+              className="px-3 py-1 text-xs bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+            >
+              Format JSON
+            </button>
+          </div>
+          <textarea
+            value={editedContent}
+            onChange={(e) => {
+              setEditedContent(e.target.value);
+              setParseError(null);
+            }}
+            className="flex-1 w-full bg-blue-900/30 border border-blue-700/30 rounded-lg p-3 font-mono text-sm text-blue-100 resize-none focus:outline-none focus:border-blue-500"
+            placeholder="Paste or edit JSON content here..."
+            spellCheck={false}
+          />
+
+          {/* Parse error display */}
+          {parseError && (
+            <div className="mt-2 p-2 bg-red-900/30 border border-red-700/30 rounded-lg">
+              <p className="text-sm text-red-300 font-mono">{parseError}</p>
+            </div>
+          )}
+        </div>
+
+        {/* Footer with actions */}
+        <div className="flex items-center justify-between p-4 border-t border-blue-700/30 bg-blue-900/20">
+          <div className="text-xs text-blue-300/50">
+            Tip: Look for missing commas, unclosed brackets, or truncated
+            strings
+          </div>
+          <div className="flex gap-3">
+            <button
+              onClick={handleValidate}
+              className="px-4 py-2 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
+            >
+              Validate
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isParsing}
+              className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg transition-colors"
+            >
+              {isParsing ? "Parsing..." : "Save & Continue"}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -319,26 +505,34 @@ function LiveOutput({
   completedStages: GenerationStage[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [selectedStage, setSelectedStage] = useState<GenerationStage | null>(null);
+  const [selectedStage, setSelectedStage] = useState<GenerationStage | null>(
+    null
+  );
   const [autoScroll, setAutoScroll] = useState(false);
 
   // All stages that have content (active or completed)
-  const stagesWithContent = Array.from(stageContents.keys()).filter(
-    (stage) => stageContents.get(stage)
+  const stagesWithContent = Array.from(stageContents.keys()).filter((stage) =>
+    stageContents.get(stage)
   );
 
   // Auto-select the first active stage when a new stage starts
   useEffect(() => {
     if (activeStages.length > 0 && !selectedStage) {
       setSelectedStage(activeStages[0]);
-    } else if (activeStages.length > 0 && selectedStage && !stageContents.has(selectedStage)) {
+    } else if (
+      activeStages.length > 0 &&
+      selectedStage &&
+      !stageContents.has(selectedStage)
+    ) {
       // If selected stage was removed, switch to first active
       setSelectedStage(activeStages[0]);
     }
   }, [activeStages, selectedStage, stageContents]);
 
   // Handle auto-scroll when enabled
-  const currentContent = selectedStage ? stageContents.get(selectedStage) || "" : "";
+  const currentContent = selectedStage
+    ? stageContents.get(selectedStage) || ""
+    : "";
   useEffect(() => {
     if (autoScroll && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -412,7 +606,9 @@ function LiveOutput({
         className="bg-blue-950/50 rounded-lg p-4 h-80 overflow-y-auto font-mono text-sm text-blue-200 whitespace-pre-wrap border border-blue-700/30"
       >
         {currentContent || (
-          <span className="text-blue-400/50 italic">Waiting for content...</span>
+          <span className="text-blue-400/50 italic">
+            Waiting for content...
+          </span>
         )}
       </div>
     </div>
@@ -1173,7 +1369,16 @@ function BigAdventureCreatorPage() {
   const [completedTasks, setCompletedTasks] = useState(0);
   const [completedStages, setCompletedStages] = useState<GenerationStage[]>([]);
   const [failedStages, setFailedStages] = useState<GenerationStage[]>([]);
-  const [liveContentMap, setLiveContentMap] = useState<Map<GenerationStage, string>>(new Map());
+  const [liveContentMap, setLiveContentMap] = useState<
+    Map<GenerationStage, string>
+  >(new Map());
+
+  // JSON Repair Modal state - for manual fixing of broken JSON output
+  const [repairModalOpen, setRepairModalOpen] = useState(false);
+  const [repairStage, setRepairStage] = useState<GenerationStage | null>(null);
+  const [repairContent, setRepairContent] = useState("");
+  const [repairError, setRepairError] = useState("");
+
   const [result, setResult] = useState<BigAdventureResult | null>(null);
   // partialResults is used for autosave recovery and intermediate state
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1628,6 +1833,59 @@ function BigAdventureCreatorPage() {
     setSessionId(generateSessionId());
   }, []);
 
+  // Handle JSON repair save - when user manually fixes broken JSON output
+  const handleRepairSave = useCallback(
+    (fixedContent: string, stage: GenerationStage) => {
+      try {
+        // Parse the fixed content
+        const parsedResult = parseBigAdventureStageOutput(fixedContent, stage);
+
+        if (!parsedResult) {
+          addNotification(
+            "Failed to parse fixed JSON - please check the format",
+            "warning"
+          );
+          return;
+        }
+
+        // Merge into partialResults
+        setPartialResults((prev) => ({
+          ...prev,
+          ...parsedResult,
+          storyTemplate: {
+            ...prev.storyTemplate,
+            ...parsedResult.storyTemplate,
+          },
+        }));
+
+        // Remove from failed stages and add to completed
+        setFailedStages((prev) => prev.filter((s) => s !== stage));
+        setCompletedStages((prev) => [...prev, stage]);
+
+        // Close the modal and reset state
+        setRepairModalOpen(false);
+        setRepairStage(null);
+        setRepairContent("");
+        setRepairError("");
+
+        addNotification(
+          `Successfully recovered ${
+            getStageInfo(stage).name
+          } stage from fixed JSON!`,
+          "success"
+        );
+      } catch (err) {
+        addNotification(
+          `Error applying fixed JSON: ${
+            err instanceof Error ? err.message : "Unknown error"
+          }`,
+          "warning"
+        );
+      }
+    },
+    [addNotification]
+  );
+
   // Get model's max output tokens
   const getModelMaxTokens = useCallback(() => {
     const modelConfig = getModelConfig(selectedModel);
@@ -1920,7 +2178,8 @@ function BigAdventureCreatorPage() {
           const currentContent = prev.get(stage) || "";
           newMap.set(
             stage,
-            currentContent + `\n\n/* Continuing generation (${attempt}/${maxAttempts})... */\n`
+            currentContent +
+              `\n\n/* Continuing generation (${attempt}/${maxAttempts})... */\n`
           );
           return newMap;
         });
@@ -1977,17 +2236,35 @@ function BigAdventureCreatorPage() {
         setActiveStages((prev) => prev.filter((s) => s !== stage));
       },
 
-      onStageError: (stage, error, canRetry) => {
-        console.error(`Stage ${stage} error:`, error, { canRetry });
+      onStageError: (stage, error, canRetry, rawContent) => {
+        console.error(`Stage ${stage} error:`, error, {
+          canRetry,
+          hasRawContent: !!rawContent,
+        });
         if (!canRetry) {
           setFailedStages((prev) => [...prev, stage]);
         }
-        addNotification(
-          canRetry
-            ? error
-            : `Stage ${getStageInfo(stage).name} failed: ${error}`,
-          "warning"
-        );
+
+        // If we have raw content, offer to repair it manually
+        if (rawContent && rawContent.length > 100) {
+          setRepairStage(stage);
+          setRepairContent(rawContent);
+          setRepairError(error);
+          setRepairModalOpen(true);
+          addNotification(
+            `Stage ${
+              getStageInfo(stage).name
+            } failed - you can try to fix the JSON manually`,
+            "warning"
+          );
+        } else {
+          addNotification(
+            canRetry
+              ? error
+              : `Stage ${getStageInfo(stage).name} failed: ${error}`,
+            "warning"
+          );
+        }
         // Remove from active stages (keep content in map for debugging)
         setActiveStages((prev) => prev.filter((s) => s !== stage));
       },
@@ -2980,6 +3257,21 @@ ${result.description || ""}`;
           onDiscard={handleDiscardAutosave}
         />
       )}
+
+      {/* JSON Repair Modal */}
+      <JsonRepairModal
+        isOpen={repairModalOpen}
+        stage={repairStage}
+        content={repairContent}
+        error={repairError}
+        onClose={() => {
+          setRepairModalOpen(false);
+          setRepairStage(null);
+          setRepairContent("");
+          setRepairError("");
+        }}
+        onSave={handleRepairSave}
+      />
 
       {/* Stage Preview Modal */}
       {showStagePreview && previewStageData && (

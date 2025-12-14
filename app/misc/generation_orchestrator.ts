@@ -63,7 +63,8 @@ export interface GenerationCallbacks {
   onStageError: (
     stage: GenerationStage,
     error: string,
-    canRetry: boolean
+    canRetry: boolean,
+    rawContent?: string // The raw content that failed to parse - for manual repair
   ) => void;
   onStageWarning: (stage: GenerationStage, message: string) => void;
   onProgress: (completedStages: GenerationStage[], totalStages: number) => void;
@@ -944,7 +945,8 @@ async function runSingleStageWithRetry(
         callbacks.onStageError(
           stage,
           wrapUpResult.error || "Failed to finish early",
-          false
+          false,
+          partialContent // Raw content for manual repair
         );
         return {
           success: false,
@@ -1003,7 +1005,7 @@ async function runSingleStageWithRetry(
         result.timedOut && partialContent.length <= 100
           ? "Stage timed out with insufficient content to recover"
           : result.error || "Unknown error";
-      callbacks.onStageError(stage, errorMsg, false);
+      callbacks.onStageError(stage, errorMsg, false, partialContent);
 
       // Save partial progress
       if (stageResults.length > 0) {
@@ -1269,7 +1271,8 @@ async function runStagesInParallel(
         callbacks.onStageError(
           stage,
           stageResult.result.error || "Unknown error",
-          false
+          false,
+          partialContent
         );
 
         return stageResult;
@@ -1290,7 +1293,12 @@ async function runStagesInParallel(
     results.push(stageResult);
 
     // Immediately notify that this stage failed
-    callbacks.onStageError(stage, "Max retries exceeded", false);
+    callbacks.onStageError(
+      stage,
+      "Max retries exceeded",
+      false,
+      partialContent
+    );
 
     return stageResult;
   });
