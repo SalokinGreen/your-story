@@ -1387,7 +1387,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
 
 **Character Sheet:**
 - update_character_sheet - Update the player's filled character sheet markdown
-- update_character_sheet_template - Set the adventure's fillable template
+- update_character_sheet_template - Set the adventure's fillable template. Use {{FieldName (Category) | Description | Default}} syntax to group fields into pages
 - update_preset_character_sheet - Update a preset's pre-filled character sheet
 
 **Starting Choices:**

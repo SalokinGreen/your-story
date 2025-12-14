@@ -1230,7 +1230,15 @@ ${presetTemplatesList}
 
 TEMPLATE SYNTAX:
 Use {{FieldName | Description | Default Value}} for fillable fields.
-Example: {{Name | Your character's name | Unnamed Hero}}
+Optionally, use {{FieldName (Category) | Description | Default Value}} to group fields into pages.
+
+Examples:
+- Basic: {{Name | Your character's name | Unnamed Hero}}
+- With category: {{Strength (Stats) | Physical power | 10}}
+- With category: {{Background (Story) | Your character's history | A wanderer}}
+
+Fields with the same category will appear together on the same page in the character creation wizard.
+Fields without a category will appear on the first page.
 
 Each field will be rendered as an input when players create their character.
 
