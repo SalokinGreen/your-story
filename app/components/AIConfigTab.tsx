@@ -147,6 +147,14 @@ export default function AIConfigTab() {
     }
     return 4000;
   });
+  // Story stage context size (separate from GM stage Memory Size)
+  const [storyContextSize, setStoryContextSize] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("storyContextSize");
+      return stored ? parseInt(stored, 10) : 16000; // Default 16K
+    }
+    return 16000;
+  });
   // Track if user is in custom input mode (separate from the value)
   const [isCustomContextMode, setIsCustomContextMode] = useState(() => {
     if (typeof window !== "undefined") {
@@ -172,6 +180,21 @@ export default function AIConfigTab() {
     }
     return false;
   });
+  const [isCustomStoryContextMode, setIsCustomStoryContextMode] = useState(
+    () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("storyContextSize");
+        return (
+          stored === "-1" ||
+          (stored !== null &&
+            ![8000, 16000, 36000, 72000, 120000, 200000].includes(
+              parseInt(stored, 10)
+            ))
+        );
+      }
+      return false;
+    }
+  );
   // Temporary input values for custom fields - initialize from stored values if in custom mode
   const [customContextInput, setCustomContextInput] = useState(() => {
     if (typeof window !== "undefined") {
@@ -193,6 +216,20 @@ export default function AIConfigTab() {
       const storedVal = stored ? parseInt(stored, 10) : 0;
       // If stored value is not a preset, show it in custom input
       if (stored && ![1000, 2000, 4000, 8000].includes(storedVal)) {
+        return stored;
+      }
+    }
+    return "";
+  });
+  const [customStoryContextInput, setCustomStoryContextInput] = useState(() => {
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("storyContextSize");
+      const storedVal = stored ? parseInt(stored, 10) : 0;
+      // If stored value is not a preset, show it in custom input
+      if (
+        stored &&
+        ![8000, 16000, 36000, 72000, 120000, 200000].includes(storedVal)
+      ) {
         return stored;
       }
     }
@@ -404,15 +441,9 @@ export default function AIConfigTab() {
       ? preset.advancedToolsModel
       : baseToolsModel;
 
-  // Apply advanced choices toggle - use advanced choices model if enabled and available
-  const baseChoicesModel =
-    currentPreset === "custom" && choicesModel
-      ? choicesModel
-      : preset.choicesModel;
-  const effectiveChoicesModel =
-    advancedChoices && preset.advancedChoicesModel
-      ? preset.advancedChoicesModel
-      : baseChoicesModel;
+  // Apply advanced choices toggle - CHOICES NOW USES STORY MODEL
+  // Choices stage uses the same model as Story stage for consistency
+  const effectiveChoicesModel = effectiveStoryModel;
 
   // Helper to get display name for a model key (handles both built-in and custom models)
   const getModelDisplayName = (modelKey: string): string => {
@@ -837,166 +868,102 @@ export default function AIConfigTab() {
             <span className="text-white/60">GM:</span>{" "}
             {getModelDisplayName(effectiveToolsModel)}
           </div>
-          <div>
-            <span className="text-white/60">Choices:</span>{" "}
-            {getModelDisplayName(effectiveChoicesModel)}
+          <div className="text-white/40 text-[10px]">
+            (Choices uses Story model)
           </div>
         </div>
       </div>
 
-      {/* Preset Selection */}
-      <div className="space-y-2">
+      {/* Model Selection - Story and GM */}
+      <div className="space-y-4">
         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Model Preset
+          Model Selection
         </label>
-        <select
-          value={currentPreset}
-          onChange={(e) => handlePresetChange(e.target.value)}
-          className="w-full px-4 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-        >
-          {byokMode ? (
-            // BYOK mode - show custom preset and BYOK presets
-            <>
-              <option key="custom" value="custom">
-                Custom - FREE with your keys
-              </option>
-              <optgroup label="🔑 BYOK Presets">
-                {Object.entries(MODEL_PRESETS)
-                  .filter(([key]) => key.startsWith("byok"))
-                  .map(([key, presetConfig]) => (
-                    <option key={key} value={key}>
-                      {presetConfig.name} - FREE with your keys
-                    </option>
-                  ))}
-              </optgroup>
-            </>
-          ) : (
-            // Coins mode - show categorized presets
-            <>
-              <optgroup label="⭐ Recommended">
-                {Object.entries(MODEL_PRESETS)
-                  .filter(([, p]) => p.category === "recommended")
-                  .map(([key, presetConfig]) => (
-                    <option key={key} value={key}>
-                      {presetConfig.name} - ~
-                      {getPresetEstimatedCost(key, effectiveContextSize)} coins
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="👑 Premium">
-                {Object.entries(MODEL_PRESETS)
-                  .filter(([, p]) => p.category === "premium")
-                  .map(([key, presetConfig]) => (
-                    <option key={key} value={key}>
-                      {presetConfig.name} - ~
-                      {getPresetEstimatedCost(key, effectiveContextSize)} coins
-                    </option>
-                  ))}
-              </optgroup>
-              <optgroup label="💰 Budget">
-                {Object.entries(MODEL_PRESETS)
-                  .filter(([, p]) => p.category === "budget")
-                  .map(([key, presetConfig]) => (
-                    <option key={key} value={key}>
-                      {presetConfig.name} - ~
-                      {getPresetEstimatedCost(key, effectiveContextSize)} coins
-                    </option>
-                  ))}
-              </optgroup>
-            </>
-          )}
-        </select>
-      </div>
 
-      {/* Advanced Toggles - Only show for Coins mode presets with advanced options */}
-      {!byokMode &&
-        (preset.advancedToolsModel || preset.advancedChoicesModel) && (
-          <div className="space-y-3">
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-              Advanced Options
-            </label>
-            <div className="flex flex-col gap-2">
-              {/* Advanced Tools Toggle */}
-              {preset.advancedToolsModel && (
-                <button
-                  onClick={() => setAdvancedTools(!advancedTools)}
-                  className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
-                    advancedTools
-                      ? "bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700"
-                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-700"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <DynamicIcon
-                      name="Wrench"
-                      className="w-4 h-4 text-orange-500"
-                    />
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      Advanced Tools
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      (Devstral 2 for GM/tools)
-                    </span>
-                  </div>
-                  <div
-                    className={`w-10 h-5 rounded-full transition-colors ${
-                      advancedTools
-                        ? "bg-orange-500"
-                        : "bg-gray-300 dark:bg-gray-600"
-                    }`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-0.5 ${
-                        advancedTools
-                          ? "translate-x-5 ml-0.5"
-                          : "translate-x-0.5"
-                      }`}
-                    />
-                  </div>
-                </button>
-              )}
-              {/* Advanced Choices Toggle */}
-              {preset.advancedChoicesModel && (
-                <button
-                  onClick={() => setAdvancedChoices(!advancedChoices)}
-                  className={`flex items-center justify-between px-4 py-2.5 rounded-lg border transition-colors ${
-                    advancedChoices
-                      ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
-                      : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <DynamicIcon
-                      name="ListChecks"
-                      className="w-4 h-4 text-purple-500"
-                    />
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      Advanced Choices
-                    </span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">
-                      (MiniMax M2 for actions)
-                    </span>
-                  </div>
-                  <div
-                    className={`w-10 h-5 rounded-full transition-colors ${
-                      advancedChoices
-                        ? "bg-purple-500"
-                        : "bg-gray-300 dark:bg-gray-600"
-                    }`}
-                  >
-                    <div
-                      className={`w-4 h-4 rounded-full bg-white shadow-sm transform transition-transform mt-0.5 ${
-                        advancedChoices
-                          ? "translate-x-5 ml-0.5"
-                          : "translate-x-0.5"
-                      }`}
-                    />
-                  </div>
-                </button>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Story Model */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+            Story Model{" "}
+            <span className="text-gray-400">(also used for choices)</span>
+          </label>
+          <select
+            value={storyModel || preset.storyModel}
+            onChange={(e) => setStoryModel(e.target.value)}
+            className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            {Object.entries(AI_MODELS)
+              .filter(([, config]) => {
+                const isBYOKProvider =
+                  config.provider === "openrouter" ||
+                  config.provider === "deepseek" ||
+                  config.provider === "novelai" ||
+                  config.provider === "google";
+                return byokMode ? isBYOKProvider : !isBYOKProvider;
+              })
+              .map(([key, config]) => (
+                <option key={key} value={key}>
+                  {config.name} ({config.cost} coin
+                  {config.cost > 1 ? "s" : ""},{" "}
+                  {(config.maxTokens / 1000).toFixed(0)}K)
+                </option>
+              ))}
+            {byokMode && customModels.length > 0 && (
+              <optgroup label="Custom Models">
+                {[...customModels]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name} (FREE,{" "}
+                      {(model.contextSize / 1000).toFixed(0)}K)
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
+
+        {/* GM Model */}
+        <div>
+          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
+            GM Model{" "}
+            <span className="text-gray-400">(game master / tools)</span>
+          </label>
+          <select
+            value={toolsModel || preset.toolsModel}
+            onChange={(e) => setToolsModel(e.target.value)}
+            className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
+            {Object.entries(AI_MODELS)
+              .filter(([, config]) => {
+                const isBYOKProvider =
+                  config.provider === "openrouter" ||
+                  config.provider === "deepseek" ||
+                  config.provider === "novelai" ||
+                  config.provider === "google";
+                return byokMode ? isBYOKProvider : !isBYOKProvider;
+              })
+              .map(([key, config]) => (
+                <option key={key} value={key}>
+                  {config.name} ({(config as any).cost || 1} coin
+                  {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
+                  {(config.maxTokens / 1000).toFixed(0)}K)
+                </option>
+              ))}
+            {byokMode && customModels.length > 0 && (
+              <optgroup label="Custom Models">
+                {[...customModels]
+                  .sort((a, b) => a.name.localeCompare(b.name))
+                  .map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.name} (FREE,{" "}
+                      {(model.contextSize / 1000).toFixed(0)}K)
+                    </option>
+                  ))}
+              </optgroup>
+            )}
+          </select>
+        </div>
+      </div>
 
       {/* Memory Size Slider */}
       <div className="space-y-2">
@@ -1087,6 +1054,99 @@ export default function AIConfigTab() {
         )}
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Lower = cheaper & faster • Higher = better story memory
+        </p>
+      </div>
+
+      {/* Story Context Size Slider */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            Story Context
+          </label>
+          <span className="text-sm text-cyan-600 dark:text-cyan-400 font-medium">
+            {isCustomStoryContextMode
+              ? storyContextSize > 0
+                ? `${(storyContextSize / 1000).toFixed(0)}K tokens`
+                : "Custom"
+              : `${(storyContextSize / 1000).toFixed(0)}K tokens`}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
+            💰 Cheap
+          </span>
+          <div className="flex-1 relative">
+            <div className="h-2 rounded-full bg-linear-to-r from-green-500 via-yellow-500 to-purple-600" />
+            <div className="absolute top-0 left-0 right-0 h-2 flex justify-between px-0">
+              {[8000, 16000, 36000, 72000, 120000, 200000, -1].map((val) => (
+                <button
+                  key={val}
+                  onClick={() => {
+                    if (val === -1) {
+                      setIsCustomStoryContextMode(true);
+                      setCustomStoryContextInput(
+                        storyContextSize > 0 ? String(storyContextSize) : ""
+                      );
+                    } else {
+                      setIsCustomStoryContextMode(false);
+                      setStoryContextSize(val);
+                      if (typeof window !== "undefined") {
+                        localStorage.setItem("storyContextSize", String(val));
+                      }
+                    }
+                  }}
+                  className={`w-4 h-4 rounded-full border-2 -mt-1 transition-all ${
+                    (val === -1 && isCustomStoryContextMode) ||
+                    (val !== -1 &&
+                      !isCustomStoryContextMode &&
+                      storyContextSize === val)
+                      ? "bg-white border-white scale-125 shadow-lg"
+                      : "bg-gray-800 border-gray-500 hover:border-white hover:scale-110"
+                  }`}
+                  title={val === -1 ? "Custom" : `${(val / 1000).toFixed(0)}K`}
+                />
+              ))}
+            </div>
+            <div className="flex justify-between mt-3 text-[10px] text-gray-500 dark:text-gray-400">
+              <span>8K</span>
+              <span>16K</span>
+              <span>36K</span>
+              <span>72K</span>
+              <span>120K</span>
+              <span>200K</span>
+              <span>⚙️</span>
+            </div>
+          </div>
+          <span className="text-xs text-cyan-600 dark:text-cyan-400 whitespace-nowrap">
+            📖 Story
+          </span>
+        </div>
+        {isCustomStoryContextMode && (
+          <div className="flex items-center gap-2 mt-2 pl-16">
+            <input
+              type="number"
+              value={customStoryContextInput}
+              onChange={(e) => {
+                setCustomStoryContextInput(e.target.value);
+                const val = parseInt(e.target.value, 10) || 0;
+                if (val > 0) {
+                  setStoryContextSize(val);
+                  if (typeof window !== "undefined") {
+                    localStorage.setItem("storyContextSize", String(val));
+                  }
+                }
+              }}
+              min="4000"
+              step="1000"
+              placeholder="Enter tokens..."
+              className="w-32 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-cyan-500"
+            />
+            <span className="text-xs text-gray-500">tokens</span>
+          </div>
+        )}
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Context for story writing stage • Lower = cheaper • Higher = more
+          story context
         </p>
       </div>
 
@@ -1183,156 +1243,6 @@ export default function AIConfigTab() {
           against output limit.
         </p>
       </div>
-
-      {/* Custom Model Config (only for custom preset) */}
-      {currentPreset === "custom" && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-          <button
-            onClick={() => setShowModelConfig(!showModelConfig)}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-              <DynamicIcon name="Settings" className="w-4 h-4" />
-              Configure Custom Models
-            </h4>
-            <DynamicIcon
-              name={showModelConfig ? "ChevronUp" : "ChevronDown"}
-              className="w-4 h-4 text-gray-500"
-            />
-          </button>
-
-          {showModelConfig && (
-            <div className="space-y-4 pt-2">
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Choose models for each generation stage
-              </p>
-
-              {/* Story Model */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Story Narration Model
-                </label>
-                <select
-                  value={storyModel || preset.storyModel}
-                  onChange={(e) => setStoryModel(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  {Object.entries(AI_MODELS)
-                    .filter(([, config]) => {
-                      const isBYOKProvider =
-                        config.provider === "openrouter" ||
-                        config.provider === "deepseek" ||
-                        config.provider === "novelai" ||
-                        config.provider === "google";
-                      return byokMode ? isBYOKProvider : !isBYOKProvider;
-                    })
-                    .map(([key, config]) => (
-                      <option key={key} value={key}>
-                        {config.name} ({config.cost} coin
-                        {config.cost > 1 ? "s" : ""},{" "}
-                        {(config.maxTokens / 1000).toFixed(0)}K)
-                      </option>
-                    ))}
-                  {byokMode && customModels.length > 0 && (
-                    <optgroup label="Custom Models">
-                      {[...customModels]
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.name} (FREE,{" "}
-                            {(model.contextSize / 1000).toFixed(0)}K)
-                          </option>
-                        ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-
-              {/* Tools Model */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Tools & Game State Model
-                </label>
-                <select
-                  value={toolsModel || preset.toolsModel}
-                  onChange={(e) => setToolsModel(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  {Object.entries(AI_MODELS)
-                    .filter(([, config]) => {
-                      const isBYOKProvider =
-                        config.provider === "openrouter" ||
-                        config.provider === "deepseek" ||
-                        config.provider === "novelai" ||
-                        config.provider === "google";
-                      return byokMode ? isBYOKProvider : !isBYOKProvider;
-                    })
-                    .map(([key, config]) => (
-                      <option key={key} value={key}>
-                        {config.name} ({(config as any).cost || 1} coin
-                        {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
-                        {(config.maxTokens / 1000).toFixed(0)}K)
-                      </option>
-                    ))}
-                  {byokMode && customModels.length > 0 && (
-                    <optgroup label="Custom Models">
-                      {[...customModels]
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.name} (FREE,{" "}
-                            {(model.contextSize / 1000).toFixed(0)}K)
-                          </option>
-                        ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-
-              {/* Choices Model */}
-              <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                  Player Choices Model
-                </label>
-                <select
-                  value={choicesModel || preset.choicesModel}
-                  onChange={(e) => setChoicesModel(e.target.value)}
-                  className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  {Object.entries(AI_MODELS)
-                    .filter(([, config]) => {
-                      const isBYOKProvider =
-                        config.provider === "openrouter" ||
-                        config.provider === "deepseek" ||
-                        config.provider === "novelai" ||
-                        config.provider === "google";
-                      return byokMode ? isBYOKProvider : !isBYOKProvider;
-                    })
-                    .map(([key, config]) => (
-                      <option key={key} value={key}>
-                        {config.name} ({(config as any).cost || 1} coin
-                        {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
-                        {(config.maxTokens / 1000).toFixed(0)}K)
-                      </option>
-                    ))}
-                  {byokMode && customModels.length > 0 && (
-                    <optgroup label="Custom Models">
-                      {[...customModels]
-                        .sort((a, b) => a.name.localeCompare(b.name))
-                        .map((model) => (
-                          <option key={model.id} value={model.id}>
-                            {model.name} (FREE,{" "}
-                            {(model.contextSize / 1000).toFixed(0)}K)
-                          </option>
-                        ))}
-                    </optgroup>
-                  )}
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* Custom Models Management - Only in BYOK mode */}
       {byokMode && (

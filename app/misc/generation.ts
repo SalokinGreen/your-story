@@ -100,7 +100,8 @@ export interface GenerationOptions {
   enableTools: boolean;
   maxToolLoops?: number;
   skipChoices?: boolean;
-  customMaxContext?: number;
+  customMaxContext?: number; // GM stage context (Memory Size slider)
+  customStoryContext?: number; // Story stage context (Story Context slider)
   customMaxOutput?: number;
   // NovelAI BYOK support (story stage only)
   novelaiEnabled?: boolean;
@@ -947,6 +948,7 @@ Call the tool:`,
       commandResponses,
       modelName: storyModelName,
       customMaxContext: options.customMaxContext,
+      customStoryContext: options.customStoryContext, // Story Context slider
       customMaxOutput: storyMaxOutput,
       embeddingContext,
       usePrefill: options.usePrefill !== false, // Default to true

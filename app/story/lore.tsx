@@ -113,7 +113,37 @@ export default function LorePage(props: LorePageProps) {
   >("all");
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
+  const [editType, setEditType] = useState<LoreType>("lore");
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [newNote, setNewNote] = useState<Partial<StoryLore>>({
+    title: "",
+    content: "",
+    type: "lore",
+  });
+
+  // Add a new note
+  const handleAddNote = () => {
+    if (!onUpdateLore || !newNote.title) return;
+    const note: StoryLore = {
+      title: newNote.title,
+      content: newNote.content || "",
+      relatedCharacters: [],
+      relatedLocations: [],
+      secrtet: newNote.type === "secret",
+      keys: [],
+      type: newNote.type as LoreType,
+      on: true,
+      alwaysOn: false,
+      on_triggers: [],
+      off_triggers: [],
+      embedded: false,
+    };
+    onUpdateLore([...storyData.lore, note]);
+    setNewNote({ title: "", content: "", type: "lore" });
+    setIsAddingNote(false);
+    setSelectedLore(note);
+  };
 
   // Filter lore based on search term and type
   const filteredLore = useMemo(() => {
@@ -198,10 +228,12 @@ export default function LorePage(props: LorePageProps) {
     if (!selectedLore || !onUpdateLore) return;
 
     const updatedLore = storyData.lore.map((l) =>
-      l.title === selectedLore.title ? { ...l, content: editContent } : l
+      l.title === selectedLore.title
+        ? { ...l, content: editContent, type: editType }
+        : l
     );
     onUpdateLore(updatedLore);
-    setSelectedLore({ ...selectedLore, content: editContent });
+    setSelectedLore({ ...selectedLore, content: editContent, type: editType });
     setIsEditing(false);
   };
 
@@ -209,6 +241,7 @@ export default function LorePage(props: LorePageProps) {
   const startEditing = () => {
     if (selectedLore) {
       setEditContent(selectedLore.content || "");
+      setEditType(selectedLore.type || "lore");
       setIsEditing(true);
     }
   };
@@ -233,86 +266,99 @@ export default function LorePage(props: LorePageProps) {
             </p>
           </div>
 
-          {/* Type Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-              className="flex items-center gap-2 px-3 py-2 bg-blue-900/60 hover:bg-blue-800/60 border border-blue-700/40 rounded-lg text-sm text-white transition-all"
-            >
-              <DynamicIcon
-                name={TYPE_CONFIG[selectedType].icon}
-                className={`w-4 h-4 ${TYPE_CONFIG[selectedType].color}`}
-              />
-              <span>{TYPE_CONFIG[selectedType].label}</span>
-              <span
-                className={`px-1.5 py-0.5 rounded text-xs ${TYPE_CONFIG[selectedType].bgColor}`}
+          <div className="flex items-center gap-2">
+            {/* Add Note Button */}
+            {onUpdateLore && (
+              <button
+                onClick={() => setIsAddingNote(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-emerald-600/80 hover:bg-emerald-500/80 border border-emerald-500/40 rounded-lg text-sm text-white transition-all"
               >
-                {selectedType === "all"
-                  ? typeCounts.all
-                  : typeCounts[selectedType]}
-              </span>
-              <DynamicIcon
-                name={isTypeDropdownOpen ? "ChevronUp" : "ChevronDown"}
-                className="w-4 h-4 text-blue-300"
-              />
-            </button>
-
-            {isTypeDropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsTypeDropdownOpen(false)}
-                />
-                <div className="absolute right-0 mt-2 w-56 bg-blue-950 border border-blue-700/50 rounded-xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
-                  {(
-                    [
-                      "all",
-                      "character_sheet",
-                      "gm_notes",
-                      "npc",
-                      "item",
-                      "location",
-                      "faction",
-                      "event",
-                      "mechanics",
-                      "lore",
-                      "secrets",
-                    ] as const
-                  ).map((type) => (
-                    <button
-                      key={type}
-                      onClick={() => {
-                        setSelectedType(type);
-                        setIsTypeDropdownOpen(false);
-                        setSelectedLore(null);
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
-                        selectedType === type
-                          ? "bg-blue-800/50 text-white"
-                          : "text-blue-100 hover:bg-blue-900/50"
-                      }`}
-                    >
-                      <div
-                        className={`p-1.5 rounded-lg ${TYPE_CONFIG[type].bgColor}`}
-                      >
-                        <DynamicIcon
-                          name={TYPE_CONFIG[type].icon}
-                          className={`w-4 h-4 ${TYPE_CONFIG[type].color}`}
-                        />
-                      </div>
-                      <span className="flex-1 text-left">
-                        {TYPE_CONFIG[type].label}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${TYPE_CONFIG[type].bgColor} ${TYPE_CONFIG[type].color}`}
-                      >
-                        {typeCounts[type]}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </>
+                <DynamicIcon name="Plus" className="w-4 h-4" />
+                <span className="hidden sm:inline">Add Note</span>
+              </button>
             )}
+
+            {/* Type Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+                className="flex items-center gap-2 px-3 py-2 bg-blue-900/60 hover:bg-blue-800/60 border border-blue-700/40 rounded-lg text-sm text-white transition-all"
+              >
+                <DynamicIcon
+                  name={TYPE_CONFIG[selectedType].icon}
+                  className={`w-4 h-4 ${TYPE_CONFIG[selectedType].color}`}
+                />
+                <span>{TYPE_CONFIG[selectedType].label}</span>
+                <span
+                  className={`px-1.5 py-0.5 rounded text-xs ${TYPE_CONFIG[selectedType].bgColor}`}
+                >
+                  {selectedType === "all"
+                    ? typeCounts.all
+                    : typeCounts[selectedType]}
+                </span>
+                <DynamicIcon
+                  name={isTypeDropdownOpen ? "ChevronUp" : "ChevronDown"}
+                  className="w-4 h-4 text-blue-300"
+                />
+              </button>
+
+              {isTypeDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsTypeDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-56 bg-blue-950 border border-blue-700/50 rounded-xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
+                    {(
+                      [
+                        "all",
+                        "character_sheet",
+                        "gm_notes",
+                        "npc",
+                        "item",
+                        "location",
+                        "faction",
+                        "event",
+                        "mechanics",
+                        "lore",
+                        "secrets",
+                      ] as const
+                    ).map((type) => (
+                      <button
+                        key={type}
+                        onClick={() => {
+                          setSelectedType(type);
+                          setIsTypeDropdownOpen(false);
+                          setSelectedLore(null);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
+                          selectedType === type
+                            ? "bg-blue-800/50 text-white"
+                            : "text-blue-100 hover:bg-blue-900/50"
+                        }`}
+                      >
+                        <div
+                          className={`p-1.5 rounded-lg ${TYPE_CONFIG[type].bgColor}`}
+                        >
+                          <DynamicIcon
+                            name={TYPE_CONFIG[type].icon}
+                            className={`w-4 h-4 ${TYPE_CONFIG[type].color}`}
+                          />
+                        </div>
+                        <span className="flex-1 text-left">
+                          {TYPE_CONFIG[type].label}
+                        </span>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs ${TYPE_CONFIG[type].bgColor} ${TYPE_CONFIG[type].color}`}
+                        >
+                          {typeCounts[type]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -584,6 +630,35 @@ export default function LorePage(props: LorePageProps) {
                 {/* Content - Edit Mode or Display Mode */}
                 {isEditing ? (
                   <div className="space-y-3">
+                    {/* Type Selector */}
+                    <div>
+                      <label className="block text-xs font-medium text-blue-200/70 mb-1">
+                        Note Type
+                      </label>
+                      <select
+                        value={editType}
+                        onChange={(e) =>
+                          setEditType(e.target.value as LoreType)
+                        }
+                        className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm"
+                      >
+                        <option value="lore">📁 World Lore</option>
+                        <option value="secret">🔒 Secret</option>
+                        <option value="gm_notes">📋 GM Instructions</option>
+                        <option value="story_instructions">
+                          📝 Story Instructions
+                        </option>
+                        <option value="mechanics">⚙️ Mechanics</option>
+                        <option value="character_sheet">
+                          👤 Character Sheet
+                        </option>
+                        <option value="npc">🧑 NPC</option>
+                        <option value="item">🗡️ Item</option>
+                        <option value="location">📍 Location</option>
+                        <option value="faction">⚔️ Faction</option>
+                        <option value="event">📅 Event</option>
+                      </select>
+                    </div>
                     <textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
@@ -685,6 +760,105 @@ export default function LorePage(props: LorePageProps) {
           )}
         </div>
       </div>
+
+      {/* Add Note Modal */}
+      {isAddingNote && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-linear-to-br from-blue-950 to-slate-900 rounded-xl border border-blue-700/40 w-full max-w-lg shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-blue-800/40">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <DynamicIcon name="Plus" className="w-5 h-5 text-emerald-400" />
+                Add New Note
+              </h3>
+              <button
+                onClick={() => setIsAddingNote(false)}
+                className="p-1 hover:bg-blue-800/50 rounded-lg transition-colors"
+              >
+                <DynamicIcon name="X" className="w-5 h-5 text-blue-300" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Title */}
+              <div>
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                  Title
+                </label>
+                <input
+                  type="text"
+                  value={newNote.title || ""}
+                  onChange={(e) =>
+                    setNewNote({ ...newNote, title: e.target.value })
+                  }
+                  placeholder="Note title..."
+                  className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white placeholder-blue-400/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+
+              {/* Type */}
+              <div>
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                  Type
+                </label>
+                <select
+                  value={newNote.type || "lore"}
+                  onChange={(e) =>
+                    setNewNote({ ...newNote, type: e.target.value as LoreType })
+                  }
+                  className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                >
+                  <option value="lore">📁 World Lore</option>
+                  <option value="secret">🔒 Secret</option>
+                  <option value="gm_notes">📋 GM Instructions</option>
+                  <option value="story_instructions">
+                    📝 Story Instructions
+                  </option>
+                  <option value="mechanics">⚙️ Mechanics</option>
+                  <option value="character_sheet">👤 Character Sheet</option>
+                  <option value="npc">🧑 NPC</option>
+                  <option value="item">🗡️ Item</option>
+                  <option value="location">📍 Location</option>
+                  <option value="faction">⚔️ Faction</option>
+                  <option value="event">📅 Event</option>
+                </select>
+              </div>
+
+              {/* Content */}
+              <div>
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
+                  Content
+                </label>
+                <textarea
+                  value={newNote.content || ""}
+                  onChange={(e) =>
+                    setNewNote({ ...newNote, content: e.target.value })
+                  }
+                  placeholder="Note content... (supports Markdown)"
+                  rows={6}
+                  className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white placeholder-blue-400/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 p-4 border-t border-blue-800/40">
+              <button
+                onClick={() => setIsAddingNote(false)}
+                className="px-4 py-2 text-blue-300 hover:bg-blue-800/40 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddNote}
+                disabled={!newNote.title}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-blue-800/40 disabled:text-blue-400/50 text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                <DynamicIcon name="Plus" className="w-4 h-4" />
+                Add Note
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

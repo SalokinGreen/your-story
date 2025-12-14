@@ -2823,6 +2823,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
           : 36000;
+      const storyContextSize =
+        typeof window !== "undefined"
+          ? parseInt(localStorage.getItem("storyContextSize") || "16000", 10)
+          : 16000;
       const customMaxOutput =
         typeof window !== "undefined"
           ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
@@ -2870,6 +2874,8 @@ function StoryPageContent() {
           enableTools: toolCallingEnabled,
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
+          customStoryContext:
+            storyContextSize > 0 ? storyContextSize : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
           novelaiEnabled: novelaiEnabled && !!novelaiKey,
           novelaiKey,
@@ -4998,6 +5004,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
         : 36000;
+    const storyContextSize =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("storyContextSize") || "16000", 10)
+        : 16000;
     const customMaxOutput =
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
@@ -5137,6 +5147,8 @@ function StoryPageContent() {
             maxToolLoops,
             customMaxContext:
               customMaxContext > 0 ? customMaxContext : undefined,
+            customStoryContext:
+              storyContextSize > 0 ? storyContextSize : undefined,
             customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
             skipChoices: !!actionChoice, // Skip choices generation in freeform action mode
             novelaiEnabled: novelaiEnabled && !!novelaiKey,
@@ -5566,6 +5578,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
         : 36000;
+    const storyContextSize =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("storyContextSize") || "16000", 10)
+        : 16000;
     const customMaxOutput =
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
@@ -5627,6 +5643,8 @@ function StoryPageContent() {
           enableTools: toolCallingEnabled,
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
+          customStoryContext:
+            storyContextSize > 0 ? storyContextSize : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
           skipChoices: false,
           novelaiEnabled: novelaiEnabled && !!novelaiKey,
@@ -5836,6 +5854,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
         : 36000;
+    const storyContextSize =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("storyContextSize") || "16000", 10)
+        : 16000;
     const customMaxOutput =
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
@@ -5894,6 +5916,8 @@ function StoryPageContent() {
           enableTools: toolCallingEnabled,
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
+          customStoryContext:
+            storyContextSize > 0 ? storyContextSize : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
           skipChoices: true, // On retry, we already have choices from the previous generation
           novelaiEnabled: novelaiEnabled && !!novelaiKey,

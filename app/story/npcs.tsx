@@ -96,8 +96,42 @@ export default function NPCsPage(props: NPCsPageProps) {
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editNotes, setEditNotes] = useState("");
+  const [isAddingNPC, setIsAddingNPC] = useState(false);
+  const [newNPC, setNewNPC] = useState<Partial<NPC>>({
+    name: "",
+    description: "",
+    role: "",
+    status: "alive",
+    attitude: "neutral",
+  });
 
   const npcs = storyData.npcs || [];
+
+  // Add new NPC
+  const handleAddNPC = () => {
+    if (!onUpdateNPCs || !newNPC.name) return;
+    const npc: NPC = {
+      id: `npc_${Date.now()}`,
+      name: newNPC.name,
+      description: newNPC.description || "",
+      role: newNPC.role || "",
+      status: (newNPC.status as NPCStatus) || "alive",
+      attitude: (newNPC.attitude as NPCAttitude) || "neutral",
+      relationship: newNPC.relationship || "",
+      faction: newNPC.faction || "",
+      createdAt: Date.now(),
+    };
+    onUpdateNPCs([...npcs, npc]);
+    setNewNPC({
+      name: "",
+      description: "",
+      role: "",
+      status: "alive",
+      attitude: "neutral",
+    });
+    setIsAddingNPC(false);
+    setSelectedNPC(npc);
+  };
 
   // Filter NPCs
   const filteredNPCs = useMemo(() => {
@@ -214,133 +248,148 @@ export default function NPCsPage(props: NPCsPageProps) {
             </p>
           </div>
 
-          {/* Filter Dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-              className="flex items-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-700/60 border border-slate-600/40 rounded-lg text-sm text-white transition-all"
-            >
-              <DynamicIcon
-                name={getFilterIcon()}
-                className={`w-4 h-4 ${getFilterColor()}`}
-              />
-              <span>{getFilterLabel()}</span>
-              <span className="px-1.5 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-300">
-                {filterType === "all"
-                  ? statusCounts.all
-                  : statusCounts[filterType] || 0}
-              </span>
-              <DynamicIcon
-                name={isFilterDropdownOpen ? "ChevronUp" : "ChevronDown"}
-                className="w-4 h-4 text-slate-400"
-              />
-            </button>
+          <div className="flex items-center gap-2">
+            {/* Add NPC Button */}
+            {onUpdateNPCs && (
+              <button
+                onClick={() => setIsAddingNPC(true)}
+                className="flex items-center gap-2 px-3 py-2 bg-emerald-600/80 hover:bg-emerald-500/80 border border-emerald-500/40 rounded-lg text-sm text-white transition-all"
+              >
+                <DynamicIcon name="Plus" className="w-4 h-4" />
+                <span className="hidden sm:inline">Add NPC</span>
+              </button>
+            )}
 
-            {isFilterDropdownOpen && (
-              <>
-                <div
-                  className="fixed inset-0 z-40"
-                  onClick={() => setIsFilterDropdownOpen(false)}
+            {/* Filter Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
+                className="flex items-center gap-2 px-3 py-2 bg-slate-800/60 hover:bg-slate-700/60 border border-slate-600/40 rounded-lg text-sm text-white transition-all"
+              >
+                <DynamicIcon
+                  name={getFilterIcon()}
+                  className={`w-4 h-4 ${getFilterColor()}`}
                 />
-                <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
-                  {/* All option */}
-                  <button
-                    onClick={() => {
-                      setFilterType("all");
-                      setIsFilterDropdownOpen(false);
-                      setSelectedNPC(null);
-                    }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
-                      filterType === "all"
-                        ? "bg-slate-700/50 text-white"
-                        : "text-slate-100 hover:bg-slate-800/50"
-                    }`}
-                  >
-                    <div className="p-1.5 rounded-lg bg-cyan-500/20">
-                      <DynamicIcon
-                        name="Users"
-                        className="w-4 h-4 text-cyan-300"
-                      />
-                    </div>
-                    <span className="flex-1 text-left">All NPCs</span>
-                    <span className="px-2 py-0.5 rounded-full text-xs bg-cyan-500/20 text-cyan-300">
-                      {statusCounts.all}
-                    </span>
-                  </button>
+                <span>{getFilterLabel()}</span>
+                <span className="px-1.5 py-0.5 rounded text-xs bg-cyan-500/20 text-cyan-300">
+                  {filterType === "all"
+                    ? statusCounts.all
+                    : statusCounts[filterType] || 0}
+                </span>
+                <DynamicIcon
+                  name={isFilterDropdownOpen ? "ChevronUp" : "ChevronDown"}
+                  className="w-4 h-4 text-slate-400"
+                />
+              </button>
 
-                  {/* Status filters */}
-                  <div className="px-3 py-2 text-xs text-slate-500 uppercase tracking-wider border-t border-slate-700/30">
-                    Status
-                  </div>
-                  {(Object.keys(STATUS_CONFIG) as NPCStatus[]).map((status) => (
+              {isFilterDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsFilterDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-2 w-56 bg-slate-900 border border-slate-700/50 rounded-xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
+                    {/* All option */}
                     <button
-                      key={status}
                       onClick={() => {
-                        setFilterType(status);
+                        setFilterType("all");
                         setIsFilterDropdownOpen(false);
                         setSelectedNPC(null);
                       }}
                       className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
-                        filterType === status
+                        filterType === "all"
                           ? "bg-slate-700/50 text-white"
                           : "text-slate-100 hover:bg-slate-800/50"
                       }`}
                     >
-                      <div
-                        className={`p-1.5 rounded-lg ${STATUS_CONFIG[status].bgColor}`}
-                      >
+                      <div className="p-1.5 rounded-lg bg-cyan-500/20">
                         <DynamicIcon
-                          name={STATUS_CONFIG[status].icon}
-                          className={`w-4 h-4 ${STATUS_CONFIG[status].color}`}
+                          name="Users"
+                          className="w-4 h-4 text-cyan-300"
                         />
                       </div>
-                      <span className="flex-1 text-left">
-                        {STATUS_CONFIG[status].label}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded-full text-xs ${STATUS_CONFIG[status].bgColor} ${STATUS_CONFIG[status].color}`}
-                      >
-                        {statusCounts[status]}
+                      <span className="flex-1 text-left">All NPCs</span>
+                      <span className="px-2 py-0.5 rounded-full text-xs bg-cyan-500/20 text-cyan-300">
+                        {statusCounts.all}
                       </span>
                     </button>
-                  ))}
 
-                  {/* Attitude filters */}
-                  <div className="px-3 py-2 text-xs text-slate-500 uppercase tracking-wider border-t border-slate-700/30">
-                    Attitude
-                  </div>
-                  {(Object.keys(ATTITUDE_CONFIG) as NPCAttitude[]).map(
-                    (attitude) => (
-                      <button
-                        key={attitude}
-                        onClick={() => {
-                          setFilterType(attitude);
-                          setIsFilterDropdownOpen(false);
-                          setSelectedNPC(null);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
-                          filterType === attitude
-                            ? "bg-slate-700/50 text-white"
-                            : "text-slate-100 hover:bg-slate-800/50"
-                        }`}
-                      >
-                        <div
-                          className={`p-1.5 rounded-lg ${ATTITUDE_CONFIG[attitude].bgColor}`}
+                    {/* Status filters */}
+                    <div className="px-3 py-2 text-xs text-slate-500 uppercase tracking-wider border-t border-slate-700/30">
+                      Status
+                    </div>
+                    {(Object.keys(STATUS_CONFIG) as NPCStatus[]).map(
+                      (status) => (
+                        <button
+                          key={status}
+                          onClick={() => {
+                            setFilterType(status);
+                            setIsFilterDropdownOpen(false);
+                            setSelectedNPC(null);
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
+                            filterType === status
+                              ? "bg-slate-700/50 text-white"
+                              : "text-slate-100 hover:bg-slate-800/50"
+                          }`}
                         >
-                          <DynamicIcon
-                            name={ATTITUDE_CONFIG[attitude].icon}
-                            className={`w-4 h-4 ${ATTITUDE_CONFIG[attitude].color}`}
-                          />
-                        </div>
-                        <span className="flex-1 text-left">
-                          {ATTITUDE_CONFIG[attitude].label}
-                        </span>
-                      </button>
-                    )
-                  )}
-                </div>
-              </>
-            )}
+                          <div
+                            className={`p-1.5 rounded-lg ${STATUS_CONFIG[status].bgColor}`}
+                          >
+                            <DynamicIcon
+                              name={STATUS_CONFIG[status].icon}
+                              className={`w-4 h-4 ${STATUS_CONFIG[status].color}`}
+                            />
+                          </div>
+                          <span className="flex-1 text-left">
+                            {STATUS_CONFIG[status].label}
+                          </span>
+                          <span
+                            className={`px-2 py-0.5 rounded-full text-xs ${STATUS_CONFIG[status].bgColor} ${STATUS_CONFIG[status].color}`}
+                          >
+                            {statusCounts[status]}
+                          </span>
+                        </button>
+                      )
+                    )}
+
+                    {/* Attitude filters */}
+                    <div className="px-3 py-2 text-xs text-slate-500 uppercase tracking-wider border-t border-slate-700/30">
+                      Attitude
+                    </div>
+                    {(Object.keys(ATTITUDE_CONFIG) as NPCAttitude[]).map(
+                      (attitude) => (
+                        <button
+                          key={attitude}
+                          onClick={() => {
+                            setFilterType(attitude);
+                            setIsFilterDropdownOpen(false);
+                            setSelectedNPC(null);
+                          }}
+                          className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
+                            filterType === attitude
+                              ? "bg-slate-700/50 text-white"
+                              : "text-slate-100 hover:bg-slate-800/50"
+                          }`}
+                        >
+                          <div
+                            className={`p-1.5 rounded-lg ${ATTITUDE_CONFIG[attitude].bgColor}`}
+                          >
+                            <DynamicIcon
+                              name={ATTITUDE_CONFIG[attitude].icon}
+                              className={`w-4 h-4 ${ATTITUDE_CONFIG[attitude].color}`}
+                            />
+                          </div>
+                          <span className="flex-1 text-left">
+                            {ATTITUDE_CONFIG[attitude].label}
+                          </span>
+                        </button>
+                      )
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -702,6 +751,180 @@ export default function NPCsPage(props: NPCsPageProps) {
           )}
         </div>
       </div>
+
+      {/* Add NPC Modal */}
+      {isAddingNPC && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-linear-to-br from-slate-800 to-slate-900 rounded-xl border border-slate-700/40 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-slate-700/40 sticky top-0 bg-slate-800/95 backdrop-blur-sm">
+              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                <DynamicIcon
+                  name="UserPlus"
+                  className="w-5 h-5 text-emerald-400"
+                />
+                Add Character
+              </h3>
+              <button
+                onClick={() => setIsAddingNPC(false)}
+                className="p-1 hover:bg-slate-700/50 rounded-lg transition-colors"
+              >
+                <DynamicIcon name="X" className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Name *
+                </label>
+                <input
+                  type="text"
+                  value={newNPC.name || ""}
+                  onChange={(e) =>
+                    setNewNPC({ ...newNPC, name: e.target.value })
+                  }
+                  placeholder="Character name..."
+                  className="w-full px-3 py-2 bg-slate-800/60 border border-slate-600/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+
+              {/* Role */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Role
+                </label>
+                <input
+                  type="text"
+                  value={newNPC.role || ""}
+                  onChange={(e) =>
+                    setNewNPC({ ...newNPC, role: e.target.value })
+                  }
+                  placeholder="e.g. Blacksmith, Guard Captain, Mysterious Stranger..."
+                  className="w-full px-3 py-2 bg-slate-800/60 border border-slate-600/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Status */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={newNPC.status || "alive"}
+                    onChange={(e) =>
+                      setNewNPC({
+                        ...newNPC,
+                        status: e.target.value as NPCStatus,
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-800/60 border border-slate-600/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  >
+                    {(Object.keys(STATUS_CONFIG) as NPCStatus[]).map(
+                      (status) => (
+                        <option key={status} value={status}>
+                          {STATUS_CONFIG[status].label}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+
+                {/* Attitude */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    Attitude
+                  </label>
+                  <select
+                    value={newNPC.attitude || "neutral"}
+                    onChange={(e) =>
+                      setNewNPC({
+                        ...newNPC,
+                        attitude: e.target.value as NPCAttitude,
+                      })
+                    }
+                    className="w-full px-3 py-2 bg-slate-800/60 border border-slate-600/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  >
+                    {(Object.keys(ATTITUDE_CONFIG) as NPCAttitude[]).map(
+                      (attitude) => (
+                        <option key={attitude} value={attitude}>
+                          {ATTITUDE_CONFIG[attitude].label}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </div>
+              </div>
+
+              {/* Relationship */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Relationship
+                </label>
+                <input
+                  type="text"
+                  value={newNPC.relationship || ""}
+                  onChange={(e) =>
+                    setNewNPC({ ...newNPC, relationship: e.target.value })
+                  }
+                  placeholder="e.g. Trusted mentor, Rival, Secret ally..."
+                  className="w-full px-3 py-2 bg-slate-800/60 border border-slate-600/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+
+              {/* Faction */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Faction
+                </label>
+                <input
+                  type="text"
+                  value={newNPC.faction || ""}
+                  onChange={(e) =>
+                    setNewNPC({ ...newNPC, faction: e.target.value })
+                  }
+                  placeholder="e.g. The Guild, Royal Guard, Independent..."
+                  className="w-full px-3 py-2 bg-slate-800/60 border border-slate-600/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={newNPC.description || ""}
+                  onChange={(e) =>
+                    setNewNPC({ ...newNPC, description: e.target.value })
+                  }
+                  placeholder="Physical appearance, notable traits, background..."
+                  rows={4}
+                  className="w-full px-3 py-2 bg-slate-800/60 border border-slate-600/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 p-4 border-t border-slate-700/40 sticky bottom-0 bg-slate-800/95 backdrop-blur-sm">
+              <button
+                onClick={() => setIsAddingNPC(false)}
+                className="px-4 py-2 text-slate-400 hover:bg-slate-700/40 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleAddNPC}
+                disabled={!newNPC.name}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700/40 disabled:text-slate-500 text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                <DynamicIcon name="UserPlus" className="w-4 h-4" />
+                Add Character
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

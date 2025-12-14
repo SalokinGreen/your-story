@@ -76,8 +76,8 @@ The GM stage reads mechanics from lore entries and uses formula_roll with custom
     - Tool responses marked with ✓ (success), ✗ (failure), ⚠ (partial success)
 - app/misc/ai_staged.ts: Staged generation prompt builders. Exports buildStoryPrompt(), buildToolPrompt(), buildChoicesPrompt(), buildGMStagePrompt() - each returns specialized prompts without XML wrappers.
   - **GM Stage is the "brain"**: buildGMStagePrompt accepts `customMaxContext` (Memory Size slider) and gets the large context allocation. It reads mechanics notes (type: "mechanics" lore), character sheets (type: "character_sheet" lore), and determines outcomes using formula_roll.
-  - **Story Stage is the "translator"**: buildStoryPrompt uses fixed smaller context (STORY_STAGE_TOKEN_BUDGET = 16k). It only needs recent story + GM output to write prose.
-  - **Context allocation**: GM Stage gets 60% history / 40% info from Memory Size. Story Stage uses fixed 16k budget regardless of slider.
+  - **Story Stage is the "translator"**: buildStoryPrompt accepts `customStoryContext` (Story Context slider) for context allocation. Defaults to STORY_STAGE_TOKEN_BUDGET (16k) if not provided.
+  - **Context allocation**: GM Stage gets 60% history / 40% info from Memory Size slider. Story Stage uses Story Context slider (localStorage key: `storyContextSize`, default 16k).
   - **GM History Preservation**: buildGMStagePrompt reconstructs full GM conversation history from `ScenePart.gmThinking` and `ScenePart.gmToolCalls`. User input formatted as `[Story so far...]\nstory output\n\n> player action` so GM sees narrative context.
   - **State Changes in Context**: buildStoryPrompt prepends `stateChanges` from the previous assistant part to the user's choice message, informing the story stage about mechanical game state updates.
   - **DEPRECATED fields**: stats, resources, abilities, rpgSystem are no longer sent to AI. Character data is in character_sheet lore, mechanics in mechanics lore.
@@ -293,7 +293,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Keep server components for Next 16 app router by default.
 - Toast notifications via NotificationContext; use addNotification("message", "success"|"failure"|"warning").
 - Profile page: Admin controls must always be at the very bottom (see comment in profile/[userId]/page.tsx).
-- **AI Config Menu**: Model selection saved to localStorage as "aiPreset", with presets defined in MODEL_PRESETS. Custom presets allow per-stage model overrides.
+- **AI Config Menu**: Model selection saved to localStorage as "aiPreset", with presets defined in MODEL_PRESETS. Custom presets allow per-stage model overrides. Two context size sliders: Memory Size (GM stage, localStorage key: `maxContextSize`, default 128k) and Story Context (story stage, localStorage key: `storyContextSize`, default 16k, options: 8K/12K/16K/24K/32K/Custom).
 - **API Keys Settings**: Users must provide their own API keys via Settings modal (gear icon in header). Supports OpenRouter (OAuth + manual), DeepSeek, NovelAI. TTS uses server-side DeepInfra key (no BYOK). Keys stored in localStorage (default) or encrypted on server (optional).
 - **NovelAI Settings**: BYOK integration for story generation only. Settings saved to localStorage (novelaiEnabled, novelaiKey, novelaiTemperature). When enabled, story stage uses NovelAI GLM-4-6 while tools/choices stages use OpenRouter/DeepSeek.
 - **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices, ttsModel). Two models: Kokoro (fast, cheap) and Orpheus (premium, expressive).

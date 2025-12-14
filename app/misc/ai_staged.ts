@@ -1265,7 +1265,8 @@ export function buildStoryPrompt({
   userChoice,
   commandResponses,
   modelName = "Deepseek Chat",
-  customMaxContext, // DEPRECATED: Story stage now uses fixed budget. Kept for backward compat.
+  customMaxContext, // DEPRECATED: Use customStoryContext instead
+  customStoryContext, // Story stage context size (from Story Context slider)
   customMaxOutput,
   embeddingContext, // DEPRECATED: Story stage no longer uses embeddings - it's just a translator
   usePrefill = true,
@@ -1278,7 +1279,8 @@ export function buildStoryPrompt({
   userChoice?: string;
   commandResponses?: CommandResponse[];
   modelName?: string;
-  customMaxContext?: number; // Deprecated - story stage uses fixed budget now
+  customMaxContext?: number; // Deprecated - use customStoryContext
+  customStoryContext?: number; // Story stage context size (from Story Context slider, default 16K)
   customMaxOutput?: number;
   embeddingContext?: EmbeddingContext; // Deprecated - story stage is just a translator now
   usePrefill?: boolean;
@@ -1294,10 +1296,11 @@ export function buildStoryPrompt({
   const modelConfig = getModelConfig(modelName);
   const modelMaxTokens = modelConfig.maxTokens;
 
-  // Story stage uses FIXED smaller context - it's just a translator now
-  // The Memory Size slider now controls GM Stage context, not Story Stage
-  // Use the smaller of: fixed budget OR model's actual limit
-  const effectiveMaxTokens = Math.min(STORY_STAGE_TOKEN_BUDGET, modelMaxTokens);
+  // Story stage context is now configurable via Story Context slider
+  // Use customStoryContext if provided, fall back to customMaxContext for backward compat, then default
+  const storyContextBudget =
+    customStoryContext || customMaxContext || STORY_STAGE_TOKEN_BUDGET;
+  const effectiveMaxTokens = Math.min(storyContextBudget, modelMaxTokens);
 
   // Use custom max output if provided, otherwise use model's default
   const actualMaxOutput = customMaxOutput || modelConfig.maxOutputTokens;
@@ -1592,8 +1595,8 @@ User will not see your output. Use your message content to "Think Step-by-Step" 
 
 ## CRITICAL: Existing Game Data
 The info message contains the CURRENT game state - these are entries that ALREADY EXIST:
-- **"## Notes/Lore"** = Note entries that exist. Use \`update_lore\` to add info, NOT \`create_lore\`
-- **"### Threads"** = Quests/storylines that exist. Use \`update_thread\` to progress, NOT \`create_thread\`
+- **"## Notes/Lore"** = Note entries that exist. Use \`update_lore\` to add info, NOT \`create_note\`
+update_note **"### Threads"** = Quests/storylines that exist. Use \`update_thread\` to progress, NOT \`create_thread\`
 - **"## Memory"** = Facts already saved. Don't duplicate them.
 - **"## NPCs"** = Characters already tracked. Don't recreate them.
 
@@ -1603,7 +1606,7 @@ Only use CREATE tools for GENUINELY NEW content not shown in the info message.
 THE THREE TRACKING SYSTEMS: NOTES vs MEMORIES vs NPCs
 ═══════════════════════════════════════════════════════════════
 
-**📝 NOTES (\`create_lore\` / \`update_lore\`)** — World Reference Database
+**📝 NOTES (\`create_note\` update_note \`update_lore\`)** — World Reference Database
 Use for DETAILED information you'll need to reference later:
 - **Location details**: Layout, features, dangers, history
 - **Faction information**: Goals, members, relationships, territory
@@ -1637,7 +1640,7 @@ WHEN TO CREATE WHAT (Decision Tree)
 → \`add_npc\` with name, role, attitude, description
 
 **Character has COMBAT STATS or special abilities?**
-→ ALSO \`create_lore\` titled "[Name] - Combat Stats" with:
+→ ALSO \`create_note\` update_note "[Name] - Combat Stats" with:
   - Health/wounds capacity
   - Attack methods and damage
   - Defenses, armor, resistances
@@ -1646,10 +1649,10 @@ WHEN TO CREATE WHAT (Decision Tree)
   - Behavior patterns (aggressive, cowardly, tactical)
 
 **New location discovered?**
-→ \`create_lore\` with layout, atmosphere, dangers, notable features
+→ \`create_note\` update_note layout, atmosphere, dangers, notable features
 
 **Important world lore revealed?**
-→ \`create_lore\` with detailed explanation
+→ \`create_note\` update_note detailed explanation
 
 **Quick fact player needs to remember?**
 → \`add_memory\` (1-2 sentences only)
@@ -1718,14 +1721,13 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 1. **New NPCs?** Named character appeared for the first time? → \`add_npc\`
    - If they have combat potential, ALSO create a stats note!
 
-2. **Combat Stats Revealed?** Did we learn how tough/dangerous something is? → \`create_lore\` with stats
+2. **Combat Stats Revealed?** Did we learn how tough/dangerous something is? → \`create_note\` update_note stats
 
 3. **Resource Delta:** Did the player lose or gain resources? → \`update_resource\` / \`modify_field\`
 
 4. **Quick Facts:** Codes, deadlines, debts, clues? → \`add_memory\` (keep it SHORT)
 
-5. **World Building:** New location, faction, or detailed lore? → \`create_lore\`
-
+5. **World Building:** New location, faction, or detailed lore? → \`create_noteupdate_note
 6. **Thread Progress:** Quest started, progressed, or completed? → thread tools
 
 7. **Nothing Significant?** → \`skip_tools\` (this is the most common case!)
@@ -1758,7 +1760,7 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 
 ⚠️ **CRITICAL: Check existing notes before creating new ones!**
 - If a note exists with similar title → \`update_lore\` to add information
-- Only \`create_lore\` for COMPLETELY NEW topics
+- Only \`create_note\` update_note COMPLETELY NEW topics
 
 **When to CREATE a Note:**
 - New significant location discovered
@@ -2611,7 +2613,7 @@ TRACKING THINGS (NOTES & STATS)
 
 **When something important happens**, remember it:
 - add_memory for quick facts ("The password is MOONRISE")
-- create_lore for detailed info (location layouts, faction details)
+- create_note for update_note info (location layouts, faction details)
 - update_lore to add to existing notes
 
 **When NPCs change**, track it:
@@ -2660,7 +2662,7 @@ TOOL QUICK REFERENCE
 • group_check - Party-wide tests, majority wins
 
 **📝 TRACKING**
-• create_lore / update_lore - Notes for locations, creatures, factions
+• create_note / update_note - Notes for locations, creatures, factions
 • add_memory - Quick facts (1-2 sentences max)
 • add_npc / update_npc / remove_npc - Character tracking
 • npc_reaction - Show NPC emotional response as notification
@@ -2759,7 +2761,7 @@ They're alone, no time pressure, and this is just a storage room. No roll needed
 
 Actually, the journal could be a plot hook. Let me add a note about it.
 \`\`\`
-*Calls create_lore for the journal, then end_gm_thinking with outcome="neutral"*
+*Calls create_note for update_note journal, then end_gm_thinking with outcome="neutral"*
 
 ---
 
@@ -2772,7 +2774,7 @@ A troll! Before anything else, I need to establish what this thing can do. Let m
 
 Trolls are tough, regenerate, hate fire. Classic.
 \`\`\`
-*Calls create_lore: "Cave Troll - Combat Stats" with HP, attacks, regeneration, fire weakness*
+*Calls create_note: "update_note Troll - Combat Stats" with HP, attacks, regeneration, fire weakness*
 
 \`\`\`
 [GAME MASTER]
@@ -2884,12 +2886,12 @@ IMPORTANT
     "modify_passive",
     // Achievement
     "trigger_achievement",
-    // Lore tools
-    "create_lore",
-    "delete_lore",
-    "show_lore",
-    "hide_lore",
-    "update_lore",
+    // note tools
+    "create_note",
+    "delete_note",
+    "show_note",
+    "hide_note",
+    "update_note",
     // Memory
     "add_memory",
     // Condition tools (no add_condition - that happens via stakes)

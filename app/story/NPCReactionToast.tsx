@@ -66,7 +66,7 @@ export default function NPCReactionToast({
       }}
     >
       {/* NPC Avatar */}
-      <div className="relative flex-shrink-0">
+      <div className="relative shrink-0">
         {reaction.npcImage ? (
           <img
             src={reaction.npcImage}
@@ -74,7 +74,7 @@ export default function NPCReactionToast({
             className="w-12 h-12 rounded-full object-cover ring-2 ring-indigo-500/50"
           />
         ) : (
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center ring-2 ring-indigo-500/50">
+          <div className="w-12 h-12 rounded-full bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center ring-2 ring-indigo-500/50">
             <span className="text-white text-lg font-bold">
               {reaction.npcName.charAt(0).toUpperCase()}
             </span>
@@ -96,7 +96,7 @@ export default function NPCReactionToast({
           </span>
           <span className="text-gray-300 truncate">{reaction.reaction}</span>
           {reaction.emoji && !reaction.npcImage && (
-            <span className="text-lg flex-shrink-0">{reaction.emoji}</span>
+            <span className="text-lg shrink-0">{reaction.emoji}</span>
           )}
         </div>
         {reaction.context && (
@@ -109,7 +109,7 @@ export default function NPCReactionToast({
       {/* Progress bar at bottom */}
       <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gray-700/50 rounded-b-xl overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-50 ease-linear"
+          className="h-full bg-linear-to-r from-indigo-500 to-purple-500 transition-all duration-50 ease-linear"
           style={{ width: `${progress}%` }}
         />
       </div>
