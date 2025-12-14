@@ -308,42 +308,112 @@ function StageProgress({
   );
 }
 
-// Live Output Component
+// Live Output Component with tabs for different stages
 function LiveOutput({
-  content,
+  stageContents,
   activeStages,
+  completedStages,
 }: {
-  content: string;
+  stageContents: Map<GenerationStage, string>;
   activeStages: GenerationStage[];
+  completedStages: GenerationStage[];
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [selectedStage, setSelectedStage] = useState<GenerationStage | null>(null);
+  const [autoScroll, setAutoScroll] = useState(false);
 
+  // All stages that have content (active or completed)
+  const stagesWithContent = Array.from(stageContents.keys()).filter(
+    (stage) => stageContents.get(stage)
+  );
+
+  // Auto-select the first active stage when a new stage starts
   useEffect(() => {
+    if (activeStages.length > 0 && !selectedStage) {
+      setSelectedStage(activeStages[0]);
+    } else if (activeStages.length > 0 && selectedStage && !stageContents.has(selectedStage)) {
+      // If selected stage was removed, switch to first active
+      setSelectedStage(activeStages[0]);
+    }
+  }, [activeStages, selectedStage, stageContents]);
+
+  // Handle auto-scroll when enabled
+  const currentContent = selectedStage ? stageContents.get(selectedStage) || "" : "";
+  useEffect(() => {
+    if (autoScroll && scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [currentContent, autoScroll]);
+
+  if (stagesWithContent.length === 0) return null;
+
+  const scrollToBottom = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [content]);
-
-  if (!content) return null;
-
-  // Show first active stage name, or count if multiple
-  const stageLabel =
-    activeStages.length === 0
-      ? ""
-      : activeStages.length === 1
-      ? `(${getStageInfo(activeStages[0]).name})`
-      : `(${activeStages.length} stages in parallel)`;
+  };
 
   return (
     <div className="mt-4">
-      <div className="text-sm text-blue-300/60 mb-2">
-        Live Output {stageLabel}
+      {/* Header with tabs */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-sm text-blue-300/60 mr-2">Live Output</span>
+          {stagesWithContent.map((stage) => {
+            const info = getStageInfo(stage);
+            const isActive = activeStages.includes(stage);
+            const isCompleted = completedStages.includes(stage);
+            const isSelected = selectedStage === stage;
+
+            return (
+              <button
+                key={stage}
+                onClick={() => setSelectedStage(stage)}
+                className={`px-3 py-1 text-xs rounded-lg transition-all flex items-center gap-1.5 ${
+                  isSelected
+                    ? "bg-blue-600 text-white"
+                    : "bg-blue-900/40 text-blue-300/70 hover:bg-blue-800/50 hover:text-blue-200"
+                }`}
+              >
+                {isActive && (
+                  <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
+                )}
+                {isCompleted && !isActive && (
+                  <span className="text-green-400">✓</span>
+                )}
+                {info.name}
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex items-center gap-2">
+          <label className="flex items-center gap-1.5 text-xs text-blue-300/60 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoScroll}
+              onChange={(e) => setAutoScroll(e.target.checked)}
+              className="w-3 h-3 rounded bg-blue-900/50 border-blue-700/50 text-purple-500"
+            />
+            Auto-scroll
+          </label>
+          <button
+            onClick={scrollToBottom}
+            className="px-2 py-1 text-xs bg-blue-900/40 hover:bg-blue-800/50 text-blue-300/70 rounded transition-colors"
+            title="Scroll to bottom"
+          >
+            ↓ Bottom
+          </button>
+        </div>
       </div>
+
+      {/* Content area - larger window */}
       <div
         ref={scrollRef}
-        className="bg-blue-950/50 rounded-lg p-4 h-48 overflow-y-auto font-mono text-sm text-blue-200 whitespace-pre-wrap border border-blue-700/30"
+        className="bg-blue-950/50 rounded-lg p-4 h-80 overflow-y-auto font-mono text-sm text-blue-200 whitespace-pre-wrap border border-blue-700/30"
       >
-        {content}
+        {currentContent || (
+          <span className="text-blue-400/50 italic">Waiting for content...</span>
+        )}
       </div>
     </div>
   );
@@ -1103,7 +1173,7 @@ function BigAdventureCreatorPage() {
   const [completedTasks, setCompletedTasks] = useState(0);
   const [completedStages, setCompletedStages] = useState<GenerationStage[]>([]);
   const [failedStages, setFailedStages] = useState<GenerationStage[]>([]);
-  const [liveContent, setLiveContent] = useState("");
+  const [liveContentMap, setLiveContentMap] = useState<Map<GenerationStage, string>>(new Map());
   const [result, setResult] = useState<BigAdventureResult | null>(null);
   // partialResults is used for autosave recovery and intermediate state
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -1806,7 +1876,7 @@ function BigAdventureCreatorPage() {
       setPartialResults({});
     }
     setFailedStages([]);
-    setLiveContent("");
+    setLiveContentMap(new Map());
     setResult(null);
     setTokenCost(0);
     // Clear resume mode now that we're generating
@@ -1818,40 +1888,42 @@ function BigAdventureCreatorPage() {
 
     abortControllerRef.current = new AbortController();
 
-    // Track live content per stage (for parallel mode)
-    const stageLiveContents = new Map<GenerationStage, string>();
-
     // Create callbacks for the orchestrator
     const callbacks: GenerationCallbacks = {
       onStageStart: (stage, stageInfo) => {
         // Add to active stages (supports parallel)
-        setActiveStages((prev) => {
-          // Clear live content only if this is the first active stage
-          if (prev.length === 0) {
-            setLiveContent("");
-          }
-          return [...prev, stage];
+        setActiveStages((prev) => [...prev, stage]);
+        // Initialize content for this stage
+        setLiveContentMap((prev) => {
+          const newMap = new Map(prev);
+          newMap.set(stage, "");
+          return newMap;
         });
         setCurrentIteration(1);
-        stageLiveContents.set(stage, "");
         console.log(`Starting stage: ${stageInfo.name}`);
       },
 
       onStageContent: (stage, content) => {
-        const currentContent = stageLiveContents.get(stage) || "";
-        stageLiveContents.set(stage, currentContent + content);
-        // Show content from the most recently started stage
-        setLiveContent(stageLiveContents.get(stage) || "");
+        // Append content to the stage's buffer
+        setLiveContentMap((prev) => {
+          const newMap = new Map(prev);
+          const currentContent = prev.get(stage) || "";
+          newMap.set(stage, currentContent + content);
+          return newMap;
+        });
       },
 
       onStageContinuation: (stage, attempt, maxAttempts) => {
         console.log(`Stage ${stage} continuation: ${attempt}/${maxAttempts}`);
-        const currentContent = stageLiveContents.get(stage) || "";
-        const newContent =
-          currentContent +
-          `\n\n/* Continuing generation (${attempt}/${maxAttempts})... */\n`;
-        stageLiveContents.set(stage, newContent);
-        setLiveContent(newContent);
+        setLiveContentMap((prev) => {
+          const newMap = new Map(prev);
+          const currentContent = prev.get(stage) || "";
+          newMap.set(
+            stage,
+            currentContent + `\n\n/* Continuing generation (${attempt}/${maxAttempts})... */\n`
+          );
+          return newMap;
+        });
       },
 
       onStageComplete: (stage, stageResult, promptTokens, completionTokens) => {
@@ -1886,20 +1958,23 @@ function BigAdventureCreatorPage() {
           getParentStage(stage) !== "advanced"
         ) {
           const isLastStage = stage === stagesToRun[stagesToRun.length - 1];
-          const currentLiveContent = stageLiveContents.get(stage) || "";
           if (!isLastStage && stageResult) {
-            setPreviewStageData({
-              stage,
-              content: currentLiveContent,
-              partialResult: stageResult,
+            // Get the content from state for preview
+            setLiveContentMap((prev) => {
+              const currentLiveContent = prev.get(stage) || "";
+              setPreviewStageData({
+                stage,
+                content: currentLiveContent,
+                partialResult: stageResult,
+              });
+              setShowStagePreview(true);
+              return prev;
             });
-            setShowStagePreview(true);
           }
         }
 
-        // Remove from active stages
+        // Remove from active stages (keep content in map for viewing)
         setActiveStages((prev) => prev.filter((s) => s !== stage));
-        stageLiveContents.delete(stage);
       },
 
       onStageError: (stage, error, canRetry) => {
@@ -1913,9 +1988,8 @@ function BigAdventureCreatorPage() {
             : `Stage ${getStageInfo(stage).name} failed: ${error}`,
           "warning"
         );
-        // Remove from active stages
+        // Remove from active stages (keep content in map for debugging)
         setActiveStages((prev) => prev.filter((s) => s !== stage));
-        stageLiveContents.delete(stage);
       },
 
       onStageWarning: (stage, message) => {
@@ -4539,7 +4613,11 @@ ${result.description || ""}`;
               failedStages={failedStages}
             />
 
-            <LiveOutput content={liveContent} activeStages={activeStages} />
+            <LiveOutput
+              stageContents={liveContentMap}
+              activeStages={activeStages}
+              completedStages={completedStages}
+            />
 
             {/* Content Browser - browse generated content while waiting */}
             <ContentBrowser partialResults={partialResults} />
