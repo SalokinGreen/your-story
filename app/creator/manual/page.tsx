@@ -37,6 +37,10 @@ import {
   STARTING_UPGRADES_BY_DIFFICULTY,
   AdventureDifficulty,
   CharacterSheetTemplate,
+  NPC,
+  NPCStatus,
+  NPCAttitude,
+  LoreType,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { supabase } from "@/app/misc/supabase";
@@ -102,6 +106,7 @@ type CreatorStep =
   | "lore"
   | "achievements"
   | "quests"
+  | "npcs"
   | "mythic"
   | "variables"
   | "tables"
@@ -1106,6 +1111,14 @@ function AdventureCreatorContent() {
       });
     }
 
+    if (data.npcs) {
+      data.npcs.forEach((n: any) => {
+        if (n._command === "delete") {
+          deletions.push(`NPC: ${n.name}`);
+        }
+      });
+    }
+
     if (data.abilities) {
       data.abilities.forEach((a: any) => {
         if (a._command === "delete") {
@@ -1273,6 +1286,10 @@ function AdventureCreatorContent() {
           "name"
         )
       );
+    }
+
+    if (data.npcs) {
+      setNPCs(applyItemChanges(npcs, data.npcs as any, "npc", "name"));
     }
 
     if (data.presets) {
@@ -1636,6 +1653,7 @@ function AdventureCreatorContent() {
         setConditions(template.conditions || []);
         setAchievements(template.achievements || []);
         setQuests(template.quests || []);
+        setNPCs(template.npcs || []);
         setCustomTables(template.customTables || []);
         setVariables(template.variables || []);
         setUpgradeSettings({
@@ -1786,6 +1804,7 @@ function AdventureCreatorContent() {
     if (Array.isArray(saved.conditions)) setConditions(saved.conditions);
     if (Array.isArray(saved.achievements)) setAchievements(saved.achievements);
     if (Array.isArray(saved.quests)) setQuests(saved.quests);
+    if (Array.isArray(saved.npcs)) setNPCs(saved.npcs);
     if (Array.isArray(saved.customTables)) setCustomTables(saved.customTables);
     if (Array.isArray(saved.variables)) setVariables(saved.variables);
     if (saved.upgradeSettings)
@@ -1902,6 +1921,7 @@ function AdventureCreatorContent() {
           setConditions(template.conditions || []);
           setAchievements(template.achievements || []);
           setQuests(template.quests || []);
+          setNPCs(template.npcs || []);
           setCustomTables(template.customTables || []);
           setVariables(template.variables || []);
           setUpgradeSettings({
@@ -2160,6 +2180,25 @@ function AdventureCreatorContent() {
   );
   const [editQuest, setEditQuest] = useState<Partial<Quest>>({});
 
+  // NPCs
+  const [npcs, setNPCs] = useState<NPC[]>([]);
+  const [newNPC, setNewNPC] = useState<Partial<NPC>>({
+    name: "",
+    description: "",
+    role: "",
+    status: "alive",
+    relationship: "",
+    attitude: "neutral",
+    symbol: "User",
+    faction: "",
+    lastSeen: "",
+    notes: "",
+  });
+  const [editingNPCIndex, setEditingNPCIndex] = useState<number | null>(null);
+  const [editNPC, setEditNPC] = useState<Partial<NPC>>({});
+  const [showNPCIconPicker, setShowNPCIconPicker] = useState(false);
+  const [showEditNPCIconPicker, setShowEditNPCIconPicker] = useState(false);
+
   // Starting Choices
   const [startingChoices, setStartingChoices] = useState<StartingChoice[]>([]);
   const [newStartingChoice, setNewStartingChoice] = useState<
@@ -2241,6 +2280,7 @@ function AdventureCreatorContent() {
     { id: "lore", label: "Notes", icon: "Scroll" },
     { id: "achievements", label: "Achievements", icon: "Trophy" },
     { id: "quests", label: "Quests", icon: "ClipboardList" },
+    { id: "npcs", label: "NPCs", icon: "UserCircle" },
     { id: "variables", label: "Variables", icon: "Variable" },
     { id: "tables", label: "Custom Tables", icon: "Dices" },
     { id: "mythic", label: "Advanced RPG Tools", icon: "Sparkles" },
@@ -2295,6 +2335,7 @@ function AdventureCreatorContent() {
       if (Array.isArray(saved.achievements))
         setAchievements(saved.achievements);
       if (Array.isArray(saved.quests)) setQuests(saved.quests);
+      if (Array.isArray(saved.npcs)) setNPCs(saved.npcs);
       if (Array.isArray(saved.customTables))
         setCustomTables(saved.customTables);
       if (Array.isArray(saved.variables)) setVariables(saved.variables);
@@ -2374,6 +2415,7 @@ function AdventureCreatorContent() {
       conditions,
       achievements,
       quests,
+      npcs,
       customTables,
       variables,
       levelingSettings,
@@ -2509,6 +2551,7 @@ function AdventureCreatorContent() {
     conditions,
     achievements,
     quests,
+    npcs,
     customTables,
     variables,
     levelingSettings,
@@ -3493,6 +3536,7 @@ ${description || ""}`;
       relationships,
       conditions: conditions.length > 0 ? conditions : undefined,
       quests,
+      npcs: npcs.length > 0 ? npcs : undefined,
       customTables,
       variables,
       earnedPointsFromQuests: [],
@@ -3600,6 +3644,7 @@ ${description || ""}`;
       setRelationships([]);
       setAchievements([]);
       setQuests([]);
+      setNPCs([]);
       setCustomTables([]);
       setSelectedPreset("custom");
       setPresets([DEFAULT_PRESET]);
@@ -3663,6 +3708,7 @@ ${description || ""}`;
         relationships,
         conditions: conditions.length > 0 ? conditions : undefined,
         quests,
+        npcs: npcs.length > 0 ? npcs : undefined,
         customTables,
         variables,
         earnedPointsFromQuests: [],
@@ -3813,6 +3859,7 @@ ${description || ""}`;
       relationships,
       conditions: conditions.length > 0 ? conditions : undefined,
       quests,
+      npcs: npcs.length > 0 ? npcs : undefined,
       customTables,
       variables,
       earnedPointsFromQuests: [],
@@ -5877,7 +5924,7 @@ ${description || ""}`;
                               </span>
                             )}
                             {choice.agmt_check && (
-                              <span className="px-2 py-0.5 bg-pink-900/30 text-pink-200 rounded text-xs">
+                              <span className="px-2 py-0.5 bg-purple-900/30 text-purple-200 rounded text-xs">
                                 <DynamicIcon
                                   name="Sparkles"
                                   className="w-3 h-3 inline mr-1"
@@ -6023,15 +6070,29 @@ ${description || ""}`;
                         setNewLore({
                           ...newLore,
                           type: (e.target.value || undefined) as
-                            | "lore"
-                            | "mechanics"
+                            | LoreType
                             | undefined,
                         })
                       }
                       className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                     >
-                      <option value="">Normal</option>
-                      <option value="mechanics">Mechanics</option>
+                      <option value="">📁 World Lore (default)</option>
+                      <option value="secret">🔒 Secret</option>
+                      <option value="dm_instructions">
+                        📋 GM Instructions
+                      </option>
+                      <option value="story_instructions">
+                        📝 Story Instructions
+                      </option>
+                      <option value="mechanics">⚙️ Mechanics</option>
+                      <option value="character_sheet">
+                        👤 Character Sheet
+                      </option>
+                      <option value="npc">🧑 NPC</option>
+                      <option value="item">🗡️ Item</option>
+                      <option value="location">📍 Location</option>
+                      <option value="faction">⚔️ Faction</option>
+                      <option value="event">📅 Event</option>
                     </select>
                   </div>
                 </div>
@@ -6884,15 +6945,35 @@ ${description || ""}`;
                                       setEditLore({
                                         ...editLore,
                                         type: (e.target.value || undefined) as
-                                          | "lore"
-                                          | "mechanics"
+                                          | LoreType
                                           | undefined,
                                       })
                                     }
                                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                                   >
-                                    <option value="">Normal</option>
-                                    <option value="mechanics">Mechanics</option>
+                                    <option value="">
+                                      📁 World Lore (default)
+                                    </option>
+                                    <option value="secret">🔒 Secret</option>
+                                    <option value="dm_instructions">
+                                      📋 GM Instructions
+                                    </option>
+                                    <option value="story_instructions">
+                                      📝 Story Instructions
+                                    </option>
+                                    <option value="mechanics">
+                                      ⚙️ Mechanics
+                                    </option>
+                                    <option value="character_sheet">
+                                      👤 Character Sheet
+                                    </option>
+                                    <option value="npc">🧑 NPC</option>
+                                    <option value="item">🗡️ Item</option>
+                                    <option value="location">
+                                      📍 Location
+                                    </option>
+                                    <option value="faction">⚔️ Faction</option>
+                                    <option value="event">📅 Event</option>
                                   </select>
                                 </div>
                               </div>
@@ -8777,6 +8858,576 @@ ${description || ""}`;
           </div>
         );
 
+      case "npcs":
+        return (
+          <div className="space-y-6">
+            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+              <p className="text-sm text-blue-300 flex items-start gap-2">
+                <DynamicIcon
+                  name="Lightbulb"
+                  className="w-5 h-5 text-blue-600 shrink-0 mt-0.5"
+                />
+                <span>
+                  <strong>Tip:</strong> NPCs (Non-Player Characters) are the
+                  characters players will interact with. Define key NPCs
+                  upfront, and the AI can introduce more during gameplay.
+                </span>
+              </p>
+            </div>
+
+            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+              <h3 className="text-lg font-bold mb-4 text-white">Add NPC</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                {/* Name and Icon */}
+                <div className="sm:col-span-2 flex gap-3">
+                  <div className="shrink-0 relative">
+                    <button
+                      onClick={() => setShowNPCIconPicker(!showNPCIconPicker)}
+                      className="w-14 h-14 rounded-lg bg-blue-800/50 border border-blue-600/50 flex items-center justify-center hover:bg-blue-700/50 transition-colors"
+                      title="Change icon"
+                    >
+                      <DynamicIcon
+                        name={newNPC.symbol || "User"}
+                        className="w-8 h-8 text-blue-300"
+                      />
+                    </button>
+                    {showNPCIconPicker && (
+                      <div className="absolute mt-2 z-50">
+                        <IconPicker
+                          value={newNPC.symbol || "User"}
+                          onChange={(icon) => {
+                            setNewNPC({ ...newNPC, symbol: icon });
+                            setShowNPCIconPicker(false);
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
+                      Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={newNPC.name}
+                      onChange={(e) =>
+                        setNewNPC({ ...newNPC, name: e.target.value })
+                      }
+                      placeholder="e.g., Captain Thorne"
+                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    />
+                  </div>
+                </div>
+
+                {/* Role */}
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Role
+                  </label>
+                  <input
+                    type="text"
+                    value={newNPC.role}
+                    onChange={(e) =>
+                      setNewNPC({ ...newNPC, role: e.target.value })
+                    }
+                    placeholder="e.g., Quest Giver, Antagonist, Mentor"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  />
+                </div>
+
+                {/* Status and Attitude */}
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={newNPC.status || "alive"}
+                    onChange={(e) =>
+                      setNewNPC({
+                        ...newNPC,
+                        status: e.target.value as NPCStatus,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  >
+                    <option value="alive">Alive</option>
+                    <option value="dead">Dead</option>
+                    <option value="missing">Missing</option>
+                    <option value="unknown">Unknown</option>
+                    <option value="departed">Departed</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Attitude
+                  </label>
+                  <select
+                    value={newNPC.attitude || "neutral"}
+                    onChange={(e) =>
+                      setNewNPC({
+                        ...newNPC,
+                        attitude: e.target.value as NPCAttitude,
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  >
+                    <option value="hostile">Hostile</option>
+                    <option value="unfriendly">Unfriendly</option>
+                    <option value="neutral">Neutral</option>
+                    <option value="friendly">Friendly</option>
+                    <option value="allied">Allied</option>
+                  </select>
+                </div>
+
+                {/* Relationship */}
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Relationship{" "}
+                    <span className="font-normal text-blue-300/60">
+                      (player&apos;s connection to them)
+                    </span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newNPC.relationship}
+                    onChange={(e) =>
+                      setNewNPC({ ...newNPC, relationship: e.target.value })
+                    }
+                    placeholder='e.g., "Trusted mentor", "Bitter rival", "Old friend"'
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  />
+                </div>
+
+                {/* Faction */}
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Faction
+                  </label>
+                  <input
+                    type="text"
+                    value={newNPC.faction}
+                    onChange={(e) =>
+                      setNewNPC({ ...newNPC, faction: e.target.value })
+                    }
+                    placeholder="Organization, guild, or group affiliation"
+                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={newNPC.description}
+                    onChange={(e) =>
+                      setNewNPC({ ...newNPC, description: e.target.value })
+                    }
+                    placeholder="Physical appearance, personality, motivations..."
+                    className="w-full h-24 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div className="sm:col-span-2">
+                  <label className="block text-sm font-semibold text-blue-200 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={newNPC.notes}
+                    onChange={(e) =>
+                      setNewNPC({ ...newNPC, notes: e.target.value })
+                    }
+                    placeholder="DM notes, secrets, plot hooks..."
+                    className="w-full h-20 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  if (!newNPC.name?.trim()) {
+                    addNotification("NPC name is required", "warning");
+                    return;
+                  }
+                  const npc: NPC = {
+                    id: crypto.randomUUID(),
+                    name: newNPC.name.trim(),
+                    description: newNPC.description || "",
+                    role: newNPC.role || "",
+                    status: newNPC.status || "alive",
+                    relationship: newNPC.relationship || "",
+                    attitude: newNPC.attitude || "neutral",
+                    faction: newNPC.faction,
+                    symbol: newNPC.symbol || "User",
+                    notes: newNPC.notes,
+                    createdAt: Date.now(),
+                  };
+                  setNPCs([...npcs, npc]);
+                  setNewNPC({
+                    name: "",
+                    description: "",
+                    role: "",
+                    status: "alive",
+                    relationship: "",
+                    attitude: "neutral",
+                    symbol: "User",
+                    faction: "",
+                    lastSeen: "",
+                    notes: "",
+                  });
+                  addNotification(`Added NPC: ${npc.name}`, "success");
+                }}
+                disabled={!newNPC.name?.trim()}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+              >
+                Add NPC
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <h3 className="text-lg font-bold text-white">
+                NPCs ({npcs.length})
+              </h3>
+              {npcs.length === 0 ? (
+                <p className="text-blue-300/60 text-sm">No NPCs added yet</p>
+              ) : (
+                npcs.map((npc, index) =>
+                  editingNPCIndex === index ? (
+                    // Edit mode
+                    <div
+                      key={npc.id}
+                      className="p-4 bg-blue-900/40 rounded-lg border-2 border-blue-600"
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                        {/* Name and Icon */}
+                        <div className="sm:col-span-2 flex gap-3">
+                          <div className="shrink-0 relative">
+                            <button
+                              onClick={() =>
+                                setShowEditNPCIconPicker(!showEditNPCIconPicker)
+                              }
+                              className="w-14 h-14 rounded-lg bg-blue-800/50 border border-blue-600/50 flex items-center justify-center hover:bg-blue-700/50 transition-colors"
+                              title="Change icon"
+                            >
+                              <DynamicIcon
+                                name={editNPC.symbol || "User"}
+                                className="w-8 h-8 text-blue-300"
+                              />
+                            </button>
+                            {showEditNPCIconPicker && (
+                              <div className="absolute mt-2 z-50">
+                                <IconPicker
+                                  value={editNPC.symbol || "User"}
+                                  onChange={(icon) => {
+                                    setEditNPC({ ...editNPC, symbol: icon });
+                                    setShowEditNPCIconPicker(false);
+                                  }}
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <label className="block text-xs font-semibold text-blue-300 mb-1">
+                              Name *
+                            </label>
+                            <input
+                              type="text"
+                              value={editNPC.name || ""}
+                              onChange={(e) =>
+                                setEditNPC({ ...editNPC, name: e.target.value })
+                              }
+                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Role */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Role
+                          </label>
+                          <input
+                            type="text"
+                            value={editNPC.role || ""}
+                            onChange={(e) =>
+                              setEditNPC({ ...editNPC, role: e.target.value })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                          />
+                        </div>
+
+                        {/* Status and Attitude */}
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Status
+                          </label>
+                          <select
+                            value={editNPC.status || "alive"}
+                            onChange={(e) =>
+                              setEditNPC({
+                                ...editNPC,
+                                status: e.target.value as NPCStatus,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                          >
+                            <option value="alive">Alive</option>
+                            <option value="dead">Dead</option>
+                            <option value="missing">Missing</option>
+                            <option value="unknown">Unknown</option>
+                            <option value="departed">Departed</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Attitude
+                          </label>
+                          <select
+                            value={editNPC.attitude || "neutral"}
+                            onChange={(e) =>
+                              setEditNPC({
+                                ...editNPC,
+                                attitude: e.target.value as NPCAttitude,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                          >
+                            <option value="hostile">Hostile</option>
+                            <option value="unfriendly">Unfriendly</option>
+                            <option value="neutral">Neutral</option>
+                            <option value="friendly">Friendly</option>
+                            <option value="allied">Allied</option>
+                          </select>
+                        </div>
+
+                        {/* Relationship */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Relationship
+                          </label>
+                          <input
+                            type="text"
+                            value={editNPC.relationship || ""}
+                            onChange={(e) =>
+                              setEditNPC({
+                                ...editNPC,
+                                relationship: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                          />
+                        </div>
+
+                        {/* Faction */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Faction
+                          </label>
+                          <input
+                            type="text"
+                            value={editNPC.faction || ""}
+                            onChange={(e) =>
+                              setEditNPC({
+                                ...editNPC,
+                                faction: e.target.value,
+                              })
+                            }
+                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                          />
+                        </div>
+
+                        {/* Description */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Description
+                          </label>
+                          <textarea
+                            value={editNPC.description || ""}
+                            onChange={(e) =>
+                              setEditNPC({
+                                ...editNPC,
+                                description: e.target.value,
+                              })
+                            }
+                            className="w-full h-24 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white resize-none"
+                          />
+                        </div>
+
+                        {/* Notes */}
+                        <div className="sm:col-span-2">
+                          <label className="block text-xs font-semibold text-blue-300 mb-1">
+                            Notes
+                          </label>
+                          <textarea
+                            value={editNPC.notes || ""}
+                            onChange={(e) =>
+                              setEditNPC({
+                                ...editNPC,
+                                notes: e.target.value,
+                              })
+                            }
+                            className="w-full h-20 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white resize-none"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            if (!editNPC.name?.trim()) {
+                              addNotification(
+                                "NPC name is required",
+                                "warning"
+                              );
+                              return;
+                            }
+                            const updated = npcs.map((n, i) =>
+                              i === index
+                                ? {
+                                    ...n,
+                                    name: editNPC.name?.trim() || n.name,
+                                    description:
+                                      editNPC.description ?? n.description,
+                                    role: editNPC.role ?? n.role,
+                                    status: editNPC.status ?? n.status,
+                                    relationship:
+                                      editNPC.relationship ?? n.relationship,
+                                    attitude: editNPC.attitude ?? n.attitude,
+                                    faction: editNPC.faction,
+                                    symbol: editNPC.symbol ?? n.symbol,
+                                    notes: editNPC.notes,
+                                  }
+                                : n
+                            );
+                            setNPCs(updated);
+                            setEditingNPCIndex(null);
+                            setEditNPC({});
+                            setShowEditNPCIconPicker(false);
+                            addNotification("NPC updated", "success");
+                          }}
+                          disabled={!editNPC.name?.trim()}
+                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded-lg transition-colors"
+                        >
+                          Save Changes
+                        </button>
+                        <button
+                          onClick={() => {
+                            setEditingNPCIndex(null);
+                            setEditNPC({});
+                            setShowEditNPCIconPicker(false);
+                          }}
+                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    // View mode
+                    <div
+                      key={npc.id}
+                      className="flex items-start gap-3 p-4 bg-blue-900/20 rounded-lg border border-blue-700/40"
+                    >
+                      <div className="shrink-0">
+                        <div className="w-12 h-12 rounded-lg bg-blue-800/30 border border-blue-700/30 flex items-center justify-center">
+                          <DynamicIcon
+                            name={npc.symbol || "User"}
+                            className="w-6 h-6 text-blue-400"
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className="font-bold text-white">
+                            {npc.name}
+                          </span>
+                          <span
+                            className={`text-xs px-1.5 py-0.5 rounded ${
+                              npc.attitude === "hostile"
+                                ? "text-red-400 bg-red-500/20"
+                                : npc.attitude === "unfriendly"
+                                ? "text-orange-400 bg-orange-500/20"
+                                : npc.attitude === "neutral"
+                                ? "text-gray-400 bg-gray-500/20"
+                                : npc.attitude === "friendly"
+                                ? "text-green-400 bg-green-500/20"
+                                : "text-blue-400 bg-blue-500/20"
+                            }`}
+                          >
+                            {npc.attitude}
+                          </span>
+                          {npc.status !== "alive" && (
+                            <span
+                              className={`text-xs px-1.5 py-0.5 rounded ${
+                                npc.status === "dead"
+                                  ? "text-gray-400 bg-gray-500/20"
+                                  : npc.status === "missing"
+                                  ? "text-yellow-400 bg-yellow-500/20"
+                                  : "text-purple-400 bg-purple-500/20"
+                              }`}
+                            >
+                              {npc.status}
+                            </span>
+                          )}
+                        </div>
+                        {npc.role && (
+                          <p className="text-xs text-blue-300/60 mb-1">
+                            {npc.role}
+                          </p>
+                        )}
+                        {npc.relationship && (
+                          <p className="text-sm text-blue-200/80 italic">
+                            &quot;{npc.relationship}&quot;
+                          </p>
+                        )}
+                        {npc.faction && (
+                          <p className="text-xs text-indigo-300/60 mt-1">
+                            <DynamicIcon
+                              name="Flag"
+                              className="w-3 h-3 inline mr-1"
+                            />
+                            {npc.faction}
+                          </p>
+                        )}
+                        {npc.description && (
+                          <p className="text-sm text-blue-200/60 mt-2 line-clamp-2">
+                            {npc.description}
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 shrink-0">
+                        <button
+                          onClick={() => {
+                            setEditingNPCIndex(index);
+                            setEditNPC({ ...npc });
+                          }}
+                          className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
+                          title="Edit"
+                        >
+                          <DynamicIcon name="Edit" className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => {
+                            const updated = npcs.filter((_, i) => i !== index);
+                            setNPCs(updated);
+                            addNotification("NPC removed", "success");
+                          }}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                          title="Remove"
+                        >
+                          <DynamicIcon name="Trash2" className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )
+                )
+              )}
+            </div>
+          </div>
+        );
+
       case "variables":
         return (
           <div className="space-y-6">
@@ -9068,6 +9719,12 @@ ${description || ""}`;
                     </span>
                   </div>
                   <div>
+                    <span className="text-blue-300/60">NPCs:</span>
+                    <span className="ml-2 font-semibold text-white">
+                      {npcs.length}
+                    </span>
+                  </div>
+                  <div>
                     <span className="text-blue-300/60">Tags:</span>
                     <span className="ml-2 font-semibold text-white">
                       {tags.length}
@@ -9284,6 +9941,7 @@ ${description || ""}`;
                               lore,
                               relationships,
                               quests,
+                              npcs: npcs.length > 0 ? npcs : undefined,
                               customTables,
                               variables,
                               earnedPointsFromQuests: [],
@@ -9975,6 +10633,7 @@ ${description || ""}`;
           lore,
           achievements,
           quests,
+          npcs,
           relationships,
           variables,
           presets,

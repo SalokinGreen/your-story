@@ -27,6 +27,7 @@ import {
   AbilityGrade,
   NodeEffects,
   CharacterSheetTemplate,
+  NPC,
 } from "@/app/misc/structs";
 import { getCumulativeXPForLevel } from "@/app/misc/leveling";
 import {
@@ -66,6 +67,7 @@ export interface CreatorChanges {
   presets?: Preset[];
   skillTrees?: SkillTree[];
   customTables?: CustomTable[];
+  npcs?: NPC[];
   upgradeSettings?: Partial<UpgradeSettings>;
   levelingSettings?: Partial<LevelingSettings>;
   characterSheetTemplate?: CharacterSheetTemplate;
@@ -1364,6 +1366,145 @@ export function executeCreatorTool(
         break;
       }
 
+      // ============================================
+      // NPCs
+      // ============================================
+      case "add_npcs": {
+        const npcsToAdd = args.npcs as Array<{
+          name: string;
+          description?: string;
+          role?: string;
+          status?: "alive" | "dead" | "missing" | "unknown" | "departed";
+          relationship?: string;
+          attitude?:
+            | "hostile"
+            | "unfriendly"
+            | "neutral"
+            | "friendly"
+            | "allied";
+          faction?: string;
+          lastSeen?: string;
+          symbol?: string;
+          notes?: string;
+        }>;
+        const existingNPCs = [...(currentState.storyData.npcs || [])];
+
+        for (const npc of npcsToAdd) {
+          // Skip if NPC with same name exists
+          if (
+            existingNPCs.some(
+              (n) => n.name.toLowerCase() === npc.name.toLowerCase()
+            )
+          ) {
+            changesList.push(`NPC "${npc.name}" already exists, skipped`);
+            continue;
+          }
+
+          const newNPC: NPC = {
+            id: crypto.randomUUID(),
+            name: npc.name,
+            description: npc.description || "",
+            role: npc.role || "",
+            status: npc.status || "alive",
+            relationship: npc.relationship || "",
+            attitude: npc.attitude || "neutral",
+            faction: npc.faction,
+            lastSeen: npc.lastSeen,
+            symbol: npc.symbol,
+            notes: npc.notes,
+            createdAt: Date.now(),
+          };
+
+          existingNPCs.push(newNPC);
+          changesList.push(`Added NPC: ${npc.name}`);
+        }
+
+        changes.npcs = existingNPCs;
+        break;
+      }
+
+      case "modify_npcs": {
+        const npcsToModify = args.npcs as Array<{
+          name: string;
+          new_name?: string;
+          description?: string;
+          role?: string;
+          status?: "alive" | "dead" | "missing" | "unknown" | "departed";
+          relationship?: string;
+          attitude?:
+            | "hostile"
+            | "unfriendly"
+            | "neutral"
+            | "friendly"
+            | "allied";
+          faction?: string;
+          lastSeen?: string;
+          symbol?: string;
+          notes?: string;
+        }>;
+        const existingNPCs = [...(currentState.storyData.npcs || [])];
+
+        for (const npcUpdate of npcsToModify) {
+          const idx = existingNPCs.findIndex(
+            (n) => n.name.toLowerCase() === npcUpdate.name.toLowerCase()
+          );
+
+          if (idx === -1) {
+            changesList.push(`NPC "${npcUpdate.name}" not found, skipped`);
+            continue;
+          }
+
+          const updated: NPC = { ...existingNPCs[idx] };
+
+          if (npcUpdate.new_name !== undefined)
+            updated.name = npcUpdate.new_name;
+          if (npcUpdate.description !== undefined)
+            updated.description = npcUpdate.description;
+          if (npcUpdate.role !== undefined) updated.role = npcUpdate.role;
+          if (npcUpdate.status !== undefined) updated.status = npcUpdate.status;
+          if (npcUpdate.relationship !== undefined)
+            updated.relationship = npcUpdate.relationship;
+          if (npcUpdate.attitude !== undefined)
+            updated.attitude = npcUpdate.attitude;
+          if (npcUpdate.faction !== undefined)
+            updated.faction = npcUpdate.faction;
+          if (npcUpdate.lastSeen !== undefined)
+            updated.lastSeen = npcUpdate.lastSeen;
+          if (npcUpdate.symbol !== undefined) updated.symbol = npcUpdate.symbol;
+          if (npcUpdate.notes !== undefined) updated.notes = npcUpdate.notes;
+
+          existingNPCs[idx] = updated;
+          changesList.push(`Modified NPC: ${npcUpdate.name}`);
+        }
+
+        changes.npcs = existingNPCs;
+        break;
+      }
+
+      case "remove_npcs": {
+        const namesToRemove = args.names as string[];
+        const existingNPCs = [...(currentState.storyData.npcs || [])];
+        const removed: string[] = [];
+
+        for (const name of namesToRemove) {
+          const idx = existingNPCs.findIndex(
+            (n) => n.name.toLowerCase() === name.toLowerCase()
+          );
+          if (idx !== -1) {
+            removed.push(existingNPCs[idx].name);
+            existingNPCs.splice(idx, 1);
+          } else {
+            changesList.push(`NPC "${name}" not found, skipped`);
+          }
+        }
+
+        if (removed.length > 0) {
+          changesList.push(`Removed NPCs: ${removed.join(", ")}`);
+        }
+        changes.npcs = existingNPCs;
+        break;
+      }
+
       default:
         return {
           result: {
@@ -1446,6 +1587,9 @@ export function executeCreatorTools(
           }),
           ...(changes.customTables !== undefined && {
             customTables: changes.customTables,
+          }),
+          ...(changes.npcs !== undefined && {
+            npcs: changes.npcs,
           }),
           ...(changes.story_name !== undefined && {
             story_name: changes.story_name,

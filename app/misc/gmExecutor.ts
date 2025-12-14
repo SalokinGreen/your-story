@@ -757,284 +757,367 @@ export async function executeGMTools(
     let params: unknown;
     try {
       params = JSON.parse(call.function.arguments);
-    } catch {
+    } catch (parseError) {
       console.error(
-        `Failed to parse GM tool arguments: ${call.function.arguments}`
+        `[GM Tool Error] Failed to parse arguments for tool "${call.function.name}"`,
+        {
+          toolCallId: call.id,
+          toolName: call.function.name,
+          rawArguments: call.function.arguments,
+          error:
+            parseError instanceof Error
+              ? parseError.message
+              : String(parseError),
+        }
       );
       continue;
     }
 
     let result: GMToolResult;
 
-    switch (call.function.name) {
-      case "skill_check":
-        result = executeSkillCheck(
-          call.id,
-          params as SkillCheckParams,
-          modified
-        );
-        break;
-      case "challenge_check":
-        result = executeChallengeCheck(
-          call.id,
-          params as ChallengeCheckParams,
-          modified
-        );
-        break;
-      case "start_challenge":
-        result = executeStartChallenge(
-          call.id,
-          params as StartChallengeParams,
-          modified
-        );
-        break;
-      case "opposed_check":
-        result = executeOpposedCheck(
-          call.id,
-          params as OpposedCheckParams,
-          modified
-        );
-        break;
-      case "roll_dice":
-        result = executeRollDice(call.id, params as RollDiceParams);
-        break;
-      case "calculate":
-        result = executeCalculate(call.id, params as CalculateParams);
-        break;
-      case "take_rest":
-        result = executeTakeRest(call.id, params as TakeRestParams, modified);
-        break;
-      case "formula_roll":
-        result = executeFormulaRoll(
-          call.id,
-          params as FormulaRollParams,
-          modified
-        );
-        break;
-      case "opposed_formula":
-        result = executeOpposedFormula(
-          call.id,
-          params as OpposedFormulaParams,
-          modified
-        );
-        break;
-      case "formula_challenge_check":
-        result = executeFormulaChallengeCheck(
-          call.id,
-          params as FormulaChallengeCheckParams,
-          modified
-        );
-        break;
-      case "fate_question":
-        result = executeFateQuestion(
-          call.id,
-          params as FateQuestionParams,
-          modified
-        );
-        break;
-      case "roll_table":
-        result = executeRollTable(call.id, params as RollTableParams, modified);
-        break;
-      case "read_notes":
-        result = executeReadNotes(call.id, params as ReadNotesParams, modified);
-        break;
-      case "search_memory":
-        result = executeSearchMemory(
-          call.id,
-          params as SearchMemoryParams,
-          modified
-        );
-        break;
-      case "request_continuation":
-        result = executeRequestContinuation(
-          call.id,
-          params as RequestContinuationParams
-        );
-        break;
-      case "ask_player":
-        result = executeAskPlayer(call.id, params as AskPlayerParams);
-        break;
-      case "end_gm_thinking":
-        result = executeEndGmThinking(call.id, params as RespondToPlayerParams);
-        break;
-      // Combat tools
-      case "start_combat":
-        result = executeStartCombat(
-          call.id,
-          params as StartCombatParams,
-          modified
-        );
-        break;
-      case "add_combatant":
-        result = executeAddCombatant(
-          call.id,
-          params as AddCombatantParams,
-          modified
-        );
-        break;
-      case "add_multiple_combatants":
-        result = executeAddMultipleCombatants(
-          call.id,
-          params as AddMultipleCombatantsParams,
-          modified
-        );
-        break;
-      case "remove_combatant":
-        result = executeRemoveCombatant(
-          call.id,
-          params as RemoveCombatantParams,
-          modified
-        );
-        break;
-      case "update_combatant_stat":
-        result = executeUpdateCombatantStat(
-          call.id,
-          params as UpdateCombatantStatParams,
-          modified
-        );
-        break;
-      case "add_combatant_condition":
-        result = executeAddCombatantCondition(
-          call.id,
-          params as AddCombatantConditionParams,
-          modified
-        );
-        break;
-      case "remove_combatant_condition":
-        result = executeRemoveCombatantCondition(
-          call.id,
-          params as RemoveCombatantConditionParams,
-          modified
-        );
-        break;
-      case "npc_roll":
-        result = executeNPCRoll(call.id, params as NPCRollParams, modified);
-        break;
-      case "advance_turn":
-        result = executeAdvanceTurn(
-          call.id,
-          params as AdvanceTurnParams,
-          modified
-        );
-        break;
-      case "end_combat":
-        result = executeEndCombat(call.id, params as EndCombatParams, modified);
-        break;
-      // Timer tools
-      case "create_timer":
-        result = executeCreateTimer(
-          call.id,
-          params as CreateTimerParams,
-          modified
-        );
-        break;
-      case "advance_timer":
-        result = executeAdvanceTimer(
-          call.id,
-          params as AdvanceTimerParams,
-          modified
-        );
-        break;
-      case "pause_timer":
-        result = executePauseTimer(
-          call.id,
-          params as PauseTimerParams,
-          modified
-        );
-        break;
-      case "resume_timer":
-        result = executeResumeTimer(
-          call.id,
-          params as ResumeTimerParams,
-          modified
-        );
-        break;
-      case "cancel_timer":
-        result = executeCancelTimer(
-          call.id,
-          params as CancelTimerParams,
-          modified
-        );
-        break;
-      case "trigger_timer":
-        result = executeTriggerTimer(
-          call.id,
-          params as TriggerTimerParams,
-          modified
-        );
-        break;
-      // Group check
-      case "group_check":
-        result = executeGroupCheck(
-          call.id,
-          params as GroupCheckParams,
-          modified
-        );
-        break;
-      // NPC management tools
-      case "add_npc":
-        result = executeAddNPC(call.id, params as AddNPCParams, modified);
-        break;
-      case "update_npc":
-        result = executeUpdateNPC(call.id, params as UpdateNPCParams, modified);
-        break;
-      case "remove_npc":
-        result = executeRemoveNPC(call.id, params as RemoveNPCParams, modified);
-        break;
-      case "npc_reaction":
-        result = executeNPCReaction(
-          call.id,
-          params as NPCReactionParams,
-          modified
-        );
-        break;
-      default:
-        // Delegate to state tool executor for tools like modify_stat, add_item, etc.
-        const stateToolCalls = [
-          {
-            id: call.id,
-            type: "function" as const,
-            function: {
-              name: call.function.name,
-              arguments: params as Record<string, unknown>,
+    try {
+      switch (call.function.name) {
+        case "skill_check":
+          result = executeSkillCheck(
+            call.id,
+            params as SkillCheckParams,
+            modified
+          );
+          break;
+        case "challenge_check":
+          result = executeChallengeCheck(
+            call.id,
+            params as ChallengeCheckParams,
+            modified
+          );
+          break;
+        case "start_challenge":
+          result = executeStartChallenge(
+            call.id,
+            params as StartChallengeParams,
+            modified
+          );
+          break;
+        case "opposed_check":
+          result = executeOpposedCheck(
+            call.id,
+            params as OpposedCheckParams,
+            modified
+          );
+          break;
+        case "roll_dice":
+          result = executeRollDice(call.id, params as RollDiceParams);
+          break;
+        case "calculate":
+          result = executeCalculate(call.id, params as CalculateParams);
+          break;
+        case "take_rest":
+          result = executeTakeRest(call.id, params as TakeRestParams, modified);
+          break;
+        case "formula_roll":
+          result = executeFormulaRoll(
+            call.id,
+            params as FormulaRollParams,
+            modified
+          );
+          break;
+        case "opposed_formula":
+          result = executeOpposedFormula(
+            call.id,
+            params as OpposedFormulaParams,
+            modified
+          );
+          break;
+        case "formula_challenge_check":
+          result = executeFormulaChallengeCheck(
+            call.id,
+            params as FormulaChallengeCheckParams,
+            modified
+          );
+          break;
+        case "fate_question":
+          result = executeFateQuestion(
+            call.id,
+            params as FateQuestionParams,
+            modified
+          );
+          break;
+        case "roll_table":
+          result = executeRollTable(
+            call.id,
+            params as RollTableParams,
+            modified
+          );
+          break;
+        case "read_notes":
+          result = executeReadNotes(
+            call.id,
+            params as ReadNotesParams,
+            modified
+          );
+          break;
+        case "search_memory":
+          result = executeSearchMemory(
+            call.id,
+            params as SearchMemoryParams,
+            modified
+          );
+          break;
+        case "request_continuation":
+          result = executeRequestContinuation(
+            call.id,
+            params as RequestContinuationParams
+          );
+          break;
+        case "ask_player":
+          result = executeAskPlayer(call.id, params as AskPlayerParams);
+          break;
+        case "end_gm_thinking":
+          result = executeEndGmThinking(
+            call.id,
+            params as RespondToPlayerParams
+          );
+          break;
+        // Combat tools
+        case "start_combat":
+          result = executeStartCombat(
+            call.id,
+            params as StartCombatParams,
+            modified
+          );
+          break;
+        case "add_combatant":
+          result = executeAddCombatant(
+            call.id,
+            params as AddCombatantParams,
+            modified
+          );
+          break;
+        case "add_multiple_combatants":
+          result = executeAddMultipleCombatants(
+            call.id,
+            params as AddMultipleCombatantsParams,
+            modified
+          );
+          break;
+        case "remove_combatant":
+          result = executeRemoveCombatant(
+            call.id,
+            params as RemoveCombatantParams,
+            modified
+          );
+          break;
+        case "update_combatant_stat":
+          result = executeUpdateCombatantStat(
+            call.id,
+            params as UpdateCombatantStatParams,
+            modified
+          );
+          break;
+        case "add_combatant_condition":
+          result = executeAddCombatantCondition(
+            call.id,
+            params as AddCombatantConditionParams,
+            modified
+          );
+          break;
+        case "remove_combatant_condition":
+          result = executeRemoveCombatantCondition(
+            call.id,
+            params as RemoveCombatantConditionParams,
+            modified
+          );
+          break;
+        case "npc_roll":
+          result = executeNPCRoll(call.id, params as NPCRollParams, modified);
+          break;
+        case "advance_turn":
+          result = executeAdvanceTurn(
+            call.id,
+            params as AdvanceTurnParams,
+            modified
+          );
+          break;
+        case "end_combat":
+          result = executeEndCombat(
+            call.id,
+            params as EndCombatParams,
+            modified
+          );
+          break;
+        // Timer tools
+        case "create_timer":
+          result = executeCreateTimer(
+            call.id,
+            params as CreateTimerParams,
+            modified
+          );
+          break;
+        case "advance_timer":
+          result = executeAdvanceTimer(
+            call.id,
+            params as AdvanceTimerParams,
+            modified
+          );
+          break;
+        case "pause_timer":
+          result = executePauseTimer(
+            call.id,
+            params as PauseTimerParams,
+            modified
+          );
+          break;
+        case "resume_timer":
+          result = executeResumeTimer(
+            call.id,
+            params as ResumeTimerParams,
+            modified
+          );
+          break;
+        case "cancel_timer":
+          result = executeCancelTimer(
+            call.id,
+            params as CancelTimerParams,
+            modified
+          );
+          break;
+        case "trigger_timer":
+          result = executeTriggerTimer(
+            call.id,
+            params as TriggerTimerParams,
+            modified
+          );
+          break;
+        // Group check
+        case "group_check":
+          result = executeGroupCheck(
+            call.id,
+            params as GroupCheckParams,
+            modified
+          );
+          break;
+        // NPC management tools
+        case "add_npc":
+          result = executeAddNPC(call.id, params as AddNPCParams, modified);
+          break;
+        case "update_npc":
+          result = executeUpdateNPC(
+            call.id,
+            params as UpdateNPCParams,
+            modified
+          );
+          break;
+        case "remove_npc":
+          result = executeRemoveNPC(
+            call.id,
+            params as RemoveNPCParams,
+            modified
+          );
+          break;
+        case "npc_reaction":
+          result = executeNPCReaction(
+            call.id,
+            params as NPCReactionParams,
+            modified
+          );
+          break;
+        default:
+          // Delegate to state tool executor for tools like modify_stat, add_item, etc.
+          const stateToolCalls = [
+            {
+              id: call.id,
+              type: "function" as const,
+              function: {
+                name: call.function.name,
+                arguments: params as Record<string, unknown>,
+              },
             },
-          },
-        ];
-        const stateResult = executeStateTools(stateToolCalls, modified);
+          ];
+          const stateResult = executeStateTools(stateToolCalls, modified);
 
-        if (stateResult.responses.length > 0) {
-          const response = stateResult.responses[0];
-          // Convert state tool response to GM tool result format
-          result = {
-            toolName: call.function.name,
-            toolCallId: call.id,
-            success: response.success === true,
-            result: {
-              type: "state_change" as const,
-              message: response.message,
-              command: response.command,
-            },
-            contextForStory:
-              response.success === true
-                ? `[State: ${response.message}]`
-                : `[State Failed: ${response.message}]`,
-          };
+          if (stateResult.responses.length > 0) {
+            const response = stateResult.responses[0];
+            // Convert state tool response to GM tool result format
+            result = {
+              toolName: call.function.name,
+              toolCallId: call.id,
+              success: response.success === true,
+              result: {
+                type: "state_change" as const,
+                message: response.message,
+                command: response.command,
+              },
+              contextForStory:
+                response.success === true
+                  ? `[State: ${response.message}]`
+                  : `[State Failed: ${response.message}]`,
+            };
 
-          // Add state changes to context
-          if (stateResult.stateChanges.length > 0) {
-            contextParts.push(
-              ...stateResult.stateChanges.map((sc) => `[State Change: ${sc}]`)
+            // Add state changes to context
+            if (stateResult.stateChanges.length > 0) {
+              contextParts.push(
+                ...stateResult.stateChanges.map((sc) => `[State Change: ${sc}]`)
+              );
+            }
+          } else {
+            console.warn(
+              `Unknown tool (not GM or state): ${call.function.name}`
             );
+            continue;
           }
-        } else {
-          console.warn(`Unknown tool (not GM or state): ${call.function.name}`);
-          continue;
+      }
+    } catch (executionError) {
+      // Detailed error logging for failed GM tool execution
+      const errorMessage =
+        executionError instanceof Error
+          ? executionError.message
+          : String(executionError);
+      const errorStack =
+        executionError instanceof Error ? executionError.stack : undefined;
+
+      console.error(
+        `[GM Tool Execution Error] Tool "${call.function.name}" failed`,
+        {
+          toolCallId: call.id,
+          toolName: call.function.name,
+          params: params,
+          error: errorMessage,
+          stack: errorStack,
         }
+      );
+
+      // Create an error result that includes debugging info in the context
+      result = {
+        toolName: call.function.name,
+        toolCallId: call.id,
+        success: false,
+        result: {
+          type: "state_change" as const,
+          message: `Tool execution failed: ${errorMessage}`,
+          command: call.function.name,
+        },
+        contextForStory: `[ERROR: ${
+          call.function.name
+        } failed - ${errorMessage}]\n[Debug: params=${JSON.stringify(params)}]`,
+      };
     }
 
     results.push(result);
     if (result.contextForStory) {
       contextParts.push(result.contextForStory);
+    }
+
+    // Log successful tool executions with failure status for debugging
+    if (!result.success) {
+      console.warn(
+        `[GM Tool Failed] Tool "${call.function.name}" returned failure`,
+        {
+          toolCallId: call.id,
+          toolName: call.function.name,
+          params: params,
+          contextForStory: result.contextForStory,
+        }
+      );
     }
   }
 
@@ -1114,6 +1197,23 @@ export async function executeGMTools(
     if (timerUpdates.length > 0) {
       contextParts.push(...timerUpdates);
     }
+  }
+
+  // Log execution summary for debugging
+  const failedResults = results.filter((r) => !r.success);
+  if (failedResults.length > 0) {
+    console.warn(
+      `[GM Execution Summary] ${failedResults.length}/${results.length} tools failed`,
+      {
+        totalTools: results.length,
+        failedCount: failedResults.length,
+        failedTools: failedResults.map((r) => ({
+          name: r.toolName,
+          id: r.toolCallId,
+          context: r.contextForStory,
+        })),
+      }
+    );
   }
 
   return {

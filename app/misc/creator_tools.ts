@@ -1507,6 +1507,130 @@ export const update_preset_character_sheet: ToolDefinition = {
 };
 
 // ============================================
+// NPC TOOLS
+// ============================================
+
+export const add_npcs: ToolDefinition = {
+  name: "add_npcs",
+  description:
+    "Add NPCs (non-player characters) to the adventure. NPCs are characters the player can encounter and interact with.",
+  parameters: {
+    type: "object",
+    properties: {
+      npcs: {
+        type: "array",
+        description: "Array of NPCs to add",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "NPC's name" },
+            description: {
+              type: "string",
+              description: "Who they are, appearance, personality",
+            },
+            role: {
+              type: "string",
+              description:
+                "Their role in the story (e.g., 'Village Elder', 'Antagonist', 'Quest Giver', 'Love Interest')",
+            },
+            status: {
+              type: "string",
+              enum: ["alive", "dead", "missing", "unknown", "departed"],
+              description: "Current status of the NPC",
+              default: "alive",
+            },
+            relationship: {
+              type: "string",
+              description:
+                "Custom relationship text (e.g., 'Trusted mentor', 'Bitter rival', 'Old friend')",
+            },
+            attitude: {
+              type: "string",
+              enum: ["hostile", "unfriendly", "neutral", "friendly", "allied"],
+              description: "NPC's attitude toward the player",
+              default: "neutral",
+            },
+            faction: {
+              type: "string",
+              description: "What group/faction they belong to",
+            },
+            lastSeen: {
+              type: "string",
+              description: "Where/when they were last encountered",
+            },
+            symbol: {
+              type: "string",
+              description: "Lucide icon name (e.g., 'User', 'Crown', 'Sword')",
+            },
+            notes: {
+              type: "string",
+              description: "GM/player notes about this NPC",
+            },
+          },
+          required: ["name", "description", "role"],
+        },
+      },
+    },
+    required: ["npcs"],
+  },
+};
+
+export const modify_npcs: ToolDefinition = {
+  name: "modify_npcs",
+  description:
+    "Modify existing NPCs by name. Only specified fields will be updated.",
+  parameters: {
+    type: "object",
+    properties: {
+      npcs: {
+        type: "array",
+        description: "Array of NPC modifications",
+        items: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Current NPC name to find" },
+            new_name: { type: "string", description: "New name (if changing)" },
+            description: { type: "string" },
+            role: { type: "string" },
+            status: {
+              type: "string",
+              enum: ["alive", "dead", "missing", "unknown", "departed"],
+            },
+            relationship: { type: "string" },
+            attitude: {
+              type: "string",
+              enum: ["hostile", "unfriendly", "neutral", "friendly", "allied"],
+            },
+            faction: { type: "string" },
+            lastSeen: { type: "string" },
+            symbol: { type: "string" },
+            notes: { type: "string" },
+          },
+          required: ["name"],
+        },
+      },
+    },
+    required: ["npcs"],
+  },
+};
+
+export const remove_npcs: ToolDefinition = {
+  name: "remove_npcs",
+  description: "Remove NPCs by name.",
+  parameters: {
+    type: "object",
+    properties: {
+      names: {
+        type: "array",
+        description: "NPC names to remove",
+        items: { type: "string" },
+      },
+    },
+    required: ["names"],
+  },
+};
+
+// ============================================
 // ALL TOOLS EXPORT
 // ============================================
 
@@ -1562,6 +1686,10 @@ export const CREATOR_TOOLS: ToolDefinition[] = [
   update_character_sheet,
   update_character_sheet_template,
   update_preset_character_sheet,
+  // NPCs
+  add_npcs,
+  modify_npcs,
+  remove_npcs,
 ];
 
 /**
