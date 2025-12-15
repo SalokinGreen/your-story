@@ -13,8 +13,8 @@ const mockLogger = {
   warn: (msg: string, data?: any) => {},
 };
 
-// Simulate command processing for lore commands
-function processLoreCommands(
+// Simulate command processing for note commands
+function processNoteCommands(
   commands: string[],
   storyData: StoryData,
   addNotification: typeof mockAddNotification,
@@ -23,21 +23,21 @@ function processLoreCommands(
   for (const command of commands) {
     const trimmed = command.trim();
 
-    // /create_lore: title | content | on_triggers | off_triggers
-    const createLoreMatch = trimmed.match(
-      /^\/create_lore:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+    // /create_note: title | content | on_triggers | off_triggers
+    const createNoteMatch = trimmed.match(
+      /^\/create_note:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
     );
-    if (createLoreMatch) {
-      const loreTitle = createLoreMatch[1].trim();
-      const loreContent = createLoreMatch[2].trim();
-      const onTriggers = createLoreMatch[3].trim();
-      const offTriggers = createLoreMatch[4].trim();
+    if (createNoteMatch) {
+      const noteTitle = createNoteMatch[1].trim();
+      const noteContent = createNoteMatch[2].trim();
+      const onTriggers = createNoteMatch[3].trim();
+      const offTriggers = createNoteMatch[4].trim();
 
       if (!storyData.lore) storyData.lore = [];
 
-      const existingLore = storyData.lore.find((l) => l.title === loreTitle);
-      if (existingLore) {
-        addNotification(`⚠️ Lore "${loreTitle}" already exists`, "warning");
+      const existingNote = storyData.lore.find((l) => l.title === noteTitle);
+      if (existingNote) {
+        addNotification(`⚠️ Note "${noteTitle}" already exists`, "warning");
       } else {
         const onTriggerArray = onTriggers
           ? onTriggers
@@ -53,8 +53,8 @@ function processLoreCommands(
           : [];
 
         storyData.lore.push({
-          title: loreTitle,
-          content: loreContent,
+          title: noteTitle,
+          content: noteContent,
           relatedCharacters: [],
           relatedLocations: [],
           secrtet: false,
@@ -63,8 +63,8 @@ function processLoreCommands(
           off_triggers: offTriggerArray,
           on: onTriggerArray.length === 0,
         });
-        logger.action("New lore created via command", { title: loreTitle });
-        addNotification(`✨ New lore entry created: ${loreTitle}`, "success");
+        logger.action("New note created via command", { title: noteTitle });
+        addNotification(`✨ New note entry created: ${noteTitle}`, "success");
       }
       continue;
     }
@@ -222,13 +222,13 @@ describe("Lore Manipulation Commands", () => {
     } as StoryData;
   });
 
-  describe("/create_lore command", () => {
-    it("should create a new lore entry with triggers", () => {
+  describe("/create_note command", () => {
+    it("should create a new note entry with triggers", () => {
       const commands = [
-        "/create_lore: Dragon Lore | Dragons are ancient creatures | dragon,ancient | slain,extinct",
+        "/create_note: Dragon Lore | Dragons are ancient creatures | dragon,ancient | slain,extinct",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       expect(storyData.lore).toHaveLength(2);
       expect(storyData.lore[1]).toMatchObject({
@@ -240,17 +240,17 @@ describe("Lore Manipulation Commands", () => {
       });
 
       expect(mockNotifications).toContainEqual({
-        message: "✨ New lore entry created: Dragon Lore",
+        message: "✨ New note entry created: Dragon Lore",
         type: "success",
       });
     });
 
-    it("should create a new lore entry without triggers (visible from start)", () => {
+    it("should create a new note entry without triggers (visible from start)", () => {
       const commands = [
-        "/create_lore: Basic History | The kingdom was founded 500 years ago | | ",
+        "/create_note: Basic History | The kingdom was founded 500 years ago | | ",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       expect(storyData.lore).toHaveLength(2);
       expect(storyData.lore[1]).toMatchObject({
@@ -262,16 +262,16 @@ describe("Lore Manipulation Commands", () => {
       });
     });
 
-    it("should warn if lore entry already exists", () => {
+    it("should warn if note entry already exists", () => {
       const commands = [
-        "/create_lore: The Ancient Order | Duplicate content | | ",
+        "/create_note: The Ancient Order | Duplicate content | | ",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       expect(storyData.lore).toHaveLength(1); // No new entry added
       expect(mockNotifications).toContainEqual({
-        message: '⚠️ Lore "The Ancient Order" already exists',
+        message: '⚠️ Note "The Ancient Order" already exists',
         type: "warning",
       });
     });
@@ -283,7 +283,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_replace_content: The Ancient Order | secret society | powerful organization",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       const lore = storyData.lore.find((l) => l.title === "The Ancient Order");
       expect(lore?.content).toBe(
@@ -301,7 +301,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_replace_content: Nonexistent Lore | old text | new text",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       expect(mockNotifications).toContainEqual({
         message: '⚠️ Lore "Nonexistent Lore" not found',
@@ -314,7 +314,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_replace_content: The Ancient Order | nonexistent text | new text",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       expect(mockNotifications).toContainEqual({
         message: '⚠️ Text not found in lore "The Ancient Order"',
@@ -334,7 +334,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_replace_content: The Ancient Order | hidden society | mysterious guild",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       const lore = storyData.lore.find((l) => l.title === "The Ancient Order");
       expect(lore?.content).toBe(
@@ -349,7 +349,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_add_content: The Ancient Order | Their influence spans across the entire kingdom.",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       const lore = storyData.lore.find((l) => l.title === "The Ancient Order");
       expect(lore?.content).toBe(
@@ -367,7 +367,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_add_content: Nonexistent Lore | Some new content",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       expect(mockNotifications).toContainEqual({
         message: '⚠️ Lore "Nonexistent Lore" not found',
@@ -381,7 +381,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_add_content: The Ancient Order | Second addition.",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       const lore = storyData.lore.find((l) => l.title === "The Ancient Order");
       expect(lore?.content).toBe(
@@ -396,7 +396,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_delete_content: The Ancient Order | secret society of ",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       const lore = storyData.lore.find((l) => l.title === "The Ancient Order");
       expect(lore?.content).toBe("A mages who guard ancient knowledge.");
@@ -410,7 +410,7 @@ describe("Lore Manipulation Commands", () => {
     it("should warn if lore entry not found", () => {
       const commands = ["/lore_delete_content: Nonexistent Lore | some text"];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       expect(mockNotifications).toContainEqual({
         message: '⚠️ Lore "Nonexistent Lore" not found',
@@ -423,7 +423,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_delete_content: The Ancient Order | nonexistent text",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       expect(mockNotifications).toContainEqual({
         message: '⚠️ Text not found in lore "The Ancient Order"',
@@ -446,7 +446,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_delete_content: The Ancient Order | Second paragraph.",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       const lore = storyData.lore.find((l) => l.title === "The Ancient Order");
       // Should clean up to max 2 consecutive newlines
@@ -457,16 +457,16 @@ describe("Lore Manipulation Commands", () => {
   describe("Combined operations", () => {
     it("should handle create, add, replace, and delete in sequence", () => {
       const commands = [
-        "/create_lore: Test Lore | Initial content | | ",
-        "/lore_add_content: Test Lore | Added sentence.",
-        "/lore_replace_content: Test Lore | Initial | Updated",
-        "/lore_delete_content: Test Lore | sentence.",
+        "/create_note: Test Note | Initial content | | ",
+        "/lore_add_content: Test Note | Added sentence.",
+        "/lore_replace_content: Test Note | Initial | Updated",
+        "/lore_delete_content: Test Note | sentence.",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
-      const lore = storyData.lore.find((l) => l.title === "Test Lore");
-      expect(lore?.content).toBe("Updated content\nAdded");
+      const note = storyData.lore.find((l) => l.title === "Test Note");
+      expect(note?.content).toBe("Updated content\nAdded");
 
       // Should have 4 success notifications
       const successNotifications = mockNotifications.filter(
@@ -482,7 +482,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_delete_content: The Ancient Order | secret society of ",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       const lore = storyData.lore.find((l) => l.title === "The Ancient Order");
 
@@ -511,7 +511,7 @@ describe("Lore Manipulation Commands", () => {
         "  /lore_add_content:   The Ancient Order   |   Extra spaces here   ",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       const lore = storyData.lore.find((l) => l.title === "The Ancient Order");
       expect(lore?.content).toContain("Extra spaces here");
@@ -522,7 +522,7 @@ describe("Lore Manipulation Commands", () => {
 
       const commands = ["/lore_replace_content: The Ancient Order | old | new"];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       expect(mockNotifications).toContainEqual({
         message: '⚠️ Lore "The Ancient Order" not found',
@@ -535,7 +535,7 @@ describe("Lore Manipulation Commands", () => {
         "/lore_add_content: The Ancient Order | They use the symbol: | for marking.",
       ];
 
-      processLoreCommands(commands, storyData, mockAddNotification, mockLogger);
+      processNoteCommands(commands, storyData, mockAddNotification, mockLogger);
 
       const lore = storyData.lore.find((l) => l.title === "The Ancient Order");
       expect(lore?.content).toContain("They use the symbol: | for marking.");

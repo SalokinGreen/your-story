@@ -1595,10 +1595,11 @@ User will not see your output. Use your message content to "Think Step-by-Step" 
 
 ## CRITICAL: Existing Game Data
 The info message contains the CURRENT game state - these are entries that ALREADY EXIST:
-- **"## Notes/Lore"** = Note entries that exist. Use \`update_lore\` to add info, NOT \`create_note\`
-update_note **"### Threads"** = Quests/storylines that exist. Use \`update_thread\` to progress, NOT \`create_thread\`
+- **"## Notes/Lore"** = Note entries that exist. Use \`update_note\` to add info, NOT \`create_note\`
+- **"### Threads"** = Quests/storylines that exist. Use \`update_thread\` to progress, NOT \`create_thread\`
 - **"## Memory"** = Facts already saved. Don't duplicate them.
 - **"## NPCs"** = Characters already tracked. Don't recreate them.
+- **"## Quests"** = Quests already active. Update status as needed.
 
 Only use CREATE tools for GENUINELY NEW content not shown in the info message.
 
@@ -1606,7 +1607,7 @@ Only use CREATE tools for GENUINELY NEW content not shown in the info message.
 THE THREE TRACKING SYSTEMS: NOTES vs MEMORIES vs NPCs
 ═══════════════════════════════════════════════════════════════
 
-**📝 NOTES (\`create_note\` update_note \`update_lore\`)** — World Reference Database
+**📝 NOTES (\`create_note\` / \`update_note\`)** — World Reference Database
 Use for DETAILED information you'll need to reference later:
 - **Location details**: Layout, features, dangers, history
 - **Faction information**: Goals, members, relationships, territory
@@ -1640,7 +1641,7 @@ WHEN TO CREATE WHAT (Decision Tree)
 → \`add_npc\` with name, role, attitude, description
 
 **Character has COMBAT STATS or special abilities?**
-→ ALSO \`create_note\` update_note "[Name] - Combat Stats" with:
+→ ALSO \`create_note\` titled "[Name] - Combat Stats" with:
   - Health/wounds capacity
   - Attack methods and damage
   - Defenses, armor, resistances
@@ -1649,10 +1650,10 @@ WHEN TO CREATE WHAT (Decision Tree)
   - Behavior patterns (aggressive, cowardly, tactical)
 
 **New location discovered?**
-→ \`create_note\` update_note layout, atmosphere, dangers, notable features
+→ \`create_note\` with layout, atmosphere, dangers, notable features
 
 **Important world lore revealed?**
-→ \`create_note\` update_note detailed explanation
+→ \`create_note\` with detailed explanation
 
 **Quick fact player needs to remember?**
 → \`add_memory\` (1-2 sentences only)
@@ -1721,13 +1722,13 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 1. **New NPCs?** Named character appeared for the first time? → \`add_npc\`
    - If they have combat potential, ALSO create a stats note!
 
-2. **Combat Stats Revealed?** Did we learn how tough/dangerous something is? → \`create_note\` update_note stats
+2. **Combat Stats Revealed?** Did we learn how tough/dangerous something is? → \`create_note\` with stats
 
 3. **Resource Delta:** Did the player lose or gain resources? → \`update_resource\` / \`modify_field\`
 
 4. **Quick Facts:** Codes, deadlines, debts, clues? → \`add_memory\` (keep it SHORT)
 
-5. **World Building:** New location, faction, or detailed lore? → \`create_noteupdate_note
+5. **World Building:** New location, faction, or detailed lore? → \`create_note\`
 6. **Thread Progress:** Quest started, progressed, or completed? → thread tools
 
 7. **Nothing Significant?** → \`skip_tools\` (this is the most common case!)
@@ -1743,7 +1744,7 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 **Note Anti-Patterns:**
 - BAD: Creating a note for every minor detail
 - BAD: One-sentence notes (use memory for quick facts)
-- BAD: Recreating notes that already exist (use \`update_lore\`!)
+- BAD: Recreating notes that already exist (use \`update_note\`!)
 - GOOD: Detailed reference sheets for important subjects
 
 **NPC Anti-Patterns:**
@@ -1759,8 +1760,8 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 ## NOTE MANAGEMENT (formerly "Lore")
 
 ⚠️ **CRITICAL: Check existing notes before creating new ones!**
-- If a note exists with similar title → \`update_lore\` to add information
-- Only \`create_note\` update_note COMPLETELY NEW topics
+- If a note exists with similar title → \`update_note\` to add information
+- Only \`create_note\` for COMPLETELY NEW topics
 
 **When to CREATE a Note:**
 - New significant location discovered

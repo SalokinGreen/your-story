@@ -804,6 +804,7 @@ export async function generateStoryTurn(
           } else {
             // No tool calls - AI only produced thinking text without calling tools
             // Check if the content suggests the GM wants to continue (mentions rolling, attacking, etc.)
+            // OR if the AI wrote pseudo-tool-call syntax (indicating it meant to call a tool but didn't)
             const wantsToContinue =
               gmResult.content &&
               (/let me roll|i('ll| will) roll|roll for|let's roll|rolling|attack roll|damage roll/i.test(
@@ -813,6 +814,14 @@ export async function generateStoryTurn(
                   gmResult.content
                 ) ||
                 /retaliate|counter.?attack|strike back|fight back/i.test(
+                  gmResult.content
+                ) ||
+                // Detect pseudo-tool-call syntax - AI wrote about calling a tool but didn't actually call it
+                /\*?\s*(calls?|using|calling|invoke|invoking)\s+\w+[_:]/i.test(
+                  gmResult.content
+                ) ||
+                // Detect tool name patterns like "search_notes", "formula_roll", "roll_dice"
+                /\b(search_notes|formula_roll|roll_dice|npc_roll|list_inactive_notes|update_note|show_note|hide_note)\s*[:{(]/i.test(
                   gmResult.content
                 ));
 
@@ -834,15 +843,28 @@ export async function generateStoryTurn(
               });
 
               // Then add the continuation prompt as a user message
-              conversationHistory.push({
-                role: "user",
-                content: `You mentioned wanting to roll or take an action, but didn't call a tool. Please call the tool NOW:
+              // Check if they wrote pseudo-tool-call syntax vs just mentioning rolling
+              const wrotePseudoToolCall =
+                /\*?\s*(calls?|using|calling|invoke|invoking)\s+\w+[_:]/i.test(
+                  gmResult.content || ""
+                ) ||
+                /\b(search_notes|formula_roll|roll_dice|npc_roll|list_inactive_notes|update_note|show_note|hide_note)\s*[:{(]/i.test(
+                  gmResult.content || ""
+                );
+
+              const prompt = wrotePseudoToolCall
+                ? `You described calling a tool but didn't actually invoke it. Don't write "*Calls tool_name*" - actually call the function. Please call the tool NOW or call end_gm_thinking if done.`
+                : `You mentioned wanting to roll or take an action, but didn't call a tool. Please call the tool NOW:
 - Use formula_roll for attack/skill checks
 - Use npc_roll for enemy attacks
 - Use roll_dice for damage
 - Or call end_gm_thinking if you're done
 
-Call the tool:`,
+Call the tool:`;
+
+              conversationHistory.push({
+                role: "user",
+                content: prompt,
               });
               continue;
             }

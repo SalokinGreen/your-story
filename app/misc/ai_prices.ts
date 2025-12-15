@@ -508,7 +508,7 @@ export const AI_MODELS = {
     name: "Devstral Small 2",
     original_model: "labs-devstral-small-2512",
     model: "labs-devstral-small-2512",
-    maxTokens: 2561000,
+    maxTokens: 256000,
     maxOutputTokens: 100000,
     provider: "mistral",
     supportsToolCalling: true,

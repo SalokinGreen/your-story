@@ -458,9 +458,9 @@ export function executeTools(
         continue;
       }
 
-      // Special handling for list_inactive_lore (query tool - returns data directly)
-      if (toolCall.function.name === "list_inactive_lore") {
-        logger.action("Special handling: list_inactive_lore", {
+      // Special handling for list_inactive_notes (query tool - returns data directly)
+      if (toolCall.function.name === "list_inactive_notes") {
+        logger.action("Special handling: list_inactive_notes", {
           toolCallId: toolId,
         });
 
@@ -468,20 +468,20 @@ export function executeTools(
           responses.push({
             command: toolCall.function.name,
             success: true,
-            message: "No lore entries defined in this adventure.",
+            message: "No note entries defined in this adventure.",
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
           continue;
         }
 
-        // Find inactive lore (not revealed, not always-on, on=false or no triggers matched)
+        // Find inactive notes (not revealed, not always-on, on=false or no triggers matched)
         const currentPartIndex = storyData.scene.parts.length;
-        const inactiveLore = storyData.lore.filter((l) => {
+        const inactiveNotes = storyData.lore.filter((l) => {
           if (l.enabled === false) return false; // Completely disabled in editor
           if (l.alwaysOn) return false; // Always visible, not "inactive"
 
-          // Check if already revealed via show_lore
+          // Check if already revealed via show_note
           const wasRevealed = storyData.scene.parts.some((p) =>
             p.revealedLore?.some(
               (title) => title.toLowerCase() === l.title.toLowerCase()
@@ -500,24 +500,24 @@ export function executeTools(
             }
           }
 
-          // If we get here, lore is inactive
+          // If we get here, note is inactive
           return true;
         });
 
-        if (inactiveLore.length === 0) {
+        if (inactiveNotes.length === 0) {
           responses.push({
             command: toolCall.function.name,
             success: true,
             message:
-              "All lore entries are currently active/visible. No hidden lore available.",
+              "All note entries are currently active/visible. No hidden notes available.",
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
           continue;
         }
 
-        // Format inactive lore for AI
-        const loreList = inactiveLore
+        // Format inactive notes for AI
+        const noteList = inactiveNotes
           .map((l) => {
             const preview =
               l.content.length > 80
@@ -527,13 +527,13 @@ export function executeTools(
           })
           .join("\n");
 
-        const successMsg = `Inactive/Hidden Lore Entries (${inactiveLore.length}):\n${loreList}\n\nUse show_lore({ title: "..." }) to reveal any of these to the player.`;
+        const successMsg = `Inactive/Hidden Note Entries (${inactiveNotes.length}):\n${noteList}\n\nUse show_note({ title: "..." }) to reveal any of these to the player.`;
 
         logger.action(
-          `Tool call succeeded: list_inactive_lore found ${inactiveLore.length} entries`,
+          `Tool call succeeded: list_inactive_notes found ${inactiveNotes.length} entries`,
           {
             toolCallId: toolId,
-            count: inactiveLore.length,
+            count: inactiveNotes.length,
           }
         );
 
@@ -1060,9 +1060,9 @@ export function executeTools(
         continue;
       }
 
-      // Special handling for search_lore_content (read-only)
-      if (toolCall.function.name === "search_lore_content") {
-        logger.action("Special handling: search_lore_content", {
+      // Special handling for search_notes (read-only)
+      if (toolCall.function.name === "search_notes") {
+        logger.action("Special handling: search_notes", {
           toolCallId: toolId,
         });
 
@@ -3048,33 +3048,33 @@ function convertToolToCommand(
     case "trigger_achievement":
       return `/trigger_achievement: ${args.title}`;
 
-    // Lore Management
-    case "create_lore": {
-      // Use /create_lore command (exists in commandResponses.ts)
-      // Format: /create_lore: title | content | on_triggers | off_triggers
+    // Note Management
+    case "create_note": {
+      // Use /create_note command
+      // Format: /create_note: title | content | on_triggers | off_triggers
       const onTriggersStr = args.onTriggers?.length
         ? args.onTriggers.join(", ")
         : "";
       const offTriggersStr = args.offTriggers?.length
         ? args.offTriggers.join(", ")
         : "";
-      return `/create_lore: ${args.title} | ${args.content} | ${onTriggersStr} | ${offTriggersStr}`;
+      return `/create_note: ${args.title} | ${args.content} | ${onTriggersStr} | ${offTriggersStr}`;
     }
 
-    case "delete_lore":
-      return `/lore_delete: ${args.title}`;
+    case "delete_note":
+      return `/note_delete: ${args.title}`;
 
-    case "show_lore":
-      return `/lore_show: ${args.title}`;
+    case "show_note":
+      return `/note_show: ${args.title}`;
 
-    case "hide_lore":
-      return `/lore_hide: ${args.title}`;
+    case "hide_note":
+      return `/note_hide: ${args.title}`;
 
-    case "list_inactive_lore":
+    case "list_inactive_notes":
       return null; // Handled directly in executeTools
 
-    case "update_lore": {
-      // Format: /lore_update: title | newTitle | content | on | onTriggers | offTriggers
+    case "update_note": {
+      // Format: /note_update: title | newTitle | content | on | onTriggers | offTriggers
       const newTitle = args.newTitle || "";
       const content = args.content || "";
       const on = args.on !== undefined ? String(args.on) : "";
@@ -3084,7 +3084,7 @@ function convertToolToCommand(
       const offTriggersStr = Array.isArray(args.offTriggers)
         ? args.offTriggers.join(",")
         : "";
-      return `/lore_update: ${args.title} | ${newTitle} | ${content} | ${on} | ${onTriggersStr} | ${offTriggersStr}`;
+      return `/note_update: ${args.title} | ${newTitle} | ${content} | ${on} | ${onTriggersStr} | ${offTriggersStr}`;
     }
 
     case "edit_lore_replace":
@@ -3115,7 +3115,7 @@ function convertToolToCommand(
       // Handled directly in executeTools
       return null;
 
-    case "search_lore_content":
+    case "search_notes":
       // Handled directly in executeTools
       return null;
 

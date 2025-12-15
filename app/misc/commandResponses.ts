@@ -2184,26 +2184,26 @@ export function executeCommandWithResponse(
     };
   }
 
-  // === LORE COMMANDS ===
+  // === NOTE COMMANDS ===
 
-  // /create_lore: title | content | on_triggers | off_triggers
-  const createLoreMatch = trimmed.match(
-    /^\/create_lore:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+  // /create_note: title | content | on_triggers | off_triggers
+  const createNoteMatch = trimmed.match(
+    /^\/create_note:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
   );
-  if (createLoreMatch) {
-    const loreTitle = createLoreMatch[1].trim();
-    const loreContent = createLoreMatch[2].trim();
-    const onTriggers = createLoreMatch[3].trim();
-    const offTriggers = createLoreMatch[4].trim();
+  if (createNoteMatch) {
+    const noteTitle = createNoteMatch[1].trim();
+    const noteContent = createNoteMatch[2].trim();
+    const onTriggers = createNoteMatch[3].trim();
+    const offTriggers = createNoteMatch[4].trim();
 
     if (!storyData.lore) storyData.lore = [];
 
-    const existingLore = storyData.lore.find((l) => l.title === loreTitle);
-    if (existingLore) {
+    const existingNote = storyData.lore.find((l) => l.title === noteTitle);
+    if (existingNote) {
       return {
         command: trimmed,
         success: false,
-        message: `Lore "${loreTitle}" already exists`,
+        message: `Note "${noteTitle}" already exists`,
         timestamp,
       };
     }
@@ -2222,8 +2222,8 @@ export function executeCommandWithResponse(
       : [];
 
     storyData.lore.push({
-      title: loreTitle,
-      content: loreContent,
+      title: noteTitle,
+      content: noteContent,
       relatedCharacters: [],
       relatedLocations: [],
       secrtet: false,
@@ -2237,71 +2237,71 @@ export function executeCommandWithResponse(
     // Mark lore embeddings as dirty for re-sync
     storyData.loreEmbeddingsDirty = true;
 
-    logger.action("New lore created via command response", {
-      title: loreTitle,
+    logger.action("New note created via command response", {
+      title: noteTitle,
     });
 
     return {
       command: trimmed,
       success: true,
-      message: `Created lore entry "${loreTitle}"`,
+      message: `Created note entry "${noteTitle}"`,
       timestamp,
     };
   }
 
-  // /lore_show: lore title
-  const loreShowMatch = trimmed.match(/^\/lore_show:\s*(.+)$/i);
-  if (loreShowMatch) {
-    const loreTitle = loreShowMatch[1].trim();
+  // /note_show: note title (also handles legacy /lore_show)
+  const noteShowMatch = trimmed.match(/^\/(note_show|lore_show):\s*(.+)$/i);
+  if (noteShowMatch) {
+    const noteTitle = noteShowMatch[2].trim();
 
     if (!storyData.lore) storyData.lore = [];
 
-    const matchResult = findLoreMatch(loreTitle, storyData.lore);
-    const loreEntry = matchResult?.item;
+    const matchResult = findLoreMatch(noteTitle, storyData.lore);
+    const noteEntry = matchResult?.item;
 
-    if (!loreEntry) {
+    if (!noteEntry) {
       return {
         command: trimmed,
         success: false,
-        message: `Lore "${loreTitle}" not found`,
+        message: `Note "${noteTitle}" not found`,
         timestamp,
       };
     }
 
-    if (loreEntry.on === true) {
+    if (noteEntry.on === true) {
       const fuzzyNote =
         matchResult && !matchResult.isExact
-          ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+          ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
               matchResult.score * 100
             )}%)`
           : "";
       return {
         command: trimmed,
         success: "partial",
-        message: `Lore "${loreEntry.title}" was already visible${fuzzyNote}`,
+        message: `Note "${noteEntry.title}" was already visible${fuzzyNote}`,
         timestamp,
       };
     }
 
-    loreEntry.on = true;
-    loreEntry.lastTriggeredIndex = storyData.scene.parts.length;
+    noteEntry.on = true;
+    noteEntry.lastTriggeredIndex = storyData.scene.parts.length;
 
     // Add to revealedLore on the last scene part (or create one if needed)
     const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
     if (lastPart) {
       if (!lastPart.revealedLore) lastPart.revealedLore = [];
-      if (!lastPart.revealedLore.includes(loreEntry.title)) {
-        lastPart.revealedLore.push(loreEntry.title);
+      if (!lastPart.revealedLore.includes(noteEntry.title)) {
+        lastPart.revealedLore.push(noteEntry.title);
       }
     }
 
-    logger.action("Lore revealed via command response", {
-      title: loreEntry.title,
+    logger.action("Note revealed via command response", {
+      title: noteEntry.title,
     });
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+        ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
             matchResult.score * 100
           )}%)`
         : "";
@@ -2309,54 +2309,54 @@ export function executeCommandWithResponse(
     return {
       command: trimmed,
       success: true,
-      message: `Revealed lore "${loreEntry.title}"${fuzzyNote}`,
+      message: `Revealed note "${noteEntry.title}"${fuzzyNote}`,
       timestamp,
     };
   }
 
-  // /lore_hide: lore title
-  const loreHideMatch = trimmed.match(/^\/lore_hide:\s*(.+)$/i);
-  if (loreHideMatch) {
-    const loreTitle = loreHideMatch[1].trim();
+  // /note_hide: note title (also handles legacy /lore_hide)
+  const noteHideMatch = trimmed.match(/^\/(note_hide|lore_hide):\s*(.+)$/i);
+  if (noteHideMatch) {
+    const noteTitle = noteHideMatch[2].trim();
 
     if (!storyData.lore) storyData.lore = [];
 
-    const matchResult = findLoreMatch(loreTitle, storyData.lore);
-    const loreEntry = matchResult?.item;
+    const matchResult = findLoreMatch(noteTitle, storyData.lore);
+    const noteEntry = matchResult?.item;
 
-    if (!loreEntry) {
+    if (!noteEntry) {
       return {
         command: trimmed,
         success: false,
-        message: `Lore "${loreTitle}" not found`,
+        message: `Note "${noteTitle}" not found`,
         timestamp,
       };
     }
 
-    if (loreEntry.on === false) {
+    if (noteEntry.on === false) {
       const fuzzyNote =
         matchResult && !matchResult.isExact
-          ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+          ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
               matchResult.score * 100
             )}%)`
           : "";
       return {
         command: trimmed,
         success: "partial",
-        message: `Lore "${loreEntry.title}" was already hidden${fuzzyNote}`,
+        message: `Note "${noteEntry.title}" was already hidden${fuzzyNote}`,
         timestamp,
       };
     }
 
-    loreEntry.on = false;
+    noteEntry.on = false;
 
-    logger.action("Lore hidden via command response", {
-      title: loreEntry.title,
+    logger.action("Note hidden via command response", {
+      title: noteEntry.title,
     });
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+        ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
             matchResult.score * 100
           )}%)`
         : "";
@@ -2364,33 +2364,33 @@ export function executeCommandWithResponse(
     return {
       command: trimmed,
       success: true,
-      message: `Hidden lore "${loreEntry.title}"${fuzzyNote}`,
+      message: `Hidden note "${noteEntry.title}"${fuzzyNote}`,
       timestamp,
     };
   }
 
-  // /lore_update: title | newTitle | content | on | onTriggers | offTriggers
-  const loreUpdateMatch = trimmed.match(
-    /^\/lore_update:\s*(.+?)\s*\|\s*(.*?)\s*\|\s*([\s\S]*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+  // /note_update: title | newTitle | content | on | onTriggers | offTriggers (also handles legacy /lore_update)
+  const noteUpdateMatch = trimmed.match(
+    /^\/(note_update|lore_update):\s*(.+?)\s*\|\s*(.*?)\s*\|\s*([\s\S]*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
   );
-  if (loreUpdateMatch) {
-    const loreTitle = loreUpdateMatch[1].trim();
-    const newTitle = loreUpdateMatch[2].trim();
-    const newContent = loreUpdateMatch[3].trim();
-    const onValue = loreUpdateMatch[4].trim().toLowerCase();
-    const onTriggers = loreUpdateMatch[5].trim();
-    const offTriggers = loreUpdateMatch[6].trim();
+  if (noteUpdateMatch) {
+    const noteTitle = noteUpdateMatch[2].trim();
+    const newTitle = noteUpdateMatch[3].trim();
+    const newContent = noteUpdateMatch[4].trim();
+    const onValue = noteUpdateMatch[5].trim().toLowerCase();
+    const onTriggers = noteUpdateMatch[6].trim();
+    const offTriggers = noteUpdateMatch[7].trim();
 
     if (!storyData.lore) storyData.lore = [];
 
-    const matchResult = findLoreMatch(loreTitle, storyData.lore);
-    const loreEntry = matchResult?.item;
+    const matchResult = findLoreMatch(noteTitle, storyData.lore);
+    const noteEntry = matchResult?.item;
 
-    if (!loreEntry) {
+    if (!noteEntry) {
       return {
         command: trimmed,
         success: false,
-        message: `Lore "${loreTitle}" not found`,
+        message: `Note "${noteTitle}" not found`,
         timestamp,
       };
     }
@@ -2398,31 +2398,31 @@ export function executeCommandWithResponse(
     const changes: string[] = [];
 
     if (newTitle) {
-      loreEntry.title = newTitle;
+      noteEntry.title = newTitle;
       changes.push("title");
-      loreEntry.embedded = false; // Title changed, needs re-embedding
+      noteEntry.embedded = false; // Title changed, needs re-embedding
     }
     if (newContent) {
-      loreEntry.content = newContent;
+      noteEntry.content = newContent;
       changes.push("content");
-      loreEntry.embedded = false; // Content changed, needs re-embedding
+      noteEntry.embedded = false; // Content changed, needs re-embedding
     }
     if (onValue === "true") {
-      loreEntry.on = true;
+      noteEntry.on = true;
       changes.push("visibility (shown)");
     } else if (onValue === "false") {
-      loreEntry.on = false;
+      noteEntry.on = false;
       changes.push("visibility (hidden)");
     }
     if (onTriggers) {
-      loreEntry.on_triggers = onTriggers
+      noteEntry.on_triggers = onTriggers
         .split(",")
         .map((t) => t.trim())
         .filter((t) => t.length > 0);
       changes.push("on_triggers");
     }
     if (offTriggers) {
-      loreEntry.off_triggers = offTriggers
+      noteEntry.off_triggers = offTriggers
         .split(",")
         .map((t) => t.trim())
         .filter((t) => t.length > 0);
@@ -2433,7 +2433,7 @@ export function executeCommandWithResponse(
       return {
         command: trimmed,
         success: "partial",
-        message: `Lore "${loreEntry.title}" unchanged (no updates provided)`,
+        message: `Note "${noteEntry.title}" unchanged (no updates provided)`,
         timestamp,
       };
     }
@@ -2443,14 +2443,14 @@ export function executeCommandWithResponse(
       storyData.loreEmbeddingsDirty = true;
     }
 
-    logger.action("Lore updated via command response", {
-      title: loreEntry.title,
+    logger.action("Note updated via command response", {
+      title: noteEntry.title,
       changes,
     });
 
     const fuzzyNote =
       matchResult && !matchResult.isExact
-        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
+        ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
             matchResult.score * 100
           )}%)`
         : "";
@@ -2458,7 +2458,7 @@ export function executeCommandWithResponse(
     return {
       command: trimmed,
       success: true,
-      message: `Updated lore "${loreEntry.title}": ${changes.join(
+      message: `Updated note "${noteEntry.title}": ${changes.join(
         ", "
       )}${fuzzyNote}`,
       timestamp,

@@ -127,14 +127,14 @@ describe("Tool Execution", () => {
     });
   });
 
-  describe("create_lore tool", () => {
-    test("should create lore entry with triggers", () => {
+  describe("create_note tool", () => {
+    test("should create note entry with triggers", () => {
       const storyData = createTestStory();
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "create_lore",
+            name: "create_note",
             arguments: {
               title: "The Ancient Temple",
               content: "A forgotten temple deep in the forest",
@@ -149,7 +149,7 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(responses[0].message).toContain("Created lore entry");
+      expect(responses[0].message).toContain("Created note entry");
       expect(storyData.lore).toHaveLength(1);
       expect(storyData.lore[0].title).toBe("The Ancient Temple");
       expect(storyData.lore[0].content).toBe(
@@ -159,16 +159,16 @@ describe("Tool Execution", () => {
       expect(storyData.lore[0].off_triggers).toEqual(["forget"]);
     });
 
-    test("should create lore entry without triggers", () => {
+    test("should create note entry without triggers", () => {
       const storyData = createTestStory();
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "create_lore",
+            name: "create_note",
             arguments: {
-              title: "Simple Lore",
-              content: "Basic lore content",
+              title: "Simple Note",
+              content: "Basic note content",
             },
           },
         },
@@ -184,10 +184,10 @@ describe("Tool Execution", () => {
       expect(storyData.lore[0].on).toBe(true); // Visible by default when no triggers
     });
 
-    test("should reject duplicate lore titles", () => {
+    test("should reject duplicate note titles", () => {
       const storyData = createTestStory();
       storyData.lore.push({
-        title: "Existing Lore",
+        title: "Existing Note",
         content: "Already exists",
         relatedCharacters: [],
         relatedLocations: [],
@@ -202,9 +202,9 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "create_lore",
+            name: "create_note",
             arguments: {
-              title: "Existing Lore",
+              title: "Existing Note",
               content: "Trying to duplicate",
             },
           },
@@ -221,7 +221,7 @@ describe("Tool Execution", () => {
   });
 
   describe("Mixed tool execution", () => {
-    test("should handle memory and lore tools together", () => {
+    test("should handle memory and note tools together", () => {
       const storyData = createTestStory();
       const toolCalls: ToolCall[] = [
         {
@@ -236,7 +236,7 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "create_lore",
+            name: "create_note",
             arguments: {
               title: "The Ruins",
               content: "Ancient civilization remains",
@@ -277,9 +277,9 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "create_lore",
+            name: "create_note",
             arguments: {
-              title: "Valid Lore",
+              title: "Valid Note",
               content: "Valid content",
             },
           },
@@ -322,16 +322,16 @@ describe("Tool Execution", () => {
       );
     });
 
-    test("should parse JSON string arguments for create_lore", () => {
+    test("should parse JSON string arguments for create_note", () => {
       const storyData = createTestStory();
       const toolCalls: ToolCall[] = [
         {
           type: "function",
           function: {
-            name: "create_lore",
+            name: "create_note",
             arguments: JSON.stringify({
-              title: "Lore Title",
-              content: "Lore content",
+              title: "Note Title",
+              content: "Note content",
               onTriggers: ["trigger1", "trigger2"],
             }),
           },
@@ -342,7 +342,7 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(storyData.lore[0].title).toBe("Lore Title");
+      expect(storyData.lore[0].title).toBe("Note Title");
       expect(storyData.lore[0].on_triggers).toEqual(["trigger1", "trigger2"]);
     });
 
@@ -391,8 +391,8 @@ describe("Tool Execution", () => {
     });
   });
 
-  describe("Lore Visibility Tools", () => {
-    test("should show lore entry that exists", () => {
+  describe("Note Visibility Tools", () => {
+    test("should show note entry that exists", () => {
       const storyData = createTestStory();
       storyData.lore = [
         {
@@ -418,7 +418,7 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "show_lore",
+            name: "show_note",
             arguments: {
               title: "Containment Wards",
             },
@@ -430,7 +430,7 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(responses[0].message).toContain("Revealed lore");
+      expect(responses[0].message).toContain("Revealed note");
       expect(storyData.lore[0].on).toBe(true);
       expect(storyData.scene.parts[0].revealedLore).toContain(
         "Containment Wards"
@@ -439,7 +439,7 @@ describe("Tool Execution", () => {
       expect(stateChanges.length).toBe(0);
     });
 
-    test("should handle show_lore with fuzzy matching", () => {
+    test("should handle show_note with fuzzy matching", () => {
       const storyData = createTestStory();
       storyData.lore = [
         {
@@ -465,7 +465,7 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "show_lore",
+            name: "show_note",
             arguments: {
               title: "Ancient Prophecy", // Missing "The" - should still match
             },
@@ -480,7 +480,7 @@ describe("Tool Execution", () => {
       expect(storyData.lore[0].on).toBe(true);
     });
 
-    test("should fail show_lore when lore not found", () => {
+    test("should fail show_note when note not found", () => {
       const storyData = createTestStory();
       storyData.lore = [];
 
@@ -488,9 +488,9 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "show_lore",
+            name: "show_note",
             arguments: {
-              title: "Nonexistent Lore",
+              title: "Nonexistent Note",
             },
           },
         },
@@ -503,7 +503,7 @@ describe("Tool Execution", () => {
       expect(responses[0].message).toContain("not found");
     });
 
-    test("should return partial success if lore already visible", () => {
+    test("should return partial success if note already visible", () => {
       const storyData = createTestStory();
       storyData.lore = [
         {
@@ -523,7 +523,7 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "show_lore",
+            name: "show_note",
             arguments: {
               title: "Known Secret",
             },
@@ -538,7 +538,7 @@ describe("Tool Execution", () => {
       expect(responses[0].message).toContain("already visible");
     });
 
-    test("should hide lore entry that exists", () => {
+    test("should hide note entry that exists", () => {
       const storyData = createTestStory();
       storyData.lore = [
         {
@@ -558,7 +558,7 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "hide_lore",
+            name: "hide_note",
             arguments: {
               title: "Temporary Knowledge",
             },
@@ -570,17 +570,17 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(responses[0].message).toContain("Hidden lore");
+      expect(responses[0].message).toContain("Hidden note");
       expect(storyData.lore[0].on).toBe(false);
       // Note: Lore tools don't generate stateChanges (removed to reduce AI context noise)
       expect(stateChanges.length).toBe(0);
     });
 
-    test("should return partial success if lore already hidden", () => {
+    test("should return partial success if note already hidden", () => {
       const storyData = createTestStory();
       storyData.lore = [
         {
-          title: "Hidden Lore",
+          title: "Hidden Note",
           content: "Already hidden",
           on: false,
           relatedCharacters: [],
@@ -596,9 +596,9 @@ describe("Tool Execution", () => {
         {
           type: "function",
           function: {
-            name: "hide_lore",
+            name: "hide_note",
             arguments: {
-              title: "Hidden Lore",
+              title: "Hidden Note",
             },
           },
         },

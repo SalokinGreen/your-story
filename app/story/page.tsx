@@ -642,23 +642,23 @@ export function processCommands(
       continue;
     }
 
-    // /create_lore: title | content | on_triggers | off_triggers
-    const createLoreMatch = trimmed.match(
-      /^\/create_lore:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+    // /create_note: title | content | on_triggers | off_triggers
+    const createNoteMatch = trimmed.match(
+      /^\/create_note:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
     );
-    if (createLoreMatch) {
-      const loreTitle = createLoreMatch[1].trim();
-      const loreContent = createLoreMatch[2].trim();
-      const onTriggers = createLoreMatch[3].trim();
-      const offTriggers = createLoreMatch[4].trim();
+    if (createNoteMatch) {
+      const noteTitle = createNoteMatch[1].trim();
+      const noteContent = createNoteMatch[2].trim();
+      const onTriggers = createNoteMatch[3].trim();
+      const offTriggers = createNoteMatch[4].trim();
 
       if (!storyData.lore) storyData.lore = [];
 
-      // Check if lore entry already exists
-      const existingLore = storyData.lore.find((l) => l.title === loreTitle);
-      if (existingLore) {
-        logger.warn("Lore already exists", { loreTitle });
-        addNotification(`Lore "${loreTitle}" already exists`, "warning");
+      // Check if note entry already exists
+      const existingNote = storyData.lore.find((l) => l.title === noteTitle);
+      if (existingNote) {
+        logger.warn("Note already exists", { noteTitle });
+        addNotification(`Note "${noteTitle}" already exists`, "warning");
       } else {
         const onTriggerArray = onTriggers
           ? onTriggers
@@ -674,8 +674,8 @@ export function processCommands(
           : [];
 
         storyData.lore.push({
-          title: loreTitle,
-          content: loreContent,
+          title: noteTitle,
+          content: noteContent,
           relatedCharacters: [],
           relatedLocations: [],
           secrtet: false,
@@ -684,7 +684,7 @@ export function processCommands(
           off_triggers: offTriggerArray,
           on: onTriggerArray.length === 0, // If no triggers, show from start
         });
-        logger.action("New lore created via command", { title: loreTitle });
+        logger.action("New note created via command", { title: noteTitle });
       }
       continue;
     }

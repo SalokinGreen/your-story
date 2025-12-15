@@ -363,69 +363,69 @@ describe("processCommands", () => {
     });
   });
 
-  describe("/create_lore command", () => {
-    it("should create a new lore entry with triggers", () => {
+  describe("/create_note command", () => {
+    it("should create a new note entry with triggers", () => {
       processCommands(
         [
-          "/create_lore: Ancient Order | A secret society of mages | ancient,order | disbanded",
+          "/create_note: Ancient Order | A secret society of mages | ancient,order | disbanded",
         ],
         mockStoryData,
         mockNotification
       );
 
       expect(mockStoryData.lore).toHaveLength(1);
-      const newLore = mockStoryData.lore[0];
-      expect(newLore.title).toBe("Ancient Order");
-      expect(newLore.content).toBe("A secret society of mages");
-      expect(newLore.on_triggers).toEqual(["ancient", "order"]);
-      expect(newLore.off_triggers).toEqual(["disbanded"]);
-      expect(newLore.on).toBe(false); // Has triggers, so starts hidden
-      // Notification removed - granular lore notifications no longer shown
+      const newNote = mockStoryData.lore[0];
+      expect(newNote.title).toBe("Ancient Order");
+      expect(newNote.content).toBe("A secret society of mages");
+      expect(newNote.on_triggers).toEqual(["ancient", "order"]);
+      expect(newNote.off_triggers).toEqual(["disbanded"]);
+      expect(newNote.on).toBe(false); // Has triggers, so starts hidden
+      // Notification removed - granular note notifications no longer shown
     });
 
-    it("should create lore entry visible from start if no on_triggers", () => {
+    it("should create note entry visible from start if no on_triggers", () => {
       processCommands(
-        ["/create_lore: Basic Knowledge | Common information | | "],
+        ["/create_note: Basic Knowledge | Common information | | "],
         mockStoryData,
         mockNotification
       );
 
       expect(mockStoryData.lore).toHaveLength(1);
-      const newLore = mockStoryData.lore[0];
-      expect(newLore.title).toBe("Basic Knowledge");
-      expect(newLore.on).toBe(true); // No triggers, visible from start
-      expect(newLore.on_triggers).toEqual([]);
-      expect(newLore.off_triggers).toEqual([]);
+      const newNote = mockStoryData.lore[0];
+      expect(newNote.title).toBe("Basic Knowledge");
+      expect(newNote.on).toBe(true); // No triggers, visible from start
+      expect(newNote.on_triggers).toEqual([]);
+      expect(newNote.off_triggers).toEqual([]);
     });
 
     it("should handle empty trigger strings properly", () => {
       processCommands(
-        ["/create_lore: Test Lore | Test content |  | hidden"],
+        ["/create_note: Test Note | Test content |  | hidden"],
         mockStoryData,
         mockNotification
       );
 
-      const newLore = mockStoryData.lore[0];
-      expect(newLore.on_triggers).toEqual([]);
-      expect(newLore.off_triggers).toEqual(["hidden"]);
-      expect(newLore.on).toBe(true); // No on_triggers, visible from start
+      const newNote = mockStoryData.lore[0];
+      expect(newNote.on_triggers).toEqual([]);
+      expect(newNote.off_triggers).toEqual(["hidden"]);
+      expect(newNote.on).toBe(true); // No on_triggers, visible from start
     });
 
-    it("should warn if lore with same title already exists", () => {
+    it("should warn if note with same title already exists", () => {
       processCommands(
-        ["/create_lore: Test Lore | Initial content | test | "],
+        ["/create_note: Test Note | Initial content | test | "],
         mockStoryData,
         mockNotification
       );
       processCommands(
-        ["/create_lore: Test Lore | Duplicate content | test | "],
+        ["/create_note: Test Note | Duplicate content | test | "],
         mockStoryData,
         mockNotification
       );
 
       expect(mockStoryData.lore).toHaveLength(1); // Only one entry added
       expect(mockNotification).toHaveBeenCalledWith(
-        'Lore "Test Lore" already exists',
+        'Note "Test Note" already exists',
         "warning"
       );
     });
@@ -433,21 +433,21 @@ describe("processCommands", () => {
     it("should trim whitespace from triggers", () => {
       processCommands(
         [
-          "/create_lore: Trimmed Lore | Test content | sword , shield , armor | lost , broken ",
+          "/create_note: Trimmed Note | Test content | sword , shield , armor | lost , broken ",
         ],
         mockStoryData,
         mockNotification
       );
 
-      const newLore = mockStoryData.lore[0];
-      expect(newLore.on_triggers).toEqual(["sword", "shield", "armor"]);
-      expect(newLore.off_triggers).toEqual(["lost", "broken"]);
+      const newNote = mockStoryData.lore[0];
+      expect(newNote.on_triggers).toEqual(["sword", "shield", "armor"]);
+      expect(newNote.off_triggers).toEqual(["lost", "broken"]);
     });
 
-    it("should initialize lore array if undefined", () => {
+    it("should initialize note array if undefined", () => {
       mockStoryData.lore = undefined as any;
       processCommands(
-        ["/create_lore: New Lore | Content | trigger | "],
+        ["/create_note: New Note | Content | trigger | "],
         mockStoryData,
         mockNotification
       );

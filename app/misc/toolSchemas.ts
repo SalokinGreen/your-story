@@ -779,39 +779,39 @@ const triggerAchievementTool: ToolSchema = {
   },
 };
 
-// Lore Management Tools
-const createLoreTool: ToolSchema = {
+// Note Management Tools
+const createNoteTool: ToolSchema = {
   type: "function",
   function: {
-    name: "create_lore",
+    name: "create_note",
     description:
-      "Add a new lore entry. IMPORTANT: Always provide onTriggers for lore that should be discovered during play. Triggers use EXACT word matching (case-insensitive), so include variations like 'dragon', 'dragons', 'Dragon'. Without triggers, lore is visible immediately.",
+      "Add a new note entry. IMPORTANT: Always provide onTriggers for notes that should be discovered during play. Triggers use EXACT word matching (case-insensitive), so include variations like 'dragon', 'dragons', 'Dragon'. Without triggers, note is visible immediately.",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Lore entry title (must be unique)",
+          description: "Note entry title (must be unique)",
         },
         content: {
           type: "string",
-          description: "Lore text content",
+          description: "Note text content",
         },
         on: {
           type: "boolean",
           description:
-            "Whether lore is initially visible (default: false if triggers provided, true otherwise)",
+            "Whether note is initially visible (default: false if triggers provided, true otherwise)",
         },
         onTriggers: {
           type: "array",
           items: { type: "string" },
           description:
-            "Words that reveal this lore when mentioned in the story. Uses EXACT matching - 'zombie' won't match 'zombies', so include all variations. Example: ['zombie', 'zombies', 'undead', 'Zombie']",
+            "Words that reveal this note when mentioned in the story. Uses EXACT matching - 'zombie' won't match 'zombies', so include all variations. Example: ['zombie', 'zombies', 'undead', 'Zombie']",
         },
         offTriggers: {
           type: "array",
           items: { type: "string" },
-          description: "Words that hide this lore when mentioned (optional)",
+          description: "Words that hide this note when mentioned (optional)",
         },
       },
       required: ["title", "content"],
@@ -819,17 +819,17 @@ const createLoreTool: ToolSchema = {
   },
 };
 
-const deleteLoreTool: ToolSchema = {
+const deleteNoteTool: ToolSchema = {
   type: "function",
   function: {
-    name: "delete_lore",
-    description: "Remove a lore entry entirely",
+    name: "delete_note",
+    description: "Remove a note entry entirely",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Lore entry title (fuzzy matching supported)",
+          description: "Note entry title (fuzzy matching supported)",
         },
       },
       required: ["title"],
@@ -837,17 +837,17 @@ const deleteLoreTool: ToolSchema = {
   },
 };
 
-const showLoreTool: ToolSchema = {
+const showNoteTool: ToolSchema = {
   type: "function",
   function: {
-    name: "show_lore",
-    description: "Make a lore entry visible to the player",
+    name: "show_note",
+    description: "Make a note entry visible to the player",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Lore entry title (fuzzy matching supported)",
+          description: "Note entry title (fuzzy matching supported)",
         },
       },
       required: ["title"],
@@ -855,17 +855,17 @@ const showLoreTool: ToolSchema = {
   },
 };
 
-const hideLoreTool: ToolSchema = {
+const hideNoteTool: ToolSchema = {
   type: "function",
   function: {
-    name: "hide_lore",
-    description: "Hide a lore entry from the player",
+    name: "hide_note",
+    description: "Hide a note entry from the player",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Lore entry title (fuzzy matching supported)",
+          description: "Note entry title (fuzzy matching supported)",
         },
       },
       required: ["title"],
@@ -873,12 +873,12 @@ const hideLoreTool: ToolSchema = {
   },
 };
 
-const listInactiveLoreTool: ToolSchema = {
+const listInactiveNotesTool: ToolSchema = {
   type: "function",
   function: {
-    name: "list_inactive_lore",
+    name: "list_inactive_notes",
     description:
-      "List all inactive/hidden lore entries that can be revealed. Use this to discover what lore exists before calling show_lore. Returns titles and brief descriptions of hidden lore.",
+      "List all inactive/hidden note entries that can be revealed. Use this to discover what notes exist before calling show_note. Returns titles and brief descriptions of hidden notes.",
     parameters: {
       type: "object",
       properties: {},
@@ -887,40 +887,40 @@ const listInactiveLoreTool: ToolSchema = {
   },
 };
 
-const updateLoreTool: ToolSchema = {
+const updateNoteTool: ToolSchema = {
   type: "function",
   function: {
-    name: "update_lore",
+    name: "update_note",
     description:
-      "Update an existing lore entry's content or triggers. Use this to modify lore as the story reveals more information.",
+      "Update an existing note entry's content or triggers. Use this to modify notes as the story reveals more information.",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Lore entry title to update (fuzzy matching supported)",
+          description: "Note entry title to update (fuzzy matching supported)",
         },
         newTitle: {
           type: "string",
-          description: "New title for the lore entry (optional)",
+          description: "New title for the note entry (optional)",
         },
         content: {
           type: "string",
-          description: "New content for the lore entry (optional)",
+          description: "New content for the note entry (optional)",
         },
         on: {
           type: "boolean",
-          description: "Whether lore is visible (optional)",
+          description: "Whether note is visible (optional)",
         },
         onTriggers: {
           type: "array",
           items: { type: "string" },
-          description: "New words that reveal this lore (replaces existing)",
+          description: "New words that reveal this note (replaces existing)",
         },
         offTriggers: {
           type: "array",
           items: { type: "string" },
-          description: "New words that hide this lore (replaces existing)",
+          description: "New words that hide this note (replaces existing)",
         },
       },
       required: ["title"],
@@ -1128,33 +1128,30 @@ const duplicateLoreTool: ToolSchema = {
   },
 };
 
-const searchLoreContentTool: ToolSchema = {
+const searchNotesTool: ToolSchema = {
   type: "function",
   function: {
-    name: "search_lore_content",
+    name: "search_notes",
     description:
-      "Search through all lore entries for content matching a pattern. Returns matching excerpts with context. Use to find information before updating notes.",
+      "Search through all notes (lore entries) for content matching a query. Returns matching excerpts with context. Use to find information before updating notes.",
     parameters: {
       type: "object",
       properties: {
-        pattern: {
+        query: {
           type: "string",
-          description: "Text or regex pattern to search for (case-insensitive)",
-        },
-        isRegex: {
-          type: "boolean",
-          description: "Treat pattern as regex (default: false, plain text)",
+          description:
+            "Text to search for in note titles and content (case-insensitive)",
         },
         includeHidden: {
           type: "boolean",
-          description: "Include hidden (on=false) lore entries (default: true)",
+          description: "Include hidden (on=false) notes (default: true)",
         },
         maxResults: {
           type: "number",
           description: "Maximum number of matches to return (default: 10)",
         },
       },
-      required: ["pattern"],
+      required: ["query"],
     },
   },
 };
@@ -2117,13 +2114,13 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Achievement (1 tool)
   triggerAchievementTool,
 
-  // Lore Management (10 tools)
-  createLoreTool,
-  deleteLoreTool,
-  showLoreTool,
-  hideLoreTool,
-  updateLoreTool,
-  listInactiveLoreTool,
+  // Note Management (10 tools)
+  createNoteTool,
+  deleteNoteTool,
+  showNoteTool,
+  hideNoteTool,
+  updateNoteTool,
+  listInactiveNotesTool,
   editLoreReplaceTool,
   editLoreAppendTool,
   editLorePrependTool,
@@ -2131,7 +2128,7 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   editLoreInsertTool,
   mergeLoreTool,
   duplicateLoreTool,
-  searchLoreContentTool,
+  searchNotesTool,
 
   // Momentum (1 tool)
   modifyMomentumTool,
