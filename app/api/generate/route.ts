@@ -81,6 +81,54 @@ interface AIResponse {
 }
 
 /**
+ * Filter tools for Google/Gemini to stay within schema complexity limits.
+ * Google's API can only handle ~25-30 tools with complex schemas.
+ * We keep only the most essential GM tools.
+ */
+const GOOGLE_ESSENTIAL_TOOLS = new Set([
+  // Core rolling
+  "formula_roll",
+  "roll_dice",
+  "opposed_formula",
+  "fate_question",
+  // Lookup
+  "search_notes",
+  "read_notes",
+  "search_memory",
+  // Tracking
+  "add_memory",
+  "create_note",
+  "update_note",
+  // NPC management
+  "add_npc",
+  "update_npc",
+  "npc_reaction",
+  // Combat essentials
+  "start_combat",
+  "end_combat",
+  "add_combatant",
+  "update_combatant_stat",
+  "npc_roll",
+  // Items
+  "add_item",
+  "remove_item",
+  // Core state
+  "modify_momentum",
+  // Terminal - required
+  "end_gm_thinking",
+]);
+
+function filterToolsForGoogle(tools: any[]): any[] {
+  const filtered = tools.filter(
+    (t) => t?.function?.name && GOOGLE_ESSENTIAL_TOOLS.has(t.function.name)
+  );
+  console.log(
+    `[API] Filtered tools for Google: ${tools.length} -> ${filtered.length}`
+  );
+  return filtered;
+}
+
+/**
  * Normalize tool call IDs for Mistral API compatibility.
  * Mistral requires tool_call_id to be exactly 9 alphanumeric characters (a-z, A-Z, 0-9).
  * Other providers (DeepSeek, OpenRouter) may use formats like "call_36383327".
@@ -202,12 +250,13 @@ async function callAI(
     headers["X-Title"] = "Your Story";
   }
 
-  // For DeepSeek/DeepInfra/Mistral with tools: strip the prefill since these providers don't handle prefill well with function calling
+  // For DeepSeek/DeepInfra/Mistral/Google with tools: strip the prefill since these providers don't handle prefill well with function calling
   let processedMessages = messages;
   if (
     (provider === "deepseek" ||
       provider === "deepinfra" ||
-      provider === "mistral") &&
+      provider === "mistral" ||
+      provider === "google") &&
     hasTools &&
     hasPrefill
   ) {
@@ -266,8 +315,13 @@ async function callAI(
   };
 
   if (tools && tools.length > 0) {
-    requestBody.tools = tools;
-    requestBody.tool_choice = "auto";
+    // Google/Gemini has strict schema complexity limits - filter to essential tools
+    const toolsToUse =
+      provider === "google" ? filterToolsForGoogle(tools) : tools;
+    requestBody.tools = toolsToUse;
+    // Google/Gemini needs tool_choice: "required" to actually invoke tools
+    // ("auto" often results in empty responses)
+    requestBody.tool_choice = provider === "google" ? "required" : "auto";
   }
 
   const response = await fetch(endpoint, {

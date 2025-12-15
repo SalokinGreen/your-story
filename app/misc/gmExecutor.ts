@@ -748,12 +748,50 @@ export async function executeGMTools(
   toolCalls: { id: string; function: { name: string; arguments: string } }[],
   storyData: StoryData
 ): Promise<GMExecutionResult> {
+  // Check for premature end_gm_thinking calls when there are other tools
+  // The AI sometimes calls end_gm_thinking before processing roll results
+  const endGmThinkingCall = toolCalls.find(
+    (c) => c.function.name === "end_gm_thinking"
+  );
+  const otherToolCalls = toolCalls.filter(
+    (c) => c.function.name !== "end_gm_thinking"
+  );
+  const hasOtherTools = otherToolCalls.length > 0;
+
   // Clone storyData to avoid mutations
   const modified = JSON.parse(JSON.stringify(storyData)) as StoryData;
   const results: GMToolResult[] = [];
   const contextParts: string[] = [];
 
-  for (const call of toolCalls) {
+  // If end_gm_thinking was called with other tools, add an error result for it
+  if (endGmThinkingCall && hasOtherTools) {
+    console.log(
+      `[GM Tools] Rejecting premature end_gm_thinking (${toolCalls.length} total calls)`
+    );
+    const errorResult: GMToolResult = {
+      toolName: "end_gm_thinking",
+      toolCallId: endGmThinkingCall.id,
+      success: false,
+      result: {
+        type: "end_gm_thinking",
+        summary:
+          "ERROR: end_gm_thinking must be called ALONE, not with other tools.",
+        outcome: "failure",
+        narrativeHints:
+          "Process the other tools first, see their results, THEN call end_gm_thinking in a separate response.",
+      } as GMEndGmThinkingResult,
+      contextForStory:
+        "⚠️ ERROR: end_gm_thinking rejected - you called it with other tools. Review your other tool results below, then call end_gm_thinking ALONE in your next response.",
+    };
+    results.push(errorResult);
+    contextParts.push(errorResult.contextForStory);
+  }
+
+  // Process either filtered tools (if end_gm_thinking was premature) or all tools
+  const toolsToProcess =
+    hasOtherTools && endGmThinkingCall ? otherToolCalls : toolCalls;
+
+  for (const call of toolsToProcess) {
     let params: unknown;
     try {
       params = JSON.parse(call.function.arguments);
