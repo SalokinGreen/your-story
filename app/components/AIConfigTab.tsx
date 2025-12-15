@@ -45,18 +45,18 @@ export default function AIConfigTab() {
     return "custom";
   });
 
-  // Model configuration for custom preset
+  // Model configuration - direct model selection (no presets)
   const [storyModel, setStoryModel] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("aiModelStory") || "";
+      return localStorage.getItem("aiModelStory") || "mistralSmall";
     }
-    return "";
+    return "mistralSmall";
   });
   const [toolsModel, setToolsModel] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("aiModelTools") || "";
+      return localStorage.getItem("aiModelTools") || "mistralSmall";
     }
-    return "";
+    return "mistralSmall";
   });
   const [choicesModel, setChoicesModel] = useState(() => {
     if (typeof window !== "undefined") {
@@ -428,18 +428,12 @@ export default function AIConfigTab() {
   // Check if user has any AI keys configured
   const hasAnyAIKey = hasKey("openRouterKey") || hasKey("deepseekKey");
 
-  // Get current preset configuration (fallback to mistralLarge if preset not found)
+  // Get current preset configuration (for cost estimation only)
   const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["mistralLarge"];
-  const effectiveStoryModel =
-    currentPreset === "custom" && storyModel ? storyModel : preset.storyModel;
 
-  // Get effective tools model - apply advanced toggle if enabled
-  const baseToolsModel =
-    currentPreset === "custom" && toolsModel ? toolsModel : preset.toolsModel;
-  const effectiveToolsModel =
-    advancedTools && preset.advancedToolsModel
-      ? preset.advancedToolsModel
-      : baseToolsModel;
+  // Direct model selection - no preset fallback
+  const effectiveStoryModel = storyModel;
+  const effectiveToolsModel = toolsModel;
 
   // Apply advanced choices toggle - CHOICES NOW USES STORY MODEL
   // Choices stage uses the same model as Story stage for consistency
@@ -887,8 +881,13 @@ export default function AIConfigTab() {
             <span className="text-gray-400">(also used for choices)</span>
           </label>
           <select
-            value={storyModel || preset.storyModel}
-            onChange={(e) => setStoryModel(e.target.value)}
+            value={storyModel}
+            onChange={(e) => {
+              setStoryModel(e.target.value);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("aiModelStory", e.target.value);
+              }
+            }}
             className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             {Object.entries(AI_MODELS)
@@ -929,8 +928,13 @@ export default function AIConfigTab() {
             <span className="text-gray-400">(game master / tools)</span>
           </label>
           <select
-            value={toolsModel || preset.toolsModel}
-            onChange={(e) => setToolsModel(e.target.value)}
+            value={toolsModel}
+            onChange={(e) => {
+              setToolsModel(e.target.value);
+              if (typeof window !== "undefined") {
+                localStorage.setItem("aiModelTools", e.target.value);
+              }
+            }}
             className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
           >
             {Object.entries(AI_MODELS)
