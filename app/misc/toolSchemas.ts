@@ -837,42 +837,6 @@ const deleteNoteTool: ToolSchema = {
   },
 };
 
-const showNoteTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "show_note",
-    description: "Make a note entry visible to the player",
-    parameters: {
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          description: "Note entry title (fuzzy matching supported)",
-        },
-      },
-      required: ["title"],
-    },
-  },
-};
-
-const hideNoteTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "hide_note",
-    description: "Hide a note entry from the player",
-    parameters: {
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          description: "Note entry title (fuzzy matching supported)",
-        },
-      },
-      required: ["title"],
-    },
-  },
-};
-
 const listInactiveNotesTool: ToolSchema = {
   type: "function",
   function: {
@@ -1674,224 +1638,6 @@ const gameOverTool: ToolSchema = {
   },
 };
 
-// Variable Management Tools
-const setVariableTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "set_variable",
-    description:
-      "Set a variable to a specific value. For numbers, supports dice notation (e.g., '3d6+5'). For booleans, set true/false. For strings, set any text value. Cannot be used on list variables.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Variable name (fuzzy matching supported)",
-        },
-        value: {
-          oneOf: [
-            { type: "number" },
-            { type: "boolean" },
-            {
-              type: "string",
-              description:
-                "Text value for string variables, or dice notation like '2d6+3' for numbers",
-            },
-          ],
-          description:
-            "Value to set: number, boolean, string text, or dice notation",
-        },
-      },
-      required: ["name", "value"],
-    },
-  },
-};
-
-const modifyVariableTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "modify_variable",
-    description:
-      "Modify a number variable by adding/subtracting. Supports dice notation (e.g., '-1d8+2' for damage, '+2d6' for healing). Only works on number variables.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Variable name (fuzzy matching supported)",
-        },
-        amount: {
-          oneOf: [
-            { type: "number" },
-            {
-              type: "string",
-              description: "Dice notation like '-1d8+2' or '+2d6'",
-            },
-          ],
-          description:
-            "Amount to add/subtract: number or dice notation (negative for subtraction)",
-        },
-      },
-      required: ["name", "amount"],
-    },
-  },
-};
-
-const toggleVariableTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "toggle_variable",
-    description:
-      "Toggle a boolean variable between true and false. Only works on boolean variables.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Variable name (fuzzy matching supported)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const addToListTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "add_to_list",
-    description:
-      "Add an item to a list variable. Respects maxSize if defined. Only works on list variables.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "List variable name (fuzzy matching supported)",
-        },
-        item: {
-          type: "string",
-          description: "Item to add to the list",
-        },
-      },
-      required: ["name", "item"],
-    },
-  },
-};
-
-const removeFromListTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "remove_from_list",
-    description:
-      "Remove an item from a list variable. Uses fuzzy matching to find the item. Only works on list variables.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "List variable name (fuzzy matching supported)",
-        },
-        item: {
-          type: "string",
-          description: "Item to remove (fuzzy matching supported)",
-        },
-      },
-      required: ["name", "item"],
-    },
-  },
-};
-
-const clearListTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "clear_list",
-    description:
-      "Remove all items from a list variable. Only works on list variables.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "List variable name (fuzzy matching supported)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const createVariableTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "create_variable",
-    description:
-      "Create a new variable to track custom game state. Types: 'number' for counters/timers, 'boolean' for flags, 'string' for text values (day, location, etc.), 'list' for collections.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description:
-            "Variable name (e.g., 'Days Until Festival', 'Current Weather', 'Allies Met')",
-        },
-        type: {
-          type: "string",
-          enum: ["number", "boolean", "string", "list"],
-          description: "Variable type: number, boolean, string, or list",
-        },
-        value: {
-          oneOf: [{ type: "number" }, { type: "boolean" }, { type: "string" }],
-          description:
-            "Initial value (for number/boolean/string types). Lists start empty.",
-        },
-        description: {
-          type: "string",
-          description: "What this variable tracks (shown to player)",
-        },
-        options: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "For string variables only: predefined options (e.g., ['Monday', 'Tuesday', ...])",
-        },
-        minValue: {
-          type: "number",
-          description: "For number variables only: minimum allowed value",
-        },
-        maxValue: {
-          type: "number",
-          description: "For number variables only: maximum allowed value",
-        },
-        maxSize: {
-          type: "number",
-          description: "For list variables only: maximum number of items",
-        },
-      },
-      required: ["name", "type"],
-    },
-  },
-};
-
-const deleteVariableTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "delete_variable",
-    description:
-      "Delete a variable that is no longer needed. Use when a tracked value becomes irrelevant to the story.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Variable name to delete (fuzzy matching supported)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
 // Scene Challenge (Progress Clock) Tools
 const startChallengeTool: ToolSchema = {
   type: "function",
@@ -2114,11 +1860,9 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Achievement (1 tool)
   triggerAchievementTool,
 
-  // Note Management (10 tools)
+  // Note Management (8 tools)
   createNoteTool,
   deleteNoteTool,
-  showNoteTool,
-  hideNoteTool,
   updateNoteTool,
   listInactiveNotesTool,
   editLoreReplaceTool,
@@ -2151,16 +1895,6 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   removeConditionTool,
   modifyConditionTool,
   gameOverTool,
-
-  // Variable Management (8 tools)
-  setVariableTool,
-  modifyVariableTool,
-  toggleVariableTool,
-  addToListTool,
-  removeFromListTool,
-  clearListTool,
-  createVariableTool,
-  deleteVariableTool,
 
   // Scene Challenges (4 tools)
   startChallengeTool,

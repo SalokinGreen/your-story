@@ -2,11 +2,10 @@
  * GM Stage Tools - Tool definitions for the Game Master stage
  *
  * The GM stage runs before the story stage and determines:
- * - What skill checks are needed
- * - What resources are at stake
- * - Challenge management
- * - Opposed checks between player and NPCs
- * - Arbitrary dice rolls and calculations
+ * - What dice rolls are needed (formula_roll, opposed_formula)
+ * - Challenge management (start_challenge, formula_challenge_check)
+ * - Combat state management
+ * - Oracle and utility tools
  *
  * The frontend executes these tools, rolls dice, and prepends results to the story stage.
  */
@@ -17,43 +16,6 @@ import { ToolSchema } from "./toolSchemas";
 // GM TOOL INTERFACES
 // ============================================
 
-export interface SkillCheckParams {
-  stat: string;
-  difficulty: string; // Tier name (easy/average/hard) or DC number
-  reason: string;
-  item?: string;
-  ability?: string;
-  modifier?: number;
-  modifier_reason?: string;
-  resource?: {
-    name: string;
-    amount: number;
-  };
-  stakes?: "low" | "medium" | "high" | "deadly";
-  consequences?: {
-    success?: string;
-    failure?: string;
-    partial?: string; // For PbtA/Fate systems
-  };
-  show_to_player?: boolean; // Show dice animation to player (default true)
-}
-
-export interface ChallengeCheckParams {
-  description: string;
-  stat?: string;
-  difficulty?: string;
-  item?: string;
-  ability?: string;
-  modifier?: number;
-  modifier_reason?: string;
-  consequences?: {
-    success?: string;
-    failure?: string;
-    partial?: string;
-  };
-  show_to_player?: boolean; // Show dice animation to player (default true)
-}
-
 export interface StartChallengeParams {
   name: string;
   description: string;
@@ -63,31 +25,6 @@ export interface StartChallengeParams {
   difficulty: string;
   victory_consequence?: string;
   defeat_consequence?: string;
-}
-
-export interface OpposedCheckParams {
-  player_stat: string;
-  opponent_name: string;
-  opponent_skill: number;
-  reason: string;
-  player_item?: string;
-  player_ability?: string;
-  player_modifier?: number;
-  player_modifier_reason?: string;
-  opponent_modifier?: number;
-  stakes?: "low" | "medium" | "high" | "deadly";
-  consequences?: {
-    player_wins?: string;
-    opponent_wins?: string;
-    tie?: string;
-  };
-  show_to_player?: boolean; // Show dice animation to player (default true)
-}
-
-export interface RollDiceParams {
-  dice: string; // "1d6", "2d10+5", "3d6-2"
-  reason: string;
-  display_name?: string;
 }
 
 export interface CalculateParams {
@@ -309,20 +246,15 @@ export interface UpdateCombatantStatParams {
 }
 
 /**
- * Add Combatant Condition - Add a status effect to a combatant
+ * Toggle Combatant Condition - Add or remove a status effect from a combatant
+ * If condition exists, removes it. If not, adds it.
  */
-export interface AddCombatantConditionParams {
+export interface ToggleCombatantConditionParams {
   combatant: string; // Name or ID of combatant
   condition: string; // Condition name (e.g., "Stunned", "Prone", "Frightened")
-  duration?: number; // Optional: turns until condition expires
-}
-
-/**
- * Remove Combatant Condition - Remove a status effect from a combatant
- */
-export interface RemoveCombatantConditionParams {
-  combatant: string; // Name or ID of combatant
-  condition: string; // Condition name to remove
+  duration?: number; // Optional: turns until condition expires (only used when adding)
+  force_add?: boolean; // Force add even if exists (updates duration)
+  force_remove?: boolean; // Force remove even if doesn't exist
 }
 
 /**
@@ -382,16 +314,10 @@ export interface AdvanceTimerParams {
 }
 
 /**
- * Pause Timer - Temporarily stop a timer from advancing
+ * Toggle Timer Pause - Pause or resume a timer
+ * If timer is active, pauses it. If paused, resumes it.
  */
-export interface PauseTimerParams {
-  timer: string; // Timer name or ID
-}
-
-/**
- * Resume Timer - Resume a paused timer
- */
-export interface ResumeTimerParams {
+export interface ToggleTimerPauseParams {
   timer: string; // Timer name or ID
 }
 
@@ -409,23 +335,6 @@ export interface CancelTimerParams {
 export interface TriggerTimerParams {
   timer: string; // Timer name or ID
   reason?: string; // Why the timer was triggered early
-}
-
-// ============================================
-// GROUP CHECK INTERFACES
-// ============================================
-
-/**
- * Group Check - Multiple rolls where majority determines success
- * Useful for party stealth, group negotiations, travel hazards
- */
-export interface GroupCheckParams {
-  stat: string; // Stat to roll (e.g., "Stealth", "Endurance")
-  difficulty: string; // Difficulty tier or exact DC
-  participants: number; // How many are rolling (3-10)
-  reason: string; // What the group is attempting
-  threshold?: number; // Custom success threshold (default: majority = ceil(participants/2))
-  show_individual_rolls?: boolean; // Show each roll result (default: true)
 }
 
 // ============================================
@@ -484,11 +393,7 @@ export interface NPCReactionParams {
 
 // Union type for all GM tool parameters
 export type GMToolParams =
-  | { name: "skill_check"; params: SkillCheckParams }
-  | { name: "challenge_check"; params: ChallengeCheckParams }
   | { name: "start_challenge"; params: StartChallengeParams }
-  | { name: "opposed_check"; params: OpposedCheckParams }
-  | { name: "roll_dice"; params: RollDiceParams }
   | { name: "calculate"; params: CalculateParams }
   | { name: "take_rest"; params: TakeRestParams }
   | { name: "formula_roll"; params: FormulaRollParams }
@@ -504,22 +409,18 @@ export type GMToolParams =
   // Timer tools
   | { name: "create_timer"; params: CreateTimerParams }
   | { name: "advance_timer"; params: AdvanceTimerParams }
-  | { name: "pause_timer"; params: PauseTimerParams }
-  | { name: "resume_timer"; params: ResumeTimerParams }
+  | { name: "toggle_timer_pause"; params: ToggleTimerPauseParams }
   | { name: "cancel_timer"; params: CancelTimerParams }
   | { name: "trigger_timer"; params: TriggerTimerParams }
-  // Group check
-  | { name: "group_check"; params: GroupCheckParams }
   // Combat tools
   | { name: "start_combat"; params: StartCombatParams }
   | { name: "add_combatant"; params: AddCombatantParams }
   | { name: "add_multiple_combatants"; params: AddMultipleCombatantsParams }
   | { name: "remove_combatant"; params: RemoveCombatantParams }
   | { name: "update_combatant_stat"; params: UpdateCombatantStatParams }
-  | { name: "add_combatant_condition"; params: AddCombatantConditionParams }
   | {
-      name: "remove_combatant_condition";
-      params: RemoveCombatantConditionParams;
+      name: "toggle_combatant_condition";
+      params: ToggleCombatantConditionParams;
     }
   | { name: "npc_roll"; params: NPCRollParams }
   | { name: "advance_turn"; params: AdvanceTurnParams }
@@ -534,153 +435,6 @@ export type GMToolParams =
 // GM TOOL SCHEMAS
 // ============================================
 
-const skillCheckTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "skill_check",
-    description: `Request a skill check for the player's action. The frontend will roll dice, apply modifiers, and determine success/failure.
-
-WHEN TO USE:
-- Player attempts something with meaningful risk of failure
-- Action requires specific character competency
-- Outcome should depend on character stats
-
-STAKES determine condition tier on failure:
-- low: Tier 1 (minor setback)
-- medium: Tier 2 (noticeable consequence)
-- high: Tier 3 (significant injury/problem)
-- deadly: Tier 4+ (severe/life-threatening)`,
-    parameters: {
-      type: "object",
-      properties: {
-        stat: {
-          type: "string",
-          description:
-            "Which character stat to check (e.g., 'Strength', 'Stealth', 'Persuasion')",
-        },
-        difficulty: {
-          type: "string",
-          description:
-            "Difficulty tier (trivial/easy/average/hard/very_hard/impossible) or exact DC number",
-        },
-        reason: {
-          type: "string",
-          description:
-            "Brief description of what's being attempted (e.g., 'Picking the lock quietly')",
-        },
-        item: {
-          type: "string",
-          description:
-            "Item being used (grants advantage, may break on critical failure)",
-        },
-        ability: {
-          type: "string",
-          description: "Ability being used (grants grade bonus, pays cost)",
-        },
-        modifier: {
-          type: "number",
-          description:
-            "Flat bonus/penalty from passives, situation, or other factors",
-        },
-        modifier_reason: {
-          type: "string",
-          description:
-            "Explanation for the modifier (e.g., 'Rapier Mastery passive +2')",
-        },
-        resource: {
-          type: "object",
-          description:
-            "Resource being spent (insufficient = penalty instead of failure)",
-          properties: {
-            name: { type: "string", description: "Resource name" },
-            amount: { type: "number", description: "Amount required" },
-          },
-          required: ["name", "amount"],
-        },
-        stakes: {
-          type: "string",
-          enum: ["low", "medium", "high", "deadly"],
-          description:
-            "How dangerous is failure? Determines condition tier if player fails.",
-        },
-        consequences: {
-          type: "object",
-          description: "What happens on each outcome (guides the story stage)",
-          properties: {
-            success: { type: "string", description: "What happens on success" },
-            failure: { type: "string", description: "What happens on failure" },
-            partial: {
-              type: "string",
-              description: "PbtA/Fate: success with complication",
-            },
-          },
-        },
-        show_to_player: {
-          type: "boolean",
-          description:
-            "Show dice roll animation to player? Default true for player rolls. Set false for DM/enemy/hidden rolls.",
-        },
-      },
-      required: ["stat", "difficulty", "reason"],
-    },
-  },
-};
-
-const challengeCheckTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "challenge_check",
-    description: `Make a check as part of the active challenge. Inherits the challenge's primary stat and difficulty unless overridden.
-
-Use this INSTEAD of skill_check when there's an active challenge in progress.`,
-    parameters: {
-      type: "object",
-      properties: {
-        description: {
-          type: "string",
-          description:
-            "What this specific check represents (e.g., 'Vault over the gap between rooftops')",
-        },
-        stat: {
-          type: "string",
-          description: "Override: use a different stat for this check",
-        },
-        difficulty: {
-          type: "string",
-          description: "Override: situational difficulty change",
-        },
-        item: {
-          type: "string",
-          description: "Item being used",
-        },
-        ability: {
-          type: "string",
-          description: "Ability being used",
-        },
-        modifier: {
-          type: "number",
-          description: "Situational modifier",
-        },
-        modifier_reason: {
-          type: "string",
-          description: "Explanation for modifier",
-        },
-        consequences: {
-          type: "object",
-          description:
-            "Specific consequences for THIS check within the challenge",
-          properties: {
-            success: { type: "string" },
-            failure: { type: "string" },
-            partial: { type: "string" },
-          },
-        },
-      },
-      required: ["description"],
-    },
-  },
-};
-
 const startChallengeTool: ToolSchema = {
   type: "function",
   function: {
@@ -688,7 +442,7 @@ const startChallengeTool: ToolSchema = {
     description: `Start a multi-roll "best of X" challenge for complex tasks.
 
 GUIDELINES:
-- Simple tasks = regular skill_check, not a challenge
+- Simple tasks = regular formula_roll, not a challenge
 - Dangerous combat/chase = 3 successes needed
 - Boss fight = 4-5 successes needed
 - Epic battle = 6+ successes needed
@@ -744,116 +498,6 @@ Only ONE challenge can be active at a time.`,
         "primary_stat",
         "difficulty",
       ],
-    },
-  },
-};
-
-const opposedCheckTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "opposed_check",
-    description: `Contested roll between player and NPC. Both roll, higher wins.
-
-Use for:
-- Arm wrestling, drinking contests
-- Stealth vs Perception
-- Haggling/negotiations where both parties push back
-- Chases where opponent actively resists`,
-    parameters: {
-      type: "object",
-      properties: {
-        player_stat: {
-          type: "string",
-          description: "Player's stat to roll",
-        },
-        opponent_name: {
-          type: "string",
-          description: "NPC's name (e.g., 'Guard Captain', 'The Merchant')",
-        },
-        opponent_skill: {
-          type: "number",
-          description:
-            "NPC's effective skill (0-100). 30=novice, 50=competent, 70=skilled, 90=master",
-          minimum: 0,
-          maximum: 100,
-        },
-        reason: {
-          type: "string",
-          description: "What the contest is about",
-        },
-        player_item: {
-          type: "string",
-          description: "Item player is using",
-        },
-        player_ability: {
-          type: "string",
-          description: "Ability player is using",
-        },
-        player_modifier: {
-          type: "number",
-          description: "Player's situational modifier",
-        },
-        player_modifier_reason: {
-          type: "string",
-          description: "Explanation for player modifier",
-        },
-        opponent_modifier: {
-          type: "number",
-          description: "NPC's situational modifier",
-        },
-        stakes: {
-          type: "string",
-          enum: ["low", "medium", "high", "deadly"],
-          description: "Consequences of losing",
-        },
-        consequences: {
-          type: "object",
-          properties: {
-            player_wins: { type: "string" },
-            opponent_wins: { type: "string" },
-            tie: { type: "string" },
-          },
-        },
-        show_to_player: {
-          type: "boolean",
-          description:
-            "Show dice roll animation to player? Default true for player rolls. Set false for DM/hidden rolls.",
-        },
-      },
-      required: ["player_stat", "opponent_name", "opponent_skill", "reason"],
-    },
-  },
-};
-
-const rollDiceTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "roll_dice",
-    description: `Roll dice for random determination (NOT a skill check).
-
-Use for:
-- Random encounters
-- Loot quality
-- NPC reactions
-- Weather changes
-- Any random narrative element`,
-    parameters: {
-      type: "object",
-      properties: {
-        dice: {
-          type: "string",
-          description: "Dice notation: '1d6', '2d10', '1d20+5', '3d6-2'",
-        },
-        reason: {
-          type: "string",
-          description: "What this roll determines",
-        },
-        display_name: {
-          type: "string",
-          description: "Optional label for the UI (e.g., 'Encounter Roll')",
-        },
-      },
-      required: ["dice", "reason"],
     },
   },
 };
@@ -1189,22 +833,31 @@ const rollTableTool: ToolSchema = {
   type: "function",
   function: {
     name: "roll_table",
-    description: `Roll on a custom table or AGMT table for random content generation.
+    description: `Roll on a custom table or built-in AGMT table for random content generation.
 
 Use when:
 - You need random content from a defined set of options
 - The adventure has custom tables (weather, encounters, NPCs, etc.)
-- You want weighted random selection
+- You want to use built-in element tables for inspiration
 
-Tables are defined in the adventure's customTables or agmtState.tables.
-Each entry has a weight - higher weight = more likely to be selected.`,
+BUILT-IN TABLES (always available):
+- Character: character_appearance, character_personality, character_background, character_motivations, character_identity, character_skills, character_traits_flaws
+- Combat/Action: character_actions_combat, character_actions_general, creature_abilities, creature_descriptors
+- Locations: dungeon, dungeon_traps, forest, city, cavern, terrain, domicile
+- World: gods, legends, noble_house, civilization, army
+- Items: magic_item, scavenging_results
+- Narrative: plot_twists, cryptic_message, curses, visions_dreams
+- Atmosphere: smells, sounds, adventure_tone
+- Other: names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions
+
+Adventure-specific custom tables take priority over built-in tables with the same name.`,
     parameters: {
       type: "object",
       properties: {
         table_name: {
           type: "string",
           description:
-            "Name of the table to roll on (case-insensitive, partial match supported)",
+            "Name of the table to roll on (case-insensitive, partial match supported, underscores or spaces OK)",
         },
         reason: {
           type: "string",
@@ -1235,9 +888,9 @@ Use when:
 The GM stage will run again with the current results available.
 
 Example flow:
-1. First GM call: skill_check for attack
+1. First GM call: formula_roll for attack
 2. GM sees SUCCESS, calls request_continuation for damage
-3. Second GM call: roll_dice for damage calculation
+3. Second GM call: formula_roll for damage calculation
 4. Story stage receives both attack and damage results`,
     parameters: {
       type: "object",
@@ -1467,8 +1120,8 @@ Tactical combat is for:
 - Encounters requiring detailed stat tracking
 
 NOT for:
-- Quick narrative fights (use regular skill_check)
-- Single-roll conflicts (use opposed_check)
+- Quick narrative fights (use formula_roll)
+- Single-roll conflicts (use opposed_formula)
 - Chases or non-combat challenges (use scene challenges)`,
     parameters: {
       type: "object",
@@ -1699,21 +1352,22 @@ The combatant's stat cannot go below 0 unless the system allows negatives.`,
   },
 };
 
-const addCombatantConditionTool: ToolSchema = {
+const toggleCombatantConditionTool: ToolSchema = {
   type: "function",
   function: {
-    name: "add_combatant_condition",
-    description: `Add a status condition to a combatant.
+    name: "toggle_combatant_condition",
+    description: `Toggle a status condition on a combatant (add if missing, remove if present).
 
 Conditions are narrative/mechanical effects:
 - Stunned, Prone, Frightened, Poisoned
 - Blessed, Hasted, Invisible
 - On Fire, Bleeding, Cursed
 
-Duration is in turns (rounds of combat).
-Leave duration empty for permanent conditions.
+By default, toggles: adds if not present, removes if present.
+Use force_add=true to always add (updates duration if exists).
+Use force_remove=true to always remove.
 
-Duplicate conditions: If condition already exists, updates the duration to max of old/new.`,
+Duration is in turns (rounds of combat). Omit for permanent conditions.`,
     parameters: {
       type: "object",
       properties: {
@@ -1728,36 +1382,17 @@ Duplicate conditions: If condition already exists, updates the duration to max o
         duration: {
           type: "number",
           description:
-            "Optional: Turns until condition expires. Omit for permanent conditions.",
+            "Optional: Turns until condition expires (only used when adding). Omit for permanent conditions.",
         },
-      },
-      required: ["combatant", "condition"],
-    },
-  },
-};
-
-const removeCombatantConditionTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "remove_combatant_condition",
-    description: `Remove a status condition from a combatant.
-
-Use when:
-- A condition expires naturally (turn duration)
-- A condition is cured or dispelled
-- The situation changes (e.g., they get up from Prone)
-
-If the condition doesn't exist on the combatant, no error is raised.`,
-    parameters: {
-      type: "object",
-      properties: {
-        combatant: {
-          type: "string",
-          description: "Name of the combatant",
+        force_add: {
+          type: "boolean",
+          description:
+            "Force add even if condition exists (updates duration). Default: false",
         },
-        condition: {
-          type: "string",
-          description: "Condition name to remove",
+        force_remove: {
+          type: "boolean",
+          description:
+            "Force remove even if condition doesn't exist. Default: false",
         },
       },
       required: ["combatant", "condition"],
@@ -1980,45 +1615,26 @@ If ticks would reduce currentTicks to 0 or below, the timer triggers.`,
   },
 };
 
-const pauseTimerTool: ToolSchema = {
+const toggleTimerPauseTool: ToolSchema = {
   type: "function",
   function: {
-    name: "pause_timer",
-    description: `Pause a timer, stopping it from advancing.
+    name: "toggle_timer_pause",
+    description: `Toggle a timer between paused and active states.
+
+If timer is active, pauses it. If paused, resumes it.
 
 Use when:
-- Player action delays the countdown
-- Time is frozen narratively
+- Player action delays/resumes the countdown
+- Time is frozen/unfrozen narratively
 - Temporary reprieve from deadline
 
-Paused timers don't auto-advance and can't be manually advanced.
-Use resume_timer to restart.`,
+Paused timers don't auto-advance and can't be manually advanced.`,
     parameters: {
       type: "object",
       properties: {
         timer: {
           type: "string",
-          description: "Timer name or ID to pause",
-        },
-      },
-      required: ["timer"],
-    },
-  },
-};
-
-const resumeTimerTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "resume_timer",
-    description: `Resume a paused timer.
-
-The timer continues from where it was paused.`,
-    parameters: {
-      type: "object",
-      properties: {
-        timer: {
-          type: "string",
-          description: "Timer name or ID to resume",
+          description: "Timer name or ID to toggle",
         },
       },
       required: ["timer"],
@@ -2080,65 +1696,6 @@ The timer fires regardless of remaining ticks.`,
         },
       },
       required: ["timer"],
-    },
-  },
-};
-
-// ============================================
-// GROUP CHECK TOOL SCHEMA
-// ============================================
-
-const groupCheckTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "group_check",
-    description: `Roll multiple checks where majority success determines overall outcome.
-
-Use for party/group actions:
-- "Everyone tries to sneak past the guards"
-- "The group makes their way through the blizzard"
-- "We all try to persuade the king"
-
-How it works:
-1. Rolls the specified stat check N times (one per participant)
-2. Counts successes vs failures
-3. If successes >= threshold (default: majority), overall SUCCESS
-
-Unlike individual checks, uses the PLAYER'S stat for all rolls.
-Represents the party helping each other / averaging out luck.
-
-Results show each roll, total successes, and overall outcome.`,
-    parameters: {
-      type: "object",
-      properties: {
-        stat: {
-          type: "string",
-          description: "Stat to roll for each participant",
-        },
-        difficulty: {
-          type: "string",
-          description:
-            "Difficulty tier (trivial/easy/average/hard/very_hard/impossible) or exact DC",
-        },
-        participants: {
-          type: "number",
-          description: "Number of participants rolling (3-10)",
-        },
-        reason: {
-          type: "string",
-          description: "What the group is attempting",
-        },
-        threshold: {
-          type: "number",
-          description:
-            "Custom success threshold (default: majority = ceil(participants/2))",
-        },
-        show_individual_rolls: {
-          type: "boolean",
-          description: "Show each individual roll result (default: true)",
-        },
-      },
-      required: ["stat", "difficulty", "participants", "reason"],
     },
   },
 };
@@ -2360,11 +1917,7 @@ Examples:
  * All GM stage tool schemas
  */
 export const GM_TOOL_SCHEMAS: ToolSchema[] = [
-  // DEPRECATED: skillCheckTool - use formulaRollTool instead
-  // DEPRECATED: challengeCheckTool - use formulaChallengeCheckTool instead
-  // DEPRECATED: opposedCheckTool - use opposedFormulaTool instead
   startChallengeTool,
-  rollDiceTool,
   calculateTool,
   takeRestTool,
   // Formula-based tools (primary dice mechanics)
@@ -2382,20 +1935,16 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Countdown timer tools
   createTimerTool,
   advanceTimerTool,
-  pauseTimerTool,
-  resumeTimerTool,
+  toggleTimerPauseTool,
   cancelTimerTool,
   triggerTimerTool,
-  // Group check tool
-  groupCheckTool,
   // Combat tools
   startCombatTool,
   addCombatantTool,
   addMultipleCombatantsTool,
   removeCombatantTool,
   updateCombatantStatTool,
-  addCombatantConditionTool,
-  removeCombatantConditionTool,
+  toggleCombatantConditionTool,
   npcRollTool,
   advanceTurnTool,
   endCombatTool,

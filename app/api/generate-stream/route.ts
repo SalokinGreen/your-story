@@ -102,7 +102,6 @@ function extractTextContent(content: unknown): string {
 const GOOGLE_ESSENTIAL_TOOLS = new Set([
   // Core rolling
   "formula_roll",
-  "roll_dice",
   "opposed_formula",
   "fate_question",
   // Lookup

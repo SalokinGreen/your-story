@@ -2458,18 +2458,41 @@ export function buildGMStagePrompt({
     (l) => l.enabled !== false && l.type === "mechanics"
   );
 
-  // 📁 World Lore - Titles only (use read_notes to view)
-  const worldLoreNotes = (storyData.lore || []).filter((l) => {
-    if (l.enabled === false) return false;
-    if (isPinnedType(l.type)) return false;
-    if (isSecretType(l.type)) return false;
-    return true;
-  });
+  // Categorize notes by type for better organization
+  const categorizeNotes = (notes: typeof storyData.lore) => {
+    const categories: Record<string, typeof notes> = {
+      lore: [],
+      npc: [],
+      location: [],
+      item: [],
+      faction: [],
+      event: [],
+      secret: [],
+    };
+    for (const l of notes || []) {
+      if (l.enabled === false) continue;
+      if (isPinnedType(l.type)) continue; // Skip pinned types
+      const type = l.type || "lore";
+      if (type === "secret") {
+        categories.secret.push(l);
+      } else if (type === "npc") {
+        categories.npc.push(l);
+      } else if (type === "location") {
+        categories.location.push(l);
+      } else if (type === "item") {
+        categories.item.push(l);
+      } else if (type === "faction") {
+        categories.faction.push(l);
+      } else if (type === "event") {
+        categories.event.push(l);
+      } else {
+        categories.lore.push(l);
+      }
+    }
+    return categories;
+  };
 
-  // 🔒 Secrets - Titles only (use read_notes to view)
-  const secretNotes = (storyData.lore || []).filter(
-    (l) => l.enabled !== false && isSecretType(l.type)
-  );
+  const noteCategories = categorizeNotes(storyData.lore);
 
   // Build the lore/notes section
   let loreSection = "";
@@ -2494,15 +2517,42 @@ export function buildGMStagePrompt({
     }
   }
 
-  // Folder notes: Titles only
-  if (worldLoreNotes.length > 0) {
-    loreSection += `\n## 📁 WORLD LORE (use read_notes to view)\n`;
-    loreSection += worldLoreNotes.map((l) => `- ${l.title}`).join("\n");
+  // Folder notes by category: Titles only
+  if (noteCategories.npc.length > 0) {
+    loreSection += `\n## 👤 NPC NOTES (use read_notes to view)\n`;
+    loreSection += noteCategories.npc.map((l) => `- ${l.title}`).join("\n");
     loreSection += "\n";
   }
-  if (secretNotes.length > 0) {
+  if (noteCategories.location.length > 0) {
+    loreSection += `\n## 📍 LOCATION NOTES (use read_notes to view)\n`;
+    loreSection += noteCategories.location
+      .map((l) => `- ${l.title}`)
+      .join("\n");
+    loreSection += "\n";
+  }
+  if (noteCategories.item.length > 0) {
+    loreSection += `\n## 🎒 ITEM NOTES (use read_notes to view)\n`;
+    loreSection += noteCategories.item.map((l) => `- ${l.title}`).join("\n");
+    loreSection += "\n";
+  }
+  if (noteCategories.faction.length > 0) {
+    loreSection += `\n## ⚔️ FACTION NOTES (use read_notes to view)\n`;
+    loreSection += noteCategories.faction.map((l) => `- ${l.title}`).join("\n");
+    loreSection += "\n";
+  }
+  if (noteCategories.event.length > 0) {
+    loreSection += `\n## 📜 EVENT NOTES (use read_notes to view)\n`;
+    loreSection += noteCategories.event.map((l) => `- ${l.title}`).join("\n");
+    loreSection += "\n";
+  }
+  if (noteCategories.lore.length > 0) {
+    loreSection += `\n## 📁 WORLD LORE (use read_notes to view)\n`;
+    loreSection += noteCategories.lore.map((l) => `- ${l.title}`).join("\n");
+    loreSection += "\n";
+  }
+  if (noteCategories.secret.length > 0) {
     loreSection += `\n## 🔒 SECRETS (use read_notes to view)\n`;
-    loreSection += secretNotes.map((l) => `- ${l.title}`).join("\n");
+    loreSection += noteCategories.secret.map((l) => `- ${l.title}`).join("\n");
     loreSection += "\n";
   }
 
@@ -2727,13 +2777,12 @@ HOW THIS WORKS
 TOOL QUICK REFERENCE
 ═══════════════════════════════════════════════════════════════
 
-**🎲 ROLLING**
+**🎲 ROLLING & ORACLES**
 • formula_roll - Main roll: formula, dc, stakes, consequences. Use reverse_dc for roll-under!
 • npc_roll - Roll for NPCs/enemies in combat
 • opposed_formula - Contested rolls (both sides roll)
-• roll_dice - Simple rolls: damage, tables ("2d6+3")
-• fate_question - Yes/no oracle with likelihood
-• group_check - Party-wide tests, majority wins
+• roll_table - Roll on tables by name. Built-in: character_appearance, character_personality, character_background, character_motivations, dungeon, dungeon_traps, forest, city, cavern, terrain, creature_abilities, creature_descriptors, magic_item, plot_twists, gods, legends, curses, names, smells, sounds. Custom tables from adventure also available.
+• fate_question - Yes/no oracle with likelihood ("Is the door locked?" → likely/unlikely)
 
 **📝 TRACKING**
 • create_note / update_note - Notes for locations, creatures, factions
@@ -3147,7 +3196,6 @@ Were the robbers actually hired? That's a question for later.
     "formula_roll",
     "formula_challenge_check",
     "opposed_formula",
-    "roll_dice",
     "fate_question",
     "roll_table",
     // Calculator
@@ -3164,8 +3212,7 @@ Were the robbers actually hired? That's a question for later.
     "add_combatant",
     "remove_combatant",
     "update_combatant_stat",
-    "add_combatant_condition",
-    "remove_combatant_condition",
+    "toggle_combatant_condition",
     "npc_roll",
     "advance_turn",
     "end_combat",
@@ -3177,12 +3224,9 @@ Were the robbers actually hired? That's a question for later.
     // Timer tools
     "create_timer",
     "advance_timer",
-    "pause_timer",
-    "resume_timer",
+    "toggle_timer_pause",
     "cancel_timer",
     "trigger_timer",
-    // Group check
-    "group_check",
     // Terminal
     "end_gm_thinking",
   ];
@@ -3214,8 +3258,6 @@ Were the robbers actually hired? That's a question for later.
     // note tools
     "create_note",
     "delete_note",
-    "show_note",
-    "hide_note",
     "update_note",
     // Memory
     "add_memory",
@@ -3224,15 +3266,6 @@ Were the robbers actually hired? That's a question for later.
     "downgrade_condition",
     "remove_condition",
     "modify_condition",
-    // Variable tools
-    "set_variable",
-    "modify_variable",
-    "toggle_variable",
-    "add_to_list",
-    "remove_from_list",
-    "clear_list",
-    "create_variable",
-    "delete_variable",
     // Thread tools
     "create_thread",
     "update_thread",
@@ -3294,37 +3327,11 @@ Were the robbers actually hired? That's a question for later.
     const part = partsToInclude[i];
 
     if (part.user) {
-      // User choice - look ahead for the story response to build proper context
-      const nextPart = partsToInclude[i + 1];
-      const storyOutput = nextPart && !nextPart.user ? nextPart.content : null;
-
-      // Format: previous story output (truncated) + "> user action"
-      // This gives the GM context of what the player saw before acting
-      if (i > 0) {
-        // Find the previous story output (full text, not truncated)
-        const prevPart = partsToInclude[i - 1];
-        if (prevPart && !prevPart.user) {
-          messages.push({
-            role: "user",
-            content: cleanString(
-              `[Story so far...]\n${
-                prevPart.content
-              }\n\n> ${part.content.replace(/^>\s*/, "")}`
-            ),
-          });
-        } else {
-          messages.push({
-            role: "user",
-            content: cleanString(`> ${part.content.replace(/^>\s*/, "")}`),
-          });
-        }
-      } else {
-        // First user action in history
-        messages.push({
-          role: "user",
-          content: cleanString(`> ${part.content.replace(/^>\s*/, "")}`),
-        });
-      }
+      // User action - simple format, story context comes after GM response
+      messages.push({
+        role: "user",
+        content: cleanString(`> ${part.content.replace(/^>\s*/, "")}`),
+      });
     } else {
       // Assistant (story) part - reconstruct GM's thinking and tool calls
       // This is the key improvement: GM sees its own reasoning from past turns
@@ -3452,28 +3459,23 @@ Were the robbers actually hired? That's a question for later.
         });
       }
 
-      // DON'T add the story output as a separate message - it will be included
-      // with the next user action as "[Story so far...]\n> action"
+      // Add the story output as assistant response AFTER GM thinking
+      // This shows the GM what narrative was generated from their decisions
+      if (part.content && part.content.trim()) {
+        messages.push({
+          role: "assistant",
+          content: cleanString(`[STORY OUTPUT]\n${part.content}`),
+        });
+      }
     }
   }
 
   // Add the current player action as the final user message
-  // Include the most recent story output for context (full text, not truncated)
-  const lastStoryPart = partsToInclude
-    .slice()
-    .reverse()
-    .find((p) => !p.user);
-  const recentStory = lastStoryPart ? lastStoryPart.content : null;
-
-  const playerActionMessage = recentStory
-    ? `[Story so far...]\n${recentStory}\n\n> ${userChoice.replace(
-        /^>\s*/,
-        ""
-      )}\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GAME MASTER] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`
-    : `> ${userChoice.replace(
-        /^>\s*/,
-        ""
-      )}\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GAME MASTER] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`;
+  // Story context is now in the previous assistant message, so just include the action
+  const playerActionMessage = `> ${userChoice.replace(
+    /^>\s*/,
+    ""
+  )}\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GAME MASTER] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`;
 
   messages.push({
     role: "user",

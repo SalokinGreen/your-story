@@ -9,6 +9,7 @@ import SyncIndicator from "../components/SyncIndicator";
 import STTButton from "../components/STTButton";
 import CombatDisplay from "../components/CombatDisplay";
 import type { SyncStatus } from "../misc/localStoryManager";
+import type { GMToolResult } from "../misc/gmExecutor";
 
 interface StoryProps {
   storyData: StoryData;
@@ -38,6 +39,11 @@ interface StoryProps {
   onNavigateRight?: () => void;
   onResetToCurrentPart?: () => void;
   syncStatus?: SyncStatus;
+  // Interleaved GM streaming entries (thinking text and tool results in order)
+  liveGMEntries?: Array<
+    | { type: "thinking"; content: string; isStreaming?: boolean }
+    | { type: "tool"; result: GMToolResult }
+  >;
 }
 
 export default function Story({
@@ -66,6 +72,7 @@ export default function Story({
   onNavigateRight,
   onResetToCurrentPart,
   syncStatus,
+  liveGMEntries,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -465,99 +472,171 @@ export default function Story({
         )}
 
         {/* GM Thinking Collapsible (shows reasoning, tool calls, and results) */}
-        {displayGMThinkingEnabled && hasGMContent && (
-          <div className="border-b border-purple-800/30">
-            <button
-              onClick={() => setShowGMThinking(!showGMThinking)}
-              className="w-full flex items-center justify-between px-4 py-2 bg-purple-900/20 hover:bg-purple-900/30 transition-colors"
-            >
-              <div className="flex items-center gap-2">
-                <DynamicIcon name="Dice5" className="w-4 h-4 text-purple-400" />
-                <span className="text-sm font-medium text-purple-300">
-                  GM Reasoning
-                </span>
-                <span className="text-xs text-purple-400/60">
-                  ({gmThinking.length}{" "}
-                  {gmThinking.length === 1 ? "thought" : "thoughts"}
-                  {gmToolCalls.length > 0 &&
-                    `, ${gmToolCalls.length} ${
-                      gmToolCalls.length === 1 ? "roll" : "rolls"
-                    }`}
-                  )
-                </span>
-              </div>
-              <DynamicIcon
-                name={showGMThinking ? "ChevronUp" : "ChevronDown"}
-                className="w-4 h-4 text-purple-400"
-              />
-            </button>
-            {showGMThinking && (
-              <div className="px-4 py-3 bg-purple-950/30 space-y-3 max-h-80 overflow-y-auto">
-                {/* GM Thinking Text */}
-                {gmThinking.length > 0 && (
-                  <div className="space-y-2">
-                    {gmThinking.map((thought, idx) => (
-                      <div
-                        key={idx}
-                        className="text-sm text-purple-200/80 whitespace-pre-wrap"
-                      >
-                        <span className="text-purple-400/60 font-medium">
-                          [GM]{" "}
-                        </span>
-                        {thought}
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Tool Calls and Results */}
-                {gmToolCalls.length > 0 && (
-                  <div className="border-t border-purple-800/30 pt-3 space-y-2">
-                    <div className="text-xs font-medium text-purple-400/80 uppercase tracking-wide">
-                      Dice Rolls & Tools
-                    </div>
-                    {gmToolCalls.map((call: any, idx: number) => (
-                      <div
-                        key={idx}
-                        className="text-sm bg-purple-900/30 rounded px-3 py-2"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`font-medium ${
-                              call.success ? "text-green-400" : "text-red-400"
-                            }`}
+        {/* Show when: has saved content OR currently streaming GM stage */}
+        {displayGMThinkingEnabled &&
+          (hasGMContent ||
+            (loadingStage === "gm" &&
+              liveGMEntries &&
+              liveGMEntries.length > 0)) && (
+            <div className="border-b border-purple-800/30">
+              <button
+                onClick={() => setShowGMThinking(!showGMThinking)}
+                className="w-full flex items-center justify-between px-4 py-2 bg-purple-900/20 hover:bg-purple-900/30 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <DynamicIcon
+                    name="Dice5"
+                    className="w-4 h-4 text-purple-400"
+                  />
+                  <span className="text-sm font-medium text-purple-300">
+                    GM Reasoning
+                  </span>
+                  {loadingStage === "gm" ? (
+                    <span className="text-xs text-purple-400/60 flex items-center gap-1">
+                      <span className="animate-pulse">●</span> Streaming...
+                    </span>
+                  ) : (
+                    <span className="text-xs text-purple-400/60">
+                      ({gmThinking.length}{" "}
+                      {gmThinking.length === 1 ? "thought" : "thoughts"}
+                      {gmToolCalls.length > 0 &&
+                        `, ${gmToolCalls.length} ${
+                          gmToolCalls.length === 1 ? "tool" : "tools"
+                        }`}
+                      )
+                    </span>
+                  )}
+                </div>
+                <DynamicIcon
+                  name={
+                    showGMThinking || loadingStage === "gm"
+                      ? "ChevronUp"
+                      : "ChevronDown"
+                  }
+                  className="w-4 h-4 text-purple-400"
+                />
+              </button>
+              {/* Auto-expand during streaming, otherwise respect user toggle */}
+              {(showGMThinking || loadingStage === "gm") && (
+                <div className="px-4 py-3 bg-purple-950/30 space-y-3 max-h-80 overflow-y-auto">
+                  {/* Live streaming content - interleaved thinking and tool results */}
+                  {loadingStage === "gm" && liveGMEntries ? (
+                    <div className="space-y-3">
+                      {liveGMEntries.map((entry, idx) =>
+                        entry.type === "thinking" ? (
+                          <div
+                            key={`thinking-${idx}`}
+                            className="text-sm text-purple-200/80 whitespace-pre-wrap"
                           >
-                            {call.success ? "✓" : "✗"}
-                          </span>
-                          <span className="text-purple-300 font-medium">
-                            {call.toolName?.replace(/_/g, " ")}
-                          </span>
-                        </div>
-                        {call.contextForStory && (
-                          <div className="text-purple-200/70 text-xs mt-1 font-mono">
-                            {call.contextForStory}
+                            <span className="text-purple-400/60 font-medium">
+                              [GM]{" "}
+                            </span>
+                            {entry.content}
+                            {entry.isStreaming && (
+                              <span className="animate-pulse text-purple-400">
+                                ▌
+                              </span>
+                            )}
                           </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                        ) : (
+                          <div
+                            key={`tool-${idx}`}
+                            className="text-sm bg-purple-900/30 rounded px-3 py-2 animate-fadeIn"
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={`font-medium ${
+                                  entry.result.success
+                                    ? "text-green-400"
+                                    : "text-red-400"
+                                }`}
+                              >
+                                {entry.result.success ? "✓" : "✗"}
+                              </span>
+                              <span className="text-purple-300 font-medium">
+                                {entry.result.toolName?.replace(/_/g, " ")}
+                              </span>
+                            </div>
+                            {entry.result.contextForStory && (
+                              <div className="text-purple-200/70 text-xs mt-1 font-mono">
+                                {entry.result.contextForStory}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      )}
+                    </div>
+                  ) : (
+                    <>
+                      {/* Saved GM Thinking Text */}
+                      {gmThinking.length > 0 && (
+                        <div className="space-y-2">
+                          {gmThinking.map((thought, idx) => (
+                            <div
+                              key={idx}
+                              className="text-sm text-purple-200/80 whitespace-pre-wrap"
+                            >
+                              <span className="text-purple-400/60 font-medium">
+                                [GM]{" "}
+                              </span>
+                              {thought}
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-                {/* GM Summary Context */}
-                {gmStoryContext && !gmToolCalls.length && (
-                  <div className="border-t border-purple-800/30 pt-3">
-                    <div className="text-xs font-medium text-purple-400/80 uppercase tracking-wide mb-2">
-                      GM Summary
-                    </div>
-                    <div className="text-sm text-purple-200/70 font-mono whitespace-pre-wrap">
-                      {gmStoryContext}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+                      {/* Saved Tool Calls and Results */}
+                      {gmToolCalls.length > 0 && (
+                        <div className="border-t border-purple-800/30 pt-3 space-y-2">
+                          <div className="text-xs font-medium text-purple-400/80 uppercase tracking-wide">
+                            Dice Rolls & Tools
+                          </div>
+                          {gmToolCalls.map((call: any, idx: number) => (
+                            <div
+                              key={idx}
+                              className="text-sm bg-purple-900/30 rounded px-3 py-2"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={`font-medium ${
+                                    call.success
+                                      ? "text-green-400"
+                                      : "text-red-400"
+                                  }`}
+                                >
+                                  {call.success ? "✓" : "✗"}
+                                </span>
+                                <span className="text-purple-300 font-medium">
+                                  {call.toolName?.replace(/_/g, " ")}
+                                </span>
+                              </div>
+                              {call.contextForStory && (
+                                <div className="text-purple-200/70 text-xs mt-1 font-mono">
+                                  {call.contextForStory}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* GM Summary Context */}
+                      {gmStoryContext && !gmToolCalls.length && (
+                        <div className="border-t border-purple-800/30 pt-3">
+                          <div className="text-xs font-medium text-purple-400/80 uppercase tracking-wide mb-2">
+                            GM Summary
+                          </div>
+                          <div className="text-sm text-purple-200/70 font-mono whitespace-pre-wrap">
+                            {gmStoryContext}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
         {/* Combat Display - shows active combat state */}
         {storyData.combatState?.active && (
@@ -704,16 +783,16 @@ export default function Story({
               {loading || loadingStage ? (
                 <button
                   onClick={onStop}
-                  className="flex-1 py-3.5 sm:py-2.5 text-base font-semibold rounded-lg bg-red-600/80 hover:bg-red-600 text-white transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation cursor-pointer"
+                  className="flex-1 py-3.5 sm:py-2.5 text-base font-medium rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-400/30 text-blue-300 transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation cursor-pointer"
                   title="Cancel generation"
                 >
-                  <div className="w-4 h-4 border-2 border-white/60 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-blue-400/60 border-t-blue-300 rounded-full animate-spin" />
                   {loadingStage === "gm"
-                    ? "Analyzing action..."
+                    ? "Thinking..."
                     : loadingStage === "choices"
                     ? "Preparing choices..."
                     : "Generating..."}
-                  <DynamicIcon name="Square" className="w-4 h-4 ml-1" />
+                  <span className="text-blue-400/80 text-sm ml-1">Cancel</span>
                 </button>
               ) : (
                 <button

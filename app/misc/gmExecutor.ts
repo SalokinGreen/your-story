@@ -1,7 +1,7 @@
 /**
  * GM Stage Executor - Frontend execution of GM tool calls
  *
- * Executes GM tool calls (skill_check, challenge_check, etc.) on the frontend,
+ * Executes GM tool calls (formula_roll, start_challenge, etc.) on the frontend,
  * rolling dice, checking items/abilities, and returning results for the story stage.
  */
 
@@ -22,11 +22,7 @@ import {
   NPCAttitude,
 } from "./structs";
 import {
-  SkillCheckParams,
-  ChallengeCheckParams,
   StartChallengeParams,
-  OpposedCheckParams,
-  RollDiceParams,
   CalculateParams,
   TakeRestParams,
   FormulaRollParams,
@@ -42,20 +38,16 @@ import {
   // Timer tools
   CreateTimerParams,
   AdvanceTimerParams,
-  PauseTimerParams,
-  ResumeTimerParams,
+  ToggleTimerPauseParams,
   CancelTimerParams,
   TriggerTimerParams,
-  // Group check
-  GroupCheckParams,
   // Combat tools
   StartCombatParams,
   AddCombatantParams,
   AddMultipleCombatantsParams,
   RemoveCombatantParams,
   UpdateCombatantStatParams,
-  AddCombatantConditionParams,
-  RemoveCombatantConditionParams,
+  ToggleCombatantConditionParams,
   NPCRollParams,
   AdvanceTurnParams,
   EndCombatParams,
@@ -93,10 +85,7 @@ export interface GMToolResult {
   toolCallId: string;
   success: boolean;
   result:
-    | GMCheckResult
     | GMChallengeResult
-    | GMOpposedResult
-    | GMRollResult
     | GMCalculateResult
     | GMRestResult
     | GMFormulaRollResult
@@ -113,20 +102,16 @@ export interface GMToolResult {
     // Timer results
     | GMCreateTimerResult
     | GMAdvanceTimerResult
-    | GMPauseTimerResult
-    | GMResumeTimerResult
+    | GMToggleTimerPauseResult
     | GMCancelTimerResult
     | GMTriggerTimerResult
-    // Group check result
-    | GMGroupCheckResult
     // Combat results
     | GMStartCombatResult
     | GMAddCombatantResult
     | GMAddMultipleCombatantsResult
     | GMRemoveCombatantResult
     | GMUpdateCombatantStatResult
-    | GMAddCombatantConditionResult
-    | GMRemoveCombatantConditionResult
+    | GMToggleCombatantConditionResult
     | GMNPCRollResult
     | GMAdvanceTurnResult
     | GMEndCombatResult
@@ -144,65 +129,6 @@ export interface GMStateChangeResult {
   command: string;
 }
 
-export interface GMCheckResult {
-  type: "skill_check" | "challenge_check";
-  stat: string;
-  statValue: number;
-  difficulty: string;
-  dc: number;
-  roll: number;
-  rolls: number[]; // Individual dice values for dice visualizer
-  total: number;
-  success: boolean;
-  showToPlayer?: boolean; // Show dice animation to player (default true)
-  explosions?: number; // For explosive dice system
-  partialSuccess?: boolean;
-  criticalSuccess?: boolean;
-  criticalFailure?: boolean;
-  margin?: number;
-  item?: {
-    name: string;
-    used: boolean;
-    broken?: boolean;
-    consumed?: boolean;
-  };
-  ability?: {
-    name: string;
-    used: boolean;
-    costPaid?: boolean;
-  };
-  resource?: {
-    name: string;
-    required: number;
-    had: number;
-    penalty?: number;
-  };
-  condition?: {
-    name: string;
-    tier: number;
-    penalty: number;
-  };
-  modifier?: {
-    value: number;
-    reason: string;
-  };
-  stakes?: string;
-  consequences?: {
-    success?: string;
-    failure?: string;
-    partial?: string;
-  };
-  challengeProgress?: {
-    name: string;
-    successes: number;
-    failures: number;
-    required: number;
-    maxFailures: number;
-    completed?: boolean;
-    won?: boolean;
-  };
-}
-
 export interface GMChallengeResult {
   type: "start_challenge";
   name: string;
@@ -213,48 +139,6 @@ export interface GMChallengeResult {
   difficulty: string;
   victoryConsequence?: string;
   defeatConsequence?: string;
-}
-
-export interface GMOpposedResult {
-  type: "opposed_check";
-  playerStat: string;
-  playerStatValue: number;
-  playerRoll: number;
-  playerTotal: number;
-  opponentName: string;
-  opponentSkill: number;
-  opponentRoll: number;
-  opponentTotal: number;
-  winner: "player" | "opponent" | "tie";
-  margin: number;
-  showToPlayer?: boolean; // Show dice animation to player (default true)
-  item?: {
-    name: string;
-    used: boolean;
-    broken?: boolean;
-    consumed?: boolean;
-  };
-  ability?: {
-    name: string;
-    used: boolean;
-    costPaid?: boolean;
-  };
-  stakes?: string;
-  consequences?: {
-    player_wins?: string;
-    opponent_wins?: string;
-    tie?: string;
-  };
-}
-
-export interface GMRollResult {
-  type: "roll_dice";
-  dice: string;
-  rolls: number[];
-  modifier: number;
-  total: number;
-  reason: string;
-  displayName?: string;
 }
 
 export interface GMCalculateResult {
@@ -468,19 +352,12 @@ export interface GMUpdateCombatantStatResult {
   diceRolled?: number[]; // If value was a dice formula
 }
 
-export interface GMAddCombatantConditionResult {
-  type: "add_combatant_condition";
+export interface GMToggleCombatantConditionResult {
+  type: "toggle_combatant_condition";
   combatant: string;
   condition: string;
   duration?: number;
-  wasUpdate: boolean; // True if condition already existed and was updated
-}
-
-export interface GMRemoveCombatantConditionResult {
-  type: "remove_combatant_condition";
-  combatant: string;
-  condition: string;
-  wasRemoved: boolean; // False if condition didn't exist
+  action: "added" | "removed" | "updated"; // What actually happened
 }
 
 export interface GMNPCRollResult {
@@ -540,16 +417,11 @@ export interface GMAdvanceTimerResult {
   triggered: boolean;
 }
 
-export interface GMPauseTimerResult {
-  type: "pause_timer";
+export interface GMToggleTimerPauseResult {
+  type: "toggle_timer_pause";
   timer: string;
-  wasPaused: boolean; // False if already paused
-}
-
-export interface GMResumeTimerResult {
-  type: "resume_timer";
-  timer: string;
-  wasResumed: boolean; // False if already active
+  newStatus: "paused" | "active";
+  ticksRemaining: number;
 }
 
 export interface GMCancelTimerResult {
@@ -565,30 +437,6 @@ export interface GMTriggerTimerResult {
   reason?: string;
   ticksRemaining: number;
   description?: string; // What the timer effect was
-}
-
-// ============================================
-// GROUP CHECK RESULT INTERFACE
-// ============================================
-
-export interface GMGroupCheckResult {
-  type: "group_check";
-  stat: string;
-  statValue: number;
-  difficulty: string;
-  dc: number;
-  participants: number;
-  threshold: number;
-  individualRolls: {
-    roll: number;
-    total: number;
-    success: boolean;
-  }[];
-  totalSuccesses: number;
-  totalFailures: number;
-  overallSuccess: boolean;
-  reason: string;
-  showIndividualRolls: boolean;
 }
 
 // ============================================
@@ -794,7 +642,10 @@ export async function executeGMTools(
   for (const call of toolsToProcess) {
     let params: unknown;
     try {
-      params = JSON.parse(call.function.arguments);
+      // Handle both string and already-parsed object arguments
+      // Some providers (like Mistral) return arguments as objects, others as strings
+      const args = call.function.arguments;
+      params = typeof args === "string" ? JSON.parse(args) : args;
     } catch (parseError) {
       console.error(
         `[GM Tool Error] Failed to parse arguments for tool "${call.function.name}"`,
@@ -815,36 +666,12 @@ export async function executeGMTools(
 
     try {
       switch (call.function.name) {
-        case "skill_check":
-          result = executeSkillCheck(
-            call.id,
-            params as SkillCheckParams,
-            modified
-          );
-          break;
-        case "challenge_check":
-          result = executeChallengeCheck(
-            call.id,
-            params as ChallengeCheckParams,
-            modified
-          );
-          break;
         case "start_challenge":
           result = executeStartChallenge(
             call.id,
             params as StartChallengeParams,
             modified
           );
-          break;
-        case "opposed_check":
-          result = executeOpposedCheck(
-            call.id,
-            params as OpposedCheckParams,
-            modified
-          );
-          break;
-        case "roll_dice":
-          result = executeRollDice(call.id, params as RollDiceParams);
           break;
         case "calculate":
           result = executeCalculate(call.id, params as CalculateParams);
@@ -952,17 +779,10 @@ export async function executeGMTools(
             modified
           );
           break;
-        case "add_combatant_condition":
-          result = executeAddCombatantCondition(
+        case "toggle_combatant_condition":
+          result = executeToggleCombatantCondition(
             call.id,
-            params as AddCombatantConditionParams,
-            modified
-          );
-          break;
-        case "remove_combatant_condition":
-          result = executeRemoveCombatantCondition(
-            call.id,
-            params as RemoveCombatantConditionParams,
+            params as ToggleCombatantConditionParams,
             modified
           );
           break;
@@ -998,17 +818,10 @@ export async function executeGMTools(
             modified
           );
           break;
-        case "pause_timer":
-          result = executePauseTimer(
+        case "toggle_timer_pause":
+          result = executeToggleTimerPause(
             call.id,
-            params as PauseTimerParams,
-            modified
-          );
-          break;
-        case "resume_timer":
-          result = executeResumeTimer(
-            call.id,
-            params as ResumeTimerParams,
+            params as ToggleTimerPauseParams,
             modified
           );
           break;
@@ -1023,14 +836,6 @@ export async function executeGMTools(
           result = executeTriggerTimer(
             call.id,
             params as TriggerTimerParams,
-            modified
-          );
-          break;
-        // Group check
-        case "group_check":
-          result = executeGroupCheck(
-            call.id,
-            params as GroupCheckParams,
             modified
           );
           break;
@@ -1271,308 +1076,6 @@ export async function executeGMTools(
 }
 
 // ============================================
-// SKILL CHECK EXECUTOR
-// ============================================
-
-function executeSkillCheck(
-  toolCallId: string,
-  params: SkillCheckParams,
-  storyData: StoryData
-): GMToolResult {
-  const systemId = (storyData.rpgSystem || "3d6") as RPGSystemType;
-  const system = getRPGSystem(systemId);
-  const { dc, tierName } = parseDifficulty(params.difficulty, system);
-
-  // Find stat
-  const statMatch = findStatMatch(params.stat, storyData.stats || []);
-  const statValue = statMatch?.item?.value ?? 0;
-  const statName = statMatch?.item?.name ?? params.stat;
-
-  // Find item if specified
-  let itemResult: GMCheckResult["item"] | undefined;
-  let itemBonus = 0;
-  if (params.item) {
-    const itemMatch = findItemMatch(params.item, storyData.inventory || []);
-    if (itemMatch) {
-      const item = itemMatch.item as unknown as InventoryItem;
-      itemResult = { name: item.name, used: true };
-      itemBonus = getItemBonus(item, systemId);
-
-      // Mark consumable items
-      if (item.type === "consumable") {
-        itemResult.consumed = true;
-      }
-    }
-  }
-
-  // Find ability if specified
-  let abilityResult: GMCheckResult["ability"] | undefined;
-  let abilityBonus = 0;
-  if (params.ability) {
-    const abilityMatch = findAbilityMatch(
-      params.ability,
-      storyData.abilities || []
-    );
-    if (abilityMatch) {
-      const ability = abilityMatch.item as unknown as Ability;
-      abilityResult = { name: ability.name, used: true };
-      abilityBonus = getAbilityBonus(ability, systemId);
-      abilityResult.costPaid = true; // Cost deduction handled by tools stage
-    }
-  }
-
-  // Check resource if specified
-  let resourceResult: GMCheckResult["resource"] | undefined;
-  let resourcePenalty = 0;
-  if (params.resource) {
-    const resMatch = findResourceMatch(
-      params.resource.name,
-      storyData.resources || []
-    );
-    if (resMatch) {
-      const resource = resMatch.item;
-      const had = resource.value;
-      const required = params.resource.amount;
-      resourceResult = {
-        name: resource.name,
-        required,
-        had,
-      };
-      if (had < required) {
-        // Insufficient resource = penalty
-        resourcePenalty = Math.max(5, Math.floor(dc / 10));
-        resourceResult.penalty = resourcePenalty;
-      }
-    }
-  }
-
-  // Calculate condition penalty
-  let conditionResult: GMCheckResult["condition"] | undefined;
-  const condPenalty = calculateConditionPenalty(
-    storyData.conditions || [],
-    statName,
-    systemId
-  );
-  if (condPenalty.penalty !== 0 && condPenalty.condition) {
-    conditionResult = {
-      name: condPenalty.condition.name,
-      tier: condPenalty.condition.tier,
-      penalty: condPenalty.penalty,
-    };
-  }
-
-  // Calculate modifier
-  let modifierResult: GMCheckResult["modifier"] | undefined;
-  if (params.modifier) {
-    modifierResult = {
-      value: params.modifier,
-      reason: params.modifier_reason || "situational",
-    };
-  }
-
-  // Roll dice
-  const rollResult = rollDice(system);
-  const roll = rollResult.total;
-
-  // Calculate total
-  const total =
-    statValue +
-    roll +
-    itemBonus +
-    abilityBonus +
-    (params.modifier || 0) -
-    resourcePenalty -
-    (condPenalty.penalty || 0);
-
-  // Check success
-  const successResult = checkSuccess(
-    system,
-    roll,
-    statValue,
-    dc,
-    condPenalty.penalty,
-    rollResult.rolls,
-    storyData.reverseDC // Call of Cthulhu style - roll under DC
-  );
-  const success = successResult.success;
-  const partialSuccess = successResult.partial || false;
-  const criticalSuccess = successResult.critical && success;
-  const criticalFailure = successResult.critical && !success;
-  const margin = storyData.reverseDC ? dc - total : total - dc; // Invert margin for reverseDC
-
-  // Build context string for story stage
-  let contextForStory = `[${statName} Check: ${
-    success ? (partialSuccess ? "PARTIAL SUCCESS" : "SUCCESS") : "FAILURE"
-  }`;
-  contextForStory += ` | Roll: ${roll} + ${statValue} (stat)`;
-  if (itemBonus > 0) contextForStory += ` + ${itemBonus} (${itemResult?.name})`;
-  if (abilityBonus > 0)
-    contextForStory += ` + ${abilityBonus} (${abilityResult?.name})`;
-  if (params.modifier)
-    contextForStory += ` + ${params.modifier} (${
-      params.modifier_reason || "modifier"
-    })`;
-  if (resourcePenalty > 0)
-    contextForStory += ` - ${resourcePenalty} (low ${resourceResult?.name})`;
-  if (condPenalty.penalty > 0)
-    contextForStory += ` - ${condPenalty.penalty} (${conditionResult?.name})`;
-  contextForStory += ` = ${total} vs DC ${dc} (${tierName})]`;
-
-  if (params.stakes) {
-    contextForStory += `\n[Stakes: ${params.stakes}]`;
-  }
-
-  if (params.consequences) {
-    const outcome = success
-      ? partialSuccess
-        ? params.consequences.partial
-        : params.consequences.success
-      : params.consequences.failure;
-    if (outcome) {
-      contextForStory += `\n[Intended consequence: ${outcome}]`;
-    }
-  }
-
-  return {
-    toolName: "skill_check",
-    toolCallId,
-    success,
-    result: {
-      type: "skill_check",
-      stat: statName,
-      statValue,
-      difficulty: tierName,
-      dc,
-      roll,
-      rolls: rollResult.rolls, // Individual dice values for visualizer
-      explosions: rollResult.explosions, // For explosive dice system
-      total,
-      success,
-      partialSuccess,
-      criticalSuccess,
-      criticalFailure,
-      margin,
-      item: itemResult,
-      ability: abilityResult,
-      resource: resourceResult,
-      condition: conditionResult,
-      modifier: modifierResult,
-      stakes: params.stakes,
-      consequences: params.consequences,
-      showToPlayer: params.show_to_player !== false, // Default true
-    } as GMCheckResult,
-    contextForStory,
-  };
-}
-
-// ============================================
-// CHALLENGE CHECK EXECUTOR
-// ============================================
-
-function executeChallengeCheck(
-  toolCallId: string,
-  params: ChallengeCheckParams,
-  storyData: StoryData
-): GMToolResult {
-  const challenge = storyData.activeChallenge;
-  if (!challenge) {
-    return {
-      toolName: "challenge_check",
-      toolCallId,
-      success: false,
-      result: {
-        type: "challenge_check",
-        stat: params.stat || "unknown",
-        statValue: 0,
-        difficulty: "unknown",
-        dc: 0,
-        roll: 0,
-        total: 0,
-        success: false,
-      } as GMCheckResult,
-      contextForStory: "[ERROR: No active challenge to make a check for]",
-    };
-  }
-
-  // Use default stat from challenge name context or override
-  const stat = params.stat || "default";
-  const difficulty = params.difficulty || "average";
-
-  // Delegate to skill check with challenge context
-  const skillCheckParams: SkillCheckParams = {
-    stat,
-    difficulty,
-    reason: params.description,
-    item: params.item,
-    ability: params.ability,
-    modifier: params.modifier,
-    modifier_reason: params.modifier_reason,
-    consequences: params.consequences,
-    show_to_player: params.show_to_player, // Pass through visibility flag
-  };
-
-  const skillResult = executeSkillCheck(
-    toolCallId,
-    skillCheckParams,
-    storyData
-  );
-  const checkResult = skillResult.result as GMCheckResult;
-
-  // Update challenge progress
-  if (checkResult.success) {
-    challenge.currentSuccesses = (challenge.currentSuccesses || 0) + 1;
-  } else {
-    challenge.currentFailures = (challenge.currentFailures || 0) + 1;
-  }
-
-  // Calculate majority needed: (rounds / 2) + 1 rounded down
-  const requiredToWin = Math.floor(challenge.rounds / 2) + 1;
-
-  // Check if challenge is complete
-  let completed = false;
-  let won = false;
-  if (challenge.currentSuccesses >= requiredToWin) {
-    completed = true;
-    won = true;
-    challenge.result = "won";
-    challenge.active = false;
-    challenge.resolvedAt = Date.now();
-  } else if (challenge.currentFailures >= requiredToWin) {
-    completed = true;
-    won = false;
-    challenge.result = "lost";
-    challenge.active = false;
-    challenge.resolvedAt = Date.now();
-  }
-
-  // Add challenge progress to result
-  checkResult.type = "challenge_check";
-  checkResult.challengeProgress = {
-    name: challenge.name,
-    successes: challenge.currentSuccesses,
-    failures: challenge.currentFailures,
-    required: requiredToWin,
-    maxFailures: requiredToWin,
-    completed,
-    won,
-  };
-
-  // Update context string
-  let contextForStory = skillResult.contextForStory;
-  contextForStory += `\n[Challenge "${challenge.name}": ${challenge.currentSuccesses}/${requiredToWin} successes, ${challenge.currentFailures}/${requiredToWin} failures]`;
-  if (completed) {
-    contextForStory += `\n[Challenge ${won ? "WON" : "LOST"}!]`;
-  }
-
-  return {
-    ...skillResult,
-    toolName: "challenge_check",
-    result: checkResult,
-    contextForStory,
-  };
-}
-
-// ============================================
 // START CHALLENGE EXECUTOR
 // ============================================
 
@@ -1634,222 +1137,6 @@ function executeStartChallenge(
       victoryConsequence: params.victory_consequence,
       defeatConsequence: params.defeat_consequence,
     } as GMChallengeResult,
-    contextForStory,
-  };
-}
-
-// ============================================
-// OPPOSED CHECK EXECUTOR
-// ============================================
-
-function executeOpposedCheck(
-  toolCallId: string,
-  params: OpposedCheckParams,
-  storyData: StoryData
-): GMToolResult {
-  const systemId = (storyData.rpgSystem || "3d6") as RPGSystemType;
-  const system = getRPGSystem(systemId);
-
-  // Find player stat
-  const statMatch = findStatMatch(params.player_stat, storyData.stats || []);
-  const playerStatValue = statMatch?.item?.value ?? 0;
-  const playerStatName = statMatch?.item?.name ?? params.player_stat;
-
-  // Find item if specified
-  let itemResult: GMOpposedResult["item"] | undefined;
-  let itemBonus = 0;
-  if (params.player_item) {
-    const itemMatch = findItemMatch(
-      params.player_item,
-      storyData.inventory || []
-    );
-    if (itemMatch) {
-      const item = itemMatch.item as unknown as InventoryItem;
-      itemResult = { name: item.name, used: true };
-      itemBonus = getItemBonus(item, systemId);
-    }
-  }
-
-  // Find ability if specified
-  let abilityResult: GMOpposedResult["ability"] | undefined;
-  let abilityBonus = 0;
-  if (params.player_ability) {
-    const abilityMatch = findAbilityMatch(
-      params.player_ability,
-      storyData.abilities || []
-    );
-    if (abilityMatch) {
-      const ability = abilityMatch.item as unknown as Ability;
-      abilityResult = { name: ability.name, used: true };
-      abilityBonus = getAbilityBonus(ability, systemId);
-    }
-  }
-
-  // Calculate condition penalty
-  const condPenalty = calculateConditionPenalty(
-    storyData.conditions || [],
-    playerStatName,
-    systemId
-  );
-
-  // Roll for player
-  const playerRollResult = rollDice(system);
-  const playerRoll = playerRollResult.total;
-  const playerTotal =
-    playerStatValue +
-    playerRoll +
-    itemBonus +
-    abilityBonus +
-    (params.player_modifier || 0) -
-    (condPenalty.penalty || 0);
-
-  // Roll for opponent
-  const opponentRollResult = rollDice(system);
-  const opponentRoll = opponentRollResult.total;
-  const opponentTotal =
-    params.opponent_skill + opponentRoll + (params.opponent_modifier || 0);
-
-  // Determine winner
-  let winner: "player" | "opponent" | "tie";
-  const margin = playerTotal - opponentTotal;
-  if (margin > 0) {
-    winner = "player";
-  } else if (margin < 0) {
-    winner = "opponent";
-  } else {
-    winner = "tie";
-  }
-
-  // Build context string
-  let contextForStory = `[Opposed Check: ${playerStatName} vs ${params.opponent_name}]`;
-  contextForStory += `\n[Player: ${playerRoll} + ${playerStatValue} (stat)`;
-  if (itemBonus > 0) contextForStory += ` + ${itemBonus} (${itemResult?.name})`;
-  if (abilityBonus > 0)
-    contextForStory += ` + ${abilityBonus} (${abilityResult?.name})`;
-  if (params.player_modifier) contextForStory += ` + ${params.player_modifier}`;
-  if (condPenalty.penalty > 0)
-    contextForStory += ` - ${condPenalty.penalty} (condition)`;
-  contextForStory += ` = ${playerTotal}]`;
-  contextForStory += `\n[${params.opponent_name}: ${opponentRoll} + ${params.opponent_skill}`;
-  if (params.opponent_modifier)
-    contextForStory += ` + ${params.opponent_modifier}`;
-  contextForStory += ` = ${opponentTotal}]`;
-  contextForStory += `\n[Winner: ${
-    winner === "player"
-      ? "PLAYER"
-      : winner === "opponent"
-      ? params.opponent_name.toUpperCase()
-      : "TIE"
-  } (margin: ${Math.abs(margin)})]`;
-
-  if (params.stakes) {
-    contextForStory += `\n[Stakes: ${params.stakes}]`;
-  }
-
-  if (params.consequences) {
-    const outcome =
-      winner === "player"
-        ? params.consequences.player_wins
-        : winner === "opponent"
-        ? params.consequences.opponent_wins
-        : params.consequences.tie;
-    if (outcome) {
-      contextForStory += `\n[Intended consequence: ${outcome}]`;
-    }
-  }
-
-  return {
-    toolName: "opposed_check",
-    toolCallId,
-    success: winner === "player",
-    result: {
-      type: "opposed_check",
-      playerStat: playerStatName,
-      playerStatValue,
-      playerRoll,
-      playerTotal,
-      opponentName: params.opponent_name,
-      opponentSkill: params.opponent_skill,
-      opponentRoll,
-      opponentTotal,
-      winner,
-      margin: Math.abs(margin),
-      item: itemResult,
-      ability: abilityResult,
-      stakes: params.stakes,
-      consequences: params.consequences,
-      showToPlayer: params.show_to_player !== false, // Default true
-    } as GMOpposedResult,
-    contextForStory,
-  };
-}
-
-// ============================================
-// ROLL DICE EXECUTOR
-// ============================================
-
-function executeRollDice(
-  toolCallId: string,
-  params: RollDiceParams
-): GMToolResult {
-  // Parse dice notation: "2d6+5", "1d20-3", "3d8"
-  const diceRegex = /^(\d+)d(\d+)([+-]\d+)?$/i;
-  const match = params.dice.match(diceRegex);
-
-  if (!match) {
-    return {
-      toolName: "roll_dice",
-      toolCallId,
-      success: false,
-      result: {
-        type: "roll_dice",
-        dice: params.dice,
-        rolls: [],
-        modifier: 0,
-        total: 0,
-        reason: params.reason,
-        displayName: params.display_name,
-      } as GMRollResult,
-      contextForStory: `[ERROR: Invalid dice notation "${params.dice}"]`,
-    };
-  }
-
-  const numDice = parseInt(match[1], 10);
-  const dieSize = parseInt(match[2], 10);
-  const modifier = match[3] ? parseInt(match[3], 10) : 0;
-
-  // Roll dice
-  const rolls: number[] = [];
-  for (let i = 0; i < numDice; i++) {
-    rolls.push(Math.floor(Math.random() * dieSize) + 1);
-  }
-
-  const rollSum = rolls.reduce((a, b) => a + b, 0);
-  const total = rollSum + modifier;
-
-  const displayName = params.display_name || "Dice Roll";
-  let contextForStory = `[${displayName}: ${params.dice} = [${rolls.join(
-    ", "
-  )}]`;
-  if (modifier !== 0) {
-    contextForStory += ` ${modifier > 0 ? "+" : ""}${modifier}`;
-  }
-  contextForStory += ` = ${total}]`;
-  contextForStory += `\n[Reason: ${params.reason}]`;
-
-  return {
-    toolName: "roll_dice",
-    toolCallId,
-    success: true,
-    result: {
-      type: "roll_dice",
-      dice: params.dice,
-      rolls,
-      modifier,
-      total,
-      reason: params.reason,
-      displayName: params.display_name,
-    } as GMRollResult,
     contextForStory,
   };
 }
@@ -2677,7 +1964,7 @@ function executeFateQuestion(
 }
 
 /**
- * Execute a roll on a custom table
+ * Execute a roll on a custom table or built-in AGMT element table
  */
 function executeRollTable(
   toolCallId: string,
@@ -2703,51 +1990,93 @@ function executeRollTable(
     }) => { text: string; weight: number } | null;
   };
 
+  // Import AGMT element tables
+  const { generateElement, MYTHIC_TABLE_NAMES } = require("./mythic") as {
+    generateElement: (category: string) => {
+      element: string;
+      roll: number;
+      category: string;
+    };
+    MYTHIC_TABLE_NAMES: string[];
+  };
+
   // Use customTables from storyData
   const allTables = storyData.customTables || [];
 
-  // Find the table
+  // First try to find in custom tables
   const table = getTableByName(allTables, params.table_name);
 
-  if (!table) {
-    const displayName = params.display_name || "Table Roll";
+  if (table) {
+    // Roll on the custom table
+    const rollResult = rollOnCustomTable(table);
+    const resultText = rollResult?.text || "No result";
+
+    // Build context string
+    const displayName = params.display_name || `${table.name} Roll`;
+    let contextForStory = `[${displayName}: "${resultText}"]`;
+    contextForStory += `\n[Reason: ${params.reason}]`;
+
     return {
       toolName: "roll_table",
       toolCallId,
-      success: false,
+      success: true,
       result: {
         type: "roll_table",
-        tableName: params.table_name,
-        result: "",
+        tableName: table.name,
+        result: resultText,
         reason: params.reason,
         displayName: params.display_name,
-        tableNotFound: true,
       } as GMRollTableResult,
-      contextForStory: `[${displayName}: Table "${params.table_name}" not found]`,
+      contextForStory,
     };
   }
 
-  // Roll on the table
-  const rollResult = rollOnCustomTable(table);
-  const resultText = rollResult?.text || "No result";
+  // Try as AGMT element table (normalize name: spaces to underscores, lowercase)
+  const normalizedName = params.table_name.toLowerCase().replace(/\s+/g, "_");
+  const isAgmtTable = MYTHIC_TABLE_NAMES.includes(normalizedName);
 
-  // Build context string
-  const displayName = params.display_name || `${table.name} Roll`;
-  let contextForStory = `[${displayName}: "${resultText}"]`;
-  contextForStory += `\n[Reason: ${params.reason}]`;
+  if (isAgmtTable) {
+    // Roll on the AGMT element table
+    const result = generateElement(normalizedName);
+    const prettifiedName = params.table_name
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (l: string) => l.toUpperCase());
 
+    // Build context string
+    const displayName = params.display_name || `${prettifiedName} Roll`;
+    let contextForStory = `[${displayName}: "${result.element}"]`;
+    contextForStory += `\n[Reason: ${params.reason}]`;
+
+    return {
+      toolName: "roll_table",
+      toolCallId,
+      success: true,
+      result: {
+        type: "roll_table",
+        tableName: prettifiedName,
+        result: result.element,
+        reason: params.reason,
+        displayName: params.display_name,
+      } as GMRollTableResult,
+      contextForStory,
+    };
+  }
+
+  // Table not found
+  const displayName = params.display_name || "Table Roll";
   return {
     toolName: "roll_table",
     toolCallId,
-    success: true,
+    success: false,
     result: {
       type: "roll_table",
-      tableName: table.name,
-      result: resultText,
+      tableName: params.table_name,
+      result: "",
       reason: params.reason,
       displayName: params.display_name,
+      tableNotFound: true,
     } as GMRollTableResult,
-    contextForStory,
+    contextForStory: `[${displayName}: Table "${params.table_name}" not found]`,
   };
 }
 
@@ -3583,25 +2912,24 @@ function executeUpdateCombatantStat(
 }
 
 /**
- * Add a condition to a combatant
+ * Toggle a condition on a combatant (add if missing, remove if present)
  */
-function executeAddCombatantCondition(
+function executeToggleCombatantCondition(
   toolCallId: string,
-  params: AddCombatantConditionParams,
+  params: ToggleCombatantConditionParams,
   storyData: StoryData
 ): GMToolResult {
   if (!storyData.combatState?.active) {
     return {
-      toolName: "add_combatant_condition",
+      toolName: "toggle_combatant_condition",
       toolCallId,
       success: false,
       result: {
-        type: "add_combatant_condition",
+        type: "toggle_combatant_condition",
         combatant: params.combatant,
         condition: params.condition,
-        duration: params.duration,
-        wasUpdate: false,
-      } as GMAddCombatantConditionResult,
+        action: "added",
+      } as GMToggleCombatantConditionResult,
       contextForStory: `[Combat Error: No active combat]`,
     };
   }
@@ -3609,16 +2937,15 @@ function executeAddCombatantCondition(
   const combatant = findCombatant(storyData.combatState, params.combatant);
   if (!combatant) {
     return {
-      toolName: "add_combatant_condition",
+      toolName: "toggle_combatant_condition",
       toolCallId,
       success: false,
       result: {
-        type: "add_combatant_condition",
+        type: "toggle_combatant_condition",
         combatant: params.combatant,
         condition: params.condition,
-        duration: params.duration,
-        wasUpdate: false,
-      } as GMAddCombatantConditionResult,
+        action: "added",
+      } as GMToggleCombatantConditionResult,
       contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
     };
   }
@@ -3627,127 +2954,87 @@ function executeAddCombatantCondition(
   const existingIdx = combatant.conditions.findIndex(
     (c) => c.name.toLowerCase() === params.condition.toLowerCase()
   );
-  let wasUpdate = false;
+  const exists = existingIdx >= 0;
 
-  if (existingIdx >= 0) {
-    // Update existing condition's duration if new one is longer
-    const existing = combatant.conditions[existingIdx];
-    if (params.duration !== undefined) {
-      if (
-        existing.duration === undefined ||
-        params.duration > existing.duration
-      ) {
-        existing.duration = params.duration;
-        wasUpdate = true;
+  // Determine action based on force flags and existence
+  let action: "added" | "removed" | "updated";
+
+  if (params.force_remove) {
+    // Force remove
+    if (exists) {
+      combatant.conditions.splice(existingIdx, 1);
+      action = "removed";
+    } else {
+      // Nothing to remove
+      return {
+        toolName: "toggle_combatant_condition",
+        toolCallId,
+        success: true,
+        result: {
+          type: "toggle_combatant_condition",
+          combatant: combatant.name,
+          condition: params.condition,
+          action: "removed",
+        } as GMToggleCombatantConditionResult,
+        contextForStory: `[${combatant.name} did not have condition: ${params.condition}]`,
+      };
+    }
+  } else if (params.force_add || !exists) {
+    // Force add or doesn't exist - add/update
+    if (exists) {
+      // Update duration
+      const existing = combatant.conditions[existingIdx];
+      if (params.duration !== undefined) {
+        if (
+          existing.duration === undefined ||
+          params.duration > existing.duration
+        ) {
+          existing.duration = params.duration;
+        }
       }
+      action = "updated";
+    } else {
+      // Add new
+      combatant.conditions.push({
+        name: params.condition,
+        duration: params.duration,
+      });
+      action = "added";
     }
   } else {
-    // Add new condition
-    combatant.conditions.push({
-      name: params.condition,
-      duration: params.duration,
-    });
+    // Toggle: exists, no force flags -> remove
+    combatant.conditions.splice(existingIdx, 1);
+    action = "removed";
   }
 
   const durationText =
-    params.duration !== undefined ? ` for ${params.duration} turns` : "";
+    params.duration !== undefined && action !== "removed"
+      ? ` for ${params.duration} turns`
+      : "";
+
+  const actionText =
+    action === "removed"
+      ? "lost"
+      : action === "updated"
+      ? "extended"
+      : "gained";
   logCombat(
     storyData.combatState,
-    `${combatant.name} gained condition: ${params.condition}${durationText}`
+    `${combatant.name} ${actionText} condition: ${params.condition}${durationText}`
   );
 
   return {
-    toolName: "add_combatant_condition",
+    toolName: "toggle_combatant_condition",
     toolCallId,
     success: true,
     result: {
-      type: "add_combatant_condition",
+      type: "toggle_combatant_condition",
       combatant: combatant.name,
       condition: params.condition,
-      duration: params.duration,
-      wasUpdate,
-    } as GMAddCombatantConditionResult,
-    contextForStory: `[${combatant.name} ${
-      wasUpdate ? "extended" : "gained"
-    } condition: ${params.condition}${durationText}]`,
-  };
-}
-
-/**
- * Remove a condition from a combatant
- */
-function executeRemoveCombatantCondition(
-  toolCallId: string,
-  params: RemoveCombatantConditionParams,
-  storyData: StoryData
-): GMToolResult {
-  if (!storyData.combatState?.active) {
-    return {
-      toolName: "remove_combatant_condition",
-      toolCallId,
-      success: false,
-      result: {
-        type: "remove_combatant_condition",
-        combatant: params.combatant,
-        condition: params.condition,
-        wasRemoved: false,
-      } as GMRemoveCombatantConditionResult,
-      contextForStory: `[Combat Error: No active combat]`,
-    };
-  }
-
-  const combatant = findCombatant(storyData.combatState, params.combatant);
-  if (!combatant) {
-    return {
-      toolName: "remove_combatant_condition",
-      toolCallId,
-      success: false,
-      result: {
-        type: "remove_combatant_condition",
-        combatant: params.combatant,
-        condition: params.condition,
-        wasRemoved: false,
-      } as GMRemoveCombatantConditionResult,
-      contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
-    };
-  }
-
-  const conditionIdx = combatant.conditions.findIndex(
-    (c) => c.name.toLowerCase() === params.condition.toLowerCase()
-  );
-
-  if (conditionIdx < 0) {
-    return {
-      toolName: "remove_combatant_condition",
-      toolCallId,
-      success: true,
-      result: {
-        type: "remove_combatant_condition",
-        combatant: combatant.name,
-        condition: params.condition,
-        wasRemoved: false,
-      } as GMRemoveCombatantConditionResult,
-      contextForStory: `[${combatant.name} did not have condition: ${params.condition}]`,
-    };
-  }
-
-  combatant.conditions.splice(conditionIdx, 1);
-  logCombat(
-    storyData.combatState,
-    `${combatant.name} lost condition: ${params.condition}`
-  );
-
-  return {
-    toolName: "remove_combatant_condition",
-    toolCallId,
-    success: true,
-    result: {
-      type: "remove_combatant_condition",
-      combatant: combatant.name,
-      condition: params.condition,
-      wasRemoved: true,
-    } as GMRemoveCombatantConditionResult,
-    contextForStory: `[${combatant.name} lost condition: ${params.condition}]`,
+      duration: action !== "removed" ? params.duration : undefined,
+      action,
+    } as GMToggleCombatantConditionResult,
+    contextForStory: `[${combatant.name} ${actionText} condition: ${params.condition}${durationText}]`,
   };
 }
 
@@ -4259,108 +3546,60 @@ function executeAdvanceTimer(
 }
 
 /**
- * Pause a timer
+ * Toggle a timer between paused and active states
  */
-function executePauseTimer(
+function executeToggleTimerPause(
   toolCallId: string,
-  params: PauseTimerParams,
+  params: ToggleTimerPauseParams,
   storyData: StoryData
 ): GMToolResult {
   const timer = findTimer(storyData.timers, params.timer);
 
   if (!timer) {
     return {
-      toolName: "pause_timer",
+      toolName: "toggle_timer_pause",
       toolCallId,
       success: false,
       result: {
-        type: "pause_timer",
+        type: "toggle_timer_pause",
         timer: params.timer,
-        wasPaused: false,
-      } as GMPauseTimerResult,
+        newStatus: "active",
+      } as GMToggleTimerPauseResult,
       contextForStory: `[Timer Error: Timer "${params.timer}" not found]`,
     };
   }
 
-  if (timer.status !== "active") {
+  if (timer.status !== "active" && timer.status !== "paused") {
     return {
-      toolName: "pause_timer",
+      toolName: "toggle_timer_pause",
       toolCallId,
       success: false,
       result: {
-        type: "pause_timer",
+        type: "toggle_timer_pause",
         timer: timer.name,
-        wasPaused: false,
-      } as GMPauseTimerResult,
-      contextForStory: `[Timer Error: Timer "${timer.name}" is ${timer.status}, cannot pause]`,
+        newStatus: timer.status as "active" | "paused",
+      } as GMToggleTimerPauseResult,
+      contextForStory: `[Timer Error: Timer "${timer.name}" is ${timer.status}, cannot toggle pause]`,
     };
   }
 
-  timer.status = "paused";
+  // Toggle the status
+  const wasPaused = timer.status === "paused";
+  timer.status = wasPaused ? "active" : "paused";
+  const newStatus = timer.status as "active" | "paused";
+
+  const actionText = wasPaused ? "Resumed" : "Paused";
 
   return {
-    toolName: "pause_timer",
+    toolName: "toggle_timer_pause",
     toolCallId,
     success: true,
     result: {
-      type: "pause_timer",
+      type: "toggle_timer_pause",
       timer: timer.name,
-      wasPaused: true,
-    } as GMPauseTimerResult,
-    contextForStory: `[Timer Paused: "${timer.name}" at ${timer.currentTicks} ticks]`,
-  };
-}
-
-/**
- * Resume a paused timer
- */
-function executeResumeTimer(
-  toolCallId: string,
-  params: ResumeTimerParams,
-  storyData: StoryData
-): GMToolResult {
-  const timer = findTimer(storyData.timers, params.timer);
-
-  if (!timer) {
-    return {
-      toolName: "resume_timer",
-      toolCallId,
-      success: false,
-      result: {
-        type: "resume_timer",
-        timer: params.timer,
-        wasResumed: false,
-      } as GMResumeTimerResult,
-      contextForStory: `[Timer Error: Timer "${params.timer}" not found]`,
-    };
-  }
-
-  if (timer.status !== "paused") {
-    return {
-      toolName: "resume_timer",
-      toolCallId,
-      success: false,
-      result: {
-        type: "resume_timer",
-        timer: timer.name,
-        wasResumed: false,
-      } as GMResumeTimerResult,
-      contextForStory: `[Timer Error: Timer "${timer.name}" is ${timer.status}, not paused]`,
-    };
-  }
-
-  timer.status = "active";
-
-  return {
-    toolName: "resume_timer",
-    toolCallId,
-    success: true,
-    result: {
-      type: "resume_timer",
-      timer: timer.name,
-      wasResumed: true,
-    } as GMResumeTimerResult,
-    contextForStory: `[Timer Resumed: "${timer.name}" - ${timer.currentTicks} ticks remaining]`,
+      newStatus,
+    } as GMToggleTimerPauseResult,
+    contextForStory: `[Timer ${actionText}: "${timer.name}" at ${timer.currentTicks} ticks]`,
   };
 }
 
@@ -4482,133 +3721,6 @@ function executeTriggerTimer(
     contextForStory: `[⏰ TIMER TRIGGERED EARLY: "${timer.name}"${
       params.reason ? ` - ${params.reason}` : ""
     }${timer.description ? ` | Effect: ${timer.description}` : ""}]`,
-  };
-}
-
-// ============================================
-// GROUP CHECK EXECUTOR
-// ============================================
-
-/**
- * Execute a group check - multiple rolls where majority wins
- */
-function executeGroupCheck(
-  toolCallId: string,
-  params: GroupCheckParams,
-  storyData: StoryData
-): GMToolResult {
-  // Validate participants
-  const participants = Math.max(3, Math.min(10, params.participants));
-
-  // Get the stat
-  const statMatch = findStatMatch(params.stat, storyData.stats || []);
-  if (!statMatch) {
-    return {
-      toolName: "group_check",
-      toolCallId,
-      success: false,
-      result: {
-        type: "group_check",
-        stat: params.stat,
-        statValue: 0,
-        difficulty: params.difficulty,
-        dc: 0,
-        participants,
-        threshold: 0,
-        individualRolls: [],
-        totalSuccesses: 0,
-        totalFailures: 0,
-        overallSuccess: false,
-        reason: params.reason,
-        showIndividualRolls: true,
-      } as GMGroupCheckResult,
-      contextForStory: `[Group Check Error: Stat "${params.stat}" not found]`,
-    };
-  }
-
-  const statValue = statMatch.item?.value ?? 0;
-  const statName = statMatch.item?.name ?? params.stat;
-
-  // Get the RPG system and calculate DC
-  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
-  const { dc, tierName } = parseDifficulty(params.difficulty, rpgSystem);
-
-  // Calculate threshold (default: majority)
-  const threshold = params.threshold || Math.ceil(participants / 2);
-
-  // Roll for each participant
-  const individualRolls: {
-    roll: number;
-    total: number;
-    success: boolean;
-    partial?: boolean;
-  }[] = [];
-
-  for (let i = 0; i < participants; i++) {
-    // Roll dice
-    const rollResult = rollDice(rpgSystem);
-    const roll = rollResult.total;
-
-    // Check success
-    const result = checkSuccess(
-      rpgSystem,
-      roll,
-      statValue,
-      dc,
-      0, // No penalty for group checks
-      rollResult.rolls,
-      storyData.reverseDC
-    );
-
-    individualRolls.push({
-      roll,
-      total: roll + statValue,
-      success: result.success,
-      partial: result.partial,
-    });
-  }
-
-  const totalSuccesses = individualRolls.filter((r) => r.success).length;
-  const totalFailures = individualRolls.filter((r) => !r.success).length;
-  const overallSuccess = totalSuccesses >= threshold;
-
-  const showIndividual = params.show_individual_rolls !== false;
-
-  // Build context string
-  let contextForStory = `[Group Check: ${params.reason} - ${statName} vs DC ${dc} (${tierName})]`;
-  if (showIndividual) {
-    const rollsStr = individualRolls
-      .map(
-        (r, i) =>
-          `#${i + 1}: ${r.total} ${r.success ? "✓" : r.partial ? "~" : "✗"}`
-      )
-      .join(", ");
-    contextForStory += `\n[Rolls: ${rollsStr}]`;
-  }
-  contextForStory += `\n[Result: ${totalSuccesses}/${participants} succeeded (needed ${threshold}) → ${
-    overallSuccess ? "OVERALL SUCCESS" : "OVERALL FAILURE"
-  }]`;
-
-  return {
-    toolName: "group_check",
-    toolCallId,
-    success: true,
-    result: {
-      type: "group_check",
-      stat: statName,
-      statValue,
-      difficulty: params.difficulty,
-      dc,
-      participants,
-      threshold,
-      individualRolls,
-      totalSuccesses,
-      totalFailures,
-      overallSuccess,
-      reason: params.reason,
-      showIndividualRolls: showIndividual,
-    } as GMGroupCheckResult,
-    contextForStory,
   };
 }
 

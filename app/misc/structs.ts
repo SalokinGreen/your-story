@@ -271,7 +271,7 @@ export interface ScenePart {
   commands?: string[]; // Legacy: XML commands
   toolCalls?: any[]; // Tool calls made by AI (OpenAI/DeepSeek format)
   toolResponses?: CommandResponse[]; // Execution results of tool calls
-  gmToolCalls?: any[]; // GM stage tool calls (skill_check, formula_roll, etc.)
+  gmToolCalls?: any[]; // GM stage tool calls (formula_roll, start_challenge, etc.)
   gmStoryContext?: string; // GM stage context string passed to story stage
   gmThinking?: string[]; // GM stage "[GM]" reasoning text for UI display
   revealedLore?: string[]; // Lore titles manually revealed by AI in this part

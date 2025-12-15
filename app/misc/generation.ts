@@ -148,6 +148,10 @@ export interface GenerationCallbacks {
   onChoicesStart?: () => void;
   onChoicesComplete?: (choices: Choice[], usage: TokenUsage) => void;
   onGMStageStart?: () => void;
+  // NEW: Stream GM content as it generates (thinking text)
+  onGMContent?: (content: string, fullContent: string) => void;
+  // NEW: Called after each GM tool execution with interleaved results
+  onGMToolResult?: (result: GMToolResult) => void;
   onGMStageComplete?: (
     results: GMToolResult[],
     storyContext: string,
@@ -646,7 +650,8 @@ export async function generateStoryTurn(
             throw new Error("Generation cancelled by user");
           }
 
-          const gmResponse = await fetch("/api/generate", {
+          // Use streaming for GM stage so user can see thinking in real-time
+          const gmResponse = await fetch("/api/generate-stream", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -675,7 +680,35 @@ export async function generateStoryTurn(
             );
           }
 
-          const gmResult = await gmResponse.json();
+          // Stream the GM response
+          let gmContent = "";
+          let gmToolCalls: any[] = [];
+          let gmResultMeta: any = null;
+
+          for await (const event of parseSSEStream(gmResponse)) {
+            if (event.type === "error") {
+              throw new Error(event.error || "GM generation failed");
+            }
+            if (event.type === "content" && event.content) {
+              gmContent += event.content;
+              // Stream GM content to callback for real-time display
+              callbacks.onGMContent?.(event.content, gmContent);
+            }
+            if (event.type === "tool_calls" && event.toolCalls) {
+              gmToolCalls = event.toolCalls;
+            }
+            if (event.type === "done" && event.meta) {
+              gmResultMeta = event.meta;
+            }
+          }
+
+          // Build gmResult object from streamed data
+          const gmResult = {
+            content: gmContent,
+            toolCalls: gmToolCalls,
+            meta: gmResultMeta,
+          };
+
           console.log(
             `[GM Stage Round ${gmRound}] Raw response:`,
             JSON.stringify(gmResult, null, 2)
@@ -747,6 +780,11 @@ export async function generateStoryTurn(
               );
             }
 
+            // Notify callback for each tool result (for real-time interleaved display)
+            for (const result of gmExecution.results) {
+              callbacks.onGMToolResult?.(result);
+            }
+
             // Update storyData with any modifications from GM tools
             Object.assign(storyData, gmExecution.modifiedStoryData);
 
@@ -797,11 +835,13 @@ export async function generateStoryTurn(
                 } else {
                   // Make errors very prominent with hints about what went wrong
                   const errorMsg = result.contextForStory || "Unknown error";
-                  const paramsUsed = JSON.stringify(
-                    JSON.parse(tc.function.arguments || "{}"),
-                    null,
-                    2
-                  );
+                  // Handle arguments that could be string or already-parsed object
+                  const rawArgs = tc.function.arguments;
+                  const parsedArgs =
+                    typeof rawArgs === "string"
+                      ? JSON.parse(rawArgs || "{}")
+                      : rawArgs || {};
+                  const paramsUsed = JSON.stringify(parsedArgs, null, 2);
                   toolContent = `**ERROR** in ${result.toolName}: ${errorMsg}\n\nYou called with: ${paramsUsed}\n\nPlease check the tool's required parameters and try again with correct arguments.`;
                 }
               } else {
@@ -906,8 +946,8 @@ export async function generateStoryTurn(
                 /\*?\s*(calls?|using|calling|invoke|invoking)\s+\w+[_:]/i.test(
                   gmResult.content
                 ) ||
-                // Detect tool name patterns like "search_notes", "formula_roll", "roll_dice"
-                /\b(search_notes|formula_roll|roll_dice|npc_roll|list_inactive_notes|update_note|show_note|hide_note)\s*[:{(]/i.test(
+                // Detect tool name patterns like "search_notes", "formula_roll", etc.
+                /\b(search_notes|formula_roll|npc_roll|list_inactive_notes|update_note|show_note|hide_note)\s*[:{(]/i.test(
                   gmResult.content
                 ));
 

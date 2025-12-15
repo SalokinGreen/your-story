@@ -165,8 +165,8 @@ import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn, analyzeAction } from "../misc/generation";
 import {
   GMToolResult,
-  GMCheckResult,
   GMNPCReactionResult,
+  GMFormulaRollResult,
 } from "../misc/gmExecutor";
 import {
   canAffordAbility,
@@ -1542,6 +1542,11 @@ function StoryPageContent() {
   const [loadingStage, setLoadingStage] = useState<
     "gm" | "story" | "choices" | null
   >(null);
+  // Live GM streaming state - interleaved thinking and tool results
+  type GMEntry =
+    | { type: "thinking"; content: string; isStreaming?: boolean }
+    | { type: "tool"; result: import("@/app/misc/gmExecutor").GMToolResult };
+  const [liveGMEntries, setLiveGMEntries] = useState<GMEntry[]>([]);
   const [momentumMode, setMomentumMode] = useState<
     "none" | "advantage" | "guarantee"
   >("none");
@@ -2896,7 +2901,38 @@ function StoryPageContent() {
         {
           onGMStageStart: () => {
             setLoadingStage("gm");
+            setLiveGMEntries([]);
             logger.action("GM stage started (custom input)");
+          },
+          onGMContent: (delta, fullContent) => {
+            // Update or add the current thinking entry (last one if streaming)
+            setLiveGMEntries((prev) => {
+              const lastEntry = prev[prev.length - 1];
+              if (lastEntry?.type === "thinking" && lastEntry.isStreaming) {
+                // Update the existing streaming thinking entry
+                return [
+                  ...prev.slice(0, -1),
+                  { type: "thinking", content: fullContent, isStreaming: true },
+                ];
+              } else {
+                // Start a new thinking entry
+                return [
+                  ...prev,
+                  { type: "thinking", content: fullContent, isStreaming: true },
+                ];
+              }
+            });
+          },
+          onGMToolResult: (result) => {
+            // Finalize any streaming thinking entry, then add tool result
+            setLiveGMEntries((prev) => {
+              const updated = prev.map((entry) =>
+                entry.type === "thinking" && entry.isStreaming
+                  ? { ...entry, isStreaming: false }
+                  : entry
+              );
+              return [...updated, { type: "tool", result }];
+            });
           },
           onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
             logger.ai_response("GM stage complete (custom input)", {
@@ -2905,9 +2941,14 @@ function StoryPageContent() {
               thinkingLines: thinking?.length || 0,
               usage,
             });
-            // Store GM results in the partial part
-            if (gmResults.length > 0) {
-              partialPart.gmToolCalls = gmResults;
+            setLiveGMEntries([]);
+
+            // Filter out failed tool calls from context (prune faulty results)
+            const successfulResults = gmResults.filter((r) => r.success);
+
+            // Store GM results in the partial part (only successful ones for context)
+            if (successfulResults.length > 0) {
+              partialPart.gmToolCalls = successfulResults;
             }
             if (storyContext) {
               partialPart.gmStoryContext = storyContext;
@@ -5170,7 +5211,49 @@ function StoryPageContent() {
           {
             onGMStageStart: () => {
               setLoadingStage("gm");
+              // Reset live GM entries for new generation
+              setLiveGMEntries([]);
               logger.action("GM stage started - determining mechanics");
+            },
+            onGMContent: (delta, fullContent) => {
+              // Stream GM thinking content - accumulate entries properly
+              setLiveGMEntries((prev) => {
+                const lastEntry = prev[prev.length - 1];
+                // If last entry is streaming thinking, update it
+                if (lastEntry?.type === "thinking" && lastEntry.isStreaming) {
+                  return [
+                    ...prev.slice(0, -1),
+                    {
+                      type: "thinking",
+                      content: fullContent,
+                      isStreaming: true,
+                    },
+                  ];
+                } else {
+                  // Otherwise add new thinking entry
+                  return [
+                    ...prev,
+                    {
+                      type: "thinking",
+                      content: fullContent,
+                      isStreaming: true,
+                    },
+                  ];
+                }
+              });
+            },
+            onGMToolResult: (result) => {
+              // Add tool result and finalize any streaming thinking entry
+              setLiveGMEntries((prev) => {
+                // Mark any streaming thinking as complete
+                const updated = prev.map((entry) =>
+                  entry.type === "thinking" && entry.isStreaming
+                    ? { ...entry, isStreaming: false }
+                    : entry
+                );
+                // Add the tool result
+                return [...updated, { type: "tool", result }];
+              });
             },
             onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
               logger.ai_response("GM stage complete", {
@@ -5181,9 +5264,13 @@ function StoryPageContent() {
                 usage,
               });
 
-              // Store GM results in the partial part - they'll be saved to scene when content streams
-              if (gmResults.length > 0) {
-                partialPart.gmToolCalls = gmResults;
+              // Clear live state now that we have final results
+              setLiveGMEntries([]);
+
+              // Store only successful GM results (prune faulty tool calls)
+              const successfulResults = gmResults.filter((r) => r.success);
+              if (successfulResults.length > 0) {
+                partialPart.gmToolCalls = successfulResults;
               }
               if (storyContext) {
                 partialPart.gmStoryContext = storyContext;
@@ -5192,70 +5279,17 @@ function StoryPageContent() {
                 partialPart.gmThinking = thinking;
               }
 
-              // Find skill_check, challenge_check, or formula_roll results to show dice
+              // Find formula_roll results to show dice
               // Only show dice if showToPlayer is true (default)
-              const checkResult = gmResults.find(
-                (r) =>
-                  (r.toolName === "skill_check" ||
-                    r.toolName === "challenge_check") &&
-                  (r.result as GMCheckResult)?.showToPlayer !== false
-              );
-
-              // Also check for formula_roll results (only if showToPlayer is true)
               const formulaResult = gmResults.find(
                 (r) =>
                   r.toolName === "formula_roll" &&
-                  (
-                    r.result as import("@/app/misc/gmExecutor").GMFormulaRollResult
-                  )?.showToPlayer !== false
+                  (r.result as GMFormulaRollResult)?.showToPlayer !== false
               );
 
-              const rpgSystemId = storyData.rpgSystem || "3d6";
-
-              if (checkResult && checkResult.result) {
-                const result = checkResult.result as GMCheckResult;
-
-                // Trigger dice visualizer with GM stage roll data
-                setDiceRoll({
-                  show: true,
-                  rolls: result.rolls || [result.roll],
-                  finalRoll: result.roll,
-                  skillName: result.stat,
-                  skillBonus: result.statValue,
-                  dc: result.dc,
-                  isSuccess: result.success,
-                  isPartial: result.partialSuccess,
-                  isCritical:
-                    result.criticalSuccess || result.criticalFailure || false,
-                  hasAdvantage: false, // GM stage doesn't track advantage yet
-                  hasDisadvantage: false,
-                  diceRolls: [result.rolls || [result.roll]],
-                  rpgSystem: rpgSystemId as
-                    | "3d6"
-                    | "1d20"
-                    | "1d100"
-                    | "percentile"
-                    | "pbta"
-                    | "fate"
-                    | "yze"
-                    | "explosive"
-                    | "narrative",
-                  reverseDC: storyData.reverseDC,
-                  explosions: result.explosions,
-                  conditionPenalty: result.condition?.penalty,
-                  conditionName: result.condition?.name,
-                });
-
-                logger.action("Dice visualizer triggered from GM stage", {
-                  stat: result.stat,
-                  roll: result.roll,
-                  dc: result.dc,
-                  success: result.success,
-                });
-              } else if (formulaResult && formulaResult.result) {
+              if (formulaResult && formulaResult.result) {
                 // Handle formula_roll results (custom formula-based dice rolls)
-                const result =
-                  formulaResult.result as import("@/app/misc/gmExecutor").GMFormulaRollResult;
+                const result = formulaResult.result as GMFormulaRollResult;
 
                 // Trigger dice visualizer with formula roll data (generic mode)
                 const dc = typeof result.dc === "number" ? result.dc : 0;
@@ -5670,10 +5704,45 @@ function StoryPageContent() {
         {
           onGMStageStart: () => {
             setLoadingStage("gm");
+            setLiveGMEntries([]);
+          },
+          onGMContent: (delta, fullContent) => {
+            // Stream GM thinking content - accumulate entries properly
+            setLiveGMEntries((prev) => {
+              const lastEntry = prev[prev.length - 1];
+              // If last entry is streaming thinking, update it
+              if (lastEntry?.type === "thinking" && lastEntry.isStreaming) {
+                return [
+                  ...prev.slice(0, -1),
+                  { type: "thinking", content: fullContent, isStreaming: true },
+                ];
+              } else {
+                // Otherwise add new thinking entry
+                return [
+                  ...prev,
+                  { type: "thinking", content: fullContent, isStreaming: true },
+                ];
+              }
+            });
+          },
+          onGMToolResult: (result) => {
+            // Add tool result and finalize any streaming thinking entry
+            setLiveGMEntries((prev) => {
+              // Mark any streaming thinking as complete
+              const updated = prev.map((entry) =>
+                entry.type === "thinking" && entry.isStreaming
+                  ? { ...entry, isStreaming: false }
+                  : entry
+              );
+              // Add the tool result
+              return [...updated, { type: "tool", result }];
+            });
           },
           onGMStageComplete: (results, storyContext, usage, thinking) => {
-            // Update partial part with final GM results
-            partialPart.gmToolCalls = results;
+            setLiveGMEntries([]);
+            // Store only successful GM results (prune faulty tool calls)
+            const successfulResults = results.filter((r) => r.success);
+            partialPart.gmToolCalls = successfulResults;
             partialPart.gmStoryContext = storyContext;
             if (thinking && thinking.length > 0) {
               partialPart.gmThinking = thinking;
@@ -6989,6 +7058,7 @@ function StoryPageContent() {
             onNavigateRight={handleNavigateRight}
             onResetToCurrentPart={resetToCurrentPart}
             syncStatus={syncStatus}
+            liveGMEntries={liveGMEntries}
           />
         )}
         {currentState === StoryState.STATS && <StatsPage {...storyData} />}

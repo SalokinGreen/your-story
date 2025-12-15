@@ -376,29 +376,4 @@ describe("Mixed GM Tools", () => {
     expect(result.results[0].toolName).toBe("formula_roll");
     expect(result.results[1].toolName).toBe("formula_roll");
   });
-
-  it("should work alongside legacy skill_check tool", async () => {
-    const storyData = createMockStoryData({
-      stats: [{ name: "Perception", value: 50, description: "", symbol: "👁️" }],
-    });
-
-    const toolCalls = [
-      createToolCall("skill_check", {
-        stat: "Perception",
-        difficulty: "average",
-        reason: "Spot the hidden door",
-      }),
-      createToolCall("formula_roll", {
-        formula: "1d20+2", // Direct number
-        dc: 12,
-        reason: "Understand the mechanism",
-      }),
-    ];
-
-    const result = await executeGMTools(toolCalls, storyData);
-
-    expect(result.results).toHaveLength(2);
-    expect(result.results[0].toolName).toBe("skill_check");
-    expect(result.results[1].toolName).toBe("formula_roll");
-  });
 });

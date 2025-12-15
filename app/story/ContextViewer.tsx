@@ -410,7 +410,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                 <>
                   <strong>GM Stage:</strong> Runs BEFORE story generation. AI
                   determines what mechanical checks are needed and executes them
-                  via tool calls (skill_check, challenge_check, take_rest,
+                  via tool calls (formula_roll, start_challenge, take_rest,
                   etc.). Results are passed to the Story stage.
                 </>
               )}
