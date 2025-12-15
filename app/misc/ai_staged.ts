@@ -2756,14 +2756,6 @@ Before rolling, CHECK the Character Sheet and Game Mechanics sections:
 
 **Follow the adventure's custom rules exactly.** Don't assume D&D conventions.
 
-${loreSection ? `\n${loreSection}` : ""}
-
-## CURRENT GAME STATE
-${npcList ? `**Known NPCs:**\n- ${npcList}` : ""}
-${combatSection ? `\n${combatSection}` : ""}${
-    timersSection ? `\n${timersSection}` : ""
-  }
-
 ═══════════════════════════════════════════════════════════════
 HOW THIS WORKS
 ═══════════════════════════════════════════════════════════════
@@ -3283,9 +3275,48 @@ Were the robbers actually hired? That's a question for later.
   );
   const toolsToUse = [...gmTools, ...stateTools];
 
+  // Build the state/info message (separate from system prompt for cleaner context)
+  let stateMessage = `═══════════════════════════════════════════════════════════════
+📋 CURRENT GAME STATE
+═══════════════════════════════════════════════════════════════
+`;
+
+  // Add lore/notes section
+  if (loreSection) {
+    stateMessage += loreSection + "\n";
+  }
+
+  // Add NPCs
+  if (npcList) {
+    stateMessage += `## 👥 KNOWN NPCs\n- ${npcList}\n\n`;
+  }
+
+  // Add combat state
+  if (combatSection) {
+    stateMessage += combatSection + "\n";
+  }
+
+  // Add timers
+  if (timersSection) {
+    stateMessage += timersSection + "\n";
+  }
+
   const messages: ChatMessage[] = [
     { role: "system", content: cleanString(systemPrompt) },
   ];
+
+  // Add state as a separate user message (keeps system prompt lean)
+  if (stateMessage.trim().length > 100) {
+    messages.push({
+      role: "user",
+      content: cleanString(stateMessage),
+    });
+    messages.push({
+      role: "assistant",
+      content:
+        "[GAME MASTER] I've reviewed the current game state. Ready to process the player's action.",
+    });
+  }
 
   // Examples are now embedded in the system prompt for natural reading
   // No separate few-shot messages needed
@@ -3495,6 +3526,7 @@ Were the robbers actually hired? That's a question for later.
     `[buildGMStagePrompt] Context budget: ${totalContextBudget} tokens (history: ${historyBudget}, info: ${infoBudget})`
   );
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
+  console.log(`  - State message: ${estimateTokens(stateMessage)} tokens`);
   console.log(
     `  - Chat history: ${recentParts.length} parts (${partsWithGMHistory} with GM thinking/tools)`
   );

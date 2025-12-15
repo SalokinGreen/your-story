@@ -93,6 +93,58 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
   return content;
 }
 
+/**
+ * Detect if AI output contains repetitive/looping content.
+ * This happens when the model gets stuck repeating the same phrase.
+ */
+function detectRepetition(content: string): boolean {
+  if (!content || content.length < 500) return false;
+
+  // Method 1: Check for repeated phrases (minimum 30 chars repeated 3+ times)
+  // Look for patterns like "Let me check X. Let me check X. Let me check X."
+  const phrasePattern = /(.{30,100})\1{2,}/;
+  if (phrasePattern.test(content)) {
+    return true;
+  }
+
+  // Method 2: Check for high repetition ratio
+  // Split into sentences and check how many are duplicates
+  const sentences = content
+    .split(/[.!?]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 20);
+
+  if (sentences.length >= 5) {
+    const uniqueSentences = new Set(sentences);
+    const uniqueRatio = uniqueSentences.size / sentences.length;
+    // If less than 30% unique sentences, it's repetitive
+    if (uniqueRatio < 0.3) {
+      return true;
+    }
+  }
+
+  // Method 3: Check for specific repetition patterns
+  // Count occurrences of common repetitive starters
+  const repetitiveStarters = [
+    "let me check",
+    "let me also check",
+    "i need to check",
+    "i'll check",
+    "checking",
+  ];
+
+  for (const starter of repetitiveStarters) {
+    const count = (content.toLowerCase().match(new RegExp(starter, "g")) || [])
+      .length;
+    // If same phrase appears 5+ times, it's stuck in a loop
+    if (count >= 5) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export interface GenerationOptions {
   storyModel: string;
   toolsModel: string;
@@ -929,85 +981,74 @@ export async function generateStoryTurn(
             continue;
           } else {
             // No tool calls - AI only produced thinking text without calling tools
-            // Check if the content suggests the GM wants to continue (mentions rolling, attacking, etc.)
-            // OR if the AI wrote pseudo-tool-call syntax (indicating it meant to call a tool but didn't)
-            const wantsToContinue =
-              gmResult.content &&
-              (/let me roll|i('ll| will) roll|roll for|let's roll|rolling|attack roll|damage roll/i.test(
-                gmResult.content
-              ) ||
-                /now.*(the|they|it|enemy|enemies|creature|monster|npc)/i.test(
-                  gmResult.content
-                ) ||
-                /retaliate|counter.?attack|strike back|fight back/i.test(
-                  gmResult.content
-                ) ||
-                // Detect pseudo-tool-call syntax - AI wrote about calling a tool but didn't actually call it
-                /\*?\s*(calls?|using|calling|invoke|invoking)\s+\w+[_:]/i.test(
-                  gmResult.content
-                ) ||
-                // Detect tool name patterns like "search_notes", "formula_roll", etc.
-                /\b(search_notes|formula_roll|npc_roll|list_inactive_notes|update_note|show_note|hide_note)\s*[:{(]/i.test(
-                  gmResult.content
-                ));
+            // Check for repetition (AI stuck in a loop)
+            const content = gmResult.content || "";
+            const isRepetitive = detectRepetition(content);
 
-            if (
-              wantsToContinue &&
-              gmRound < MAX_GM_ROUNDS &&
-              noToolCallPrompts < MAX_NO_TOOL_PROMPTS
-            ) {
-              // Prompt the GM to continue with tool calls or end
-              noToolCallPrompts++;
+            if (isRepetitive) {
+              // AI is stuck in a repetition loop - force end immediately
               logger.action(
-                `GM seems to want to continue - prompting for action (attempt ${noToolCallPrompts}/${MAX_NO_TOOL_PROMPTS})`
+                "GM stage detected repetitive content - forcing end"
               );
-
-              // First add the assistant's response that had no tool calls
-              conversationHistory.push({
-                role: "assistant",
-                content: gmResult.content,
-              });
-
-              // Then add the continuation prompt as a user message
-              // Check if they wrote pseudo-tool-call syntax vs just mentioning rolling
-              const wrotePseudoToolCall =
-                /\*?\s*(calls?|using|calling|invoke|invoking)\s+\w+[_:]/i.test(
-                  gmResult.content || ""
-                ) ||
-                /\b(search_notes|formula_roll|roll_dice|npc_roll|list_inactive_notes|update_note|show_note|hide_note)\s*[:{(]/i.test(
-                  gmResult.content || ""
-                );
-
-              const prompt = wrotePseudoToolCall
-                ? `You described calling a tool but didn't actually invoke it. Don't write "*Calls tool_name*" - actually call the function. Please call the tool NOW or call end_gm_thinking if done.`
-                : `You mentioned wanting to roll or take an action, but didn't call a tool. Please call the tool NOW:
-- Use formula_roll for attack/skill checks
-- Use npc_roll for enemy attacks
-- Use roll_dice for damage
-- Or call end_gm_thinking if you're done
-
-Call the tool:`;
-
-              conversationHistory.push({
-                role: "user",
-                content: prompt,
-              });
-              continue;
-            }
-
-            // The GM didn't call tools and doesn't seem to want to continue
-            // This likely means the action doesn't require mechanics. Stop the GM stage here.
-            logger.action(
-              "GM stage returned no tool calls - stopping GM stage"
-            );
-            // Use the thinking content as context for the story stage
-            if (gmResult.content) {
+              // Don't add repetitive content to context - it's useless
               allGMContextParts.push(
-                `[GAME MASTER]\n${gmResult.content}\n[No mechanical resolution needed]`
+                `[GAME MASTER: AI got stuck in repetition loop. Treating as no mechanical action needed.]`
               );
+              isComplete = true;
+              break;
             }
-            isComplete = true;
-            break;
+
+            // Always prompt the GM to either call tools or end_gm_thinking
+            // The loop continues until end_gm_thinking is explicitly called
+            noToolCallPrompts++;
+
+            if (noToolCallPrompts >= MAX_NO_TOOL_PROMPTS) {
+              // Too many rounds without tool calls - force end
+              logger.action(
+                `GM stage hit max no-tool-call prompts (${noToolCallPrompts}/${MAX_NO_TOOL_PROMPTS}) - forcing end`
+              );
+              // Truncate content if too long
+              const truncatedContent =
+                content.length > 500
+                  ? content.substring(0, 500) + "..."
+                  : content;
+              if (truncatedContent) {
+                allGMContextParts.push(
+                  `[GAME MASTER]\n${truncatedContent}\n[GM stage auto-completed - no mechanical resolution needed]`
+                );
+              }
+              isComplete = true;
+              break;
+            }
+
+            logger.action(
+              `GM produced thinking without tool calls (attempt ${noToolCallPrompts}/${MAX_NO_TOOL_PROMPTS}) - prompting to continue`
+            );
+
+            // Add the assistant's response to history (truncated to avoid bloating context)
+            const truncatedForHistory =
+              content.length > 1000
+                ? content.substring(0, 1000) + "..."
+                : content;
+            conversationHistory.push({
+              role: "assistant",
+              content: truncatedForHistory,
+            });
+
+            // Stronger prompt to force tool calling
+            const prompt = `STOP. You wrote thinking text but didn't call any tools.
+
+You MUST either:
+1. CALL A TOOL NOW (formula_roll, search_notes, end_gm_thinking, etc.)
+2. Or call end_gm_thinking immediately if no rolls/mechanics are needed
+
+Do NOT write more thinking. Call a tool function RIGHT NOW.`;
+
+            conversationHistory.push({
+              role: "user",
+              content: prompt,
+            });
+            continue;
           }
         }
 
