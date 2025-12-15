@@ -783,15 +783,52 @@ export async function generateStoryTurn(
           }
 
           // Capture GM's thinking text (content before/with tool calls)
+          // Only add if it's meaningfully different from previous thinking
           if (gmResult.content) {
-            gmThinking.push(gmResult.content);
-            // Add to interleaved parts with proper formatting
-            const formattedThinking =
-              gmResult.content.trim().startsWith("[GAME MASTER]") ||
-              gmResult.content.trim().startsWith("[GM]")
-                ? gmResult.content.trim().replace(/^\[GM\]/, "[GAME MASTER]")
-                : `[GAME MASTER]\n${gmResult.content.trim()}`;
-            gmInterleavedParts.push(formattedThinking);
+            const newThinking = gmResult.content.trim();
+
+            // Normalize for comparison - collapse whitespace and remove formatting variations
+            const normalizeForComparison = (text: string) => {
+              return text
+                .replace(/\s+/g, " ") // Collapse all whitespace
+                .replace(/\*\*/g, "") // Remove bold markers
+                .replace(/\n/g, " ") // Newlines to spaces
+                .trim()
+                .toLowerCase()
+                .substring(0, 500); // First 500 chars normalized
+            };
+
+            const newNormalized = normalizeForComparison(newThinking);
+
+            // Check if this thinking is substantially similar to previous entries
+            const isDuplicate = gmThinking.some((prev) => {
+              const prevNormalized = normalizeForComparison(prev);
+              // Exact normalized match
+              if (prevNormalized === newNormalized) return true;
+              // Very high overlap (first 300 chars match)
+              if (
+                prevNormalized.substring(0, 300) ===
+                newNormalized.substring(0, 300)
+              )
+                return true;
+              return false;
+            });
+
+            if (!isDuplicate) {
+              gmThinking.push(gmResult.content);
+              // Add to interleaved parts with proper formatting
+              const formattedThinking =
+                gmResult.content.trim().startsWith("[GAME MASTER]") ||
+                gmResult.content.trim().startsWith("[GM]")
+                  ? gmResult.content.trim().replace(/^\[GM\]/, "[GAME MASTER]")
+                  : `[GAME MASTER]\n${gmResult.content.trim()}`;
+              gmInterleavedParts.push(formattedThinking);
+            } else {
+              logger.action("GM produced duplicate thinking - skipping", {
+                thinkingLength: newThinking.length,
+                existingCount: gmThinking.length,
+              });
+            }
             // Note: We DON'T add thinking-only content to conversation history here
             // because the AI will re-see its own thinking and repeat it.
             // Only add to history when there are actual tool calls.
@@ -800,10 +837,18 @@ export async function generateStoryTurn(
           // Execute GM tool calls locally
           if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
             // FIRST: Add the assistant's response with tool calls to history
-            // This is crucial - the AI needs to see that IT made these calls
+            // IMPORTANT: Don't include full thinking text in history - just the tool calls
+            // Including the thinking causes the AI to repeat itself, seeing its own
+            // "Let me think through this..." and producing it again
+            // The AI needs to see WHAT it called, not the reasoning leading up to it
+            const toolNames = gmResult.toolCalls.map(
+              (tc: any) => tc.function.name
+            );
             conversationHistory.push({
               role: "assistant",
-              content: gmResult.content || "",
+              content: `[GM made ${
+                toolNames.length
+              } tool call(s): ${toolNames.join(", ")}]`,
               tool_calls: gmResult.toolCalls.map((tc: any) => ({
                 id: tc.id,
                 type: "function",
@@ -840,37 +885,54 @@ export async function generateStoryTurn(
             // Update storyData with any modifications from GM tools
             Object.assign(storyData, gmExecution.modifiedStoryData);
 
-            // Track consecutive failures - if ALL tools in a round fail, increment counter
-            const failedCount = gmExecution.results.filter(
-              (r) => !r.success
-            ).length;
+            // Track consecutive failures - only count ACTUAL tool errors, not dice roll failures
+            // Dice rolls that fail their DC are still successful tool executions
+            const actualToolErrors = gmExecution.results.filter((r) => {
+              // Tool succeeded - not an error
+              if (r.success) return false;
+              // Check if this is a dice roll tool - these should never count as errors
+              // even when the character fails the check (success=false just means roll < DC)
+              const diceTools = [
+                "formula_roll",
+                "opposed_formula",
+                "formula_challenge_check",
+                "npc_roll",
+                "group_check",
+              ];
+              if (diceTools.includes(r.toolName)) {
+                // Only count as error if contextForStory contains "ERROR" (invalid formula, etc.)
+                return r.contextForStory?.includes("ERROR") ?? false;
+              }
+              // Non-dice tools: success=false means actual error
+              return true;
+            });
             const allFailed =
-              failedCount === gmExecution.results.length &&
+              actualToolErrors.length === gmExecution.results.length &&
               gmExecution.results.length > 0;
 
             if (allFailed) {
               consecutiveFailures++;
               logger.action(
-                `GM stage round ${gmRound} - all tools failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`,
+                `GM stage round ${gmRound} - all tools had errors (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`,
                 {
-                  failedTools: gmExecution.results.map((r) => r.toolName),
+                  errorTools: actualToolErrors.map((r) => r.toolName),
                 }
               );
 
               // Check if we should break out due to consecutive failures
               if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
                 logger.action(
-                  "GM stage aborting - too many consecutive failures"
+                  "GM stage aborting - too many consecutive tool errors"
                 );
                 // Force completion with neutral outcome
                 isComplete = true;
                 allGMContextParts.push(
-                  `[GAME MASTER: Tool calls failed repeatedly. Proceeding without mechanical resolution.]`
+                  `[GAME MASTER: Tool calls errored repeatedly. Proceeding without mechanical resolution.]`
                 );
                 break;
               }
             } else {
-              // Reset counter if at least one tool succeeded
+              // Reset counter if at least one tool executed without error
               consecutiveFailures = 0;
             }
 
