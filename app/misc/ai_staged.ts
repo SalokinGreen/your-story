@@ -2505,7 +2505,7 @@ export function buildGMStagePrompt({
     }
   }
   if (characterSheetLore.length > 0) {
-    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\n`;
+    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\nTo update: edit_note("title", "new content") - Keep stats, HP, XP, etc. current!\n`;
     for (const l of characterSheetLore) {
       loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
     }
