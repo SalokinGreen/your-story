@@ -784,6 +784,56 @@ export async function POST(req: NextRequest) {
           }
         }
 
+        // Process any remaining data in buffer after stream closes
+        // This catches edge cases where the last chunk wasn't followed by a newline
+        if (buffer.trim()) {
+          const trimmed = buffer.trim();
+          if (trimmed.startsWith("data:")) {
+            const data = trimmed.slice(5).trim();
+            if (data !== "[DONE]") {
+              try {
+                const parsed = JSON.parse(data);
+                const delta = parsed.choices?.[0]?.delta;
+
+                // Process any final tool call arguments in the buffer
+                if (delta?.tool_calls) {
+                  console.log(
+                    "[API] Processing final buffer tool_calls:",
+                    JSON.stringify(delta.tool_calls)
+                  );
+                  for (const tc of delta.tool_calls) {
+                    const index = tc.index ?? 0;
+                    if (!toolCalls[index]) {
+                      toolCalls[index] = {
+                        id: tc.id || "",
+                        type: "function",
+                        function: { name: "", arguments: "" },
+                      };
+                    }
+                    if (tc.id) toolCalls[index].id = tc.id;
+                    if (tc.function?.name)
+                      toolCalls[index].function.name = tc.function.name;
+                    if (tc.function?.arguments)
+                      toolCalls[index].function.arguments +=
+                        tc.function.arguments;
+                  }
+                }
+
+                // Capture any final usage info
+                if (parsed.usage) {
+                  promptTokens = parsed.usage.prompt_tokens || 0;
+                  completionTokens = parsed.usage.completion_tokens || 0;
+                  if (parsed.usage.estimated_cost !== undefined) {
+                    estimatedCost = parsed.usage.estimated_cost;
+                  }
+                }
+              } catch {
+                // Skip malformed JSON in final buffer
+              }
+            }
+          }
+        }
+
         // Parse tool call arguments
         console.log(
           "[API] Final toolCalls before parsing:",
@@ -793,18 +843,40 @@ export async function POST(req: NextRequest) {
           .filter((tc) => tc && tc.function?.name)
           .map((tc) => {
             try {
+              const parsedArgs =
+                typeof tc.function.arguments === "string"
+                  ? JSON.parse(tc.function.arguments)
+                  : tc.function.arguments;
               return {
                 ...tc,
                 function: {
                   ...tc.function,
-                  arguments:
-                    typeof tc.function.arguments === "string"
-                      ? JSON.parse(tc.function.arguments)
-                      : tc.function.arguments,
+                  arguments: parsedArgs,
                 },
               };
-            } catch {
-              return tc;
+            } catch (parseError) {
+              // Log detailed error to help debug streaming issues
+              console.error(
+                `[API] Failed to parse tool arguments for ${tc.function?.name}:`,
+                {
+                  id: tc.id,
+                  name: tc.function?.name,
+                  argsLength: tc.function?.arguments?.length,
+                  argsPreview: tc.function?.arguments?.substring(0, 200),
+                  error:
+                    parseError instanceof Error
+                      ? parseError.message
+                      : String(parseError),
+                }
+              );
+              // Return with empty object as fallback to avoid downstream undefined errors
+              return {
+                ...tc,
+                function: {
+                  ...tc.function,
+                  arguments: {},
+                },
+              };
             }
           });
         console.log(

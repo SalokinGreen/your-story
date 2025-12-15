@@ -2311,13 +2311,27 @@ function executeEndGmThinking(
   toolCallId: string,
   params: RespondToPlayerParams
 ): GMToolResult {
-  // Build the final context for story stage
-  let contextForStory = `[GAME MASTER Summary: ${params.summary}]`;
-  contextForStory += `\n[Outcome: ${params.outcome}]`;
-  if (params.narrative_hints) {
-    contextForStory += `\n[Narrative Hints: ${params.narrative_hints}]`;
+  // Defensive: Handle missing params (can happen if streaming truncates tool call arguments)
+  const summary = params?.summary || "(No summary provided)";
+  const outcome = params?.outcome || "neutral";
+  const narrativeHints = params?.narrative_hints;
+  const dramaticMoment = params?.dramatic_moment;
+
+  // Log warning if params are missing (helps debug streaming issues)
+  if (!params?.summary || !params?.outcome) {
+    console.warn(
+      `[GM Tools] end_gm_thinking called with missing params:`,
+      JSON.stringify(params)
+    );
   }
-  if (params.dramatic_moment) {
+
+  // Build the final context for story stage
+  let contextForStory = `[GAME MASTER Summary: ${summary}]`;
+  contextForStory += `\n[Outcome: ${outcome}]`;
+  if (narrativeHints) {
+    contextForStory += `\n[Narrative Hints: ${narrativeHints}]`;
+  }
+  if (dramaticMoment) {
     contextForStory += `\n[DRAMATIC MOMENT - Emphasize this beat]`;
   }
 
@@ -2327,10 +2341,10 @@ function executeEndGmThinking(
     success: true,
     result: {
       type: "end_gm_thinking",
-      summary: params.summary,
-      outcome: params.outcome,
-      narrativeHints: params.narrative_hints,
-      dramaticMoment: params.dramatic_moment,
+      summary,
+      outcome,
+      narrativeHints,
+      dramaticMoment,
     } as GMEndGmThinkingResult,
     contextForStory,
   };
