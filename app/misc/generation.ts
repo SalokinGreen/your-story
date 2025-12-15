@@ -550,16 +550,22 @@ export async function generateStoryTurn(
 
         // GM stage loop - continues until end_gm_thinking is called
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
+        const MAX_CONSECUTIVE_FAILURES = 3; // Stop if tools keep failing
         let gmRound = 0;
+        let consecutiveFailures = 0; // Track how many rounds had ALL tools fail
         let allGMContextParts: string[] = [];
         // NEW: Build interleaved conversation log for story stage
         // This preserves the exact order: thinking -> tool results -> thinking -> tool results
         let gmInterleavedParts: string[] = [];
         let conversationHistory: {
-          role: string;
+          role: "assistant" | "user" | "tool";
           content: string;
-          toolCalls?: unknown[];
-          toolResults?: unknown[];
+          tool_calls?: {
+            id: string;
+            type: string;
+            function: { name: string; arguments: string };
+          }[];
+          tool_call_id?: string;
         }[] = [];
         let isComplete = false;
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
@@ -607,15 +613,24 @@ export async function generateStoryTurn(
           // Add previous round history (assistant responses + tool results)
           for (const historyEntry of conversationHistory) {
             if (historyEntry.role === "assistant") {
-              messagesWithHistory.push({
+              // Include tool_calls if present so AI sees it made these calls
+              const msg: any = {
                 role: "assistant",
-                content: historyEntry.content,
-                // Note: tool_calls would need proper handling here if provider supports it
-              });
+                content: historyEntry.content || "",
+              };
+              if (
+                historyEntry.tool_calls &&
+                historyEntry.tool_calls.length > 0
+              ) {
+                msg.tool_calls = historyEntry.tool_calls;
+              }
+              messagesWithHistory.push(msg);
             } else if (historyEntry.role === "tool") {
+              // Proper tool response with tool_call_id
               messagesWithHistory.push({
-                role: "user",
-                content: historyEntry.content, // Tool results formatted as user message
+                role: "tool",
+                content: historyEntry.content,
+                tool_call_id: historyEntry.tool_call_id,
               });
             } else if (historyEntry.role === "user") {
               // User messages (like continuation prompts) are added directly
@@ -692,16 +707,31 @@ export async function generateStoryTurn(
                 ? gmResult.content.trim().replace(/^\[GM\]/, "[GAME MASTER]")
                 : `[GAME MASTER]\n${gmResult.content.trim()}`;
             gmInterleavedParts.push(formattedThinking);
-            // Add to conversation history
-            conversationHistory.push({
-              role: "assistant",
-              content: gmResult.content,
-              toolCalls: gmResult.toolCalls,
-            });
+            // Note: We DON'T add thinking-only content to conversation history here
+            // because the AI will re-see its own thinking and repeat it.
+            // Only add to history when there are actual tool calls.
           }
 
           // Execute GM tool calls locally
           if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
+            // FIRST: Add the assistant's response with tool calls to history
+            // This is crucial - the AI needs to see that IT made these calls
+            conversationHistory.push({
+              role: "assistant",
+              content: gmResult.content || "",
+              tool_calls: gmResult.toolCalls.map((tc: any) => ({
+                id: tc.id,
+                type: "function",
+                function: {
+                  name: tc.function.name,
+                  arguments:
+                    typeof tc.function.arguments === "string"
+                      ? tc.function.arguments
+                      : JSON.stringify(tc.function.arguments),
+                },
+              })),
+            });
+
             const gmExecution = await executeGMTools(
               gmResult.toolCalls,
               storyData
@@ -720,14 +750,70 @@ export async function generateStoryTurn(
             // Update storyData with any modifications from GM tools
             Object.assign(storyData, gmExecution.modifiedStoryData);
 
-            // Format tool results for conversation history
-            const toolResultsText = gmExecution.results
-              .map((r) => `[Tool: ${r.toolName}]\n${r.contextForStory}`)
-              .join("\n\n");
-            conversationHistory.push({
-              role: "tool",
-              content: `## Tool Results\n\n${toolResultsText}`,
-            });
+            // Track consecutive failures - if ALL tools in a round fail, increment counter
+            const failedCount = gmExecution.results.filter(
+              (r) => !r.success
+            ).length;
+            const allFailed =
+              failedCount === gmExecution.results.length &&
+              gmExecution.results.length > 0;
+
+            if (allFailed) {
+              consecutiveFailures++;
+              logger.action(
+                `GM stage round ${gmRound} - all tools failed (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`,
+                {
+                  failedTools: gmExecution.results.map((r) => r.toolName),
+                }
+              );
+
+              // Check if we should break out due to consecutive failures
+              if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
+                logger.action(
+                  "GM stage aborting - too many consecutive failures"
+                );
+                // Force completion with neutral outcome
+                isComplete = true;
+                allGMContextParts.push(
+                  `[GAME MASTER: Tool calls failed repeatedly. Proceeding without mechanical resolution.]`
+                );
+                break;
+              }
+            } else {
+              // Reset counter if at least one tool succeeded
+              consecutiveFailures = 0;
+            }
+
+            // Add tool results to conversation history - one per tool call
+            // Make error messages VERY clear so the AI can correct its mistake
+            for (let i = 0; i < gmResult.toolCalls.length; i++) {
+              const tc = gmResult.toolCalls[i];
+              const result = gmExecution.results[i];
+
+              let toolContent: string;
+              if (result) {
+                if (result.success) {
+                  toolContent = `[${result.toolName}] ${result.contextForStory}`;
+                } else {
+                  // Make errors very prominent with hints about what went wrong
+                  const errorMsg = result.contextForStory || "Unknown error";
+                  const paramsUsed = JSON.stringify(
+                    JSON.parse(tc.function.arguments || "{}"),
+                    null,
+                    2
+                  );
+                  toolContent = `**ERROR** in ${result.toolName}: ${errorMsg}\n\nYou called with: ${paramsUsed}\n\nPlease check the tool's required parameters and try again with correct arguments.`;
+                }
+              } else {
+                toolContent = `[${tc.function.name}] Executed`;
+              }
+
+              conversationHistory.push({
+                role: "tool",
+                content: toolContent,
+                tool_call_id: tc.id,
+              });
+            }
 
             logger.action(`GM stage round ${gmRound} tools executed`, {
               toolCount: gmResult.toolCalls.length,
