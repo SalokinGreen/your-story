@@ -1275,7 +1275,7 @@ export async function generateStoryTurn(
       // Return a partial result that the UI can use to ask the question
       if (playerQuestion) {
         // Build gmConversation for resuming - includes all tool calls and responses
-        const gmConversationForPause = conversationHistory
+        const gmConversationForPause = gmConversationHistory
           .filter(
             (entry) => entry.role === "assistant" || entry.role === "tool"
           )
