@@ -974,16 +974,34 @@ export async function generateStoryTurn(
 
             // Add tool results to conversation history - one per tool call
             // Make error messages VERY clear so the AI can correct its mistake
+            // BUT: Dice tools use success=false to mean "check failed", not "tool error"
+            const diceTools = [
+              "formula_roll",
+              "opposed_formula",
+              "formula_challenge_check",
+              "npc_roll",
+              "group_check",
+            ];
             for (let i = 0; i < gmResult.toolCalls.length; i++) {
               const tc = gmResult.toolCalls[i];
               const result = gmExecution.results[i];
 
               let toolContent: string;
               if (result) {
-                if (result.success) {
+                // Check if this is a dice tool - these return success=false for failed checks,
+                // which is a VALID GAME OUTCOME, not an error
+                const isDiceTool = diceTools.includes(result.toolName);
+                // Only treat as error if: (1) not a dice tool AND (2) success is false
+                // OR if it's a dice tool but contextForStory contains "ERROR"
+                const isActualError = isDiceTool
+                  ? result.contextForStory?.includes("ERROR") ?? false
+                  : !result.success;
+
+                if (!isActualError) {
+                  // Valid result - show normally (includes failed dice checks!)
                   toolContent = `[${result.toolName}] ${result.contextForStory}`;
                 } else {
-                  // Make errors very prominent with hints about what went wrong
+                  // Actual error - make it prominent so AI can fix
                   const errorMsg = result.contextForStory || "Unknown error";
                   // Handle arguments that could be string or already-parsed object
                   const rawArgs = tc.function.arguments;
