@@ -2089,7 +2089,16 @@ function executeReadNotes(
   params: ReadNotesParams,
   storyData: StoryData
 ): GMToolResult {
-  const { titles } = params;
+  // Handle both "titles" (array) and "title" (single string) - LLMs often confuse these
+  let titles = params.titles;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const paramsAny = params as any;
+  if (!titles && paramsAny.title) {
+    // AI sent "title" (singular) instead of "titles" (array) - normalize it
+    titles = Array.isArray(paramsAny.title)
+      ? paramsAny.title
+      : [paramsAny.title];
+  }
 
   if (!titles || titles.length === 0) {
     return {
@@ -2111,12 +2120,17 @@ function executeReadNotes(
     [];
   const notFoundTitles: string[] = [];
 
+  // Helper to normalize title for matching (strip .md suffix, case-insensitive)
+  const normalizeTitle = (title: string): string => {
+    return title.toLowerCase().replace(/\.md$/i, "").trim();
+  };
+
   for (const requestedTitle of titles) {
-    // Find entry with matching title (case-insensitive)
+    const normalizedRequest = normalizeTitle(requestedTitle);
+    // Find entry with matching title (case-insensitive, .md suffix tolerant)
     const entry = loreEntries.find(
       (e) =>
-        e.title.toLowerCase() === requestedTitle.toLowerCase() &&
-        e.enabled !== false
+        normalizeTitle(e.title) === normalizedRequest && e.enabled !== false
     );
 
     if (entry) {

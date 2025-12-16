@@ -101,14 +101,18 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
 function stripThinkingTags(content: string): string {
   if (!content) return "";
   // Remove all <thinking>...</thinking> blocks (including multiline)
+  // Handle spaces inside tags like < thinking > that some models output
   // Also remove **[STORY OUTPUT]** marker and [GAME MASTER] that GM might add
   // Also remove GM reasoning blocks that aren't in thinking tags (common AI mistake)
+  // Also remove tool call echoes that some models output (→ function_name({...}))
   return (
     content
-      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+      .replace(/<\s*thinking\s*>[\s\S]*?<\s*\/\s*thinking\s*>/gi, "")
       .replace(/^\s*\*?\*?\[STORY OUTPUT\]\*?\*?\s*\n?/i, "")
       .replace(/^\s*\[GAME MASTER\]\s*\n?/i, "")
       .replace(/^\s*\[GM\]\s*\n?/i, "")
+      // Remove [GM made X tool call(s): ...] markers
+      .replace(/^\s*\[GM made \d+ tool call\(s\):[^\]]*\]\s*\n?/gim, "")
       // Remove **[GAME MASTER] Reasoning:** blocks and everything until the next --- or prose
       .replace(
         /\*?\*?\[(?:GAME MASTER|GM)\]?\s*Reasoning:?\*?\*?[\s\S]*?(?=\n---|\n\n[A-Z]|\n\*\*\[|$)/gi,
@@ -124,6 +128,12 @@ function stripThinkingTags(content: string): string {
         /^\s*\*?\*?Rolling\s+[\w\s]+\s+check[\s\S]*?\.{3}\s*\*?\*?\s*$/gim,
         ""
       )
+      // Remove tool call echoes: → function_name({...}) or → function_name(JSON)
+      // These appear when AI models echo their function calls in text content
+      .replace(/^\s*→\s*\w+\s*\([^)]*\)\s*$/gm, "")
+      .replace(/^\s*→\s*\w+\s*\(\{[\s\S]*?\}\)\s*$/gm, "")
+      // Also remove lines that are just "→ function_name" without parens
+      .replace(/^\s*→\s*\w+\s*$/gm, "")
       // Remove standalone --- dividers
       .replace(/^\s*---+\s*$/gm, "")
       // Clean up multiple newlines
@@ -135,11 +145,13 @@ function stripThinkingTags(content: string): string {
 /**
  * Extract <thinking>...</thinking> content from a string
  * Returns array of thinking blocks found
+ * Handles spaces inside tags like < thinking > that some models output
  */
 function extractThinkingTags(content: string): string[] {
   if (!content) return [];
-  const matches = content.match(/<thinking>[\s\S]*?<\/thinking>/gi) || [];
-  return matches.map((m) => m.replace(/<\/?thinking>/gi, "").trim());
+  const matches =
+    content.match(/<\s*thinking\s*>[\s\S]*?<\s*\/\s*thinking\s*>/gi) || [];
+  return matches.map((m) => m.replace(/<\s*\/?\s*thinking\s*>/gi, "").trim());
 }
 
 /**
@@ -2065,6 +2077,18 @@ export async function generateStoryTurn(
     // BUILD SCENE PART
     // ========================================
     console.log("[Generation] Building scene part");
+
+    // Filter gmConversationHistory to only include assistant and tool messages
+    // (user messages are not part of the GM conversation we want to save)
+    const gmConversationForStorage = gmConversationHistory
+      .filter((entry) => entry.role === "assistant" || entry.role === "tool")
+      .map((entry) => ({
+        role: entry.role as "assistant" | "tool",
+        content: entry.content,
+        ...(entry.tool_calls && { tool_calls: entry.tool_calls }),
+        ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
+      }));
+
     const scenePart: ScenePart = {
       content: storyContent,
       imageUrl: "",
@@ -2075,6 +2099,10 @@ export async function generateStoryTurn(
       toolResponses: allToolResponses.length > 0 ? allToolResponses : undefined,
       stateChanges: allStateChanges.length > 0 ? allStateChanges : undefined,
       gmToolCalls: gmResults.length > 0 ? gmResults : undefined,
+      gmConversation:
+        gmConversationForStorage.length > 0
+          ? gmConversationForStorage
+          : undefined,
       gmStoryContext: gmStoryContext || undefined,
       gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
     };

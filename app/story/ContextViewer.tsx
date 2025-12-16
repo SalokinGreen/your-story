@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from "react";
 import { StoryData } from "../misc/structs";
 import {
-  buildStoryPrompt,
   buildGMStagePrompt,
   ChatMessage,
   buildInfoMessage,
@@ -17,7 +16,6 @@ interface ContextViewerProps {
 
 export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [activeStage, setActiveStage] = useState<"story" | "gm">("story");
   const [contextString, setContextString] = useState("");
   const [estimatedTokens, setEstimatedTokens] = useState(0);
   const [activeModelName, setActiveModelName] = useState("Deepseek Chat");
@@ -28,8 +26,6 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [showInfo, setShowInfo] = useState(false);
   const [showStateChanges, setShowStateChanges] = useState(false);
   const [showGMToolCalls, setShowGMToolCalls] = useState(false);
-  const [prunedParts, setPrunedParts] = useState(0);
-  const [prefillEnabled, setPrefillEnabled] = useState(true);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -51,53 +47,28 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   };
 
   useEffect(() => {
-    // Check prefill setting (default: true)
-    const prefillSetting =
-      typeof window !== "undefined" ? localStorage.getItem("usePrefill") : null;
-    // If not set, default to true
-    setPrefillEnabled(prefillSetting !== "false");
-
     // Get current preset and custom model overrides from localStorage
     const currentPreset =
       typeof window !== "undefined"
         ? localStorage.getItem("aiPreset") || "custom"
         : "custom";
 
-    const customStoryModel =
-      typeof window !== "undefined"
-        ? localStorage.getItem("aiModelStory") || ""
-        : "";
     const customToolsModel =
       typeof window !== "undefined"
         ? localStorage.getItem("aiModelTools") || ""
-        : "";
-    const customChoicesModel =
-      typeof window !== "undefined"
-        ? localStorage.getItem("aiModelChoices") || ""
         : "";
 
     // Get preset config (fallback to main if invalid)
     const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["custom"];
 
-    // Determine effective models - use custom only if preset is "custom" AND value is set
-    const effectiveStoryModel =
-      currentPreset === "custom" && customStoryModel
-        ? customStoryModel
-        : preset.storyModel;
+    // Determine effective model - GM stage uses tools model
     const effectiveToolsModel =
       currentPreset === "custom" && customToolsModel
         ? customToolsModel
         : preset.toolsModel;
-    const effectiveChoicesModel =
-      currentPreset === "custom" && customChoicesModel
-        ? customChoicesModel
-        : preset.choicesModel;
 
-    // Select the model based on active stage
-    const currentModel =
-      activeStage === "story" ? effectiveStoryModel : effectiveToolsModel; // GM stage uses tools model
-    const modelConfig = getModelConfig(currentModel);
-    setActiveModelName(currentModel);
+    const modelConfig = getModelConfig(effectiveToolsModel);
+    setActiveModelName(effectiveToolsModel);
     setActiveModelConfig(modelConfig);
 
     const maxTokens = modelConfig.maxTokens;
@@ -108,46 +79,16 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       sceneParts: storyData.scene.parts.length,
       memoryEntries: storyData.memory.length,
       loreEntries: storyData.lore.filter((l) => l.on !== false).length,
-      activeStage,
     });
 
-    // Build messages using the SAME functions as generation.ts
-    let contextMessages: ChatMessage[] = [];
-    let prunedCount = 0;
-
-    // Get actual GM context from last assistant part (if available)
-    // Falls back to a sample if no real GM context exists
-    const lastAssistantPart = [...storyData.scene.parts]
-      .reverse()
-      .find((p) => !p.user);
-    const actualGMContext = lastAssistantPart?.gmStoryContext;
-    const sampleGMContext =
-      actualGMContext ||
-      "[Perception Check: SUCCESS | Roll: 1d100 = 72 vs DC 50 (Average)]\\n[Stakes: Notice something unusual]\\n[Intended consequence: You spot hidden details]";
-
-    switch (activeStage) {
-      case "story":
-        const storyPrompt = buildStoryPrompt({
-          storyData,
-          userChoice: undefined,
-          modelName: effectiveStoryModel,
-          usePrefill: prefillSetting !== "false",
-          gmStoryContext: sampleGMContext, // Show actual GM context if available, else sample
-        });
-        contextMessages = storyPrompt.messages;
-        prunedCount = storyPrompt.prunedParts;
-        break;
-      case "gm":
-        const gmPrompt = buildGMStagePrompt({
-          storyData,
-          userChoice: "(Player's action would go here)",
-        });
-        contextMessages = gmPrompt.messages;
-        break;
-    }
+    // Build GM stage messages using the SAME function as generation.ts
+    const gmPrompt = buildGMStagePrompt({
+      storyData,
+      userChoice: "(Player's action would go here)",
+    });
+    const contextMessages = gmPrompt.messages;
 
     setMessages(contextMessages);
-    setPrunedParts(prunedCount);
 
     // Build info string for display
     const infoStr = buildInfoMessage(storyData);
@@ -162,7 +103,6 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     setEstimatedTokens(estimatedTokenCount);
 
     console.log("📊 Context Statistics:", {
-      stage: activeStage,
       totalMessages: contextMessages.length,
       totalChars,
       estimatedTokens: estimatedTokenCount,
@@ -173,7 +113,6 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         contextMessages.filter(
           (m) => m.role === "user" || m.role === "assistant"
         ).length - 1, // Subtract the info message
-      prunedParts: prunedCount,
       messagesBreakdown: contextMessages.map((msg, i) => ({
         index: i,
         role: msg.role,
@@ -184,7 +123,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           (msg.content.length > 100 ? "..." : ""),
       })),
     });
-  }, [storyData, activeStage]);
+  }, [storyData]);
 
   const formatRole = (role: ChatMessage["role"]) => {
     switch (role) {
@@ -239,7 +178,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `context-${activeStage}-${Date.now()}.json`;
+    a.download = `context-gm-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -252,7 +191,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `context-${activeStage}-${Date.now()}.txt`;
+    a.download = `context-gm-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -297,63 +236,14 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
           </div>
         </div>
 
-        {/* Stage Selector Tabs */}
-        <div className="flex gap-1 bg-gray-200 dark:bg-gray-800 p-1 rounded-lg">
-          <button
-            onClick={() => setActiveStage("story")}
-            className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-              activeStage === "story"
-                ? "bg-white dark:bg-blue-950 text-purple-600 dark:text-purple-400 shadow"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            }`}
-          >
-            <DynamicIcon name="BookOpen" className="w-3 h-3 inline mr-1" />
-            Story
-          </button>
-          <button
-            onClick={() => setActiveStage("gm")}
-            className={`flex-1 px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md transition-colors ${
-              activeStage === "gm"
-                ? "bg-white dark:bg-blue-950 text-cyan-600 dark:text-cyan-400 shadow"
-                : "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white"
-            }`}
-          >
-            <DynamicIcon name="Dices" className="w-3 h-3 inline mr-1" />
-            GM Stage
-          </button>
-        </div>
-
         {showInfo && (
           <>
             {/* Stage Description */}
             <div className="text-xs p-2 rounded bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300">
-              {activeStage === "story" && (
-                <>
-                  <strong>Story Stage:</strong> Fallback stage used when GM
-                  stage is skipped (e.g., intro). Uses 75% of context for story
-                  history, 25% for info (lore, memory, stats).
-                  {prunedParts > 0 ? (
-                    <span className="text-amber-600 dark:text-amber-400">
-                      {" "}
-                      Pruned {prunedParts} oldest parts to fit {activeModelName}
-                      's context.
-                    </span>
-                  ) : (
-                    <span className="text-green-600 dark:text-green-400">
-                      {" "}
-                      All {storyData.scene.parts.length} parts included.
-                    </span>
-                  )}
-                </>
-              )}
-              {activeStage === "gm" && (
-                <>
-                  <strong>GM Stage:</strong> The main generation stage. AI acts
-                  as a tabletop GM - uses tools (formula_roll, read_notes,
-                  search_memory, etc.) to handle mechanics, then writes the
-                  story prose directly when done.
-                </>
-              )}
+              <strong>GM Stage:</strong> The main generation stage. AI acts as a
+              tabletop GM - uses tools (formula_roll, read_notes, search_memory,
+              etc.) to handle mechanics, then writes the story prose directly
+              when done.
             </div>
 
             {/* Stats and Options */}
@@ -381,11 +271,6 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                 <span className="font-semibold text-gray-900 dark:text-white">
                   {storyData.scene.parts.length}
                 </span>
-                {activeStage === "story" && prunedParts > 0 && (
-                  <span className="text-amber-600 dark:text-amber-400 ml-1">
-                    (-{prunedParts})
-                  </span>
-                )}
               </div>
               <div className="px-2 sm:px-3 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
                 <span className="text-gray-600 dark:text-gray-400">
@@ -409,16 +294,6 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   : estimatedTokens > activeModelConfig.maxTokens * 0.7
                   ? "⚡ High Usage"
                   : "✓ Normal"}
-              </div>
-              <div
-                className={`px-2 sm:px-3 py-1 rounded border text-xs ${
-                  prefillEnabled
-                    ? "bg-cyan-100 dark:bg-cyan-900/30 border-cyan-300 dark:border-cyan-700 text-cyan-700 dark:text-cyan-400"
-                    : "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400"
-                }`}
-                title="Role Affirmation primes the model to follow output rules"
-              >
-                {prefillEnabled ? "🎭 Prefill ON" : "Prefill OFF"}
               </div>
             </div>
 
@@ -715,109 +590,115 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto p-2 sm:p-4 space-y-3 sm:space-y-4 relative"
       >
-        {/* GM Stage Results Panel - Show at top when in GM stage view */}
-        {activeStage === "gm" &&
-          (() => {
-            const lastAssistantPart = [...storyData.scene.parts]
-              .reverse()
-              .find((p) => !p.user);
-            if (
-              (lastAssistantPart?.gmToolCalls &&
-                lastAssistantPart.gmToolCalls.length > 0) ||
-              (lastAssistantPart?.gmThinking &&
-                lastAssistantPart.gmThinking.length > 0)
-            ) {
-              return (
-                <div className="mx-2 sm:mx-4 mb-4 p-4 bg-cyan-50 dark:bg-cyan-900/20 border-2 border-cyan-300 dark:border-cyan-700 rounded-lg">
-                  <h4 className="font-bold text-cyan-700 dark:text-cyan-400 mb-3 flex items-center gap-2">
-                    <DynamicIcon name="Dices" className="w-5 h-5" />
-                    GM Stage Results (Last Turn)
-                  </h4>
-                  <div className="space-y-3">
-                    {/* GM Thinking/Reasoning */}
-                    {lastAssistantPart.gmThinking &&
-                      lastAssistantPart.gmThinking.length > 0 && (
-                        <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                          <h5 className="font-semibold text-purple-700 dark:text-purple-400 mb-2 flex items-center gap-1">
-                            <DynamicIcon name="Brain" className="w-4 h-4" />
-                            GM Reasoning ({
-                              lastAssistantPart.gmThinking.length
-                            }{" "}
-                            blocks)
-                          </h5>
-                          <div className="space-y-2">
-                            {lastAssistantPart.gmThinking.map(
-                              (thinking: string, i: number) => (
-                                <pre
-                                  key={i}
-                                  className="text-xs text-purple-800 dark:text-purple-300 whitespace-pre-wrap bg-purple-100 dark:bg-purple-900/30 p-2 rounded"
-                                >
-                                  {thinking}
-                                </pre>
-                              )
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    {/* Tool Calls */}
-                    {lastAssistantPart.gmToolCalls &&
-                      lastAssistantPart.gmToolCalls.length > 0 &&
-                      lastAssistantPart.gmToolCalls.map(
-                        (tool: any, i: number) => (
-                          <div
-                            key={i}
-                            className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-cyan-200 dark:border-cyan-800"
+        {/* GM Stage Results Panel - Show at top */}
+        {(() => {
+          const lastAssistantPart = [...storyData.scene.parts]
+            .reverse()
+            .find((p) => !p.user);
+          if (
+            lastAssistantPart?.gmConversation &&
+            lastAssistantPart.gmConversation.length > 0
+          ) {
+            return (
+              <div className="mx-2 sm:mx-4 mb-4 p-4 bg-cyan-50 dark:bg-cyan-900/20 border-2 border-cyan-300 dark:border-cyan-700 rounded-lg">
+                <h4 className="font-bold text-cyan-700 dark:text-cyan-400 mb-3 flex items-center gap-2">
+                  <DynamicIcon name="Dices" className="w-5 h-5" />
+                  GM Stage Results (Last Turn)
+                </h4>
+                <div className="space-y-2">
+                  {lastAssistantPart.gmConversation.map(
+                    (msg: any, i: number) => (
+                      <div
+                        key={i}
+                        className={`p-2 rounded-lg border ${
+                          msg.role === "assistant"
+                            ? "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800"
+                            : "bg-orange-50 dark:bg-orange-900/20 border-orange-200 dark:border-orange-800"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <span
+                            className={`text-xs font-semibold ${
+                              msg.role === "assistant"
+                                ? "text-green-700 dark:text-green-400"
+                                : "text-orange-700 dark:text-orange-400"
+                            }`}
                           >
-                            <div className="flex items-center gap-2 mb-2">
-                              <span
-                                className={`text-lg ${
-                                  tool.success
-                                    ? "text-green-500"
-                                    : "text-red-500"
-                                }`}
-                              >
-                                {tool.success ? "✓" : "✗"}
-                              </span>
-                              <span className="font-mono font-semibold text-gray-900 dark:text-white">
-                                {tool.toolName}
-                              </span>
+                            {msg.role === "assistant"
+                              ? "🤖 ASSISTANT"
+                              : "🔧 TOOL"}
+                          </span>
+                          {msg.tool_call_id && (
+                            <span className="text-[10px] text-gray-500 font-mono">
+                              id: {msg.tool_call_id}
+                            </span>
+                          )}
+                        </div>
+                        {/* Show tool_calls if present */}
+                        {msg.tool_calls && msg.tool_calls.length > 0 && (
+                          <div className="mb-2 p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-700">
+                            <div className="text-xs font-semibold text-blue-700 dark:text-blue-400 mb-1">
+                              Tool Calls:
                             </div>
-                            {tool.contextForStory && (
-                              <pre className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap bg-gray-50 dark:bg-gray-900 p-2 rounded">
-                                {tool.contextForStory}
-                              </pre>
-                            )}
+                            {msg.tool_calls.map((tc: any, tcIdx: number) => (
+                              <div key={tcIdx} className="text-xs font-mono">
+                                <span className="text-blue-600 dark:text-blue-300">
+                                  {tc.function?.name || tc.name}
+                                </span>
+                                <span className="text-gray-500">
+                                  (
+                                  {typeof tc.function?.arguments === "string"
+                                    ? tc.function.arguments.substring(0, 100)
+                                    : JSON.stringify(
+                                        tc.function?.arguments
+                                      )?.substring(0, 100)}
+                                  {(tc.function?.arguments?.length || 0) > 100
+                                    ? "..."
+                                    : ""}
+                                  )
+                                </span>
+                                <span className="text-gray-400 ml-1">
+                                  id: {tc.id}
+                                </span>
+                              </div>
+                            ))}
                           </div>
-                        )
-                      )}
-                  </div>
-                  {lastAssistantPart.gmStoryContext && (
-                    <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                      <h5 className="font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center gap-1">
-                        <DynamicIcon name="ArrowRight" className="w-4 h-4" />
-                        Context Sent to Story Stage
-                      </h5>
-                      <pre className="text-xs text-green-800 dark:text-green-300 whitespace-pre-wrap">
-                        {lastAssistantPart.gmStoryContext}
-                      </pre>
-                    </div>
+                        )}
+                        {/* Show content */}
+                        <pre className="text-xs whitespace-pre-wrap text-gray-700 dark:text-gray-300">
+                          {msg.content}
+                        </pre>
+                      </div>
+                    )
                   )}
                 </div>
-              );
-            }
-            return (
-              <div className="mx-2 sm:mx-4 mb-4 p-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-center">
-                <DynamicIcon
-                  name="Info"
-                  className="w-6 h-6 mx-auto mb-2 text-gray-400"
-                />
-                <p className="text-sm text-gray-600 dark:text-gray-400">
-                  No GM results from the last turn. The prompt below shows what
-                  would be sent to the GM stage.
-                </p>
+                {lastAssistantPart.gmStoryContext && (
+                  <div className="mt-4 p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                    <h5 className="font-semibold text-green-700 dark:text-green-400 mb-2 flex items-center gap-1">
+                      <DynamicIcon name="ArrowRight" className="w-4 h-4" />
+                      Context Sent to Story Stage
+                    </h5>
+                    <pre className="text-xs text-green-800 dark:text-green-300 whitespace-pre-wrap">
+                      {lastAssistantPart.gmStoryContext}
+                    </pre>
+                  </div>
+                )}
               </div>
             );
-          })()}
+          }
+          return (
+            <div className="mx-2 sm:mx-4 mb-4 p-4 bg-gray-100 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-center">
+              <DynamicIcon
+                name="Info"
+                className="w-6 h-6 mx-auto mb-2 text-gray-400"
+              />
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                No GM results from the last turn. The prompt below shows what
+                would be sent to the GM stage.
+              </p>
+            </div>
+          );
+        })()}
 
         {showRawJSON ? (
           <pre className="bg-gray-50 dark:bg-gray-900 p-3 sm:p-4 rounded text-xs overflow-x-auto text-gray-800 dark:text-gray-200 font-mono mx-2 sm:mx-4">

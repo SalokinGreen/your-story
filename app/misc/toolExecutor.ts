@@ -1048,6 +1048,7 @@ export function executeTools(
       if (toolCall.function.name === "search_notes") {
         logger.action("Special handling: search_notes", {
           toolCallId: toolId,
+          args,
         });
 
         if (!storyData.lore || storyData.lore.length === 0) {
@@ -1061,7 +1062,21 @@ export function executeTools(
           continue;
         }
 
-        const query = (args.query as string).toLowerCase();
+        // Validate required query parameter
+        if (!args.query || typeof args.query !== "string") {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `search_notes requires a 'query' string parameter (got: ${JSON.stringify(
+              args
+            )})`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const query = args.query.toLowerCase();
         const caseSensitive = args.case_sensitive === true;
         const maxResults = (args.max_results as number) || 10;
 

@@ -261,6 +261,21 @@ export interface Chapter {
   scene: Scene;
   notes: string[];
 }
+// GM Conversation message - preserves actual tool_calls and tool role structure
+export interface GMConversationMessage {
+  role: "assistant" | "tool";
+  content: string;
+  tool_calls?: Array<{
+    id: string;
+    type: "function";
+    function: {
+      name: string;
+      arguments: string;
+    };
+  }>;
+  tool_call_id?: string; // For tool role messages
+}
+
 export interface ScenePart {
   content: string;
   imageUrl: string;
@@ -271,7 +286,8 @@ export interface ScenePart {
   commands?: string[]; // Legacy: XML commands
   toolCalls?: any[]; // Tool calls made by AI (OpenAI/DeepSeek format)
   toolResponses?: CommandResponse[]; // Execution results of tool calls
-  gmToolCalls?: any[]; // GM stage tool calls (formula_roll, start_challenge, etc.)
+  gmToolCalls?: any[]; // GM stage tool execution results (formula_roll results, etc.) - for backwards compat
+  gmConversation?: GMConversationMessage[]; // NEW: Full GM conversation with proper tool_calls and tool messages
   gmStoryContext?: string; // GM stage context string passed to story stage
   gmThinking?: string[]; // GM stage "[GM]" reasoning text for UI display
   revealedLore?: string[]; // Lore titles manually revealed by AI in this part

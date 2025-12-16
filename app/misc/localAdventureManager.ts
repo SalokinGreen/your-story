@@ -1,30 +1,21 @@
 import { Adventure, StoryData } from "./structs";
 
-const DB_NAME = "YourStoryDB";
-const STORE_NAME = "local_adventures";
-const DB_VERSION = 1; // Note: If sharing DB with stories, we might need to handle versioning carefully or use a different DB/Store. 
-// Actually, IndexedDB versioning is global for the DB. 
-// If "YourStoryDB" is already used by localStoryManager with version 1, and we want to add a new store, we need to bump version to 2.
-// However, localStoryManager.ts uses version 1. 
-// To avoid conflicts/complexity with upgrading the existing DB in a separate file without coordination, 
-// I will use a separate DB name for adventures for simplicity, or I need to check if I can dynamically upgrade.
-// Using a separate DB "YourStoryAdventuresDB" is safer to avoid breaking the existing "YourStoryDB" if the user has it open.
-// BUT, ideally they should be in the same DB. 
-// Let's check localStoryManager.ts content again. It opens "YourStoryDB" version 1.
-// If I want to add a store, I must increase version. 
-// If I change version in one file but not the other, it might cause issues if both try to open with different versions.
-// For now, to be safe and isolated, I'll use a different DB name: "YourStoryAdventuresDB".
-
 const ADVENTURE_DB_NAME = "YourStoryAdventuresDB";
 const ADVENTURE_STORE_NAME = "local_adventures";
-const ADVENTURE_DB_VERSION = 1;
+const ADVENTURE_DB_VERSION = 2; // Bumped for sync metadata
+
+export type AdventureSyncStatus = "synced" | "pending" | "local-only";
 
 export interface LocalAdventure {
   id: string;
   title: string;
   description: string;
   updatedAt: Date;
-  adventureData: Partial<Adventure>; // Store the whole adventure object or parts of it
+  adventureData: Partial<Adventure>;
+  // Sync metadata
+  syncStatus: AdventureSyncStatus;
+  serverUpdatedAt?: string; // ISO timestamp from server
+  lastSyncedAt?: Date; // When we last synced with server
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -41,26 +32,70 @@ function openDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+      const oldVersion = event.oldVersion;
+
       if (!db.objectStoreNames.contains(ADVENTURE_STORE_NAME)) {
         const objectStore = db.createObjectStore(ADVENTURE_STORE_NAME, { keyPath: "id" });
         objectStore.createIndex("updatedAt", "updatedAt", { unique: false });
+        objectStore.createIndex("syncStatus", "syncStatus", { unique: false });
+      } else if (oldVersion < 2) {
+        // Migration: add syncStatus index for existing stores
+        const transaction = (event.target as IDBOpenDBRequest).transaction;
+        if (transaction) {
+          const store = transaction.objectStore(ADVENTURE_STORE_NAME);
+          if (!store.indexNames.contains("syncStatus")) {
+            store.createIndex("syncStatus", "syncStatus", { unique: false });
+          }
+        }
       }
     };
   });
 }
 
-export async function saveLocalAdventure(adventureId: string, adventure: Partial<Adventure>): Promise<void> {
+export async function saveLocalAdventure(
+  adventureId: string,
+  adventure: Partial<Adventure>,
+  options?: {
+    serverUpdatedAt?: string;
+    markAsSynced?: boolean;
+  }
+): Promise<void> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     const transaction = db.transaction([ADVENTURE_STORE_NAME], "readwrite");
     const store = transaction.objectStore(ADVENTURE_STORE_NAME);
+
+    // Get existing adventure to preserve metadata
+    let existing: LocalAdventure | undefined;
+    const existingRequest = store.get(adventureId);
+    await new Promise<void>((res) => {
+      existingRequest.onsuccess = () => {
+        existing = existingRequest.result as LocalAdventure | undefined;
+        res();
+      };
+      existingRequest.onerror = () => res();
+    });
+
+    const isLocalOnly = adventureId.startsWith("local:");
+    const now = new Date();
+
+    // Determine sync status
+    let syncStatus: AdventureSyncStatus =
+      existing?.syncStatus || (isLocalOnly ? "local-only" : "synced");
+    if (options?.markAsSynced) {
+      syncStatus = "synced";
+    }
 
     const localAdventure: LocalAdventure = {
       id: adventureId,
       title: adventure.title || "Untitled Adventure",
       description: adventure.shortDescription || "",
-      updatedAt: new Date(),
+      updatedAt: now,
       adventureData: adventure,
+      // Sync metadata
+      syncStatus,
+      serverUpdatedAt: options?.serverUpdatedAt || existing?.serverUpdatedAt,
+      lastSyncedAt: options?.markAsSynced ? now : existing?.lastSyncedAt,
     };
 
     const request = store.put(localAdventure);
@@ -114,4 +149,83 @@ export async function deleteLocalAdventure(adventureId: string): Promise<void> {
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
+}
+
+/**
+ * Cache multiple adventures from the server for offline access
+ * Only updates adventures that are newer on the server or don't exist locally
+ */
+export async function cacheAdventuresFromServer(adventures: Adventure[]): Promise<void> {
+  if (adventures.length === 0) return;
+
+  const db = await openDB();
+  const transaction = db.transaction([ADVENTURE_STORE_NAME], "readwrite");
+  const store = transaction.objectStore(ADVENTURE_STORE_NAME);
+
+  // Get all existing local adventures first
+  const existingMap = new Map<string, LocalAdventure>();
+  const getAllRequest = store.getAll();
+  
+  await new Promise<void>((resolve) => {
+    getAllRequest.onsuccess = () => {
+      const existing = getAllRequest.result as LocalAdventure[];
+      for (const adv of existing) {
+        existingMap.set(adv.id, adv);
+      }
+      resolve();
+    };
+    getAllRequest.onerror = () => resolve();
+  });
+
+  // Process each adventure
+  const now = new Date();
+  const putPromises: Promise<void>[] = [];
+
+  for (const adventure of adventures) {
+    const existing = existingMap.get(adventure.id);
+    const serverUpdatedAt = adventure.updatedAt instanceof Date 
+      ? adventure.updatedAt.toISOString() 
+      : adventure.updatedAt;
+
+    // Skip if local version is newer or same (and not local-only)
+    if (existing && existing.syncStatus !== "local-only") {
+      const existingServerTime = existing.serverUpdatedAt 
+        ? new Date(existing.serverUpdatedAt).getTime() 
+        : 0;
+      const newServerTime = serverUpdatedAt 
+        ? new Date(serverUpdatedAt).getTime() 
+        : 0;
+      
+      // Skip if server version is same or older
+      if (existingServerTime >= newServerTime) {
+        continue;
+      }
+    }
+
+    // Don't overwrite local-only adventures with server data
+    if (existing?.syncStatus === "local-only") {
+      continue;
+    }
+
+    const localAdventure: LocalAdventure = {
+      id: adventure.id,
+      title: adventure.title || "Untitled Adventure",
+      description: adventure.shortDescription || "",
+      updatedAt: now,
+      adventureData: adventure,
+      syncStatus: "synced",
+      serverUpdatedAt,
+      lastSyncedAt: now,
+    };
+
+    putPromises.push(
+      new Promise<void>((resolve, reject) => {
+        const putRequest = store.put(localAdventure);
+        putRequest.onsuccess = () => resolve();
+        putRequest.onerror = () => reject(putRequest.error);
+      })
+    );
+  }
+
+  await Promise.all(putPromises);
 }

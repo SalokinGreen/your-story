@@ -93,10 +93,26 @@ export function buildStoryAffirmation(
     return STORY_AFFIRMATION_FALLBACK;
   }
 
+  // Clean up the reasoning:
+  // 1. Strip any existing <thinking> tags (we'll wrap in our own)
+  //    Handle spaces inside tags like < thinking > that some models output
+  // 2. Remove [GAME MASTER] headers (redundant in prefill context)
+  // 3. Remove [STORY OUTPUT] markers (we want the prose to flow)
+  // 4. Remove [GM made X tool call(s)] markers
+  let cleanedReasoning = gmReasoning
+    .replace(/<\s*thinking\s*>/gi, "")
+    .replace(/<\s*\/\s*thinking\s*>/gi, "")
+    .replace(/^\s*\[GAME MASTER\]\s*\n?/gim, "")
+    .replace(/^\s*\[GM\]\s*\n?/gim, "")
+    .replace(/^\s*\[STORY OUTPUT\]\s*\n?/gim, "")
+    .replace(/^\s*\[GM made \d+ tool call\(s\):[^\]]*\]\s*\n?/gim, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+
   // Build the prefill with GM reasoning in thinking tags
   return STORY_AFFIRMATION_TEMPLATE.replace(
     "{{GM_REASONING}}",
-    gmReasoning.trim()
+    cleanedReasoning
   );
 }
 
@@ -703,26 +719,34 @@ export function buildInfoMessage(
   // Folder types: lore, secret (show titles only, use read_notes tool)
 
   // Helper to check if a note type is "pinned" for GM Stage (always loaded in full)
+  // NOTE: mechanics is NO LONGER pinned - it uses read_notes like other folders
   const isPinnedType = (type?: string): boolean => {
     return (
       type === "dm_instructions" ||
       type === "character_sheet" ||
-      type === "mechanics" ||
       type === "gm_notes" // Legacy alias for dm_instructions
-      // NOTE: story_instructions is NOT pinned for GM Stage (only Story Stage uses it)
+      // NOTE: mechanics and story_instructions are NOT pinned for GM Stage
     );
   };
 
   // Helper to check if a note type should be excluded from World Lore folder
   const isExcludedFromWorldLore = (type?: string): boolean => {
     return (
-      isPinnedType(type) || type === "secret" || type === "story_instructions" // Excluded - only for Story Stage
+      isPinnedType(type) ||
+      type === "mechanics" ||
+      type === "secret" ||
+      type === "story_instructions" // Excluded - only for Story Stage
     );
   };
 
   // Helper to check if a note type is "secret" (hidden from player)
   const isSecretType = (type?: string): boolean => {
     return type === "secret";
+  };
+
+  // Helper to add .md suffix to note titles (helps AI understand they're readable files)
+  const formatNoteTitle = (title: string): string => {
+    return title.endsWith(".md") ? title : `${title}.md`;
   };
 
   // 📌 DM Instructions - Always loaded in full (read every turn like copilot-instructions.md)
@@ -733,7 +757,9 @@ export function buildInfoMessage(
   );
   const dmInstructionsSection = dmInstructionsLore.length
     ? `## 📌 DM Instructions\nGuidelines for running this adventure. Follow these precisely.\n${dmInstructionsLore
-        .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
+        .map(
+          (l) => `### ${formatNoteTitle(l.title)}\n${cleanString(l.content)}`
+        )
         .join("\n\n")}`
     : "";
 
@@ -743,30 +769,127 @@ export function buildInfoMessage(
   );
   const characterSheetSection = characterSheetLore.length
     ? `## 📌 Character Sheet\nThe player's character details. Reference these for personality, abilities, and backstory.\n${characterSheetLore
-        .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
+        .map(
+          (l) => `### ${formatNoteTitle(l.title)}\n${cleanString(l.content)}`
+        )
         .join("\n\n")}`
     : "";
 
-  // 📌 Game Mechanics - Always loaded in full
+  // � Game Mechanics - Titles only (use read_notes to view rules)
   const mechanicsLore = storyData.lore.filter(
     (l) => l.enabled !== false && l.type === "mechanics"
   );
   const mechanicsSection = mechanicsLore.length
-    ? `## 📌 Game Mechanics\nThese are the rules for this adventure. Follow them precisely.\n${mechanicsLore
-        .map((l) => `### ${l.title}\n${cleanString(l.content)}`)
-        .join("\n\n")}`
+    ? `## 📁 Game Mechanics (use read_notes to view rules)\n${mechanicsLore
+        .map((l) => `- ${formatNoteTitle(l.title)}`)
+        .join("\n")}`
     : "";
 
-  // 📁 World Lore - Titles only (use read_notes to view content)
-  // Includes: lore (default), npc, item, location, faction, event, and untyped notes
+  // ============================================
+  // WORLD LORE - Split by category for clarity
+  // ============================================
+  // Filter out pinned types, mechanics, secrets, and story-stage-only types
   const worldLoreNotes = storyData.lore.filter((l) => {
     if (l.enabled === false) return false;
-    if (isExcludedFromWorldLore(l.type)) return false; // Not pinned, secret, or story-stage-only types
-    return true; // Everything else goes in World Lore
+    if (isExcludedFromWorldLore(l.type)) return false;
+    return true;
   });
-  const worldLoreSection = worldLoreNotes.length
-    ? `## 📁 World Lore (use read_notes to view)\n${worldLoreNotes
-        .map((l) => `- ${l.title}`)
+
+  // Group world lore by type/category
+  const loreByCategory: Record<string, typeof worldLoreNotes> = {
+    npc: [],
+    location: [],
+    item: [],
+    faction: [],
+    event: [],
+    lore: [], // Default/untyped
+  };
+
+  for (const note of worldLoreNotes) {
+    const category = note.type || "lore";
+    if (loreByCategory[category]) {
+      loreByCategory[category].push(note);
+    } else {
+      loreByCategory.lore.push(note); // Unknown types go to default
+    }
+  }
+
+  // Build categorized world lore sections
+  const worldLoreSections: string[] = [];
+
+  // 📁 NPCs from lore notes
+  if (loreByCategory.npc.length > 0) {
+    worldLoreSections.push(
+      `### 📁 NPCs (use read_notes to view)\n${loreByCategory.npc
+        .map((l) => `- ${formatNoteTitle(l.title)}`)
+        .join("\n")}`
+    );
+  }
+
+  // 📁 Locations
+  if (loreByCategory.location.length > 0) {
+    worldLoreSections.push(
+      `### 📁 Locations (use read_notes to view)\n${loreByCategory.location
+        .map((l) => `- ${formatNoteTitle(l.title)}`)
+        .join("\n")}`
+    );
+  }
+
+  // 📁 Items
+  if (loreByCategory.item.length > 0) {
+    worldLoreSections.push(
+      `### 📁 Items (use read_notes to view)\n${loreByCategory.item
+        .map((l) => `- ${formatNoteTitle(l.title)}`)
+        .join("\n")}`
+    );
+  }
+
+  // 📁 Factions
+  if (loreByCategory.faction.length > 0) {
+    worldLoreSections.push(
+      `### 📁 Factions (use read_notes to view)\n${loreByCategory.faction
+        .map((l) => `- ${formatNoteTitle(l.title)}`)
+        .join("\n")}`
+    );
+  }
+
+  // 📁 Events
+  if (loreByCategory.event.length > 0) {
+    worldLoreSections.push(
+      `### 📁 Events (use read_notes to view)\n${loreByCategory.event
+        .map((l) => `- ${formatNoteTitle(l.title)}`)
+        .join("\n")}`
+    );
+  }
+
+  // 📁 Other Lore (default type)
+  if (loreByCategory.lore.length > 0) {
+    worldLoreSections.push(
+      `### 📁 World Notes (use read_notes to view)\n${loreByCategory.lore
+        .map((l) => `- ${formatNoteTitle(l.title)}`)
+        .join("\n")}`
+    );
+  }
+
+  const worldLoreSection = worldLoreSections.length
+    ? `## 📁 WORLD LORE\n${worldLoreSections.join("\n\n")}`
+    : "";
+
+  // ============================================
+  // KNOWN NPCs - From storyData.npcs (tracked characters)
+  // ============================================
+  const knownNPCs =
+    storyData.npcs?.filter((npc) => npc.status !== "unknown") || [];
+  const npcsSection = knownNPCs.length
+    ? `## 👥 Known NPCs\n${knownNPCs
+        .map((npc) => {
+          const status = npc.status !== "alive" ? ` [${npc.status}]` : "";
+          const attitude =
+            npc.attitude !== "neutral" ? ` (${npc.attitude})` : "";
+          const role = npc.role ? ` - ${npc.role}` : "";
+          const lastSeen = npc.lastSeen ? ` | Last seen: ${npc.lastSeen}` : "";
+          return `- **${npc.name}**${status}${attitude}${role}${lastSeen}`;
+        })
         .join("\n")}`
     : "";
 
@@ -776,7 +899,7 @@ export function buildInfoMessage(
   );
   const secretsSection = secretNotes.length
     ? `## 🔒 Secrets (use read_notes to view)\n${secretNotes
-        .map((l) => `- ${l.title}`)
+        .map((l) => `- ${formatNoteTitle(l.title)}`)
         .join("\n")}`
     : "";
 
@@ -895,9 +1018,10 @@ ${
     // Pinned notes - always loaded in full
     dmInstructionsSection, // DM Instructions - highest priority, read every turn
     characterSheetSection, // Character sheet - player details
-    mechanicsSection, // Game mechanics - rules
+    mechanicsSection, // Game mechanics - titles only, read with read_notes
     // Folder notes - titles only, use read_notes tool
-    worldLoreSection, // World Lore folder
+    worldLoreSection, // World Lore folder (split by category)
+    npcsSection, // Known NPCs with key details
     secretsSection, // Secrets folder
     // Memory - summary only, use search_memory tool
     memorySection,
@@ -1374,17 +1498,39 @@ export function buildStoryPrompt({
 
     // Add GAME MASTER thinking (the [GAME MASTER] reasoning text)
     // The AI response may already include [GAME MASTER] tags, so don't double-add
+    // IMPORTANT: Strip the [STORY OUTPUT] section since the story prose is already
+    // in part.content - we only want the reasoning/analysis part here
     if (part.gmThinking && part.gmThinking.length > 0) {
       sections.push(
         part.gmThinking
           .map((t) => {
-            const trimmed = t.trim();
+            let processed = t.trim();
+            // Strip <thinking> tags entirely - they're internal reasoning
+            processed = processed
+              .replace(/<\s*thinking\s*>[\s\S]*?<\s*\/\s*thinking\s*>/gi, "")
+              .trim();
+            // Strip [STORY OUTPUT] section and everything after it
+            // This prevents doubling the story (once in GM thinking, once in assistant message)
+            const storyOutputIndex = processed.indexOf("[STORY OUTPUT]");
+            if (storyOutputIndex !== -1) {
+              processed = processed.substring(0, storyOutputIndex).trim();
+            }
+            // Also strip variations like [STORY] or [OUTPUT]
+            const altStoryIndex = processed.search(
+              /\[(STORY|OUTPUT|NARRATIVE)\s*(OUTPUT|CONTENT)?\]/i
+            );
+            if (altStoryIndex !== -1) {
+              processed = processed.substring(0, altStoryIndex).trim();
+            }
+            // If nothing meaningful remains after stripping, skip this entry
+            if (!processed || processed.length < 20) return "";
             // Only add [GAME MASTER] prefix if the thinking doesn't already start with it
-            return trimmed.startsWith("[GAME MASTER]") ||
-              trimmed.startsWith("[GM]")
-              ? trimmed.replace(/^\[GM\]/, "[GAME MASTER]")
-              : `[GAME MASTER]\n${trimmed}`;
+            return processed.startsWith("[GAME MASTER]") ||
+              processed.startsWith("[GM]")
+              ? processed.replace(/^\[GM\]/, "[GAME MASTER]")
+              : `[GAME MASTER]\n${processed}`;
           })
+          .filter((s) => s.length > 0) // Remove empty entries
           .join("\n\n")
       );
     }
@@ -2497,62 +2643,69 @@ export function buildGMStagePrompt({
   // Build the lore/notes section
   let loreSection = "";
 
-  // Pinned notes: Full content
+  // Pinned notes: Full content (DM Instructions and Character Sheet only)
   if (dmInstructionsLore.length > 0) {
     loreSection += `## 📌 DM INSTRUCTIONS\nRead these guidelines every turn. They define how to run this adventure.\n`;
     for (const l of dmInstructionsLore) {
-      loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
+      loreSection += `\n### ${l.title}.md\n${cleanString(l.content)}\n`;
     }
   }
   if (characterSheetLore.length > 0) {
     loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\nTo update: edit_note("title", "new content") - Keep stats, HP, XP, etc. current!\n`;
     for (const l of characterSheetLore) {
-      loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
+      loreSection += `\n### ${l.title}.md\n${cleanString(l.content)}\n`;
     }
   }
+
+  // Mechanics notes: Titles only (use read_notes to view)
   if (mechanicsLore.length > 0) {
-    loreSection += `\n## 📌 GAME RULES & MECHANICS\nThese rules define how the game works. Use them to set appropriate DCs and determine what actions are possible.\n`;
-    for (const l of mechanicsLore) {
-      loreSection += `\n### ${l.title}\n${cleanString(l.content)}\n`;
-    }
+    loreSection += `\n## 📁 GAME MECHANICS (use read_notes to view rules, always read the rules before doing anything with mechanics.)\n`;
+    loreSection += mechanicsLore.map((l) => `- ${l.title}.md`).join("\n");
+    loreSection += "\n";
   }
 
   // Folder notes by category: Titles only
   if (noteCategories.npc.length > 0) {
-    loreSection += `\n## 👤 NPC NOTES (use read_notes to view)\n`;
-    loreSection += noteCategories.npc.map((l) => `- ${l.title}`).join("\n");
+    loreSection += `\n## 👤 NPC NOTES (use read_notes to view, read them for details on NPCs beyond NPC summary.)\n`;
+    loreSection += noteCategories.npc.map((l) => `- ${l.title}.md`).join("\n");
     loreSection += "\n";
   }
   if (noteCategories.location.length > 0) {
     loreSection += `\n## 📍 LOCATION NOTES (use read_notes to view)\n`;
     loreSection += noteCategories.location
-      .map((l) => `- ${l.title}`)
+      .map((l) => `- ${l.title}.md`)
       .join("\n");
     loreSection += "\n";
   }
   if (noteCategories.item.length > 0) {
     loreSection += `\n## 🎒 ITEM NOTES (use read_notes to view)\n`;
-    loreSection += noteCategories.item.map((l) => `- ${l.title}`).join("\n");
+    loreSection += noteCategories.item.map((l) => `- ${l.title}.md`).join("\n");
     loreSection += "\n";
   }
   if (noteCategories.faction.length > 0) {
     loreSection += `\n## ⚔️ FACTION NOTES (use read_notes to view)\n`;
-    loreSection += noteCategories.faction.map((l) => `- ${l.title}`).join("\n");
+    loreSection += noteCategories.faction
+      .map((l) => `- ${l.title}.md`)
+      .join("\n");
     loreSection += "\n";
   }
   if (noteCategories.event.length > 0) {
     loreSection += `\n## 📜 EVENT NOTES (use read_notes to view)\n`;
-    loreSection += noteCategories.event.map((l) => `- ${l.title}`).join("\n");
+    loreSection += noteCategories.event
+      .map((l) => `- ${l.title}.md`)
+      .join("\n");
     loreSection += "\n";
   }
   if (noteCategories.lore.length > 0) {
     loreSection += `\n## 📁 WORLD LORE (use read_notes to view)\n`;
-    loreSection += noteCategories.lore.map((l) => `- ${l.title}`).join("\n");
+    loreSection += noteCategories.lore.map((l) => `- ${l.title}.md`).join("\n");
     loreSection += "\n";
   }
   if (noteCategories.secret.length > 0) {
     loreSection += `\n## 🔒 SECRETS (use read_notes to view)\n`;
-    loreSection += noteCategories.secret.map((l) => `- ${l.title}`).join("\n");
+    loreSection += noteCategories.secret
+      .map((l) => `- ${l.title}.md`)
+      .join("\n");
     loreSection += "\n";
   }
 
@@ -2582,49 +2735,64 @@ export function buildGMStagePrompt({
     })
     .join("\n- ");
 
-  const systemPrompt = `You ARE the Dungeon Master. Run this game like a real tabletop session.
+  const systemPrompt = `You ARE the Game Master. Run this like a real tabletop session.
 
-**CRITICAL: The player sees EVERYTHING you write EXCEPT text inside <thinking>...</thinking> tags.**
-This applies to EVERY response, including your very first one. Any reasoning, analysis, game system notes, DC calculations, etc. MUST be wrapped in <thinking> tags or the player will see it!
+## VISIBILITY RULES
+**The player sees EVERYTHING you write EXCEPT text inside <thinking>...</thinking> tags.**
+- ALWAYS start with <thinking> for your private reasoning
+- After </thinking>, write only vivid story prose the player will see
+- Tool calls are invisible to the player - they just see results narratively
+- Always read the DM Instructions and Character Sheet and Game Mechanics notes before acting or rolling dice.
+- Remember to check notes for NPCs, enemies, locations, items, and lore before making assumptions.
 
-**HOW TO RESPOND:**
-1. <thinking>Your private reasoning here - player never sees this</thinking>
-2. Prose narration the player sees
-3. Tool calls as needed
-4. More prose continuing the story
+## RESPONSE STRUCTURE
+1. <thinking>Your private GM reasoning - dice math, difficulty decisions, what notes to check</thinking>
+2. Story prose describing the action (player sees this)
+3. Call tools as needed (player doesn't see these)
+4. Continue story prose based on results
 
-**ALWAYS START WITH <thinking>** - Put your GM reasoning there:
-- What skill/check is needed?
-- What's the DC and why?
-- What are the stakes?
-- Do I need to look up any notes?
+## WHEN TO USE TOOLS
 
-**BE PROACTIVE WITH TOOLS:**
-- **read_notes**: ALWAYS check relevant notes before encounters (enemy stats, location details, NPC info)
-- **search_notes**: Find notes when you're not sure what exists
-- **add_memory**: Record important events, discoveries, NPC meetings, player decisions
-- **add_npc**: Track ANY named character the player meets
-- **create_note**: Create stat blocks for enemies, document new locations
+### Information Lookup (DO THIS FIRST!)
+- **Before any combat**: Search notes for enemy/monster stat sheets
+- **Before NPC interactions**: Check if notes exist about that character
+- **When player asks about lore**: Search notes for relevant world info
+- Use \`search_notes\` when unsure what exists, \`read_notes\` when you know the title
 
-**WHEN TO ROLL:** Only for meaningful risk. Routine tasks just succeed.
-**COMBAT:** You control NPCs/enemies. Look up their stats with read_notes, roll for them, apply damage. Think tactically.
+### Creating Records
+- **New enemy encountered without stats**: Create a note with their combat stats (HP, attacks, abilities)
+- **Important event happens**: Add a memory entry (discoveries, decisions, plot twists)
+- **Meet a named NPC**: Use \`add_npc\` to track them (name, role, attitude, description)
+- **Discover new location/faction/item**: Create a note documenting it
 
-**EXAMPLE - GOOD:**
-<thinking>A zombie attacks! This is a combat encounter. Let me check zombie stats first, then roll its attack against the player's defense.</thinking>
-The shambling corpse lunges at you with rotting claws!
-→ call read_notes({ titles: ["Zombies"] })
-→ call formula_roll({ formula: "1d20+2", dc: 14, reason: "Zombie claw attack vs your defense" })
+### Updating Records
+- **Enemy HP changes**: Use \`update_combatant_stat\` during combat
+- **NPC attitude/relationship changes**: Use \`update_npc\`
+- **Character sheet changes**: Use \`edit_note\` to keep stats, resources, abilities current
+- **Any other Note changes**: Use \`edit_note\` to update lore, locations, items, etc.
 
-[After seeing "15 vs DC 14 = SUCCESS"]
-Its fetid claws rake across your arm, tearing through your sleeve!
-→ call modify_resource({ name: "Health", delta: -6, reason: "Zombie claw damage" })
+### Combat & Mechanics
+- **Skill checks**: Use \`formula_roll\` for risky actions with meaningful stakes
+- **Enemy attacks**: Roll for them using their stats, apply damage to player resources
+- **Multiple enemies**: Start formal combat with \`start_combat\` for initiative tracking
+- **Routine actions**: No roll needed - just narrate success
 
-**EXAMPLE - BAD (player sees your reasoning!):**
-**Game System:** Call of Cthulhu uses roll-under...
-**Skill Check:** This is a Brawn check...
-→ call formula_roll(...)
+### State Changes
+- **Player Stats:** Update their character sheet with \`edit_note\` as needed
+- **NPC Status:** Use \`update_npc\` to change attitudes, relationships, or conditions, or \`edit_note\` for detailed changes on their note
+- **Combatants:** Use \`update_combatant_stat\` or \`toggle_combatant_condition\` to adjust HP, conditions, or status effects during combat
+- **Timers:** Manage timed events with \`create_timer\`, \`advance_timer\`, etc.
 
-Write vivid, immersive prose. The player should see story, not game mechanics.`;
+### Story Progression
+- **Quest progress**: \`create_quest\`, \`update_quest\`, \`complete_quest\`
+- **Significant achievements**: \`trigger_achievement\`
+## IMPORTANT BEHAVIORS
+- Look up notes BEFORE making assumptions about enemy stats or NPC details
+- If no stat sheet exists for an enemy, create one before combat rolls
+- Record significant moments so you remember them in future turns
+- The player's character sheet and game rules are in the pinned notes - reference them
+
+Write immersive prose. The player should experience the story, not see game mechanics.`;
 
   // Use tools + state tools
   const legacyToolNames = [
@@ -2731,7 +2899,7 @@ Write vivid, immersive prose. The player should see story, not game mechanics.`;
 
   // Add NPCs
   if (npcList) {
-    stateMessage += `## 👥 KNOWN NPCs\n- ${npcList}\n\n`;
+    stateMessage += `## 👥 NPCs Summary (read their notes for more details)\n- ${npcList}\n\n`;
   }
 
   // Add combat state
@@ -2807,13 +2975,31 @@ Write vivid, immersive prose. The player should see story, not game mechanics.`;
         content: cleanString(`> ${part.content.replace(/^>\s*/, "")}`),
       });
     } else {
-      // Assistant (story) part - reconstruct GM's thinking and tool calls
-      // This is the key improvement: GM sees its own reasoning from past turns
-
-      // Add GM thinking if available (the reasoning text)
-      if (part.gmThinking && part.gmThinking.length > 0) {
-        // GM's reasoning - each thinking entry corresponds to a separate GM round
-        // We need to pair each thinking with its tool call results
+      // Assistant (story) part - reconstruct GM's conversation
+      // NEW: Use gmConversation if available (has actual tool_calls and tool role messages)
+      if (part.gmConversation && part.gmConversation.length > 0) {
+        // Use the actual saved conversation - this preserves exact tool_calls and tool responses
+        for (const msg of part.gmConversation) {
+          if (msg.role === "assistant") {
+            const assistantMsg: ChatMessage = {
+              role: "assistant",
+              content: cleanString(msg.content),
+            };
+            if (msg.tool_calls && msg.tool_calls.length > 0) {
+              assistantMsg.tool_calls = msg.tool_calls;
+            }
+            messages.push(assistantMsg);
+          } else if (msg.role === "tool") {
+            messages.push({
+              role: "tool",
+              content: msg.content,
+              tool_call_id: msg.tool_call_id,
+            });
+          }
+        }
+      } else if (part.gmThinking && part.gmThinking.length > 0) {
+        // LEGACY FALLBACK: Synthesize conversation from gmThinking + gmToolCalls
+        // This is for backward compatibility with stories saved before gmConversation was added
 
         // gmToolCalls contains GMToolResult[] objects, not raw tool_calls
         // Each entry has: toolName, toolCallId, success, contextForStory
@@ -2826,16 +3012,9 @@ Write vivid, immersive prose. The player should see story, not game mechanics.`;
 
         // If we have tool results, reconstruct the conversation properly
         if (gmToolResults.length > 0) {
-          // Group thinking entries - each thinking entry is one GM round
-          // Group tool results by their index (approximate round matching)
           const thinkingEntries = part.gmThinking;
 
-          // For proper API compliance, we need:
-          // 1. Assistant message with tool_calls
-          // 2. Tool message with matching tool_call_id for each tool_call
-
           // Simple approach: One assistant message per GM round, with its tool responses
-          // If we have N thinking entries and M tool results, pair them 1:1 where possible
           for (
             let roundIdx = 0;
             roundIdx < thinkingEntries.length;
@@ -2936,16 +3115,28 @@ Write vivid, immersive prose. The player should see story, not game mechanics.`;
 
       // Add the story output as assistant response AFTER GM thinking
       // This shows the GM what narrative was generated from their decisions
-      // Skip if this is a GM-direct output (gmThinking exists but no gmToolCalls)
-      // because the story is already part of the GM's response in that case
+      // Skip if gmConversation was used (story is already in there)
+      // Also skip if this is a GM-direct output (gmThinking exists but no gmToolCalls)
+      const hasGmConversation =
+        part.gmConversation && part.gmConversation.length > 0;
       const isGMDirectOutput =
         part.gmThinking?.length && !part.gmToolCalls?.length;
-      if (part.content && part.content.trim() && !isGMDirectOutput) {
+      if (
+        part.content &&
+        part.content.trim() &&
+        !hasGmConversation &&
+        !isGMDirectOutput
+      ) {
         messages.push({
           role: "assistant",
           content: cleanString(`[STORY OUTPUT]\n${part.content}`),
         });
-      } else if (part.content && part.content.trim() && isGMDirectOutput) {
+      } else if (
+        part.content &&
+        part.content.trim() &&
+        !hasGmConversation &&
+        isGMDirectOutput
+      ) {
         // GM wrote the story directly - just add it without the [STORY OUTPUT] marker
         // since it's a continuation of the GM's response
         messages.push({
@@ -2961,7 +3152,7 @@ Write vivid, immersive prose. The player should see story, not game mechanics.`;
   const playerActionMessage = `> ${userChoice.replace(
     /^>\s*/,
     ""
-  )}\n\n**INSTRUCTIONS:**\n1. First, check the GAME RULES section - is this roll-under or roll-over?\n2. Write [GAME MASTER] reasoning: What skill? What's the target? reverse_dc needed?\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool function in this response.`;
+  )}\n\n**INSTRUCTIONS:**\n1. First, check read through the Game Mechanics Notes if needed.?\n2. User reasoning and planning before talking back to the player.\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool or as many as you need to handle the player's action properly. Do not skip tool calls!\n4. Finally, write the story output the player will see, based on the tool results. Remember to keep it immersive and engaging!`;
 
   messages.push({
     role: "user",
@@ -2971,9 +3162,16 @@ Write vivid, immersive prose. The player should see story, not game mechanics.`;
   // Add prefill for tool calling (may be stripped by API for some providers)
   messages.push({ role: "assistant", content: GM_STAGE_AFFIRMATION });
 
-  // Count how many parts have GM history
+  // Count how many parts have GM history (new or legacy format)
   const partsWithGMHistory = partsToInclude.filter(
-    (p) => !p.user && (p.gmThinking?.length || p.gmToolCalls?.length)
+    (p) =>
+      !p.user &&
+      (p.gmConversation?.length ||
+        p.gmThinking?.length ||
+        p.gmToolCalls?.length)
+  ).length;
+  const partsWithNewFormat = partsToInclude.filter(
+    (p) => !p.user && p.gmConversation?.length
   ).length;
 
   // Debug logging
@@ -2983,7 +3181,7 @@ Write vivid, immersive prose. The player should see story, not game mechanics.`;
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
   console.log(`  - State message: ${estimateTokens(stateMessage)} tokens`);
   console.log(
-    `  - Chat history: ${recentParts.length} parts (${partsWithGMHistory} with GM thinking/tools)`
+    `  - Chat history: ${recentParts.length} parts (${partsWithGMHistory} with GM data, ${partsWithNewFormat} with new gmConversation format)`
   );
   console.log(`  - Available tools: ${toolsToUse.length}`);
 

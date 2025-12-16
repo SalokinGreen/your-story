@@ -2943,12 +2943,29 @@ function StoryPageContent() {
             });
             setLiveGMEntries([]);
 
-            // Filter out failed tool calls from context (prune faulty results)
-            const successfulResults = gmResults.filter((r) => r.success);
+            // Filter out ACTUAL tool errors, but keep dice roll failures (they're valid game state)
+            // Dice tools use success=false to mean "roll didn't beat DC", not "tool error"
+            const DICE_TOOLS = [
+              "formula_roll",
+              "opposed_formula",
+              "formula_challenge_check",
+              "npc_roll",
+              "group_check",
+            ];
+            const validResults = gmResults.filter((r) => {
+              // Always keep successful results
+              if (r.success) return true;
+              // Dice tools: only exclude if contextForStory contains ERROR (invalid formula, etc.)
+              if (DICE_TOOLS.includes(r.toolName)) {
+                return !r.contextForStory?.includes("ERROR");
+              }
+              // Non-dice tools: exclude failed results (actual errors)
+              return false;
+            });
 
-            // Store GM results in the partial part (only successful ones for context)
-            if (successfulResults.length > 0) {
-              partialPart.gmToolCalls = successfulResults;
+            // Store GM results in the partial part (excludes actual errors, keeps failed rolls)
+            if (validResults.length > 0) {
+              partialPart.gmToolCalls = validResults;
             }
             if (storyContext) {
               partialPart.gmStoryContext = storyContext;
@@ -5267,10 +5284,27 @@ function StoryPageContent() {
               // Clear live state now that we have final results
               setLiveGMEntries([]);
 
-              // Store only successful GM results (prune faulty tool calls)
-              const successfulResults = gmResults.filter((r) => r.success);
-              if (successfulResults.length > 0) {
-                partialPart.gmToolCalls = successfulResults;
+              // Filter out ACTUAL tool errors, but keep dice roll failures (they're valid game state)
+              // Dice tools use success=false to mean "roll didn't beat DC", not "tool error"
+              const DICE_TOOLS = [
+                "formula_roll",
+                "opposed_formula",
+                "formula_challenge_check",
+                "npc_roll",
+                "group_check",
+              ];
+              const validResults = gmResults.filter((r) => {
+                // Always keep successful results
+                if (r.success) return true;
+                // Dice tools: only exclude if contextForStory contains ERROR (invalid formula, etc.)
+                if (DICE_TOOLS.includes(r.toolName)) {
+                  return !r.contextForStory?.includes("ERROR");
+                }
+                // Non-dice tools: exclude failed results (actual errors)
+                return false;
+              });
+              if (validResults.length > 0) {
+                partialPart.gmToolCalls = validResults;
               }
               if (storyContext) {
                 partialPart.gmStoryContext = storyContext;
@@ -5740,9 +5774,22 @@ function StoryPageContent() {
           },
           onGMStageComplete: (results, storyContext, usage, thinking) => {
             setLiveGMEntries([]);
-            // Store only successful GM results (prune faulty tool calls)
-            const successfulResults = results.filter((r) => r.success);
-            partialPart.gmToolCalls = successfulResults;
+            // Filter out ACTUAL tool errors, but keep dice roll failures (valid game state)
+            const DICE_TOOLS = [
+              "formula_roll",
+              "opposed_formula",
+              "formula_challenge_check",
+              "npc_roll",
+              "group_check",
+            ];
+            const validResults = results.filter((r) => {
+              if (r.success) return true;
+              if (DICE_TOOLS.includes(r.toolName)) {
+                return !r.contextForStory?.includes("ERROR");
+              }
+              return false;
+            });
+            partialPart.gmToolCalls = validResults;
             partialPart.gmStoryContext = storyContext;
             if (thinking && thinking.length > 0) {
               partialPart.gmThinking = thinking;

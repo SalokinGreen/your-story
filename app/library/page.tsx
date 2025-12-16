@@ -27,6 +27,8 @@ import {
 import {
   listLocalAdventures,
   deleteLocalAdventure,
+  cacheAdventuresFromServer,
+  LocalAdventure,
 } from "@/app/misc/localAdventureManager";
 
 interface Story {
@@ -81,13 +83,15 @@ export default function LibraryPage() {
   const [stories, setStories] = useState<Story[]>([]);
   const [localStories, setLocalStories] = useState<LocalStory[]>([]);
   const [adventures, setAdventures] = useState<Adventure[]>([]);
-  const [localAdventures, setLocalAdventures] = useState<any[]>([]);
+  const [localAdventures, setLocalAdventures] = useState<LocalAdventure[]>([]);
   const [folders, setFolders] = useState<StoryFolder[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false); // Background sync indicator
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // Ref to track if we've already loaded data (prevents reload on tab focus)
   const hasLoadedRef = useRef(false);
+  const hasLoadedLocalRef = useRef(false); // Track if local data has been loaded
 
   // Filter and sort states
   const [storySearch, setStorySearch] = useState("");
@@ -140,38 +144,59 @@ export default function LibraryPage() {
     }
   }, [user, authLoading, router, addNotification]);
 
-  // Initial load: fetch both stories and adventures for accurate tab counts
+  // Initial load: Load local data first (instant), then sync with server
   useEffect(() => {
-    if (user && !hasLoadedRef.current) {
-      fetchAllData();
+    if (user && !hasLoadedLocalRef.current) {
+      // Load local data immediately (fast)
+      loadLocalDataFirst();
     }
   }, [user]);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (showMassMoveDropdown) {
-        const target = event.target as HTMLElement;
-        if (!target.closest(".relative")) {
-          setShowMassMoveDropdown(false);
-        }
+  // Load local data first for instant display
+  const loadLocalDataFirst = async () => {
+    hasLoadedLocalRef.current = true;
+    
+    try {
+      // Load local data in parallel - this is instant from IndexedDB
+      const [localStoriesList, localAdvs] = await Promise.all([
+        listLocalStories(),
+        listLocalAdventures().catch((error) => {
+          console.error("Error loading local adventures:", error);
+          return [];
+        }),
+      ]);
+
+      setLocalStories(localStoriesList);
+      setLocalAdventures(localAdvs);
+      
+      // Determine if we have local data to show immediately
+      const hasLocalData = localStoriesList.length > 0 || localAdvs.length > 0;
+      
+      // If we have local data, hide loading immediately
+      if (hasLocalData) {
+        setLoading(false);
       }
-    };
+      
+      // Now fetch server data in background (pass hasLocalData to avoid stale state)
+      fetchServerData(hasLocalData);
+    } catch (error) {
+      console.error("Error loading local data:", error);
+      // Fall back to server fetch
+      fetchServerData(false);
+    }
+  };
 
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMassMoveDropdown]);
-
-  // Fetch all data (stories and adventures) for accurate counts
-  const fetchAllData = async (forceRefresh = false) => {
+  // Fetch server data (can run in background)
+  const fetchServerData = async (hasLocalData: boolean = false) => {
     if (!user) return;
 
-    // Skip if already loaded (prevents reload on tab focus)
-    if (hasLoadedRef.current && !forceRefresh) {
-      return;
+    // Show syncing indicator instead of full loading if we already have local data
+    if (hasLocalData) {
+      setSyncing(true);
+    } else {
+      setLoading(true);
     }
 
-    setLoading(true);
     try {
       // Fetch everything in parallel
       const [foldersResponse, storiesResponse, adventuresResponse] =
@@ -198,7 +223,80 @@ export default function LibraryPage() {
       // Process adventures
       if (adventuresResponse.ok) {
         const adventuresData = await adventuresResponse.json();
-        setAdventures(adventuresData.adventures || []);
+        const serverAdventures = adventuresData.adventures || [];
+        setAdventures(serverAdventures);
+        
+        // Cache adventures locally for offline access (fire and forget)
+        cacheAdventuresFromServer(serverAdventures).catch((err) => {
+          console.error("Failed to cache adventures locally:", err);
+        });
+      } else {
+        console.error("Failed to fetch adventures");
+      }
+
+      // Mark as fully loaded
+      hasLoadedRef.current = true;
+    } catch (error: any) {
+      console.error("Error fetching server data:", error);
+      // Only show error if we don't have local data to fall back on
+      if (!hasLocalData) {
+        addNotification(`Failed to load library: ${error.message}`, "failure");
+      }
+    } finally {
+      setLoading(false);
+      setSyncing(false);
+    }
+  };
+
+  // Fetch all data (stories and adventures) for accurate counts
+  const fetchAllData = async (forceRefresh = false) => {
+    if (!user) return;
+
+    // Skip if already loaded (prevents reload on tab focus)
+    if (hasLoadedRef.current && !forceRefresh) {
+      return;
+    }
+
+    // For force refresh, reload everything
+    if (forceRefresh) {
+      setSyncing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      // Fetch everything in parallel
+      const [foldersResponse, storiesResponse, adventuresResponse] =
+        await Promise.all([
+          authenticatedFetch("/api/folders"),
+          authenticatedFetch(`/api/stories?userId=${user.id}`),
+          authenticatedFetch(`/api/adventures?userId=${user.id}`),
+        ]);
+
+      // Process folders
+      if (foldersResponse.ok) {
+        const foldersData = await foldersResponse.json();
+        setFolders(foldersData.folders || []);
+      }
+
+      // Process stories
+      if (storiesResponse.ok) {
+        const storiesData = await storiesResponse.json();
+        setStories(storiesData.stories || []);
+      } else {
+        console.error("Failed to fetch stories");
+      }
+
+      // Process adventures
+      if (adventuresResponse.ok) {
+        const adventuresData = await adventuresResponse.json();
+        const serverAdventures = adventuresData.adventures || [];
+        setAdventures(serverAdventures);
+        
+        // Cache adventures locally for offline access (fire and forget)
+        cacheAdventuresFromServer(serverAdventures).catch((err) => {
+          console.error("Failed to cache adventures locally:", err);
+        });
       } else {
         console.error("Failed to fetch adventures");
       }
@@ -222,11 +320,27 @@ export default function LibraryPage() {
       addNotification(`Failed to load library: ${error.message}`, "failure");
     } finally {
       setLoading(false);
+      setSyncing(false);
     }
   };
 
   // Kept for backwards compatibility - used by refresh operations
   const fetchLibraryData = fetchAllData;
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (showMassMoveDropdown) {
+        const target = event.target as HTMLElement;
+        if (!target.closest(".relative")) {
+          setShowMassMoveDropdown(false);
+        }
+      }
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMassMoveDropdown]);
 
   const handleDeleteStory = async (
     storyId: string,
@@ -845,6 +959,52 @@ export default function LibraryPage() {
       }
     });
 
+  // Get set of online adventure IDs for filtering
+  const onlineAdventureIds = new Set(adventures.map((a) => a.id));
+
+  // Filter local adventures - only show true local-only adventures (local: prefix or not synced from server)
+  const filteredLocalAdventures = localAdventures
+    .filter((adventure) => {
+      // Skip cached server adventures - only show local-only adventures
+      if (adventure.syncStatus === "synced" || onlineAdventureIds.has(adventure.id)) {
+        return false;
+      }
+
+      // Search filter
+      if (
+        adventureSearch &&
+        !adventure.title
+          .toLowerCase()
+          .includes(adventureSearch.toLowerCase()) &&
+        !adventure.description
+          .toLowerCase()
+          .includes(adventureSearch.toLowerCase())
+      ) {
+        return false;
+      }
+      // Local adventures are drafts
+      if (adventureFilter === "published") return false;
+      return true;
+    })
+    .sort((a, b) => {
+      switch (adventureSortBy) {
+        case "updated":
+        case "created":
+          return (
+            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+          );
+        case "title":
+          return a.title.localeCompare(b.title);
+        default:
+          return 0;
+      }
+    });
+
+  // Count of true local-only adventures (not cached server copies)
+  const trueLocalAdventures = localAdventures.filter(
+    (a) => a.syncStatus === "local-only" || (!onlineAdventureIds.has(a.id) && a.id.startsWith("local:"))
+  );
+
   if (authLoading || !user) {
     return (
       <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
@@ -866,6 +1026,13 @@ export default function LibraryPage() {
               <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
             </button>
             <h1 className="text-lg font-bold">Library</h1>
+            {/* Syncing indicator */}
+            {syncing && (
+              <div className="flex items-center gap-1.5 text-xs text-blue-300/70">
+                <DynamicIcon name="RefreshCw" className="w-3.5 h-3.5 animate-spin" />
+                <span className="hidden sm:inline">Syncing...</span>
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -909,7 +1076,7 @@ export default function LibraryPage() {
               name="Gamepad2"
               className="w-4 h-4 inline-block mr-2"
             />
-            Adventures ({adventures.length + localAdventures.length})
+            Adventures ({adventures.length + trueLocalAdventures.length})
           </button>
         </div>
 
@@ -1445,23 +1612,23 @@ export default function LibraryPage() {
             </div>
 
             {/* Adventures Grid */}
-            {filteredAdventures.length === 0 && localAdventures.length === 0 ? (
+            {filteredAdventures.length === 0 && filteredLocalAdventures.length === 0 ? (
               <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
                 <DynamicIcon
                   name="Gamepad2"
                   className="w-16 h-16 text-blue-400/30 mx-auto mb-4"
                 />
                 <h3 className="text-xl font-bold mb-2">
-                  {adventures.length === 0 && localAdventures.length === 0
+                  {adventures.length === 0 && trueLocalAdventures.length === 0
                     ? "No Adventures Yet"
                     : "No Adventures Match Filters"}
                 </h3>
                 <p className="text-blue-200/60 mb-6">
-                  {adventures.length === 0 && localAdventures.length === 0
+                  {adventures.length === 0 && trueLocalAdventures.length === 0
                     ? "Create your first adventure and share it with the community!"
                     : "Try adjusting your search or filters."}
                 </p>
-                {adventures.length === 0 && localAdventures.length === 0 && (
+                {adventures.length === 0 && trueLocalAdventures.length === 0 && (
                   <button
                     onClick={() => router.push("/creator")}
                     className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
@@ -1586,7 +1753,7 @@ export default function LibraryPage() {
                 ))}
 
                 {/* Local Adventures */}
-                {localAdventures.map((adventure) => (
+                {filteredLocalAdventures.map((adventure) => (
                   <div
                     key={adventure.id}
                     className="group relative bg-blue-950/50 rounded-xl overflow-hidden border border-blue-800/30 hover:border-blue-700/50 transition-all cursor-pointer"
@@ -1640,7 +1807,7 @@ export default function LibraryPage() {
 
                       {/* Updated */}
                       <div className="text-xs text-blue-200/40 mb-3">
-                        {getRelativeTime(adventure.updatedAt)}
+                        {getRelativeTime(String(adventure.updatedAt))}
                       </div>
 
                       {/* Actions */}
