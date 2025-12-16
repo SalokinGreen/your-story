@@ -2745,6 +2745,14 @@ export function buildGMStagePrompt({
 - Always read the DM Instructions and Character Sheet and Game Mechanics notes before acting or rolling dice.
 - Remember to check notes for NPCs, enemies, locations, items, and lore before making assumptions.
 
+## OUT-OF-CHARACTER (OOC) COMMUNICATION
+You and the player can talk OOC by wrapping text in (round brackets).
+- **(GM asking)**: "(Quick question: do you want to use your potion now or save it?)"
+- **(Player answering)**: "(I'll save it for now)"
+- Use OOC when you need clarification, want to offer meta-choices, or explain rules.
+- OOC text is visible to the player but clearly separate from the story narration.
+- After OOC exchanges, continue with the story based on their answer.
+
 ## RESPONSE STRUCTURE
 1. <thinking>Your private GM reasoning - dice math, difficulty decisions, what notes to check</thinking>
 2. Story prose describing the action (player sees this)
@@ -2810,7 +2818,6 @@ Write immersive prose. The player should experience the story, not see game mech
     // Flow control
     "start_challenge",
     "take_rest",
-    "ask_player",
     // Combat tools
     "start_combat",
     "add_combatant",

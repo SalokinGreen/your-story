@@ -231,18 +231,8 @@ export interface GenerationOptions {
   // GM Stage (new architecture: AI determines mechanics via tool calls)
   enableGMStage?: boolean; // Use GM stage instead of ActionAnalysis JSON
   gmStageModel?: string; // Model to use for GM stage (defaults to toolsModel)
-  precomputedGMContext?: string; // GM context from paused generation (player question flow)
+  precomputedGMContext?: string; // GM context from paused generation (retry flow)
   precomputedGMThinking?: string[]; // GM thinking from paused generation or retry
-  // Player answer continuation (after ask_player tool)
-  playerAnswerContext?: string; // Player's answer to inject into GM continuation
-  previousGMResults?: GMToolResult[]; // Results from before question was asked
-  previousGMContext?: string; // Context accumulated before question
-  previousGMConversation?: Array<{
-    role: "assistant" | "tool";
-    content: string;
-    tool_calls?: any[];
-    tool_call_id?: string;
-  }>; // Conversation history from before question was asked
   // Sampling settings (for story stage only, Coins mode)
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
@@ -313,14 +303,7 @@ export interface GenerationResult {
     content: string;
     tool_calls?: any[];
     tool_call_id?: string;
-  }>; // Full GM conversation for resuming after player question
-  // Player question (when GM asks a question that needs player input)
-  playerQuestion?: {
-    question: string;
-    context: string;
-    options?: string[];
-    allowCustom: boolean;
-  };
+  }>; // Full GM conversation for context preservation
   meta: {
     storyMeta?: GenerationMeta;
     toolsMeta?: GenerationMeta;
@@ -636,23 +619,15 @@ export async function generateStoryTurn(
     let gmBaseMessages: ChatMessage[] = []; // Base GM prompt for story continuation
     let gmConversationHistory: ChatMessage[] = []; // Full GM conversation history for continuation
     let gmModel = ""; // Track which model was used for GM stage
-    let playerQuestion:
-      | {
-          question: string;
-          context: string;
-          options?: string[];
-          allowCustom: boolean;
-        }
-      | undefined;
 
-    // Use precomputed context if provided AND no player answer (skip GM stage entirely)
-    if (options.precomputedGMContext && !options.playerAnswerContext) {
+    // Use precomputed context if provided (skip GM stage for retry flows)
+    if (options.precomputedGMContext) {
       gmStoryContext = options.precomputedGMContext;
       // Also restore precomputed GM thinking if available
       if (options.precomputedGMThinking) {
         gmThinking = options.precomputedGMThinking;
       }
-      logger.action("Using precomputed GM context (retry/resume flow)", {
+      logger.action("Using precomputed GM context (retry flow)", {
         contextLength: gmStoryContext.length,
         thinkingCount: gmThinking.length,
       });
@@ -708,40 +683,6 @@ export async function generateStoryTurn(
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
         const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
 
-        // If resuming from player answer, inject previous results and the answer
-        if (options.playerAnswerContext) {
-          // Preserve previous GM results
-          if (options.previousGMResults) {
-            gmResults.push(...options.previousGMResults);
-          }
-          if (options.previousGMContext) {
-            allGMContextParts.push(options.previousGMContext);
-          }
-          // Restore previous conversation history so AI sees its tool calls
-          if (
-            options.previousGMConversation &&
-            options.previousGMConversation.length > 0
-          ) {
-            for (const entry of options.previousGMConversation) {
-              conversationHistory.push({
-                role: entry.role,
-                content: entry.content,
-                ...(entry.tool_calls && { tool_calls: entry.tool_calls }),
-                ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
-              });
-            }
-            logger.action("Restored previous GM conversation history", {
-              entryCount: options.previousGMConversation.length,
-            });
-          }
-          logger.action("Resuming GM stage with player answer", {
-            answerContext: options.playerAnswerContext,
-            previousResultsCount: options.previousGMResults?.length || 0,
-            previousConversationCount:
-              options.previousGMConversation?.length || 0,
-          });
-        }
-
         while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
           logger.action(`GM stage round ${gmRound}`);
@@ -762,14 +703,6 @@ export async function generateStoryTurn(
 
           // Add conversation history from previous rounds
           const messagesWithHistory = [...gmPrompt.messages];
-
-          // If resuming from player answer on first round, inject the answer
-          if (gmRound === 1 && options.playerAnswerContext) {
-            messagesWithHistory.push({
-              role: "user",
-              content: `[Player answered: ${options.playerAnswerContext}]\n\nContinue with the GM resolution based on this answer.`,
-            });
-          }
 
           // Add previous round history (assistant responses + tool results)
           for (const historyEntry of conversationHistory) {
@@ -1137,7 +1070,6 @@ export async function generateStoryTurn(
               toolCount: gmResult.toolCalls.length,
               toolNames: gmExecution.results.map((r) => r.toolName),
               isComplete: gmExecution.isComplete,
-              asksPlayer: gmExecution.asksPlayer,
             });
 
             // Legacy: Check if gmExecution has isComplete flag (from end_gm_thinking)
@@ -1172,16 +1104,6 @@ export async function generateStoryTurn(
                 summary: gmExecution.finalSummary?.substring(0, 100),
                 outcome: gmExecution.finalOutcome,
               });
-              break;
-            }
-
-            // Check for player question - pause generation and return question
-            if (gmExecution.asksPlayer && gmExecution.playerQuestion) {
-              playerQuestion = gmExecution.playerQuestion;
-              logger.action("GM stage paused - player question required", {
-                question: playerQuestion.question,
-              });
-              // Break out of GM loop - generation will pause for player input
               break;
             }
 
@@ -1270,52 +1192,6 @@ export async function generateStoryTurn(
         },
         gmThinking.length > 0 ? gmThinking : undefined
       );
-
-      // If there's a player question, we need to pause generation
-      // Return a partial result that the UI can use to ask the question
-      if (playerQuestion) {
-        // Build gmConversation for resuming - includes all tool calls and responses
-        const gmConversationForPause = gmConversationHistory
-          .filter(
-            (entry) => entry.role === "assistant" || entry.role === "tool"
-          )
-          .map((entry) => ({
-            role: entry.role as "assistant" | "tool",
-            content: entry.content,
-            ...(entry.tool_calls && { tool_calls: entry.tool_calls }),
-            ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
-          }));
-
-        const partialResult: GenerationResult = {
-          success: false, // Indicates incomplete generation
-          content: "",
-          toolCalls: [],
-          toolResponses: [],
-          stateChanges: [],
-          choices: [],
-          scenePart: {
-            content: "",
-            imageUrl: "",
-            user: false,
-            role: "assistant",
-          },
-          gmResults,
-          gmStoryContext,
-          gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
-          gmConversation:
-            gmConversationForPause.length > 0
-              ? gmConversationForPause
-              : undefined,
-          playerQuestion,
-          meta: {
-            gmMeta,
-            totalTokenCost,
-            balance: finalBalance,
-          },
-        };
-        callbacks.onComplete?.(partialResult);
-        return partialResult;
-      }
     }
 
     // ========================================

@@ -404,7 +404,6 @@ export type GMToolParams =
   | { name: "read_notes"; params: ReadNotesParams }
   | { name: "search_memory"; params: SearchMemoryParams }
   | { name: "request_continuation"; params: RequestContinuationParams }
-  | { name: "ask_player"; params: AskPlayerParams }
   | { name: "end_gm_thinking"; params: RespondToPlayerParams }
   // Timer tools
   | { name: "create_timer"; params: CreateTimerParams }
@@ -916,52 +915,6 @@ Example flow:
   },
 };
 
-const askPlayerTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "ask_player",
-    description: `Pause GM processing and ask the player a question.
-
-Use when:
-- You need player input before deciding mechanics
-- A choice would change what rolls are needed
-- You want to give the player narrative agency mid-action
-- Clarification is needed before proceeding
-
-The player will see the question and provide an answer.
-The GM stage will run again with their answer included.
-
-Example uses:
-- "Do you want to use your healing potion now, or save it?"
-- "Which enemy do you focus your attack on?"
-- "Do you try to negotiate or fight?"`,
-    parameters: {
-      type: "object",
-      properties: {
-        question: {
-          type: "string",
-          description: "The question to ask the player",
-        },
-        context: {
-          type: "string",
-          description: "Why you need this information (shown to player)",
-        },
-        options: {
-          type: "array",
-          items: { type: "string" },
-          description: "Optional: Suggested answer options for the player",
-        },
-        allow_custom: {
-          type: "boolean",
-          description:
-            "Whether the player can give a custom answer (default: true)",
-        },
-      },
-      required: ["question", "context"],
-    },
-  },
-};
-
 const endGmThinkingTool: ToolSchema = {
   type: "function",
   function: {
@@ -982,8 +935,8 @@ WHEN TO CALL:
 
 DO NOT call if:
 - You still need to make rolls
-- You're waiting for player input (use ask_player instead)
-- You need to see results before deciding next action`,
+- You need to see results before deciding next action
+- You want to ask the player something (use OOC brackets instead, then continue)`,
     parameters: {
       type: "object",
       properties: {
@@ -1931,7 +1884,6 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   readNotesTool,
   searchMemoryTool,
   requestContinuationTool,
-  askPlayerTool,
   // Countdown timer tools
   createTimerTool,
   advanceTimerTool,

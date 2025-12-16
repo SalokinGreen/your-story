@@ -96,7 +96,6 @@ export interface GMToolResult {
     | GMReadNotesResult
     | GMSearchMemoryResult
     | GMRequestContinuationResult
-    | GMAskPlayerResult
     | GMEndGmThinkingResult
     | GMStateChangeResult
     // Timer results
@@ -282,14 +281,6 @@ export interface GMRequestContinuationResult {
   reason: string;
   context: string;
   nextAction?: string;
-}
-
-export interface GMAskPlayerResult {
-  type: "ask_player";
-  question: string;
-  context: string;
-  options?: string[];
-  allowCustom: boolean;
 }
 
 export interface GMEndGmThinkingResult {
@@ -574,13 +565,6 @@ export interface GMExecutionResult {
   // Special flow control flags
   requestsContinuation?: boolean; // AI wants another GM round (legacy)
   continuationContext?: string; // Context for next round (legacy)
-  asksPlayer?: boolean; // AI wants to ask the player something
-  playerQuestion?: {
-    question: string;
-    context: string;
-    options?: string[];
-    allowCustom: boolean;
-  };
   // Terminal condition (new loop-based GM)
   isComplete?: boolean; // end_gm_thinking was called - GM stage is done
   finalSummary?: string; // Summary from end_gm_thinking
@@ -733,9 +717,6 @@ export async function executeGMTools(
             call.id,
             params as RequestContinuationParams
           );
-          break;
-        case "ask_player":
-          result = executeAskPlayer(call.id, params as AskPlayerParams);
           break;
         case "end_gm_thinking":
           result = executeEndGmThinking(
@@ -967,15 +948,6 @@ export async function executeGMTools(
   // Check for special flow control results
   let requestsContinuation = false;
   let continuationContext: string | undefined;
-  let asksPlayer = false;
-  let playerQuestion:
-    | {
-        question: string;
-        context: string;
-        options?: string[];
-        allowCustom: boolean;
-      }
-    | undefined;
   // Terminal condition
   let isComplete = false;
   let finalSummary: string | undefined;
@@ -990,16 +962,6 @@ export async function executeGMTools(
       continuationContext = `Previous round: ${
         contResult.context
       }\nNext planned: ${contResult.nextAction || "See results"}`;
-    }
-    if (res.toolName === "ask_player") {
-      asksPlayer = true;
-      const askResult = res.result as GMAskPlayerResult;
-      playerQuestion = {
-        question: askResult.question,
-        context: askResult.context,
-        options: askResult.options,
-        allowCustom: askResult.allowCustom,
-      };
     }
     if (res.toolName === "end_gm_thinking") {
       isComplete = true;
@@ -1065,8 +1027,6 @@ export async function executeGMTools(
     storyContext: contextParts.join("\n"),
     requestsContinuation,
     continuationContext,
-    asksPlayer,
-    playerQuestion,
     isComplete,
     finalSummary,
     finalOutcome,
@@ -2293,41 +2253,6 @@ function executeRequestContinuation(
       context: params.context,
       nextAction: params.next_action,
     } as GMRequestContinuationResult,
-    contextForStory,
-  };
-}
-
-/**
- * Execute an ask player request
- */
-function executeAskPlayer(
-  toolCallId: string,
-  params: AskPlayerParams
-): GMToolResult {
-  const allowCustom = params.allow_custom !== false; // Default to true
-
-  // Build context string (will be shown to player)
-  let contextForStory = `[GAME MASTER Question for Player]`;
-  contextForStory += `\n[Question: ${params.question}]`;
-  contextForStory += `\n[Context: ${params.context}]`;
-  if (params.options && params.options.length > 0) {
-    contextForStory += `\n[Suggested Options: ${params.options.join(" | ")}]`;
-    if (allowCustom) {
-      contextForStory += ` (or custom answer)`;
-    }
-  }
-
-  return {
-    toolName: "ask_player",
-    toolCallId,
-    success: true,
-    result: {
-      type: "ask_player",
-      question: params.question,
-      context: params.context,
-      options: params.options,
-      allowCustom,
-    } as GMAskPlayerResult,
     contextForStory,
   };
 }
