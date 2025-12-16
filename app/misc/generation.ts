@@ -102,11 +102,34 @@ function stripThinkingTags(content: string): string {
   if (!content) return "";
   // Remove all <thinking>...</thinking> blocks (including multiline)
   // Also remove **[STORY OUTPUT]** marker and [GAME MASTER] that GM might add
-  return content
-    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
-    .replace(/^\s*\*?\*?\[STORY OUTPUT\]\*?\*?\s*\n?/i, "")
-    .replace(/^\s*\[GAME MASTER\]\s*\n?/i, "")
-    .trim();
+  // Also remove GM reasoning blocks that aren't in thinking tags (common AI mistake)
+  return (
+    content
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+      .replace(/^\s*\*?\*?\[STORY OUTPUT\]\*?\*?\s*\n?/i, "")
+      .replace(/^\s*\[GAME MASTER\]\s*\n?/i, "")
+      .replace(/^\s*\[GM\]\s*\n?/i, "")
+      // Remove **[GAME MASTER] Reasoning:** blocks and everything until the next --- or prose
+      .replace(
+        /\*?\*?\[(?:GAME MASTER|GM)\]?\s*Reasoning:?\*?\*?[\s\S]*?(?=\n---|\n\n[A-Z]|\n\*\*\[|$)/gi,
+        ""
+      )
+      // Remove numbered reasoning lists (1. **Game System:** etc.)
+      .replace(
+        /^\s*\d+\.\s*\*\*(?:Game System|Skill Check|Target|Reverse DC|Consequences|Damage|Tool Call|Roll Result|Narrative Direction):?\*\*[\s\S]*?(?=\n---|\n\n[A-Z]|\n\*\*\[|$)/gim,
+        ""
+      )
+      // Remove "Rolling X check..." announcements
+      .replace(
+        /^\s*\*?\*?Rolling\s+[\w\s]+\s+check[\s\S]*?\.{3}\s*\*?\*?\s*$/gim,
+        ""
+      )
+      // Remove standalone --- dividers
+      .replace(/^\s*---+\s*$/gm, "")
+      // Clean up multiple newlines
+      .replace(/\n{3,}/g, "\n\n")
+      .trim()
+  );
 }
 
 /**
@@ -867,12 +890,41 @@ export async function generateStoryTurn(
               // Strip <thinking> tags to get only the player-visible content
               const visibleProse = stripThinkingTags(gmResult.content);
               if (visibleProse.trim()) {
-                gmAccumulatedStory.push(visibleProse.trim());
-                logger.action("Accumulated prose from GM round", {
-                  round: gmRound,
-                  proseLength: visibleProse.length,
-                  totalAccumulated: gmAccumulatedStory.length,
-                });
+                // Check for duplicate prose (different thinking but same visible content)
+                const proseNormalized = normalizeForComparison(visibleProse);
+                const isProseAlreadyAccumulated = gmAccumulatedStory.some(
+                  (existing) => {
+                    const existingNormalized = normalizeForComparison(existing);
+                    // Check for exact match or high overlap
+                    if (existingNormalized === proseNormalized) return true;
+                    if (
+                      existingNormalized.substring(0, 200) ===
+                      proseNormalized.substring(0, 200)
+                    )
+                      return true;
+                    // Also check if one contains the other (subset)
+                    if (
+                      existingNormalized.includes(proseNormalized) ||
+                      proseNormalized.includes(existingNormalized)
+                    )
+                      return true;
+                    return false;
+                  }
+                );
+
+                if (!isProseAlreadyAccumulated) {
+                  gmAccumulatedStory.push(visibleProse.trim());
+                  logger.action("Accumulated prose from GM round", {
+                    round: gmRound,
+                    proseLength: visibleProse.length,
+                    totalAccumulated: gmAccumulatedStory.length,
+                  });
+                } else {
+                  logger.action("Skipping duplicate prose content", {
+                    round: gmRound,
+                    proseLength: visibleProse.length,
+                  });
+                }
               }
             } else {
               logger.action("GM produced duplicate thinking - skipping", {
@@ -1097,7 +1149,10 @@ export async function generateStoryTurn(
             );
             continue;
           } else {
-            // No tool calls - GM is done! This final content is added to accumulated story
+            // No tool calls - GM is done!
+            // NOTE: The content/prose was already extracted and added to gmAccumulatedStory
+            // earlier in this round (at the "Capture GM's thinking text" block).
+            // We just need to mark completion and add context parts for backward compat.
             const content = gmResult.content || "";
 
             // Check for repetition (AI stuck in a loop)
@@ -1111,31 +1166,18 @@ export async function generateStoryTurn(
                 `[GAME MASTER: AI got stuck in repetition loop.]`
               );
             } else if (content.trim()) {
-              // GM produced final content - add to accumulated story
-              // Extract <thinking> tags for context reconstruction
-              const thinkingBlocks = extractThinkingTags(content);
-              if (thinkingBlocks.length > 0) {
-                // Add thinking to gmThinking array for history reconstruction
-                gmThinking.push(...thinkingBlocks);
-              }
-
-              // Strip <thinking> tags to get the visible prose
-              const visibleContent = stripThinkingTags(content);
-
-              if (visibleContent.trim()) {
-                gmAccumulatedStory.push(visibleContent.trim());
-              }
-
-              logger.action("GM stage complete - final round content added", {
-                rawLength: content.length,
-                visibleLength: visibleContent.length,
-                thinkingBlocks: thinkingBlocks.length,
-                totalAccumulatedParts: gmAccumulatedStory.length,
-              });
-
               // Add raw content to context parts (with thinking) for backward compat
+              // (Prose extraction already happened earlier - don't duplicate)
               allGMContextParts.push(content);
-              gmInterleavedParts.push(content);
+              // Don't add to gmInterleavedParts - already added in thinking capture block
+
+              logger.action(
+                "GM stage complete - no tool calls, prose already captured",
+                {
+                  rawLength: content.length,
+                  totalAccumulatedParts: gmAccumulatedStory.length,
+                }
+              );
             }
 
             isComplete = true;

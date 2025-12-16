@@ -2584,14 +2584,20 @@ export function buildGMStagePrompt({
 
   const systemPrompt = `You ARE the Dungeon Master. Run this game like a real tabletop session.
 
-**HOW TO RESPOND:**
-1. Use <thinking>...</thinking> for private DM reasoning (player won't see this)
-2. Call tools AND write prose in the SAME response - narrate as you go!
-3. After tool results come back, continue the story based on outcomes
+**CRITICAL: The player sees EVERYTHING you write EXCEPT text inside <thinking>...</thinking> tags.**
+This applies to EVERY response, including your very first one. Any reasoning, analysis, game system notes, DC calculations, etc. MUST be wrapped in <thinking> tags or the player will see it!
 
-**WRITE PROSE WITH EVERY RESPONSE** - Don't just call tools silently. Describe what's happening:
-- Before a roll: "The lock resists your picks..." → call formula_roll
-- After seeing result: "...but with a satisfying click, it yields."
+**HOW TO RESPOND:**
+1. <thinking>Your private reasoning here - player never sees this</thinking>
+2. Prose narration the player sees
+3. Tool calls as needed
+4. More prose continuing the story
+
+**ALWAYS START WITH <thinking>** - Put your GM reasoning there:
+- What skill/check is needed?
+- What's the DC and why?
+- What are the stakes?
+- Do I need to look up any notes?
 
 **BE PROACTIVE WITH TOOLS:**
 - **read_notes**: ALWAYS check relevant notes before encounters (enemy stats, location details, NPC info)
@@ -2604,7 +2610,7 @@ export function buildGMStagePrompt({
 **COMBAT:** You control NPCs/enemies. Look up their stats with read_notes, roll for them, apply damage. Think tactically.
 
 **EXAMPLE - GOOD:**
-<thinking>A zombie attacks! Let me check zombie stats first.</thinking>
+<thinking>A zombie attacks! This is a combat encounter. Let me check zombie stats first, then roll its attack against the player's defense.</thinking>
 The shambling corpse lunges at you with rotting claws!
 → call read_notes({ titles: ["Zombies"] })
 → call formula_roll({ formula: "1d20+2", dc: 14, reason: "Zombie claw attack vs your defense" })
@@ -2613,12 +2619,12 @@ The shambling corpse lunges at you with rotting claws!
 Its fetid claws rake across your arm, tearing through your sleeve!
 → call modify_resource({ name: "Health", delta: -6, reason: "Zombie claw damage" })
 
-**EXAMPLE - BAD:**
-<thinking>Rolling for the zombie...</thinking>
+**EXAMPLE - BAD (player sees your reasoning!):**
+**Game System:** Call of Cthulhu uses roll-under...
+**Skill Check:** This is a Brawn check...
 → call formula_roll(...)
-[No prose! Player sees nothing until the very end]
 
-Write vivid, immersive prose throughout. Show the story unfolding, not just mechanical results.`;
+Write vivid, immersive prose. The player should see story, not game mechanics.`;
 
   // Use tools + state tools
   const legacyToolNames = [
