@@ -1725,6 +1725,12 @@ function StoryPageContent() {
     pendingUserChoice: string;
     gmResults: GMToolResult[];
     gmStoryContext: string;
+    gmConversation?: Array<{
+      role: "assistant" | "tool";
+      content: string;
+      tool_calls?: any[];
+      tool_call_id?: string;
+    }>; // Full GM conversation for resuming
   }>({
     isOpen: false,
     question: "",
@@ -1733,6 +1739,7 @@ function StoryPageContent() {
     pendingUserChoice: "",
     gmResults: [],
     gmStoryContext: "",
+    gmConversation: undefined,
   });
 
   // Story part navigation
@@ -3101,6 +3108,16 @@ function StoryPageContent() {
                   "success"
                 );
               }
+            }
+
+            // Copy gmConversation from result.scenePart to the last scene part
+            // This preserves the full GM conversation history for future context
+            const lastIdx = storyData.scene.parts.length - 1;
+            if (lastIdx >= 0 && result.scenePart?.gmConversation) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                gmConversation: result.scenePart.gmConversation,
+              };
             }
 
             setCanRetry(true);
@@ -5490,6 +5507,7 @@ function StoryPageContent() {
                   pendingUserChoice: actionChoice?.text || choice?.text || "",
                   gmResults: result.gmResults || [],
                   gmStoryContext: result.gmStoryContext || "",
+                  gmConversation: result.gmConversation || [],
                 });
 
                 // Update balance but don't complete generation
@@ -5530,6 +5548,21 @@ function StoryPageContent() {
                     "success"
                   );
                 }
+              }
+
+              // Copy gmConversation from result.scenePart to the last scene part
+              // This preserves the full GM conversation history for future context
+              const lastIdx = storyData.scene.parts.length - 1;
+              if (lastIdx >= 0 && result.scenePart?.gmConversation) {
+                storyData.scene.parts[lastIdx] = {
+                  ...storyData.scene.parts[lastIdx],
+                  gmConversation: result.scenePart.gmConversation,
+                };
+                console.log(
+                  "[onComplete] Saved gmConversation:",
+                  result.scenePart.gmConversation.length,
+                  "messages"
+                );
               }
 
               setCanRetry(true);
@@ -5734,6 +5767,7 @@ function StoryPageContent() {
           playerAnswerContext: answerContext, // Inject the player's answer
           previousGMResults: playerQuestion.gmResults, // Preserve results from before question
           previousGMContext: playerQuestion.gmStoryContext, // Preserve context from before question
+          previousGMConversation: playerQuestion.gmConversation, // Preserve conversation history
         },
         {
           onGMStageStart: () => {
@@ -5837,6 +5871,17 @@ function StoryPageContent() {
             if (result.meta.balance !== undefined) {
               setTokenBalance(result.meta.balance);
             }
+
+            // Copy gmConversation from result.scenePart to the last scene part
+            // This preserves the full GM conversation history for future context
+            const lastIdx = storyData.scene.parts.length - 1;
+            if (lastIdx >= 0 && result.scenePart?.gmConversation) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                gmConversation: result.scenePart.gmConversation,
+              };
+            }
+
             setCanRetry(true);
             setCanUndo(true);
             setLoading(false);
@@ -6154,6 +6199,16 @@ function StoryPageContent() {
 
             // Process lore triggers based on new content
             processLoreTriggers(storyData, addNotification);
+
+            // Copy gmConversation from result.scenePart to the last scene part
+            // This preserves the full GM conversation history for future context
+            const lastIdx = storyData.scene.parts.length - 1;
+            if (lastIdx >= 0 && result.scenePart?.gmConversation) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                gmConversation: result.scenePart.gmConversation,
+              };
+            }
 
             setCanRetry(true);
             setCanUndo(true);

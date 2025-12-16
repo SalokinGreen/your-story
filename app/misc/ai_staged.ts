@@ -2786,6 +2786,7 @@ export function buildGMStagePrompt({
 ### Story Progression
 - **Quest progress**: \`create_quest\`, \`update_quest\`, \`complete_quest\`
 - **Significant achievements**: \`trigger_achievement\`
+
 ## IMPORTANT BEHAVIORS
 - Look up notes BEFORE making assumptions about enemy stats or NPC details
 - If no stat sheet exists for an enemy, create one before combat rolls

@@ -2089,7 +2089,11 @@ function executeReadNotes(
   params: ReadNotesParams,
   storyData: StoryData
 ): GMToolResult {
-  // Handle both "titles" (array) and "title" (single string) - LLMs often confuse these
+  // Handle multiple parameter names - LLMs often confuse these:
+  // - "titles" (correct, array)
+  // - "title" (singular string or array)
+  // - "notes" (array - common mistake)
+  // - "note" (singular string)
   let titles = params.titles;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const paramsAny = params as any;
@@ -2098,6 +2102,16 @@ function executeReadNotes(
     titles = Array.isArray(paramsAny.title)
       ? paramsAny.title
       : [paramsAny.title];
+  }
+  if (!titles && paramsAny.notes) {
+    // AI sent "notes" instead of "titles" - normalize it
+    titles = Array.isArray(paramsAny.notes)
+      ? paramsAny.notes
+      : [paramsAny.notes];
+  }
+  if (!titles && paramsAny.note) {
+    // AI sent "note" (singular) instead of "titles" - normalize it
+    titles = Array.isArray(paramsAny.note) ? paramsAny.note : [paramsAny.note];
   }
 
   if (!titles || titles.length === 0) {

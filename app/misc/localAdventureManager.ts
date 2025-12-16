@@ -35,7 +35,9 @@ function openDB(): Promise<IDBDatabase> {
       const oldVersion = event.oldVersion;
 
       if (!db.objectStoreNames.contains(ADVENTURE_STORE_NAME)) {
-        const objectStore = db.createObjectStore(ADVENTURE_STORE_NAME, { keyPath: "id" });
+        const objectStore = db.createObjectStore(ADVENTURE_STORE_NAME, {
+          keyPath: "id",
+        });
         objectStore.createIndex("updatedAt", "updatedAt", { unique: false });
         objectStore.createIndex("syncStatus", "syncStatus", { unique: false });
       } else if (oldVersion < 2) {
@@ -105,7 +107,9 @@ export async function saveLocalAdventure(
   });
 }
 
-export async function getLocalAdventure(adventureId: string): Promise<LocalAdventure | undefined> {
+export async function getLocalAdventure(
+  adventureId: string
+): Promise<LocalAdventure | undefined> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([ADVENTURE_STORE_NAME], "readonly");
@@ -155,7 +159,9 @@ export async function deleteLocalAdventure(adventureId: string): Promise<void> {
  * Cache multiple adventures from the server for offline access
  * Only updates adventures that are newer on the server or don't exist locally
  */
-export async function cacheAdventuresFromServer(adventures: Adventure[]): Promise<void> {
+export async function cacheAdventuresFromServer(
+  adventures: Adventure[]
+): Promise<void> {
   if (adventures.length === 0) return;
 
   const db = await openDB();
@@ -165,7 +171,7 @@ export async function cacheAdventuresFromServer(adventures: Adventure[]): Promis
   // Get all existing local adventures first
   const existingMap = new Map<string, LocalAdventure>();
   const getAllRequest = store.getAll();
-  
+
   await new Promise<void>((resolve) => {
     getAllRequest.onsuccess = () => {
       const existing = getAllRequest.result as LocalAdventure[];
@@ -183,19 +189,20 @@ export async function cacheAdventuresFromServer(adventures: Adventure[]): Promis
 
   for (const adventure of adventures) {
     const existing = existingMap.get(adventure.id);
-    const serverUpdatedAt = adventure.updatedAt instanceof Date 
-      ? adventure.updatedAt.toISOString() 
-      : adventure.updatedAt;
+    const serverUpdatedAt =
+      adventure.updatedAt instanceof Date
+        ? adventure.updatedAt.toISOString()
+        : adventure.updatedAt;
 
     // Skip if local version is newer or same (and not local-only)
     if (existing && existing.syncStatus !== "local-only") {
-      const existingServerTime = existing.serverUpdatedAt 
-        ? new Date(existing.serverUpdatedAt).getTime() 
+      const existingServerTime = existing.serverUpdatedAt
+        ? new Date(existing.serverUpdatedAt).getTime()
         : 0;
-      const newServerTime = serverUpdatedAt 
-        ? new Date(serverUpdatedAt).getTime() 
+      const newServerTime = serverUpdatedAt
+        ? new Date(serverUpdatedAt).getTime()
         : 0;
-      
+
       // Skip if server version is same or older
       if (existingServerTime >= newServerTime) {
         continue;

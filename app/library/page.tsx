@@ -155,7 +155,7 @@ export default function LibraryPage() {
   // Load local data first for instant display
   const loadLocalDataFirst = async () => {
     hasLoadedLocalRef.current = true;
-    
+
     try {
       // Load local data in parallel - this is instant from IndexedDB
       const [localStoriesList, localAdvs] = await Promise.all([
@@ -168,15 +168,15 @@ export default function LibraryPage() {
 
       setLocalStories(localStoriesList);
       setLocalAdventures(localAdvs);
-      
+
       // Determine if we have local data to show immediately
       const hasLocalData = localStoriesList.length > 0 || localAdvs.length > 0;
-      
+
       // If we have local data, hide loading immediately
       if (hasLocalData) {
         setLoading(false);
       }
-      
+
       // Now fetch server data in background (pass hasLocalData to avoid stale state)
       fetchServerData(hasLocalData);
     } catch (error) {
@@ -225,7 +225,7 @@ export default function LibraryPage() {
         const adventuresData = await adventuresResponse.json();
         const serverAdventures = adventuresData.adventures || [];
         setAdventures(serverAdventures);
-        
+
         // Cache adventures locally for offline access (fire and forget)
         cacheAdventuresFromServer(serverAdventures).catch((err) => {
           console.error("Failed to cache adventures locally:", err);
@@ -292,7 +292,7 @@ export default function LibraryPage() {
         const adventuresData = await adventuresResponse.json();
         const serverAdventures = adventuresData.adventures || [];
         setAdventures(serverAdventures);
-        
+
         // Cache adventures locally for offline access (fire and forget)
         cacheAdventuresFromServer(serverAdventures).catch((err) => {
           console.error("Failed to cache adventures locally:", err);
@@ -966,7 +966,10 @@ export default function LibraryPage() {
   const filteredLocalAdventures = localAdventures
     .filter((adventure) => {
       // Skip cached server adventures - only show local-only adventures
-      if (adventure.syncStatus === "synced" || onlineAdventureIds.has(adventure.id)) {
+      if (
+        adventure.syncStatus === "synced" ||
+        onlineAdventureIds.has(adventure.id)
+      ) {
         return false;
       }
 
@@ -1002,7 +1005,9 @@ export default function LibraryPage() {
 
   // Count of true local-only adventures (not cached server copies)
   const trueLocalAdventures = localAdventures.filter(
-    (a) => a.syncStatus === "local-only" || (!onlineAdventureIds.has(a.id) && a.id.startsWith("local:"))
+    (a) =>
+      a.syncStatus === "local-only" ||
+      (!onlineAdventureIds.has(a.id) && a.id.startsWith("local:"))
   );
 
   if (authLoading || !user) {
@@ -1029,7 +1034,10 @@ export default function LibraryPage() {
             {/* Syncing indicator */}
             {syncing && (
               <div className="flex items-center gap-1.5 text-xs text-blue-300/70">
-                <DynamicIcon name="RefreshCw" className="w-3.5 h-3.5 animate-spin" />
+                <DynamicIcon
+                  name="RefreshCw"
+                  className="w-3.5 h-3.5 animate-spin"
+                />
                 <span className="hidden sm:inline">Syncing...</span>
               </div>
             )}
@@ -1612,7 +1620,8 @@ export default function LibraryPage() {
             </div>
 
             {/* Adventures Grid */}
-            {filteredAdventures.length === 0 && filteredLocalAdventures.length === 0 ? (
+            {filteredAdventures.length === 0 &&
+            filteredLocalAdventures.length === 0 ? (
               <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
                 <DynamicIcon
                   name="Gamepad2"
@@ -1628,14 +1637,15 @@ export default function LibraryPage() {
                     ? "Create your first adventure and share it with the community!"
                     : "Try adjusting your search or filters."}
                 </p>
-                {adventures.length === 0 && trueLocalAdventures.length === 0 && (
-                  <button
-                    onClick={() => router.push("/creator")}
-                    className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
-                  >
-                    Create Adventure
-                  </button>
-                )}
+                {adventures.length === 0 &&
+                  trueLocalAdventures.length === 0 && (
+                    <button
+                      onClick={() => router.push("/creator")}
+                      className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
+                    >
+                      Create Adventure
+                    </button>
+                  )}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

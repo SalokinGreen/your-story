@@ -237,6 +237,12 @@ export interface GenerationOptions {
   playerAnswerContext?: string; // Player's answer to inject into GM continuation
   previousGMResults?: GMToolResult[]; // Results from before question was asked
   previousGMContext?: string; // Context accumulated before question
+  previousGMConversation?: Array<{
+    role: "assistant" | "tool";
+    content: string;
+    tool_calls?: any[];
+    tool_call_id?: string;
+  }>; // Conversation history from before question was asked
   // Sampling settings (for story stage only, Coins mode)
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
@@ -302,6 +308,12 @@ export interface GenerationResult {
   gmResults?: GMToolResult[];
   gmStoryContext?: string;
   gmThinking?: string[]; // GM's "[GM]" reasoning text from each round
+  gmConversation?: Array<{
+    role: "assistant" | "tool";
+    content: string;
+    tool_calls?: any[];
+    tool_call_id?: string;
+  }>; // Full GM conversation for resuming after player question
   // Player question (when GM asks a question that needs player input)
   playerQuestion?: {
     question: string;
@@ -705,9 +717,28 @@ export async function generateStoryTurn(
           if (options.previousGMContext) {
             allGMContextParts.push(options.previousGMContext);
           }
+          // Restore previous conversation history so AI sees its tool calls
+          if (
+            options.previousGMConversation &&
+            options.previousGMConversation.length > 0
+          ) {
+            for (const entry of options.previousGMConversation) {
+              conversationHistory.push({
+                role: entry.role,
+                content: entry.content,
+                ...(entry.tool_calls && { tool_calls: entry.tool_calls }),
+                ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
+              });
+            }
+            logger.action("Restored previous GM conversation history", {
+              entryCount: options.previousGMConversation.length,
+            });
+          }
           logger.action("Resuming GM stage with player answer", {
             answerContext: options.playerAnswerContext,
             previousResultsCount: options.previousGMResults?.length || 0,
+            previousConversationCount:
+              options.previousGMConversation?.length || 0,
           });
         }
 
@@ -1243,6 +1274,18 @@ export async function generateStoryTurn(
       // If there's a player question, we need to pause generation
       // Return a partial result that the UI can use to ask the question
       if (playerQuestion) {
+        // Build gmConversation for resuming - includes all tool calls and responses
+        const gmConversationForPause = conversationHistory
+          .filter(
+            (entry) => entry.role === "assistant" || entry.role === "tool"
+          )
+          .map((entry) => ({
+            role: entry.role as "assistant" | "tool",
+            content: entry.content,
+            ...(entry.tool_calls && { tool_calls: entry.tool_calls }),
+            ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
+          }));
+
         const partialResult: GenerationResult = {
           success: false, // Indicates incomplete generation
           content: "",
@@ -1259,6 +1302,10 @@ export async function generateStoryTurn(
           gmResults,
           gmStoryContext,
           gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
+          gmConversation:
+            gmConversationForPause.length > 0
+              ? gmConversationForPause
+              : undefined,
           playerQuestion,
           meta: {
             gmMeta,
