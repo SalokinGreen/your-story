@@ -643,6 +643,9 @@ export async function generateStoryTurn(
         // NEW: Build interleaved conversation log for story stage
         // This preserves the exact order: thinking -> tool results -> thinking -> tool results
         let gmInterleavedParts: string[] = [];
+        // NEW: Accumulate visible prose from ALL rounds (not just the final one)
+        // This allows GM to narrate while calling tools, building up the story incrementally
+        let gmAccumulatedStory: string[] = [];
         // Local conversation history (will be copied to outer scope at end)
         let conversationHistory: {
           role: "assistant" | "user" | "tool";
@@ -859,6 +862,18 @@ export async function generateStoryTurn(
                   ? gmResult.content.trim().replace(/^\[GM\]/, "[GAME MASTER]")
                   : `[GAME MASTER]\n${gmResult.content.trim()}`;
               gmInterleavedParts.push(formattedThinking);
+
+              // NEW: Extract visible prose and add to accumulated story
+              // Strip <thinking> tags to get only the player-visible content
+              const visibleProse = stripThinkingTags(gmResult.content);
+              if (visibleProse.trim()) {
+                gmAccumulatedStory.push(visibleProse.trim());
+                logger.action("Accumulated prose from GM round", {
+                  round: gmRound,
+                  proseLength: visibleProse.length,
+                  totalAccumulated: gmAccumulatedStory.length,
+                });
+              }
             } else {
               logger.action("GM produced duplicate thinking - skipping", {
                 thinkingLength: newThinking.length,
@@ -1082,8 +1097,7 @@ export async function generateStoryTurn(
             );
             continue;
           } else {
-            // No tool calls - GM is done! This content IS the story
-            // (New behavior: no tool calls = GM finished, use content as story)
+            // No tool calls - GM is done! This final content is added to accumulated story
             const content = gmResult.content || "";
 
             // Check for repetition (AI stuck in a loop)
@@ -1097,7 +1111,7 @@ export async function generateStoryTurn(
                 `[GAME MASTER: AI got stuck in repetition loop.]`
               );
             } else if (content.trim()) {
-              // GM produced final content - this is the story!
+              // GM produced final content - add to accumulated story
               // Extract <thinking> tags for context reconstruction
               const thinkingBlocks = extractThinkingTags(content);
               if (thinkingBlocks.length > 0) {
@@ -1108,17 +1122,16 @@ export async function generateStoryTurn(
               // Strip <thinking> tags to get the visible prose
               const visibleContent = stripThinkingTags(content);
 
-              logger.action(
-                "GM stage complete - no tool calls, content is story",
-                {
-                  rawLength: content.length,
-                  visibleLength: visibleContent.length,
-                  thinkingBlocks: thinkingBlocks.length,
-                }
-              );
+              if (visibleContent.trim()) {
+                gmAccumulatedStory.push(visibleContent.trim());
+              }
 
-              // Store the visible content as the final story
-              gmFinalStoryContent = visibleContent;
+              logger.action("GM stage complete - final round content added", {
+                rawLength: content.length,
+                visibleLength: visibleContent.length,
+                thinkingBlocks: thinkingBlocks.length,
+                totalAccumulatedParts: gmAccumulatedStory.length,
+              });
 
               // Add raw content to context parts (with thinking) for backward compat
               allGMContextParts.push(content);
@@ -1141,6 +1154,16 @@ export async function generateStoryTurn(
           ...(entry.tool_calls && { tool_calls: entry.tool_calls }),
           ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
         }));
+
+        // NEW: Combine accumulated story from all rounds as the final story content
+        // This allows GM to write prose incrementally while calling tools
+        if (gmAccumulatedStory.length > 0) {
+          gmFinalStoryContent = gmAccumulatedStory.join("\n\n");
+          logger.action("Combined accumulated GM story", {
+            parts: gmAccumulatedStory.length,
+            totalLength: gmFinalStoryContent.length,
+          });
+        }
 
         if (gmRound >= MAX_GM_ROUNDS && !isComplete) {
           logger.action("GM stage hit max rounds limit without completing", {

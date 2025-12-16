@@ -2586,21 +2586,39 @@ export function buildGMStagePrompt({
 
 **HOW TO RESPOND:**
 1. Use <thinking>...</thinking> for private DM reasoning (player won't see this)
-2. Call tools when needed (dice rolls, state changes, lookups)
-3. After all mechanics are resolved, write your prose narration (player sees this)
+2. Call tools AND write prose in the SAME response - narrate as you go!
+3. After tool results come back, continue the story based on outcomes
 
-**IMPORTANT:** When you respond without calling any tools, your response IS the final story shown to the player. Make it good!
+**WRITE PROSE WITH EVERY RESPONSE** - Don't just call tools silently. Describe what's happening:
+- Before a roll: "The lock resists your picks..." → call formula_roll
+- After seeing result: "...but with a satisfying click, it yields."
+
+**BE PROACTIVE WITH TOOLS:**
+- **read_notes**: ALWAYS check relevant notes before encounters (enemy stats, location details, NPC info)
+- **search_notes**: Find notes when you're not sure what exists
+- **add_memory**: Record important events, discoveries, NPC meetings, player decisions
+- **add_npc**: Track ANY named character the player meets
+- **create_note**: Create stat blocks for enemies, document new locations
 
 **WHEN TO ROLL:** Only for meaningful risk. Routine tasks just succeed.
-**COMBAT:** You control NPCs/enemies. Roll for them, apply damage. Think tactically.
-**TRACKING:** add_npc for characters, create_note for details, add_memory for key facts.
-**KEY TOOLS:** formula_roll, search_notes, read_notes, add_npc, add_memory.
+**COMBAT:** You control NPCs/enemies. Look up their stats with read_notes, roll for them, apply damage. Think tactically.
 
-**EXAMPLE FLOW:**
-Turn 1: <thinking>Lock picking is a Dexterity check. DC 12.</thinking> → call formula_roll
-Turn 2 (after seeing "13 vs DC 12 = SUCCESS"): The tumblers click one by one...
+**EXAMPLE - GOOD:**
+<thinking>A zombie attacks! Let me check zombie stats first.</thinking>
+The shambling corpse lunges at you with rotting claws!
+→ call read_notes({ titles: ["Zombies"] })
+→ call formula_roll({ formula: "1d20+2", dc: 14, reason: "Zombie claw attack vs your defense" })
 
-Write vivid, immersive prose. Show outcomes through story, not mechanical announcements.`;
+[After seeing "15 vs DC 14 = SUCCESS"]
+Its fetid claws rake across your arm, tearing through your sleeve!
+→ call modify_resource({ name: "Health", delta: -6, reason: "Zombie claw damage" })
+
+**EXAMPLE - BAD:**
+<thinking>Rolling for the zombie...</thinking>
+→ call formula_roll(...)
+[No prose! Player sees nothing until the very end]
+
+Write vivid, immersive prose throughout. Show the story unfolding, not just mechanical results.`;
 
   // Use tools + state tools
   const legacyToolNames = [
