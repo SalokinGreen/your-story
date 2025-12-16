@@ -24,6 +24,7 @@ import {
   buildChoicesPrompt,
   buildActionAnalysisPrompt,
   buildGMStagePrompt,
+  buildStoryContinuationPrompt,
   ChatMessage,
   EmbeddingContext,
   TOOLS_AFFIRMATION,
@@ -91,6 +92,31 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
   }
 
   return content;
+}
+
+/**
+ * Strip <thinking>...</thinking> tags and other GM markers from content
+ * Used to hide GM's internal reasoning from the player
+ */
+function stripThinkingTags(content: string): string {
+  if (!content) return "";
+  // Remove all <thinking>...</thinking> blocks (including multiline)
+  // Also remove **[STORY OUTPUT]** marker and [GAME MASTER] that GM might add
+  return content
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, "")
+    .replace(/^\s*\*?\*?\[STORY OUTPUT\]\*?\*?\s*\n?/i, "")
+    .replace(/^\s*\[GAME MASTER\]\s*\n?/i, "")
+    .trim();
+}
+
+/**
+ * Extract <thinking>...</thinking> content from a string
+ * Returns array of thinking blocks found
+ */
+function extractThinkingTags(content: string): string[] {
+  if (!content) return [];
+  const matches = content.match(/<thinking>[\s\S]*?<\/thinking>/gi) || [];
+  return matches.map((m) => m.replace(/<\/?thinking>/gi, "").trim());
 }
 
 /**
@@ -552,13 +578,17 @@ export async function generateStoryTurn(
     // ========================================
     // STAGE 0.5: GM Stage (if enabled)
     // AI thinks out loud like a tabletop GM, calls tools in a loop
-    // until end_gm_thinking is called (terminal condition)
+    // until no more tool calls are made (natural completion)
     // ========================================
     let gmResults: GMToolResult[] = [];
     let gmStoryContext = "";
     let gmInterleavedConversation = ""; // NEW: Full interleaved GM conversation for story stage
+    let gmFinalStoryContent = ""; // NEW: GM's final prose content (when no tool calls)
     let gmMeta: GenerationMeta | undefined;
     let gmThinking: string[] = []; // Capture GM's "[GM]" reasoning text
+    let gmBaseMessages: ChatMessage[] = []; // Base GM prompt for story continuation
+    let gmConversationHistory: ChatMessage[] = []; // Full GM conversation history for continuation
+    let gmModel = ""; // Track which model was used for GM stage
     let playerQuestion:
       | {
           question: string;
@@ -602,9 +632,9 @@ export async function generateStoryTurn(
         logger.action("GM stage skipped - no user choice found");
         gmStoryContext = "";
       } else {
-        const gmModel = options.gmStageModel || options.toolsModel;
+        gmModel = options.gmStageModel || options.toolsModel;
 
-        // GM stage loop - continues until end_gm_thinking is called
+        // GM stage loop - continues until no more tool calls (AI writes final story)
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         const MAX_CONSECUTIVE_FAILURES = 3; // Stop if tools keep failing
         let gmRound = 0;
@@ -613,6 +643,7 @@ export async function generateStoryTurn(
         // NEW: Build interleaved conversation log for story stage
         // This preserves the exact order: thinking -> tool results -> thinking -> tool results
         let gmInterleavedParts: string[] = [];
+        // Local conversation history (will be copied to outer scope at end)
         let conversationHistory: {
           role: "assistant" | "user" | "tool";
           content: string;
@@ -654,6 +685,11 @@ export async function generateStoryTurn(
             customMaxContext: options.customMaxContext, // Memory Size slider controls GM context
             modelName: gmModel,
           });
+
+          // Store base messages on first round for story continuation
+          if (gmRound === 1) {
+            gmBaseMessages = [...gmPrompt.messages];
+          }
 
           // Add conversation history from previous rounds
           const messagesWithHistory = [...gmPrompt.messages];
@@ -976,7 +1012,8 @@ export async function generateStoryTurn(
               asksPlayer: gmExecution.asksPlayer,
             });
 
-            // Check if GM stage is complete (end_gm_thinking was called)
+            // Legacy: Check if gmExecution has isComplete flag (from end_gm_thinking)
+            // Note: This path is rarely used now - the loop ends when no tool calls
             if (gmExecution.isComplete) {
               isComplete = true;
               // Use the final summary as the primary context for story
@@ -1020,97 +1057,58 @@ export async function generateStoryTurn(
               break;
             }
 
-            // Legacy: Check for explicit continuation request
-            if (
-              gmExecution.requestsContinuation &&
-              gmExecution.continuationContext
-            ) {
-              logger.action(
-                "GM stage continuing - explicit continuation requested",
-                {
-                  context: gmExecution.continuationContext.substring(0, 100),
-                }
-              );
-              // Continue to next round
-              continue;
-            }
-
-            // New behavior: Continue looping until end_gm_thinking is called
-            // (the AI should call end_gm_thinking when done)
+            // Continue looping - AI may make more tool calls
+            // Loop ends when AI produces content WITHOUT tool calls
             logger.action(
-              "GM stage round complete, waiting for end_gm_thinking"
+              "GM stage round complete, continuing to see if more tools needed"
             );
             continue;
           } else {
-            // No tool calls - AI only produced thinking text without calling tools
-            // Check for repetition (AI stuck in a loop)
+            // No tool calls - GM is done! This content IS the story
+            // (New behavior: no tool calls = GM finished, use content as story)
             const content = gmResult.content || "";
+
+            // Check for repetition (AI stuck in a loop)
             const isRepetitive = detectRepetition(content);
 
             if (isRepetitive) {
-              // AI is stuck in a repetition loop - force end immediately
               logger.action(
                 "GM stage detected repetitive content - forcing end"
               );
-              // Don't add repetitive content to context - it's useless
               allGMContextParts.push(
-                `[GAME MASTER: AI got stuck in repetition loop. Treating as no mechanical action needed.]`
+                `[GAME MASTER: AI got stuck in repetition loop.]`
               );
-              isComplete = true;
-              break;
-            }
-
-            // Always prompt the GM to either call tools or end_gm_thinking
-            // The loop continues until end_gm_thinking is explicitly called
-            noToolCallPrompts++;
-
-            if (noToolCallPrompts >= MAX_NO_TOOL_PROMPTS) {
-              // Too many rounds without tool calls - force end
-              logger.action(
-                `GM stage hit max no-tool-call prompts (${noToolCallPrompts}/${MAX_NO_TOOL_PROMPTS}) - forcing end`
-              );
-              // Truncate content if too long
-              const truncatedContent =
-                content.length > 500
-                  ? content.substring(0, 500) + "..."
-                  : content;
-              if (truncatedContent) {
-                allGMContextParts.push(
-                  `[GAME MASTER]\n${truncatedContent}\n[GM stage auto-completed - no mechanical resolution needed]`
-                );
+            } else if (content.trim()) {
+              // GM produced final content - this is the story!
+              // Extract <thinking> tags for context reconstruction
+              const thinkingBlocks = extractThinkingTags(content);
+              if (thinkingBlocks.length > 0) {
+                // Add thinking to gmThinking array for history reconstruction
+                gmThinking.push(...thinkingBlocks);
               }
-              isComplete = true;
-              break;
+
+              // Strip <thinking> tags to get the visible prose
+              const visibleContent = stripThinkingTags(content);
+
+              logger.action(
+                "GM stage complete - no tool calls, content is story",
+                {
+                  rawLength: content.length,
+                  visibleLength: visibleContent.length,
+                  thinkingBlocks: thinkingBlocks.length,
+                }
+              );
+
+              // Store the visible content as the final story
+              gmFinalStoryContent = visibleContent;
+
+              // Add raw content to context parts (with thinking) for backward compat
+              allGMContextParts.push(content);
+              gmInterleavedParts.push(content);
             }
 
-            logger.action(
-              `GM produced thinking without tool calls (attempt ${noToolCallPrompts}/${MAX_NO_TOOL_PROMPTS}) - prompting to continue`
-            );
-
-            // Add the assistant's response to history (truncated to avoid bloating context)
-            const truncatedForHistory =
-              content.length > 1000
-                ? content.substring(0, 1000) + "..."
-                : content;
-            conversationHistory.push({
-              role: "assistant",
-              content: truncatedForHistory,
-            });
-
-            // Stronger prompt to force tool calling
-            const prompt = `STOP. You wrote thinking text but didn't call any tools.
-
-You MUST either:
-1. CALL A TOOL NOW (formula_roll, search_notes, end_gm_thinking, etc.)
-2. Or call end_gm_thinking immediately if no rolls/mechanics are needed
-
-Do NOT write more thinking. Call a tool function RIGHT NOW.`;
-
-            conversationHistory.push({
-              role: "user",
-              content: prompt,
-            });
-            continue;
+            isComplete = true;
+            break;
           }
         }
 
@@ -1118,14 +1116,18 @@ Do NOT write more thinking. Call a tool function RIGHT NOW.`;
         gmStoryContext = allGMContextParts.join("\n\n");
         // Build interleaved conversation string for story stage
         gmInterleavedConversation = gmInterleavedParts.join("\n\n");
+        // Copy conversation history to outer scope for story continuation
+        gmConversationHistory = conversationHistory.map((entry) => ({
+          role: entry.role as "user" | "assistant" | "tool",
+          content: entry.content,
+          ...(entry.tool_calls && { tool_calls: entry.tool_calls }),
+          ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
+        }));
 
         if (gmRound >= MAX_GM_ROUNDS && !isComplete) {
-          logger.action(
-            "GM stage hit max rounds limit without end_gm_thinking",
-            {
-              maxRounds: MAX_GM_ROUNDS,
-            }
-          );
+          logger.action("GM stage hit max rounds limit without completing", {
+            maxRounds: MAX_GM_ROUNDS,
+          });
           // Add a note about forced completion
           gmStoryContext +=
             "\n\n[GM stage reached maximum rounds - auto-completing]";
@@ -1178,328 +1180,426 @@ Do NOT write more thinking. Call a tool function RIGHT NOW.`;
     // STAGE 1: Story Generation
     // ========================================
     callbacks.onStoryStart?.();
-    logger.action("Stage 1: Building story prompt");
 
-    // When NovelAI is enabled, use its model name for proper context sizing
-    const useNovelAI = options.novelaiEnabled && options.novelaiKey;
-    const storyModelName = useNovelAI ? "NovelAI GLM-4-6" : options.storyModel;
-
-    // Calculate actual max output for NovelAI or standard models
-    // Enforce minimum 1000 tokens to account for prefill overhead
-    // (Some providers like OpenRouter count prefill against output limit)
-    const MIN_OUTPUT_TOKENS = 1000;
-    const rawMaxOutput = useNovelAI
-      ? options.customMaxOutput || 2000
-      : options.customMaxOutput || 4000;
-    const storyMaxOutput = Math.max(rawMaxOutput, MIN_OUTPUT_TOKENS);
-
-    const storyPrompt = buildStoryPrompt({
-      storyData,
-      userChoice,
-      commandResponses,
-      modelName: storyModelName,
-      customMaxContext: options.customMaxContext,
-      customStoryContext: options.customStoryContext, // Story Context slider
-      customMaxOutput: storyMaxOutput,
-      embeddingContext,
-      usePrefill: options.usePrefill !== false, // Default to true
-      gmStoryContext: gmStoryContext || undefined, // DEPRECATED: Use gmInterleavedConversation
-      gmThinking: gmThinking.length > 0 ? gmThinking : undefined, // DEPRECATED: Use gmInterleavedConversation
-      gmInterleavedConversation: gmInterleavedConversation || undefined, // NEW: Full interleaved GM conversation
-      storytellerMode: options.storytellerMode || "narrator", // Default to narrator mode
-    });
-
-    // Clear pending player actions after they've been included in the prompt
-    // (they were shown to the AI in the user choice message)
-    if (
-      storyData.pendingPlayerActions &&
-      storyData.pendingPlayerActions.length > 0
-    ) {
+    // NEW: Check if GM already produced the final story content
+    // (When GM completes without tool calls, its content IS the story)
+    if (gmFinalStoryContent) {
       logger.action(
-        `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`
+        "Using GM's final content as story (no separate API call needed)",
+        {
+          contentLength: gmFinalStoryContent.length,
+        }
       );
-      storyData.pendingPlayerActions = [];
-    }
 
-    if (storyPrompt.prunedParts > 0) {
-      logger.action(
-        `Pruned ${storyPrompt.prunedParts} oldest scene parts to fit context`
+      // Use GM's content directly as the story
+      storyContent = gmFinalStoryContent;
+
+      // Prune leading dividers (---, ***, ___) that the model might add
+      while (/^[\s\n]*([-*_]{3,})/.test(storyContent)) {
+        storyContent = storyContent.replace(/^[\s\n]*([-*_]{3,})[\s\n]*/, "");
+      }
+      storyContent = storyContent.trimStart();
+
+      // Prune trailing dividers (---, ***, ___) that the model might add
+      while (/\n?[-*_]{3,}[\s\n]*$/.test(storyContent)) {
+        storyContent = storyContent.replace(/\n?[-*_]{3,}[\s\n]*$/, "");
+      }
+      storyContent = storyContent.trimEnd();
+
+      // Stream the content to the UI in one chunk
+      callbacks.onStoryContent?.(storyContent, storyContent);
+
+      // Mark story as complete
+      callbacks.onStoryComplete?.(
+        storyContent,
+        gmMeta?.usage || {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        }
       );
-    }
-
-    // useNovelAI already computed above for model name selection
-
-    let storyResponse: Response;
-    if (useNovelAI) {
-      // Use NovelAI for story generation (BYOK)
-      logger.action("Using NovelAI for story generation (BYOK)");
-      storyResponse = await fetch("/api/novelai/generate-stream", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          messages: storyPrompt.messages,
-          novelaiKey: options.novelaiKey,
-          maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
-          temperature: options.novelaiTemperature ?? 1,
-        }),
-        signal: options.abortSignal,
+      logger.action("Stage 1 complete (from GM content)", {
+        contentLength: storyContent.length,
       });
     } else {
-      // Use standard API (DeepSeek/OpenRouter/Mistral/DeepInfra)
-      // Build request body with optional sampling settings
-      const storyRequestBody: Record<string, unknown> = {
-        messages: storyPrompt.messages,
-        model: options.storyModel,
-        maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
-        temperature: options.samplingSettings?.temperature ?? 0.7,
-        openRouterKey: options.openRouterKey,
-        deepseekKey: options.deepseekKey,
-        googleKey: options.googleKey,
-        // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
-        // Also stop on [STOP] marker for player agency stopping points
-        stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
-      };
+      // No GM content - need separate story API call (legacy path or error recovery)
+      logger.action("Stage 1: Building story prompt (no GM content available)");
 
-      // Add sampling settings for Coins mode (Mistral/DeepInfra)
-      if (options.samplingSettings) {
-        storyRequestBody.samplingSettings = options.samplingSettings;
+      // When NovelAI is enabled, use its model name for proper context sizing
+      const useNovelAI = options.novelaiEnabled && options.novelaiKey;
+      const storyModelName = useNovelAI
+        ? "NovelAI GLM-4-6"
+        : options.storyModel;
+
+      // Calculate actual max output for NovelAI or standard models
+      // Enforce minimum 1000 tokens to account for prefill overhead
+      // (Some providers like OpenRouter count prefill against output limit)
+      const MIN_OUTPUT_TOKENS = 1000;
+      const rawMaxOutput = useNovelAI
+        ? options.customMaxOutput || 2000
+        : options.customMaxOutput || 4000;
+      const storyMaxOutput = Math.max(rawMaxOutput, MIN_OUTPUT_TOKENS);
+
+      // Determine if we should continue the GM conversation or build a new prompt
+      // Continue GM conversation when:
+      // 1. GM stage actually ran (gmBaseMessages has content)
+      // 2. NOT using NovelAI (which requires its own API)
+      const continueGMConversation = gmBaseMessages.length > 0 && !useNovelAI;
+
+      let storyMessages: ChatMessage[];
+      let storyPromptPrunedParts = 0;
+
+      if (continueGMConversation) {
+        // Continue the GM conversation with a brief story prompt
+        // This is more efficient: same model, single conversation, no context duplication
+        logger.action("Continuing GM conversation for story generation", {
+          baseMessages: gmBaseMessages.length,
+          historyEntries: gmConversationHistory.length,
+          model: gmModel,
+        });
+
+        const storyContinuationPrompt = buildStoryContinuationPrompt(
+          options.storytellerMode || "narrator"
+        );
+
+        // Build messages: GM base + conversation history + story prompt
+        storyMessages = [
+          ...gmBaseMessages,
+          ...gmConversationHistory,
+          {
+            role: "user" as const,
+            content: storyContinuationPrompt,
+          },
+        ];
+      } else {
+        // Fall back to building a separate story prompt
+        // Used for: NovelAI, precomputed GM context, or when GM was skipped
+        const storyPrompt = buildStoryPrompt({
+          storyData,
+          userChoice,
+          commandResponses,
+          modelName: storyModelName,
+          customMaxContext: options.customMaxContext,
+          customStoryContext: options.customStoryContext, // Story Context slider
+          customMaxOutput: storyMaxOutput,
+          embeddingContext,
+          usePrefill: options.usePrefill !== false, // Default to true
+          gmStoryContext: gmStoryContext || undefined, // DEPRECATED: Use gmInterleavedConversation
+          gmThinking: gmThinking.length > 0 ? gmThinking : undefined, // DEPRECATED: Use gmInterleavedConversation
+          gmInterleavedConversation: gmInterleavedConversation || undefined, // NEW: Full interleaved GM conversation
+          storytellerMode: options.storytellerMode || "narrator", // Default to narrator mode
+        });
+
+        storyMessages = storyPrompt.messages;
+        storyPromptPrunedParts = storyPrompt.prunedParts;
       }
 
-      storyResponse = await fetch("/api/generate-stream", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(storyRequestBody),
-        signal: options.abortSignal,
-      });
-    }
+      // Clear pending player actions after they've been included in the prompt
+      // (they were shown to the AI in the user choice message)
+      if (
+        storyData.pendingPlayerActions &&
+        storyData.pendingPlayerActions.length > 0
+      ) {
+        logger.action(
+          `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`
+        );
+        storyData.pendingPlayerActions = [];
+      }
 
-    // Debug: Log maxTokens being sent
-    console.log(
-      "[Generation] Story stage - maxTokens:",
-      storyMaxOutput,
-      "model:",
-      options.storyModel
-    );
+      if (storyPromptPrunedParts > 0) {
+        logger.action(
+          `Pruned ${storyPromptPrunedParts} oldest scene parts to fit context`
+        );
+      }
 
-    if (!storyResponse.ok) {
-      const errorText = await storyResponse.text().catch(() => "");
-      throw new Error(
-        `Story generation failed: ${storyResponse.status} - ${errorText}`
+      // useNovelAI already computed above for model name selection
+
+      let storyResponse: Response;
+      if (useNovelAI) {
+        // Use NovelAI for story generation (BYOK)
+        logger.action("Using NovelAI for story generation (BYOK)");
+        storyResponse = await fetch("/api/novelai/generate-stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            messages: storyMessages,
+            novelaiKey: options.novelaiKey,
+            maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
+            temperature: options.novelaiTemperature ?? 1,
+          }),
+          signal: options.abortSignal,
+        });
+      } else {
+        // Use standard API (DeepSeek/OpenRouter/Mistral/DeepInfra)
+        // Build request body with optional sampling settings
+        // When continuing GM conversation, use the same model
+        const storyModelToUse = continueGMConversation
+          ? gmModel
+          : options.storyModel;
+
+        const storyRequestBody: Record<string, unknown> = {
+          messages: storyMessages,
+          model: storyModelToUse,
+          maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
+          temperature: options.samplingSettings?.temperature ?? 0.7,
+          openRouterKey: options.openRouterKey,
+          deepseekKey: options.deepseekKey,
+          googleKey: options.googleKey,
+          // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
+          // Also stop on [STOP] marker for player agency stopping points
+          stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
+        };
+
+        // Add sampling settings for Coins mode (Mistral/DeepInfra)
+        if (options.samplingSettings) {
+          storyRequestBody.samplingSettings = options.samplingSettings;
+        }
+
+        storyResponse = await fetch("/api/generate-stream", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(storyRequestBody),
+          signal: options.abortSignal,
+        });
+      }
+
+      // Debug: Log maxTokens being sent
+      console.log(
+        "[Generation] Story stage - maxTokens:",
+        storyMaxOutput,
+        "model:",
+        continueGMConversation ? gmModel : options.storyModel,
+        "continueGM:",
+        continueGMConversation
       );
-    }
 
-    // Process story stream with real-time prefill stripping
-    // We buffer content until we find the marker, then stream only the actual story
-    // The prefill now contains <thinking>GM reasoning</thinking> followed by an affirmation
-    const usePrefill = options.usePrefill !== false;
-    let prefillStripped = !usePrefill; // If prefill disabled, consider it already "stripped"
-    let dividerStripped = false; // Track if we've stripped leading dividers
-    let rawContent = ""; // Buffer for finding the marker
-    let pendingContent = ""; // Buffer for stripping dividers after marker
-    let stopMarkerHit = false; // Track if we hit [STOP] during streaming
-    // Look for end of thinking block OR the affirmation line (whichever comes last)
-    const THINKING_END = "</thinking>";
-    const STORY_MARKER = "Now I write the story.";
-    const STOP_MARKER = "[STOP]";
-
-    for await (const event of parseSSEStream(storyResponse)) {
-      if (event.type === "error") {
-        throw new Error(event.error || "Story generation failed");
+      if (!storyResponse.ok) {
+        const errorText = await storyResponse.text().catch(() => "");
+        throw new Error(
+          `Story generation failed: ${storyResponse.status} - ${errorText}`
+        );
       }
-      if (event.type === "content" && event.content) {
-        // Skip all content after [STOP] is detected
-        if (stopMarkerHit) continue;
 
-        if (prefillStripped && dividerStripped) {
-          // Already past prefill and dividers, stream directly
-          // But check for [STOP] in the accumulated content
-          const newContent = storyContent + event.content;
-          const stopIndex = newContent.indexOf(STOP_MARKER);
-          if (stopIndex !== -1) {
-            // Found [STOP] - only emit content before it
-            const contentBeforeStop = newContent.slice(0, stopIndex).trimEnd();
-            const deltaToEmit = contentBeforeStop.slice(storyContent.length);
-            storyContent = contentBeforeStop;
-            if (deltaToEmit) {
-              callbacks.onStoryContent?.(deltaToEmit, storyContent);
-            }
-            stopMarkerHit = true;
-            logger.action(
-              "Hit [STOP] marker during streaming - stopping content emission"
-            );
-          } else {
-            storyContent += event.content;
-            callbacks.onStoryContent?.(event.content, storyContent);
-          }
-        } else if (prefillStripped && !dividerStripped) {
-          // Past prefill but still checking for dividers
-          pendingContent += event.content;
+      // Process story stream with real-time prefill stripping
+      // We buffer content until we find the marker, then stream only the actual story
+      // The prefill now contains <thinking>GM reasoning</thinking> followed by an affirmation
+      // When continuing GM conversation, no prefill is used - skip stripping entirely
+      const usePrefill =
+        options.usePrefill !== false && !continueGMConversation;
+      let prefillStripped = !usePrefill; // If prefill disabled or continuing GM, consider it already "stripped"
+      let dividerStripped = false; // Track if we've stripped leading dividers
+      let rawContent = ""; // Buffer for finding the marker
+      let pendingContent = ""; // Buffer for stripping dividers after marker
+      let stopMarkerHit = false; // Track if we hit [STOP] during streaming
+      // Look for end of thinking block OR the affirmation line (whichever comes last)
+      const THINKING_END = "</thinking>";
+      const STORY_MARKER = "Now I write the story.";
+      const STOP_MARKER = "[STOP]";
 
-          // Check for [STOP] in pending content first
-          const stopIndex = pendingContent.indexOf(STOP_MARKER);
-          if (stopIndex !== -1) {
-            // Truncate at [STOP]
-            pendingContent = pendingContent.slice(0, stopIndex);
-            stopMarkerHit = true;
-          }
+      for await (const event of parseSSEStream(storyResponse)) {
+        if (event.type === "error") {
+          throw new Error(event.error || "Story generation failed");
+        }
+        if (event.type === "content" && event.content) {
+          // Skip all content after [STOP] is detected
+          if (stopMarkerHit) continue;
 
-          // Strip ALL leading whitespace and dividers (loop to catch multiple)
-          let cleaned = pendingContent.trimStart();
-          while (/^[-*_]{3,}/.test(cleaned)) {
-            cleaned = cleaned.replace(/^[-*_]{3,}[\s\n]*/, "").trimStart();
-          }
-
-          // If we have actual content (not just potential divider chars), we're done stripping
-          if (cleaned.length > 0 && !/^[-*_]+$/.test(cleaned)) {
-            dividerStripped = true;
-            storyContent = cleaned;
-            callbacks.onStoryContent?.(cleaned, storyContent);
-          } else if (pendingContent.length > 100 || stopMarkerHit) {
-            // After 100 chars or [STOP], just emit whatever we have
-            dividerStripped = true;
-            storyContent = cleaned || pendingContent.trimStart();
-            if (storyContent) {
-              callbacks.onStoryContent?.(storyContent, storyContent);
-            }
-          }
-        } else {
-          // Still looking for the marker
-          rawContent += event.content;
-
-          // Check for [STOP] in raw content first
-          const stopIndex = rawContent.indexOf(STOP_MARKER);
-          if (stopIndex !== -1) {
-            // Truncate at [STOP]
-            rawContent = rawContent.slice(0, stopIndex);
-            stopMarkerHit = true;
-          }
-
-          // Check if we've found the marker
-          const markerIndex = rawContent.indexOf(STORY_MARKER);
-          if (markerIndex !== -1) {
-            // Found it! Extract content after the marker
-            let contentAfterMarker = rawContent
-              .slice(markerIndex + STORY_MARKER.length)
-              .trimStart();
-            // Strip leading dividers (---, ***, ___)
-            while (/^[-*_]{3,}/.test(contentAfterMarker)) {
-              contentAfterMarker = contentAfterMarker
-                .replace(/^[-*_]{3,}[\s\n]*/, "")
-                .trimStart();
-            }
-            prefillStripped = true;
-
-            // Check if we have actual content or need to keep buffering for dividers
-            if (
-              contentAfterMarker.length > 0 &&
-              !/^[-*_]+$/.test(contentAfterMarker)
-            ) {
-              storyContent = contentAfterMarker;
-              dividerStripped = true;
-              callbacks.onStoryContent?.(contentAfterMarker, storyContent);
+          if (prefillStripped && dividerStripped) {
+            // Already past prefill and dividers, stream directly
+            // But check for [STOP] in the accumulated content
+            const newContent = storyContent + event.content;
+            const stopIndex = newContent.indexOf(STOP_MARKER);
+            if (stopIndex !== -1) {
+              // Found [STOP] - only emit content before it
+              const contentBeforeStop = newContent
+                .slice(0, stopIndex)
+                .trimEnd();
+              const deltaToEmit = contentBeforeStop.slice(storyContent.length);
+              storyContent = contentBeforeStop;
+              if (deltaToEmit) {
+                callbacks.onStoryContent?.(deltaToEmit, storyContent);
+              }
+              stopMarkerHit = true;
+              logger.action(
+                "Hit [STOP] marker during streaming - stopping content emission"
+              );
             } else {
-              // Content might be empty or just divider chars, buffer it
-              pendingContent = contentAfterMarker;
+              storyContent += event.content;
+              callbacks.onStoryContent?.(event.content, storyContent);
             }
-          } else if (rawContent.length > 800 || stopMarkerHit) {
-            // Marker not found after 800 chars or [STOP] hit - stream what we have
-            storyContent = rawContent;
-            prefillStripped = true;
-            dividerStripped = true;
-            if (rawContent) {
-              callbacks.onStoryContent?.(rawContent, storyContent);
+          } else if (prefillStripped && !dividerStripped) {
+            // Past prefill but still checking for dividers
+            pendingContent += event.content;
+
+            // Check for [STOP] in pending content first
+            const stopIndex = pendingContent.indexOf(STOP_MARKER);
+            if (stopIndex !== -1) {
+              // Truncate at [STOP]
+              pendingContent = pendingContent.slice(0, stopIndex);
+              stopMarkerHit = true;
             }
+
+            // Strip ALL leading whitespace and dividers (loop to catch multiple)
+            let cleaned = pendingContent.trimStart();
+            while (/^[-*_]{3,}/.test(cleaned)) {
+              cleaned = cleaned.replace(/^[-*_]{3,}[\s\n]*/, "").trimStart();
+            }
+
+            // If we have actual content (not just potential divider chars), we're done stripping
+            if (cleaned.length > 0 && !/^[-*_]+$/.test(cleaned)) {
+              dividerStripped = true;
+              storyContent = cleaned;
+              callbacks.onStoryContent?.(cleaned, storyContent);
+            } else if (pendingContent.length > 100 || stopMarkerHit) {
+              // After 100 chars or [STOP], just emit whatever we have
+              dividerStripped = true;
+              storyContent = cleaned || pendingContent.trimStart();
+              if (storyContent) {
+                callbacks.onStoryContent?.(storyContent, storyContent);
+              }
+            }
+          } else {
+            // Still looking for the marker
+            rawContent += event.content;
+
+            // Check for [STOP] in raw content first
+            const stopIndex = rawContent.indexOf(STOP_MARKER);
+            if (stopIndex !== -1) {
+              // Truncate at [STOP]
+              rawContent = rawContent.slice(0, stopIndex);
+              stopMarkerHit = true;
+            }
+
+            // Check if we've found the marker
+            const markerIndex = rawContent.indexOf(STORY_MARKER);
+            if (markerIndex !== -1) {
+              // Found it! Extract content after the marker
+              let contentAfterMarker = rawContent
+                .slice(markerIndex + STORY_MARKER.length)
+                .trimStart();
+              // Strip leading dividers (---, ***, ___)
+              while (/^[-*_]{3,}/.test(contentAfterMarker)) {
+                contentAfterMarker = contentAfterMarker
+                  .replace(/^[-*_]{3,}[\s\n]*/, "")
+                  .trimStart();
+              }
+              prefillStripped = true;
+
+              // Check if we have actual content or need to keep buffering for dividers
+              if (
+                contentAfterMarker.length > 0 &&
+                !/^[-*_]+$/.test(contentAfterMarker)
+              ) {
+                storyContent = contentAfterMarker;
+                dividerStripped = true;
+                callbacks.onStoryContent?.(contentAfterMarker, storyContent);
+              } else {
+                // Content might be empty or just divider chars, buffer it
+                pendingContent = contentAfterMarker;
+              }
+            } else if (rawContent.length > 800 || stopMarkerHit) {
+              // Marker not found after 800 chars or [STOP] hit - stream what we have
+              storyContent = rawContent;
+              prefillStripped = true;
+              dividerStripped = true;
+              if (rawContent) {
+                callbacks.onStoryContent?.(rawContent, storyContent);
+              }
+            }
+            // Otherwise keep buffering
           }
-          // Otherwise keep buffering
+        }
+        if (event.type === "done" && event.meta) {
+          storyMeta = event.meta;
+          totalTokenCost += event.meta.tokenCost;
+          finalBalance = event.meta.balance;
         }
       }
-      if (event.type === "done" && event.meta) {
-        storyMeta = event.meta;
-        totalTokenCost += event.meta.tokenCost;
-        finalBalance = event.meta.balance;
+
+      // Handle any pending content that wasn't emitted
+      if (prefillStripped && !dividerStripped && pendingContent) {
+        let cleaned = pendingContent
+          .replace(/^[\s\n]*([-*_]{3,})[\s\n]*/g, "")
+          .trimStart();
+        storyContent = cleaned || pendingContent.trimStart();
       }
-    }
 
-    // Handle any pending content that wasn't emitted
-    if (prefillStripped && !dividerStripped && pendingContent) {
-      let cleaned = pendingContent
-        .replace(/^[\s\n]*([-*_]{3,})[\s\n]*/g, "")
-        .trimStart();
-      storyContent = cleaned || pendingContent.trimStart();
-    }
-
-    // If we never found the marker but have buffered content, use it as-is
-    if (!prefillStripped && rawContent) {
-      storyContent = rawContent;
-    }
-
-    // Strip [STOP] marker and partial variants if the model added it
-    // Handles: [STOP], [STOP, [STO, [ST, ---[STOP], ***[STOP], etc.
-    // Also handles partial [GM State markers from stop sequences
-    // IMPORTANT: First strip everything AFTER [STOP] if it appears mid-content
-    // (stop sequences should prevent this, but some providers may not respect them)
-    storyContent = storyContent
-      .replace(/\[STOP\][\s\S]*$/i, "") // Strip [STOP] and everything after it
-      .replace(/\s*[-*_]{0,3}\s*\[STOP\]?\s*$/i, "")
-      .replace(/\s*\[STO?P?\s*$/i, "")
-      .replace(/\s*\[S\s*$/i, "")
-      .replace(/\s*\[(?:GM|GAME MASTER)?\s*S?t?a?t?e?\s*$/i, "") // Partial [GM State... or [GAME MASTER State... from stop sequence
-      .replace(/\s*\[\s*$/i, "") // Lone [ at end (from stop sequence cutting mid-bracket)
-      .replace(/\s*[-*]{3}\s*\[\s*$/i, "") // ---[ or ***[
-      .replace(/\s*[-*]{3}\s*$/i, "") // trailing --- or ***
-      .trimEnd();
-
-    // Strip trailing meta-blocks that start with dividers (---, ***) followed by bracketed content
-    // Patterns like: "--- [GAME MASTER State Update] ..." or "--- *[STOP – Player must choose...]*"
-    storyContent = storyContent
-      .replace(
-        /\n*[-*_]{3,}\s*\*?\[(?:(?:GM|GAME MASTER) State Update|STOP)[^\]]*\][\s\S]*$/i,
-        ""
-      )
-      .trimEnd();
-
-    // Strip leading dividers (---, ***, ___) that the model might add
-    // Loop to handle multiple dividers or whitespace-separated dividers
-    while (/^[\s\n]*([-*_]{3,})/.test(storyContent)) {
-      storyContent = storyContent.replace(/^[\s\n]*([-*_]{3,})[\s\n]*/, "");
-    }
-    storyContent = storyContent.trimStart();
-
-    // Strip trailing dividers (---, ***, ___) that the model might add
-    // Also catches \n--- and \n*** patterns at the end
-    while (/\n?[-*_]{3,}[\s\n]*$/.test(storyContent)) {
-      storyContent = storyContent.replace(/\n?[-*_]{3,}[\s\n]*$/, "");
-    }
-    storyContent = storyContent.trimEnd();
-
-    // Strip [GAME MASTER State Update] blocks that the model might echo from history
-    // These blocks contain bullet-pointed stat changes like "• Health: 95 → 85/100 (-10)"
-    // Match the header and all following lines that are bullet points or indented content
-    storyContent = storyContent
-      .replace(/\n*\[(?:GM|GAME MASTER) State Update\]\n(?:• [^\n]+\n?)*/gi, "")
-      .trim();
-
-    // Also strip if there's no header but just the bullet-style state changes at the end
-    // Pattern: lines starting with • containing arrows (→) indicating stat changes
-    storyContent = storyContent
-      .replace(/\n+(?:• [^\n]*→[^\n]*\n?)+$/, "")
-      .trim();
-
-    callbacks.onStoryComplete?.(
-      storyContent,
-      storyMeta?.usage || {
-        promptTokens: 0,
-        completionTokens: 0,
-        totalTokens: 0,
+      // If we never found the marker but have buffered content, use it as-is
+      if (!prefillStripped && rawContent) {
+        storyContent = rawContent;
       }
-    );
-    logger.action("Stage 1 complete", { contentLength: storyContent.length });
+
+      // Strip [STOP] marker and partial variants if the model added it
+      // Handles: [STOP], [STOP, [STO, [ST, ---[STOP], ***[STOP], etc.
+      // Also handles partial [GM State markers from stop sequences
+      // IMPORTANT: First strip everything AFTER [STOP] if it appears mid-content
+      // (stop sequences should prevent this, but some providers may not respect them)
+      storyContent = storyContent
+        .replace(/\[STOP\][\s\S]*$/i, "") // Strip [STOP] and everything after it
+        .replace(/\s*[-*_]{0,3}\s*\[STOP\]?\s*$/i, "")
+        .replace(/\s*\[STO?P?\s*$/i, "")
+        .replace(/\s*\[S\s*$/i, "")
+        .replace(/\s*\[(?:GM|GAME MASTER)?\s*S?t?a?t?e?\s*$/i, "") // Partial [GM State... or [GAME MASTER State... from stop sequence
+        .replace(/\s*\[\s*$/i, "") // Lone [ at end (from stop sequence cutting mid-bracket)
+        .replace(/\s*[-*]{3}\s*\[\s*$/i, "") // ---[ or ***[
+        .replace(/\s*[-*]{3}\s*$/i, "") // trailing --- or ***
+        .trimEnd();
+
+      // Strip trailing meta-blocks that start with dividers (---, ***) followed by bracketed content
+      // Patterns like: "--- [GAME MASTER State Update] ..." or "--- *[STOP – Player must choose...]*"
+      storyContent = storyContent
+        .replace(
+          /\n*[-*_]{3,}\s*\*?\[(?:(?:GM|GAME MASTER) State Update|STOP)[^\]]*\][\s\S]*$/i,
+          ""
+        )
+        .trimEnd();
+
+      // Strip leading dividers (---, ***, ___) that the model might add
+      // Loop to handle multiple dividers or whitespace-separated dividers
+      while (/^[\s\n]*([-*_]{3,})/.test(storyContent)) {
+        storyContent = storyContent.replace(/^[\s\n]*([-*_]{3,})[\s\n]*/, "");
+      }
+      storyContent = storyContent.trimStart();
+
+      // Strip trailing dividers (---, ***, ___) that the model might add
+      // Also catches \n--- and \n*** patterns at the end
+      while (/\n?[-*_]{3,}[\s\n]*$/.test(storyContent)) {
+        storyContent = storyContent.replace(/\n?[-*_]{3,}[\s\n]*$/, "");
+      }
+      storyContent = storyContent.trimEnd();
+
+      // Strip [GAME MASTER State Update] blocks that the model might echo from history
+      // These blocks contain bullet-pointed stat changes like "• Health: 95 → 85/100 (-10)"
+      // Match the header and all following lines that are bullet points or indented content
+      storyContent = storyContent
+        .replace(
+          /\n*\[(?:GM|GAME MASTER) State Update\]\n(?:• [^\n]+\n?)*/gi,
+          ""
+        )
+        .trim();
+
+      // Also strip if there's no header but just the bullet-style state changes at the end
+      // Pattern: lines starting with • containing arrows (→) indicating stat changes
+      storyContent = storyContent
+        .replace(/\n+(?:• [^\n]*→[^\n]*\n?)+$/, "")
+        .trim();
+
+      callbacks.onStoryComplete?.(
+        storyContent,
+        storyMeta?.usage || {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+        }
+      );
+      logger.action("Stage 1 complete", { contentLength: storyContent.length });
+    } // End of else block (no GM content - fallback to API call)
 
     // ========================================
     // STAGE 2 & 3: Tools + Choices (in parallel)

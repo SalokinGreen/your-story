@@ -112,18 +112,6 @@ export default function AIConfigTab() {
     }
     return true;
   });
-  // Storyteller Mode: narrator (literary prose) vs dm (inline mechanics)
-  const [storytellerMode, setStorytellerMode] = useState<"narrator" | "dm">(
-    () => {
-      if (typeof window !== "undefined") {
-        return (
-          (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
-          "narrator"
-        );
-      }
-      return "narrator";
-    }
-  );
   // GM Stage is now always enabled - removed the toggle
   // Keeping displayGMThinking for showing/hiding GM reasoning in UI
   const [displayGMThinking, setDisplayGMThinking] = useState(() => {
@@ -374,13 +362,6 @@ export default function AIConfigTab() {
       localStorage.setItem("byokMode", byokMode.toString());
     }
   }, [byokMode]);
-
-  // Persist Storyteller Mode
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("storytellerMode", storytellerMode);
-    }
-  }, [storytellerMode]);
 
   // Auto-save context settings to cloud when they change (after initial load)
   useEffect(() => {
@@ -840,7 +821,7 @@ export default function AIConfigTab() {
         </div>
         <div className="flex flex-col gap-1 text-xs mt-2">
           <div>
-            <span className="text-white/60">Story:</span>{" "}
+            <span className="text-white/60">Model:</span>{" "}
             {novelaiEnabled && hasKey("novelaiKey") ? (
               <span className="text-green-200">
                 NovelAI GLM-4-6 (BYOK) - 28K context
@@ -858,34 +839,25 @@ export default function AIConfigTab() {
               </>
             )}
           </div>
-          <div>
-            <span className="text-white/60">GM:</span>{" "}
-            {getModelDisplayName(effectiveToolsModel)}
-          </div>
-          <div className="text-white/40 text-[10px]">
-            (Choices uses Story model)
-          </div>
         </div>
       </div>
 
-      {/* Model Selection - Story and GM */}
+      {/* Model Selection */}
       <div className="space-y-4">
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-          Model Selection
-        </label>
-
-        {/* Story Model */}
         <div>
           <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-            Story Model{" "}
-            <span className="text-gray-400">(also used for choices)</span>
+            AI Model
           </label>
           <select
             value={storyModel}
             onChange={(e) => {
-              setStoryModel(e.target.value);
+              const newModel = e.target.value;
+              setStoryModel(newModel);
+              // Also update GM model to match (merged GM+Story stages)
+              setToolsModel(newModel);
               if (typeof window !== "undefined") {
-                localStorage.setItem("aiModelStory", e.target.value);
+                localStorage.setItem("aiModelStory", newModel);
+                localStorage.setItem("aiModelTools", newModel);
               }
             }}
             className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -903,53 +875,6 @@ export default function AIConfigTab() {
                 <option key={key} value={key}>
                   {config.name} ({config.cost} coin
                   {config.cost > 1 ? "s" : ""},{" "}
-                  {(config.maxTokens / 1000).toFixed(0)}K)
-                </option>
-              ))}
-            {byokMode && customModels.length > 0 && (
-              <optgroup label="Custom Models">
-                {[...customModels]
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name} (FREE,{" "}
-                      {(model.contextSize / 1000).toFixed(0)}K)
-                    </option>
-                  ))}
-              </optgroup>
-            )}
-          </select>
-        </div>
-
-        {/* GM Model */}
-        <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-            GM Model{" "}
-            <span className="text-gray-400">(game master / tools)</span>
-          </label>
-          <select
-            value={toolsModel}
-            onChange={(e) => {
-              setToolsModel(e.target.value);
-              if (typeof window !== "undefined") {
-                localStorage.setItem("aiModelTools", e.target.value);
-              }
-            }}
-            className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            {Object.entries(AI_MODELS)
-              .filter(([, config]) => {
-                const isBYOKProvider =
-                  config.provider === "openrouter" ||
-                  config.provider === "deepseek" ||
-                  config.provider === "novelai" ||
-                  config.provider === "google";
-                return byokMode ? isBYOKProvider : !isBYOKProvider;
-              })
-              .map(([key, config]) => (
-                <option key={key} value={key}>
-                  {config.name} ({(config as any).cost || 1} coin
-                  {((config as any).cost || 1) > 1 ? "s" : ""},{" "}
                   {(config.maxTokens / 1000).toFixed(0)}K)
                 </option>
               ))}
@@ -1058,99 +983,6 @@ export default function AIConfigTab() {
         )}
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Lower = cheaper & faster • Higher = better story memory
-        </p>
-      </div>
-
-      {/* Story Context Size Slider */}
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-            Story Context
-          </label>
-          <span className="text-sm text-cyan-600 dark:text-cyan-400 font-medium">
-            {isCustomStoryContextMode
-              ? storyContextSize > 0
-                ? `${(storyContextSize / 1000).toFixed(0)}K tokens`
-                : "Custom"
-              : `${(storyContextSize / 1000).toFixed(0)}K tokens`}
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
-            💰 Cheap
-          </span>
-          <div className="flex-1 relative">
-            <div className="h-2 rounded-full bg-linear-to-r from-green-500 via-yellow-500 to-purple-600" />
-            <div className="absolute top-0 left-0 right-0 h-2 flex justify-between px-0">
-              {[8000, 16000, 36000, 72000, 120000, 200000, -1].map((val) => (
-                <button
-                  key={val}
-                  onClick={() => {
-                    if (val === -1) {
-                      setIsCustomStoryContextMode(true);
-                      setCustomStoryContextInput(
-                        storyContextSize > 0 ? String(storyContextSize) : ""
-                      );
-                    } else {
-                      setIsCustomStoryContextMode(false);
-                      setStoryContextSize(val);
-                      if (typeof window !== "undefined") {
-                        localStorage.setItem("storyContextSize", String(val));
-                      }
-                    }
-                  }}
-                  className={`w-4 h-4 rounded-full border-2 -mt-1 transition-all ${
-                    (val === -1 && isCustomStoryContextMode) ||
-                    (val !== -1 &&
-                      !isCustomStoryContextMode &&
-                      storyContextSize === val)
-                      ? "bg-white border-white scale-125 shadow-lg"
-                      : "bg-gray-800 border-gray-500 hover:border-white hover:scale-110"
-                  }`}
-                  title={val === -1 ? "Custom" : `${(val / 1000).toFixed(0)}K`}
-                />
-              ))}
-            </div>
-            <div className="flex justify-between mt-3 text-[10px] text-gray-500 dark:text-gray-400">
-              <span>8K</span>
-              <span>16K</span>
-              <span>36K</span>
-              <span>72K</span>
-              <span>120K</span>
-              <span>200K</span>
-              <span>⚙️</span>
-            </div>
-          </div>
-          <span className="text-xs text-cyan-600 dark:text-cyan-400 whitespace-nowrap">
-            📖 Story
-          </span>
-        </div>
-        {isCustomStoryContextMode && (
-          <div className="flex items-center gap-2 mt-2 pl-16">
-            <input
-              type="number"
-              value={customStoryContextInput}
-              onChange={(e) => {
-                setCustomStoryContextInput(e.target.value);
-                const val = parseInt(e.target.value, 10) || 0;
-                if (val > 0) {
-                  setStoryContextSize(val);
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("storyContextSize", String(val));
-                  }
-                }
-              }}
-              min="4000"
-              step="1000"
-              placeholder="Enter tokens..."
-              className="w-32 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-cyan-500"
-            />
-            <span className="text-xs text-gray-500">tokens</span>
-          </div>
-        )}
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Context for story writing stage • Lower = cheaper • Higher = more
-          story context
         </p>
       </div>
 
@@ -1749,89 +1581,6 @@ export default function AIConfigTab() {
               rules...&rdquo; before generation. This technique improves output
               consistency by making the AI &ldquo;commit&rdquo; to constraints.
               Disable for A/B testing.
-            </span>
-          </p>
-        </div>
-      </div>
-
-      {/* Storyteller Mode Section */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-          <DynamicIcon name="BookOpen" className="w-4 h-4" />
-          Storyteller Mode
-        </h4>
-
-        <div className="space-y-3">
-          <button
-            onClick={() => setStorytellerMode("narrator")}
-            className={`w-full flex items-start gap-3 p-3 rounded-lg border transition-colors ${
-              storytellerMode === "narrator"
-                ? "bg-purple-100 dark:bg-purple-900/30 border-purple-300 dark:border-purple-700"
-                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
-            }`}
-          >
-            <div
-              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                storytellerMode === "narrator"
-                  ? "border-purple-500 bg-purple-500"
-                  : "border-gray-400"
-              }`}
-            >
-              {storytellerMode === "narrator" && (
-                <div className="w-2 h-2 rounded-full bg-white" />
-              )}
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                📖 Literary Narrator
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Immersive prose with no mechanical echoes. The AI writes like a
-                novel author, showing outcomes through vivid description rather
-                than announcing game mechanics.
-              </p>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setStorytellerMode("dm")}
-            className={`w-full flex items-start gap-3 p-3 rounded-lg border transition-colors ${
-              storytellerMode === "dm"
-                ? "bg-orange-100 dark:bg-orange-900/30 border-orange-300 dark:border-orange-700"
-                : "bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 hover:border-orange-300 dark:hover:border-orange-700"
-            }`}
-          >
-            <div
-              className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 mt-0.5 ${
-                storytellerMode === "dm"
-                  ? "border-orange-500 bg-orange-500"
-                  : "border-gray-400"
-              }`}
-            >
-              {storytellerMode === "dm" && (
-                <div className="w-2 h-2 rounded-full bg-white" />
-              )}
-            </div>
-            <div className="text-left">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                🎲 Dungeon Master
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                Weaves mechanics into the narrative. You&apos;ll see dice
-                results, damage numbers, and skill checks announced inline like
-                a tabletop GM would narrate them.
-              </p>
-            </div>
-          </button>
-        </div>
-
-        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <p className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-1.5">
-            <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-            <span>
-              {storytellerMode === "narrator"
-                ? "Narrator mode writes pure story prose. Roll results and state changes still happen behind the scenes."
-                : 'DM mode announces mechanics in-line, e.g., "He swings! **Hit!** You take **5 damage**, dropping you to 12 HP."'}
             </span>
           </p>
         </div>

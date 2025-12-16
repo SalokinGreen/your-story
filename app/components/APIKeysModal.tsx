@@ -345,33 +345,24 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                 </div>
 
-                {/* NovelAI */}
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                {/* NovelAI - DISABLED: Model doesn't support tool calls required for game mechanics */}
+                <div className="flex items-center gap-3 opacity-50">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-gray-400 to-gray-500 flex items-center justify-center">
                     <span className="text-white text-xs font-bold">📖</span>
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400 line-through">
                         NovelAI
                       </span>
-                      {hasKey("novelaiKey") && (
-                        <DynamicIcon
-                          name="CheckCircle"
-                          className="w-3.5 h-3.5 text-green-500"
-                        />
-                      )}
-                      <span className="text-xs text-gray-400 ml-auto">
-                        Story only
+                      <span className="text-xs text-amber-500 ml-auto">
+                        Disabled
                       </span>
                     </div>
-                    <input
-                      type={showKeys ? "text" : "password"}
-                      value={keys.novelaiKey}
-                      onChange={(e) => setKey("novelaiKey", e.target.value)}
-                      placeholder="pst-..."
-                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
-                    />
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      NovelAI models don&apos;t support tool calling, which is
+                      required for game mechanics.
+                    </p>
                   </div>
                 </div>
 
