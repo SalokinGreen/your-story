@@ -915,19 +915,11 @@ export async function generateStoryTurn(
 
           // Execute GM tool calls locally
           if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
-            // FIRST: Add the assistant's response with tool calls to history
-            // IMPORTANT: Don't include full thinking text in history - just the tool calls
-            // Including the thinking causes the AI to repeat itself, seeing its own
-            // "Let me think through this..." and producing it again
-            // The AI needs to see WHAT it called, not the reasoning leading up to it
-            const toolNames = gmResult.toolCalls.map(
-              (tc: any) => tc.function.name
-            );
+            // Add the assistant's response with tool calls to history
+            // The tool_calls array contains the full tool call details - no need for summary text
             conversationHistory.push({
               role: "assistant",
-              content: `[GM made ${
-                toolNames.length
-              } tool call(s): ${toolNames.join(", ")}]`,
+              content: "", // Empty - the tool_calls array has all the info the AI needs
               tool_calls: gmResult.toolCalls.map((tc: any) => ({
                 id: tc.id,
                 type: "function",

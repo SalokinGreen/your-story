@@ -111,7 +111,7 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
   // Tracking
   "add_memory",
   "create_note",
-  "update_note",
+  "edit_note",
   // NPC management
   "add_npc",
   "update_npc",

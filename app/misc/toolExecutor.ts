@@ -3040,7 +3040,7 @@ function convertToolToCommand(
     case "list_inactive_notes":
       return null; // Handled directly in executeTools
 
-    case "update_note": {
+    case "edit_note": {
       // Format: /note_update: title | newTitle | content | on | onTriggers | offTriggers
       const newTitle = args.newTitle || "";
       const content = args.content || "";

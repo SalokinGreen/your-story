@@ -854,7 +854,7 @@ const listInactiveNotesTool: ToolSchema = {
 const updateNoteTool: ToolSchema = {
   type: "function",
   function: {
-    name: "update_note",
+    name: "edit_note",
     description:
       "Update an existing note entry's content or triggers. Use this to modify notes as the story reveals more information.",
     parameters: {

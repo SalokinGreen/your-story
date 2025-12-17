@@ -1741,7 +1741,7 @@ User will not see your output. Use your message content to "Think Step-by-Step" 
 
 ## CRITICAL: Existing Game Data
 The info message contains the CURRENT game state - these are entries that ALREADY EXIST:
-- **"## Notes/Lore"** = Note entries that exist. Use \`update_note\` to add info, NOT \`create_note\`
+- **"## Notes/Lore"** = Note entries that exist. Use \`edit_note\` to add info, NOT \`create_note\`
 - **"### Threads"** = Quests/storylines that exist. Use \`update_thread\` to progress, NOT \`create_thread\`
 - **"## Memory"** = Facts already saved. Don't duplicate them.
 - **"## NPCs"** = Characters already tracked. Don't recreate them.
@@ -1753,7 +1753,7 @@ Only use CREATE tools for GENUINELY NEW content not shown in the info message.
 THE THREE TRACKING SYSTEMS: NOTES vs MEMORIES vs NPCs
 ═══════════════════════════════════════════════════════════════
 
-**📝 NOTES (\`create_note\` / \`update_note\`)** — World Reference Database
+**📝 NOTES (\`create_note\` / \`edit_note\`)** — World Reference Database
 Use for DETAILED information you'll need to reference later:
 - **Location details**: Layout, features, dangers, history
 - **Faction information**: Goals, members, relationships, territory
@@ -1890,7 +1890,7 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 **Note Anti-Patterns:**
 - BAD: Creating a note for every minor detail
 - BAD: One-sentence notes (use memory for quick facts)
-- BAD: Recreating notes that already exist (use \`update_note\`!)
+- BAD: Recreating notes that already exist (use \`edit_note\`!)
 - GOOD: Detailed reference sheets for important subjects
 
 **NPC Anti-Patterns:**
@@ -1906,7 +1906,7 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 ## NOTE MANAGEMENT (formerly "Lore")
 
 ⚠️ **CRITICAL: Check existing notes before creating new ones!**
-- If a note exists with similar title → \`update_note\` to add information
+- If a note exists with similar title → \`edit_note\` to add information
 - Only \`create_note\` for COMPLETELY NEW topics
 
 **When to CREATE a Note:**
@@ -2651,7 +2651,7 @@ export function buildGMStagePrompt({
     }
   }
   if (characterSheetLore.length > 0) {
-    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\nTo update: edit_note("title", "new content") - Keep stats, HP, XP, etc. current!\n`;
+    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\nTo update: edit_note("title", content="new content") - Keep stats, HP, XP, etc. current!\n`;
     for (const l of characterSheetLore) {
       loreSection += `\n### ${l.title}.md\n${cleanString(l.content)}\n`;
     }
@@ -2869,7 +2869,7 @@ Write immersive prose. The player should experience the story, not see game mech
     "search_notes",
     "create_note",
     "delete_note",
-    "update_note",
+    "edit_note",
     // Memory
     "add_memory",
     // Condition tools (no add_condition - that happens via stakes)
