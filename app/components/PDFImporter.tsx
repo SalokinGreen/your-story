@@ -594,14 +594,14 @@ export default function PDFImporter({
         let combinedMarkdown = "";
         let combinedTotalPages = 0;
         let combinedCost = 0;
-        
+
         // For chunked processing, we summarize each chunk and merge results
         let chunkLore: StoryLore[] = [];
         let chunkMechanics: StoryLore[] = [];
         let chunkTables: CustomTable[] = [];
 
         if (needsChunking) {
-          // Large PDF: Split into chunks, OCR each, then summarize each
+          // Large PDF: Split into chunks, then OCR all, then summarize all
           setStep("uploading");
           setStatusMessage(`Splitting ${file.name} into chunks...`);
           setProgress(fileProgressStart + fileProgressRange * 0.05);
@@ -609,24 +609,17 @@ export default function PDFImporter({
           const chunks = await splitPDFIntoChunks(file, (msg) =>
             setStatusMessage(msg)
           );
-          
+
           const totalChunks = chunks.length;
 
-          for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
-            const chunk = chunks[chunkIdx];
-            // Progress: 5% for splitting, 85% for processing chunks (OCR + summarize), 10% for finalization
-            const chunkProgressStart = 0.05 + (chunkIdx / totalChunks) * 0.85;
-            const chunkProgressEnd = 0.05 + ((chunkIdx + 1) / totalChunks) * 0.85;
+          // Phase 1: OCR all chunks in PARALLEL (5% - 45% progress)
+          setStep("ocr");
+          setStatusMessage(
+            `Running OCR on ${totalChunks} chunks in parallel...`
+          );
+          setProgress(fileProgressStart + fileProgressRange * 0.1);
 
-            // OCR step for this chunk
-            setStep("ocr");
-            setStatusMessage(
-              `OCR: pages ${chunk.pageStart}-${chunk.pageEnd} (chunk ${
-                chunkIdx + 1
-              }/${totalChunks})...`
-            );
-            setProgress(fileProgressStart + fileProgressRange * chunkProgressStart);
-
+          const ocrPromises = chunks.map(async (chunk, chunkIdx) => {
             const ocrResponse = await fetch("/api/ocr/process", {
               method: "POST",
               headers: {
@@ -650,81 +643,117 @@ export default function PDFImporter({
                 errorMsg = (await ocrResponse.text()) || errorMsg;
               }
               throw new Error(
-                `${file.name} (chunk ${chunkIdx + 1}): ${errorMsg}`
+                `Chunk ${chunkIdx + 1} (pages ${chunk.pageStart}-${
+                  chunk.pageEnd
+                }): ${errorMsg}`
               );
             }
 
             const chunkResult: OCRProcessResult & { cost: number } =
               await ocrResponse.json();
 
+            return {
+              markdown: chunkResult.markdown,
+              pageStart: chunk.pageStart,
+              pageEnd: chunk.pageEnd,
+              totalPages: chunkResult.totalPages,
+              cost: chunkResult.cost,
+            };
+          });
+
+          const ocrResults = await Promise.all(ocrPromises);
+
+          // Sort by page order and combine results
+          ocrResults.sort((a, b) => a.pageStart - b.pageStart);
+
+          for (const ocr of ocrResults) {
             combinedMarkdown +=
               (combinedMarkdown ? "\n\n---\n\n" : "") +
-              `<!-- Pages ${chunk.pageStart}-${chunk.pageEnd} -->\n${chunkResult.markdown}`;
-            combinedTotalPages += chunkResult.totalPages;
-            combinedCost += chunkResult.cost;
-            
-            // Summarize this chunk immediately to avoid huge payloads
-            setStep("summarizing");
-            setStatusMessage(
-              `Extracting notes from pages ${chunk.pageStart}-${chunk.pageEnd} (chunk ${
-                chunkIdx + 1
-              }/${totalChunks})...`
-            );
-            setProgress(
-              fileProgressStart + 
-              fileProgressRange * (chunkProgressStart + (chunkProgressEnd - chunkProgressStart) * 0.5)
-            );
-            
-            const summarizeResponse = await fetch("/api/ocr/summarize", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({
-                markdown: chunkResult.markdown,
-                focus: ["all"],
-                customInstructions: customInstructions + 
-                  `\n\nNote: This is pages ${chunk.pageStart}-${chunk.pageEnd} of a larger document.`,
-                model:
-                  aiModel === "custom-openrouter" ? customOpenRouterModel : aiModel,
-                maxTokens: maxOutputTokens,
-                openRouterKey: keys.openRouterKey,
-                deepseekKey: keys.deepseekKey,
-              }),
-            });
-
-            if (!summarizeResponse.ok) {
-              let errorMsg = "Note extraction failed";
-              try {
-                const error = await summarizeResponse.json();
-                errorMsg = error.error || errorMsg;
-              } catch {
-                errorMsg = (await summarizeResponse.text()) || errorMsg;
-              }
-              // Don't fail the whole import if one chunk summarization fails
-              console.error(`Chunk ${chunkIdx + 1} summarization failed:`, errorMsg);
-              continue;
-            }
-
-            const summarizeResult = await summarizeResponse.json();
-            chunkLore.push(...(summarizeResult.lore || []));
-            chunkMechanics.push(...(summarizeResult.mechanicNotes || []));
-            chunkTables.push(...(summarizeResult.customTables || []));
-            
-            setProgress(fileProgressStart + fileProgressRange * chunkProgressEnd);
+              `<!-- Pages ${ocr.pageStart}-${ocr.pageEnd} -->\n${ocr.markdown}`;
+            combinedTotalPages += ocr.totalPages;
+            combinedCost += ocr.cost;
           }
-          
+
+          // Update extracted markdown after all OCR is done
+          setExtractedMarkdown(
+            (prev) => prev + "\n\n---\n\n" + combinedMarkdown
+          );
+          totalPagesProcessed += combinedTotalPages;
+          totalCost += combinedCost;
+          setProgress(fileProgressStart + fileProgressRange * 0.45);
+
+          // Phase 2: Summarize all chunks in PARALLEL (45% - 95% progress)
+          setStep("summarizing");
+          setStatusMessage(
+            `Extracting notes from ${ocrResults.length} chunks in parallel...`
+          );
+          setProgress(fileProgressStart + fileProgressRange * 0.5);
+
+          // Refresh token before summarization phase (may have expired during OCR)
+          const freshToken = await getAuthToken();
+          if (!freshToken) {
+            throw new Error("Session expired. Please sign in again.");
+          }
+
+          const summarizePromises = ocrResults.map(async (ocr) => {
+            try {
+              const summarizeResponse = await fetch("/api/ocr/summarize", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${freshToken}`,
+                },
+                body: JSON.stringify({
+                  markdown: ocr.markdown,
+                  focus: ["all"],
+                  customInstructions:
+                    customInstructions +
+                    `\n\nNote: This is pages ${ocr.pageStart}-${ocr.pageEnd} of a larger document.`,
+                  model:
+                    aiModel === "custom-openrouter"
+                      ? customOpenRouterModel
+                      : aiModel,
+                  maxTokens: maxOutputTokens,
+                  openRouterKey: keys.openRouterKey,
+                  deepseekKey: keys.deepseekKey,
+                }),
+              });
+
+              if (!summarizeResponse.ok) {
+                const errorMsg = await summarizeResponse.text();
+                console.error(
+                  `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization failed:`,
+                  errorMsg
+                );
+                return null;
+              }
+
+              return await summarizeResponse.json();
+            } catch (err) {
+              console.error(
+                `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization error:`,
+                err
+              );
+              return null;
+            }
+          });
+
+          const summarizeResults = await Promise.all(summarizePromises);
+
+          // Collect results from successful summarizations
+          for (const result of summarizeResults) {
+            if (result) {
+              chunkLore.push(...(result.lore || []));
+              chunkMechanics.push(...(result.mechanicNotes || []));
+              chunkTables.push(...(result.customTables || []));
+            }
+          }
+
           // Add chunk results to totals
           allLore.push(...chunkLore);
           allMechanicNotes.push(...chunkMechanics);
           allCustomTables.push(...chunkTables);
-          
-          setExtractedMarkdown((prev) => prev + "\n\n---\n\n" + combinedMarkdown);
-          totalPagesProcessed += combinedTotalPages;
-          totalCost += combinedCost;
           setProgress(fileProgressEnd);
-          
         } else {
           // Small file or non-PDF: Use original single-request approach
           setStep("uploading");
@@ -818,8 +847,10 @@ export default function PDFImporter({
           combinedMarkdown = ocrResult.markdown;
           combinedTotalPages = ocrResult.totalPages;
           combinedCost = ocrResult.cost;
-          
-          setExtractedMarkdown((prev) => prev + "\n\n---\n\n" + combinedMarkdown);
+
+          setExtractedMarkdown(
+            (prev) => prev + "\n\n---\n\n" + combinedMarkdown
+          );
           totalPagesProcessed += combinedTotalPages;
           totalCost += combinedCost;
           setProgress(fileProgressStart + fileProgressRange * 0.4);
@@ -841,7 +872,9 @@ export default function PDFImporter({
               focus: ["all"],
               customInstructions,
               model:
-                aiModel === "custom-openrouter" ? customOpenRouterModel : aiModel,
+                aiModel === "custom-openrouter"
+                  ? customOpenRouterModel
+                  : aiModel,
               maxTokens: maxOutputTokens,
               openRouterKey: keys.openRouterKey,
               deepseekKey: keys.deepseekKey,
