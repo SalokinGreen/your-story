@@ -12,7 +12,7 @@ import {
   MAX_PDF_SIZE_MB,
   OCRProcessResult,
 } from "@/app/misc/ocr";
-import { StoryLore, CustomTable, Variable } from "@/app/misc/structs";
+import { StoryLore, CustomTable } from "@/app/misc/structs";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 
 // Saved import data structure
@@ -23,8 +23,28 @@ interface SavedPDFImport {
   lore: StoryLore[];
   mechanicNotes: StoryLore[];
   customTables: CustomTable[];
-  variables: Variable[];
   summary: string;
+}
+
+// Community import data structure (from API)
+interface CommunityImport {
+  id: string;
+  name: string;
+  description: string | null;
+  source_book: string | null;
+  system: string | null;
+  tags: string[];
+  lore_count: number;
+  mechanics_count: number;
+  tables_count: number;
+  downloads: number;
+  is_public: boolean;
+  created_at: string;
+  user_id: string;
+  // Full content (only when fetching single import)
+  lore?: StoryLore[];
+  mechanic_notes?: StoryLore[];
+  custom_tables?: CustomTable[];
 }
 
 const SAVED_IMPORTS_KEY = "pdf-imports-cache";
@@ -35,11 +55,10 @@ interface PDFImporterProps {
     lore: StoryLore[];
     mechanicNotes: StoryLore[];
     customTables: CustomTable[];
-    variables: Variable[];
     summary: string;
   }) => void;
   /** Optional: Only import specific types */
-  importTypes?: ("lore" | "mechanics" | "tables" | "variables")[];
+  importTypes?: ("lore" | "mechanics" | "tables")[];
   /** Optional: Custom button text */
   buttonText?: string;
   /** Optional: Compact mode */
@@ -57,7 +76,7 @@ type ProcessingStep =
 
 export default function PDFImporter({
   onImportComplete,
-  importTypes = ["lore", "mechanics", "tables", "variables"],
+  importTypes = ["lore", "mechanics", "tables"],
   buttonText = "Import from PDF",
   compact = false,
 }: PDFImporterProps) {
@@ -90,6 +109,30 @@ export default function PDFImporter({
   const [showSavedImports, setShowSavedImports] = useState(false);
   const [expandedImport, setExpandedImport] = useState<string | null>(null);
 
+  // Community imports
+  const [showCommunityImports, setShowCommunityImports] = useState(false);
+  const [communityImports, setCommunityImports] = useState<CommunityImport[]>(
+    []
+  );
+  const [communityLoading, setCommunityLoading] = useState(false);
+  const [communitySearch, setCommunitySearch] = useState("");
+  const [communitySystem, setCommunitySystem] = useState("");
+  const [communitySort, setCommunitySort] = useState<"recent" | "popular">(
+    "popular"
+  );
+  const [communityTotal, setCommunityTotal] = useState(0);
+
+  // Share modal state
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [shareData, setShareData] = useState<SavedPDFImport | null>(null);
+  const [shareName, setShareName] = useState("");
+  const [shareDescription, setShareDescription] = useState("");
+  const [shareSourceBook, setShareSourceBook] = useState("");
+  const [shareSystem, setShareSystem] = useState("");
+  const [shareTags, setShareTags] = useState("");
+  const [sharePublic, setSharePublic] = useState(true);
+  const [shareUploading, setShareUploading] = useState(false);
+
   // Load saved imports on mount
   useEffect(() => {
     try {
@@ -116,7 +159,6 @@ export default function PDFImporter({
       lore: StoryLore[];
       mechanicNotes: StoryLore[];
       customTables: CustomTable[];
-      variables: Variable[];
       summary: string;
     }) => {
       const newImport: SavedPDFImport = {
@@ -129,7 +171,6 @@ export default function PDFImporter({
         lore: data.lore,
         mechanicNotes: data.mechanicNotes,
         customTables: data.customTables,
-        variables: data.variables,
         summary: data.summary,
       };
 
@@ -166,7 +207,6 @@ export default function PDFImporter({
         lore: imp.lore,
         mechanicNotes: imp.mechanicNotes,
         customTables: imp.customTables,
-        variables: imp.variables,
         summary: imp.summary,
       });
       addNotification(
@@ -179,6 +219,190 @@ export default function PDFImporter({
     },
     [onImportComplete, addNotification]
   );
+
+  // Fetch community imports
+  const fetchCommunityImports = useCallback(async () => {
+    setCommunityLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (communitySearch) params.set("search", communitySearch);
+      if (communitySystem) params.set("system", communitySystem);
+      params.set("sort", communitySort);
+      params.set("limit", "20");
+
+      const response = await fetch(`/api/book-imports?${params}`);
+      
+      // Handle non-JSON responses (e.g., if table doesn't exist yet)
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Community imports API error:", response.status, text);
+        // Don't show error notification for 403/404 - table might not exist yet
+        if (response.status !== 403 && response.status !== 404) {
+          addNotification("Failed to load community imports", "failure");
+        }
+        return;
+      }
+      
+      const data = await response.json();
+
+      if (data.error) {
+        addNotification(data.error, "failure");
+        return;
+      }
+
+      setCommunityImports(data.imports || []);
+      setCommunityTotal(data.total || 0);
+    } catch (error) {
+      console.error("Failed to fetch community imports:", error);
+      // Silently fail - table might not be set up yet
+    } finally {
+      setCommunityLoading(false);
+    }
+  }, [communitySearch, communitySystem, communitySort, addNotification]);
+
+  // Load community imports when section opens
+  useEffect(() => {
+    if (showCommunityImports && communityImports.length === 0) {
+      fetchCommunityImports();
+    }
+  }, [showCommunityImports, fetchCommunityImports, communityImports.length]);
+
+  // Use a community import
+  const useCommunityImport = useCallback(
+    async (imp: CommunityImport) => {
+      try {
+        // Fetch full import data if not already loaded
+        const token = await getAuthToken();
+        const response = await fetch(`/api/book-imports/${imp.id}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
+
+        if (!response.ok) {
+          const text = await response.text();
+          console.error("Community import fetch error:", response.status, text);
+          addNotification("Failed to load import", "failure");
+          return;
+        }
+
+        const data = await response.json();
+
+        if (data.error) {
+          addNotification(data.error, "failure");
+          return;
+        }
+
+        const fullImport = data.import;
+        onImportComplete({
+          lore: fullImport.lore || [],
+          mechanicNotes: fullImport.mechanic_notes || [],
+          customTables: fullImport.custom_tables || [],
+          summary: `Imported from: ${fullImport.name}`,
+        });
+
+        addNotification(
+          `Loaded ${
+            fullImport.lore_count + fullImport.mechanics_count
+          } notes, ${fullImport.tables_count} tables from "${fullImport.name}"`,
+          "success"
+        );
+        setIsOpen(false);
+      } catch (error) {
+        console.error("Failed to use community import:", error);
+        addNotification("Failed to load import", "failure");
+      }
+    },
+    [onImportComplete, addNotification]
+  );
+
+  // Share a saved import to community
+  const shareImportToCommunity = useCallback(async () => {
+    if (!shareData || !user) {
+      addNotification("Please sign in to share imports", "warning");
+      return;
+    }
+
+    if (!shareName.trim()) {
+      addNotification("Please enter a name for this import", "warning");
+      return;
+    }
+
+    setShareUploading(true);
+    try {
+      const token = await getAuthToken();
+      const response = await fetch("/api/book-imports", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          name: shareName.trim(),
+          description: shareDescription.trim() || null,
+          source_book: shareSourceBook.trim() || null,
+          system: shareSystem.trim() || null,
+          tags: shareTags
+            .split(",")
+            .map((t) => t.trim())
+            .filter(Boolean),
+          lore: shareData.lore,
+          mechanicNotes: shareData.mechanicNotes,
+          customTables: shareData.customTables,
+          is_public: sharePublic,
+        }),
+      });
+
+      if (!response.ok) {
+        const text = await response.text();
+        console.error("Share import error:", response.status, text);
+        addNotification("Failed to share import. Make sure you're signed in.", "failure");
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.error) {
+        addNotification(data.error, "failure");
+        return;
+      }
+
+      addNotification(
+        `Successfully shared "${shareName}" to the community!`,
+        "success"
+      );
+      setShowShareModal(false);
+      setShareData(null);
+      // Reset form
+      setShareName("");
+      setShareDescription("");
+      setShareSourceBook("");
+      setShareSystem("");
+      setShareTags("");
+      setSharePublic(true);
+    } catch (error) {
+      console.error("Failed to share import:", error);
+      addNotification("Failed to share import", "failure");
+    } finally {
+      setShareUploading(false);
+    }
+  }, [
+    shareData,
+    user,
+    shareName,
+    shareDescription,
+    shareSourceBook,
+    shareSystem,
+    shareTags,
+    sharePublic,
+    addNotification,
+  ]);
+
+  // Open share modal for a saved import
+  const openShareModal = useCallback((imp: SavedPDFImport) => {
+    setShareData(imp);
+    setShareName(imp.fileName);
+    setShareDescription(imp.summary || "");
+    setShowShareModal(true);
+  }, []);
 
   // Get max output limit based on selected model
   const getModelMaxOutput = () => {
@@ -270,7 +494,6 @@ export default function PDFImporter({
     const allLore: StoryLore[] = [];
     const allMechanicNotes: StoryLore[] = [];
     const allCustomTables: CustomTable[] = [];
-    const allVariables: Variable[] = [];
     let totalPagesProcessed = 0;
     let totalCost = 0;
 
@@ -301,8 +524,14 @@ export default function PDFImporter({
         });
 
         if (!uploadResponse.ok) {
-          const error = await uploadResponse.json();
-          throw new Error(`${file.name}: ${error.error || "Upload failed"}`);
+          let errorMsg = "Upload failed";
+          try {
+            const error = await uploadResponse.json();
+            errorMsg = error.error || errorMsg;
+          } catch {
+            errorMsg = await uploadResponse.text() || errorMsg;
+          }
+          throw new Error(`${file.name}: ${errorMsg}`);
         }
 
         const uploadResult = await uploadResponse.json();
@@ -328,10 +557,14 @@ export default function PDFImporter({
         });
 
         if (!ocrResponse.ok) {
-          const error = await ocrResponse.json();
-          throw new Error(
-            `${file.name}: ${error.error || "OCR processing failed"}`
-          );
+          let errorMsg = "OCR processing failed";
+          try {
+            const error = await ocrResponse.json();
+            errorMsg = error.error || errorMsg;
+          } catch {
+            errorMsg = await ocrResponse.text() || errorMsg;
+          }
+          throw new Error(`${file.name}: ${errorMsg}`);
         }
 
         const ocrResult: OCRProcessResult & { cost: number } =
@@ -368,10 +601,14 @@ export default function PDFImporter({
         });
 
         if (!loreResponse.ok) {
-          const error = await loreResponse.json();
-          throw new Error(
-            `${file.name}: ${error.error || "Lore extraction failed"}`
-          );
+          let errorMsg = "Lore extraction failed";
+          try {
+            const error = await loreResponse.json();
+            errorMsg = error.error || errorMsg;
+          } catch {
+            errorMsg = await loreResponse.text() || errorMsg;
+          }
+          throw new Error(`${file.name}: ${errorMsg}`);
         }
 
         const loreResult = await loreResponse.json();
@@ -393,7 +630,7 @@ export default function PDFImporter({
           },
           body: JSON.stringify({
             markdown: ocrResult.markdown,
-            focus: ["mechanics", "variables"],
+            focus: ["mechanics"],
             customInstructions:
               customInstructions +
               "\nFocus specifically on game rules, combat mechanics, skill systems, special abilities, and numerical systems.",
@@ -406,16 +643,19 @@ export default function PDFImporter({
         });
 
         if (!mechanicsResponse.ok) {
-          const error = await mechanicsResponse.json();
-          throw new Error(
-            `${file.name}: ${error.error || "Mechanics extraction failed"}`
-          );
+          let errorMsg = "Mechanics extraction failed";
+          try {
+            const error = await mechanicsResponse.json();
+            errorMsg = error.error || errorMsg;
+          } catch {
+            errorMsg = await mechanicsResponse.text() || errorMsg;
+          }
+          throw new Error(`${file.name}: ${errorMsg}`);
         }
 
         const mechanicsResult = await mechanicsResponse.json();
         allMechanicNotes.push(...(mechanicsResult.mechanicNotes || []));
         allCustomTables.push(...(mechanicsResult.customTables || []));
-        allVariables.push(...(mechanicsResult.variables || []));
         setProgress(fileProgressEnd);
       }
 
@@ -429,7 +669,6 @@ export default function PDFImporter({
         lore: allLore,
         mechanicNotes: allMechanicNotes,
         customTables: allCustomTables,
-        variables: allVariables,
         summary: `Imported from ${totalFiles} file${totalFiles > 1 ? "s" : ""}`,
       };
 
@@ -610,24 +849,45 @@ export default function PDFImporter({
                       <DynamicIcon name={getStepIcon()} className="w-6 h-6" />
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-white">{statusMessage}</p>
-                      <p className="text-sm text-blue-300/60">
+                      <p className="font-medium text-white">
+                        {step === "uploading" && "Step 1/4: Uploading"}
+                        {step === "ocr" && "Step 2/4: Text Extraction"}
+                        {step === "summarizing-lore" && "Step 3/4: Lore Analysis"}
+                        {step === "summarizing-mechanics" && "Step 4/4: Mechanics Analysis"}
+                        {step === "complete" && "✓ Import Complete"}
+                      </p>
+                      <p className="text-sm text-blue-300/70 mt-0.5">
+                        {statusMessage}
+                      </p>
+                      <p className="text-xs text-blue-300/50 mt-1">
                         {step === "uploading" &&
-                          "This may take a moment for large files..."}
-                        {step === "ocr" && `Processing ${pageCount} pages...`}
+                          "Uploading your PDF to secure storage..."}
+                        {step === "ocr" && 
+                          `Running OCR on ${pageCount} page${pageCount !== 1 ? "s" : ""}...`}
                         {step === "summarizing-lore" &&
-                          "Extracting world-building and characters..."}
+                          "AI is extracting world-building, characters, locations..."}
                         {step === "summarizing-mechanics" &&
-                          "Extracting rules and game systems..."}
-                        {step === "complete" && "All done!"}
+                          "AI is extracting rules, abilities, tables..."}
+                        {step === "complete" && "Ready to use your imported content!"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-lg font-bold text-purple-300">
+                        {Math.round(progress)}%
                       </p>
                     </div>
                   </div>
-                  <div className="w-full bg-blue-900/50 rounded-full h-2">
+                  <div className="w-full bg-blue-900/50 rounded-full h-2.5">
                     <div
-                      className="bg-linear-to-r from-purple-500 to-blue-500 h-2 rounded-full transition-all duration-500"
+                      className="bg-linear-to-r from-purple-500 to-blue-500 h-2.5 rounded-full transition-all duration-300"
                       style={{ width: `${progress}%` }}
                     />
+                  </div>
+                  <div className="flex justify-between text-xs text-blue-300/40 mt-1">
+                    <span>Upload</span>
+                    <span>OCR</span>
+                    <span>Lore</span>
+                    <span>Mechanics</span>
                   </div>
                 </div>
               )}
@@ -952,8 +1212,7 @@ export default function PDFImporter({
                                         imp.timestamp
                                       ).toLocaleDateString()}{" "}
                                       • {totalNotes} notes •{" "}
-                                      {imp.customTables.length} tables •{" "}
-                                      {imp.variables.length} variables
+                                      {imp.customTables.length} tables
                                     </p>
                                   </div>
                                   <DynamicIcon
@@ -1060,8 +1319,24 @@ export default function PDFImporter({
                                           name="Download"
                                           className="w-3 h-3"
                                         />
-                                        Use This Import
+                                        Use
                                       </button>
+                                      {user && (
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            openShareModal(imp);
+                                          }}
+                                          className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 text-white text-xs rounded-lg transition-colors flex items-center gap-1"
+                                          title="Share to community"
+                                        >
+                                          <DynamicIcon
+                                            name="Share2"
+                                            className="w-3 h-3"
+                                          />
+                                          Share
+                                        </button>
+                                      )}
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -1084,6 +1359,177 @@ export default function PDFImporter({
                       )}
                     </div>
                   )}
+
+                  {/* Community Imports Section */}
+                  <div className="border border-purple-700/40 rounded-lg overflow-hidden">
+                    <button
+                      onClick={() =>
+                        setShowCommunityImports(!showCommunityImports)
+                      }
+                      className="w-full px-4 py-3 flex items-center justify-between bg-purple-900/20 hover:bg-purple-900/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <DynamicIcon
+                          name="Globe"
+                          className="w-4 h-4 text-purple-400"
+                        />
+                        <span className="text-sm font-medium text-purple-200">
+                          Community Imports
+                        </span>
+                      </div>
+                      <DynamicIcon
+                        name={
+                          showCommunityImports ? "ChevronUp" : "ChevronDown"
+                        }
+                        className="w-4 h-4 text-purple-400"
+                      />
+                    </button>
+                    {showCommunityImports && (
+                      <div className="p-3 space-y-3 bg-purple-900/10">
+                        {/* Search and Filters */}
+                        <div className="flex gap-2">
+                          <div className="flex-1">
+                            <input
+                              type="text"
+                              value={communitySearch}
+                              onChange={(e) =>
+                                setCommunitySearch(e.target.value)
+                              }
+                              placeholder="Search imports..."
+                              className="w-full px-3 py-2 bg-purple-900/30 border border-purple-700/40 rounded-lg text-white text-sm placeholder-purple-300/50"
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") fetchCommunityImports();
+                              }}
+                            />
+                          </div>
+                          <select
+                            value={communitySort}
+                            onChange={(e) =>
+                              setCommunitySort(
+                                e.target.value as "recent" | "popular"
+                              )
+                            }
+                            className="px-3 py-2 bg-purple-900/30 border border-purple-700/40 rounded-lg text-white text-sm"
+                          >
+                            <option value="popular">Popular</option>
+                            <option value="recent">Recent</option>
+                          </select>
+                          <button
+                            onClick={fetchCommunityImports}
+                            disabled={communityLoading}
+                            className="px-3 py-2 bg-purple-600/80 hover:bg-purple-600 disabled:opacity-50 text-white rounded-lg transition-colors"
+                          >
+                            <DynamicIcon
+                              name={communityLoading ? "Loader2" : "Search"}
+                              className={`w-4 h-4 ${
+                                communityLoading ? "animate-spin" : ""
+                              }`}
+                            />
+                          </button>
+                        </div>
+
+                        {/* RPG System Filter */}
+                        <div className="flex gap-2 flex-wrap">
+                          {[
+                            "",
+                            "D&D 5e",
+                            "Pathfinder",
+                            "Call of Cthulhu",
+                            "Other",
+                          ].map((sys) => (
+                            <button
+                              key={sys}
+                              onClick={() => {
+                                setCommunitySystem(sys);
+                                setTimeout(fetchCommunityImports, 100);
+                              }}
+                              className={`px-2 py-1 text-xs rounded-full transition-colors ${
+                                communitySystem === sys
+                                  ? "bg-purple-600 text-white"
+                                  : "bg-purple-900/40 text-purple-300 hover:bg-purple-800/50"
+                              }`}
+                            >
+                              {sys || "All Systems"}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Results */}
+                        {communityLoading ? (
+                          <div className="flex items-center justify-center py-8">
+                            <DynamicIcon
+                              name="Loader2"
+                              className="w-6 h-6 text-purple-400 animate-spin"
+                            />
+                          </div>
+                        ) : communityImports.length === 0 ? (
+                          <div className="text-center py-8 text-purple-300/60 text-sm">
+                            No community imports found
+                          </div>
+                        ) : (
+                          <div className="space-y-2 max-h-80 overflow-y-auto">
+                            {communityImports.map((imp) => (
+                              <div
+                                key={imp.id}
+                                className="bg-purple-900/30 rounded-lg border border-purple-700/40 p-3"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-medium text-white truncate">
+                                      {imp.name}
+                                    </p>
+                                    {imp.description && (
+                                      <p className="text-xs text-purple-300/70 line-clamp-2 mt-1">
+                                        {imp.description}
+                                      </p>
+                                    )}
+                                    <div className="flex items-center gap-2 mt-2 text-xs text-purple-300/60">
+                                      {imp.system && (
+                                        <span className="px-2 py-0.5 bg-purple-800/40 rounded-full">
+                                          {imp.system}
+                                        </span>
+                                      )}
+                                      <span>
+                                        📚 {imp.lore_count} • ⚙️{" "}
+                                        {imp.mechanics_count} • 🎲{" "}
+                                        {imp.tables_count}
+                                      </span>
+                                      <span title="Downloads">
+                                        ⬇️ {imp.downloads}
+                                      </span>
+                                    </div>
+                                    <div className="flex items-center gap-2 mt-1 text-xs text-purple-300/40">
+                                      <span>
+                                        {new Date(
+                                          imp.created_at
+                                        ).toLocaleDateString()}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <button
+                                    onClick={() => useCommunityImport(imp)}
+                                    className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 text-white text-xs rounded-lg transition-colors flex items-center gap-1 shrink-0"
+                                  >
+                                    <DynamicIcon
+                                      name="Download"
+                                      className="w-3 h-3"
+                                    />
+                                    Use
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                            {communityTotal > communityImports.length && (
+                              <p className="text-center text-xs text-purple-300/50 py-2">
+                                Showing {communityImports.length} of{" "}
+                                {communityTotal} imports
+                              </p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </>
               )}
             </div>
@@ -1106,6 +1552,173 @@ export default function PDFImporter({
               >
                 <DynamicIcon name="Sparkles" className="w-4 h-4" />
                 Start Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Share Modal */}
+      {showShareModal && shareData && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/80 backdrop-blur-sm"
+          onClick={() => setShowShareModal(false)}
+        >
+          <div
+            className="bg-linear-to-br from-purple-950/95 via-blue-950/95 to-purple-950/95 border border-purple-500/40 rounded-xl shadow-2xl w-full max-w-lg m-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b border-purple-700/40">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-purple-600/30 flex items-center justify-center">
+                  <DynamicIcon
+                    name="Share2"
+                    className="w-5 h-5 text-purple-300"
+                  />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-white">
+                    Share Import to Community
+                  </h2>
+                  <p className="text-sm text-purple-200/70">
+                    Help others discover this content
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Name */}
+              <div>
+                <label className="block text-sm font-medium text-purple-200 mb-1">
+                  Import Name *
+                </label>
+                <input
+                  type="text"
+                  value={shareName}
+                  onChange={(e) => setShareName(e.target.value)}
+                  placeholder="e.g., Monster Manual Lore"
+                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white placeholder-purple-300/50"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-purple-200 mb-1">
+                  Description
+                </label>
+                <textarea
+                  value={shareDescription}
+                  onChange={(e) => setShareDescription(e.target.value)}
+                  placeholder="What content is included? Any special notes?"
+                  rows={2}
+                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white placeholder-purple-300/50 resize-none"
+                />
+              </div>
+
+              {/* Source Book */}
+              <div>
+                <label className="block text-sm font-medium text-purple-200 mb-1">
+                  Source Book
+                </label>
+                <input
+                  type="text"
+                  value={shareSourceBook}
+                  onChange={(e) => setShareSourceBook(e.target.value)}
+                  placeholder="e.g., D&D 5e Monster Manual"
+                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white placeholder-purple-300/50"
+                />
+              </div>
+
+              {/* System */}
+              <div>
+                <label className="block text-sm font-medium text-purple-200 mb-1">
+                  RPG System
+                </label>
+                <select
+                  value={shareSystem}
+                  onChange={(e) => setShareSystem(e.target.value)}
+                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white"
+                >
+                  <option value="">Select system...</option>
+                  <option value="D&D 5e">D&D 5e</option>
+                  <option value="Pathfinder">Pathfinder</option>
+                  <option value="Call of Cthulhu">Call of Cthulhu</option>
+                  <option value="Blades in the Dark">Blades in the Dark</option>
+                  <option value="Fate">Fate</option>
+                  <option value="Year Zero Engine">Year Zero Engine</option>
+                  <option value="Savage Worlds">Savage Worlds</option>
+                  <option value="System Agnostic">System Agnostic</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="block text-sm font-medium text-purple-200 mb-1">
+                  Tags (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={shareTags}
+                  onChange={(e) => setShareTags(e.target.value)}
+                  placeholder="e.g., monsters, fantasy, official"
+                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white placeholder-purple-300/50"
+                />
+              </div>
+
+              {/* Content Summary */}
+              <div className="bg-purple-900/30 rounded-lg p-3 text-sm">
+                <p className="text-purple-200 font-medium mb-2">
+                  Content to share:
+                </p>
+                <div className="flex gap-4 text-purple-300/70">
+                  <span>📚 {shareData.lore.length} Lore</span>
+                  <span>⚙️ {shareData.mechanicNotes.length} Mechanics</span>
+                  <span>🎲 {shareData.customTables.length} Tables</span>
+                </div>
+              </div>
+
+              {/* Public toggle */}
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={sharePublic}
+                  onChange={(e) => setSharePublic(e.target.checked)}
+                  className="w-4 h-4 rounded border-purple-700/40 bg-purple-900/40 text-purple-600 focus:ring-purple-500"
+                />
+                <span className="text-sm text-purple-200">
+                  Make publicly visible (others can browse and use)
+                </span>
+              </label>
+            </div>
+
+            <div className="flex justify-end gap-3 p-4 border-t border-purple-700/40">
+              <button
+                onClick={() => setShowShareModal(false)}
+                className="px-4 py-2 bg-purple-900/40 hover:bg-purple-800/50 text-white rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={shareImportToCommunity}
+                disabled={!shareName.trim() || shareUploading}
+                className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                {shareUploading ? (
+                  <>
+                    <DynamicIcon
+                      name="Loader2"
+                      className="w-4 h-4 animate-spin"
+                    />
+                    Sharing...
+                  </>
+                ) : (
+                  <>
+                    <DynamicIcon name="Share2" className="w-4 h-4" />
+                    Share
+                  </>
+                )}
               </button>
             </div>
           </div>

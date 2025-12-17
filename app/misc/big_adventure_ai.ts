@@ -147,7 +147,6 @@ export interface BigAdventureConfig {
   importedLore?: import("./structs").StoryLore[];
   importedMechanicsNotes?: import("./structs").StoryLore[];
   importedCustomTables?: import("./structs").CustomTable[];
-  importedVariables?: import("./structs").Variable[];
 }
 
 // Style presets for different narrative tones
@@ -2623,9 +2622,67 @@ export function generateSessionId(): string {
 export function saveAutosave(data: BigAdventureAutosave): void {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(data));
+    // Create a slimmed-down version to avoid quota issues
+    const slimConfig: BigAdventureConfig = {
+      ...data.config,
+      // Limit imported content
+      importedLore: data.config.importedLore?.slice(0, 10),
+      importedMechanicsNotes: data.config.importedMechanicsNotes?.slice(0, 10),
+      importedCustomTables: data.config.importedCustomTables?.slice(0, 5),
+    };
+    
+    // Slim down partialResults if it has a storyTemplate with large arrays
+    let slimPartialResults = data.partialResults;
+    if (data.partialResults?.storyTemplate) {
+      const st = data.partialResults.storyTemplate;
+      slimPartialResults = {
+        ...data.partialResults,
+        storyTemplate: {
+          ...st,
+          lore: st.lore?.slice(0, 30),
+          achievements: st.achievements?.slice(0, 20),
+          quests: st.quests?.slice(0, 10),
+          customTables: st.customTables?.slice(0, 10),
+        },
+      };
+    }
+    
+    const slimData: BigAdventureAutosave = {
+      ...data,
+      config: slimConfig,
+      partialResults: slimPartialResults,
+    };
+    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(slimData));
   } catch (e) {
-    console.error("Failed to save autosave:", e);
+    // Quota exceeded - clear old data and try minimal save
+    console.warn("Autosave quota exceeded, attempting minimal save:", e);
+    try {
+      localStorage.removeItem(AUTOSAVE_KEY);
+      localStorage.removeItem("bigAdventure_configDraft");
+      localStorage.removeItem("bigAdventure_generatedData");
+      // Save minimal autosave with just progress info
+      const minimalData: BigAdventureAutosave = {
+        id: data.id,
+        timestamp: data.timestamp,
+        config: {
+          ...data.config,
+          importedLore: [],
+          importedMechanicsNotes: [],
+          importedCustomTables: [],
+        },
+        completedStages: data.completedStages,
+        partialResults: {
+          title: data.partialResults?.title,
+          shortDescription: data.partialResults?.shortDescription,
+        },
+        currentStage: data.currentStage,
+        currentIteration: data.currentIteration,
+      };
+      localStorage.setItem(AUTOSAVE_KEY, JSON.stringify(minimalData));
+    } catch {
+      // Give up silently - generation will continue but won't be recoverable
+      console.warn("Failed to save even minimal autosave");
+    }
   }
 }
 
@@ -2671,15 +2728,44 @@ export function clearAutosave(): void {
 export function saveConfigDraft(config: BigAdventureConfig): void {
   if (typeof window === "undefined") return;
   try {
+    // Create a minimal config without large data fields
+    const minimalConfig = {
+      ...config,
+      // Don't save imported PDF data - it's too large
+      importedLore: config.importedLore?.slice(0, 10), // Keep only first 10
+      importedMechanicsNotes: config.importedMechanicsNotes?.slice(0, 10),
+      importedCustomTables: config.importedCustomTables?.slice(0, 5),
+    };
     localStorage.setItem(
       "bigAdventure_configDraft",
       JSON.stringify({
-        config,
+        config: minimalConfig,
         timestamp: Date.now(),
       })
     );
   } catch (e) {
-    console.error("Failed to save config draft:", e);
+    // Quota exceeded - try to clear old data and retry with minimal config
+    console.warn("Config draft save failed, clearing old data:", e);
+    try {
+      localStorage.removeItem("bigAdventure_configDraft");
+      localStorage.removeItem("bigAdventure_generatedData");
+      // Save without imported content
+      const bareConfig = {
+        ...config,
+        importedLore: [],
+        importedMechanicsNotes: [],
+        importedCustomTables: [],
+      };
+      localStorage.setItem(
+        "bigAdventure_configDraft",
+        JSON.stringify({
+          config: bareConfig,
+          timestamp: Date.now(),
+        })
+      );
+    } catch {
+      // Give up silently
+    }
   }
 }
 

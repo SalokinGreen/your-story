@@ -821,13 +821,6 @@ export async function generateAdventureSequential(
         ...config.importedCustomTables,
       ];
     }
-    // Add imported variables
-    if (config.importedVariables && config.importedVariables.length > 0) {
-      finalResult.storyTemplate.variables = [
-        ...(finalResult.storyTemplate.variables || []),
-        ...config.importedVariables,
-      ];
-    }
   }
 
   // Apply RPG system and NSFW settings

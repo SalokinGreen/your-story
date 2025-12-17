@@ -390,7 +390,7 @@ export function cleanOCRMarkdown(markdown: string): string {
 // Validation
 // ============================================================================
 
-export const MAX_PDF_SIZE_MB = 50;
+export const MAX_PDF_SIZE_MB = 100;
 export const MAX_PDF_SIZE_BYTES = MAX_PDF_SIZE_MB * 1024 * 1024;
 export const ALLOWED_MIME_TYPES = [
   "application/pdf",

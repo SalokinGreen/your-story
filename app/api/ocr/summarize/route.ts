@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { StoryLore, CustomTable, Variable } from "@/app/misc/structs";
+import { StoryLore, CustomTable } from "@/app/misc/structs";
 import {
   detectContentType,
   splitIntoSections,
@@ -38,7 +38,6 @@ export const maxDuration = 300;
  *   lore: StoryLore[],
  *   mechanicNotes: StoryLore[],  // Type: mechanics
  *   customTables: CustomTable[],
- *   variables: Variable[],
  *   summary: string
  * }
  */
@@ -273,14 +272,6 @@ OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields
         { "min": 1, "max": 10, "result": "Result text" }
       ]
     }
-  ],
-  "variables": [
-    {
-      "name": "Variable name",
-      "type": "number|boolean|string",
-      "value": "default value",
-      "description": "What this tracks"
-    }
   ]
 }
 
@@ -311,7 +302,6 @@ CONTENT RULES:
 - Use descriptive folder names for organization (Characters, Locations, Items, Factions, History, Bestiary, etc.)
 - Mark secret/hidden information with "secrtet": true
 - For tables, estimate reasonable min/max ranges if not explicitly stated
-- Create variables for trackable game states (quest flags, relationship scores, etc.)
 - Be thorough but concise - prioritize quality over quantity
 
 ${customInstructions ? `ADDITIONAL INSTRUCTIONS:\n${customInstructions}` : ""}`;
@@ -535,7 +525,6 @@ function tryParseAIResponse(content: string): {
   lore: StoryLore[];
   mechanicNotes: StoryLore[];
   customTables: CustomTable[];
-  variables: Variable[];
 } | null {
   try {
     // Try direct parse first
@@ -568,7 +557,6 @@ function processParserResult(parsed: any): {
   lore: StoryLore[];
   mechanicNotes: StoryLore[];
   customTables: CustomTable[];
-  variables: Variable[];
 } {
   // Process lore entries
   const lore: StoryLore[] = (parsed.lore || []).map(
@@ -626,47 +614,11 @@ function processParserResult(parsed: any): {
     })
   );
 
-  // Process variables
-  const variables: Variable[] = (parsed.variables || []).map(
-    (v: any, index: number) => {
-      const varType = v.type || "string";
-      const baseVar = {
-        id: `var-ocr-${Date.now()}-${index}`,
-        name: v.name || `Variable ${index + 1}`,
-        description: v.description || "",
-      };
-
-      if (varType === "number") {
-        return {
-          ...baseVar,
-          type: "number" as const,
-          value: typeof v.value === "number" ? v.value : 0,
-          minValue: v.minValue,
-          maxValue: v.maxValue,
-        };
-      } else if (varType === "boolean") {
-        return {
-          ...baseVar,
-          type: "boolean" as const,
-          value: v.value === true || v.value === "true",
-        };
-      } else {
-        return {
-          ...baseVar,
-          type: "string" as const,
-          value: String(v.value || ""),
-          options: v.options,
-        };
-      }
-    }
-  );
-
   return {
     summary: parsed.summary || "",
     lore,
     mechanicNotes,
     customTables,
-    variables,
   };
 }
 
@@ -675,14 +627,12 @@ function parseAIResponse(content: string): {
   lore: StoryLore[];
   mechanicNotes: StoryLore[];
   customTables: CustomTable[];
-  variables: Variable[];
 } {
   const defaultResult = {
     summary: "",
     lore: [],
     mechanicNotes: [],
     customTables: [],
-    variables: [],
   };
 
   try {

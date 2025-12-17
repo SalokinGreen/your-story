@@ -16,7 +16,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB
+const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
 const ALLOWED_TYPES = [
   "application/pdf",
   "image/png",
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
         {
           error: `File too large: ${(file.size / 1024 / 1024).toFixed(
             1
-          )}MB. Max: 50MB`,
+          )}MB. Max: 100MB`,
         },
         { status: 400 }
       );

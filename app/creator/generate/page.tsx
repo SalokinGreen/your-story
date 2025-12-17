@@ -3901,10 +3901,6 @@ ${result.description || ""}`;
                             ...(config.importedCustomTables || []),
                             ...(result.customTables || []),
                           ],
-                          importedVariables: [
-                            ...(config.importedVariables || []),
-                            ...(result.variables || []),
-                          ],
                         });
 
                         // Also append a summary to the prompt for AI context
@@ -3964,8 +3960,7 @@ ${result.description || ""}`;
                     {/* Show imported content counts */}
                     {(config.importedLore?.length || 0) +
                       (config.importedMechanicsNotes?.length || 0) +
-                      (config.importedCustomTables?.length || 0) +
-                      (config.importedVariables?.length || 0) >
+                      (config.importedCustomTables?.length || 0) >
                       0 && (
                       <div className="mt-2 text-xs text-green-400 flex flex-col items-center gap-1">
                         <div className="flex items-center gap-2 flex-wrap justify-center">
@@ -3983,11 +3978,6 @@ ${result.description || ""}`;
                               {config.importedCustomTables?.length} tables
                             </span>
                           )}
-                          {(config.importedVariables?.length || 0) > 0 && (
-                            <span>
-                              {config.importedVariables?.length} variables
-                            </span>
-                          )}
                         </div>
                         <button
                           onClick={() => {
@@ -3995,7 +3985,6 @@ ${result.description || ""}`;
                               importedLore: [],
                               importedMechanicsNotes: [],
                               importedCustomTables: [],
-                              importedVariables: [],
                             });
                             addNotification(
                               "Cleared all imported content",

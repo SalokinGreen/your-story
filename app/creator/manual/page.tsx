@@ -6030,14 +6030,6 @@ ${description || ""}`;
                     "success"
                   );
                 }
-                // Merge variables
-                if (data.variables.length > 0) {
-                  setVariables((prev) => [...prev, ...data.variables]);
-                  addNotification(
-                    `Added ${data.variables.length} variables from PDF`,
-                    "success"
-                  );
-                }
               }}
               buttonText="Import Notes from PDF"
             />
