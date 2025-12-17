@@ -205,6 +205,7 @@ export interface StoryLore {
   on?: boolean;
   lastTriggeredIndex?: number; // Track when lore was last triggered for auto-expiry
   embedded?: boolean; // True if content has been embedded for semantic search
+  pinned?: boolean; // User-pinned notes appear at top of list
   // Author/creator-only organization fields (not visible during gameplay)
   tags?: string[]; // Tags for filtering/categorization in creator UI
   folder?: string; // Folder name for grouping in creator UI

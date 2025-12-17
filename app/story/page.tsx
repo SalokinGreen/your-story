@@ -6770,11 +6770,6 @@ function StoryPageContent() {
           <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-1">
             {[
               { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
-              {
-                state: StoryState.STATS,
-                icon: "UserCheck",
-                label: "Character",
-              },
               { state: StoryState.LORE, icon: "Scroll", label: "Notes" },
               { state: StoryState.NPCS, icon: "Users", label: "NPCs" },
               { state: StoryState.QUESTS, icon: "Target", label: "Quests" },

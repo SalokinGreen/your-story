@@ -145,9 +145,21 @@ export default function LorePage(props: LorePageProps) {
     setSelectedLore(note);
   };
 
+  // Toggle pin status for a note
+  const handleTogglePin = (loreItem: StoryLore) => {
+    if (!onUpdateLore) return;
+    const updatedLore = storyData.lore.map((l) =>
+      l.title === loreItem.title ? { ...l, pinned: !l.pinned } : l
+    );
+    onUpdateLore(updatedLore);
+    if (selectedLore?.title === loreItem.title) {
+      setSelectedLore({ ...loreItem, pinned: !loreItem.pinned });
+    }
+  };
+
   // Filter lore based on search term and type
   const filteredLore = useMemo(() => {
-    return storyData.lore.filter((loreItem) => {
+    const filtered = storyData.lore.filter((loreItem) => {
       // Type filter
       if (selectedType === "secrets") {
         if (!loreItem.secrtet) return false;
@@ -173,6 +185,12 @@ export default function LorePage(props: LorePageProps) {
           loc.toLowerCase().includes(term)
         )
       );
+    });
+    // Sort: pinned notes first, then alphabetically
+    return filtered.sort((a, b) => {
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
+      return a.title.localeCompare(b.title);
     });
   }, [storyData.lore, selectedType, searchTerm]);
 
@@ -439,15 +457,11 @@ export default function LorePage(props: LorePageProps) {
               const isSecret = loreItem.secrtet;
               const isSelected = selectedLore?.title === loreItem.title;
               const isInactive = loreItem.on === false;
+              const isPinned = loreItem.pinned;
 
               return (
-                <button
+                <div
                   key={index}
-                  onClick={() => {
-                    setSelectedLore(loreItem);
-                    setIsEditing(false);
-                    setShowImageGen(false);
-                  }}
                   className={`w-full text-left p-2 rounded-lg border transition-all group ${
                     isSelected
                       ? isSecret
@@ -456,9 +470,18 @@ export default function LorePage(props: LorePageProps) {
                       : isSecret
                       ? "border-amber-800/30 hover:border-amber-600/40 hover:bg-amber-500/5"
                       : "border-blue-800/20 hover:border-blue-600/40 hover:bg-blue-500/5"
-                  } ${isInactive ? "opacity-50" : ""}`}
+                  } ${isInactive ? "opacity-50" : ""} ${
+                    isPinned ? "ring-1 ring-yellow-500/30" : ""
+                  }`}
                 >
-                  <div className="flex items-center gap-2">
+                  <div
+                    className="flex items-center gap-2 cursor-pointer"
+                    onClick={() => {
+                      setSelectedLore(loreItem);
+                      setIsEditing(false);
+                      setShowImageGen(false);
+                    }}
+                  >
                     {loreItem.thumbnailUrl ? (
                       <img
                         src={loreItem.thumbnailUrl}
@@ -489,7 +512,13 @@ export default function LorePage(props: LorePageProps) {
                     )}
 
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-sm text-white truncate">
+                      <h4 className="font-medium text-sm text-white truncate flex items-center gap-1.5">
+                        {isPinned && (
+                          <DynamicIcon
+                            name="Pin"
+                            className="w-3 h-3 text-yellow-400 shrink-0"
+                          />
+                        )}
                         {loreItem.title}
                       </h4>
                     </div>
@@ -510,7 +539,24 @@ export default function LorePage(props: LorePageProps) {
                       </span>
                     )}
                   </div>
-                </button>
+                  {/* Pin button */}
+                  {onUpdateLore && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleTogglePin(loreItem);
+                      }}
+                      className={`mt-1 p-1 rounded transition-colors ${
+                        isPinned
+                          ? "text-yellow-400 hover:bg-yellow-500/20"
+                          : "text-blue-400/40 hover:text-blue-300 hover:bg-blue-500/10 opacity-0 group-hover:opacity-100"
+                      }`}
+                      title={isPinned ? "Unpin note" : "Pin note to top"}
+                    >
+                      <DynamicIcon name="Pin" className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               );
             })}
           </div>
