@@ -1135,6 +1135,15 @@ export async function generateStoryTurn(
             // We just need to mark completion and add context parts for backward compat.
             const content = gmResult.content || "";
 
+            // IMPORTANT: Add the final assistant response to conversation history
+            // even without tool calls, so it gets saved in gmConversation
+            if (content.trim()) {
+              conversationHistory.push({
+                role: "assistant",
+                content: content,
+              });
+            }
+
             // Check for repetition (AI stuck in a loop)
             const isRepetitive = detectRepetition(content);
 
