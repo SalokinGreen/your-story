@@ -6,14 +6,21 @@ import { deductTokens, hasEnoughTokens } from "@/app/misc/tokens";
 // Allow up to 2 minutes for OCR processing of large PDFs
 export const maxDuration = 120;
 
+// Allow large payloads for base64 PDF uploads (up to 50MB)
+// Note: This works in Vercel. For development, Next.js has no built-in body limit.
+export const dynamic = "force-dynamic";
+
 /**
  * POST /api/ocr/process
  *
  * Calls Mistral OCR API to extract text from a PDF
  *
  * Request: {
- *   signedUrl: string,  // Supabase signed URL to the PDF
- *   pages?: number[],   // Optional: specific pages to process (0-indexed)
+ *   signedUrl?: string,  // Supabase signed URL to the PDF
+ *   base64Data?: string, // Base64 encoded file data (fallback)
+ *   fileName?: string,   // Original file name (for base64 mode)
+ *   mimeType?: string,   // MIME type (for base64 mode)
+ *   pages?: number[],    // Optional: specific pages to process (0-indexed)
  *   includeImages?: boolean
  * }
  *
@@ -61,26 +68,52 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { signedUrl, pages, includeImages = false } = body;
+    const {
+      signedUrl,
+      base64Data,
+      fileName,
+      mimeType,
+      pages,
+      includeImages = false,
+    } = body;
 
-    if (!signedUrl) {
+    if (!signedUrl && !base64Data) {
       return NextResponse.json(
-        { error: "signedUrl is required" },
+        { error: "Either signedUrl or base64Data is required" },
         { status: 400 }
       );
     }
 
     // Determine if this is a PDF or image
-    const isPDF = signedUrl.includes(".pdf");
+    let isPDF: boolean;
+    if (signedUrl) {
+      isPDF = signedUrl.includes(".pdf");
+    } else {
+      isPDF =
+        mimeType === "application/pdf" ||
+        fileName?.toLowerCase().endsWith(".pdf");
+    }
 
     // Build OCR request
-    const ocrRequest: any = {
+    let ocrRequest: any = {
       model: "mistral-ocr-latest",
-      document: isPDF
-        ? { type: "document_url", document_url: signedUrl }
-        : { type: "image_url", image_url: signedUrl },
       include_image_base64: includeImages,
     };
+
+    if (signedUrl) {
+      // URL-based document
+      ocrRequest.document = isPDF
+        ? { type: "document_url", document_url: signedUrl }
+        : { type: "image_url", image_url: signedUrl };
+    } else {
+      // Base64-based document
+      const dataUrl = `data:${
+        mimeType || "application/pdf"
+      };base64,${base64Data}`;
+      ocrRequest.document = isPDF
+        ? { type: "document_url", document_url: dataUrl }
+        : { type: "image_url", image_url: dataUrl };
+    }
 
     // Add specific pages if requested (only for PDFs)
     if (isPDF && pages && pages.length > 0) {

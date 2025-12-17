@@ -1476,16 +1476,14 @@ export function buildStoryPrompt({
   // Include GM state changes from previous turns so the AI knows what happened
   const historyMessages: ChatMessage[] = [];
 
-  // Count assistant (story) messages to determine which get [STOP] appended
-  // We append [STOP] to the last 5 story messages to train the model on stopping
-  // We also attach GM reasoning to the last 5 user messages to show the pattern
+  // We attach GM reasoning to the last 5 user messages to show the pattern
   const assistantIndices: number[] = [];
   for (let i = 0; i < storyData.scene.parts.length; i++) {
     if (!storyData.scene.parts[i].user) {
       assistantIndices.push(i);
     }
   }
-  const stopThreshold =
+  const gmReasoningThreshold =
     assistantIndices.length > 5
       ? assistantIndices[assistantIndices.length - 5]
       : 0;
@@ -1567,7 +1565,7 @@ export function buildStoryPrompt({
 
       // Find the next assistant part to get its GM reasoning
       const nextPart = partsToProcess[i + 1];
-      if (nextPart && !nextPart.user && i >= stopThreshold - 1) {
+      if (nextPart && !nextPart.user && i >= gmReasoningThreshold - 1) {
         const gmReasoning = formatGMReasoning(nextPart);
         if (gmReasoning) {
           userContent = `${userContent}\n\n${gmReasoning}`;
@@ -1582,10 +1580,10 @@ export function buildStoryPrompt({
       // For story generation, include the narrative content
       let assistantContent = part.raw || part.content;
 
-      // Append [STOP] to last 5 assistant messages to train the model on stopping
-      // Use original scene.parts indices for threshold check
-      const originalIndex = storyData.scene.parts.indexOf(part);
-      if (originalIndex >= stopThreshold) {
+      // Append [STOP] to every assistant message that doesn't have tool calls
+      // This trains the model to end generations properly
+      const hasToolCalls = part.toolCalls && part.toolCalls.length > 0;
+      if (!hasToolCalls) {
         assistantContent = assistantContent + "\n[STOP]";
       }
 

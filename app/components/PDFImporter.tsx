@@ -14,6 +14,77 @@ import {
 } from "@/app/misc/ocr";
 import { StoryLore, CustomTable } from "@/app/misc/structs";
 import { AI_MODELS } from "@/app/misc/ai_prices";
+import { PDFDocument } from "pdf-lib";
+
+// Maximum size per PDF chunk for Mistral OCR (in MB)
+const MAX_CHUNK_SIZE_MB = 4;
+// Pages per chunk (approximate, will be adjusted based on actual size)
+const PAGES_PER_CHUNK = 15;
+
+/**
+ * Split a large PDF into smaller chunks using pdf-lib
+ * Returns an array of base64-encoded PDF chunks
+ */
+async function splitPDFIntoChunks(
+  file: File,
+  onProgress?: (message: string) => void
+): Promise<{ base64: string; pageStart: number; pageEnd: number }[]> {
+  onProgress?.("Loading PDF for splitting...");
+
+  const arrayBuffer = await file.arrayBuffer();
+  const pdfDoc = await PDFDocument.load(arrayBuffer);
+  const totalPages = pdfDoc.getPageCount();
+
+  const chunks: { base64: string; pageStart: number; pageEnd: number }[] = [];
+
+  // Calculate how many pages per chunk based on file size
+  const avgPageSize = file.size / totalPages;
+  const targetChunkSize = MAX_CHUNK_SIZE_MB * 1024 * 1024;
+  const pagesPerChunk = Math.max(
+    5,
+    Math.min(PAGES_PER_CHUNK, Math.floor(targetChunkSize / avgPageSize))
+  );
+
+  const totalChunks = Math.ceil(totalPages / pagesPerChunk);
+
+  for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+    const startPage = chunkIndex * pagesPerChunk;
+    const endPage = Math.min(startPage + pagesPerChunk - 1, totalPages - 1);
+
+    onProgress?.(
+      `Splitting chunk ${chunkIndex + 1}/${totalChunks} (pages ${
+        startPage + 1
+      }-${endPage + 1})...`
+    );
+
+    // Create a new PDF with just the pages for this chunk
+    const chunkDoc = await PDFDocument.create();
+    const pageIndicesToCopy = Array.from(
+      { length: endPage - startPage + 1 },
+      (_, i) => startPage + i
+    );
+
+    const copiedPages = await chunkDoc.copyPages(pdfDoc, pageIndicesToCopy);
+    copiedPages.forEach((page) => chunkDoc.addPage(page));
+
+    // Convert to base64
+    const chunkBytes = await chunkDoc.save();
+    const base64 = btoa(
+      new Uint8Array(chunkBytes).reduce(
+        (data, byte) => data + String.fromCharCode(byte),
+        ""
+      )
+    );
+
+    chunks.push({
+      base64,
+      pageStart: startPage + 1, // 1-indexed for display
+      pageEnd: endPage + 1,
+    });
+  }
+
+  return chunks;
+}
 
 // Saved import data structure
 interface SavedPDFImport {
@@ -69,8 +140,7 @@ type ProcessingStep =
   | "idle"
   | "uploading"
   | "ocr"
-  | "summarizing-lore"
-  | "summarizing-mechanics"
+  | "summarizing"
   | "complete"
   | "error";
 
@@ -512,157 +582,292 @@ export default function PDFImporter({
         const fileProgressEnd = ((i + 1) / totalFiles) * 100;
         const fileProgressRange = fileProgressEnd - fileProgressStart;
 
-        // Step 1: Upload to Supabase
-        setStep("uploading");
-        setProgress(fileProgressStart + fileProgressRange * 0.1);
-        setStatusMessage(`Uploading ${file.name} (${i + 1}/${totalFiles})...`);
+        // Check file size to determine processing strategy
+        const fileSizeMB = file.size / (1024 * 1024);
+        const isPDF =
+          file.type === "application/pdf" ||
+          file.name.toLowerCase().endsWith(".pdf");
 
-        const formData = new FormData();
-        formData.append("file", file);
+        // For large PDFs, we'll split into chunks
+        const needsChunking = isPDF && fileSizeMB > MAX_CHUNK_SIZE_MB;
 
-        const uploadResponse = await fetch("/api/ocr/upload", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${token}` },
-          body: formData,
-        });
+        let combinedMarkdown = "";
+        let combinedTotalPages = 0;
+        let combinedCost = 0;
+        
+        // For chunked processing, we summarize each chunk and merge results
+        let chunkLore: StoryLore[] = [];
+        let chunkMechanics: StoryLore[] = [];
+        let chunkTables: CustomTable[] = [];
 
-        if (!uploadResponse.ok) {
-          let errorMsg = "Upload failed";
-          try {
-            const error = await uploadResponse.json();
-            errorMsg = error.error || errorMsg;
-          } catch {
-            errorMsg = (await uploadResponse.text()) || errorMsg;
+        if (needsChunking) {
+          // Large PDF: Split into chunks, OCR each, then summarize each
+          setStep("uploading");
+          setStatusMessage(`Splitting ${file.name} into chunks...`);
+          setProgress(fileProgressStart + fileProgressRange * 0.05);
+
+          const chunks = await splitPDFIntoChunks(file, (msg) =>
+            setStatusMessage(msg)
+          );
+          
+          const totalChunks = chunks.length;
+
+          for (let chunkIdx = 0; chunkIdx < totalChunks; chunkIdx++) {
+            const chunk = chunks[chunkIdx];
+            // Progress: 5% for splitting, 85% for processing chunks (OCR + summarize), 10% for finalization
+            const chunkProgressStart = 0.05 + (chunkIdx / totalChunks) * 0.85;
+            const chunkProgressEnd = 0.05 + ((chunkIdx + 1) / totalChunks) * 0.85;
+
+            // OCR step for this chunk
+            setStep("ocr");
+            setStatusMessage(
+              `OCR: pages ${chunk.pageStart}-${chunk.pageEnd} (chunk ${
+                chunkIdx + 1
+              }/${totalChunks})...`
+            );
+            setProgress(fileProgressStart + fileProgressRange * chunkProgressStart);
+
+            const ocrResponse = await fetch("/api/ocr/process", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                base64Data: chunk.base64,
+                fileName: `${file.name}_pages_${chunk.pageStart}-${chunk.pageEnd}.pdf`,
+                mimeType: "application/pdf",
+                includeImages: false,
+              }),
+            });
+
+            if (!ocrResponse.ok) {
+              let errorMsg = "OCR processing failed";
+              try {
+                const error = await ocrResponse.json();
+                errorMsg = error.error || errorMsg;
+              } catch {
+                errorMsg = (await ocrResponse.text()) || errorMsg;
+              }
+              throw new Error(
+                `${file.name} (chunk ${chunkIdx + 1}): ${errorMsg}`
+              );
+            }
+
+            const chunkResult: OCRProcessResult & { cost: number } =
+              await ocrResponse.json();
+
+            combinedMarkdown +=
+              (combinedMarkdown ? "\n\n---\n\n" : "") +
+              `<!-- Pages ${chunk.pageStart}-${chunk.pageEnd} -->\n${chunkResult.markdown}`;
+            combinedTotalPages += chunkResult.totalPages;
+            combinedCost += chunkResult.cost;
+            
+            // Summarize this chunk immediately to avoid huge payloads
+            setStep("summarizing");
+            setStatusMessage(
+              `Extracting notes from pages ${chunk.pageStart}-${chunk.pageEnd} (chunk ${
+                chunkIdx + 1
+              }/${totalChunks})...`
+            );
+            setProgress(
+              fileProgressStart + 
+              fileProgressRange * (chunkProgressStart + (chunkProgressEnd - chunkProgressStart) * 0.5)
+            );
+            
+            const summarizeResponse = await fetch("/api/ocr/summarize", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({
+                markdown: chunkResult.markdown,
+                focus: ["all"],
+                customInstructions: customInstructions + 
+                  `\n\nNote: This is pages ${chunk.pageStart}-${chunk.pageEnd} of a larger document.`,
+                model:
+                  aiModel === "custom-openrouter" ? customOpenRouterModel : aiModel,
+                maxTokens: maxOutputTokens,
+                openRouterKey: keys.openRouterKey,
+                deepseekKey: keys.deepseekKey,
+              }),
+            });
+
+            if (!summarizeResponse.ok) {
+              let errorMsg = "Note extraction failed";
+              try {
+                const error = await summarizeResponse.json();
+                errorMsg = error.error || errorMsg;
+              } catch {
+                errorMsg = (await summarizeResponse.text()) || errorMsg;
+              }
+              // Don't fail the whole import if one chunk summarization fails
+              console.error(`Chunk ${chunkIdx + 1} summarization failed:`, errorMsg);
+              continue;
+            }
+
+            const summarizeResult = await summarizeResponse.json();
+            chunkLore.push(...(summarizeResult.lore || []));
+            chunkMechanics.push(...(summarizeResult.mechanicNotes || []));
+            chunkTables.push(...(summarizeResult.customTables || []));
+            
+            setProgress(fileProgressStart + fileProgressRange * chunkProgressEnd);
           }
-          throw new Error(`${file.name}: ${errorMsg}`);
-        }
+          
+          // Add chunk results to totals
+          allLore.push(...chunkLore);
+          allMechanicNotes.push(...chunkMechanics);
+          allCustomTables.push(...chunkTables);
+          
+          setExtractedMarkdown((prev) => prev + "\n\n---\n\n" + combinedMarkdown);
+          totalPagesProcessed += combinedTotalPages;
+          totalCost += combinedCost;
+          setProgress(fileProgressEnd);
+          
+        } else {
+          // Small file or non-PDF: Use original single-request approach
+          setStep("uploading");
+          setProgress(fileProgressStart + fileProgressRange * 0.1);
+          setStatusMessage(
+            `Uploading ${file.name} (${i + 1}/${totalFiles})...`
+          );
 
-        const uploadResult = await uploadResponse.json();
-        uploadedFilePaths.push(uploadResult.filePath);
-        setProgress(fileProgressStart + fileProgressRange * 0.2);
+          let ocrPayload: {
+            signedUrl?: string;
+            base64Data?: string;
+            fileName?: string;
+            mimeType?: string;
+          } = {};
+          let filePath: string | null = null;
 
-        // Step 2: OCR Processing
-        setStep("ocr");
-        setStatusMessage(
-          `Extracting text from ${file.name} (${i + 1}/${totalFiles})...`
-        );
+          // Try Supabase upload first
+          const formData = new FormData();
+          formData.append("file", file);
 
-        const ocrResponse = await fetch("/api/ocr/process", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            signedUrl: uploadResult.signedUrl,
-            includeImages: false,
-          }),
-        });
+          const uploadResponse = await fetch("/api/ocr/upload", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${token}` },
+            body: formData,
+          });
 
-        if (!ocrResponse.ok) {
-          let errorMsg = "OCR processing failed";
-          try {
-            const error = await ocrResponse.json();
-            errorMsg = error.error || errorMsg;
-          } catch {
-            errorMsg = (await ocrResponse.text()) || errorMsg;
+          if (uploadResponse.ok) {
+            const uploadResult = await uploadResponse.json();
+            filePath = uploadResult.filePath;
+            if (filePath) {
+              uploadedFilePaths.push(filePath);
+            }
+            ocrPayload = { signedUrl: uploadResult.signedUrl };
+          } else {
+            // Fallback to base64 encoding for smaller files
+            console.log(
+              `Supabase upload failed for ${file.name}, falling back to base64`
+            );
+            setStatusMessage(
+              `Converting ${file.name} to base64 (${i + 1}/${totalFiles})...`
+            );
+
+            const arrayBuffer = await file.arrayBuffer();
+            const base64 = btoa(
+              new Uint8Array(arrayBuffer).reduce(
+                (data, byte) => data + String.fromCharCode(byte),
+                ""
+              )
+            );
+
+            ocrPayload = {
+              base64Data: base64,
+              fileName: file.name,
+              mimeType: file.type,
+            };
           }
-          throw new Error(`${file.name}: ${errorMsg}`);
-        }
+          setProgress(fileProgressStart + fileProgressRange * 0.2);
 
-        const ocrResult: OCRProcessResult & { cost: number } =
-          await ocrResponse.json();
-        setExtractedMarkdown(
-          (prev) => prev + "\n\n---\n\n" + ocrResult.markdown
-        );
-        totalPagesProcessed += ocrResult.totalPages;
-        totalCost += ocrResult.cost;
-        setProgress(fileProgressStart + fileProgressRange * 0.4);
+          // OCR Processing
+          setStep("ocr");
+          setStatusMessage(
+            `Extracting text from ${file.name} (${i + 1}/${totalFiles})...`
+          );
 
-        // Step 3: AI Summarization - Lore & World Building
-        setStep("summarizing-lore");
-        setStatusMessage(
-          `Extracting lore from ${file.name} (${i + 1}/${totalFiles})...`
-        );
+          const ocrResponse = await fetch("/api/ocr/process", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              ...ocrPayload,
+              includeImages: false,
+            }),
+          });
 
-        const loreResponse = await fetch("/api/ocr/summarize", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            markdown: ocrResult.markdown,
-            focus: ["lore", "characters", "tables"],
-            customInstructions,
-            model:
-              aiModel === "custom-openrouter" ? customOpenRouterModel : aiModel,
-            maxTokens: maxOutputTokens,
-            openRouterKey: keys.openRouterKey,
-            deepseekKey: keys.deepseekKey,
-          }),
-        });
-
-        if (!loreResponse.ok) {
-          let errorMsg = "Lore extraction failed";
-          try {
-            const error = await loreResponse.json();
-            errorMsg = error.error || errorMsg;
-          } catch {
-            errorMsg = (await loreResponse.text()) || errorMsg;
+          if (!ocrResponse.ok) {
+            let errorMsg = "OCR processing failed";
+            try {
+              const error = await ocrResponse.json();
+              errorMsg = error.error || errorMsg;
+            } catch {
+              errorMsg = (await ocrResponse.text()) || errorMsg;
+            }
+            throw new Error(`${file.name}: ${errorMsg}`);
           }
-          throw new Error(`${file.name}: ${errorMsg}`);
-        }
 
-        const loreResult = await loreResponse.json();
-        allLore.push(...(loreResult.lore || []));
-        allCustomTables.push(...(loreResult.customTables || []));
-        setProgress(fileProgressStart + fileProgressRange * 0.7);
+          const ocrResult: OCRProcessResult & { cost: number } =
+            await ocrResponse.json();
 
-        // Step 4: AI Summarization - Game Mechanics
-        setStep("summarizing-mechanics");
-        setStatusMessage(
-          `Extracting mechanics from ${file.name} (${i + 1}/${totalFiles})...`
-        );
+          combinedMarkdown = ocrResult.markdown;
+          combinedTotalPages = ocrResult.totalPages;
+          combinedCost = ocrResult.cost;
+          
+          setExtractedMarkdown((prev) => prev + "\n\n---\n\n" + combinedMarkdown);
+          totalPagesProcessed += combinedTotalPages;
+          totalCost += combinedCost;
+          setProgress(fileProgressStart + fileProgressRange * 0.4);
 
-        const mechanicsResponse = await fetch("/api/ocr/summarize", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            markdown: ocrResult.markdown,
-            focus: ["mechanics"],
-            customInstructions:
-              customInstructions +
-              "\nFocus specifically on game rules, combat mechanics, skill systems, special abilities, and numerical systems.",
-            model:
-              aiModel === "custom-openrouter" ? customOpenRouterModel : aiModel,
-            maxTokens: maxOutputTokens,
-            openRouterKey: keys.openRouterKey,
-            deepseekKey: keys.deepseekKey,
-          }),
-        });
+          // Step 3: AI Summarization - Extract all notes (only for non-chunked files)
+          setStep("summarizing");
+          setStatusMessage(
+            `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`
+          );
 
-        if (!mechanicsResponse.ok) {
-          let errorMsg = "Mechanics extraction failed";
-          try {
-            const error = await mechanicsResponse.json();
-            errorMsg = error.error || errorMsg;
-          } catch {
-            errorMsg = (await mechanicsResponse.text()) || errorMsg;
+          const summarizeResponse = await fetch("/api/ocr/summarize", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              markdown: combinedMarkdown,
+              focus: ["all"],
+              customInstructions,
+              model:
+                aiModel === "custom-openrouter" ? customOpenRouterModel : aiModel,
+              maxTokens: maxOutputTokens,
+              openRouterKey: keys.openRouterKey,
+              deepseekKey: keys.deepseekKey,
+            }),
+          });
+
+          if (!summarizeResponse.ok) {
+            let errorMsg = "Note extraction failed";
+            try {
+              const error = await summarizeResponse.json();
+              errorMsg = error.error || errorMsg;
+            } catch {
+              errorMsg = (await summarizeResponse.text()) || errorMsg;
+            }
+            throw new Error(`${file.name}: ${errorMsg}`);
           }
-          throw new Error(`${file.name}: ${errorMsg}`);
-        }
 
-        const mechanicsResult = await mechanicsResponse.json();
-        allMechanicNotes.push(...(mechanicsResult.mechanicNotes || []));
-        allCustomTables.push(...(mechanicsResult.customTables || []));
-        setProgress(fileProgressEnd);
+          const summarizeResult = await summarizeResponse.json();
+          allLore.push(...(summarizeResult.lore || []));
+          allMechanicNotes.push(...(summarizeResult.mechanicNotes || []));
+          allCustomTables.push(...(summarizeResult.customTables || []));
+          setProgress(fileProgressEnd);
+        }
       }
 
-      // Step 5: Complete
+      // Step 4: Complete
       setStep("complete");
       setStatusMessage("Import complete!");
       setProgress(100);
@@ -748,10 +953,8 @@ export default function PDFImporter({
         return "Upload";
       case "ocr":
         return "ScanText";
-      case "summarizing-lore":
+      case "summarizing":
         return "BookOpen";
-      case "summarizing-mechanics":
-        return "Cog";
       case "complete":
         return "CheckCircle";
       case "error":
@@ -853,12 +1056,9 @@ export default function PDFImporter({
                     </div>
                     <div className="flex-1">
                       <p className="font-medium text-white">
-                        {step === "uploading" && "Step 1/4: Uploading"}
-                        {step === "ocr" && "Step 2/4: Text Extraction"}
-                        {step === "summarizing-lore" &&
-                          "Step 3/4: Lore Analysis"}
-                        {step === "summarizing-mechanics" &&
-                          "Step 4/4: Mechanics Analysis"}
+                        {step === "uploading" && "Step 1/3: Uploading"}
+                        {step === "ocr" && "Step 2/3: Text Extraction"}
+                        {step === "summarizing" && "Step 3/3: Creating Notes"}
                         {step === "complete" && "✓ Import Complete"}
                       </p>
                       <p className="text-sm text-blue-300/70 mt-0.5">
@@ -871,10 +1071,8 @@ export default function PDFImporter({
                           `Running OCR on ${pageCount} page${
                             pageCount !== 1 ? "s" : ""
                           }...`}
-                        {step === "summarizing-lore" &&
-                          "AI is extracting world-building, characters, locations..."}
-                        {step === "summarizing-mechanics" &&
-                          "AI is extracting rules, abilities, tables..."}
+                        {step === "summarizing" &&
+                          "AI is creating lore, mechanics, and character sheet notes..."}
                         {step === "complete" &&
                           "Ready to use your imported content!"}
                       </p>
@@ -894,8 +1092,7 @@ export default function PDFImporter({
                   <div className="flex justify-between text-xs text-blue-300/40 mt-1">
                     <span>Upload</span>
                     <span>OCR</span>
-                    <span>Lore</span>
-                    <span>Mechanics</span>
+                    <span>Notes</span>
                   </div>
                 </div>
               )}

@@ -250,7 +250,7 @@ OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields
     {
       "title": "Entry title",
       "content": "Detailed content (2-4 paragraphs)",
-      "type": null,  // null for normal lore, "mechanics" for rules
+      "type": null,  // "lore" (default) = world-building, "mechanics" = rules/systems, "character_sheet" = player character info
       "folder": "Category folder (Characters, Locations, Items, Factions, History, etc.)",
       "tags": ["tag1", "tag2"],
       "secrtet": false  // true if this is secret/hidden information
@@ -275,6 +275,11 @@ OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields
   ]
 }
 
+NOTE TYPES:
+- type: null or "lore" (default) - World-building, NPCs, locations, factions, history. Normal priority.
+- type: "mechanics" - Game rules, dice systems, combat rules, skill checks. Second priority in AI context.
+- type: "character_sheet" - Player character sheet info (their stats, class, race, background, equipment). Highest priority - always at top of AI context.
+
 GUIDELINES:
 ${
   focusAll || focus.includes("lore")
@@ -284,6 +289,11 @@ ${
 ${
   focusAll || focus.includes("mechanics")
     ? '- Extract ALL MECHANICS: Game rules, special abilities, combat rules, skill systems, magic systems. Mark these with type: "mechanics".'
+    : ""
+}
+${
+  focusAll || focus.includes("character_sheet")
+    ? '- Extract PLAYER CHARACTER SHEET info: If the document contains a filled-out character sheet (stats, class, race, background, inventory), extract it with type: "character_sheet".'
     : ""
 }
 ${
