@@ -231,7 +231,7 @@ export default function PDFImporter({
       params.set("limit", "20");
 
       const response = await fetch(`/api/book-imports?${params}`);
-      
+
       // Handle non-JSON responses (e.g., if table doesn't exist yet)
       if (!response.ok) {
         const text = await response.text();
@@ -242,7 +242,7 @@ export default function PDFImporter({
         }
         return;
       }
-      
+
       const data = await response.json();
 
       if (data.error) {
@@ -354,7 +354,10 @@ export default function PDFImporter({
       if (!response.ok) {
         const text = await response.text();
         console.error("Share import error:", response.status, text);
-        addNotification("Failed to share import. Make sure you're signed in.", "failure");
+        addNotification(
+          "Failed to share import. Make sure you're signed in.",
+          "failure"
+        );
         return;
       }
 
@@ -529,7 +532,7 @@ export default function PDFImporter({
             const error = await uploadResponse.json();
             errorMsg = error.error || errorMsg;
           } catch {
-            errorMsg = await uploadResponse.text() || errorMsg;
+            errorMsg = (await uploadResponse.text()) || errorMsg;
           }
           throw new Error(`${file.name}: ${errorMsg}`);
         }
@@ -562,7 +565,7 @@ export default function PDFImporter({
             const error = await ocrResponse.json();
             errorMsg = error.error || errorMsg;
           } catch {
-            errorMsg = await ocrResponse.text() || errorMsg;
+            errorMsg = (await ocrResponse.text()) || errorMsg;
           }
           throw new Error(`${file.name}: ${errorMsg}`);
         }
@@ -606,7 +609,7 @@ export default function PDFImporter({
             const error = await loreResponse.json();
             errorMsg = error.error || errorMsg;
           } catch {
-            errorMsg = await loreResponse.text() || errorMsg;
+            errorMsg = (await loreResponse.text()) || errorMsg;
           }
           throw new Error(`${file.name}: ${errorMsg}`);
         }
@@ -648,7 +651,7 @@ export default function PDFImporter({
             const error = await mechanicsResponse.json();
             errorMsg = error.error || errorMsg;
           } catch {
-            errorMsg = await mechanicsResponse.text() || errorMsg;
+            errorMsg = (await mechanicsResponse.text()) || errorMsg;
           }
           throw new Error(`${file.name}: ${errorMsg}`);
         }
@@ -852,8 +855,10 @@ export default function PDFImporter({
                       <p className="font-medium text-white">
                         {step === "uploading" && "Step 1/4: Uploading"}
                         {step === "ocr" && "Step 2/4: Text Extraction"}
-                        {step === "summarizing-lore" && "Step 3/4: Lore Analysis"}
-                        {step === "summarizing-mechanics" && "Step 4/4: Mechanics Analysis"}
+                        {step === "summarizing-lore" &&
+                          "Step 3/4: Lore Analysis"}
+                        {step === "summarizing-mechanics" &&
+                          "Step 4/4: Mechanics Analysis"}
                         {step === "complete" && "✓ Import Complete"}
                       </p>
                       <p className="text-sm text-blue-300/70 mt-0.5">
@@ -862,13 +867,16 @@ export default function PDFImporter({
                       <p className="text-xs text-blue-300/50 mt-1">
                         {step === "uploading" &&
                           "Uploading your PDF to secure storage..."}
-                        {step === "ocr" && 
-                          `Running OCR on ${pageCount} page${pageCount !== 1 ? "s" : ""}...`}
+                        {step === "ocr" &&
+                          `Running OCR on ${pageCount} page${
+                            pageCount !== 1 ? "s" : ""
+                          }...`}
                         {step === "summarizing-lore" &&
                           "AI is extracting world-building, characters, locations..."}
                         {step === "summarizing-mechanics" &&
                           "AI is extracting rules, abilities, tables..."}
-                        {step === "complete" && "Ready to use your imported content!"}
+                        {step === "complete" &&
+                          "Ready to use your imported content!"}
                       </p>
                     </div>
                     <div className="text-right">

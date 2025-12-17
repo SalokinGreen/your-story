@@ -102,12 +102,21 @@ function stripThinkingTags(content: string): string {
   if (!content) return "";
   // Remove all <thinking>...</thinking> blocks (including multiline)
   // Handle spaces inside tags like < thinking > that some models output
+  // Also handle malformed tags like <thinking::label] ... </thinking> or <thinking:label>
   // Also remove **[STORY OUTPUT]** marker and [GAME MASTER] that GM might add
   // Also remove GM reasoning blocks that aren't in thinking tags (common AI mistake)
   // Also remove tool call echoes that some models output (→ function_name({...}))
   return (
     content
+      // Standard thinking tags: <thinking>...</thinking>
       .replace(/<\s*thinking\s*>[\s\S]*?<\s*\/\s*thinking\s*>/gi, "")
+      // Malformed thinking tags with labels: <thinking::label] ... </thinking> or <thinking:label>
+      .replace(
+        /<\s*thinking\s*:+[^\]>]*[\]>][\s\S]*?<\s*\/\s*thinking\s*>/gi,
+        ""
+      )
+      // Tags that might only have opening malformed tag without closing: <thinking::label]...(till next tag or end)
+      .replace(/<\s*thinking\s*:+[^\]>]*[\]>][\s\S]*?(?=<\s*thinking|$)/gi, "")
       .replace(/^\s*\*?\*?\[STORY OUTPUT\]\*?\*?\s*\n?/i, "")
       .replace(/^\s*\[GAME MASTER\]\s*\n?/i, "")
       .replace(/^\s*\[GM\]\s*\n?/i, "")
@@ -146,12 +155,25 @@ function stripThinkingTags(content: string): string {
  * Extract <thinking>...</thinking> content from a string
  * Returns array of thinking blocks found
  * Handles spaces inside tags like < thinking > that some models output
+ * Also handles malformed tags like <thinking::label] ... </thinking>
  */
 function extractThinkingTags(content: string): string[] {
   if (!content) return [];
-  const matches =
+  // Match standard thinking tags
+  const standardMatches =
     content.match(/<\s*thinking\s*>[\s\S]*?<\s*\/\s*thinking\s*>/gi) || [];
-  return matches.map((m) => m.replace(/<\s*\/?\s*thinking\s*>/gi, "").trim());
+  // Match malformed thinking tags with labels: <thinking::label] ... </thinking>
+  const malformedMatches =
+    content.match(
+      /<\s*thinking\s*:+[^\]>]*[\]>][\s\S]*?<\s*\/\s*thinking\s*>/gi
+    ) || [];
+  const allMatches = [...standardMatches, ...malformedMatches];
+  return allMatches.map((m) =>
+    m
+      .replace(/<\s*thinking\s*:+[^\]>]*[\]>]/gi, "") // Remove malformed opening tags
+      .replace(/<\s*\/?\s*thinking\s*>/gi, "") // Remove standard tags
+      .trim()
+  );
 }
 
 /**
@@ -916,10 +938,11 @@ export async function generateStoryTurn(
           // Execute GM tool calls locally
           if (gmResult.toolCalls && gmResult.toolCalls.length > 0) {
             // Add the assistant's response with tool calls to history
-            // The tool_calls array contains the full tool call details - no need for summary text
+            // IMPORTANT: Preserve the content (thinking/prose) alongside tool_calls
+            // so future context reconstruction has the full picture
             conversationHistory.push({
               role: "assistant",
-              content: "", // Empty - the tool_calls array has all the info the AI needs
+              content: gmResult.content || "", // Preserve thinking/prose content
               tool_calls: gmResult.toolCalls.map((tc: any) => ({
                 id: tc.id,
                 type: "function",

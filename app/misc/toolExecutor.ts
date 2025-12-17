@@ -1077,22 +1077,36 @@ export function executeTools(
         }
 
         const query = args.query.toLowerCase();
-        const caseSensitive = args.case_sensitive === true;
-        const maxResults = (args.max_results as number) || 10;
+        const includeHidden = args.includeHidden !== false; // Default true
+        const maxResults = (args.maxResults as number) || 10;
 
-        const searchQuery = caseSensitive ? (args.query as string) : query;
         const results: { title: string; excerpt: string; lineNum: number }[] =
           [];
 
         for (const lore of storyData.lore) {
-          const content = caseSensitive
-            ? lore.content
-            : lore.content.toLowerCase();
+          // Skip hidden lore if not including hidden
+          if (!includeHidden && lore.on === false) continue;
+          // Skip lore with no title
+          if (!lore.title) continue;
+
+          // First check if title matches
+          if (lore.title.toLowerCase().includes(query)) {
+            results.push({
+              title: lore.title,
+              excerpt: `[Title match]`,
+              lineNum: 0,
+            });
+            if (results.length >= maxResults) break;
+          }
+
+          // Skip lore with no content for content search
+          if (!lore.content) continue;
+
           const lines = lore.content.split("\n");
 
           for (let i = 0; i < lines.length; i++) {
-            const line = caseSensitive ? lines[i] : lines[i].toLowerCase();
-            if (line.includes(searchQuery)) {
+            const line = lines[i].toLowerCase();
+            if (line.includes(query)) {
               // Get context (the matching line)
               const excerpt =
                 lines[i].length > 80

@@ -2814,6 +2814,7 @@ Write immersive prose. The player should experience the story, not see game mech
     // Calculator
     "calculate",
     // Lookup
+    "read_notes",
     "search_memory",
     // Flow control
     "start_challenge",

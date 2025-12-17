@@ -112,7 +112,10 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error("Book imports query error:", error);
       // Return empty list if table doesn't exist yet (migration not run)
-      if (error.code === "PGRST200" || error.message?.includes("schema cache")) {
+      if (
+        error.code === "PGRST200" ||
+        error.message?.includes("schema cache")
+      ) {
         return NextResponse.json({
           imports: [],
           total: 0,

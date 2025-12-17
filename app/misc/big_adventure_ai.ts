@@ -2630,7 +2630,7 @@ export function saveAutosave(data: BigAdventureAutosave): void {
       importedMechanicsNotes: data.config.importedMechanicsNotes?.slice(0, 10),
       importedCustomTables: data.config.importedCustomTables?.slice(0, 5),
     };
-    
+
     // Slim down partialResults if it has a storyTemplate with large arrays
     let slimPartialResults = data.partialResults;
     if (data.partialResults?.storyTemplate) {
@@ -2646,7 +2646,7 @@ export function saveAutosave(data: BigAdventureAutosave): void {
         },
       };
     }
-    
+
     const slimData: BigAdventureAutosave = {
       ...data,
       config: slimConfig,
