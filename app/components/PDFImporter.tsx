@@ -20,6 +20,82 @@ import { PDFDocument } from "pdf-lib";
 const MAX_CHUNK_SIZE_MB = 4;
 // Pages per chunk (approximate, will be adjusted based on actual size)
 const PAGES_PER_CHUNK = 15;
+// Maximum concurrent requests to avoid overwhelming the server
+const MAX_CONCURRENT_REQUESTS = 4;
+// Timeout for summarize requests (4 minutes - server allows 5)
+const SUMMARIZE_TIMEOUT_MS = 240000;
+// Retry attempts for failed requests
+const MAX_RETRIES = 2;
+
+/**
+ * Helper to run promises with limited concurrency
+ */
+async function runWithConcurrency<T>(
+  tasks: (() => Promise<T>)[],
+  concurrency: number,
+  onProgress?: (completed: number, total: number) => void
+): Promise<T[]> {
+  const results: T[] = [];
+  let completed = 0;
+
+  // Process in batches
+  for (let i = 0; i < tasks.length; i += concurrency) {
+    const batch = tasks.slice(i, i + concurrency);
+    const batchResults = await Promise.all(batch.map((task) => task()));
+    results.push(...batchResults);
+    completed += batch.length;
+    onProgress?.(completed, tasks.length);
+  }
+
+  return results;
+}
+
+/**
+ * Fetch with timeout and retry support
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  timeoutMs: number = SUMMARIZE_TIMEOUT_MS,
+  maxRetries: number = MAX_RETRIES
+): Promise<Response> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      return response;
+    } catch (error: any) {
+      lastError = error;
+
+      // Don't retry on abort (user cancelled) or auth errors
+      if (error.name === "AbortError") {
+        throw new Error(`Request timed out after ${timeoutMs / 1000}s`);
+      }
+
+      // Wait before retry (exponential backoff)
+      if (attempt < maxRetries) {
+        const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+        console.log(
+          `Request failed, retrying in ${delay}ms (attempt ${
+            attempt + 1
+          }/${maxRetries})...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delay));
+      }
+    }
+  }
+
+  throw lastError || new Error("Request failed after retries");
+}
 
 /**
  * Split a large PDF into smaller chunks using pdf-lib
@@ -612,27 +688,31 @@ export default function PDFImporter({
 
           const totalChunks = chunks.length;
 
-          // Phase 1: OCR all chunks in PARALLEL (5% - 45% progress)
+          // Phase 1: OCR all chunks with limited concurrency (5% - 45% progress)
           setStep("ocr");
           setStatusMessage(
-            `Running OCR on ${totalChunks} chunks in parallel...`
+            `Running OCR on ${totalChunks} chunks (${MAX_CONCURRENT_REQUESTS} at a time)...`
           );
           setProgress(fileProgressStart + fileProgressRange * 0.1);
 
-          const ocrPromises = chunks.map(async (chunk, chunkIdx) => {
-            const ocrResponse = await fetch("/api/ocr/process", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
+          const ocrTasks = chunks.map((chunk, chunkIdx) => async () => {
+            const ocrResponse = await fetchWithRetry(
+              "/api/ocr/process",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  base64Data: chunk.base64,
+                  fileName: `${file.name}_pages_${chunk.pageStart}-${chunk.pageEnd}.pdf`,
+                  mimeType: "application/pdf",
+                  includeImages: false,
+                }),
               },
-              body: JSON.stringify({
-                base64Data: chunk.base64,
-                fileName: `${file.name}_pages_${chunk.pageStart}-${chunk.pageEnd}.pdf`,
-                mimeType: "application/pdf",
-                includeImages: false,
-              }),
-            });
+              180000 // 3 minute timeout for OCR
+            );
 
             if (!ocrResponse.ok) {
               let errorMsg = "OCR processing failed";
@@ -661,7 +741,18 @@ export default function PDFImporter({
             };
           });
 
-          const ocrResults = await Promise.all(ocrPromises);
+          const ocrResults = await runWithConcurrency(
+            ocrTasks,
+            MAX_CONCURRENT_REQUESTS,
+            (completed, total) => {
+              const ocrProgress = completed / total;
+              setProgress(
+                fileProgressStart +
+                  fileProgressRange * (0.1 + ocrProgress * 0.35)
+              );
+              setStatusMessage(`OCR: ${completed}/${total} chunks complete...`);
+            }
+          );
 
           // Sort by page order and combine results
           ocrResults.sort((a, b) => a.pageStart - b.pageStart);
@@ -682,10 +773,10 @@ export default function PDFImporter({
           totalCost += combinedCost;
           setProgress(fileProgressStart + fileProgressRange * 0.45);
 
-          // Phase 2: Summarize all chunks in PARALLEL (45% - 95% progress)
+          // Phase 2: Summarize all chunks with limited concurrency (45% - 95% progress)
           setStep("summarizing");
           setStatusMessage(
-            `Extracting notes from ${ocrResults.length} chunks in parallel...`
+            `Extracting notes from ${ocrResults.length} chunks (${MAX_CONCURRENT_REQUESTS} at a time)...`
           );
           setProgress(fileProgressStart + fileProgressRange * 0.5);
 
@@ -695,29 +786,34 @@ export default function PDFImporter({
             throw new Error("Session expired. Please sign in again.");
           }
 
-          const summarizePromises = ocrResults.map(async (ocr) => {
+          const summarizeTasks = ocrResults.map((ocr) => async () => {
             try {
-              const summarizeResponse = await fetch("/api/ocr/summarize", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${freshToken}`,
+              const summarizeResponse = await fetchWithRetry(
+                "/api/ocr/summarize",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${freshToken}`,
+                  },
+                  body: JSON.stringify({
+                    markdown: ocr.markdown,
+                    focus: ["all"],
+                    customInstructions:
+                      customInstructions +
+                      `\n\nNote: This is pages ${ocr.pageStart}-${ocr.pageEnd} of a larger document.`,
+                    model:
+                      aiModel === "custom-openrouter"
+                        ? customOpenRouterModel
+                        : aiModel,
+                    maxTokens: maxOutputTokens,
+                    openRouterKey: keys.openRouterKey,
+                    deepseekKey: keys.deepseekKey,
+                  }),
                 },
-                body: JSON.stringify({
-                  markdown: ocr.markdown,
-                  focus: ["all"],
-                  customInstructions:
-                    customInstructions +
-                    `\n\nNote: This is pages ${ocr.pageStart}-${ocr.pageEnd} of a larger document.`,
-                  model:
-                    aiModel === "custom-openrouter"
-                      ? customOpenRouterModel
-                      : aiModel,
-                  maxTokens: maxOutputTokens,
-                  openRouterKey: keys.openRouterKey,
-                  deepseekKey: keys.deepseekKey,
-                }),
-              });
+                SUMMARIZE_TIMEOUT_MS,
+                MAX_RETRIES
+              );
 
               if (!summarizeResponse.ok) {
                 const errorMsg = await summarizeResponse.text();
@@ -729,16 +825,37 @@ export default function PDFImporter({
               }
 
               return await summarizeResponse.json();
-            } catch (err) {
+            } catch (err: any) {
               console.error(
                 `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization error:`,
-                err
+                err.message || err
               );
               return null;
             }
           });
 
-          const summarizeResults = await Promise.all(summarizePromises);
+          const summarizeResults = await runWithConcurrency(
+            summarizeTasks,
+            MAX_CONCURRENT_REQUESTS,
+            (completed, total) => {
+              const sumProgress = completed / total;
+              setProgress(
+                fileProgressStart +
+                  fileProgressRange * (0.5 + sumProgress * 0.45)
+              );
+              setStatusMessage(
+                `Creating notes: ${completed}/${total} chunks complete...`
+              );
+            }
+          );
+
+          // Count failures and warn user
+          const failedCount = summarizeResults.filter((r) => r === null).length;
+          if (failedCount > 0) {
+            console.warn(
+              `${failedCount}/${summarizeResults.length} chunks failed to summarize`
+            );
+          }
 
           // Collect results from successful summarizations
           for (const result of summarizeResults) {
