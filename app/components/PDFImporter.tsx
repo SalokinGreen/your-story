@@ -929,6 +929,14 @@ export default function PDFImporter({
         "success"
       );
 
+      // Show reminder about Saved Imports feature
+      setTimeout(() => {
+        addNotification(
+          "💡 Tip: Your import is saved! Re-open the PDF Importer to access 'Saved Imports' anytime.",
+          "success"
+        );
+      }, 2000);
+
       // Close modal after short delay
       setTimeout(() => {
         setIsOpen(false);

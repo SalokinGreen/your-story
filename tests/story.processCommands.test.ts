@@ -54,6 +54,7 @@ describe("processCommands", () => {
       quests: [],
       earnedPointsFromQuests: [],
       relationships: [],
+      npcs: [],
       momentum: 0,
       maxMomentum: 3,
       points: 0,

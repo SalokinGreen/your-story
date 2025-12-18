@@ -40,6 +40,7 @@ export type GenerationStage =
   | "mechanics-notes"
   | "character-sheet"
   | "content-lore"
+  | "content-npcs"
   | "content-achievements"
   | "advanced-presets"
   | "advanced-tables"
@@ -867,18 +868,35 @@ export function getStageInfo(stage: GenerationStage): {
       name: "Lore & World",
       description: "World-building and lore entries",
       detailedDescription:
-        "Creates the world's history, factions, NPCs, and locations. Rich lore entries that bring the setting to life.",
+        "Creates the world's history, factions, locations, and secrets. Rich lore entries that bring the setting to life.",
       generates: [
-        "Key NPCs and characters",
         "Locations and landmarks",
         "Factions and organizations",
         "History and past events",
         "World lore and customs",
+        "Secret information",
       ],
       instructionHint:
-        "Focus on NPC depth, faction politics, location atmosphere, or historical events",
+        "Focus on faction politics, location atmosphere, or historical events",
       number: 4,
       emoji: "📚",
+    },
+    "content-npcs": {
+      name: "NPCs & Characters",
+      description: "Key characters and their relationships",
+      detailedDescription:
+        "Creates the major characters players will encounter: allies, enemies, mentors, and rivals. Each NPC has personality, motivations, and a role in the story.",
+      generates: [
+        "Major NPCs with personalities",
+        "Character motivations and secrets",
+        "Relationship dynamics",
+        "Faction affiliations",
+        "Character appearance & voice",
+      ],
+      instructionHint:
+        "Focus on NPC depth, personality quirks, hidden agendas, or inter-character drama",
+      number: 5,
+      emoji: "👥",
     },
     "content-achievements": {
       name: "Goals & Milestones",
@@ -888,7 +906,7 @@ export function getStageInfo(stage: GenerationStage): {
       generates: ["Achievements with rewards", "Main and side quests"],
       instructionHint:
         "Shape quest objectives, achievement triggers, or story pacing",
-      number: 5,
+      number: 6,
       emoji: "🏆",
     },
     "advanced-presets": {
@@ -903,7 +921,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Shape class archetypes, playstyle variety, or build uniqueness",
-      number: 6,
+      number: 7,
       emoji: "🎭",
     },
     "advanced-tables": {
@@ -918,7 +936,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Focus on event variety, oracle themes, or encounter balance",
-      number: 7,
+      number: 8,
       emoji: "🎲",
     },
     "advanced-other": {
@@ -933,7 +951,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "Shape upgrade paths, starting variations, or progression balance",
-      number: 8,
+      number: 9,
       emoji: "🛒",
     },
     icons: {
@@ -948,7 +966,7 @@ export function getStageInfo(stage: GenerationStage): {
       ],
       instructionHint:
         "The AI will automatically choose thematic icons for each element",
-      number: 9,
+      number: 10,
       emoji: "🎨",
     },
   };
@@ -973,6 +991,70 @@ function buildSystemPrompt(
   const stageConfig = getSubstageConfig(stage, config.stageConfigs);
   const customInstructions = stageConfig.customInstructions?.trim() || "";
 
+  // Build imported content context (from PDF imports)
+  let importedContentSection = "";
+  const hasImportedLore = config.importedLore && config.importedLore.length > 0;
+  const hasImportedMechanics =
+    config.importedMechanicsNotes && config.importedMechanicsNotes.length > 0;
+  const hasImportedTables =
+    config.importedCustomTables && config.importedCustomTables.length > 0;
+
+  if (hasImportedLore || hasImportedMechanics || hasImportedTables) {
+    importedContentSection = `\n\n═══════════════════════════════════════════════════════════════
+IMPORTED SOURCE MATERIAL (from user's PDF)
+═══════════════════════════════════════════════════════════════
+The user has imported content from source books. Reference this material and build upon it.
+Do NOT regenerate this content - it will be automatically merged into the final result.
+Instead, create NEW content that complements and references this imported material.
+`;
+
+    if (hasImportedMechanics) {
+      importedContentSection += `\n### IMPORTED GAME MECHANICS (${
+        config.importedMechanicsNotes!.length
+      } entries):\n`;
+      config.importedMechanicsNotes!.slice(0, 10).forEach((note) => {
+        importedContentSection += `- **${note.title}**: ${note.content.slice(
+          0,
+          200
+        )}${note.content.length > 200 ? "..." : ""}\n`;
+      });
+      if (config.importedMechanicsNotes!.length > 10) {
+        importedContentSection += `  _(+ ${
+          config.importedMechanicsNotes!.length - 10
+        } more mechanics entries)_\n`;
+      }
+    }
+
+    if (hasImportedLore) {
+      importedContentSection += `\n### IMPORTED LORE (${
+        config.importedLore!.length
+      } entries):\n`;
+      config.importedLore!.slice(0, 10).forEach((lore) => {
+        importedContentSection += `- **${lore.title}** (${
+          lore.type || "lore"
+        }): ${lore.content.slice(0, 150)}${
+          lore.content.length > 150 ? "..." : ""
+        }\n`;
+      });
+      if (config.importedLore!.length > 10) {
+        importedContentSection += `  _(+ ${
+          config.importedLore!.length - 10
+        } more lore entries)_\n`;
+      }
+    }
+
+    if (hasImportedTables) {
+      importedContentSection += `\n### IMPORTED TABLES (${
+        config.importedCustomTables!.length
+      } tables):\n`;
+      config.importedCustomTables!.forEach((table) => {
+        importedContentSection += `- **${table.name}**: ${table.entries.length} entries\n`;
+      });
+    }
+
+    importedContentSection += `\n⚠️ IMPORTANT: Create NEW content that works alongside this imported material. Reference existing NPCs, locations, and mechanics. Do not duplicate what's already been imported.\n`;
+  }
+
   const basePrompt = `You are an expert Game Designer creating a complete text adventure game.
 
 USER'S ADVENTURE CONCEPT:
@@ -983,7 +1065,7 @@ ${
   customInstructions
     ? `\nCUSTOM INSTRUCTIONS FOR THIS STAGE:\n${customInstructions}`
     : ""
-}
+}${importedContentSection}
 
 DICE MECHANICS: The game uses a flexible formula-based dice system. The GM stage will handle all dice rolls using the formula_roll tool with formulas like "1d20+{{STR}}" or "2d6+{{Perception}}". Design stats and abilities that make sense for the genre - the system adapts to any dice formula.
 
@@ -1422,10 +1504,83 @@ OUTPUT JSON SCHEMA:
 Remember: Output ONLY the JSON object, nothing else.`;
   }
 
+  // NPC STAGE
+  if (stage === "content-npcs") {
+    return `${basePrompt}
+
+STAGE 3B: NPCs & CHARACTERS
+Generate the major characters that players will encounter throughout this adventure.
+
+These NPCs are tracked separately from lore entries - they have status, attitudes, and dynamic relationships with the player.
+
+═══════════════════════════════════════════════════════════════
+NPC CREATION GUIDELINES
+═══════════════════════════════════════════════════════════════
+
+Create MEMORABLE, DISTINCT characters. Each NPC should:
+
+1. **MAJOR NPCs (create 8-15):**
+   - Central characters to the plot: allies, enemies, quest-givers, mentors, rivals
+   - Include detailed personality, appearance, voice/mannerisms
+   - Give them secrets, motivations, and things they want from the player
+   - Consider their relationship dynamics with OTHER NPCs
+
+2. **SUPPORTING NPCs (create 5-10):**
+   - Shopkeepers, guards, informants, witnesses
+   - Brief but memorable traits
+   - May become more important as story develops
+
+REQUIRED NPC FIELDS:
+- **name**: Full name or title they go by
+- **description**: 2-3 paragraphs covering appearance, personality, mannerisms, voice
+- **role**: Their function in the story (e.g., "Quest Giver", "Antagonist", "Mentor", "Love Interest", "Comic Relief")
+- **status**: "unknown" for NPCs not yet encountered (alive/dead/missing/unknown/departed)
+- **relationship**: How they initially relate to the player ("Stranger", "Potential ally", "Known enemy", etc.)
+- **attitude**: Their initial disposition (hostile/unfriendly/neutral/friendly/allied)
+- **faction**: What group they belong to (if any)
+- **symbol**: An emoji representing them
+- **notes**: GM notes about their secrets, future plot relevance, hidden agendas
+
+MAKE NPCs FEEL ALIVE:
+- Give them speech patterns, catchphrases, or verbal tics
+- Include what they want from life, not just from the player
+- Consider their relationships with each other, not just the player
+- Think about how their attitude might change based on player actions
+- Include physical descriptions that go beyond just appearance (posture, movement, presence)
+
+NPC ATTITUDES (starting disposition):
+- hostile: Actively wants to harm the player
+- unfriendly: Distrustful, unhelpful, may become hostile
+- neutral: No strong feelings either way
+- friendly: Well-disposed, helpful
+- allied: Firmly on the player's side
+
+OUTPUT JSON SCHEMA:
+{
+  "npcs": [
+    {
+      "id": "npc_unique_id",
+      "name": "Character Name",
+      "description": "string (2-3 detailed paragraphs about appearance, personality, voice, mannerisms)",
+      "role": "string (their role in the story)",
+      "status": "unknown",
+      "relationship": "string (initial relationship to player)",
+      "attitude": "neutral",
+      "faction": "string or null",
+      "symbol": "emoji",
+      "notes": "string (GM notes about secrets, future plans, hidden motivations)",
+      "createdAt": 0
+    }
+  ]
+}
+
+Remember: Output ONLY the JSON object, nothing else.`;
+  }
+
   if (stage === "content-achievements") {
     return `${basePrompt}
 
-STAGE 3B: GOALS & MILESTONES
+STAGE 3C: GOALS & MILESTONES
 Generate achievements and quests appropriate for this adventure's scope.
 
 GUIDELINES:
@@ -2289,6 +2444,24 @@ export function parseBigAdventureStageOutput(
       };
     }
 
+    if (stage === "content-npcs") {
+      // NPCs stage - add createdAt timestamps if not present
+      const npcs = (parsed.npcs || []).map(
+        (npc: import("./structs").NPC, idx: number) => ({
+          ...npc,
+          id: npc.id || `npc_${Date.now()}_${idx}`,
+          createdAt: npc.createdAt || Date.now(),
+          status: npc.status || "unknown",
+          attitude: npc.attitude || "neutral",
+        })
+      );
+      return {
+        storyTemplate: {
+          npcs,
+        },
+      };
+    }
+
     if (stage === "content-achievements") {
       return {
         storyTemplate: {
@@ -2514,6 +2687,7 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
 
   if (contentEnabled) {
     stages.push("content-lore");
+    stages.push("content-npcs");
     stages.push("content-achievements");
   }
 
@@ -2571,6 +2745,7 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
     "mechanics-notes": 3500, // Expanded prompt with foundational systems
     "character-sheet": 2500,
     "content-lore": 3500,
+    "content-npcs": 3500,
     "content-achievements": 3000,
     "advanced-presets": 4000,
     "advanced-tables": 3000,

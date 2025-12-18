@@ -28,6 +28,7 @@ describe("Tool Call History Preservation", () => {
     memory: [],
     quests: [],
     relationships: [],
+    npcs: [],
     scene: {
       parts: [],
     },

@@ -42,6 +42,7 @@ function createTestStory(): StoryData {
     level: 1,
     upgradesSpent: 0,
     conditions: [],
+    npcs: [],
   } as StoryData;
 }
 

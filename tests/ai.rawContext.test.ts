@@ -60,6 +60,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       conditions: [],
       lore: [],
       memory: [],
+      npcs: [],
       chapters: [],
       currentChapter: 0,
       scene: {
@@ -163,6 +164,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       conditions: [],
       lore: [],
       memory: [],
+      npcs: [],
       chapters: [],
       currentChapter: 0,
       scene: {
@@ -248,6 +250,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       conditions: [],
       lore: [],
       memory: [],
+      npcs: [],
       chapters: [],
       currentChapter: 0,
       scene: {
@@ -335,6 +338,7 @@ You enter the dungeon. Dark shadows dance on the walls.
       conditions: [],
       lore: [],
       memory: [],
+      npcs: [],
       chapters: [],
       currentChapter: 0,
       scene: {

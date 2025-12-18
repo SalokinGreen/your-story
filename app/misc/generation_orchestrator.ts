@@ -34,6 +34,7 @@ const SEQUENTIAL_STAGES: GenerationStage[] = ["core", "mechanics-notes"];
 const PARALLELIZABLE_STAGES: GenerationStage[] = [
   "character-sheet",
   "content-lore",
+  "content-npcs",
   "content-achievements",
   "advanced-presets",
   "advanced-tables",

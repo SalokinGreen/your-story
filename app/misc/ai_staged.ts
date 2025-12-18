@@ -2775,7 +2775,9 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Enemy HP changes**: Use \`update_combatant_stat\` during combat
 - **NPC attitude/relationship changes**: Use \`update_npc\`
 - **Character sheet changes**: Use \`edit_note\` to keep stats, resources, abilities current
-- **Any other Note changes**: Use \`edit_note\` to update lore, locations, items, etc.
+- **Small note edits**: Use \`edit_lore_replace\` (find/replace), \`edit_lore_append\` (add to end), \`edit_lore_prepend\` (add to top), or \`edit_lore_insert\` (insert near a pattern)
+- **Large note rewrites**: Use \`edit_note\` with full new content
+- **Merge related notes**: Use \`merge_lore\` to combine multiple entries
 
 ### Combat & Mechanics
 - **Skill checks**: Use \`formula_roll\` for risky actions with meaningful stakes
@@ -2864,11 +2866,18 @@ Write immersive prose. The player should experience the story, not see game mech
     "modify_passive",
     // Achievement
     "trigger_achievement",
-    // note tools
+    // Note management tools
     "search_notes",
     "create_note",
     "delete_note",
     "edit_note",
+    // Note editing tools (fine-grained content manipulation)
+    "edit_lore_replace",
+    "edit_lore_append",
+    "edit_lore_prepend",
+    "edit_lore_insert",
+    "merge_lore",
+    "duplicate_lore",
     // Memory
     "add_memory",
     // Condition tools (no add_condition - that happens via stakes)

@@ -231,62 +231,50 @@ describe("parseBigAdventureStageOutput", () => {
     });
   });
 
-  describe("mechanics stage", () => {
-    it("should parse valid mechanics stage output", () => {
-      // Mechanics stage now only outputs abilities and variables (not stats/resources)
+  describe("mechanics-notes stage", () => {
+    it("should parse valid mechanics-notes stage output", () => {
+      // Mechanics-notes stage outputs mechanicsLore (lore entries for game rules)
       const content = JSON.stringify({
-        abilities: [
+        mechanicsLore: [
           {
-            name: "Strike",
-            description: "Attack",
-            grade: "novice",
-            cost: [],
-            cooldown: 0,
-            currentCooldown: 0,
-            symbol: "⚔️",
+            title: "Combat System",
+            content: "Roll 3d6 to attack. Beat the target DC to hit.",
+            type: "mechanics",
+            on: true,
           },
-        ],
-        variables: [
-          { id: "var_001", name: "Quest Progress", type: "number", value: 0 },
         ],
       });
 
-      const result = parseBigAdventureStageOutput(content, "mechanics");
+      const result = parseBigAdventureStageOutput(content, "mechanics-notes");
       expect(result).not.toBeNull();
-      expect(result?.storyTemplate?.abilities).toHaveLength(1);
-      expect(result?.storyTemplate?.variables).toHaveLength(1);
+      expect(result?.storyTemplate?.lore).toHaveLength(1);
+      expect(result?.storyTemplate?.lore?.[0].title).toBe("Combat System");
     });
 
-    it("should handle mechanics with malformed property name", () => {
-      // Mechanics stage now only outputs abilities and variables (not stats/resources)
+    it("should handle mechanics-notes with malformed property name", () => {
+      // Test JSON repair with mechanics-notes structure
       const content = `{
-        "abilities": [
-          { "name": "Strength Strike", "description": "Power attack", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "💪" },
-          { " "name": "Quick Dodge", "description": "Agility move", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "🎯" }
-        ],
-        "variables": []
+        "mechanicsLore": [
+          { "title": "Combat Rules", "content": "Hit points determine survival.", "type": "mechanics", "on": true },
+          { " "title": "Magic System", "content": "Mana powers spells.", "type": "mechanics", "on": true }
+        ]
       }`;
 
-      const result = parseBigAdventureStageOutput(content, "mechanics");
+      const result = parseBigAdventureStageOutput(content, "mechanics-notes");
       expect(result).not.toBeNull();
-      expect(result?.storyTemplate?.abilities).toHaveLength(2);
+      expect(result?.storyTemplate?.lore).toHaveLength(2);
     });
 
-    it("should handle truncated mechanics output", () => {
-      // Mechanics stage now only outputs abilities and variables (not stats/resources)
+    it("should handle truncated mechanics-notes output", () => {
+      // Test JSON repair with truncated mechanics-notes
       const content = `{
-        "abilities": [
-          { "name": "Strike", "description": "Basic attack", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "⚔️" },
-          { "name": "Defend", "description": "Defensive stance", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "🛡️" }
-        ],
-        "variables": [
-          { "id": "var_001", "name": "Quest", "type": "number", "value": 0`;
+        "mechanicsLore": [
+          { "title": "Combat", "content": "Roll dice to attack.", "type": "mechanics", "on": true },
+          { "title": "Skills", "content": "Use skills for special actions", "type": "mechanics", "on": true`;
 
-      const result = parseBigAdventureStageOutput(content, "mechanics");
+      const result = parseBigAdventureStageOutput(content, "mechanics-notes");
       expect(result).not.toBeNull();
-      expect(result?.storyTemplate?.abilities?.length).toBeGreaterThanOrEqual(
-        1
-      );
+      expect(result?.storyTemplate?.lore?.length).toBeGreaterThanOrEqual(1);
     });
   });
 
@@ -373,74 +361,64 @@ describe("parseBigAdventureStageOutput", () => {
   });
 
   describe("real-world AI mistakes", () => {
-    it('should handle the " "name" mistake from production', () => {
-      // Mechanics stage now only outputs abilities and variables (not stats/resources)
+    it('should handle the " "title" mistake from production', () => {
+      // Test JSON repair with content-lore stage (fixed " " prefix bug)
       const content = `\`\`\`json
 {
-  "abilities": [
+  "lore": [
     {
-      "name": "Neural Strike",
-      "description": "Your ability to attack digital systems",
-      "grade": "novice",
-      "cost": [],
-      "cooldown": 0,
-      "currentCooldown": 0,
-      "symbol": "🧠"
+      "title": "The Kingdom",
+      "content": "A vast realm ruled by an ancient dynasty.",
+      "type": "lore",
+      "on": true
     },
     {
-      " "name": "Street Sense",
-      "description": "Your knowledge of the underworld",
-      "grade": "novice",
-      "cost": [],
-      "cooldown": 0,
-      "currentCooldown": 0,
-      "symbol": "🎮"
+      " "title": "The Shadow Guild",
+      "content": "A secret organization of assassins.",
+      "type": "lore",
+      "on": false
     }
-  ],
-  "variables": []
+  ]
 }
 \`\`\``;
 
-      const result = parseBigAdventureStageOutput(content, "mechanics");
+      const result = parseBigAdventureStageOutput(content, "content-lore");
       expect(result).not.toBeNull();
-      expect(result?.storyTemplate?.abilities).toHaveLength(2);
-      expect(result?.storyTemplate?.abilities?.[1].name).toBe("Street Sense");
+      expect(result?.storyTemplate?.lore).toHaveLength(2);
+      expect(result?.storyTemplate?.lore?.[1].title).toBe("The Shadow Guild");
     });
 
     it("should handle early cutoff with complete items", () => {
-      // Mechanics stage now only outputs abilities and variables (not stats/resources)
+      // Test JSON repair for truncated lore entries
       const content = `{
-  "abilities": [
-    {"name": "Fireball", "description": "Launch a ball of fire", "grade": "adept", "cost": [{"type": "variable", "name": "Mana", "amount": 10}], "cooldown": 2, "currentCooldown": 0, "symbol": "🔥"},
-    {"name": "Ice Shard", "description": "Hurl a shard of ice", "grade": "novice", "cost": [], "cooldown": 1, "currentCooldown": 0, "symbol": "❄️"}
+  "lore": [
+    {"title": "Dragon Mountains", "content": "Home to ancient dragons and their hoards.", "type": "lore", "on": true},
+    {"title": "The Underdark", "content": "A vast underground realm.", "type": "lore", "on": true}
   ],
-  "variables": [
-    {"id": "var_001", "name": "Main Quest Progress", "type": "number", "value": 0, "minValue": 0, "maxValue": 100`;
+  "npcs": [
+    {"id": "npc_001", "name": "Elder Sage", "description": "An ancient wizard", "status": "alive", "attitude": "friendly`;
 
-      const result = parseBigAdventureStageOutput(content, "mechanics");
+      const result = parseBigAdventureStageOutput(content, "content-lore");
       expect(result).not.toBeNull();
-      // Should have at least the complete abilities
-      expect(result?.storyTemplate?.abilities?.length).toBeGreaterThanOrEqual(
-        2
-      );
+      // Should have at least the complete lore entries
+      expect(result?.storyTemplate?.lore?.length).toBeGreaterThanOrEqual(2);
     });
 
     it("should handle AI adding explanation text before JSON", () => {
-      // Mechanics stage now only outputs abilities and variables (not stats/resources)
-      const content = `Here's the mechanics for your adventure:
+      // Test extraction of JSON when AI adds surrounding text
+      const content = `Here's the lore for your adventure:
 
 \`\`\`json
 {
-  "abilities": [{"name": "Power Strike", "description": "A powerful attack", "grade": "novice", "cost": [], "cooldown": 0, "currentCooldown": 0, "symbol": "💪"}],
-  "variables": []
+  "lore": [{"title": "The Old Gods", "content": "Ancient deities worshipped before the new faith.", "type": "lore", "on": true}]
 }
 \`\`\`
 
 I hope this works for your adventure!`;
 
-      const result = parseBigAdventureStageOutput(content, "mechanics");
+      const result = parseBigAdventureStageOutput(content, "content-lore");
       expect(result).not.toBeNull();
-      expect(result?.storyTemplate?.abilities?.[0].name).toBe("Power Strike");
+      expect(result?.storyTemplate?.lore?.[0].title).toBe("The Old Gods");
     });
 
     it("should handle unquoted emoji values", () => {

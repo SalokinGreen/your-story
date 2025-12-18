@@ -58,6 +58,7 @@ describe("buildMessages - Command Response Integration", () => {
     relationships: [],
     lore: [],
     memory: [],
+    npcs: [],
     chapters: [],
     currentChapter: 0,
     scene: {
