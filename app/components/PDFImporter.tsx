@@ -15,6 +15,13 @@ import {
 import { StoryLore, CustomTable } from "@/app/misc/structs";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 import { PDFDocument } from "pdf-lib";
+import {
+  LocalPDFImport,
+  listPDFImports,
+  savePDFImport,
+  deletePDFImport,
+  migrateFromLocalStorage,
+} from "@/app/misc/localPDFImportManager";
 
 // Maximum size per PDF chunk for Mistral OCR (in MB)
 const MAX_CHUNK_SIZE_MB = 4;
@@ -162,16 +169,9 @@ async function splitPDFIntoChunks(
   return chunks;
 }
 
-// Saved import data structure
-interface SavedPDFImport {
-  id: string;
-  timestamp: number;
-  fileName: string;
-  lore: StoryLore[];
-  mechanicNotes: StoryLore[];
-  customTables: CustomTable[];
-  summary: string;
-}
+// SavedPDFImport interface moved to localPDFImportManager.ts as LocalPDFImport
+// Re-export for backward compatibility in this file
+type SavedPDFImport = LocalPDFImport;
 
 // Community import data structure (from API)
 interface CommunityImport {
@@ -193,8 +193,6 @@ interface CommunityImport {
   mechanic_notes?: StoryLore[];
   custom_tables?: CustomTable[];
 }
-
-const SAVED_IMPORTS_KEY = "pdf-imports-cache";
 
 interface PDFImporterProps {
   /** Called when import completes with extracted data */
@@ -279,71 +277,53 @@ export default function PDFImporter({
   const [sharePublic, setSharePublic] = useState(true);
   const [shareUploading, setShareUploading] = useState(false);
 
-  // Load saved imports on mount
+  // Load saved imports from IndexedDB on mount
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(SAVED_IMPORTS_KEY);
-      if (saved) {
-        const parsed = JSON.parse(saved) as SavedPDFImport[];
-        // Keep only imports from last 30 days
-        const thirtyDaysAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
-        const recent = parsed.filter((imp) => imp.timestamp > thirtyDaysAgo);
-        setSavedImports(recent);
-        // Clean up old imports
-        if (recent.length !== parsed.length) {
-          localStorage.setItem(SAVED_IMPORTS_KEY, JSON.stringify(recent));
-        }
+    const loadImports = async () => {
+      try {
+        // First, migrate any existing localStorage data
+        await migrateFromLocalStorage();
+        // Then load from IndexedDB
+        const imports = await listPDFImports();
+        setSavedImports(imports);
+      } catch (e) {
+        console.warn("Failed to load saved PDF imports:", e);
       }
-    } catch (e) {
-      console.warn("Failed to load saved PDF imports:", e);
-    }
+    };
+    loadImports();
   }, []);
 
-  // Save imports to localStorage
+  // Save imports to IndexedDB
   const saveImport = useCallback(
-    (data: {
+    async (data: {
       lore: StoryLore[];
       mechanicNotes: StoryLore[];
       customTables: CustomTable[];
       summary: string;
     }) => {
-      const newImport: SavedPDFImport = {
-        id: `import-${Date.now()}`,
-        timestamp: Date.now(),
-        fileName:
-          selectedFiles.length > 1
-            ? `${selectedFiles.length} files`
-            : selectedFiles[0]?.name || "Unknown",
-        lore: data.lore,
-        mechanicNotes: data.mechanicNotes,
-        customTables: data.customTables,
-        summary: data.summary,
-      };
+      const fileName =
+        selectedFiles.length > 1
+          ? `${selectedFiles.length} files`
+          : selectedFiles[0]?.name || "Unknown";
 
-      setSavedImports((prev) => {
-        const updated = [newImport, ...prev].slice(0, 10); // Keep max 10 imports
-        try {
-          localStorage.setItem(SAVED_IMPORTS_KEY, JSON.stringify(updated));
-        } catch (e) {
-          console.warn("Failed to save PDF import:", e);
-        }
-        return updated;
-      });
+      try {
+        const newImport = await savePDFImport(data, fileName);
+        setSavedImports((prev) => [newImport, ...prev]);
+      } catch (e) {
+        console.warn("Failed to save PDF import:", e);
+      }
     },
     [selectedFiles]
   );
 
-  // Delete a saved import
-  const deleteSavedImport = useCallback((id: string) => {
-    setSavedImports((prev) => {
-      const updated = prev.filter((imp) => imp.id !== id);
-      try {
-        localStorage.setItem(SAVED_IMPORTS_KEY, JSON.stringify(updated));
-      } catch (e) {
-        console.warn("Failed to update saved imports:", e);
-      }
-      return updated;
-    });
+  // Delete a saved import from IndexedDB
+  const deleteSavedImport = useCallback(async (id: string) => {
+    try {
+      await deletePDFImport(id);
+      setSavedImports((prev) => prev.filter((imp) => imp.id !== id));
+    } catch (e) {
+      console.warn("Failed to delete saved import:", e);
+    }
   }, []);
 
   // Use a saved import

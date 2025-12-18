@@ -150,6 +150,24 @@ export const AI_MODELS = {
       "Google's latest Gemini 3 Pro preview via AI Studio. Requires your own Google API key (BYOK). Cutting-edge capabilities.",
     bannerUrl: undefined,
   },
+  "Google Gemini 3 Flash": {
+    name: "Google Gemini 3 Flash (BYOK)",
+    original_model: "models/gemini-3-flash-preview",
+    model: "models/gemini-3-flash-preview",
+    maxTokens: 1000000,
+    maxOutputTokens: 65000,
+    provider: "google",
+    supportsToolCalling: true,
+    cost: 0,
+    inputPrice: 0.5,
+    outputPrice: 3,
+    finetunes: [],
+    strengths: ["creativity", "long context", "latest"],
+    weaknesses: ["preview"],
+    description:
+      "Google's latest Gemini 3 Flash preview via AI Studio. Requires your own Google API key (BYOK). Great for creative tasks.",
+    bannerUrl: undefined,
+  },
 
   "NovelAI GLM-4-6": {
     name: "NovelAI GLM-4-6 (BYOK)",

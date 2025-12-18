@@ -290,7 +290,7 @@ function JsonRepairModal({
               setEditedContent(e.target.value);
               setParseError(null);
             }}
-            className="flex-1 w-full bg-blue-900/30 border border-blue-700/30 rounded-lg p-3 font-mono text-sm text-blue-100 resize-none focus:outline-none focus:border-blue-500"
+            className="flex-1 w-full min-h-[400px] bg-blue-900/30 border border-blue-700/30 rounded-lg p-3 font-mono text-sm text-blue-100 resize-y focus:outline-none focus:border-blue-500"
             placeholder="Paste or edit JSON content here..."
             spellCheck={false}
           />

@@ -690,7 +690,21 @@ export function saveGenerationToHistory(
     history.pop();
   }
 
-  localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(history));
+  try {
+    localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(history));
+  } catch (e) {
+    // Handle QuotaExceededError - try removing oldest entries
+    console.warn("Failed to save generation history (quota exceeded), pruning...", e);
+    try {
+      // Keep only the newest 3 entries
+      const pruned = history.slice(0, 3);
+      localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(pruned));
+    } catch (e2) {
+      // If still failing, clear history
+      console.warn("Still failing, clearing history");
+      localStorage.removeItem(GENERATION_HISTORY_KEY);
+    }
+  }
   return id;
 }
 
@@ -2171,8 +2185,16 @@ export function attemptJSONRepair(content: string): string {
     jsonContent = jsonBlockMatch[1].trim();
   }
 
-  // Remove ALL embedded markdown code block markers that may appear mid-JSON
+  // Handle embedded markdown code block markers that may appear mid-JSON
   // This handles cases where AI inserts ```json mid-response
+  // First, handle case where backticks appear inside a string value - close the string first
+  // Pattern: text.```json -> text."  (close the string before the fence)
+  jsonContent = jsonContent.replace(
+    /([^\\])"([^"]*?)\\?`{3,}(?:json)?\s*/gi,
+    '$1"$2"'
+  );
+  
+  // Remove remaining embedded markdown markers outside of strings
   jsonContent = jsonContent.replace(/```json\s*/gi, "");
   jsonContent = jsonContent.replace(/```\s*/g, "");
 
