@@ -511,18 +511,26 @@ export async function POST(req: NextRequest) {
               // Filter out any malformed tool calls that don't have the required structure
               msg.tool_calls = m.tool_calls
                 .filter((tc: any) => tc && tc.function && tc.function.name)
-                .map((tc: any) => ({
-                  ...tc,
-                  function: {
-                    ...tc.function,
-                    arguments:
-                      typeof tc.function.arguments === "string"
-                        ? tc.function.arguments
-                        : tc.function.arguments
-                        ? JSON.stringify(tc.function.arguments)
-                        : "{}",
-                  },
-                }));
+                .map((tc: any) => {
+                  const mapped: any = {
+                    id: tc.id,
+                    type: tc.type || "function",
+                    function: {
+                      name: tc.function.name,
+                      arguments:
+                        typeof tc.function.arguments === "string"
+                          ? tc.function.arguments
+                          : tc.function.arguments
+                          ? JSON.stringify(tc.function.arguments)
+                          : "{}",
+                    },
+                  };
+                  // Preserve extra_content for Google (contains thought_signature for thinking models)
+                  if (tc.extra_content && modelConfig.provider === "google") {
+                    mapped.extra_content = tc.extra_content;
+                  }
+                  return mapped;
+                });
               // Remove tool_calls if empty after filtering
               if (msg.tool_calls.length === 0) {
                 delete msg.tool_calls;
@@ -746,6 +754,10 @@ export async function POST(req: NextRequest) {
                   if (tc.function?.arguments)
                     toolCalls[index].function.arguments +=
                       tc.function.arguments;
+                  // Preserve extra_content for Google (contains thought_signature)
+                  if (tc.extra_content) {
+                    toolCalls[index].extra_content = tc.extra_content;
+                  }
                 }
                 console.log(
                   "[API] Current toolCalls state:",
@@ -816,6 +828,10 @@ export async function POST(req: NextRequest) {
                     if (tc.function?.arguments)
                       toolCalls[index].function.arguments +=
                         tc.function.arguments;
+                    // Preserve extra_content for Google (contains thought_signature)
+                    if (tc.extra_content) {
+                      toolCalls[index].extra_content = tc.extra_content;
+                    }
                   }
                 }
 
