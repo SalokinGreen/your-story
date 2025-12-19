@@ -22,7 +22,7 @@ import {
   applyChaosAdjustment,
   getChaosAdjustmentReason,
 } from "@/app/misc/mythicChaos";
-import { findBestMatch } from "@/app/misc/fuzzyMatch";
+import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
 import {
   parseDCValue,
   parsePointsValue,
@@ -30,6 +30,7 @@ import {
   parseChallengeRoundsValue,
   RPGSystemType,
 } from "@/app/misc/rpgSystems";
+import { initializeAbility } from "@/app/misc/abilitySystem";
 
 /**
  * Calculate relationship value change based on magnitude, difficulty, and current value.
@@ -525,6 +526,283 @@ export function executeTools(
           command: toolCall.function.name,
           success: true,
           message: successMsg,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for create_note (content may contain | characters like markdown tables)
+      if (toolCall.function.name === "create_note") {
+        logger.action("Special handling: create_note", {
+          toolCallId: toolId,
+          title: args.title,
+        });
+
+        if (!storyData.lore) storyData.lore = [];
+
+        const existingNote = storyData.lore.find((l) => l.title === args.title);
+        if (existingNote) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Note "${args.title}" already exists`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const noteType = args.type || "lore";
+        storyData.lore.push({
+          title: args.title,
+          content: args.content,
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          type: noteType,
+          on: true, // Agentic notes are visible by default
+          alwaysOn: true, // No more triggers needed with read_notes
+          on_triggers: [], // Empty for agentic notes
+          off_triggers: [], // Empty for agentic notes
+          embedded: false, // New entry needs embedding
+        });
+
+        // Mark lore embeddings as dirty for re-sync
+        storyData.loreEmbeddingsDirty = true;
+
+        logger.action("New note created via direct tool handling", {
+          title: args.title,
+        });
+
+        const stateChange = `📝 Created note entry "${args.title}"`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for create_quest (description may contain | characters)
+      if (toolCall.function.name === "create_quest") {
+        logger.action("Special handling: create_quest", {
+          toolCallId: toolId,
+          title: args.title,
+        });
+
+        if (!storyData.quests) storyData.quests = [];
+
+        const existing = storyData.quests.find((q) => q.title === args.title);
+        if (existing) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Quest "${args.title}" already exists`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Points can be a tier string or number
+        const rawPoints = args.points ?? "moderate";
+        const points = parsePointsValue(rawPoints, difficulty);
+
+        const newQuest = {
+          id: `quest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          title: args.title,
+          shortDescription: args.shortDescription,
+          description: args.description,
+          active: true,
+          fulfilled: false,
+          points,
+          createdAt: new Date(),
+        };
+
+        storyData.quests.push(newQuest);
+
+        logger.action("Quest created via direct tool handling", {
+          title: args.title,
+          points,
+        });
+
+        const stateChange = `📜 Created quest "${args.title}" (${points} points)`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for add_ability (description may contain | characters)
+      if (toolCall.function.name === "add_ability") {
+        logger.action("Special handling: add_ability", {
+          toolCallId: toolId,
+          name: args.name,
+        });
+
+        // Initialize abilities array if needed
+        if (!storyData.abilities) {
+          storyData.abilities = [];
+        }
+
+        const existing = storyData.abilities.find(
+          (a) => a.name.toLowerCase() === args.name.toLowerCase()
+        );
+        if (existing) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Ability "${args.name}" already exists`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Parse costs array (already structured from tool args)
+        const costs: Array<{
+          type: "resource" | "variable";
+          name: string;
+          amount: number;
+        }> = args.costs || [];
+
+        // Validate stat exists if specified
+        const stat = args.stat?.trim() || undefined;
+        let statWarning = "";
+        if (
+          stat &&
+          !storyData.stats.find((s) => s.name.toLowerCase() === stat.toLowerCase())
+        ) {
+          statWarning = ` (note: stat "${stat}" not found, ability will work with any skill check)`;
+        }
+
+        const ability = initializeAbility({
+          name: args.name,
+          description: args.description,
+          grade: args.grade || "novice",
+          stat,
+          cost: costs,
+          cooldown: args.maxCooldown || 0,
+          symbol: "✨",
+        });
+
+        storyData.abilities.push(ability);
+
+        logger.action("Ability added via direct tool handling", {
+          name: args.name,
+          grade: args.grade || "novice",
+          costs,
+          maxCooldown: args.maxCooldown || 0,
+        });
+
+        const costDesc =
+          costs.length > 0
+            ? ` (costs: ${costs.map((c) => `${c.amount} ${c.name}`).join(", ")})`
+            : "";
+        const cooldownDesc =
+          args.maxCooldown > 0 ? `, ${args.maxCooldown} turn cooldown` : "";
+        const stateChange = `✨ Added ${args.grade || "novice"} ability "${args.name}"${costDesc}${cooldownDesc}${statWarning}`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: statWarning ? "partial" as const : true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Special handling for edit_note (content may contain | characters like markdown tables)
+      if (toolCall.function.name === "edit_note") {
+        logger.action("Special handling: edit_note", {
+          toolCallId: toolId,
+          title: args.title,
+        });
+
+        if (!storyData.lore || storyData.lore.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: "No note entries defined.",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const match = findBestMatch(args.title, storyData.lore, (l) => l.title);
+        if (!match) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `Could not find note entry matching "${args.title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const noteEntry = match.item;
+        const changes: string[] = [];
+
+        // Update title if provided and different
+        if (args.newTitle && args.newTitle !== noteEntry.title) {
+          noteEntry.title = args.newTitle;
+          changes.push("title");
+        }
+
+        // Update content if provided
+        if (args.content !== undefined) {
+          noteEntry.content = args.content;
+          noteEntry.embedded = false; // Mark for re-embedding
+          storyData.loreEmbeddingsDirty = true;
+          changes.push("content");
+        }
+
+        // Update type if provided
+        if (args.type) {
+          noteEntry.type = args.type;
+          changes.push("type");
+        }
+
+        // Agentic notes are always on
+        noteEntry.on = true;
+        noteEntry.alwaysOn = true;
+        noteEntry.on_triggers = [];
+        noteEntry.off_triggers = [];
+
+        if (changes.length === 0) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `No changes specified for note "${noteEntry.title}"`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const stateChange = `📝 Updated note "${noteEntry.title}" (${changes.join(", ")})`;
+        stateChanges.push(stateChange);
+
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -2995,13 +3273,9 @@ function convertToolToCommand(
   const difficulty: AdventureDifficulty = storyData.difficulty || "medium";
 
   switch (toolName) {
-    // Quest Management
-    case "create_quest": {
-      // Points can be a tier string or number
-      const rawPoints = args.points ?? "moderate";
-      const points = parsePointsValue(rawPoints, difficulty);
-      return `/create_quest: ${args.title} | ${args.shortDescription} | ${args.description} | ${points}`;
-    }
+    // Quest Management - handled directly in executeTools (description may contain | characters)
+    case "create_quest":
+      return null;
 
     case "complete_quest":
       return `/complete_quest: ${args.title}`;
@@ -3035,12 +3309,9 @@ function convertToolToCommand(
     case "trigger_achievement":
       return `/trigger_achievement: ${args.title}`;
 
-    // Note Management
-    case "create_note": {
-      // Use /create_note command
-      // Format: /create_note: title | content | type
-      return `/create_note: ${args.title} | ${args.content} | ${args.type || ""}`;
-    }
+    // Note Management - handled directly in executeTools (content may contain | characters)
+    case "create_note":
+      return null;
 
     case "delete_note":
       return `/note_delete: ${args.title}`;
@@ -3048,13 +3319,9 @@ function convertToolToCommand(
     case "list_inactive_notes":
       return null; // Handled directly in executeTools
 
-    case "edit_note": {
-      // Format: /note_update: title | newTitle | content | type
-      const newTitle = args.newTitle || "";
-      const content = args.content || "";
-      const type = args.type || "";
-      return `/note_update: ${args.title} | ${newTitle} | ${content} | ${type}`;
-    }
+    case "edit_note":
+      // Handled directly in executeTools (content may contain | characters like markdown tables)
+      return null;
 
     case "edit_lore_replace":
       // Handled directly in executeTools
@@ -3092,21 +3359,9 @@ function convertToolToCommand(
     case "modify_momentum":
       return `/modify_momentum: ${args.amount >= 0 ? "+" : ""}${args.amount}`;
 
-    // Ability Management
-    case "add_ability": {
-      // Format: /add_ability: name | description | grade | stat | costs | maxCooldown
-      // costs format: "resource:Health:10,variable:ManaSpent:5"
-      const costsStr =
-        args.costs
-          ?.map(
-            (c: { type: string; name: string; amount: number }) =>
-              `${c.type}:${c.name}:${c.amount}`
-          )
-          .join(",") || "";
-      return `/add_ability: ${args.name} | ${args.description} | ${
-        args.grade || "novice"
-      } | ${args.stat || ""} | ${costsStr} | ${args.maxCooldown || 0}`;
-    }
+    // Ability Management - handled directly in executeTools (description may contain | characters)
+    case "add_ability":
+      return null;
 
     case "remove_ability":
       return `/remove_ability: ${args.name}`;

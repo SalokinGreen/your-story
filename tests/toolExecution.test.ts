@@ -129,7 +129,7 @@ describe("Tool Execution", () => {
   });
 
   describe("create_note tool", () => {
-    test("should create note entry with triggers", () => {
+    test("should create note entry (agentic notes are always visible)", () => {
       const storyData = createTestStory();
       const toolCalls: ToolCall[] = [
         {
@@ -139,8 +139,7 @@ describe("Tool Execution", () => {
             arguments: {
               title: "The Ancient Temple",
               content: "A forgotten temple deep in the forest",
-              onTriggers: ["temple", "ruins"],
-              offTriggers: ["forget"],
+              type: "location",
             },
           },
         },
@@ -156,8 +155,11 @@ describe("Tool Execution", () => {
       expect(storyData.lore[0].content).toBe(
         "A forgotten temple deep in the forest"
       );
-      expect(storyData.lore[0].on_triggers).toEqual(["temple", "ruins"]);
-      expect(storyData.lore[0].off_triggers).toEqual(["forget"]);
+      // Agentic notes are always visible with no triggers
+      expect(storyData.lore[0].on).toBe(true);
+      expect(storyData.lore[0].alwaysOn).toBe(true);
+      expect(storyData.lore[0].on_triggers).toEqual([]);
+      expect(storyData.lore[0].off_triggers).toEqual([]);
     });
 
     test("should create note entry without triggers", () => {
@@ -333,7 +335,7 @@ describe("Tool Execution", () => {
             arguments: JSON.stringify({
               title: "Note Title",
               content: "Note content",
-              onTriggers: ["trigger1", "trigger2"],
+              type: "lore",
             }),
           },
         },
@@ -344,7 +346,10 @@ describe("Tool Execution", () => {
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
       expect(storyData.lore[0].title).toBe("Note Title");
-      expect(storyData.lore[0].on_triggers).toEqual(["trigger1", "trigger2"]);
+      expect(storyData.lore[0].content).toBe("Note content");
+      // Agentic notes are always visible (no triggers needed)
+      expect(storyData.lore[0].on).toBe(true);
+      expect(storyData.lore[0].alwaysOn).toBe(true);
     });
 
     test("should handle invalid JSON gracefully", () => {

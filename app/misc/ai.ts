@@ -200,11 +200,9 @@ export function buildMessages({
   useRawContext = false,
   maxTokens = 120000,
   commandResponses,
-  supportsToolCalling = false,
 }: BuildPromptInput & {
   useRawContext?: boolean;
   maxTokens?: number;
-  supportsToolCalling?: boolean;
 }): { messages: ChatMessage[]; tools: any[] } {
   // Get the RPG system configuration
   const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
@@ -215,9 +213,6 @@ Stay in character and respond in the style of an interactive fiction game. You'r
 CRITICAL: Always use the exact XML-style tags in your response. Your output MUST follow this structure:
 
 Output Format (REQUIRED):
-${
-  supportsToolCalling
-    ? `
 \`\`\`
 <story>
 Story prose here. Write your narrative content between these tags.
@@ -227,53 +222,20 @@ Story prose here. Write your narrative content between these tags.
 - Choice 1
 - Choice 2
 </choices>
-\`\`\` `
-    : `\`\`\`
-<story>
-Story prose here. Write your narrative content between these tags.
-</story>
-
-<choices>
-- Choice 1
-- Choice 2
-</choices>
-
-<memory> (Optional)
-- New Memory Entry 1
-- New Memory Entry 2
-</memory>
-
-
-<commands> (Optional)
-/command1
-/command2
-</commands>
-!!! GAME OVER !!! (Optional to indicate game over)
 \`\`\`
-`
-}
+
 IMPORTANT: The <story></story> tags are MANDATORY. Never write story text without wrapping it in <story> tags. All narrative content must be enclosed in <story></story> tags.
 
 Choice Syntax:
 ${rpgSystem.aiInstructions.choiceSyntax}q
 
-${
-  supportsToolCalling
-    ? `Memory Guidelines:
+Memory Guidelines:
 - Add new memory entries with the add memory tool call.
 - Do NOT repeat entries that already exist in the Memory section below. Only add genuinely new information.
 - Make memory entries DETAILED and SPECIFIC. Include names, locations, consequences, and emotional context.
 - BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
 - BAD: "Fought goblins" GOOD: "Slaughtered goblin war party at Blackridge Pass, their chieftain swore revenge before dying"
-- Use memory to track important story developments, character actions, and world changes, or anything else that should influence future scenes and shall be remembered by the narrative.`
-    : `Memory Guidelines:
-- The <memory> section is for NEW memory entries that will be ADDED to the existing memory list.
-- Do NOT repeat entries that already exist in the Memory section below. Only add genuinely new information.
-- Make memory entries DETAILED and SPECIFIC. Include names, locations, consequences, and emotional context.
-- BAD: "Met a merchant" GOOD: "Met Aldric, a suspicious merchant in Darkwater who tried to sell cursed artifacts and fled when confronted"
-- BAD: "Fought goblins" GOOD: "Slaughtered goblin war party at Blackridge Pass, their chieftain swore revenge before dying"
-- Use memory to track important story developments, character actions, and world changes, or anything else that should influence future scenes and shall be remembered by the narrative.`
-}
+- Use memory to track important story developments, character actions, and world changes, or anything else that should influence future scenes and shall be remembered by the narrative.
 
 ⚠️ EXACT NAME MATCHING REQUIREMENT:
 When referencing skills, resources, or items in choices and commands, you MUST use the EXACT names as they appear in the game state below.
@@ -330,9 +292,7 @@ Hidden Text (DM Notes):
 - Important: If hidden information becomes relevant, you MUST reveal it in regular text - the player can't act on what they can't see
 - Hidden text persists in conversation history, so you can reference your own hidden notes later
 
-${
-  supportsToolCalling
-    ? `## TOOL CALLING
+## TOOL CALLING
 
 You have access to structured tools (functions) to modify game state.
 
@@ -349,50 +309,6 @@ Example (you just call the tool - no special format needed):
   Story output: "You find a mysterious potion on the shelf."
   Tool call: add_item with parameters {name: "Mysterious Potion", description: "A bubbling green liquid", type: "consumable", quantity: 1}
   Next turn you'll see: "✓ Added Mysterious Potion to inventory"
-`
-    : `## COMMANDS
-
-You can use commands in the <commands> section to modify game state. Commands are parsed and executed after story generation.
-
-Commands (EXACT NAME MATCHING APPLIES):
-
-Inventory Commands:
-- /add_item: item name | description | type | quantity - Adds a new item to the player's inventory. Type must be: normal, consumable, story, or misc. Example: /add_item: Health Potion | Restores vitality | consumable | 3
-- /remove_item: item name | quantity - Removes items from inventory. Use EXACT item name. Example: /remove_item: Health Potion | 2
-- /modify_item_quantity: item name | quantity_delta - Changes item quantity by delta (can be negative). Example: /modify_item_quantity: Gold Coins | -50
-- /transform_item: old_item | new_item | description | type - Transforms one item into another (upgrades, downgrades, crafting). Example: /transform_item: Rusty Sword | Steel Sword | A well-forged blade | normal
-
-Resource & Stat Commands:
-- /add_resource: name | description | current | max - Adds a new resource to the player. Example: /add_resource: Stamina | Physical energy | 100 | 100
-- /modify_resource: name | current_delta | max_delta - ⚠️ IMPORTANT: Modifies resource by ADDING the delta to current values (NOT setting absolute values). Use positive numbers to increase, negative to decrease. If current Arousal is 30 and you want it to become 44, use +14. If current Tips is 50 and you want it to become 70, use +20. Example: /modify_resource: Health | -20 | 0 (decreases Health by 20 points)
-- /remove_resource: name - Removes a resource from the player. Use EXACT resource name.
-- /add_stat: name | description | value - Adds a new stat to the player. Example: /add_stat: Charisma | Force of personality | 45
-- /modify_stat: name | value_delta - ⚠️ IMPORTANT: Modifies stat by ADDING the delta to current value (NOT setting absolute value). Use positive to increase, negative to decrease. If current Strength is 50 and you want it at 55, use +5. Example: /modify_stat: Strength | 5 (increases Strength by 5 points)
-- /remove_stat: name - Removes a stat from the player. Use EXACT stat name.
-
-Quest Commands:
-- /create_quest: title | short description | full description | points - Creates a new quest and makes it active. Example: /create_quest: Find the Lost Amulet | Locate the ancient amulet | Search the old ruins for the legendary amulet of power | 10
-- /activate_quest: quest title - Makes an inactive quest active/visible to the player. Use EXACT title from Quests section.
-- /complete_quest: quest title - Marks an active quest as fulfilled and awards points. Use EXACT title from Quests section.
-- /deactivate_quest: quest title - Makes an active quest inactive/hidden from the player. Use EXACT title from Quests section.
-- /update_quest_description: quest title | new description - Updates the full description of an existing quest. Example: /update_quest_description: Find the Lost Amulet | New evidence suggests the amulet is cursed
-- /update_quest_short_description: quest title | new short description - Updates the short description shown in quest list.
-
-Relationship Commands:
-- /add_relationship: name | value | description - Adds a new relationship with a character/faction. Value ranges from -100 (enemy) to 100 (ally). Example: /add_relationship: King's Guard | 30 | Respected by the royal guards
-- /modify_relationship: name | value_delta - ⚠️ IMPORTANT: Changes relationship by ADDING the delta to current value (NOT setting absolute value). Use positive to improve, negative to worsen. If current relationship with Emma is 50 and you want it at 70, use +20 (not just 20). If Ms. Harper is at 60 and you want it at 85, use +25. Example: /modify_relationship: King's Guard | 15 (improves relationship by 15 points)
-- /remove_relationship: name - Removes a relationship from tracking. Use EXACT name.
-- /update_relationship_description: name | new description - Updates the description of an existing relationship. Example: /update_relationship_description: King's Guard | Now trusted advisors to the throne
-
-Achievement & Beat Commands:
-- /trigger_achievement: achievement title - Triggers/unlocks an existing achievement. ⚠️ CRITICAL: You MUST use the EXACT title from the "Achievements Available to Unlock" section below. Do NOT make up achievement names or paraphrase them. Only trigger achievements that are explicitly listed in the context. Example: /trigger_achievement: First Blood
-
-Lore Commands:
-- /create_lore: title | content | on_triggers | off_triggers - Creates a new lore entry. Triggers are comma-separated keywords. Set on_triggers to empty if lore should be visible from start. Example: /create_lore: The Ancient Order | A secret society of mages | ancient,order,mages | disbanded,destroyed
-- /lore_replace_content: lore title | old text | new text - Replaces specific text within an existing lore entry. Use EXACT lore title. Example: /lore_replace_content: The Ancient Order | secret society | powerful organization
-- /lore_add_content: lore title | new text - Adds new content on a new line at the bottom of an existing lore entry. Use EXACT lore title. Example: /lore_add_content: The Ancient Order | Their influence spans across the kingdom.
-- /lore_delete_content: lore title | text to delete - Removes specific text from an existing lore entry. Use EXACT lore title. Example: /lore_delete_content: The Ancient Order | disbanded`
-}
 
 Relationship Guidelines:
 Value Ranges & Meanings:
@@ -597,7 +513,7 @@ Narrative Best Practices:
 
   return {
     messages: context,
-    tools: supportsToolCalling ? TOOL_SCHEMAS : [],
+    tools: TOOL_SCHEMAS,
   };
 }
 export function storyDataToString(storyData: StoryData): string {

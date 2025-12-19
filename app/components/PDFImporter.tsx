@@ -115,7 +115,7 @@ async function splitPDFIntoChunks(
   onProgress?.("Loading PDF for splitting...");
 
   const arrayBuffer = await file.arrayBuffer();
-  const pdfDoc = await PDFDocument.load(arrayBuffer);
+  const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
   const totalPages = pdfDoc.getPageCount();
 
   const chunks: { base64: string; pageStart: number; pageEnd: number }[] = [];

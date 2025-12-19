@@ -563,9 +563,7 @@ export async function generateStoryTurn(
 
         // GM stage loop - continues until no more tool calls (AI writes final story)
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
-        const MAX_CONSECUTIVE_FAILURES = 3; // Stop if tools keep failing
         let gmRound = 0;
-        let consecutiveFailures = 0; // Track how many rounds had ALL tools fail
         let allGMContextParts: string[] = [];
         // NEW: Build interleaved conversation log for story stage
         // This preserves the exact order: thinking -> tool results -> thinking -> tool results
@@ -922,29 +920,12 @@ export async function generateStoryTurn(
               gmExecution.results.length > 0;
 
             if (allFailed) {
-              consecutiveFailures++;
               logger.action(
-                `GM stage round ${gmRound} - all tools had errors (${consecutiveFailures}/${MAX_CONSECUTIVE_FAILURES})`,
+                `GM stage round ${gmRound} - all tools had errors`,
                 {
                   errorTools: actualToolErrors.map((r) => r.toolName),
                 }
               );
-
-              // Check if we should break out due to consecutive failures
-              if (consecutiveFailures >= MAX_CONSECUTIVE_FAILURES) {
-                logger.action(
-                  "GM stage aborting - too many consecutive tool errors"
-                );
-                // Force completion with neutral outcome
-                isComplete = true;
-                allGMContextParts.push(
-                  `[GAME MASTER: Tool calls errored repeatedly. Proceeding without mechanical resolution.]`
-                );
-                break;
-              }
-            } else {
-              // Reset counter if at least one tool executed without error
-              consecutiveFailures = 0;
             }
 
             // Add tool results to conversation history - one per tool call
