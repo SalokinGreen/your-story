@@ -262,16 +262,37 @@ export interface Chapter {
   scene: Scene;
   notes: string[];
 }
+// Reasoning detail object (from OpenRouter)
+// Used by Google Gemini 3 models for thought_signature
+export interface ReasoningDetail {
+  type: "reasoning.text" | "reasoning.summary" | "reasoning.encrypted";
+  text?: string;
+  summary?: string;
+  data?: string;
+  signature?: string;
+  id?: string;
+  format?: string;
+  index?: number;
+}
+
 // GM Conversation message - preserves actual tool_calls and tool role structure
 export interface GMConversationMessage {
   role: "assistant" | "tool";
   content: string;
+  reasoning?: string; // Optional reasoning string
+  reasoning_details?: ReasoningDetail[]; // Standardized reasoning tokens
   tool_calls?: Array<{
     id: string;
     type: "function";
     function: {
       name: string;
       arguments: string;
+    };
+    // Google thinking models require thought_signature in tool calls
+    extra_content?: {
+      google?: {
+        thought_signature?: string;
+      };
     };
   }>;
   tool_call_id?: string; // For tool role messages
@@ -282,6 +303,8 @@ export interface ScenePart {
   imageUrl: string;
   user: boolean;
   role: "system" | "user" | "assistant";
+  reasoning?: string; // NEW: AI reasoning/thinking
+  reasoning_details?: ReasoningDetail[]; // NEW: Structured reasoning tokens (OpenRouter)
   choices?: Choice[];
   memoryEntries?: string[];
   commands?: string[]; // Legacy: XML commands

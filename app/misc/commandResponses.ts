@@ -10,7 +10,7 @@
  * - Understand validation results (fuzzy matching, resource checks, etc.)
  */
 
-import type { StoryData, CommandResponse } from "./structs";
+import type { StoryData, CommandResponse, LoreType } from "./structs";
 import {
   findItemMatch,
   findResourceMatch,
@@ -2186,15 +2186,14 @@ export function executeCommandWithResponse(
 
   // === NOTE COMMANDS ===
 
-  // /create_note: title | content | on_triggers | off_triggers
+  // /create_note: title | content | type
   const createNoteMatch = trimmed.match(
-    /^\/create_note:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+    /^\/create_note:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*)$/i
   );
   if (createNoteMatch) {
     const noteTitle = createNoteMatch[1].trim();
     const noteContent = createNoteMatch[2].trim();
-    const onTriggers = createNoteMatch[3].trim();
-    const offTriggers = createNoteMatch[4].trim();
+    const noteType = createNoteMatch[3].trim() as LoreType;
 
     if (!storyData.lore) storyData.lore = [];
 
@@ -2208,19 +2207,6 @@ export function executeCommandWithResponse(
       };
     }
 
-    const onTriggerArray = onTriggers
-      ? onTriggers
-          .split(",")
-          .map((t) => t.trim())
-          .filter((t) => t.length > 0)
-      : [];
-    const offTriggerArray = offTriggers
-      ? offTriggers
-          .split(",")
-          .map((t) => t.trim())
-          .filter((t) => t.length > 0)
-      : [];
-
     storyData.lore.push({
       title: noteTitle,
       content: noteContent,
@@ -2228,9 +2214,9 @@ export function executeCommandWithResponse(
       relatedLocations: [],
       secrtet: false,
       keys: [],
-      on_triggers: onTriggerArray,
-      off_triggers: offTriggerArray,
-      on: onTriggerArray.length === 0, // If no triggers, show from start
+      type: noteType || "lore",
+      on: true, // Agentic notes are visible by default
+      alwaysOn: true, // No more triggers needed with read_notes
       embedded: false, // New entry needs embedding
     });
 
@@ -2369,98 +2355,46 @@ export function executeCommandWithResponse(
     };
   }
 
-  // /note_update: title | newTitle | content | on | onTriggers | offTriggers (also handles legacy /lore_update)
+  // /note_update: title | newTitle | content | type
   const noteUpdateMatch = trimmed.match(
-    /^\/(note_update|lore_update):\s*(.+?)\s*\|\s*(.*?)\s*\|\s*([\s\S]*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+    /^\/note_update:\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
   );
   if (noteUpdateMatch) {
-    const noteTitle = noteUpdateMatch[2].trim();
-    const newTitle = noteUpdateMatch[3].trim();
-    const newContent = noteUpdateMatch[4].trim();
-    const onValue = noteUpdateMatch[5].trim().toLowerCase();
-    const onTriggers = noteUpdateMatch[6].trim();
-    const offTriggers = noteUpdateMatch[7].trim();
+    const title = noteUpdateMatch[1].trim();
+    const newTitle = noteUpdateMatch[2].trim();
+    const content = noteUpdateMatch[3].trim();
+    const type = noteUpdateMatch[4].trim() as LoreType;
 
-    if (!storyData.lore) storyData.lore = [];
-
-    const matchResult = findLoreMatch(noteTitle, storyData.lore);
-    const noteEntry = matchResult?.item;
-
-    if (!noteEntry) {
+    const existing = (storyData.lore || []).find(
+      (l) => l.title.toLowerCase() === title.toLowerCase()
+    );
+    if (!existing) {
       return {
         command: trimmed,
         success: false,
-        message: `Note "${noteTitle}" not found`,
+        message: `Note "${title}" not found`,
         timestamp,
       };
     }
 
-    const changes: string[] = [];
-
-    if (newTitle) {
-      noteEntry.title = newTitle;
-      changes.push("title");
-      noteEntry.embedded = false; // Title changed, needs re-embedding
-    }
-    if (newContent) {
-      noteEntry.content = newContent;
-      changes.push("content");
-      noteEntry.embedded = false; // Content changed, needs re-embedding
-    }
-    if (onValue === "true") {
-      noteEntry.on = true;
-      changes.push("visibility (shown)");
-    } else if (onValue === "false") {
-      noteEntry.on = false;
-      changes.push("visibility (hidden)");
-    }
-    if (onTriggers) {
-      noteEntry.on_triggers = onTriggers
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0);
-      changes.push("on_triggers");
-    }
-    if (offTriggers) {
-      noteEntry.off_triggers = offTriggers
-        .split(",")
-        .map((t) => t.trim())
-        .filter((t) => t.length > 0);
-      changes.push("off_triggers");
-    }
-
-    if (changes.length === 0) {
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Note "${noteEntry.title}" unchanged (no updates provided)`,
-        timestamp,
-      };
-    }
-
-    // Mark lore embeddings as dirty if content or title changed
-    if (changes.includes("content") || changes.includes("title")) {
+    if (newTitle) existing.title = newTitle;
+    if (content) {
+      existing.content = content;
+      existing.embedded = false; // Re-sync if content changes
       storyData.loreEmbeddingsDirty = true;
     }
+    if (type) existing.type = type;
 
-    logger.action("Note updated via command response", {
-      title: noteEntry.title,
-      changes,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
+    // Agentic notes are always on
+    existing.on = true;
+    existing.alwaysOn = true;
+    existing.on_triggers = [];
+    existing.off_triggers = [];
 
     return {
       command: trimmed,
       success: true,
-      message: `Updated note "${noteEntry.title}": ${changes.join(
-        ", "
-      )}${fuzzyNote}`,
+      message: `Updated note "${title}"`,
       timestamp,
     };
   }

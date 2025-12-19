@@ -3038,14 +3038,8 @@ function convertToolToCommand(
     // Note Management
     case "create_note": {
       // Use /create_note command
-      // Format: /create_note: title | content | on_triggers | off_triggers
-      const onTriggersStr = args.onTriggers?.length
-        ? args.onTriggers.join(", ")
-        : "";
-      const offTriggersStr = args.offTriggers?.length
-        ? args.offTriggers.join(", ")
-        : "";
-      return `/create_note: ${args.title} | ${args.content} | ${onTriggersStr} | ${offTriggersStr}`;
+      // Format: /create_note: title | content | type
+      return `/create_note: ${args.title} | ${args.content} | ${args.type || ""}`;
     }
 
     case "delete_note":
@@ -3055,17 +3049,11 @@ function convertToolToCommand(
       return null; // Handled directly in executeTools
 
     case "edit_note": {
-      // Format: /note_update: title | newTitle | content | on | onTriggers | offTriggers
+      // Format: /note_update: title | newTitle | content | type
       const newTitle = args.newTitle || "";
       const content = args.content || "";
-      const on = args.on !== undefined ? String(args.on) : "";
-      const onTriggersStr = Array.isArray(args.onTriggers)
-        ? args.onTriggers.join(",")
-        : "";
-      const offTriggersStr = Array.isArray(args.offTriggers)
-        ? args.offTriggers.join(",")
-        : "";
-      return `/note_update: ${args.title} | ${newTitle} | ${content} | ${on} | ${onTriggersStr} | ${offTriggersStr}`;
+      const type = args.type || "";
+      return `/note_update: ${args.title} | ${newTitle} | ${content} | ${type}`;
     }
 
     case "edit_lore_replace":

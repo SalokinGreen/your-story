@@ -785,33 +785,32 @@ const createNoteTool: ToolSchema = {
   function: {
     name: "create_note",
     description:
-      "Add a new note entry. IMPORTANT: Always provide onTriggers for notes that should be discovered during play. Triggers use EXACT word matching (case-insensitive), so include variations like 'dragon', 'dragons', 'Dragon'. Without triggers, note is visible immediately.",
+      "Add a new note entry to the game world. Notes are detailed reference entries for locations, NPCs, items, lore, or secrets. IMPORTANT: Use the 'type' field to categorize the note so it appears in the correct folder.",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Note entry title (must be unique)",
+          description: "Note entry title (must be unique, e.g., 'The Frozen Wastes')",
         },
         content: {
           type: "string",
-          description: "Note text content",
+          description: "Detailed note text content (1-3 paragraphs recommended)",
         },
-        on: {
-          type: "boolean",
-          description:
-            "Whether note is initially visible (default: false if triggers provided, true otherwise)",
-        },
-        onTriggers: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "Words that reveal this note when mentioned in the story. Uses EXACT matching - 'zombie' won't match 'zombies', so include all variations. Example: ['zombie', 'zombies', 'undead', 'Zombie']",
-        },
-        offTriggers: {
-          type: "array",
-          items: { type: "string" },
-          description: "Words that hide this note when mentioned (optional)",
+        type: {
+          type: "string",
+          enum: [
+            "lore",
+            "npc",
+            "location",
+            "item",
+            "faction",
+            "event",
+            "secret",
+            "dm_instructions",
+            "mechanics",
+          ],
+          description: "Category for the note (defaults to 'lore')",
         },
       },
       required: ["title", "content"],
@@ -856,13 +855,13 @@ const updateNoteTool: ToolSchema = {
   function: {
     name: "edit_note",
     description:
-      "Update an existing note entry's content or triggers. Use this to modify notes as the story reveals more information.",
+      "Update an existing note entry's content, title, or type. Use this to modify notes as the story reveals more information.",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Note entry title to update (fuzzy matching supported)",
+          description: "Current note entry title (fuzzy matching supported)",
         },
         newTitle: {
           type: "string",
@@ -872,19 +871,20 @@ const updateNoteTool: ToolSchema = {
           type: "string",
           description: "New content for the note entry (optional)",
         },
-        on: {
-          type: "boolean",
-          description: "Whether note is visible (optional)",
-        },
-        onTriggers: {
-          type: "array",
-          items: { type: "string" },
-          description: "New words that reveal this note (replaces existing)",
-        },
-        offTriggers: {
-          type: "array",
-          items: { type: "string" },
-          description: "New words that hide this note (replaces existing)",
+        type: {
+          type: "string",
+          enum: [
+            "lore",
+            "npc",
+            "location",
+            "item",
+            "faction",
+            "event",
+            "secret",
+            "dm_instructions",
+            "mechanics",
+          ],
+          description: "Update the note category (optional)",
         },
       },
       required: ["title"],

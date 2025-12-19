@@ -15,6 +15,8 @@ import { getModelConfig } from "@/app/misc/ai_prices";
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  reasoning?: string;
+  reasoning_details?: any[];
   tool_calls?: any[];
   tool_call_id?: string;
 };
@@ -1996,15 +1998,20 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
         messages.push({
           role: "assistant",
           content: cleanString(part.raw || part.content),
+          reasoning: part.reasoning,
+          reasoning_details: part.reasoning_details,
           tool_calls: part.toolCalls.map(
             (tc: {
               id: string;
               type?: string;
               function: { name: string; arguments: string };
+              extra_content?: any;
             }) => ({
               id: tc.id,
               type: "function" as const,
               function: tc.function,
+              // Preserve extra_content for Google (contains thought_signature for thinking models)
+              ...(tc.extra_content ? { extra_content: tc.extra_content } : {}),
             })
           ),
         });
@@ -2094,10 +2101,13 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
           id: string;
           type?: string;
           function: { name: string; arguments: string };
+          extra_content?: any;
         }) => ({
           id: tc.id,
           type: "function" as const,
           function: tc.function,
+          // Preserve extra_content for Google (contains thought_signature for thinking models)
+          ...(tc.extra_content ? { extra_content: tc.extra_content } : {}),
         })
       ),
     });
@@ -3000,6 +3010,8 @@ Write immersive prose. The player should experience the story, not see game mech
             const assistantMsg: ChatMessage = {
               role: "assistant",
               content: cleanString(msg.content),
+              reasoning: msg.reasoning,
+              reasoning_details: msg.reasoning_details,
             };
             if (msg.tool_calls && msg.tool_calls.length > 0) {
               assistantMsg.tool_calls = msg.tool_calls;

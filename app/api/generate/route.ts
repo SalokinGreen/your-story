@@ -34,6 +34,8 @@ export const maxDuration = 60; // Allow up to 60 seconds for generation
 interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  reasoning?: string;
+  reasoning_details?: any[];
   tool_calls?: any[];
   tool_call_id?: string;
 }
@@ -68,6 +70,8 @@ interface AIResponse {
     message: {
       role: string;
       content: string | null;
+      reasoning?: string;
+      reasoning_details?: any[];
       tool_calls?: ToolCall[];
     };
     finish_reason: string;
@@ -272,7 +276,10 @@ async function callAI(
   const requestBody: any = {
     model,
     messages: processedMessages.map((m, index) => {
-      const msg: any = { role: m.role, content: m.content || "" };
+      const msg: any = {
+        role: m.role,
+        content: m.content !== undefined ? m.content : "",
+      };
       if (m.tool_calls) {
         // Re-serialize tool call arguments to strings if they're objects
         // (AI APIs expect arguments as JSON strings, not parsed objects)
@@ -293,9 +300,37 @@ async function callAI(
                     : "{}",
               },
             };
-            // Preserve extra_content for Google (contains thought_signature for thinking models)
-            if (tc.extra_content && provider === "google") {
+            // Preserve extra_content (contains Google's thought_signature for thinking models)
+            if (
+              tc.extra_content &&
+              (provider === "google" || provider === "openrouter")
+            ) {
               mapped.extra_content = tc.extra_content;
+            }
+
+            // FIX: Cross-populate extra_content from reasoning_details if missing from tool call
+            // This is a "belts and suspenders" fix for Google models on OpenRouter
+            if (
+              !mapped.extra_content &&
+              m.reasoning_details &&
+              (provider === "google" || provider === "openrouter")
+            ) {
+              const details = m.reasoning_details;
+              const matchingDetail = details.find(
+                (d: any) =>
+                  d.id === tc.id ||
+                  (d.type === "reasoning.encrypted" && details.length === 1)
+              );
+              if (
+                matchingDetail?.data &&
+                matchingDetail?.type === "reasoning.encrypted"
+              ) {
+                mapped.extra_content = {
+                  google: {
+                    thought_signature: matchingDetail.data,
+                  },
+                };
+              }
             }
             return mapped;
           });
@@ -556,6 +591,8 @@ export async function POST(req: NextRequest) {
     );
 
     const content = aiResponse.choices[0]?.message?.content || "";
+    const reasoning = aiResponse.choices[0]?.message?.reasoning || "";
+    const reasoning_details = aiResponse.choices[0]?.message?.reasoning_details || [];
     const toolCalls = aiResponse.choices[0]?.message?.tool_calls;
     const usage = aiResponse.usage || {
       prompt_tokens: 0,
@@ -611,6 +648,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({
       content,
+      reasoning,
+      reasoning_details,
       toolCalls: toolCalls || [],
       meta: {
         model: modelConfig.model,

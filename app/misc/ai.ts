@@ -14,6 +14,8 @@ import { TOOL_SCHEMAS, TOOL_NAMES } from "@/app/misc/toolSchemas";
 export type ChatMessage = {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  reasoning?: string; // AI reasoning/thinking
+  reasoning_details?: any[]; // Structured reasoning tokens (ReasoningDetail[])
   tool_calls?: any[]; // OpenAI/DeepSeek format tool calls
   tool_call_id?: string; // For tool role messages
 };
@@ -367,6 +369,8 @@ Narrative Best Practices:
         const assistantMessage: ChatMessage = {
           role: "assistant",
           content: cleanString(content),
+          reasoning: part.reasoning,
+          reasoning_details: part.reasoning_details,
         };
 
         // Include tool calls if present
@@ -377,10 +381,13 @@ Narrative Best Practices:
               id: string;
               type?: string;
               function: { name: string; arguments: string };
+              extra_content?: any;
             }) => ({
               id: tc.id,
               type: "function" as const,
               function: tc.function,
+              // Preserve extra_content for Google (contains thought_signature for thinking models)
+              ...(tc.extra_content ? { extra_content: tc.extra_content } : {}),
             })
           );
         }

@@ -168,6 +168,24 @@ export const AI_MODELS = {
       "Google's latest Gemini 3 Flash preview via AI Studio. Requires your own Google API key (BYOK). Great for creative tasks.",
     bannerUrl: undefined,
   },
+  "Open Router Gemini 3 Flash": {
+    name: "Open Router Gemini 3 Flash",
+    original_model: "google/gemini-3-flash-preview",
+    model: "google/gemini-3-flash-preview",
+    maxTokens: 1000000,
+    maxOutputTokens: 65000,
+    provider: "openrouter",
+    supportsToolCalling: true,
+    cost: 1,
+    inputPrice: 0.5,
+    outputPrice: 3,
+    finetunes: [],
+    strengths: ["creativity", "long context", "latest"],
+    weaknesses: ["price", "preview"],
+    description:
+      "Google's latest Gemini 3 Flash preview via Open Router. Great for creative tasks.",
+    bannerUrl: undefined,
+  },
 
   "NovelAI GLM-4-6": {
     name: "NovelAI GLM-4-6 (BYOK)",

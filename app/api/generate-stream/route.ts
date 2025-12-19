@@ -39,6 +39,8 @@ export const maxDuration = 60; // Allow up to 60 seconds for streaming
 interface ChatMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string;
+  reasoning?: string;
+  reasoning_details?: any[];
   tool_calls?: any[];
   tool_call_id?: string;
 }
@@ -504,7 +506,11 @@ export async function POST(req: NextRequest) {
         const requestBody: any = {
           model: modelConfig.model,
           messages: processedMessages.map((m, index) => {
-            const msg: any = { role: m.role, content: m.content || "" };
+            // FIX: Preserve null content (don't force to "") to avoid validation errors on some providers
+            const msg: any = {
+              role: m.role,
+              content: m.content !== undefined ? m.content : "",
+            };
             if (m.tool_calls) {
               // Re-serialize tool call arguments to strings if they're objects
               // (AI APIs expect arguments as JSON strings, not parsed objects)
@@ -525,9 +531,40 @@ export async function POST(req: NextRequest) {
                           : "{}",
                     },
                   };
-                  // Preserve extra_content for Google (contains thought_signature for thinking models)
-                  if (tc.extra_content && modelConfig.provider === "google") {
+                  // Preserve extra_content (contains Google's thought_signature for thinking models)
+                  if (
+                    tc.extra_content &&
+                    (modelConfig.provider === "google" ||
+                      modelConfig.provider === "openrouter")
+                  ) {
                     mapped.extra_content = tc.extra_content;
+                  }
+
+                  // FIX: Cross-populate extra_content from reasoning_details if missing from tool call
+                  // This is a "belts and suspenders" fix for Google models on OpenRouter
+                  if (
+                    !mapped.extra_content &&
+                    m.reasoning_details &&
+                    (modelConfig.provider === "google" ||
+                      modelConfig.provider === "openrouter")
+                  ) {
+                    const details = m.reasoning_details;
+                    const matchingDetail = details.find(
+                      (d: any) =>
+                        d.id === tc.id ||
+                        (d.type === "reasoning.encrypted" &&
+                          details.length === 1)
+                    );
+                    if (
+                      matchingDetail?.data &&
+                      matchingDetail?.type === "reasoning.encrypted"
+                    ) {
+                      mapped.extra_content = {
+                        google: {
+                          thought_signature: matchingDetail.data,
+                        },
+                      };
+                    }
                   }
                   return mapped;
                 });
@@ -682,6 +719,8 @@ export async function POST(req: NextRequest) {
         const decoder = new TextDecoder();
         let buffer = "";
         let fullContent = "";
+        let fullReasoning = "";
+        let reasoningDetails: any[] = [];
         let toolCalls: any[] = [];
         let promptTokens = 0;
         let completionTokens = 0;
@@ -725,6 +764,47 @@ export async function POST(req: NextRequest) {
                     )
                   );
                 }
+              }
+
+              if (delta?.reasoning !== undefined && delta?.reasoning !== null) {
+                fullReasoning += delta.reasoning;
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "reasoning",
+                      content: delta.reasoning,
+                    })}\n\n`
+                  )
+                );
+              }
+
+              if (delta?.reasoning_details) {
+                for (const detail of delta.reasoning_details) {
+                  const index = detail.index ?? reasoningDetails.length;
+                  if (!reasoningDetails[index]) {
+                    reasoningDetails[index] = { ...detail };
+                  } else {
+                    if (detail.text)
+                      reasoningDetails[index].text =
+                        (reasoningDetails[index].text || "") + detail.text;
+                    if (detail.summary)
+                      reasoningDetails[index].summary =
+                        (reasoningDetails[index].summary || "") + detail.summary;
+                    if (detail.data)
+                      reasoningDetails[index].data =
+                        (reasoningDetails[index].data || "") + detail.data;
+                    if (detail.signature)
+                      reasoningDetails[index].signature = detail.signature;
+                  }
+                }
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "reasoning_details",
+                      details: delta.reasoning_details,
+                    })}\n\n`
+                  )
+                );
               }
 
               if (delta?.tool_calls) {

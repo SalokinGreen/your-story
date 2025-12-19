@@ -17,6 +17,8 @@ import {
   ScenePart,
   ActionAnalysis,
   MemoryEntry,
+  GMConversationMessage,
+  ReasoningDetail,
 } from "@/app/misc/structs";
 import {
   buildStoryPrompt,
@@ -320,12 +322,7 @@ export interface GenerationResult {
   gmResults?: GMToolResult[];
   gmStoryContext?: string;
   gmThinking?: string[]; // GM's "[GM]" reasoning text from each round
-  gmConversation?: Array<{
-    role: "assistant" | "tool";
-    content: string;
-    tool_calls?: any[];
-    tool_call_id?: string;
-  }>; // Full GM conversation for context preservation
+  gmConversation?: GMConversationMessage[]; // Full GM conversation for context preservation
   meta: {
     storyMeta?: GenerationMeta;
     toolsMeta?: GenerationMeta;
@@ -341,8 +338,9 @@ export interface GenerationResult {
 // ============================================================
 
 interface StreamEvent {
-  type: "content" | "tool_calls" | "done" | "error";
+  type: "content" | "reasoning" | "reasoning_details" | "tool_calls" | "done" | "error";
   content?: string;
+  details?: ReasoningDetail[];
   toolCalls?: ToolCall[];
   meta?: GenerationMeta;
   error?: string;
@@ -560,6 +558,8 @@ export async function generateStoryTurn(
   let storyMeta: GenerationMeta | undefined;
   let toolsMeta: GenerationMeta | undefined;
   let choicesMeta: GenerationMeta | undefined;
+  let storyReasoning = "";
+  let storyReasoningDetails: ReasoningDetail[] = [];
 
   try {
     // ========================================
@@ -691,16 +691,7 @@ export async function generateStoryTurn(
         // This allows GM to narrate while calling tools, building up the story incrementally
         let gmAccumulatedStory: string[] = [];
         // Local conversation history (will be copied to outer scope at end)
-        let conversationHistory: {
-          role: "assistant" | "user" | "tool";
-          content: string;
-          tool_calls?: {
-            id: string;
-            type: string;
-            function: { name: string; arguments: string };
-          }[];
-          tool_call_id?: string;
-        }[] = [];
+        let conversationHistory: ChatMessage[] = [];
         let isComplete = false;
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
         const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
@@ -794,6 +785,8 @@ export async function generateStoryTurn(
 
           // Stream the GM response
           let gmContent = "";
+          let gmReasoning = "";
+          let gmReasoningDetails: ReasoningDetail[] = [];
           let gmToolCalls: any[] = [];
           let gmResultMeta: any = null;
 
@@ -806,6 +799,34 @@ export async function generateStoryTurn(
               // Stream GM content to callback for real-time display
               callbacks.onGMContent?.(event.content, gmContent);
             }
+            if (event.type === "reasoning" && event.content) {
+              gmReasoning += event.content;
+            }
+            if (event.type === "reasoning_details" && event.details) {
+              for (const detail of event.details) {
+                const index =
+                  detail.index !== undefined
+                    ? detail.index
+                    : gmReasoningDetails.length;
+                if (!gmReasoningDetails[index]) {
+                  gmReasoningDetails[index] = { ...detail };
+                } else {
+                  if (detail.text)
+                    gmReasoningDetails[index].text =
+                      (gmReasoningDetails[index].text || "") + detail.text;
+                  if (detail.summary)
+                    gmReasoningDetails[index].summary =
+                      (gmReasoningDetails[index].summary || "") + detail.summary;
+                  if (detail.data)
+                    gmReasoningDetails[index].data =
+                      (gmReasoningDetails[index].data || "") + detail.data;
+                  if (detail.signature)
+                    gmReasoningDetails[index].signature = detail.signature;
+                  if (detail.id) gmReasoningDetails[index].id = detail.id;
+                  if (detail.type) gmReasoningDetails[index].type = detail.type;
+                }
+              }
+            }
             if (event.type === "tool_calls" && event.toolCalls) {
               gmToolCalls = event.toolCalls;
             }
@@ -817,6 +838,8 @@ export async function generateStoryTurn(
           // Build gmResult object from streamed data
           const gmResult = {
             content: gmContent,
+            reasoning: gmReasoning,
+            reasoning_details: gmReasoningDetails,
             toolCalls: gmToolCalls,
             meta: gmResultMeta,
           };
@@ -943,6 +966,8 @@ export async function generateStoryTurn(
             conversationHistory.push({
               role: "assistant",
               content: gmResult.content || "", // Preserve thinking/prose content
+              reasoning: gmResult.reasoning,
+              reasoning_details: gmResult.reasoning_details,
               tool_calls: gmResult.toolCalls.map((tc: any) => ({
                 id: tc.id,
                 type: "function",
@@ -953,6 +978,8 @@ export async function generateStoryTurn(
                       ? tc.function.arguments
                       : JSON.stringify(tc.function.arguments),
                 },
+                // Preserve extra_content (contains Google's thought_signature)
+                ...(tc.extra_content ? { extra_content: tc.extra_content } : {}),
               })),
             });
 
@@ -1182,7 +1209,15 @@ export async function generateStoryTurn(
         gmConversationHistory = conversationHistory.map((entry) => ({
           role: entry.role as "user" | "assistant" | "tool",
           content: entry.content,
-          ...(entry.tool_calls && { tool_calls: entry.tool_calls }),
+          reasoning: entry.reasoning,
+          reasoning_details: entry.reasoning_details,
+          ...(entry.tool_calls && {
+            tool_calls: entry.tool_calls.map((tc: any) => ({
+              ...tc,
+              // Ensure extra_content is preserved in the copy
+              ...(tc.extra_content ? { extra_content: tc.extra_content } : {}),
+            })),
+          }),
           ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
         }));
 
@@ -1444,11 +1479,42 @@ export async function generateStoryTurn(
       const STORY_MARKER = "Now I write the story.";
       const STOP_MARKER = "[STOP]";
 
-      for await (const event of parseSSEStream(storyResponse)) {
-        if (event.type === "error") {
-          throw new Error(event.error || "Story generation failed");
-        }
-        if (event.type === "content" && event.content) {
+
+          for await (const event of parseSSEStream(storyResponse)) {
+            if (event.type === "error") {
+              throw new Error(event.error || "Story generation failed");
+            }
+            if (event.type === "reasoning" && event.content) {
+              storyReasoning += event.content;
+            }
+            if (event.type === "reasoning_details" && event.details) {
+              for (const detail of event.details) {
+                const index =
+                  detail.index !== undefined
+                    ? detail.index
+                    : storyReasoningDetails.length;
+                if (!storyReasoningDetails[index]) {
+                  storyReasoningDetails[index] = { ...detail };
+                } else {
+                  if (detail.text)
+                    storyReasoningDetails[index].text =
+                      (storyReasoningDetails[index].text || "") + detail.text;
+                  if (detail.summary)
+                    storyReasoningDetails[index].summary =
+                      (storyReasoningDetails[index].summary || "") +
+                      detail.summary;
+                  if (detail.data)
+                    storyReasoningDetails[index].data =
+                      (storyReasoningDetails[index].data || "") + detail.data;
+                  if (detail.signature)
+                    storyReasoningDetails[index].signature = detail.signature;
+                  if (detail.id) storyReasoningDetails[index].id = detail.id;
+                  if (detail.type)
+                    storyReasoningDetails[index].type = detail.type;
+                }
+              }
+            }
+            if (event.type === "content" && event.content) {
           // Skip all content after [STOP] is detected
           if (stopMarkerHit) continue;
 
@@ -2032,7 +2098,15 @@ export async function generateStoryTurn(
       .map((entry) => ({
         role: entry.role as "assistant" | "tool",
         content: entry.content,
-        ...(entry.tool_calls && { tool_calls: entry.tool_calls }),
+        reasoning: entry.reasoning,
+        reasoning_details: entry.reasoning_details,
+        ...(entry.tool_calls && {
+          tool_calls: entry.tool_calls.map((tc: any) => ({
+            ...tc,
+            // Ensure extra_content is preserved for storage
+            ...(tc.extra_content ? { extra_content: tc.extra_content } : {}),
+          })),
+        }),
         ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
       }));
 
@@ -2041,6 +2115,9 @@ export async function generateStoryTurn(
       imageUrl: "",
       user: false,
       role: "assistant",
+      reasoning: storyReasoning || undefined,
+      reasoning_details:
+        storyReasoningDetails.length > 0 ? storyReasoningDetails : undefined,
       choices,
       toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
       toolResponses: allToolResponses.length > 0 ? allToolResponses : undefined,
