@@ -27,8 +27,8 @@ import {
 const MAX_CHUNK_SIZE_MB = 4;
 // Pages per chunk (approximate, will be adjusted based on actual size)
 const PAGES_PER_CHUNK = 15;
-// Maximum concurrent requests to avoid overwhelming the server
-const MAX_CONCURRENT_REQUESTS = 4;
+// Maximum concurrent requests - increased for faster processing
+const MAX_CONCURRENT_REQUESTS = 10;
 // Timeout for summarize requests (4 minutes - server allows 5)
 const SUMMARIZE_TIMEOUT_MS = 240000;
 // Retry attempts for failed requests
@@ -218,6 +218,22 @@ type ProcessingStep =
   | "complete"
   | "error";
 
+// Chunk status for tracking individual chunk processing
+interface ChunkStatus {
+  chunkIndex: number;
+  pageStart: number;
+  pageEnd: number;
+  status: "pending" | "ocr" | "summarizing" | "complete" | "failed";
+  ocrMarkdown?: string;
+  rawSummarizeOutput?: string;
+  error?: string;
+  result?: {
+    lore: StoryLore[];
+    mechanicNotes: StoryLore[];
+    customTables: CustomTable[];
+  };
+}
+
 export default function PDFImporter({
   onImportComplete,
   importTypes = ["lore", "mechanics", "tables"],
@@ -276,6 +292,16 @@ export default function PDFImporter({
   const [shareTags, setShareTags] = useState("");
   const [sharePublic, setSharePublic] = useState(true);
   const [shareUploading, setShareUploading] = useState(false);
+
+  // Chunk tracking state for large PDFs
+  const [chunkStatuses, setChunkStatuses] = useState<ChunkStatus[]>([]);
+  const [showChunkDetails, setShowChunkDetails] = useState(false);
+
+  // JSON Repair Modal state - for manual fixing of broken chunk output
+  const [repairModalOpen, setRepairModalOpen] = useState(false);
+  const [repairChunkIndex, setRepairChunkIndex] = useState<number | null>(null);
+  const [repairContent, setRepairContent] = useState("");
+  const [repairError, setRepairError] = useState("");
 
   // Load saved imports from IndexedDB on mount
   useEffect(() => {
@@ -533,6 +559,267 @@ export default function PDFImporter({
     setShowShareModal(true);
   }, []);
 
+  // Retry a failed chunk
+  const retryChunk = useCallback(
+    async (chunkIndex: number) => {
+      const chunk = chunkStatuses.find((cs) => cs.chunkIndex === chunkIndex);
+      if (!chunk || !chunk.ocrMarkdown) {
+        addNotification("Cannot retry: OCR data not available", "warning");
+        return;
+      }
+
+      const token = await getAuthToken();
+      if (!token) {
+        addNotification("Please sign in to retry", "warning");
+        return;
+      }
+
+      // Update status to summarizing
+      setChunkStatuses((prev) =>
+        prev.map((cs) =>
+          cs.chunkIndex === chunkIndex
+            ? { ...cs, status: "summarizing", error: undefined }
+            : cs
+        )
+      );
+
+      try {
+        const summarizeResponse = await fetchWithRetry(
+          "/api/ocr/summarize",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              markdown: chunk.ocrMarkdown,
+              focus: ["all"],
+              customInstructions:
+                customInstructions +
+                `\n\nNote: This is pages ${chunk.pageStart}-${chunk.pageEnd} of a larger document.`,
+              model:
+                aiModel === "custom-openrouter"
+                  ? customOpenRouterModel
+                  : aiModel,
+              maxTokens: maxOutputTokens,
+              openRouterKey: keys.openRouterKey,
+              deepseekKey: keys.deepseekKey,
+            }),
+          },
+          SUMMARIZE_TIMEOUT_MS,
+          MAX_RETRIES
+        );
+
+        if (!summarizeResponse.ok) {
+          const errorMsg = await summarizeResponse.text();
+          setChunkStatuses((prev) =>
+            prev.map((cs) =>
+              cs.chunkIndex === chunkIndex
+                ? { ...cs, status: "failed", error: errorMsg }
+                : cs
+            )
+          );
+          addNotification(`Retry failed: ${errorMsg}`, "failure");
+          return;
+        }
+
+        const resultText = await summarizeResponse.text();
+        let result;
+        try {
+          result = JSON.parse(resultText);
+        } catch {
+          setChunkStatuses((prev) =>
+            prev.map((cs) =>
+              cs.chunkIndex === chunkIndex
+                ? {
+                    ...cs,
+                    status: "failed",
+                    error: "JSON parse error",
+                    rawSummarizeOutput: resultText,
+                  }
+                : cs
+            )
+          );
+          addNotification(
+            "Retry failed: JSON parse error. You can try manual fix.",
+            "warning"
+          );
+          return;
+        }
+
+        // Success - update chunk status
+        setChunkStatuses((prev) =>
+          prev.map((cs) =>
+            cs.chunkIndex === chunkIndex
+              ? {
+                  ...cs,
+                  status: "complete",
+                  error: undefined,
+                  rawSummarizeOutput: undefined,
+                  result: {
+                    lore: result.lore || [],
+                    mechanicNotes: result.mechanicNotes || [],
+                    customTables: result.customTables || [],
+                  },
+                }
+              : cs
+          )
+        );
+        addNotification(`Chunk ${chunkIndex + 1} retry successful!`, "success");
+      } catch (err: any) {
+        setChunkStatuses((prev) =>
+          prev.map((cs) =>
+            cs.chunkIndex === chunkIndex
+              ? {
+                  ...cs,
+                  status: "failed",
+                  error: err.message || "Unknown error",
+                }
+              : cs
+          )
+        );
+        addNotification(`Retry failed: ${err.message}`, "failure");
+      }
+    },
+    [
+      chunkStatuses,
+      customInstructions,
+      aiModel,
+      customOpenRouterModel,
+      maxOutputTokens,
+      keys,
+      addNotification,
+    ]
+  );
+
+  // Open repair modal for a failed chunk
+  const openRepairModal = useCallback(
+    (chunkIndex: number) => {
+      const chunk = chunkStatuses.find((cs) => cs.chunkIndex === chunkIndex);
+      if (!chunk || !chunk.rawSummarizeOutput) {
+        addNotification("No raw output available to repair", "warning");
+        return;
+      }
+      setRepairChunkIndex(chunkIndex);
+      setRepairContent(chunk.rawSummarizeOutput);
+      setRepairError(chunk.error || "JSON parse error");
+      setRepairModalOpen(true);
+    },
+    [chunkStatuses, addNotification]
+  );
+
+  // Handle repair save - apply manually fixed JSON
+  const handleRepairSave = useCallback(
+    (fixedContent: string) => {
+      if (repairChunkIndex === null) return;
+
+      try {
+        const result = JSON.parse(fixedContent);
+
+        // Update chunk status with parsed results
+        setChunkStatuses((prev) =>
+          prev.map((cs) =>
+            cs.chunkIndex === repairChunkIndex
+              ? {
+                  ...cs,
+                  status: "complete",
+                  error: undefined,
+                  rawSummarizeOutput: undefined,
+                  result: {
+                    lore: result.lore || [],
+                    mechanicNotes: result.mechanicNotes || [],
+                    customTables: result.customTables || [],
+                  },
+                }
+              : cs
+          )
+        );
+
+        // Close modal
+        setRepairModalOpen(false);
+        setRepairChunkIndex(null);
+        setRepairContent("");
+        setRepairError("");
+
+        addNotification(
+          `Chunk ${repairChunkIndex + 1} recovered from fixed JSON!`,
+          "success"
+        );
+      } catch (err) {
+        addNotification(
+          `Invalid JSON: ${err instanceof Error ? err.message : "Parse error"}`,
+          "warning"
+        );
+      }
+    },
+    [repairChunkIndex, addNotification]
+  );
+
+  // Collect all chunk results (for completing import after fixing)
+  const collectChunkResults = useCallback(() => {
+    const allLore: StoryLore[] = [];
+    const allMechanicNotes: StoryLore[] = [];
+    const allCustomTables: CustomTable[] = [];
+
+    for (const chunk of chunkStatuses) {
+      if (chunk.status === "complete" && chunk.result) {
+        allLore.push(...chunk.result.lore);
+        allMechanicNotes.push(...chunk.result.mechanicNotes);
+        allCustomTables.push(...chunk.result.customTables);
+      }
+    }
+
+    return {
+      lore: allLore,
+      mechanicNotes: allMechanicNotes,
+      customTables: allCustomTables,
+    };
+  }, [chunkStatuses]);
+
+  // Complete import with current chunk results (even if some failed)
+  const completeWithCurrentResults = useCallback(() => {
+    const results = collectChunkResults();
+    const completedCount = chunkStatuses.filter(
+      (cs) => cs.status === "complete"
+    ).length;
+    const failedCount = chunkStatuses.filter(
+      (cs) => cs.status === "failed"
+    ).length;
+
+    const importData = {
+      lore: results.lore,
+      mechanicNotes: results.mechanicNotes,
+      customTables: results.customTables,
+      summary: `Imported ${completedCount} chunks (${failedCount} failed)`,
+    };
+
+    // Save to IndexedDB
+    saveImport(importData);
+
+    // Call callback
+    onImportComplete(importData);
+
+    const totalItems =
+      results.lore.length +
+      results.mechanicNotes.length +
+      results.customTables.length;
+    addNotification(
+      `Imported ${totalItems} items from ${completedCount} chunks (${failedCount} skipped)`,
+      failedCount > 0 ? "warning" : "success"
+    );
+
+    // Close modal
+    setIsOpen(false);
+    resetState();
+  }, [
+    collectChunkResults,
+    chunkStatuses,
+    saveImport,
+    onImportComplete,
+    addNotification,
+  ]);
+
   // Get max output limit based on selected model
   const getModelMaxOutput = () => {
     // Look up actual model limits from AI_MODELS config
@@ -652,9 +939,9 @@ export default function PDFImporter({
         let combinedCost = 0;
 
         // For chunked processing, we summarize each chunk and merge results
-        let chunkLore: StoryLore[] = [];
-        let chunkMechanics: StoryLore[] = [];
-        let chunkTables: CustomTable[] = [];
+        const chunkLore: StoryLore[] = [];
+        const chunkMechanics: StoryLore[] = [];
+        const chunkTables: CustomTable[] = [];
 
         if (needsChunking) {
           // Large PDF: Split into chunks, then OCR all, then summarize all
@@ -668,6 +955,15 @@ export default function PDFImporter({
 
           const totalChunks = chunks.length;
 
+          // Initialize chunk statuses for tracking
+          const initialStatuses: ChunkStatus[] = chunks.map((chunk, idx) => ({
+            chunkIndex: idx,
+            pageStart: chunk.pageStart,
+            pageEnd: chunk.pageEnd,
+            status: "pending",
+          }));
+          setChunkStatuses(initialStatuses);
+
           // Phase 1: OCR all chunks with limited concurrency (5% - 45% progress)
           setStep("ocr");
           setStatusMessage(
@@ -676,6 +972,13 @@ export default function PDFImporter({
           setProgress(fileProgressStart + fileProgressRange * 0.1);
 
           const ocrTasks = chunks.map((chunk, chunkIdx) => async () => {
+            // Update status to ocr
+            setChunkStatuses((prev) =>
+              prev.map((cs) =>
+                cs.chunkIndex === chunkIdx ? { ...cs, status: "ocr" } : cs
+              )
+            );
+
             const ocrResponse = await fetchWithRetry(
               "/api/ocr/process",
               {
@@ -712,7 +1015,17 @@ export default function PDFImporter({
             const chunkResult: OCRProcessResult & { cost: number } =
               await ocrResponse.json();
 
+            // Update status with OCR markdown
+            setChunkStatuses((prev) =>
+              prev.map((cs) =>
+                cs.chunkIndex === chunkIdx
+                  ? { ...cs, ocrMarkdown: chunkResult.markdown }
+                  : cs
+              )
+            );
+
             return {
+              chunkIndex: chunkIdx,
               markdown: chunkResult.markdown,
               pageStart: chunk.pageStart,
               pageEnd: chunk.pageEnd,
@@ -767,6 +1080,15 @@ export default function PDFImporter({
           }
 
           const summarizeTasks = ocrResults.map((ocr) => async () => {
+            // Update status to summarizing
+            setChunkStatuses((prev) =>
+              prev.map((cs) =>
+                cs.chunkIndex === ocr.chunkIndex
+                  ? { ...cs, status: "summarizing" }
+                  : cs
+              )
+            );
+
             try {
               const summarizeResponse = await fetchWithRetry(
                 "/api/ocr/summarize",
@@ -801,16 +1123,93 @@ export default function PDFImporter({
                   `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization failed:`,
                   errorMsg
                 );
-                return null;
+                // Update status to failed
+                setChunkStatuses((prev) =>
+                  prev.map((cs) =>
+                    cs.chunkIndex === ocr.chunkIndex
+                      ? { ...cs, status: "failed", error: errorMsg }
+                      : cs
+                  )
+                );
+                return {
+                  chunkIndex: ocr.chunkIndex,
+                  success: false,
+                  error: errorMsg,
+                };
               }
 
-              return await summarizeResponse.json();
+              const resultText = await summarizeResponse.text();
+              let result;
+              try {
+                result = JSON.parse(resultText);
+              } catch (parseError) {
+                // Store raw output for manual repair
+                setChunkStatuses((prev) =>
+                  prev.map((cs) =>
+                    cs.chunkIndex === ocr.chunkIndex
+                      ? {
+                          ...cs,
+                          status: "failed",
+                          error: "JSON parse error",
+                          rawSummarizeOutput: resultText,
+                        }
+                      : cs
+                  )
+                );
+                return {
+                  chunkIndex: ocr.chunkIndex,
+                  success: false,
+                  error: "JSON parse error",
+                  rawOutput: resultText,
+                };
+              }
+
+              // Update status to complete with results
+              setChunkStatuses((prev) =>
+                prev.map((cs) =>
+                  cs.chunkIndex === ocr.chunkIndex
+                    ? {
+                        ...cs,
+                        status: "complete",
+                        result: {
+                          lore: result.lore || [],
+                          mechanicNotes: result.mechanicNotes || [],
+                          customTables: result.customTables || [],
+                        },
+                      }
+                    : cs
+                )
+              );
+
+              return {
+                chunkIndex: ocr.chunkIndex,
+                success: true,
+                lore: result.lore || [],
+                mechanicNotes: result.mechanicNotes || [],
+                customTables: result.customTables || [],
+              };
             } catch (err: any) {
               console.error(
                 `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization error:`,
                 err.message || err
               );
-              return null;
+              // Update status to failed
+              setChunkStatuses((prev) =>
+                prev.map((cs) =>
+                  cs.chunkIndex === ocr.chunkIndex
+                    ? {
+                        ...cs,
+                        status: "failed",
+                        error: err.message || "Unknown error",
+                      }
+                    : cs
+                )
+              );
+              return {
+                chunkIndex: ocr.chunkIndex,
+                success: false,
+                error: err.message,
+              };
             }
           });
 
@@ -830,16 +1229,19 @@ export default function PDFImporter({
           );
 
           // Count failures and warn user
-          const failedCount = summarizeResults.filter((r) => r === null).length;
+          const failedResults = summarizeResults.filter((r) => !r.success);
+          const failedCount = failedResults.length;
           if (failedCount > 0) {
             console.warn(
               `${failedCount}/${summarizeResults.length} chunks failed to summarize`
             );
+            // Show chunk details panel for failed chunks
+            setShowChunkDetails(true);
           }
 
           // Collect results from successful summarizations
           for (const result of summarizeResults) {
-            if (result) {
+            if (result.success) {
               chunkLore.push(...(result.lore || []));
               chunkMechanics.push(...(result.mechanicNotes || []));
               chunkTables.push(...(result.customTables || []));
@@ -1080,6 +1482,12 @@ export default function PDFImporter({
     setExtractedMarkdown("");
     setPageCount(0);
     setCurrentFileIndex(0);
+    setChunkStatuses([]);
+    setShowChunkDetails(false);
+    setRepairModalOpen(false);
+    setRepairChunkIndex(null);
+    setRepairContent("");
+    setRepairError("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -1234,6 +1642,201 @@ export default function PDFImporter({
                   </div>
                 </div>
               )}
+
+              {/* Chunk Details Panel - Shows status of individual chunks */}
+              {chunkStatuses.length > 0 &&
+                (step === "summarizing" ||
+                  step === "complete" ||
+                  step === "error" ||
+                  chunkStatuses.some((cs) => cs.status === "failed")) && (
+                  <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 overflow-hidden">
+                    <button
+                      onClick={() => setShowChunkDetails(!showChunkDetails)}
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-900/30 transition-colors"
+                    >
+                      <div className="flex items-center gap-2">
+                        <DynamicIcon
+                          name="Layers"
+                          className="w-4 h-4 text-blue-400"
+                        />
+                        <span className="text-sm font-medium text-blue-200">
+                          Chunk Status (
+                          {
+                            chunkStatuses.filter(
+                              (cs) => cs.status === "complete"
+                            ).length
+                          }
+                          /{chunkStatuses.length} complete)
+                        </span>
+                        {chunkStatuses.some((cs) => cs.status === "failed") && (
+                          <span className="px-2 py-0.5 bg-red-900/50 text-red-300 text-xs rounded-full">
+                            {
+                              chunkStatuses.filter(
+                                (cs) => cs.status === "failed"
+                              ).length
+                            }{" "}
+                            failed
+                          </span>
+                        )}
+                      </div>
+                      <DynamicIcon
+                        name={showChunkDetails ? "ChevronUp" : "ChevronDown"}
+                        className="w-4 h-4 text-blue-400"
+                      />
+                    </button>
+
+                    {showChunkDetails && (
+                      <div className="p-3 pt-0 space-y-2 max-h-60 overflow-y-auto">
+                        {chunkStatuses.map((chunk) => (
+                          <div
+                            key={chunk.chunkIndex}
+                            className={`flex items-center gap-3 p-2 rounded-lg ${
+                              chunk.status === "complete"
+                                ? "bg-green-900/20 border border-green-700/30"
+                                : chunk.status === "failed"
+                                ? "bg-red-900/20 border border-red-700/30"
+                                : chunk.status === "summarizing" ||
+                                  chunk.status === "ocr"
+                                ? "bg-blue-900/30 border border-blue-700/30"
+                                : "bg-gray-900/20 border border-gray-700/30"
+                            }`}
+                          >
+                            <div className="shrink-0">
+                              {chunk.status === "complete" && (
+                                <DynamicIcon
+                                  name="CheckCircle"
+                                  className="w-5 h-5 text-green-400"
+                                />
+                              )}
+                              {chunk.status === "failed" && (
+                                <DynamicIcon
+                                  name="XCircle"
+                                  className="w-5 h-5 text-red-400"
+                                />
+                              )}
+                              {(chunk.status === "summarizing" ||
+                                chunk.status === "ocr") && (
+                                <DynamicIcon
+                                  name="Loader2"
+                                  className="w-5 h-5 text-blue-400 animate-spin"
+                                />
+                              )}
+                              {chunk.status === "pending" && (
+                                <DynamicIcon
+                                  name="Clock"
+                                  className="w-5 h-5 text-gray-400"
+                                />
+                              )}
+                            </div>
+
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white">
+                                Chunk {chunk.chunkIndex + 1}: Pages{" "}
+                                {chunk.pageStart}-{chunk.pageEnd}
+                              </p>
+                              {chunk.status === "complete" && chunk.result && (
+                                <p className="text-xs text-green-300/70">
+                                  {chunk.result.lore.length} lore,{" "}
+                                  {chunk.result.mechanicNotes.length} mechanics,{" "}
+                                  {chunk.result.customTables.length} tables
+                                </p>
+                              )}
+                              {chunk.status === "failed" && chunk.error && (
+                                <p
+                                  className="text-xs text-red-300/70 truncate"
+                                  title={chunk.error}
+                                >
+                                  {chunk.error}
+                                </p>
+                              )}
+                              {chunk.status === "summarizing" && (
+                                <p className="text-xs text-blue-300/70">
+                                  Creating notes...
+                                </p>
+                              )}
+                              {chunk.status === "ocr" && (
+                                <p className="text-xs text-blue-300/70">
+                                  Extracting text...
+                                </p>
+                              )}
+                            </div>
+
+                            {/* Actions for failed chunks */}
+                            {chunk.status === "failed" && (
+                              <div className="flex gap-1 shrink-0">
+                                <button
+                                  onClick={() => retryChunk(chunk.chunkIndex)}
+                                  className="px-2 py-1 text-xs bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors flex items-center gap-1"
+                                  title="Retry this chunk"
+                                >
+                                  <DynamicIcon
+                                    name="RefreshCw"
+                                    className="w-3 h-3"
+                                  />
+                                  Retry
+                                </button>
+                                {chunk.rawSummarizeOutput && (
+                                  <button
+                                    onClick={() =>
+                                      openRepairModal(chunk.chunkIndex)
+                                    }
+                                    className="px-2 py-1 text-xs bg-amber-600/80 hover:bg-amber-600 text-white rounded transition-colors flex items-center gap-1"
+                                    title="Manually fix JSON"
+                                  >
+                                    <DynamicIcon
+                                      name="Wrench"
+                                      className="w-3 h-3"
+                                    />
+                                    Fix
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+
+                        {/* Complete with current results button */}
+                        {chunkStatuses.some((cs) => cs.status === "failed") &&
+                          chunkStatuses.some(
+                            (cs) => cs.status === "complete"
+                          ) && (
+                            <div className="pt-2 border-t border-blue-700/30">
+                              <button
+                                onClick={completeWithCurrentResults}
+                                className="w-full px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                              >
+                                <DynamicIcon
+                                  name="Download"
+                                  className="w-4 h-4"
+                                />
+                                Complete Import with{" "}
+                                {
+                                  chunkStatuses.filter(
+                                    (cs) => cs.status === "complete"
+                                  ).length
+                                }{" "}
+                                Chunks
+                              </button>
+                              <p className="text-xs text-blue-300/50 text-center mt-1">
+                                Skip{" "}
+                                {
+                                  chunkStatuses.filter(
+                                    (cs) => cs.status === "failed"
+                                  ).length
+                                }{" "}
+                                failed chunk
+                                {chunkStatuses.filter(
+                                  (cs) => cs.status === "failed"
+                                ).length !== 1
+                                  ? "s"
+                                  : ""}
+                              </p>
+                            </div>
+                          )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
               {/* Error State */}
               {step === "error" && (
@@ -2063,6 +2666,164 @@ export default function PDFImporter({
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* JSON Repair Modal - for manually fixing broken chunk output */}
+      {repairModalOpen && repairChunkIndex !== null && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="bg-blue-950 border border-blue-700/50 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-blue-700/30">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <DynamicIcon
+                    name="Wrench"
+                    className="w-5 h-5 text-amber-400"
+                  />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">
+                    Fix JSON Output
+                  </h3>
+                  <p className="text-sm text-blue-300/60">
+                    Chunk {repairChunkIndex + 1}: Pages{" "}
+                    {
+                      chunkStatuses.find(
+                        (cs) => cs.chunkIndex === repairChunkIndex
+                      )?.pageStart
+                    }
+                    -
+                    {
+                      chunkStatuses.find(
+                        (cs) => cs.chunkIndex === repairChunkIndex
+                      )?.pageEnd
+                    }
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setRepairModalOpen(false);
+                  setRepairChunkIndex(null);
+                  setRepairContent("");
+                  setRepairError("");
+                }}
+                className="p-2 text-blue-300/60 hover:text-white transition-colors"
+              >
+                <DynamicIcon name="X" className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Error message */}
+            <div className="px-4 py-2 bg-red-900/20 border-b border-red-700/30">
+              <p className="text-sm text-red-300">
+                <span className="font-semibold">Error:</span> {repairError}
+              </p>
+              <p className="text-xs text-red-300/70 mt-1">
+                The AI output couldn&apos;t be parsed. You can try to fix the
+                JSON manually below.
+              </p>
+            </div>
+
+            {/* Editor area */}
+            <div className="flex-1 p-4 overflow-hidden flex flex-col min-h-0">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-blue-300/60">
+                  Raw output ({repairContent.length.toLocaleString()} chars)
+                </span>
+                <button
+                  onClick={() => {
+                    try {
+                      // Try to format JSON nicely
+                      let jsonContent = repairContent.trim();
+                      const jsonBlockMatch = jsonContent.match(
+                        /```(?:json)?\s*([\s\S]*?)\s*```/
+                      );
+                      if (jsonBlockMatch) {
+                        jsonContent = jsonBlockMatch[1].trim();
+                      }
+                      jsonContent = jsonContent
+                        .replace(/```json\s*/gi, "")
+                        .replace(/```\s*/g, "");
+
+                      const startIndex = jsonContent.indexOf("{");
+                      const endIndex = jsonContent.lastIndexOf("}");
+                      if (startIndex !== -1 && endIndex !== -1) {
+                        jsonContent = jsonContent.slice(
+                          startIndex,
+                          endIndex + 1
+                        );
+                      }
+
+                      const parsed = JSON.parse(jsonContent);
+                      setRepairContent(JSON.stringify(parsed, null, 2));
+                    } catch {
+                      addNotification(
+                        "Cannot format - JSON is not valid. Try fixing the errors first.",
+                        "warning"
+                      );
+                    }
+                  }}
+                  className="px-3 py-1 text-xs bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                >
+                  Format JSON
+                </button>
+              </div>
+              <textarea
+                value={repairContent}
+                onChange={(e) => setRepairContent(e.target.value)}
+                className="flex-1 w-full min-h-[400px] bg-blue-900/30 border border-blue-700/30 rounded-lg p-3 font-mono text-sm text-blue-100 resize-y focus:outline-none focus:border-blue-500"
+                placeholder="Paste or edit JSON content here..."
+                spellCheck={false}
+              />
+            </div>
+
+            {/* Footer with actions */}
+            <div className="flex items-center justify-between p-4 border-t border-blue-700/30 bg-blue-900/20">
+              <div className="text-xs text-blue-300/50">
+                Tip: Look for missing commas, unclosed brackets, or truncated
+                strings
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    try {
+                      JSON.parse(repairContent);
+                      addNotification("JSON is valid!", "success");
+                    } catch (e) {
+                      addNotification(
+                        `Invalid JSON: ${
+                          e instanceof Error ? e.message : "Parse error"
+                        }`,
+                        "warning"
+                      );
+                    }
+                  }}
+                  className="px-4 py-2 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
+                >
+                  Validate
+                </button>
+                <button
+                  onClick={() => {
+                    setRepairModalOpen(false);
+                    setRepairChunkIndex(null);
+                    setRepairContent("");
+                    setRepairError("");
+                  }}
+                  className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleRepairSave(repairContent)}
+                  className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-colors"
+                >
+                  Save & Apply
+                </button>
+              </div>
             </div>
           </div>
         </div>
