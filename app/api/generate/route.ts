@@ -280,6 +280,12 @@ async function callAI(
         role: m.role,
         content: m.content !== undefined ? m.content : "",
       };
+
+      // Restore reasoning/thinking details for models that require them (Gemini 3 on OpenRouter)
+      if (provider === "openrouter" || provider === "google") {
+        if (m.reasoning) msg.reasoning = m.reasoning;
+        if (m.reasoning_details) msg.reasoning_details = m.reasoning_details;
+      }
       if (m.tool_calls) {
         // Re-serialize tool call arguments to strings if they're objects
         // (AI APIs expect arguments as JSON strings, not parsed objects)

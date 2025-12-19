@@ -10,6 +10,7 @@ import STTButton from "../components/STTButton";
 import CombatDisplay from "../components/CombatDisplay";
 import type { SyncStatus } from "../misc/localStoryManager";
 import type { GMToolResult } from "../misc/gmExecutor";
+import { stripThinkingTags } from "../misc/ai";
 
 interface StoryProps {
   storyData: StoryData;
@@ -862,8 +863,9 @@ const prettify = (
   showHiddenMessages: boolean = false,
   fontSettings?: FontSettings
 ) => {
-  // Process hidden text before rendering
-  const processedText = parseHiddenText(text, showHiddenMessages);
+  // Process tags and hidden text before rendering
+  const cleanedText = stripThinkingTags(text);
+  const processedText = parseHiddenText(cleanedText, showHiddenMessages);
 
   const customStyle = fontSettings
     ? {

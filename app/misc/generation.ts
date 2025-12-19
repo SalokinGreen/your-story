@@ -34,6 +34,12 @@ import {
   GM_STAGE_AFFIRMATION,
 } from "@/app/misc/ai_staged";
 import {
+  outputToScenePart,
+  stripThinkingTags,
+  extractThinkingTags,
+  detectRepetition,
+} from "@/app/misc/ai";
+import {
   executeGMTools,
   GMToolResult,
   GMExecutionResult,
@@ -97,138 +103,8 @@ function stripAffirmationPrefill(content: string, affirmation: string): string {
 }
 
 /**
- * Strip <thinking>...</thinking> tags and other GM markers from content
- * Used to hide GM's internal reasoning from the player
+ * Executes a complete story turn using the 3-stage generation flow.
  */
-function stripThinkingTags(content: string): string {
-  if (!content) return "";
-  // Remove all <thinking>...</thinking> blocks (including multiline)
-  // Handle spaces inside tags like < thinking > that some models output
-  // Also handle malformed tags like <thinking::label] ... </thinking> or <thinking:label>
-  // Also remove **[STORY OUTPUT]** marker and [GAME MASTER] that GM might add
-  // Also remove GM reasoning blocks that aren't in thinking tags (common AI mistake)
-  // Also remove tool call echoes that some models output (→ function_name({...}))
-  return (
-    content
-      // Standard thinking tags: <thinking>...</thinking>
-      .replace(/<\s*thinking\s*>[\s\S]*?<\s*\/\s*thinking\s*>/gi, "")
-      // Malformed thinking tags with labels: <thinking::label] ... </thinking> or <thinking:label>
-      .replace(
-        /<\s*thinking\s*:+[^\]>]*[\]>][\s\S]*?<\s*\/\s*thinking\s*>/gi,
-        ""
-      )
-      // Tags that might only have opening malformed tag without closing: <thinking::label]...(till next tag or end)
-      .replace(/<\s*thinking\s*:+[^\]>]*[\]>][\s\S]*?(?=<\s*thinking|$)/gi, "")
-      .replace(/^\s*\*?\*?\[STORY OUTPUT\]\*?\*?\s*\n?/i, "")
-      .replace(/^\s*\[GAME MASTER\]\s*\n?/i, "")
-      .replace(/^\s*\[GM\]\s*\n?/i, "")
-      // Remove [GM made X tool call(s): ...] markers
-      .replace(/^\s*\[GM made \d+ tool call\(s\):[^\]]*\]\s*\n?/gim, "")
-      // Remove **[GAME MASTER] Reasoning:** blocks and everything until the next --- or prose
-      .replace(
-        /\*?\*?\[(?:GAME MASTER|GM)\]?\s*Reasoning:?\*?\*?[\s\S]*?(?=\n---|\n\n[A-Z]|\n\*\*\[|$)/gi,
-        ""
-      )
-      // Remove numbered reasoning lists (1. **Game System:** etc.)
-      .replace(
-        /^\s*\d+\.\s*\*\*(?:Game System|Skill Check|Target|Reverse DC|Consequences|Damage|Tool Call|Roll Result|Narrative Direction):?\*\*[\s\S]*?(?=\n---|\n\n[A-Z]|\n\*\*\[|$)/gim,
-        ""
-      )
-      // Remove "Rolling X check..." announcements
-      .replace(
-        /^\s*\*?\*?Rolling\s+[\w\s]+\s+check[\s\S]*?\.{3}\s*\*?\*?\s*$/gim,
-        ""
-      )
-      // Remove tool call echoes: → function_name({...}) or → function_name(JSON)
-      // These appear when AI models echo their function calls in text content
-      .replace(/^\s*→\s*\w+\s*\([^)]*\)\s*$/gm, "")
-      .replace(/^\s*→\s*\w+\s*\(\{[\s\S]*?\}\)\s*$/gm, "")
-      // Also remove lines that are just "→ function_name" without parens
-      .replace(/^\s*→\s*\w+\s*$/gm, "")
-      // Remove standalone --- dividers
-      .replace(/^\s*---+\s*$/gm, "")
-      // Clean up multiple newlines
-      .replace(/\n{3,}/g, "\n\n")
-      .trim()
-  );
-}
-
-/**
- * Extract <thinking>...</thinking> content from a string
- * Returns array of thinking blocks found
- * Handles spaces inside tags like < thinking > that some models output
- * Also handles malformed tags like <thinking::label] ... </thinking>
- */
-function extractThinkingTags(content: string): string[] {
-  if (!content) return [];
-  // Match standard thinking tags
-  const standardMatches =
-    content.match(/<\s*thinking\s*>[\s\S]*?<\s*\/\s*thinking\s*>/gi) || [];
-  // Match malformed thinking tags with labels: <thinking::label] ... </thinking>
-  const malformedMatches =
-    content.match(
-      /<\s*thinking\s*:+[^\]>]*[\]>][\s\S]*?<\s*\/\s*thinking\s*>/gi
-    ) || [];
-  const allMatches = [...standardMatches, ...malformedMatches];
-  return allMatches.map((m) =>
-    m
-      .replace(/<\s*thinking\s*:+[^\]>]*[\]>]/gi, "") // Remove malformed opening tags
-      .replace(/<\s*\/?\s*thinking\s*>/gi, "") // Remove standard tags
-      .trim()
-  );
-}
-
-/**
- * Detect if AI output contains repetitive/looping content.
- * This happens when the model gets stuck repeating the same phrase.
- */
-function detectRepetition(content: string): boolean {
-  if (!content || content.length < 500) return false;
-
-  // Method 1: Check for repeated phrases (minimum 30 chars repeated 3+ times)
-  // Look for patterns like "Let me check X. Let me check X. Let me check X."
-  const phrasePattern = /(.{30,100})\1{2,}/;
-  if (phrasePattern.test(content)) {
-    return true;
-  }
-
-  // Method 2: Check for high repetition ratio
-  // Split into sentences and check how many are duplicates
-  const sentences = content
-    .split(/[.!?]+/)
-    .map((s) => s.trim().toLowerCase())
-    .filter((s) => s.length > 20);
-
-  if (sentences.length >= 5) {
-    const uniqueSentences = new Set(sentences);
-    const uniqueRatio = uniqueSentences.size / sentences.length;
-    // If less than 30% unique sentences, it's repetitive
-    if (uniqueRatio < 0.3) {
-      return true;
-    }
-  }
-
-  // Method 3: Check for specific repetition patterns
-  // Count occurrences of common repetitive starters
-  const repetitiveStarters = [
-    "let me check",
-    "let me also check",
-    "i need to check",
-    "i'll check",
-    "checking",
-  ];
-
-  for (const starter of repetitiveStarters) {
-    const count = (content.toLowerCase().match(new RegExp(starter, "g")) || [])
-      .length;
-    // If same phrase appears 5+ times, it's stuck in a loop
-    if (count >= 5) {
-      return true;
-    }
-  }
-
-  return false;
-}
 
 export interface GenerationOptions {
   storyModel: string;
@@ -338,7 +214,13 @@ export interface GenerationResult {
 // ============================================================
 
 interface StreamEvent {
-  type: "content" | "reasoning" | "reasoning_details" | "tool_calls" | "done" | "error";
+  type:
+    | "content"
+    | "reasoning"
+    | "reasoning_details"
+    | "tool_calls"
+    | "done"
+    | "error";
   content?: string;
   details?: ReasoningDetail[];
   toolCalls?: ToolCall[];
@@ -551,6 +433,7 @@ export async function generateStoryTurn(
   let totalTokenCost = 0;
   let finalBalance = 0;
   let storyContent = "";
+  let rawStoryContent = "";
   let allToolCalls: ToolCall[] = [];
   let allToolResponses: CommandResponse[] = [];
   let allStateChanges: string[] = [];
@@ -725,6 +608,10 @@ export async function generateStoryTurn(
                 role: "assistant",
                 content: historyEntry.content || "",
               };
+              if (historyEntry.reasoning)
+                msg.reasoning = historyEntry.reasoning;
+              if (historyEntry.reasoning_details)
+                msg.reasoning_details = historyEntry.reasoning_details;
               if (
                 historyEntry.tool_calls &&
                 historyEntry.tool_calls.length > 0
@@ -816,7 +703,8 @@ export async function generateStoryTurn(
                       (gmReasoningDetails[index].text || "") + detail.text;
                   if (detail.summary)
                     gmReasoningDetails[index].summary =
-                      (gmReasoningDetails[index].summary || "") + detail.summary;
+                      (gmReasoningDetails[index].summary || "") +
+                      detail.summary;
                   if (detail.data)
                     gmReasoningDetails[index].data =
                       (gmReasoningDetails[index].data || "") + detail.data;
@@ -907,43 +795,43 @@ export async function generateStoryTurn(
                   : `[GAME MASTER]\n${gmResult.content.trim()}`;
               gmInterleavedParts.push(formattedThinking);
 
-              // NEW: Extract visible prose and add to accumulated story
-              // Strip <thinking> tags to get only the player-visible content
-              const visibleProse = stripThinkingTags(gmResult.content);
-              if (visibleProse.trim()) {
-                // Check for duplicate prose (different thinking but same visible content)
-                const proseNormalized = normalizeForComparison(visibleProse);
-                const isProseAlreadyAccumulated = gmAccumulatedStory.some(
+              // NEW: Add raw content to accumulated story (preserve <output> tags)
+              // The UI will call stripThinkingTags to extract visible content
+              const rawContent = gmResult.content.trim();
+              if (rawContent) {
+                // Check for duplicate content
+                const contentNormalized = normalizeForComparison(rawContent);
+                const isAlreadyAccumulated = gmAccumulatedStory.some(
                   (existing) => {
                     const existingNormalized = normalizeForComparison(existing);
                     // Check for exact match or high overlap
-                    if (existingNormalized === proseNormalized) return true;
+                    if (existingNormalized === contentNormalized) return true;
                     if (
                       existingNormalized.substring(0, 200) ===
-                      proseNormalized.substring(0, 200)
+                      contentNormalized.substring(0, 200)
                     )
                       return true;
                     // Also check if one contains the other (subset)
                     if (
-                      existingNormalized.includes(proseNormalized) ||
-                      proseNormalized.includes(existingNormalized)
+                      existingNormalized.includes(contentNormalized) ||
+                      contentNormalized.includes(existingNormalized)
                     )
                       return true;
                     return false;
                   }
                 );
 
-                if (!isProseAlreadyAccumulated) {
-                  gmAccumulatedStory.push(visibleProse.trim());
-                  logger.action("Accumulated prose from GM round", {
+                if (!isAlreadyAccumulated) {
+                  gmAccumulatedStory.push(rawContent);
+                  logger.action("Accumulated content from GM round", {
                     round: gmRound,
-                    proseLength: visibleProse.length,
+                    contentLength: rawContent.length,
                     totalAccumulated: gmAccumulatedStory.length,
                   });
                 } else {
-                  logger.action("Skipping duplicate prose content", {
+                  logger.action("Skipping duplicate content", {
                     round: gmRound,
-                    proseLength: visibleProse.length,
+                    contentLength: rawContent.length,
                   });
                 }
               }
@@ -979,7 +867,9 @@ export async function generateStoryTurn(
                       : JSON.stringify(tc.function.arguments),
                 },
                 // Preserve extra_content (contains Google's thought_signature)
-                ...(tc.extra_content ? { extra_content: tc.extra_content } : {}),
+                ...(tc.extra_content
+                  ? { extra_content: tc.extra_content }
+                  : {}),
               })),
             });
 
@@ -1224,6 +1114,7 @@ export async function generateStoryTurn(
         // NEW: Combine accumulated story from all rounds as the final story content
         // This allows GM to write prose incrementally while calling tools
         if (gmAccumulatedStory.length > 0) {
+          // Join all accumulated parts - preserve <output> tags for UI to process
           gmFinalStoryContent = gmAccumulatedStory.join("\n\n");
           logger.action("Combined accumulated GM story", {
             parts: gmAccumulatedStory.length,
@@ -1270,6 +1161,7 @@ export async function generateStoryTurn(
 
       // Use GM's content directly as the story
       storyContent = gmFinalStoryContent;
+      rawStoryContent = gmFinalStoryContent;
 
       // Prune leading dividers (---, ***, ___) that the model might add
       while (/^[\s\n]*([-*_]{3,})/.test(storyContent)) {
@@ -1479,42 +1371,42 @@ export async function generateStoryTurn(
       const STORY_MARKER = "Now I write the story.";
       const STOP_MARKER = "[STOP]";
 
+      for await (const event of parseSSEStream(storyResponse)) {
+        if (event.type === "error") {
+          throw new Error(event.error || "Story generation failed");
+        }
+        if (event.type === "reasoning" && event.content) {
+          storyReasoning += event.content;
+        }
+        if (event.type === "reasoning_details" && event.details) {
+          for (const detail of event.details) {
+            const index =
+              detail.index !== undefined
+                ? detail.index
+                : storyReasoningDetails.length;
+            if (!storyReasoningDetails[index]) {
+              storyReasoningDetails[index] = { ...detail };
+            } else {
+              if (detail.text)
+                storyReasoningDetails[index].text =
+                  (storyReasoningDetails[index].text || "") + detail.text;
+              if (detail.summary)
+                storyReasoningDetails[index].summary =
+                  (storyReasoningDetails[index].summary || "") + detail.summary;
+              if (detail.data)
+                storyReasoningDetails[index].data =
+                  (storyReasoningDetails[index].data || "") + detail.data;
+              if (detail.signature)
+                storyReasoningDetails[index].signature = detail.signature;
+              if (detail.id) storyReasoningDetails[index].id = detail.id;
+              if (detail.type) storyReasoningDetails[index].type = detail.type;
+            }
+          }
+        }
+        if (event.type === "content" && event.content) {
+          // Capture raw content for storage
+          rawStoryContent += event.content;
 
-          for await (const event of parseSSEStream(storyResponse)) {
-            if (event.type === "error") {
-              throw new Error(event.error || "Story generation failed");
-            }
-            if (event.type === "reasoning" && event.content) {
-              storyReasoning += event.content;
-            }
-            if (event.type === "reasoning_details" && event.details) {
-              for (const detail of event.details) {
-                const index =
-                  detail.index !== undefined
-                    ? detail.index
-                    : storyReasoningDetails.length;
-                if (!storyReasoningDetails[index]) {
-                  storyReasoningDetails[index] = { ...detail };
-                } else {
-                  if (detail.text)
-                    storyReasoningDetails[index].text =
-                      (storyReasoningDetails[index].text || "") + detail.text;
-                  if (detail.summary)
-                    storyReasoningDetails[index].summary =
-                      (storyReasoningDetails[index].summary || "") +
-                      detail.summary;
-                  if (detail.data)
-                    storyReasoningDetails[index].data =
-                      (storyReasoningDetails[index].data || "") + detail.data;
-                  if (detail.signature)
-                    storyReasoningDetails[index].signature = detail.signature;
-                  if (detail.id) storyReasoningDetails[index].id = detail.id;
-                  if (detail.type)
-                    storyReasoningDetails[index].type = detail.type;
-                }
-              }
-            }
-            if (event.type === "content" && event.content) {
           // Skip all content after [STOP] is detected
           if (stopMarkerHit) continue;
 
@@ -1697,6 +1589,9 @@ export async function generateStoryTurn(
       storyContent = storyContent
         .replace(/\n+(?:• [^\n]*→[^\n]*\n?)+$/, "")
         .trim();
+
+      // Final thorough cleaning to isolate ONLY story content
+      storyContent = stripThinkingTags(storyContent);
 
       callbacks.onStoryComplete?.(
         storyContent,
@@ -2112,6 +2007,7 @@ export async function generateStoryTurn(
 
     const scenePart: ScenePart = {
       content: storyContent,
+      raw: rawStoryContent || undefined,
       imageUrl: "",
       user: false,
       role: "assistant",

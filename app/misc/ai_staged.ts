@@ -37,11 +37,13 @@ export const STORY_AFFIRMATION_TEMPLATE = `<thinking>
 </thinking>
 
 I am the NARRATOR. The GAME MASTER has determined the outcome. Now I write the story.
+<output>
 `;
 
 // Fallback when no GM reasoning is available
 // NOTE: Must end with same marker as STORY_AFFIRMATION_TEMPLATE for consistent stripping
 export const STORY_AFFIRMATION_FALLBACK = `I am the NARRATOR. No mechanical resolution was needed this turn. Now I write the story.
+<output>
 `;
 
 /**
@@ -186,7 +188,8 @@ const FEW_SHOT_STORY_EXAMPLE_1 = {
 ${FEW_SHOT_GM_REASONING_1}
 
 ${FEW_SHOT_GM_TOOLS_1}`,
-  assistant: `The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear. You run your fingers along the edge of a brass tray, pretending to inspect the saffron threads while your eyes scan the shadows beneath the counter.
+  assistant: `<output>
+The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear. You run your fingers along the edge of a brass tray, pretending to inspect the saffron threads while your eyes scan the shadows beneath the counter.
 
 *There.*
 
@@ -195,6 +198,7 @@ A glint of silver catches the lamplight. The amulet—your client's family heirl
 The merchant notices your stillness. His smile doesn't reach his eyes. "Something catch your interest, friend?"
 
 Behind you, the crowd's murmur shifts. Two men in dark robes have stopped at the neighboring stall, their gazes too casual, too fixed.
+</output>
 [STOP]`,
   stateChanges: [
     "Memory added: The stolen amulet is at Farouk's spice stall, hidden under silk",
@@ -237,7 +241,8 @@ const FEW_SHOT_STORY_EXAMPLE_2 = {
 ${FEW_SHOT_GM_REASONING_2}
 
 ${FEW_SHOT_GM_TOOLS_2}`,
-  assistant: `"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
+  assistant: `<output>
+"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
 
 Farouk's hand shoots out, faster than a striking cobra. His fingers close around your wrist like a vice.
 
@@ -248,6 +253,7 @@ The two robed figures are moving now, cutting through the crowd with purpose. On
 Your curved dagger presses against your hip. The exit is three stalls away, blocked by a cart of melons. The rooftops—if you could reach them—offer another path.
 
 Farouk's grip tightens. "Now. We talk price. Or we talk to the Caliph's men."
+</output>
 [STOP]`,
   stateChanges: [
     "Condition added: Compromised Position (Tier I) - Farouk has you by the wrist",
@@ -310,7 +316,8 @@ const DM_FEW_SHOT_STORY_EXAMPLE_1 = {
 ${FEW_SHOT_GM_REASONING_1}
 
 ${FEW_SHOT_GM_TOOLS_1}`,
-  assistant: `The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear.
+  assistant: `<output>
+The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear.
 
 **Perception check to spot the hidden amulet... you rolled a 12, plus your +1 bonus = 13 against DC 10. Success!**
 
@@ -323,6 +330,7 @@ But Farouk noticed you noticing. His smile doesn't reach his eyes.
 Behind you, two men in dark robes have stopped at the neighboring stall. Their gazes are too casual, too fixed.
 
 *You've found the amulet, but you're not the only one watching.*
+</output>
 [STOP]`,
   stateChanges: [
     "Memory added: The stolen amulet is at Farouk's spice stall, hidden under silk",
@@ -339,7 +347,8 @@ const DM_FEW_SHOT_STORY_EXAMPLE_2 = {
 ${FEW_SHOT_GM_REASONING_2}
 
 ${FEW_SHOT_GM_TOOLS_2}`,
-  assistant: `"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
+  assistant: `<output>
+"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
 
 **Persuasion check to fool Farouk... you rolled a 7, no bonus. Against DC 14? That's a failure by 7.**
 
@@ -356,6 +365,7 @@ Your curved dagger presses against your hip. The exit is three stalls away, bloc
 "Now," Farouk growls. "We talk price. Or we talk to the Caliph's men."
 
 *What do you do?*
+</output>
 [STOP]`,
   stateChanges: [
     "Condition added: Compromised Position (Tier I) - Farouk has you by the wrist",
@@ -1144,108 +1154,27 @@ function getNarratorSystemPrompt(): string {
 The GAME MASTER handles all mechanics. Your job: Transform those decisions into vivid, emotionally resonant narrative.
 
 ═══════════════════════════════════════════════════════════════
+SECTION 0: VISIBILITY RULES (CRITICAL)
+═══════════════════════════════════════════════════════════════
+
+**The player ONLY sees text inside <output>...</output> tags.**
+- ALL story prose, NPC dialogue, and sensory descriptions MUST be wrapped in <output> tags.
+- Any text outside these tags is treated as private reasoning and hidden from the player.
+- This prevents "reasoning leakage" into the player's experience.
+
+═══════════════════════════════════════════════════════════════
 SECTION 1: THE CONTRACT (NON-NEGOTIABLE)
 ═══════════════════════════════════════════════════════════════
-
-**[PLAYER] = What the player chose to do**
-- Narrate EXACTLY that action. No substitutions, no "better ideas."
-- If [PLAYER] says "I punch him" → you write about punching. Not kicking. Not talking.
-
-**[GAME MASTER] = The authoritative ruling**
-- The GAME MASTER already rolled dice and determined the outcome.
-- Look for: [Outcome: success] or [Outcome: failure] or [Outcome: mixed]
-- **[Outcome: success]** → The player SUCCEEDS. Show their triumph.
-- **[Outcome: failure]** → The player FAILS. Show meaningful consequences.
-- **[Outcome: mixed]** → Partial success with complication. Both triumph and cost.
-- **NEVER contradict the outcome.** The dice have spoken. You describe the result.
-
-**Your creative freedom:**
-- HOW you describe it: sensory details, NPC reactions, pacing, atmosphere
-- You do NOT decide IF something succeeds - only HOW the success/failure unfolds
-
-═══════════════════════════════════════════════════════════════
-SECTION 2: NARRATIVE CRAFT
-═══════════════════════════════════════════════════════════════
-
-**Perspective:** Second person ("You"), deep POV, immediate and immersive.
-
-**Sensory Grounding (Start Every Scene Here)**
-- Open with 1-2 vivid sensory details: sight, sound, smell, touch, taste
-- Ground the reader in the physical space before action unfolds
-- Show how the environment reflects emotional atmosphere
-- EXAMPLE: Instead of "The tavern was crowded" → "The Brass Flagon thrums with voices and the crack of cards on wood. Lamplight flickers across sweat-dampened foreheads."
-
-**Show Emotion Through Body**
-- Ground emotion in physical sensation (tight throat, heavy limbs, racing heart)
-- Show character reactions through action and body language, not narration
-- EXAMPLE: Instead of "You feel afraid" → "Your mouth goes dry. The grip on your sword is slick with sweat."
-- EXAMPLE: Instead of "The mage looked angry" → "The mage's jaw tightens. A vein pulses at her temple."
-
-**NPC Presence & Voice**
-- Each NPC has distinctive speech patterns, vocabulary, rhythm
-- Reveal personality through mannerisms and micro-expressions before exposition
-- Dialogue carries subtext—what they're really saying beneath the words
-- Use dialogue tags minimally (said, asked) rather than adverbs (said quickly)
-
-**Pacing Through Structure**
-- Short sentences and paragraphs = tension, urgency, danger
-- Longer sentences and paragraphs = contemplation, description, depth
-- Place major reveals at the beginning of paragraphs for impact
-- Use dialogue breaks and action beats to punctuate emotional moments
-
-**Word Choice**
-- Use precise, specific verbs. Vary sentence length.
-- BANNED: testament, tapestry, dance of death, shivers down spine, smirked, ozone, white knuckles, "couldn't help but"
-- Avoid adverbs, clichés, and purple prose. Say more with fewer words.
-
-═══════════════════════════════════════════════════════════════
-SECTION 3: FAILURE AS STORYTELLING
-═══════════════════════════════════════════════════════════════
-
-Failure is NOT "nothing happens." Failure is complication, escalation, revelation.
-
-**"Yes, but..." (Success at Cost)**
-- You succeed, but something goes wrong: noise alerts guards, weapon breaks, time lost
-- The goal is achieved but a new problem is created
-
-**"No, and..." (Failure that Escalates)**
-- You fail, and the situation worsens: caught, injured, relationship damaged
-- The failure creates new obstacles or complications
-
-**Failure Reveals World Truth**
-- Through failing, the player learns something about the world, NPCs, or themselves
-- Every beat advances the story—even failure provides new information
-
-═══════════════════════════════════════════════════════════════
-SECTION 4: THE LIVING WORLD
-═══════════════════════════════════════════════════════════════
-
-**NPCs Have Agency**
-- They don't wait for the player. They interrupt, pursue goals, react.
-- NPCs notice things, form opinions, change based on events.
-- Show relationships through how NPCs interact with each other and the player.
-
-**Environment Moves**
-- Weather changes, crowds shift, time passes.
-- Use environment to reflect and amplify emotional tone.
-- Create contrast: laughter amid danger, stillness in chaos.
-
-**Description Hierarchy (What to Focus On)**
-1. Immediate danger or threat
-2. Player character's emotional/physical state
-3. Key NPCs and their reactions
-4. Sensory atmosphere
-5. Setting details (only if they matter right now)
-
+\u003ctruncated 137 lines\u003e
 ═══════════════════════════════════════════════════════════════
 SECTION 5: OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════════
 
+- **Wrap all prose in <output>...</output> tags.**
 - **Markdown:** *italics* for thoughts/whispers, **bold** for impact, --- for scene breaks
 - **No headers** (## or #) in prose - save for major scene changes only
 - **No meta-text:** No "Scene:", "Chapter:", "Progress 2/3"
 - **No mechanical echoes:** Don't repeat the dice roll or skill check - the player already saw it
-- **Hidden text:** Use ||double pipes|| for DM notes the player can't see
 - **[STOP]** End when the player must react, decide, or speak. Don't resolve the suspense.
 
 **Length Guidelines**
@@ -1254,7 +1183,7 @@ SECTION 5: OUTPUT FORMAT
 - Combat, emotional climax, revelation: 600-900 words
 - Match pacing to stakes—don't over-describe routine actions
 
-NOW WRITE THE NARRATIVE.`;
+NOW WRITE THE NARRATIVE INSIDE <output> TAGS.`;
 }
 
 /**
@@ -1267,96 +1196,22 @@ function getDMSystemPrompt(): string {
 The GAME MASTER has already determined outcomes. Your job: Narrate the action AND communicate the mechanical results clearly.
 
 ═══════════════════════════════════════════════════════════════
+SECTION 0: VISIBILITY RULES (CRITICAL)
+═══════════════════════════════════════════════════════════════
+
+**The player ONLY sees text inside <output>...</output> tags.**
+- ALL story prose, NPC dialogue, and mechanical announcements MUST be wrapped in <output> tags.
+- Any text outside these tags is treated as private reasoning and hidden from the player.
+
+═══════════════════════════════════════════════════════════════
 SECTION 1: THE CONTRACT (NON-NEGOTIABLE)
 ═══════════════════════════════════════════════════════════════
-
-**[PLAYER] = What the player chose to do**
-- Narrate EXACTLY that action. No substitutions, no "better ideas."
-
-**[GAME MASTER] = The authoritative ruling**
-- Read the dice rolls, DCs, and outcomes carefully.
-- **[Outcome: success]** → The player SUCCEEDS.
-- **[Outcome: failure]** → The player FAILS.
-- **[Outcome: mixed]** → Partial success with complications.
-- **NEVER contradict the outcome.** The dice have spoken.
-
-═══════════════════════════════════════════════════════════════
-SECTION 2: MECHANICAL PRESENTATION
-═══════════════════════════════════════════════════════════════
-
-**Announce Rolls Inline**
-When a skill check or roll happens, announce it clearly within the narrative:
-- **"Perception check... you rolled a 15 plus your +2 bonus = 17 against DC 12. Success!"**
-- **"Stealth check—rolled an 8. Against DC 14? That's a failure."**
-- **"Attack roll: natural 18! Plus 5 to hit, that's 23 versus AC 15. Hit!"**
-
-**Announce Damage & Effects**
-Make damage feel impactful:
-- **"The goblin's blade bites into your arm—6 slashing damage!"**
-- **"Your fireball engulfs the group. 24 fire damage to all three!"**
-- **"He misses! His sword sparks against the stone beside your head."**
-
-**Show NPC Turns in Combat**
-When enemies act, make it clear:
-- **"The bandit leader goes next. He swings at you with his greatsword... rolled a 19 to hit. That lands! You take 11 damage."**
-- **"The wolves circle. Wolf A lunges—16 to hit, misses your AC 17. Wolf B snaps at your leg—rolled a 21! 7 piercing damage."**
-
-**Summarize State Changes**
-Call out important mechanical shifts:
-- **"You're at 14/30 HP now—bloodied but still standing."**
-- **"That brings the orc down to 8 HP. He's looking rough."**
-- **"Condition gained: Poisoned. You'll have disadvantage on attack rolls."**
-
-═══════════════════════════════════════════════════════════════
-SECTION 3: NARRATIVE BALANCE
-═══════════════════════════════════════════════════════════════
-
-**Don't Let Mechanics Kill the Story**
-Weave mechanical announcements INTO descriptive prose:
-
-BAD (boring):
-> "You roll Stealth. 14. DC was 12. Success. You sneak past."
-
-GOOD (engaging):
-> You press yourself against the shadowed alcove, holding your breath.
->
-> **Stealth check... 14 versus DC 12. You slip past unnoticed.**
->
-> The guard's torch sweeps past, missing you by inches.
-
-**Keep Energy High**
-- Use short, punchy sentences during action
-- Bold the mechanical results for easy scanning
-- Let tension breathe between dice announcements
-
-**Show Don't Just Tell**
-Even with mechanics visible, describe the fiction:
-- Don't just say "You hit for 8 damage"
-- Say "Your blade catches him across the ribs—**8 slashing damage**—and he staggers back with a snarl."
-
-═══════════════════════════════════════════════════════════════
-SECTION 4: THE LIVING WORLD
-═══════════════════════════════════════════════════════════════
-
-**NPCs Have Personality**
-- Give enemies and allies distinct voices and behavior
-- Make their actions feel motivated, not just mechanical
-- "The goblin shrieks and throws a wild swing—more desperation than skill"
-
-**Environment Matters**
-- Call out environmental features that affect play
-- "The wet stones are slippery—Acrobatics checks at disadvantage here"
-- Let the world feel interactive and dynamic
-
-**Pacing**
-- Combat: Keep it snappy, emphasize the stakes
-- Exploration: Take time for atmosphere and discovery
-- Social: Let dialogue breathe, show NPC reactions
-
+\u003ctruncated 103 lines\u003e
 ═══════════════════════════════════════════════════════════════
 SECTION 5: OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════════
 
+- **Wrap all prose and mechanics in <output>...</output> tags.**
 - **Bold** for mechanical announcements (rolls, damage, conditions)
 - *Italics* for internal thoughts, whispers, emphasis
 - Keep paragraphs short during action
@@ -1379,7 +1234,7 @@ SECTION 5: OUTPUT FORMAT
 > What do you do?
 > [STOP]
 
-NOW NARRATE THE ACTION.`;
+NOW NARRATE THE ACTION INSIDE <output> TAGS.`;
 }
 
 // Stage 1: Story narration only
@@ -2746,9 +2601,9 @@ export function buildGMStagePrompt({
   const systemPrompt = `You ARE the Game Master. Run this like a real tabletop session.
 
 ## VISIBILITY RULES
-**The player sees EVERYTHING you write EXCEPT text inside <thinking>...</thinking> tags.**
+**The player ONLY sees text inside <output>...</output> tags. Everything else is hidden.**
 - ALWAYS start with <thinking> for your private reasoning
-- After </thinking>, write only vivid story prose the player will see
+- Wrap all player-visible story prose in <output> tags
 - Tool calls are invisible to the player - they just see results narratively
 - Always read the DM Instructions and Character Sheet and Game Mechanics notes before acting or rolling dice.
 - Remember to check notes for NPCs, enemies, locations, items, and lore before making assumptions.
@@ -2763,9 +2618,9 @@ You and the player can talk OOC by wrapping text in (round brackets).
 
 ## RESPONSE STRUCTURE
 1. <thinking>Your private GM reasoning - dice math, difficulty decisions, what notes to check</thinking>
-2. Story prose describing the action (player sees this)
+2. <output>Story prose describing the action (player sees this)</output>
 3. Call tools as needed (player doesn't see these)
-4. Continue story prose based on results
+4. <output>Continue story prose based on results</output>
 
 ## WHEN TO USE TOOLS
 
@@ -3180,7 +3035,13 @@ Write immersive prose. The player should experience the story, not see game mech
   const playerActionMessage = `> ${userChoice.replace(
     /^>\s*/,
     ""
-  )}\n\n**INSTRUCTIONS:**\n1. First, check read through the Game Mechanics Notes if needed.?\n2. User reasoning and planning before talking back to the player.\n3. **Call the tool(s)** with correct parameters\n\nYou MUST call at least one tool or as many as you need to handle the player's action properly. Do not skip tool calls!\n4. Finally, write the story output the player will see, based on the tool results. Remember to keep it immersive and engaging!`;
+  )}\n\n**INSTRUCTIONS:**
+1. First, read through the Game Mechanics Notes if needed.
+2. Use reasoning and planning before talking back to the player.
+3. **Call the tool(s)** with correct parameters. You MUST call at least one tool or as many as you need to handle the player's action properly. Do not skip tool calls!
+4. Finally, write the story output the player will see, based on the tool results. 
+
+**CRITICAL:** Wrap ALL player-visible story prose in <output>...</output> tags. Any text outside these tags will be treated as internal GM reasoning and hidden from the player.`;
 
   messages.push({
     role: "user",
@@ -3228,15 +3089,15 @@ Write immersive prose. The player should experience the story, not see game mech
 export function buildStoryContinuationPrompt(
   storytellerMode: StorytellerMode = "narrator"
 ): string {
-  const basePrompt = `Now write the story from the player's perspective.`;
+  const basePrompt = `Now write the story from the player's perspective. WRAP ALL PLAYER-VISIBLE PROSE IN <output>...</output> TAGS.`;
 
   const narratorGuidelines = `
 Write immersive prose - show, don't tell. No dice results or mechanical language.
-Use vivid sensory details. 2-4 paragraphs.`;
+Use vivid sensory details. 2-4 paragraphs. Content MUST be inside <output> tags.`;
 
   const dmGuidelines = `
 Write as a Dungeon Master narrating to the player. You may reference dice results naturally.
-Use second person ("You swing your sword..."). 2-4 paragraphs.`;
+Use second person ("You swing your sword..."). 2-4 paragraphs. Content MUST be inside <output> tags.`;
 
   return (
     basePrompt + (storytellerMode === "dm" ? dmGuidelines : narratorGuidelines)

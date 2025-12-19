@@ -5988,23 +5988,40 @@ function StoryPageContent() {
       editedLength: editedText.length,
     });
 
-    // Update only the content field, preserve all other data
-    storyData.scene.parts[partIndex] = {
-      ...partToEdit,
-      content: editedText,
-      // Explicitly preserve these fields:
-      // - choices: AI-generated choices remain unchanged
-      // - toolCalls: AI tool usage history preserved
-      // - toolResponses: Command execution results preserved
-      // - imageUrl: Story images preserved
-      // - user: false (still AI response)
-      // - role: "assistant" (still AI role)
-    };
+    // If the text contains tags, re-parse it to update structured data
+    if (
+      editedText.includes("<output>") ||
+      editedText.includes("<story>") ||
+      editedText.includes("<choices>") ||
+      editedText.includes("<memory>") ||
+      editedText.includes("<commands>")
+    ) {
+      const parsedPart = outputToScenePart(editedText);
+      storyData.scene.parts[partIndex] = {
+        ...partToEdit,
+        ...parsedPart,
+        raw: editedText, // Store the edited raw text
+      };
 
-    // Update UI if this is the current/last part
-    if (partIndex === storyData.scene.parts.length - 1) {
-      setStoryText(editedText);
-      // Choices remain unchanged - don't update them
+      // Update UI if this is the current/last part
+      if (partIndex === storyData.scene.parts.length - 1) {
+        setStoryText(parsedPart.content);
+        if (parsedPart.choices) {
+          setChoices({ choices: parsedPart.choices });
+        }
+      }
+    } else {
+      // Just update content and raw text
+      storyData.scene.parts[partIndex] = {
+        ...partToEdit,
+        content: editedText,
+        raw: editedText,
+      };
+
+      // Update UI if this is the current/last part
+      if (partIndex === storyData.scene.parts.length - 1) {
+        setStoryText(editedText);
+      }
     }
 
     setStoryData({ ...storyData });

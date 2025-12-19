@@ -47,6 +47,153 @@ function cleanString(text: string): string {
   );
 }
 
+/**
+ * Strip <thinking>...</thinking> tags, <output> tags, and other GM markers from content
+ * Used to hide GM's internal reasoning from the player
+ *
+ * STRICT BEHAVIOR: If <output> or <story> tags are detected, ONLY content inside
+ * those tags is returned. Everything else is hidden. No fallback cleaning.
+ */
+export function stripThinkingTags(content: string): string {
+  if (!content) return "";
+
+  // 1. Check for <output> tags (new standard) - STRICT: only return content inside tags
+  const outputStartRegex = /<\s*output[^>]*>/i;
+  if (outputStartRegex.test(content)) {
+    let outputBlocks: string[] = [];
+    let lastIndex = 0;
+    let match;
+
+    // Find all closed <output>...</output> blocks
+    const closedBlockRegex = /<\s*output[^>]*>([\s\S]*?)<\s*\/\s*output\s*>/gi;
+    while ((match = closedBlockRegex.exec(content)) !== null) {
+      outputBlocks.push(match[1].trim());
+      lastIndex = closedBlockRegex.lastIndex;
+    }
+
+    // Check for an open <output> tag after the last closed block (for streaming)
+    const remainingContent = content.slice(lastIndex);
+    // Stop at the next structured tag or end of string to avoid including choices/memory in story
+    const openTagMatch =
+      /<\s*output[^>]*>([\s\S]*?)(?=<\s*(?:memory|choices|commands|thinking|output|story)|!!!|$)/i.exec(
+        remainingContent
+      );
+    if (openTagMatch) {
+      outputBlocks.push(openTagMatch[1].trim());
+    }
+
+    // STRICT: If we detected <output> tags, ONLY return content from inside them
+    // Even if no content was extracted, return empty string - don't fall through
+    return outputBlocks.join("\n\n").trim();
+  }
+
+  // 2. Check for <story> tags (legacy standard) - STRICT: only return content inside tags
+  const storyStartRegex = /<\s*story[^>]*>/i;
+  if (storyStartRegex.test(content)) {
+    let storyBlocks: string[] = [];
+    let lastIndex = 0;
+    let match;
+
+    const closedBlockRegex = /<\s*story[^>]*>([\s\S]*?)<\s*\/\s*story\s*>/gi;
+    while ((match = closedBlockRegex.exec(content)) !== null) {
+      storyBlocks.push(match[1].trim());
+      lastIndex = closedBlockRegex.lastIndex;
+    }
+
+    const remainingContent = content.slice(lastIndex);
+    const openTagMatch =
+      /<\s*story[^>]*>([\s\S]*?)(?=<\s*(?:memory|choices|commands|thinking|output|story)|!!!|$)/i.exec(
+        remainingContent
+      );
+    if (openTagMatch) {
+      storyBlocks.push(openTagMatch[1].trim());
+    }
+
+    // STRICT: If we detected <story> tags, ONLY return content from inside them
+    return storyBlocks.join("\n\n").trim();
+  }
+
+  // 3. No <output> or <story> tags found - return content as-is
+  return content.trim();
+}
+
+/**
+ * Extract <thinking>...</thinking> content from a string
+ * Returns array of thinking blocks found
+ * Handles spaces inside tags like < thinking > that some models output
+ * Also handles malformed tags like <thinking::label] ... </thinking>
+ */
+export function extractThinkingTags(content: string): string[] {
+  if (!content) return [];
+  // Match standard thinking tags
+  const standardMatches =
+    content.match(/<\s*thinking\s*>[\s\S]*?<\s*\/\s*thinking\s*>/gi) || [];
+  // Match malformed thinking tags with labels: <thinking::label] ... </thinking>
+  const malformedMatches =
+    content.match(
+      /<\s*thinking\s*:+[^\]>]*[\]>][\s\S]*?<\s*\/\s*thinking\s*>/gi
+    ) || [];
+  const allMatches = [...standardMatches, ...malformedMatches];
+  return allMatches.map((m) =>
+    m
+      .replace(/<\s*thinking\s*:+[^\]>]*[\]>]/gi, "") // Remove malformed opening tags
+      .replace(/<\s*\/?\s*thinking\s*>/gi, "") // Remove standard tags
+      .trim()
+  );
+}
+
+/**
+ * Detect if AI output contains repetitive/looping content.
+ * This happens when the model gets stuck repeating the same phrase.
+ */
+export function detectRepetition(content: string): boolean {
+  if (!content || content.length < 500) return false;
+
+  // Method 1: Check for repeated phrases (minimum 30 chars repeated 3+ times)
+  // Look for patterns like "Let me check X. Let me check X. Let me check X."
+  const phrasePattern = /(.{30,100})\1{2,}/;
+  if (phrasePattern.test(content)) {
+    return true;
+  }
+
+  // Method 2: Check for high repetition ratio
+  // Split into sentences and check how many are duplicates
+  const sentences = content
+    .split(/[.!?]+/)
+    .map((s) => s.trim().toLowerCase())
+    .filter((s) => s.length > 20);
+
+  if (sentences.length >= 5) {
+    const uniqueSentences = new Set(sentences);
+    const uniqueRatio = uniqueSentences.size / sentences.length;
+    // If less than 30% unique sentences, it's repetitive
+    if (uniqueRatio < 0.3) {
+      return true;
+    }
+  }
+
+  // Method 3: Check for specific repetition patterns
+  // Count occurrences of common repetitive starters
+  const repetitiveStarters = [
+    "let me check",
+    "let me also check",
+    "i need to check",
+    "i'll check",
+    "checking",
+  ];
+
+  for (const starter of repetitiveStarters) {
+    const count = (content.toLowerCase().match(new RegExp(starter, "g")) || [])
+      .length;
+    // If same phrase appears 5+ times, it's stuck in a loop
+    if (count >= 5) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function buildMessages({
   storyData,
   userChoice,
@@ -586,26 +733,45 @@ export function outputToScenePart(text: string): ScenePart {
     const re = new RegExp(String.raw`<${tag}[^>]*>([\s\S]*?)<\/${tag}>`, "i");
     const m = src.match(re);
     if (m?.[1]) return m[1];
+
     // Fallback: naive search, case-insensitive
     const lower = src.toLowerCase();
     const openTag = `<${tag.toLowerCase()}`;
     const closeTag = `</${tag.toLowerCase()}>`;
     const openIdx = lower.indexOf(openTag);
     if (openIdx === -1) return null;
+
     const gtIdx = lower.indexOf(">", openIdx);
     if (gtIdx === -1) return null;
+
     const closeIdx = lower.indexOf(closeTag, gtIdx + 1);
-    if (closeIdx === -1) return null;
-    return src.substring(gtIdx + 1, closeIdx);
+    if (closeIdx === -1) {
+      // If no closing tag, but we have an opening tag, return content until the next structured tag
+      // This handles streaming or truncated responses and prevents including choices/memory in story
+      const remaining = src.substring(gtIdx + 1);
+      const nextTagMatch = remaining.match(
+        /<\s*(?:memory|choices|commands|thinking|output|story)|!!!/i
+      );
+      if (nextTagMatch && nextTagMatch.index !== undefined) {
+        return remaining.substring(0, nextTagMatch.index).trim();
+      }
+      return remaining.trim();
+    }
+
+    return src.substring(gtIdx + 1, closeIdx).trim();
   };
 
   // Helper: extract story content even when tags are missing
   const extractStoryContent = (src: string): string => {
-    // Try to extract from <story> tags first
+    // Try to extract from <output> tags first (new standard)
+    const outputBlock = extractBlock("output", src);
+    if (outputBlock) return outputBlock;
+
+    // Try to extract from <story> tags (legacy standard)
     const storyBlock = extractBlock("story", src);
     if (storyBlock) return storyBlock;
 
-    // If no <story> tags, try to extract everything before <memory>, <choices>, or <commands> tags
+    // If no <output> or <story> tags, try to extract everything before <memory>, <choices>, or <commands> tags
     const lowerSrc = src.toLowerCase();
     let endIndex = src.length;
 
@@ -633,7 +799,10 @@ export function outputToScenePart(text: string): ScenePart {
     }
 
     // Extract everything up to that point as story content
-    return src.substring(0, endIndex).trim();
+    const rawContent = src.substring(0, endIndex).trim();
+
+    // Use stripThinkingTags to clean up any untagged reasoning (like [GM] markers)
+    return stripThinkingTags(rawContent);
   };
 
   const parseChoice = (line: string): Choice => {
