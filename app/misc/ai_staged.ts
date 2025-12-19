@@ -2704,7 +2704,6 @@ Write immersive prose. The player should experience the story, not see game mech
     "toggle_timer_pause",
     "cancel_timer",
     "trigger_timer",
-    // (end_gm_thinking removed - loop ends when no tool calls)
   ];
 
   // Import state tools to merge with GM tools
@@ -2716,19 +2715,6 @@ Write immersive prose. The player should experience the story, not see game mech
     "fail_quest",
     "update_quest",
     "delete_quest",
-    // Item tools
-    "add_item",
-    "remove_item",
-    // Ability tools
-    "add_ability",
-    "remove_ability",
-    "modify_ability",
-    "upgrade_ability",
-    "reset_ability_cooldown",
-    // Passive tools
-    "add_passive",
-    "remove_passive",
-    "modify_passive",
     // Achievement
     "trigger_achievement",
     // Note management tools
@@ -2755,8 +2741,6 @@ Write immersive prose. The player should experience the story, not see game mech
     "update_thread",
     "resolve_thread",
     "abandon_thread",
-    // Momentum
-    "modify_momentum",
   ];
 
   const gmTools = GM_TOOL_SCHEMAS.filter((t: any) =>

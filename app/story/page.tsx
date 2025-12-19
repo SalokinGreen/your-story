@@ -2921,29 +2921,9 @@ function StoryPageContent() {
             });
             setLiveGMEntries([]);
 
-            // Filter out ACTUAL tool errors, but keep dice roll failures (they're valid game state)
-            // Dice tools use success=false to mean "roll didn't beat DC", not "tool error"
-            const DICE_TOOLS = [
-              "formula_roll",
-              "opposed_formula",
-              "formula_challenge_check",
-              "npc_roll",
-              "group_check",
-            ];
-            const validResults = gmResults.filter((r) => {
-              // Always keep successful results
-              if (r.success) return true;
-              // Dice tools: only exclude if contextForStory contains ERROR (invalid formula, etc.)
-              if (DICE_TOOLS.includes(r.toolName)) {
-                return !r.contextForStory?.includes("ERROR");
-              }
-              // Non-dice tools: exclude failed results (actual errors)
-              return false;
-            });
-
-            // Store GM results in the partial part (excludes actual errors, keeps failed rolls)
-            if (validResults.length > 0) {
-              partialPart.gmToolCalls = validResults;
+            // Store GM results in the partial part (keeps all results including errors)
+            if (gmResults.length > 0) {
+              partialPart.gmToolCalls = gmResults;
             }
             if (storyContext) {
               partialPart.gmStoryContext = storyContext;
@@ -5272,27 +5252,9 @@ function StoryPageContent() {
               // Clear live state now that we have final results
               setLiveGMEntries([]);
 
-              // Filter out ACTUAL tool errors, but keep dice roll failures (they're valid game state)
-              // Dice tools use success=false to mean "roll didn't beat DC", not "tool error"
-              const DICE_TOOLS = [
-                "formula_roll",
-                "opposed_formula",
-                "formula_challenge_check",
-                "npc_roll",
-                "group_check",
-              ];
-              const validResults = gmResults.filter((r) => {
-                // Always keep successful results
-                if (r.success) return true;
-                // Dice tools: only exclude if contextForStory contains ERROR (invalid formula, etc.)
-                if (DICE_TOOLS.includes(r.toolName)) {
-                  return !r.contextForStory?.includes("ERROR");
-                }
-                // Non-dice tools: exclude failed results (actual errors)
-                return false;
-              });
-              if (validResults.length > 0) {
-                partialPart.gmToolCalls = validResults;
+              // Store GM results in the partial part (keeps all results including errors)
+              if (gmResults.length > 0) {
+                partialPart.gmToolCalls = gmResults;
               }
               if (storyContext) {
                 partialPart.gmStoryContext = storyContext;
