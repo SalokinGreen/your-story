@@ -457,7 +457,9 @@ export function buildToolsFewShotMessages(): ChatMessage[] {
 }
 
 // Threshold for using few-shot examples (when scene has fewer parts than this)
-export const FEW_SHOT_THRESHOLD = 10;
+// Since each turn creates ~2 parts (user + assistant), threshold of 8 means
+// few-shot examples are used until the player has made 3-4 inputs
+export const FEW_SHOT_THRESHOLD = 20;
 
 /**
  * Context retrieved from embedding search
@@ -1781,6 +1783,33 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 - Include: description, significance, connections, secrets
 - Combat stats notes: health, attacks, defenses, weaknesses, behavior
 
+═══════════════════════════════════════════════════════════════
+NOTE TYPES REFERENCE (use the 'type' parameter!)
+═══════════════════════════════════════════════════════════════
+
+**ALWAYS specify a type when creating notes!** The type determines how the note is displayed and used.
+
+| Type | Icon | Purpose | Example |
+|------|------|---------|---------|
+| \`lore\` | 📁 | General world-building, history, culture | "The Great War", "Elven Customs" |
+| \`npc\` | 👤 | Character details, backstory, stats | "Captain Aldric", "The Merchant Zara" |
+| \`location\` | 📍 | Places, regions, buildings | "The Frozen Wastes", "Tavern of the Lost" |
+| \`item\` | 🎒 | Items, artifacts, equipment details | "Sword of Flames", "Ancient Amulet" |
+| \`faction\` | ⚔️ | Organizations, groups, guilds | "The Shadow Guild", "Royal Guard" |
+| \`event\` | 📜 | Historical events, plot points | "The Fall of the Empire" |
+| \`secret\` | 🔒 | GM-only info hidden from player | "The villain's true identity" |
+| \`dm_instructions\` | 📌 | GM guidance notes (always referenced) | "Combat Rules", "Session Guidelines" |
+| \`character_sheet\` | 📌 | Player character sheet (always referenced) | "Hero Stats", "Character Background" |
+| \`mechanics\` | 📌 | Game rules and dice formulas | "Magic System", "Combat Rules" |
+
+**Example usage:**
+\`create_note({ title: "The Shadow Guild", content: "...", type: "faction" })\`
+\`create_note({ title: "Captain Aldric", content: "...", type: "npc" })\`
+\`create_note({ title: "The Frozen Wastes", content: "...", type: "location" })\`
+
+**📌 Pinned types** (dm_instructions, character_sheet, mechanics) are ALWAYS loaded in full every turn.
+Use these sparingly - only for content that must be referenced constantly.
+
 ## THREAD MANAGEMENT
 
 ⚠️ **Threads are quest trackers, NOT story summaries!**
@@ -2659,6 +2688,26 @@ You and the player can talk OOC by wrapping text in (round brackets).
 ### Story Progression
 - **Quest progress**: \`create_quest\`, \`update_quest\`, \`complete_quest\`
 - **Significant achievements**: \`trigger_achievement\`
+
+## NOTE TYPES (ALWAYS specify type when creating!)
+When using \`create_note\`, always set the \`type\` parameter:
+
+| Type | Use For | Example Titles |
+|------|---------|----------------|
+| \`npc\` | Character details, stats | "Captain Aldric", "The Merchant Zara" |
+| \`location\` | Places, regions, buildings | "The Frozen Wastes", "Tavern of the Lost" |
+| \`item\` | Artifacts, equipment | "Sword of Flames", "Ancient Amulet" |
+| \`faction\` | Organizations, guilds | "The Shadow Guild", "Royal Guard" |
+| \`event\` | Historical events | "The Fall of the Empire" |
+| \`lore\` | General world-building | "Elven Customs", "The Great War" |
+| \`secret\` | GM-only hidden info | "The villain's true identity" |
+| \`dm_instructions\` | 📌 GM guidance (always loaded) | "Combat Rules", "Session Guidelines" |
+| \`character_sheet\` | 📌 Player character (always loaded) | "Hero Stats", "Character Background" |
+| \`mechanics\` | 📌 Game rules (always loaded) | "Magic System", "Dice Formulas" |
+
+**📌 Pinned types** are loaded in FULL every turn - use sparingly!
+
+**Example:** \`create_note({ title: "Captain Aldric", content: "...", type: "npc" })\`
 
 ## IMPORTANT BEHAVIORS
 - Look up notes BEFORE making assumptions about enemy stats or NPC details

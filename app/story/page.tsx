@@ -1541,6 +1541,8 @@ function StoryPageContent() {
   const [loadingStage, setLoadingStage] = useState<
     "gm" | "story" | "choices" | null
   >(null);
+  // Pending user choice text - shown in chat while GM is generating
+  const [pendingUserChoice, setPendingUserChoice] = useState<string>("");
   // Live GM streaming state - interleaved thinking and tool results
   type GMEntry =
     | { type: "thinking"; content: string; isStreaming?: boolean }
@@ -2968,6 +2970,7 @@ function StoryPageContent() {
             // Don't call setStoryData here - it causes infinite loops during rapid streaming
             // storyText is sufficient for display, full update happens in onStoryComplete
             setLoading(false); // Let player read while tools/choices generate
+            setPendingUserChoice(""); // Clear pending choice - response is here
           },
           onStoryComplete: (content: string, usage: any) => {
             // Update the partial part with the cleaned content (strips [GM State Update] etc)
@@ -3290,6 +3293,8 @@ function StoryPageContent() {
 
     setLoading(true);
     setLoadingStage("story");
+    // Set pending user choice for immediate display in chat
+    setPendingUserChoice(choice.text);
 
     //Handlemomentumspending
     if (momentumMode === "advantage" && storyData.momentum >= 1) {
@@ -5353,6 +5358,7 @@ function StoryPageContent() {
               // Don't call setStoryData here - it causes infinite loops during rapid streaming
               // storyText is sufficient for display, full update happens in onStoryComplete
               setLoading(false); // Let player read while tools/choices generate
+              setPendingUserChoice(""); // Clear pending choice - response is here
             },
             onStoryComplete: (content: string, usage: any) => {
               // Update the partial part with the cleaned content (strips [GM State Update] etc)
@@ -5747,6 +5753,7 @@ function StoryPageContent() {
             // Don't call setStoryData here - it causes infinite loops during rapid streaming
             // storyText is sufficient for display, full update happens in onStoryComplete
             setLoading(false); // Let player read while tools/choices generate
+            setPendingUserChoice(""); // Clear pending choice - response is here
           },
           onStoryComplete: (content: string, usage: any) => {
             // Update the partial part with the cleaned content (strips [GM State Update] etc)
@@ -6803,6 +6810,7 @@ function StoryPageContent() {
             onNavigateRight={handleNavigateRight}
             onResetToCurrentPart={resetToCurrentPart}
             syncStatus={syncStatus}
+            pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
           />
         )}

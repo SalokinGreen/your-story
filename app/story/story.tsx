@@ -1,6 +1,6 @@
 "use client";
 import { Choice, Choices, StoryData, ActionAnalysis } from "../misc/structs";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import TTSControls from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
@@ -11,6 +11,8 @@ import CombatDisplay from "../components/CombatDisplay";
 import type { SyncStatus } from "../misc/localStoryManager";
 import type { GMToolResult } from "../misc/gmExecutor";
 import { stripThinkingTags } from "../misc/ai";
+import { useAuth } from "../misc/AuthContext";
+import { supabase } from "../misc/supabase";
 
 interface StoryProps {
   storyData: StoryData;
@@ -40,11 +42,104 @@ interface StoryProps {
   onNavigateRight?: () => void;
   onResetToCurrentPart?: () => void;
   syncStatus?: SyncStatus;
+  // The last user choice that was submitted (shown while GM is thinking)
+  pendingUserChoice?: string;
   // Interleaved GM streaming entries (thinking text and tool results in order)
   liveGMEntries?: Array<
     | { type: "thinking"; content: string; isStreaming?: boolean }
     | { type: "tool"; result: GMToolResult }
   >;
+}
+
+// Font settings interface
+interface FontSettings {
+  fontSize: number;
+  fontFamily: string;
+  lineHeight: number;
+  paragraphSpacing: number;
+  theme?: string;
+  themeColors?: {
+    background: string;
+    text: string;
+    accent: string;
+  };
+}
+
+// Chat message bubble component
+interface ChatMessageProps {
+  isUser: boolean;
+  content: string;
+  displayName: string;
+  avatarUrl?: string;
+  isPrevious?: boolean;
+  isLoading?: boolean;
+  showHiddenMessages?: boolean;
+  fontSettings?: FontSettings;
+}
+
+function ChatMessage({
+  isUser,
+  content,
+  displayName,
+  avatarUrl,
+  isPrevious = false,
+  isLoading = false,
+  showHiddenMessages = false,
+  fontSettings,
+}: ChatMessageProps) {
+  const opacity = isPrevious ? "opacity-50" : "opacity-100";
+  
+  // Player messages: flex-row-reverse (avatar on right)
+  // GM messages: flex-row (avatar on left)
+  const flexDirection = isUser ? "flex-row-reverse" : "flex-row";
+  const textAlign = isUser ? "text-right" : "text-left";
+  
+  return (
+    <div className={`flex gap-3 ${flexDirection} ${opacity} transition-opacity duration-300`}>
+      {/* Avatar */}
+      <div className="shrink-0">
+        {isUser ? (
+          avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={displayName}
+              className="w-10 h-10 rounded-full object-cover border-2 border-blue-500/30"
+            />
+          ) : (
+            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500/30">
+              <DynamicIcon name="User" className="w-5 h-5 text-white" />
+            </div>
+          )
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center border-2 border-purple-500/30">
+            <DynamicIcon name="Sparkles" className="w-5 h-5 text-white" />
+          </div>
+        )}
+      </div>
+      
+      {/* Message Content */}
+      <div className="flex-1 min-w-0">
+        {/* Name */}
+        <div className={`text-sm font-semibold mb-1 ${textAlign} ${isUser ? "text-blue-300" : "text-purple-300"}`}>
+          {displayName}
+        </div>
+        
+        {/* Content */}
+        <div className={`rounded-lg p-3 ${isUser ? "bg-blue-900/30 border border-blue-700/30" : "bg-purple-900/20 border border-purple-700/20"}`}>
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-purple-200/60">
+              <div className="w-4 h-4 border-2 border-purple-400/60 border-t-purple-300 rounded-full animate-spin" />
+              <span>Thinking...</span>
+            </div>
+          ) : isUser ? (
+            <p className="text-blue-100 whitespace-pre-wrap">{content}</p>
+          ) : (
+            prettify(content, !isPrevious, showHiddenMessages, fontSettings)
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Story({
@@ -73,12 +168,41 @@ export default function Story({
   onNavigateRight,
   onResetToCurrentPart,
   syncStatus,
+  pendingUserChoice,
   liveGMEntries,
 }: StoryProps) {
+  const { user } = useAuth();
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
   const [editedText, setEditedText] = React.useState("");
   const [isHovering, setIsHovering] = React.useState(false);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [userProfile, setUserProfile] = useState<{ avatar_url?: string } | null>(null);
+
+  // Fetch user profile for avatar fallback
+  useEffect(() => {
+    if (!user) return;
+    
+    const fetchProfile = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+        
+        const response = await fetch(`/api/profiles/${user.id}`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setUserProfile(data);
+        }
+      } catch (error) {
+        console.error("Error fetching profile:", error);
+      }
+    };
+    
+    fetchProfile();
+  }, [user]);
 
   // Show hidden messages setting - persisted to localStorage
   const [showHiddenMessages, setShowHiddenMessages] = React.useState(() => {
@@ -336,27 +460,63 @@ export default function Story({
   // Get selected choice from input state
   const selectedChoice = choices?.choices.find((c) => input[c.text]) || null;
 
-  // Filter to only AI story parts with content and deduplicate
-  const storyParts = storyData.scene.parts.filter(
-    (part) => !part.user && part.content.trim().length > 0
-  );
-  const uniqueStoryParts = storyParts.filter((part, index, arr) => {
-    if (index === 0) return true;
-    return part.content !== arr[index - 1].content;
+  // Get display name and avatar for chat display
+  const playerDisplayName = storyData.displayName || storyData.player_name || user?.user_metadata?.display_name || "Player";
+  const playerAvatarUrl = storyData.displayAvatar || userProfile?.avatar_url;
+
+  // Build chat messages from scene parts - pairs of user input + GM response
+  const chatMessages: Array<{
+    isUser: boolean;
+    content: string;
+    partIndex: number;
+  }> = [];
+
+  storyData.scene.parts.forEach((part, index) => {
+    if (part.content.trim()) {
+      chatMessages.push({
+        isUser: part.user,
+        content: part.content,
+        partIndex: index,
+      });
+    }
   });
 
-  const currentStoryIndex =
-    viewingPartIndex !== null && viewingPartIndex !== undefined
-      ? uniqueStoryParts.findIndex(
-          (part) => storyData.scene.parts.indexOf(part) === viewingPartIndex
-        )
-      : uniqueStoryParts.length - 1;
+  // Group messages into exchanges (user + following GM response)
+  const exchanges: Array<{
+    userMsg?: typeof chatMessages[0];
+    gmMsg?: typeof chatMessages[0];
+  }> = [];
+  
+  let currentExchange: typeof exchanges[0] = {};
+  
+  for (const msg of chatMessages) {
+    if (msg.isUser) {
+      // Start new exchange
+      if (currentExchange.userMsg) {
+        exchanges.push(currentExchange);
+      }
+      currentExchange = { userMsg: msg };
+    } else {
+      // GM response
+      currentExchange.gmMsg = msg;
+      exchanges.push(currentExchange);
+      currentExchange = {};
+    }
+  }
+  
+  // Don't forget incomplete exchange (user message waiting for GM)
+  if (currentExchange.userMsg) {
+    exchanges.push(currentExchange);
+  }
 
-  const isViewingPast =
-    viewingPartIndex !== null && viewingPartIndex !== undefined;
+  // Show last 3 exchanges for context (2 previous + 1 current)
+  const visibleExchangeCount = 3;
+  const visibleExchanges = exchanges.slice(-visibleExchangeCount);
+  const previousExchanges = exchanges.slice(0, -visibleExchangeCount);
+  const currentExchangeIndex = visibleExchanges.length - 1;
 
   // Get current scene part for GM thinking display
-  const currentScenePart = uniqueStoryParts[currentStoryIndex] || null;
+  const currentScenePart = storyData.scene.parts[storyData.scene.parts.length - 1] || null;
   const gmThinking = currentScenePart?.gmThinking || [];
   const gmToolCalls = currentScenePart?.gmToolCalls || [];
   const gmStoryContext = currentScenePart?.gmStoryContext || "";
@@ -412,12 +572,22 @@ export default function Story({
     }
   };
 
+  // Auto-scroll to bottom when new messages arrive or during streaming
+  useEffect(() => {
+    if (scrollContainerRef.current) {
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+    }
+  }, [chatMessages.length, loading, storyText, pendingUserChoice]);
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-xl border border-gray-500/30 overflow-hidden relative"
-        style={{ backgroundColor: fontSettings.themeColors?.background }}
+        className="rounded-xl border border-gray-500/30 overflow-hidden relative flex flex-col"
+        style={{ 
+          backgroundColor: fontSettings.themeColors?.background,
+          maxHeight: "80vh",
+        }}
       >
         {/* Sync Status Indicator - top right corner */}
         {syncStatus && syncStatus !== "local-only" && (
@@ -426,51 +596,20 @@ export default function Story({
           </div>
         )}
 
-        {/* Story Navigation Header */}
-        {uniqueStoryParts.length > 1 && (
-          <div className="flex items-center justify-center gap-3 py-2 px-4 bg-blue-900/30 border-b border-blue-800/30">
-            <button
-              onClick={onNavigateLeft}
-              disabled={currentStoryIndex <= 0}
-              className="p-2.5 sm:p-1.5 text-blue-300 hover:text-white disabled:text-blue-500/30 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-blue-800/50 active:bg-blue-700/50 touch-manipulation"
-              title="Previous"
-            >
-              <DynamicIcon
-                name="ChevronLeft"
-                className="w-5 h-5 sm:w-4 sm:h-4"
-              />
-            </button>
-
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-blue-200/60">
-                {currentStoryIndex + 1} / {uniqueStoryParts.length}
-              </span>
-              {isViewingPast && (
-                <button
-                  onClick={onResetToCurrentPart}
-                  className="px-3 py-1.5 sm:px-2 sm:py-0.5 text-xs font-medium text-blue-400 hover:bg-blue-800/50 active:bg-blue-700/50 rounded transition-colors touch-manipulation"
-                >
-                  Jump to Latest
-                </button>
-              )}
-            </div>
-
-            <button
-              onClick={onNavigateRight}
-              disabled={
-                !isViewingPast ||
-                currentStoryIndex >= uniqueStoryParts.length - 1
-              }
-              className="p-2.5 sm:p-1.5 text-blue-300 hover:text-white disabled:text-blue-500/30 disabled:cursor-not-allowed transition-colors rounded-lg hover:bg-blue-800/50 active:bg-blue-700/50 touch-manipulation"
-              title="Next"
-            >
-              <DynamicIcon
-                name="ChevronRight"
-                className="w-5 h-5 sm:w-4 sm:h-4"
-              />
-            </button>
+        {/* Header with story name and scroll indicator */}
+        <div className="flex items-center justify-between px-4 py-2 bg-blue-900/30 border-b border-blue-800/30">
+          <div className="flex items-center gap-2">
+            <DynamicIcon name="BookOpen" className="w-4 h-4 text-blue-300" />
+            <span className="text-sm font-medium text-blue-200 truncate max-w-[200px]">
+              {storyData.story_name || "Untitled Story"}
+            </span>
           </div>
-        )}
+          {exchanges.length > visibleExchangeCount && (
+            <span className="text-xs text-blue-400/60">
+              ↑ Scroll for history ({exchanges.length} turns)
+            </span>
+          )}
+        </div>
 
         {/* GM Thinking Collapsible (shows reasoning, tool calls, and results) */}
         {/* Show when: has saved content OR currently streaming GM stage */}
@@ -519,7 +658,7 @@ export default function Story({
               </button>
               {/* Auto-expand during streaming, otherwise respect user toggle */}
               {(showGMThinking || loadingStage === "gm") && (
-                <div className="px-4 py-3 bg-purple-950/30 space-y-3 max-h-80 overflow-y-auto">
+                <div className="px-4 py-3 bg-purple-950/30 space-y-3 max-h-60 overflow-y-auto">
                   {/* Live streaming content - interleaved thinking and tool results */}
                   {loadingStage === "gm" && liveGMEntries ? (
                     <div className="space-y-3">
@@ -648,34 +787,126 @@ export default function Story({
           />
         )}
 
-        {/* Story Content Area */}
+        {/* Chat Messages Area - Scrollable */}
         <div
-          className="relative p-4 min-h-[200px]"
-          onMouseEnter={() => setIsHovering(true)}
-          onMouseLeave={() => setIsHovering(false)}
+          ref={scrollContainerRef}
+          className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]"
+          style={{ color: fontSettings.themeColors?.text }}
         >
-          {editMode ? (
+          {/* Previous exchanges (scrolled history) */}
+          {previousExchanges.map((exchange, idx) => (
+            <React.Fragment key={`old-${idx}`}>
+              {exchange.userMsg && (
+                <ChatMessage
+                  isUser={true}
+                  content={exchange.userMsg.content}
+                  displayName={playerDisplayName}
+                  avatarUrl={playerAvatarUrl}
+                  isPrevious={true}
+                  showHiddenMessages={showHiddenMessages}
+                  fontSettings={fontSettings}
+                />
+              )}
+              {exchange.gmMsg && (
+                <ChatMessage
+                  isUser={false}
+                  content={exchange.gmMsg.content}
+                  displayName="Game Master"
+                  isPrevious={true}
+                  showHiddenMessages={showHiddenMessages}
+                  fontSettings={fontSettings}
+                />
+              )}
+            </React.Fragment>
+          ))}
+
+          {/* Visible exchanges (last 3) */}
+          {visibleExchanges.map((exchange, idx) => {
+            const isPrevious = idx < currentExchangeIndex;
+            
+            return (
+              <React.Fragment key={`visible-${idx}`}>
+                {exchange.userMsg && (
+                  <ChatMessage
+                    isUser={true}
+                    content={exchange.userMsg.content}
+                    displayName={playerDisplayName}
+                    avatarUrl={playerAvatarUrl}
+                    isPrevious={isPrevious}
+                    showHiddenMessages={showHiddenMessages}
+                    fontSettings={fontSettings}
+                  />
+                )}
+                {exchange.gmMsg && (
+                  <ChatMessage
+                    isUser={false}
+                    content={exchange.gmMsg.content}
+                    displayName="Game Master"
+                    isPrevious={isPrevious}
+                    showHiddenMessages={showHiddenMessages}
+                    fontSettings={fontSettings}
+                  />
+                )}
+              </React.Fragment>
+            );
+          })}
+
+          {/* Pending user choice (shown immediately when submitted) */}
+          {pendingUserChoice && loading && !chatMessages.some(m => m.isUser && m.content === pendingUserChoice) && (
+            <ChatMessage
+              isUser={true}
+              content={pendingUserChoice}
+              displayName={playerDisplayName}
+              avatarUrl={playerAvatarUrl}
+              isPrevious={false}
+              showHiddenMessages={showHiddenMessages}
+              fontSettings={fontSettings}
+            />
+          )}
+
+          {/* Loading indicator for GM response */}
+          {loading && loadingStage !== "story" && (
+            <ChatMessage
+              isUser={false}
+              content=""
+              displayName="Game Master"
+              isLoading={true}
+              showHiddenMessages={showHiddenMessages}
+              fontSettings={fontSettings}
+            />
+          )}
+
+          {/* Streaming story text (during story stage) */}
+          {loadingStage === "story" && storyText && (
+            <ChatMessage
+              isUser={false}
+              content={storyText}
+              displayName="Game Master"
+              isPrevious={false}
+              showHiddenMessages={showHiddenMessages}
+              fontSettings={fontSettings}
+            />
+          )}
+        </div>
+
+        {/* Edit Mode */}
+        {editMode && (
+          <div className="p-4 bg-blue-900/20 border-t border-blue-800/30">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-semibold text-white flex items-center gap-2">
                   <DynamicIcon name="Pencil" className="w-4 h-4" />
                   Edit Response
                 </h3>
-                <span className="text-xs text-blue-200/40">
-                  XML tags: &lt;story&gt;, &lt;choices&gt;, &lt;memory&gt;,
-                  &lt;commands&gt;
-                </span>
               </div>
               <textarea
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
-                className="w-full h-64 px-3 py-2 bg-blue-900/50 border border-blue-800/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
+                className="w-full h-48 px-3 py-2 bg-blue-900/50 border border-blue-800/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
                 placeholder="Edit the raw AI output..."
               />
               <div className="flex items-center justify-between">
-                <span className="text-xs text-blue-200/40">
-                  {editedText.length} characters
-                </span>
+                <span className="text-xs text-blue-200/40">{editedText.length} characters</span>
                 <div className="flex gap-2">
                   <button
                     onClick={() => {
@@ -703,34 +934,13 @@ export default function Story({
                 </div>
               </div>
             </div>
-          ) : (
-            <>
-              {prettify(storyText, true, showHiddenMessages, fontSettings)}
-
-              {/* Edit button overlay */}
-              {isHovering && onEdit && !loading && !loadingStage && (
-                <button
-                  onClick={() => {
-                    setEditMode(true);
-                    const lastPart =
-                      storyData.scene.parts[storyData.scene.parts.length - 1];
-                    setEditedText(lastPart?.raw || storyText);
-                  }}
-                  className="absolute top-3 right-3 p-1.5 bg-blue-900/80 hover:bg-blue-800 text-white rounded-lg transition-all flex items-center gap-1.5 text-xs"
-                  title="Edit response"
-                >
-                  <DynamicIcon name="Pencil" className="w-3 h-3" />
-                  Edit
-                </button>
-              )}
-            </>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Action Buttons Bar */}
         {!editMode && (
           <div className="flex items-center justify-between px-4 py-2 bg-blue-900/30 border-t border-blue-800/30">
-            {/* Left side: Retry & Undo */}
+            {/* Left side: Retry, Undo & Edit */}
             <div className="flex items-center gap-1.5 sm:gap-1">
               {canUndo && onUndo && (
                 <button
@@ -755,6 +965,20 @@ export default function Story({
                     className="w-5 h-5 sm:w-4 sm:h-4"
                   />
                   <span className="hidden sm:inline">Retry</span>
+                </button>
+              )}
+              {onEdit && !loading && !loadingStage && (
+                <button
+                  onClick={() => {
+                    setEditMode(true);
+                    const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
+                    setEditedText(lastPart?.raw || storyText);
+                  }}
+                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-blue-800/50 active:bg-blue-700/50 rounded-lg transition-colors flex items-center gap-1.5 touch-manipulation"
+                  title="Edit response"
+                >
+                  <DynamicIcon name="Pencil" className="w-5 h-5 sm:w-4 sm:h-4" />
+                  <span className="hidden sm:inline">Edit</span>
                 </button>
               )}
             </div>
@@ -843,19 +1067,6 @@ const parseHiddenText = (text: string, showHidden: boolean): string => {
     return text.replace(/\|\|[\s\S]*?\|\|/g, "");
   }
 };
-
-interface FontSettings {
-  fontSize: number;
-  fontFamily: string;
-  lineHeight: number;
-  paragraphSpacing: number;
-  theme?: string;
-  themeColors?: {
-    background: string;
-    text: string;
-    accent: string;
-  };
-}
 
 const prettify = (
   text: string,

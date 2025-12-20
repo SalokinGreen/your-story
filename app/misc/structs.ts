@@ -659,6 +659,9 @@ export interface StoryData {
   premise: string;
   player_name: string;
   player_summary: string;
+  // Custom display settings for chat-like story view (multiplayer-ready)
+  displayName?: string; // Custom display name (falls back to player_name, then auth user name)
+  displayAvatar?: string; // Custom avatar URL (falls back to auth user avatar)
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;
   memory: (string | MemoryEntry)[]; // Supports both legacy string[] and new MemoryEntry[] format
