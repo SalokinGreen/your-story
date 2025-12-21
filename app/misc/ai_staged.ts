@@ -3071,7 +3071,7 @@ Write immersive prose. The player should experience the story, not see game mech
   )}\n\n**INSTRUCTIONS:**
 1. First, read through the Game Mechanics Notes if needed.
 2. Use reasoning and planning before talking back to the player.
-3. **Call the tool(s)** with correct parameters. You MUST call at least one tool or as many as you need to handle the player's action properly. Do not skip tool calls!
+3. **Call the tool(s)** with correct parameters. You MUST call at least one tool or as many as you need to handle the player's action properly. Do not skip tool calls! *Remember:* You have to edit the player character sheets when their stats change.
 4. Finally, write the story output the player will see, based on the tool results. 
 
 **CRITICAL:** Wrap ALL player-visible text in <output>...</output> tags. Any text outside these tags will be treated as internal GM reasoning and hidden from the player.`;
