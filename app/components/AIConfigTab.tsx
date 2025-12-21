@@ -253,9 +253,15 @@ export default function AIConfigTab() {
 
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [hasLoadedSettings, setHasLoadedSettings] = useState(false);
+  const [hasLoadedSettings, setHasLoadedSettings] = useState(() => {
+    // Check if we've already loaded settings this session
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("aiConfigLoaded") === "true";
+    }
+    return false;
+  });
 
-  // Load settings from Supabase (custom models + AI config)
+  // Load settings from Supabase (custom models + AI config) - only once per session
   useEffect(() => {
     if (user && !hasLoadedSettings) {
       setIsLoadingSettings(true);
@@ -271,33 +277,36 @@ export default function AIConfigTab() {
               );
             }
 
-            // Load AI config from cloud (overrides localStorage)
+            // Load AI config from cloud ONLY if localStorage doesn't have values
+            // This prevents cloud from overwriting user's recent selections
             if (settings.ai_config) {
               const config = settings.ai_config;
-              if (config.currentPreset) {
+              
+              // Only apply cloud settings if localStorage is empty for that key
+              if (config.currentPreset && !localStorage.getItem("aiPreset")) {
                 setCurrentPreset(config.currentPreset);
                 localStorage.setItem("aiPreset", config.currentPreset);
               }
-              if (config.storyModel !== undefined) {
+              if (config.storyModel !== undefined && !localStorage.getItem("aiModelStory")) {
                 setStoryModel(config.storyModel);
                 localStorage.setItem("aiModelStory", config.storyModel);
               }
-              if (config.toolsModel !== undefined) {
+              if (config.toolsModel !== undefined && !localStorage.getItem("aiModelTools")) {
                 setToolsModel(config.toolsModel);
                 localStorage.setItem("aiModelTools", config.toolsModel);
               }
-              if (config.choicesModel !== undefined) {
+              if (config.choicesModel !== undefined && !localStorage.getItem("aiModelChoices")) {
                 setChoicesModel(config.choicesModel);
                 localStorage.setItem("aiModelChoices", config.choicesModel);
               }
-              if (config.customMaxContext !== undefined) {
+              if (config.customMaxContext !== undefined && !localStorage.getItem("customMaxContext")) {
                 setCustomMaxContext(config.customMaxContext);
                 localStorage.setItem(
                   "customMaxContext",
                   config.customMaxContext.toString()
                 );
               }
-              if (config.customMaxOutput !== undefined) {
+              if (config.customMaxOutput !== undefined && !localStorage.getItem("customMaxOutput")) {
                 setCustomMaxOutput(config.customMaxOutput);
                 localStorage.setItem(
                   "customMaxOutput",
@@ -307,6 +316,10 @@ export default function AIConfigTab() {
             }
           }
           setHasLoadedSettings(true);
+          // Mark as loaded for this session
+          if (typeof window !== "undefined") {
+            sessionStorage.setItem("aiConfigLoaded", "true");
+          }
         })
         .finally(() => setIsLoadingSettings(false));
     }
@@ -711,15 +724,18 @@ export default function AIConfigTab() {
                   const newValue = e.target.checked;
                   setByokMode(newValue);
                   if (!newValue) {
-                    // Switching to Coins mode - auto-select Mistral Large preset
-                    handlePresetChange("mistralLarge");
+                    // Switching to Coins mode - set default Coins model
+                    const defaultCoinsModel = "Mistral Large 3.0";
+                    setStoryModel(defaultCoinsModel);
+                    setToolsModel(defaultCoinsModel);
+                    localStorage.setItem("aiModelStory", defaultCoinsModel);
+                    localStorage.setItem("aiModelTools", defaultCoinsModel);
                     addNotification(
-                      "Switched to Coins mode with Mistral Large models",
+                      "Switched to Coins mode with Mistral Large 3.0",
                       "success"
                     );
                   } else {
-                    // Switching to BYOK mode - switch to custom preset
-                    handlePresetChange("custom");
+                    // Switching to BYOK mode - keep current model selection
                     addNotification(
                       "Switched to BYOK mode - use your own API keys",
                       "success"

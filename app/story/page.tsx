@@ -71,16 +71,6 @@ function getModelsFromPreset() {
     };
   }
 
-  const currentPreset = localStorage.getItem("aiPreset") || "custom";
-  const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["custom"];
-
-  // Debug logging
-  console.log(
-    `[getModelsFromPreset] currentPreset: "${currentPreset}", found preset: ${
-      preset ? preset.name : "null"
-    }, toolsModel: "${preset?.toolsModel}"`
-  );
-
   // NovelAI settings (BYOK for story stage only)
   const novelaiEnabled = localStorage.getItem("novelaiEnabled") === "true";
   const novelaiKey = localStorage.getItem("novelaiKey") || "";
@@ -88,38 +78,24 @@ function getModelsFromPreset() {
     localStorage.getItem("novelaiTemperature") || "1"
   );
 
-  // Advanced toggle settings
-  const advancedChoices = localStorage.getItem("advancedChoices") === "true";
-  const advancedTools = localStorage.getItem("advancedTools") === "true";
+  // Always read directly from localStorage model keys
+  // The preset system is deprecated - direct model selection is now the standard
+  const storedStoryModel = localStorage.getItem("aiModelStory");
+  const storedToolsModel = localStorage.getItem("aiModelTools");
+  const storedChoicesModel = localStorage.getItem("aiModelChoices");
 
-  // For custom preset, check if user has overridden any models
-  if (currentPreset === "custom") {
-    return {
-      storyModel: localStorage.getItem("aiModelStory") || preset.storyModel,
-      toolsModel: localStorage.getItem("aiModelTools") || preset.toolsModel,
-      choicesModel:
-        localStorage.getItem("aiModelChoices") || preset.choicesModel,
-      novelaiEnabled,
-      novelaiKey,
-      novelaiTemperature,
-    };
-  }
+  // Debug logging
+  console.log(
+    `[getModelsFromPreset] Direct model read - storyModel: "${storedStoryModel}", toolsModel: "${storedToolsModel}"`
+  );
 
-  // For non-custom presets, apply advanced toggles if available
-  const effectiveChoicesModel =
-    advancedChoices && preset.advancedChoicesModel
-      ? preset.advancedChoicesModel
-      : preset.choicesModel;
-
-  const effectiveToolsModel =
-    advancedTools && preset.advancedToolsModel
-      ? preset.advancedToolsModel
-      : preset.toolsModel;
-
+  // Use stored values, fall back to Mistral Large 3.0 for Coins mode defaults
+  const defaultModel = "Mistral Large 3.0";
+  
   return {
-    storyModel: preset.storyModel,
-    toolsModel: effectiveToolsModel,
-    choicesModel: effectiveChoicesModel,
+    storyModel: storedStoryModel || defaultModel,
+    toolsModel: storedToolsModel || storedStoryModel || defaultModel,
+    choicesModel: storedChoicesModel || storedStoryModel || defaultModel,
     novelaiEnabled,
     novelaiKey,
     novelaiTemperature,
