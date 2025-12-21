@@ -128,8 +128,8 @@ function ChatMessage({
     (liveThinkingEntries && liveThinkingEntries.length > 0);
   const shouldShowThinking = showThinkingProp && hasThinking;
 
-  // Auto-expand when streaming
-  const isExpanded = expanded || isStreaming;
+  // Default is collapsed; user can expand/collapse even while streaming
+  const isExpanded = expanded;
 
   return (
     <div
@@ -164,11 +164,15 @@ function ChatMessage({
         {/* Thinking toggle - inline with name for GM messages */}
         {!isUser && shouldShowThinking && (
           <button
-            onClick={() => setExpanded(!isExpanded)}
+            onClick={() => setExpanded((prev) => !prev)}
             className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors ml-1"
           >
             <span className="text-xs">
-              {isStreaming ? "Thinking..." : "Show thinking"}
+              {isExpanded
+                ? "Hide thinking"
+                : isStreaming
+                ? "Thinking..."
+                : "Show thinking"}
             </span>
             <DynamicIcon
               name={isExpanded ? "ChevronUp" : "ChevronDown"}

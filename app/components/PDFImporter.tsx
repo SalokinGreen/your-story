@@ -104,6 +104,17 @@ async function fetchWithRetry(
   throw lastError || new Error("Request failed after retries");
 }
 
+function isTextImportFile(file: File): boolean {
+  const name = file.name.toLowerCase();
+  return (
+    name.endsWith(".txt") ||
+    name.endsWith(".md") ||
+    file.type === "text/plain" ||
+    file.type === "text/markdown" ||
+    file.type.startsWith("text/")
+  );
+}
+
 /**
  * Split a large PDF into smaller chunks using pdf-lib
  * Returns an array of base64-encoded PDF chunks
@@ -115,7 +126,9 @@ async function splitPDFIntoChunks(
   onProgress?.("Loading PDF for splitting...");
 
   const arrayBuffer = await file.arrayBuffer();
-  const pdfDoc = await PDFDocument.load(arrayBuffer, { ignoreEncryption: true });
+  const pdfDoc = await PDFDocument.load(arrayBuffer, {
+    ignoreEncryption: true,
+  });
   const totalPages = pdfDoc.getPageCount();
 
   const chunks: { base64: string; pageStart: number; pageEnd: number }[] = [];
@@ -840,6 +853,11 @@ export default function PDFImporter({
       let totalPages = 0;
 
       for (const file of files) {
+        if (isTextImportFile(file)) {
+          validFiles.push(file);
+          continue;
+        }
+
         const validation = validateOCRFile(file);
         if (!validation.valid) {
           addNotification(`${file.name}: ${validation.error}`, "failure");
@@ -853,8 +871,10 @@ export default function PDFImporter({
 
       if (validFiles.length > 0) {
         setSelectedFiles((prev) => [...prev, ...validFiles]);
-        setPageCount((prev) => prev + totalPages);
-        setEstimatedCost((prev) => prev + calculateOCRCost(totalPages));
+        if (totalPages > 0) {
+          setPageCount((prev) => prev + totalPages);
+          setEstimatedCost((prev) => prev + calculateOCRCost(totalPages));
+        }
       }
     },
     [addNotification]
@@ -870,6 +890,11 @@ export default function PDFImporter({
       let totalPages = 0;
 
       for (const file of files) {
+        if (isTextImportFile(file)) {
+          validFiles.push(file);
+          continue;
+        }
+
         const validation = validateOCRFile(file);
         if (!validation.valid) {
           addNotification(`${file.name}: ${validation.error}`, "failure");
@@ -881,8 +906,10 @@ export default function PDFImporter({
 
       if (validFiles.length > 0) {
         setSelectedFiles((prev) => [...prev, ...validFiles]);
-        setPageCount((prev) => prev + totalPages);
-        setEstimatedCost((prev) => prev + calculateOCRCost(totalPages));
+        if (totalPages > 0) {
+          setPageCount((prev) => prev + totalPages);
+          setEstimatedCost((prev) => prev + calculateOCRCost(totalPages));
+        }
       }
     },
     [addNotification]
@@ -1255,6 +1282,68 @@ export default function PDFImporter({
           setProgress(fileProgressEnd);
         } else {
           // Small file or non-PDF: Use original single-request approach
+          if (isTextImportFile(file)) {
+            setStep("summarizing");
+            setProgress(fileProgressStart + fileProgressRange * 0.4);
+            setStatusMessage(
+              `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`
+            );
+
+            const textContent = await file.text();
+            combinedMarkdown = textContent;
+            combinedTotalPages = 0;
+            combinedCost = 0;
+
+            setExtractedMarkdown(
+              (prev) => prev + "\n\n---\n\n" + combinedMarkdown
+            );
+
+            const summarizeResponse = await fetchWithRetry(
+              "/api/ocr/summarize",
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  markdown: combinedMarkdown,
+                  focus: ["all"],
+                  customInstructions:
+                    (customInstructions || "") +
+                    `\n\nNote: This content was imported from a text file (${file.name}).`,
+                  model:
+                    aiModel === "custom-openrouter"
+                      ? customOpenRouterModel
+                      : aiModel,
+                  maxTokens: maxOutputTokens,
+                  openRouterKey: keys.openRouterKey,
+                  deepseekKey: keys.deepseekKey,
+                }),
+              },
+              SUMMARIZE_TIMEOUT_MS,
+              MAX_RETRIES
+            );
+
+            if (!summarizeResponse.ok) {
+              let errorMsg = "Note extraction failed";
+              try {
+                const error = await summarizeResponse.json();
+                errorMsg = error.error || errorMsg;
+              } catch {
+                errorMsg = (await summarizeResponse.text()) || errorMsg;
+              }
+              throw new Error(`${file.name}: ${errorMsg}`);
+            }
+
+            const summarizeResult = await summarizeResponse.json();
+            allLore.push(...(summarizeResult.lore || []));
+            allMechanicNotes.push(...(summarizeResult.mechanicNotes || []));
+            allCustomTables.push(...(summarizeResult.customTables || []));
+            setProgress(fileProgressEnd);
+            continue;
+          }
+
           setStep("uploading");
           setProgress(fileProgressStart + fileProgressRange * 0.1);
           setStatusMessage(
@@ -1878,7 +1967,7 @@ export default function PDFImporter({
                     <input
                       ref={fileInputRef}
                       type="file"
-                      accept=".pdf,.png,.jpg,.jpeg,.webp"
+                      accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md"
                       onChange={handleFileSelect}
                       multiple
                       className="hidden"
