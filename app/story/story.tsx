@@ -602,13 +602,12 @@ export default function Story({
   }, [chatMessages.length, loading, storyText, pendingUserChoice]);
 
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className="w-full px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-xl border border-gray-500/30 overflow-hidden relative flex flex-col"
+        className="rounded-xl border border-gray-500/30 overflow-hidden relative flex flex-col max-h-[calc(100vh-100px)] sm:max-h-[calc(100vh-180px)]"
         style={{
           backgroundColor: fontSettings.themeColors?.background,
-          maxHeight: "calc(100vh - 180px)",
         }}
       >
         {/* Sync Status Indicator - top right corner */}
@@ -619,7 +618,7 @@ export default function Story({
         )}
 
         {/* Header with story name and scroll indicator */}
-        <div className="flex items-center justify-between px-4 py-2 bg-blue-900/30 border-b border-blue-800/30">
+        <div className="flex items-center justify-between px-3 py-1 sm:px-4 sm:py-2 bg-blue-900/30 border-b border-blue-800/30">
           <div className="flex items-center gap-2">
             <DynamicIcon name="BookOpen" className="w-4 h-4 text-blue-300" />
             <span className="text-sm font-medium text-blue-200 truncate max-w-[200px]">
@@ -643,7 +642,7 @@ export default function Story({
             <div className="border-b border-purple-800/30">
               <button
                 onClick={() => setShowGMThinking(!showGMThinking)}
-                className="w-full flex items-center justify-between px-4 py-2 bg-purple-900/20 hover:bg-purple-900/30 transition-colors"
+                className="w-full flex items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-900/20 hover:bg-purple-900/30 transition-colors"
               >
                 <div className="flex items-center gap-2">
                   <DynamicIcon
@@ -680,7 +679,7 @@ export default function Story({
               </button>
               {/* Auto-expand during streaming, otherwise respect user toggle */}
               {(showGMThinking || loadingStage === "gm") && (
-                <div className="px-4 py-3 bg-purple-950/30 space-y-3 max-h-60 overflow-y-auto">
+                <div className="px-3 py-2 sm:px-4 sm:py-3 bg-purple-950/30 space-y-2 sm:space-y-3 max-h-32 sm:max-h-60 overflow-y-auto">
                   {/* Live streaming content - interleaved thinking and tool results */}
                   {loadingStage === "gm" && liveGMEntries ? (
                     <div className="space-y-3">
@@ -812,7 +811,7 @@ export default function Story({
         {/* Chat Messages Area - Scrollable */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto p-4 space-y-4 min-h-[300px]"
+          className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-[200px] sm:min-h-[300px]"
           style={{ color: fontSettings.themeColors?.text }}
         >
           {/* Previous exchanges (scrolled history) */}

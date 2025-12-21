@@ -212,7 +212,7 @@ export default function CombatDisplay({
       {/* Combat Header - always visible */}
       <button
         onClick={onToggleExpand}
-        className="w-full flex items-center justify-between px-4 py-2 bg-red-900/30 hover:bg-red-900/40 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 bg-red-900/30 hover:bg-red-900/40 transition-colors"
       >
         <div className="flex items-center gap-2">
           <DynamicIcon name="Swords" className="w-4 h-4 text-red-400" />
@@ -237,7 +237,7 @@ export default function CombatDisplay({
 
       {/* Expanded content */}
       {expanded && (
-        <div className="px-4 py-3 space-y-3">
+        <div className="px-3 py-2 sm:px-4 sm:py-3 space-y-2 sm:space-y-3 max-h-40 sm:max-h-60 overflow-y-auto">
           {/* Turn Order Bar */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1">
             <span className="text-xs text-gray-500 mr-1 shrink-0">

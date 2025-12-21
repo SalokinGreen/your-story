@@ -6071,7 +6071,7 @@ function StoryPageContent() {
 
     return (
       <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4">
-        <div className="max-w-3xl mx-auto">
+        <div className="w-full px-2 sm:max-w-3xl mx-auto">
           {/* Game Over Header */}
           <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-6 mb-4 text-center">
             <div className="flex items-center justify-center gap-3 text-red-400 mb-3">
@@ -6570,7 +6570,7 @@ function StoryPageContent() {
     return (
       <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
         <div className="py-6 px-4">
-          <div className="max-w-3xl mx-auto w-full">
+          <div className="w-full px-2 sm:max-w-3xl mx-auto">
             {/* Header */}
             <div className="text-center mb-6">
               <h1 className="text-2xl sm:text-3xl font-bold text-white mb-2">
@@ -6683,7 +6683,7 @@ function StoryPageContent() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-4 px-4 pb-20">
-      <main className="flex gap-4 w-full max-w-4xl mx-auto flex-col">
+      <main className="flex gap-4 w-full px-2 sm:max-w-4xl mx-auto flex-col">
         {/* Compact Story Header */}
         <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 px-4 py-3">
           <div className="flex items-center justify-between gap-4">
