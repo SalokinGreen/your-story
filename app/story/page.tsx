@@ -91,7 +91,7 @@ function getModelsFromPreset() {
 
   // Use stored values, fall back to Mistral Large 3.0 for Coins mode defaults
   const defaultModel = "Mistral Large 3.0";
-  
+
   return {
     storyModel: storedStoryModel || defaultModel,
     toolsModel: storedToolsModel || storedStoryModel || defaultModel,

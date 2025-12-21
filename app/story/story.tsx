@@ -101,7 +101,9 @@ function ChatMessage({
       className={`flex flex-col sm:flex-row gap-1 sm:gap-3 ${flexDirection} ${opacity} transition-opacity duration-300`}
     >
       {/* Avatar + Name row on mobile, just avatar on desktop */}
-      <div className={`flex items-center gap-2 ${mobileAlign} sm:block shrink-0`}>
+      <div
+        className={`flex items-center gap-2 ${mobileAlign} sm:block shrink-0`}
+      >
         {isUser ? (
           avatarUrl ? (
             <img
@@ -111,12 +113,18 @@ function ChatMessage({
             />
           ) : (
             <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500/30">
-              <DynamicIcon name="User" className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
+              <DynamicIcon
+                name="User"
+                className="w-3 h-3 sm:w-5 sm:h-5 text-white"
+              />
             </div>
           )
         ) : (
           <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full bg-purple-600 flex items-center justify-center border-2 border-purple-500/30">
-            <DynamicIcon name="Sparkles" className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
+            <DynamicIcon
+              name="Sparkles"
+              className="w-3 h-3 sm:w-5 sm:h-5 text-white"
+            />
           </div>
         )}
         {/* Name shown inline on mobile only */}

@@ -281,32 +281,47 @@ export default function AIConfigTab() {
             // This prevents cloud from overwriting user's recent selections
             if (settings.ai_config) {
               const config = settings.ai_config;
-              
+
               // Only apply cloud settings if localStorage is empty for that key
               if (config.currentPreset && !localStorage.getItem("aiPreset")) {
                 setCurrentPreset(config.currentPreset);
                 localStorage.setItem("aiPreset", config.currentPreset);
               }
-              if (config.storyModel !== undefined && !localStorage.getItem("aiModelStory")) {
+              if (
+                config.storyModel !== undefined &&
+                !localStorage.getItem("aiModelStory")
+              ) {
                 setStoryModel(config.storyModel);
                 localStorage.setItem("aiModelStory", config.storyModel);
               }
-              if (config.toolsModel !== undefined && !localStorage.getItem("aiModelTools")) {
+              if (
+                config.toolsModel !== undefined &&
+                !localStorage.getItem("aiModelTools")
+              ) {
                 setToolsModel(config.toolsModel);
                 localStorage.setItem("aiModelTools", config.toolsModel);
               }
-              if (config.choicesModel !== undefined && !localStorage.getItem("aiModelChoices")) {
+              if (
+                config.choicesModel !== undefined &&
+                !localStorage.getItem("aiModelChoices")
+              ) {
                 setChoicesModel(config.choicesModel);
                 localStorage.setItem("aiModelChoices", config.choicesModel);
               }
-              if (config.customMaxContext !== undefined && !localStorage.getItem("customMaxContext")) {
+              if (
+                config.customMaxContext !== undefined &&
+                !localStorage.getItem("customMaxContext")
+              ) {
                 setCustomMaxContext(config.customMaxContext);
                 localStorage.setItem(
                   "customMaxContext",
                   config.customMaxContext.toString()
                 );
               }
-              if (config.customMaxOutput !== undefined && !localStorage.getItem("customMaxOutput")) {
+              if (
+                config.customMaxOutput !== undefined &&
+                !localStorage.getItem("customMaxOutput")
+              ) {
                 setCustomMaxOutput(config.customMaxOutput);
                 localStorage.setItem(
                   "customMaxOutput",
