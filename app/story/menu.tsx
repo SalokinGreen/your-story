@@ -80,6 +80,71 @@ interface BasicSettingsForm {
     | "narrative";
 }
 
+function ChatDisplaySettings({
+  form,
+  onChange,
+}: {
+  form: Pick<
+    BasicSettingsForm,
+    "displayName" | "displayAvatar" | "player_name"
+  >;
+  onChange: (
+    updates: Partial<Pick<BasicSettingsForm, "displayName" | "displayAvatar">>
+  ) => void;
+}) {
+  return (
+    <div className="border border-blue-700/40 rounded-lg p-4 bg-blue-900/10">
+      <h4 className="text-sm font-semibold text-purple-300 mb-3 flex items-center gap-2">
+        <DynamicIcon name="MessageCircle" className="w-4 h-4" />
+        Chat Display Settings
+      </h4>
+      <p className="text-xs text-blue-200/60 mb-4">
+        Customize how your messages appear in the story chat. Leave empty to use
+        your account defaults.
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-blue-200 mb-2">
+            Display Name
+          </label>
+          <input
+            type="text"
+            value={form.displayName}
+            onChange={(e) => onChange({ displayName: e.target.value })}
+            placeholder={form.player_name || "Your name"}
+            className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 placeholder:text-blue-400/40"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-blue-200 mb-2">
+            Avatar URL
+          </label>
+          <input
+            type="url"
+            value={form.displayAvatar}
+            onChange={(e) => onChange({ displayAvatar: e.target.value })}
+            placeholder="https://..."
+            className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 placeholder:text-blue-400/40"
+          />
+        </div>
+      </div>
+      {form.displayAvatar && (
+        <div className="mt-3 flex items-center gap-3">
+          <span className="text-xs text-blue-200/60">Preview:</span>
+          <img
+            src={form.displayAvatar}
+            alt="Avatar preview"
+            className="w-10 h-10 rounded-full object-cover border-2 border-purple-500/50"
+            onError={(e) => {
+              (e.target as HTMLImageElement).style.display = "none";
+            }}
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BasicSettings({
   form,
   onChange,
@@ -99,56 +164,6 @@ function BasicSettings({
           onChange={(e) => onChange({ ...form, story_name: e.target.value })}
           className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
-      </div>
-
-      {/* Display Settings Section */}
-      <div className="border border-blue-700/40 rounded-lg p-4 bg-blue-900/10">
-        <h4 className="text-sm font-semibold text-purple-300 mb-3 flex items-center gap-2">
-          <DynamicIcon name="MessageCircle" className="w-4 h-4" />
-          Chat Display Settings
-        </h4>
-        <p className="text-xs text-blue-200/60 mb-4">
-          Customize how your messages appear in the story chat. Leave empty to use your account defaults.
-        </p>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-blue-200 mb-2">
-              Display Name
-            </label>
-            <input
-              type="text"
-              value={form.displayName}
-              onChange={(e) => onChange({ ...form, displayName: e.target.value })}
-              placeholder={form.player_name || "Your name"}
-              className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 placeholder:text-blue-400/40"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-blue-200 mb-2">
-              Avatar URL
-            </label>
-            <input
-              type="url"
-              value={form.displayAvatar}
-              onChange={(e) => onChange({ ...form, displayAvatar: e.target.value })}
-              placeholder="https://..."
-              className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 placeholder:text-blue-400/40"
-            />
-          </div>
-        </div>
-        {form.displayAvatar && (
-          <div className="mt-3 flex items-center gap-3">
-            <span className="text-xs text-blue-200/60">Preview:</span>
-            <img
-              src={form.displayAvatar}
-              alt="Avatar preview"
-              className="w-10 h-10 rounded-full object-cover border-2 border-purple-500/50"
-              onError={(e) => {
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          </div>
-        )}
       </div>
 
       <div>
@@ -5462,6 +5477,8 @@ export default function MenuPage({
 
   const [activeTab, setActiveTab] = useState<
     | "basic"
+    | "display"
+    | "multiplayer"
     | "stats"
     | "inventory"
     | "abilities"
@@ -5479,6 +5496,16 @@ export default function MenuPage({
     | "tts"
     | "ai"
   >("basic");
+
+  const [multiplayerEnabled, setMultiplayerEnabled] = useState<boolean>(
+    !!storyData.multiplayer?.enabled
+  );
+  const [multiplayerPlayersText, setMultiplayerPlayersText] = useState<string>(
+    (storyData.multiplayer?.players || []).join("\n")
+  );
+  const [multiplayerHost, setMultiplayerHost] = useState<string>(
+    storyData.multiplayer?.host || ""
+  );
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -5603,6 +5630,12 @@ export default function MenuPage({
 
   const handleSaveSettings = async () => {
     try {
+      const parsedPlayers = multiplayerPlayersText
+        .split(/\r?\n/)
+        .map((p) => p.trim())
+        .filter(Boolean);
+      const nextHost = (multiplayerHost || parsedPlayers[0] || "").trim();
+
       onUpdateStoryData({
         story_name: settingsForm.story_name,
         player_name: settingsForm.player_name,
@@ -5615,6 +5648,11 @@ export default function MenuPage({
         displayName: settingsForm.displayName || undefined,
         displayAvatar: settingsForm.displayAvatar || undefined,
         rpgSystem: settingsForm.rpgSystem,
+        multiplayer: {
+          enabled: multiplayerEnabled,
+          players: parsedPlayers,
+          host: nextHost || undefined,
+        },
       });
       await onSaveProgress();
       setShowSettings(false);
@@ -6232,6 +6270,8 @@ export default function MenuPage({
             >
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
+                { id: "display", label: "Display", icon: "MessageCircle" },
+                { id: "multiplayer", label: "Multiplayer", icon: "Users" },
                 { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
                 { id: "inventory", label: "Inventory", icon: "Backpack" },
                 { id: "abilities", label: "Abilities", icon: "Wand2" },
@@ -6275,6 +6315,76 @@ export default function MenuPage({
                     form={settingsForm}
                     onChange={setSettingsForm}
                   />
+                </div>
+              )}
+
+              {activeTab === "display" && (
+                <div className="mt-4 space-y-5">
+                  <ChatDisplaySettings
+                    form={settingsForm}
+                    onChange={(updates) =>
+                      setSettingsForm((prev) => ({ ...prev, ...updates }))
+                    }
+                  />
+                </div>
+              )}
+
+              {activeTab === "multiplayer" && (
+                <div className="mt-4 space-y-5">
+                  <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                          Enable Multiplayer (Hot-seat)
+                        </label>
+                        <p className="text-xs text-blue-200/60">
+                          Collect multiple player actions (Name: action) before
+                          generating.
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={multiplayerEnabled}
+                          onChange={(e) =>
+                            setMultiplayerEnabled(e.target.checked)
+                          }
+                          className="sr-only peer"
+                        />
+                        <div className="w-14 h-7 bg-blue-800/50 peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
+                      Players (one per line)
+                    </label>
+                    <textarea
+                      value={multiplayerPlayersText}
+                      onChange={(e) =>
+                        setMultiplayerPlayersText(e.target.value)
+                      }
+                      placeholder={`Alice\nBob\nCharlie`}
+                      className="w-full h-32 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                    />
+                    <p className="text-xs text-blue-200/60">
+                      These names can be used in inputs like "Name: action".
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-200 mb-2">
+                      Host Name (optional)
+                    </label>
+                    <input
+                      type="text"
+                      value={multiplayerHost}
+                      onChange={(e) => setMultiplayerHost(e.target.value)}
+                      placeholder="(defaults to first player)"
+                      className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
                 </div>
               )}
 
@@ -6696,6 +6806,11 @@ export default function MenuPage({
                     displayAvatar: storyData.displayAvatar || "",
                     rpgSystem: storyData.rpgSystem || "3d6",
                   });
+                  setMultiplayerEnabled(!!storyData.multiplayer?.enabled);
+                  setMultiplayerPlayersText(
+                    (storyData.multiplayer?.players || []).join("\n")
+                  );
+                  setMultiplayerHost(storyData.multiplayer?.host || "");
                   setShowSettings(false);
                 }}
                 className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 text-sm sm:text-base font-semibold rounded-lg transition-colors"

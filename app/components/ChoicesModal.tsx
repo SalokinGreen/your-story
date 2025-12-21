@@ -17,12 +17,12 @@ interface ChoicesModalProps {
   storyData: StoryData;
   selectedChoice: Choice | null;
   onSelectChoice: (choice: Choice) => void;
-  onConfirm: () => void;
-  onCustomInput?: (text: string) => void;
+  onConfirm: (playerComment?: string) => void;
+  onCustomInput?: (text: string, playerComment?: string) => void;
   onActionSubmit?: (
     text: string
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
-  onActionConfirm?: (choice: Choice) => void;
+  onActionConfirm?: (choice: Choice, playerComment?: string) => void;
   onRerollChoices?: () => void;
   loading: boolean;
   momentumMode: "none" | "advantage" | "guarantee";
@@ -30,6 +30,12 @@ interface ChoicesModalProps {
   actionMode?: boolean;
   onActionModeChange?: (enabled: boolean) => void;
 }
+
+type PendingMultiplayerAction = {
+  name: string;
+  action: string;
+  comment?: string;
+};
 
 export default function ChoicesModal({
   isOpen,
@@ -51,8 +57,17 @@ export default function ChoicesModal({
 }: ChoicesModalProps) {
   // Action mode state
   const [actionText, setActionText] = useState("");
+  const [playerComment, setPlayerComment] = useState("");
   const [analyzingAction, setAnalyzingAction] = useState(false);
   const [showActionBuilder, setShowActionBuilder] = useState(false);
+
+  const multiplayerEnabled = !!storyData.multiplayer?.enabled;
+  const multiplayerPlayers = storyData.multiplayer?.players || [];
+  const multiplayerHost = storyData.multiplayer?.host || "";
+  const [multiplayerName, setMultiplayerName] = useState("");
+  const [pendingMultiplayer, setPendingMultiplayer] = useState<
+    PendingMultiplayerAction[]
+  >([]);
 
   // Action builder state
   const [builderSkill, setBuilderSkill] = useState("");
@@ -81,6 +96,7 @@ export default function ChoicesModal({
   useEffect(() => {
     if (!isOpen) {
       setActionText("");
+      setPlayerComment("");
       setAnalyzingAction(false);
       setShowActionBuilder(false);
       setBuilderSkill("");
@@ -88,8 +104,26 @@ export default function ChoicesModal({
       setBuilderItem("");
       setBuilderResource("");
       setBuilderPlain(true);
+      setPendingMultiplayer([]);
+      setMultiplayerName("");
     }
   }, [isOpen, rpgSystem.dc.medium]);
+
+  // Initialize multiplayer name when opening
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!multiplayerEnabled) return;
+
+    const defaultName =
+      multiplayerHost || multiplayerPlayers[0] || storyData.displayName || "";
+    setMultiplayerName((prev) => prev || defaultName);
+  }, [
+    isOpen,
+    multiplayerEnabled,
+    multiplayerHost,
+    multiplayerPlayers,
+    storyData.displayName,
+  ]);
 
   // Handle escape key
   useEffect(() => {
@@ -134,7 +168,7 @@ export default function ChoicesModal({
         const choice: Choice = {
           text: "continue",
         };
-        onActionConfirm(choice);
+        onActionConfirm(choice, playerComment.trim() || undefined);
         onClose();
       }
       return;
@@ -158,7 +192,7 @@ export default function ChoicesModal({
           table: result.analysis.table || undefined,
           stt_input: isStt || undefined,
         };
-        onActionConfirm(choice);
+        onActionConfirm(choice, playerComment.trim() || undefined);
         onClose();
       } else {
         // Analysis failed - show action builder
@@ -188,7 +222,67 @@ export default function ChoicesModal({
       if (builderResource) choice.resource_used = builderResource;
     }
 
-    onActionConfirm(choice);
+    onActionConfirm(choice, playerComment.trim() || undefined);
+    onClose();
+  };
+
+  const handleMultiplayerAdd = () => {
+    const name = multiplayerName.trim();
+    const action = actionText.trim();
+    if (!name || !action) return;
+
+    setPendingMultiplayer((prev) => {
+      // Replace existing action from same player (latest wins)
+      const next = prev.filter(
+        (p) => p.name.toLowerCase() !== name.toLowerCase()
+      );
+      next.push({
+        name,
+        action,
+        comment: playerComment.trim() || undefined,
+      });
+      return next;
+    });
+
+    setActionText("");
+    setPlayerComment("");
+    setShowActionBuilder(false);
+  };
+
+  const handleMultiplayerSend = (force: boolean) => {
+    if (!onCustomInput) return;
+    if (pendingMultiplayer.length === 0) return;
+
+    const requiredPlayers = multiplayerPlayers
+      .map((p) => p.trim())
+      .filter(Boolean);
+    const hasByName = new Set(
+      pendingMultiplayer.map((p) => p.name.toLowerCase())
+    );
+    const allReady =
+      requiredPlayers.length === 0 ||
+      requiredPlayers.every((p) => hasByName.has(p.toLowerCase()));
+
+    if (!force && !allReady) return;
+
+    // Build a custom input payload that results in:
+    // > Alice: action
+    // > Bob: action
+    const lines = pendingMultiplayer
+      .map((p, idx) =>
+        idx === 0 ? `${p.name}: ${p.action}` : `>${p.name}: ${p.action}`
+      )
+      .join("\n");
+
+    const commentLines = pendingMultiplayer
+      .filter((p) => p.comment && p.comment.trim())
+      .map((p) => `${p.name}: ${p.comment}`)
+      .join("\n");
+
+    onCustomInput(lines, commentLines || undefined);
+    setPendingMultiplayer([]);
+    setPlayerComment("");
+    setActionText("");
     onClose();
   };
 
@@ -435,6 +529,79 @@ export default function ChoicesModal({
           {actionMode ? (
             /* ACTION MODE */
             <div className="space-y-3">
+              {multiplayerEnabled && (
+                <div className="space-y-2">
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex-1">
+                      <label className="block text-xs font-medium text-blue-200/70 mb-1">
+                        Name
+                      </label>
+                      <input
+                        value={multiplayerName}
+                        onChange={(e) => setMultiplayerName(e.target.value)}
+                        placeholder={
+                          multiplayerHost ||
+                          multiplayerPlayers[0] ||
+                          "Your name"
+                        }
+                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      />
+                    </div>
+                    <div className="sm:w-56">
+                      <label className="block text-xs font-medium text-blue-200/70 mb-1">
+                        Turn status
+                      </label>
+                      <div className="px-3 py-2 bg-blue-950/30 border border-blue-800/20 rounded-lg text-xs text-blue-200/60">
+                        {pendingMultiplayer.length} submitted
+                      </div>
+                    </div>
+                  </div>
+
+                  {pendingMultiplayer.length > 0 && (
+                    <div className="bg-blue-950/30 border border-blue-800/20 rounded-lg p-3 space-y-2">
+                      <div className="text-xs font-medium text-blue-200/70">
+                        Pending actions
+                      </div>
+                      {pendingMultiplayer.map((p) => (
+                        <div
+                          key={p.name}
+                          className="flex items-start justify-between gap-2 bg-blue-900/20 border border-blue-800/20 rounded-lg px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-xs text-blue-200/80 font-semibold">
+                              {p.name}
+                            </div>
+                            <div className="text-xs text-blue-100/80 whitespace-pre-wrap">
+                              {p.action}
+                            </div>
+                            {p.comment && (
+                              <div className="text-[11px] text-blue-200/60 italic mt-1">
+                                Comment: {p.comment}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() =>
+                              setPendingMultiplayer((prev) =>
+                                prev.filter(
+                                  (x) =>
+                                    x.name.toLowerCase() !==
+                                    p.name.toLowerCase()
+                                )
+                              )
+                            }
+                            className="px-2 py-1 text-xs bg-red-600/70 hover:bg-red-600 text-white rounded"
+                            title="Remove"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Action Input */}
               <div className="space-y-2">
                 <div className="flex gap-2">
@@ -462,40 +629,107 @@ export default function ChoicesModal({
                 </p>
               </div>
 
+              {/* Player Comment (not sent to AI) */}
+              <div className="space-y-1">
+                <label className="block text-xs font-medium text-blue-200/70">
+                  Comment (not sent to AI)
+                </label>
+                <textarea
+                  value={playerComment}
+                  onChange={(e) => setPlayerComment(e.target.value)}
+                  placeholder="Write a note for the other players..."
+                  rows={2}
+                  disabled={analyzingAction || loading}
+                  className="w-full px-3 py-2 bg-blue-950/30 border border-blue-800/20 rounded-lg text-white placeholder-blue-200/30 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                />
+              </div>
+
               {/* Action Builder (only shown when analysis fails) */}
               {showActionBuilder && renderActionBuilder()}
 
-              {/* Act Button */}
+              {/* Act / Multiplayer buttons */}
               {!showActionBuilder && (
-                <button
-                  onClick={() => handleActionAnalyze()}
-                  disabled={analyzingAction || loading}
-                  className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                    analyzingAction || loading
-                      ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                      : "bg-blue-600 hover:bg-blue-500 text-white"
-                  }`}
-                >
-                  {analyzingAction || loading ? (
-                    <>
-                      <DynamicIcon
-                        name="Loader2"
-                        className="w-4 h-4 animate-spin"
-                      />
-                      {analyzingAction ? "Processing..." : "Generating..."}
-                    </>
-                  ) : actionText.trim() ? (
-                    <>
-                      <DynamicIcon name="Play" className="w-4 h-4" />
-                      Act
-                    </>
+                <>
+                  {multiplayerEnabled ? (
+                    <div className="space-y-2">
+                      <button
+                        onClick={handleMultiplayerAdd}
+                        disabled={
+                          loading ||
+                          analyzingAction ||
+                          !multiplayerName.trim() ||
+                          !actionText.trim()
+                        }
+                        className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                          loading ||
+                          analyzingAction ||
+                          !multiplayerName.trim() ||
+                          !actionText.trim()
+                            ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
+                            : "bg-blue-600 hover:bg-blue-500 text-white"
+                        }`}
+                      >
+                        <DynamicIcon name="Plus" className="w-4 h-4" />
+                        Add To Turn
+                      </button>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => handleMultiplayerSend(false)}
+                          disabled={loading || pendingMultiplayer.length === 0}
+                          className={`py-3 rounded-lg font-medium transition-colors ${
+                            loading || pendingMultiplayer.length === 0
+                              ? "bg-purple-800/30 text-purple-300/40 cursor-not-allowed"
+                              : "bg-purple-600 hover:bg-purple-500 text-white"
+                          }`}
+                        >
+                          Generate (when ready)
+                        </button>
+                        <button
+                          onClick={() => handleMultiplayerSend(true)}
+                          disabled={loading || pendingMultiplayer.length === 0}
+                          className={`py-3 rounded-lg font-medium transition-colors ${
+                            loading || pendingMultiplayer.length === 0
+                              ? "bg-amber-800/30 text-amber-300/40 cursor-not-allowed"
+                              : "bg-amber-600 hover:bg-amber-500 text-white"
+                          }`}
+                        >
+                          Force Send
+                        </button>
+                      </div>
+                    </div>
                   ) : (
-                    <>
-                      <DynamicIcon name="FastForward" className="w-4 h-4" />
-                      Continue
-                    </>
+                    <button
+                      onClick={() => handleActionAnalyze()}
+                      disabled={analyzingAction || loading}
+                      className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                        analyzingAction || loading
+                          ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
+                          : "bg-blue-600 hover:bg-blue-500 text-white"
+                      }`}
+                    >
+                      {analyzingAction || loading ? (
+                        <>
+                          <DynamicIcon
+                            name="Loader2"
+                            className="w-4 h-4 animate-spin"
+                          />
+                          {analyzingAction ? "Processing..." : "Generating..."}
+                        </>
+                      ) : actionText.trim() ? (
+                        <>
+                          <DynamicIcon name="Play" className="w-4 h-4" />
+                          Act
+                        </>
+                      ) : (
+                        <>
+                          <DynamicIcon name="FastForward" className="w-4 h-4" />
+                          Continue
+                        </>
+                      )}
+                    </button>
                   )}
-                </button>
+                </>
               )}
             </div>
           ) : (
@@ -653,11 +887,26 @@ export default function ChoicesModal({
             </div>
           )}
 
+          {/* Player Comment (not sent to AI) */}
+          <div className="space-y-1">
+            <label className="block text-xs font-medium text-blue-200/70">
+              Comment (not sent to AI)
+            </label>
+            <textarea
+              value={playerComment}
+              onChange={(e) => setPlayerComment(e.target.value)}
+              placeholder="Write a note for the other players..."
+              rows={2}
+              disabled={loading}
+              className="w-full px-3 py-2 bg-blue-950/30 border border-blue-800/20 rounded-lg text-white placeholder-blue-200/30 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+            />
+          </div>
+
           {/* Confirm Button - only for choice mode */}
           {!actionMode && (
             <button
               onClick={() => {
-                onConfirm();
+                onConfirm(playerComment.trim() || undefined);
                 onClose();
               }}
               disabled={!selectedChoice || loading}

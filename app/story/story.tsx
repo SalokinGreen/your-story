@@ -23,13 +23,13 @@ interface StoryProps {
   loadingStage?: "gm" | "story" | "choices" | null;
   momentumMode: "none" | "advantage" | "guarantee";
   onMomentumModeChange: (mode: "none" | "advantage" | "guarantee") => void;
-  handleChoice: () => void;
+  handleChoice: (playerComment?: string) => void;
   handleSelect: (index: number) => void;
-  onCustomInput?: (text: string) => void;
+  onCustomInput?: (text: string, playerComment?: string) => void;
   onActionSubmit?: (
     text: string
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
-  onActionConfirm?: (choice: Choice) => void;
+  onActionConfirm?: (choice: Choice, playerComment?: string) => void;
   onRerollChoices?: () => void;
   onRetry?: () => void;
   canRetry?: boolean;
@@ -75,6 +75,7 @@ interface ChatMessageProps {
   isLoading?: boolean;
   showHiddenMessages?: boolean;
   fontSettings?: FontSettings;
+  messageType?: "normal" | "comment";
   // Thinking data for Gemini-style display - interleaved entries
   gmConversation?: Array<{
     role: "assistant" | "tool";
@@ -110,6 +111,7 @@ function ChatMessage({
   isLoading = false,
   showHiddenMessages = false,
   fontSettings,
+  messageType = "normal",
   gmConversation,
   toolResults,
   liveThinkingEntries,
@@ -118,6 +120,7 @@ function ChatMessage({
 }: ChatMessageProps) {
   const [expanded, setExpanded] = React.useState(false);
   const opacity = isPrevious ? "opacity-50" : "opacity-100";
+  const isComment = messageType === "comment";
 
   // Always stack vertically: avatar + name row at top, content below
   const rowAlign = isUser ? "justify-end" : "justify-start";
@@ -161,6 +164,9 @@ function ChatMessage({
         >
           {displayName}
         </span>
+        {isUser && isComment && (
+          <span className="text-[10px] text-blue-300/50">comment</span>
+        )}
         {/* Thinking toggle - inline with name for GM messages */}
         {!isUser && shouldShowThinking && (
           <button
@@ -290,7 +296,9 @@ function ChatMessage({
           <div
             className={`rounded-lg p-2 sm:p-3 ${
               isUser
-                ? "bg-blue-900/30 border border-blue-700/30"
+                ? isComment
+                  ? "bg-blue-900/15 border border-blue-700/20"
+                  : "bg-blue-900/30 border border-blue-700/30"
                 : "bg-purple-900/20 border border-purple-700/20"
             }`}
           >
@@ -300,7 +308,13 @@ function ChatMessage({
                 <span>Thinking...</span>
               </div>
             ) : isUser ? (
-              <p className="text-blue-100 whitespace-pre-wrap">{content}</p>
+              <p
+                className={`whitespace-pre-wrap ${
+                  isComment ? "text-blue-100/80 italic" : "text-blue-100"
+                }`}
+              >
+                {content}
+              </p>
             ) : (
               prettify(content, !isPrevious, showHiddenMessages, fontSettings)
             )}
@@ -646,6 +660,7 @@ export default function Story({
     isUser: boolean;
     content: string;
     partIndex: number;
+    messageType?: "normal" | "comment";
   }> = [];
 
   const normalizeUserText = (text: string): string => {
@@ -662,6 +677,15 @@ export default function Story({
         isUser: part.user,
         content: part.content,
         partIndex: index,
+        messageType: "normal",
+      });
+    }
+    if (part.user && part.playerComment && part.playerComment.trim()) {
+      chatMessages.push({
+        isUser: true,
+        content: part.playerComment,
+        partIndex: index,
+        messageType: "comment",
       });
     }
   });
@@ -852,6 +876,7 @@ export default function Story({
                   isPrevious={true}
                   showHiddenMessages={showHiddenMessages}
                   fontSettings={fontSettings}
+                  messageType={exchange.userMsg.messageType}
                 />
               )}
               {exchange.gmMsg && (
@@ -889,6 +914,7 @@ export default function Story({
                     isPrevious={isPrevious}
                     showHiddenMessages={showHiddenMessages}
                     fontSettings={fontSettings}
+                    messageType={exchange.userMsg.messageType}
                   />
                 )}
                 {exchange.gmMsg && (

@@ -303,6 +303,8 @@ export interface ScenePart {
   imageUrl: string;
   user: boolean;
   role: "system" | "user" | "assistant";
+  // Optional player-visible comment that is NOT sent to AI (kept separate from content)
+  playerComment?: string;
   reasoning?: string; // NEW: AI reasoning/thinking
   reasoning_details?: ReasoningDetail[]; // NEW: Structured reasoning tokens (OpenRouter)
   choices?: Choice[];
@@ -662,6 +664,12 @@ export interface StoryData {
   // Custom display settings for chat-like story view (multiplayer-ready)
   displayName?: string; // Custom display name (falls back to player_name, then auth user name)
   displayAvatar?: string; // Custom avatar URL (falls back to auth user avatar)
+  // Local multiplayer configuration (hot-seat / same-device scaffolding)
+  multiplayer?: {
+    enabled: boolean;
+    players: string[]; // Display names used in "Name: action" inputs
+    host?: string; // Optional host display name
+  };
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;
   memory: (string | MemoryEntry)[]; // Supports both legacy string[] and new MemoryEntry[] format

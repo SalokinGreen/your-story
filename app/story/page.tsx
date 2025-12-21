@@ -2722,7 +2722,7 @@ function StoryPageContent() {
     setStoryData(updatedStory);
   }
 
-  async function handleCustomInput(customText: string) {
+  async function handleCustomInput(customText: string, playerComment?: string) {
     if (!storyData) return;
     logger.action("User custom input", { customText });
     if (!user) {
@@ -2739,6 +2739,7 @@ function StoryPageContent() {
       imageUrl: "",
       user: true,
       role: "user",
+      playerComment: playerComment?.trim() ? playerComment.trim() : undefined,
       choices: [],
     });
 
@@ -3157,7 +3158,7 @@ function StoryPageContent() {
   }
 
   // Handle confirmed freeform action - this is called after analysis with a Choice object
-  async function handleActionConfirm(choice: Choice) {
+  async function handleActionConfirm(choice: Choice, playerComment?: string) {
     if (!storyData) return;
 
     logger.action("Freeform action confirmed", { choice });
@@ -3169,16 +3170,19 @@ function StoryPageContent() {
 
     // Directly call handleChoice with the action choice
     // We pass the choice directly to avoid state timing issues
-    handleChoiceWithAction(choice);
+    handleChoiceWithAction(choice, playerComment);
   }
 
   // Public handleChoice function - wrapper for normal choice selection
-  async function handleChoice() {
-    handleChoiceWithAction();
+  async function handleChoice(playerComment?: string) {
+    handleChoiceWithAction(undefined, playerComment);
   }
 
   // Internal function that handles both regular choices and freeform actions
-  async function handleChoiceWithAction(actionChoice?: Choice) {
+  async function handleChoiceWithAction(
+    actionChoice?: Choice,
+    playerComment?: string
+  ) {
     if (!storyData) return;
 
     // If we're resuming from YZE stress dice selection, use the pending choice
@@ -4962,6 +4966,7 @@ function StoryPageContent() {
       imageUrl: "",
       user: true,
       role: "user",
+      playerComment: playerComment?.trim() ? playerComment.trim() : undefined,
       choices: [], // User parts don't have choices - choices come from AI response
     });
 
