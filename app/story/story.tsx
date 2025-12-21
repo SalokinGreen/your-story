@@ -75,6 +75,30 @@ interface ChatMessageProps {
   isLoading?: boolean;
   showHiddenMessages?: boolean;
   fontSettings?: FontSettings;
+  // Thinking data for Gemini-style display - interleaved entries
+  gmConversation?: Array<{
+    role: "assistant" | "tool";
+    content: string;
+    tool_calls?: Array<{
+      id: string;
+      function: { name: string; arguments: string };
+    }>;
+    tool_call_id?: string;
+  }>;
+  // Tool results lookup (keyed by tool_call_id)
+  toolResults?: Map<
+    string,
+    { success: boolean; contextForStory: string; toolName: string }
+  >;
+  // Live streaming entries
+  liveThinkingEntries?: Array<{
+    type: "thinking" | "tool";
+    content?: string;
+    result?: any;
+    isStreaming?: boolean;
+  }>;
+  isStreaming?: boolean;
+  showThinking?: boolean;
 }
 
 function ChatMessage({
@@ -86,87 +110,198 @@ function ChatMessage({
   isLoading = false,
   showHiddenMessages = false,
   fontSettings,
+  gmConversation,
+  toolResults,
+  liveThinkingEntries,
+  isStreaming = false,
+  showThinking: showThinkingProp = false,
 }: ChatMessageProps) {
+  const [expanded, setExpanded] = React.useState(false);
   const opacity = isPrevious ? "opacity-50" : "opacity-100";
 
-  // Player messages: flex-row-reverse (avatar on right) on desktop
-  // GM messages: flex-row (avatar on left) on desktop
-  // On mobile: stack vertically with avatar + name in a row at top
-  const flexDirection = isUser ? "sm:flex-row-reverse" : "sm:flex-row";
-  const textAlign = isUser ? "sm:text-right" : "text-left";
-  const mobileAlign = isUser ? "justify-end" : "justify-start";
+  // Always stack vertically: avatar + name row at top, content below
+  const rowAlign = isUser ? "justify-end" : "justify-start";
+
+  // Determine if we should show thinking section
+  const hasThinking =
+    (gmConversation && gmConversation.length > 0) ||
+    (liveThinkingEntries && liveThinkingEntries.length > 0);
+  const shouldShowThinking = showThinkingProp && hasThinking;
+
+  // Auto-expand when streaming
+  const isExpanded = expanded || isStreaming;
 
   return (
     <div
-      className={`flex flex-col sm:flex-row gap-1 sm:gap-3 ${flexDirection} ${opacity} transition-opacity duration-300`}
+      className={`flex flex-col gap-1 ${opacity} transition-opacity duration-300`}
     >
-      {/* Avatar + Name row on mobile, just avatar on desktop */}
-      <div
-        className={`flex items-center gap-2 ${mobileAlign} sm:block shrink-0`}
-      >
+      {/* Avatar + Name + Thinking toggle row */}
+      <div className={`flex items-center gap-2 ${rowAlign}`}>
         {isUser ? (
           avatarUrl ? (
             <img
               src={avatarUrl}
               alt={displayName}
-              className="w-6 h-6 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-blue-500/30"
+              className="w-6 h-6 rounded-full object-cover border-2 border-blue-500/30"
             />
           ) : (
-            <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500/30">
-              <DynamicIcon
-                name="User"
-                className="w-3 h-3 sm:w-5 sm:h-5 text-white"
-              />
+            <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500/30">
+              <DynamicIcon name="User" className="w-3 h-3 text-white" />
             </div>
           )
         ) : (
-          <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full bg-purple-600 flex items-center justify-center border-2 border-purple-500/30">
-            <DynamicIcon
-              name="Sparkles"
-              className="w-3 h-3 sm:w-5 sm:h-5 text-white"
-            />
+          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center border-2 border-purple-500/30">
+            <DynamicIcon name="Sparkles" className="w-3 h-3 text-white" />
           </div>
         )}
-        {/* Name shown inline on mobile only */}
         <span
-          className={`text-xs font-semibold sm:hidden ${
+          className={`text-xs font-semibold ${
             isUser ? "text-blue-300" : "text-purple-300"
           }`}
         >
           {displayName}
         </span>
+        {/* Thinking toggle - inline with name for GM messages */}
+        {!isUser && shouldShowThinking && (
+          <button
+            onClick={() => setExpanded(!isExpanded)}
+            className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors ml-1"
+          >
+            <span className="text-xs">
+              {isStreaming ? "Thinking..." : "Show thinking"}
+            </span>
+            <DynamicIcon
+              name={isExpanded ? "ChevronUp" : "ChevronDown"}
+              className="w-3 h-3"
+            />
+          </button>
+        )}
       </div>
 
       {/* Message Content */}
-      <div className="flex-1 min-w-0">
-        {/* Name - desktop only */}
-        <div
-          className={`hidden sm:block text-sm font-semibold mb-1 ${textAlign} ${
-            isUser ? "text-blue-300" : "text-purple-300"
-          }`}
-        >
-          {displayName}
-        </div>
+      <div className="w-full">
+        {!isUser && shouldShowThinking && isExpanded && (
+          <div className="mb-3 pl-3 border-l-2 border-blue-500/30 space-y-2 text-sm text-gray-400 italic">
+            {/* Live streaming entries */}
+            {liveThinkingEntries && liveThinkingEntries.length > 0
+              ? liveThinkingEntries.map((entry, idx) =>
+                  entry.type === "thinking" ? (
+                    <p
+                      key={`live-think-${idx}`}
+                      className="whitespace-pre-wrap"
+                    >
+                      {entry.content}
+                      {entry.isStreaming && (
+                        <span className="animate-pulse text-blue-400">▌</span>
+                      )}
+                    </p>
+                  ) : entry.result ? (
+                    <div
+                      key={`live-tool-${idx}`}
+                      className="not-italic text-xs bg-gray-800/50 rounded px-2 py-1.5 flex items-start gap-2"
+                    >
+                      <span
+                        className={`shrink-0 ${
+                          entry.result.success
+                            ? "text-green-400"
+                            : "text-red-400"
+                        }`}
+                      >
+                        {entry.result.success ? "✓" : "✗"}
+                      </span>
+                      <div>
+                        <span className="text-gray-300 font-medium">
+                          {entry.result.toolName?.replace(/_/g, " ")}
+                        </span>
+                        {entry.result.contextForStory && (
+                          <p className="text-gray-500 mt-0.5">
+                            {entry.result.contextForStory}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  ) : null
+                )
+              : gmConversation && gmConversation.length > 0
+              ? /* Saved GM conversation - interleaved thinking and tool results */
+                gmConversation.map((msg, idx) => {
+                  if (msg.role === "assistant") {
+                    return (
+                      <React.Fragment key={`gm-${idx}`}>
+                        {/* Thinking text */}
+                        {msg.content && (
+                          <p className="whitespace-pre-wrap">{msg.content}</p>
+                        )}
+                        {/* Tool calls made by this message */}
+                        {msg.tool_calls &&
+                          msg.tool_calls.map((tc, tcIdx) => {
+                            const result = toolResults?.get(tc.id);
+                            return (
+                              <div
+                                key={`tc-${idx}-${tcIdx}`}
+                                className="not-italic text-xs bg-gray-800/50 rounded px-2 py-1.5 flex items-start gap-2"
+                              >
+                                <span
+                                  className={`shrink-0 ${
+                                    result?.success
+                                      ? "text-green-400"
+                                      : result?.success === false
+                                      ? "text-red-400"
+                                      : "text-gray-500"
+                                  }`}
+                                >
+                                  {result?.success
+                                    ? "✓"
+                                    : result?.success === false
+                                    ? "✗"
+                                    : "•"}
+                                </span>
+                                <div>
+                                  <span className="text-gray-300 font-medium">
+                                    {(
+                                      result?.toolName || tc.function.name
+                                    )?.replace(/_/g, " ")}
+                                  </span>
+                                  {result?.contextForStory && (
+                                    <p className="text-gray-500 mt-0.5">
+                                      {result.contextForStory}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </React.Fragment>
+                    );
+                  }
+                  // Skip tool role messages - results are shown inline with their tool_calls above
+                  return null;
+                })
+              : null}
+          </div>
+        )}
 
-        {/* Content */}
-        <div
-          className={`rounded-lg p-2 sm:p-3 ${
-            isUser
-              ? "bg-blue-900/30 border border-blue-700/30"
-              : "bg-purple-900/20 border border-purple-700/20"
-          }`}
-        >
-          {isLoading ? (
-            <div className="flex items-center gap-2 text-purple-200/60">
-              <div className="w-4 h-4 border-2 border-purple-400/60 border-t-purple-300 rounded-full animate-spin" />
-              <span>Thinking...</span>
-            </div>
-          ) : isUser ? (
-            <p className="text-blue-100 whitespace-pre-wrap">{content}</p>
-          ) : (
-            prettify(content, !isPrevious, showHiddenMessages, fontSettings)
-          )}
-        </div>
+        {/* Content - hide the empty box when only streaming thinking */}
+        {(content || isLoading || !isStreaming) && (
+          <div
+            className={`rounded-lg p-2 sm:p-3 ${
+              isUser
+                ? "bg-blue-900/30 border border-blue-700/30"
+                : "bg-purple-900/20 border border-purple-700/20"
+            }`}
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2 text-purple-200/60">
+                <div className="w-4 h-4 border-2 border-purple-400/60 border-t-purple-300 rounded-full animate-spin" />
+                <span>Thinking...</span>
+              </div>
+            ) : isUser ? (
+              <p className="text-blue-100 whitespace-pre-wrap">{content}</p>
+            ) : (
+              prettify(content, !isPrevious, showHiddenMessages, fontSettings)
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -556,13 +691,56 @@ export default function Story({
   // Get current scene part for GM thinking display
   const currentScenePart =
     storyData.scene.parts[storyData.scene.parts.length - 1] || null;
-  const gmThinking = currentScenePart?.gmThinking || [];
+  const gmConversation = currentScenePart?.gmConversation || [];
   const gmToolCalls = currentScenePart?.gmToolCalls || [];
-  const gmStoryContext = currentScenePart?.gmStoryContext || "";
 
-  // Check if we have any GM content to show
-  const hasGMContent =
-    gmThinking.length > 0 || gmToolCalls.length > 0 || gmStoryContext;
+  // Helper to get GM conversation and tool results for a scene part
+  const getGMDataForPart = (partIndex: number) => {
+    const part = storyData.scene.parts[partIndex];
+    if (!part) return { gmConversation: [], toolResults: new Map() };
+
+    // Build toolResults map from gmToolCalls (keyed by toolCallId)
+    const toolResults = new Map<
+      string,
+      { success: boolean; contextForStory: string; toolName: string }
+    >();
+    if (part.gmToolCalls) {
+      for (const tc of part.gmToolCalls) {
+        if (tc.toolCallId) {
+          toolResults.set(tc.toolCallId, {
+            success: tc.success,
+            contextForStory: tc.contextForStory || "",
+            toolName: tc.toolName || "",
+          });
+        }
+      }
+    }
+
+    return {
+      gmConversation: part.gmConversation || [],
+      toolResults,
+    };
+  };
+
+  // Build toolResults map for current scene part
+  const currentToolResults = React.useMemo(() => {
+    const results = new Map<
+      string,
+      { success: boolean; contextForStory: string; toolName: string }
+    >();
+    if (gmToolCalls) {
+      for (const tc of gmToolCalls) {
+        if (tc.toolCallId) {
+          results.set(tc.toolCallId, {
+            success: tc.success,
+            contextForStory: tc.contextForStory || "",
+            toolName: tc.toolName || "",
+          });
+        }
+      }
+    }
+    return results;
+  }, [gmToolCalls]);
 
   // Check if user wants to display GM thinking (from settings)
   // Use useState + useEffect to properly handle SSR and localStorage updates
@@ -596,9 +774,6 @@ export default function Story({
       window.removeEventListener("displayGMThinkingChanged", handleCustomEvent);
     };
   }, []);
-
-  // State for GM thinking collapsible
-  const [showGMThinking, setShowGMThinking] = React.useState(false);
 
   // State for combat display expansion
   const [showCombat, setShowCombat] = React.useState(true);
@@ -650,173 +825,6 @@ export default function Story({
           )}
         </div>
 
-        {/* GM Thinking Collapsible (shows reasoning, tool calls, and results) */}
-        {/* Show when: has saved content OR currently streaming GM stage */}
-        {displayGMThinkingEnabled &&
-          (hasGMContent ||
-            (loadingStage === "gm" &&
-              liveGMEntries &&
-              liveGMEntries.length > 0)) && (
-            <div className="border-b border-purple-800/30">
-              <button
-                onClick={() => setShowGMThinking(!showGMThinking)}
-                className="w-full flex items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 bg-purple-900/20 hover:bg-purple-900/30 transition-colors"
-              >
-                <div className="flex items-center gap-2">
-                  <DynamicIcon
-                    name="Dice5"
-                    className="w-4 h-4 text-purple-400"
-                  />
-                  <span className="text-sm font-medium text-purple-300">
-                    GM Reasoning
-                  </span>
-                  {loadingStage === "gm" ? (
-                    <span className="text-xs text-purple-400/60 flex items-center gap-1">
-                      <span className="animate-pulse">●</span> Streaming...
-                    </span>
-                  ) : (
-                    <span className="text-xs text-purple-400/60">
-                      ({gmThinking.length}{" "}
-                      {gmThinking.length === 1 ? "thought" : "thoughts"}
-                      {gmToolCalls.length > 0 &&
-                        `, ${gmToolCalls.length} ${
-                          gmToolCalls.length === 1 ? "tool" : "tools"
-                        }`}
-                      )
-                    </span>
-                  )}
-                </div>
-                <DynamicIcon
-                  name={
-                    showGMThinking || loadingStage === "gm"
-                      ? "ChevronUp"
-                      : "ChevronDown"
-                  }
-                  className="w-4 h-4 text-purple-400"
-                />
-              </button>
-              {/* Auto-expand during streaming, otherwise respect user toggle */}
-              {(showGMThinking || loadingStage === "gm") && (
-                <div className="px-3 py-2 sm:px-4 sm:py-3 bg-purple-950/30 space-y-2 sm:space-y-3 max-h-32 sm:max-h-60 overflow-y-auto">
-                  {/* Live streaming content - interleaved thinking and tool results */}
-                  {loadingStage === "gm" && liveGMEntries ? (
-                    <div className="space-y-3">
-                      {liveGMEntries.map((entry, idx) =>
-                        entry.type === "thinking" ? (
-                          <div
-                            key={`thinking-${idx}`}
-                            className="text-sm text-purple-200/80 whitespace-pre-wrap"
-                          >
-                            <span className="text-purple-400/60 font-medium">
-                              [GM]{" "}
-                            </span>
-                            {entry.content}
-                            {entry.isStreaming && (
-                              <span className="animate-pulse text-purple-400">
-                                ▌
-                              </span>
-                            )}
-                          </div>
-                        ) : (
-                          <div
-                            key={`tool-${idx}`}
-                            className="text-sm bg-purple-900/30 rounded px-3 py-2 animate-fadeIn"
-                          >
-                            <div className="flex items-center gap-2">
-                              <span
-                                className={`font-medium ${
-                                  entry.result.success
-                                    ? "text-green-400"
-                                    : "text-red-400"
-                                }`}
-                              >
-                                {entry.result.success ? "✓" : "✗"}
-                              </span>
-                              <span className="text-purple-300 font-medium">
-                                {entry.result.toolName?.replace(/_/g, " ")}
-                              </span>
-                            </div>
-                            {entry.result.contextForStory && (
-                              <div className="text-purple-200/70 text-xs mt-1 font-mono">
-                                {entry.result.contextForStory}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      {/* Saved GM Thinking Text */}
-                      {gmThinking.length > 0 && (
-                        <div className="space-y-2">
-                          {gmThinking.map((thought, idx) => (
-                            <div
-                              key={idx}
-                              className="text-sm text-purple-200/80 whitespace-pre-wrap"
-                            >
-                              <span className="text-purple-400/60 font-medium">
-                                [GM]{" "}
-                              </span>
-                              {thought}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* Saved Tool Calls and Results */}
-                      {gmToolCalls.length > 0 && (
-                        <div className="border-t border-purple-800/30 pt-3 space-y-2">
-                          <div className="text-xs font-medium text-purple-400/80 uppercase tracking-wide">
-                            Dice Rolls & Tools
-                          </div>
-                          {gmToolCalls.map((call: any, idx: number) => (
-                            <div
-                              key={idx}
-                              className="text-sm bg-purple-900/30 rounded px-3 py-2"
-                            >
-                              <div className="flex items-center gap-2">
-                                <span
-                                  className={`font-medium ${
-                                    call.success
-                                      ? "text-green-400"
-                                      : "text-red-400"
-                                  }`}
-                                >
-                                  {call.success ? "✓" : "✗"}
-                                </span>
-                                <span className="text-purple-300 font-medium">
-                                  {call.toolName?.replace(/_/g, " ")}
-                                </span>
-                              </div>
-                              {call.contextForStory && (
-                                <div className="text-purple-200/70 text-xs mt-1 font-mono">
-                                  {call.contextForStory}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      )}
-
-                      {/* GM Summary Context */}
-                      {gmStoryContext && !gmToolCalls.length && (
-                        <div className="border-t border-purple-800/30 pt-3">
-                          <div className="text-xs font-medium text-purple-400/80 uppercase tracking-wide mb-2">
-                            GM Summary
-                          </div>
-                          <div className="text-sm text-purple-200/70 font-mono whitespace-pre-wrap">
-                            {gmStoryContext}
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
         {/* Combat Display - shows active combat state */}
         {storyData.combatState?.active && (
           <CombatDisplay
@@ -854,6 +862,13 @@ export default function Story({
                   isPrevious={true}
                   showHiddenMessages={showHiddenMessages}
                   fontSettings={fontSettings}
+                  gmConversation={
+                    getGMDataForPart(exchange.gmMsg.partIndex).gmConversation
+                  }
+                  toolResults={
+                    getGMDataForPart(exchange.gmMsg.partIndex).toolResults
+                  }
+                  showThinking={displayGMThinkingEnabled}
                 />
               )}
             </React.Fragment>
@@ -884,6 +899,13 @@ export default function Story({
                     isPrevious={isPrevious}
                     showHiddenMessages={showHiddenMessages}
                     fontSettings={fontSettings}
+                    gmConversation={
+                      getGMDataForPart(exchange.gmMsg.partIndex).gmConversation
+                    }
+                    toolResults={
+                      getGMDataForPart(exchange.gmMsg.partIndex).toolResults
+                    }
+                    showThinking={displayGMThinkingEnabled}
                   />
                 )}
               </React.Fragment>
@@ -907,15 +929,20 @@ export default function Story({
               />
             )}
 
-          {/* Loading indicator for GM response */}
+          {/* Loading indicator for GM response - shows live thinking during GM stage */}
           {loading && loadingStage !== "story" && (
             <ChatMessage
               isUser={false}
               content=""
               displayName="Game Master"
-              isLoading={true}
+              isLoading={loadingStage !== "gm"}
               showHiddenMessages={showHiddenMessages}
               fontSettings={fontSettings}
+              liveThinkingEntries={
+                loadingStage === "gm" ? liveGMEntries : undefined
+              }
+              isStreaming={loadingStage === "gm"}
+              showThinking={displayGMThinkingEnabled}
             />
           )}
 
@@ -928,6 +955,9 @@ export default function Story({
               isPrevious={false}
               showHiddenMessages={showHiddenMessages}
               fontSettings={fontSettings}
+              gmConversation={gmConversation}
+              toolResults={currentToolResults}
+              showThinking={displayGMThinkingEnabled}
             />
           )}
         </div>
