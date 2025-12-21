@@ -80,12 +80,7 @@ export default function AIConfigTab() {
   });
 
   // Generation settings
-  const [toolCallingEnabled, setToolCallingEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("toolCallingEnabled") !== "false";
-    }
-    return true;
-  });
+  const toolCallingEnabled = true;
   const [maxToolLoops, setMaxToolLoops] = useState(() => {
     if (typeof window !== "undefined") {
       return parseInt(localStorage.getItem("maxToolLoops") || "10", 10);
@@ -112,15 +107,8 @@ export default function AIConfigTab() {
     }
     return true;
   });
-  // GM Stage is now always enabled - removed the toggle
-  // Keeping displayGMThinking for showing/hiding GM reasoning in UI
-  const [displayGMThinking, setDisplayGMThinking] = useState(() => {
-    if (typeof window !== "undefined") {
-      // Default to false - GM thinking is hidden by default
-      return localStorage.getItem("displayGMThinking") === "true";
-    }
-    return false;
-  });
+  // GM stage + GM thinking display are always enabled
+  const displayGMThinking = true;
   const [customMaxContext, setCustomMaxContext] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("customMaxContext");
@@ -1382,105 +1370,59 @@ export default function AIConfigTab() {
           Tool Calling
         </h4>
 
+        <div className="space-y-1">
+          <p className="text-sm text-gray-700 dark:text-gray-300">
+            Tool calling is always enabled.
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            The AI can modify stats, inventory, and story state.
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            GM thinking display is always enabled.
+          </p>
+        </div>
+
         <div className="flex items-center justify-between">
           <div className="flex-1">
             <p className="text-sm text-gray-700 dark:text-gray-300">
-              Enable Tool Calling
+              Max Tool Rounds
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              Allow AI to modify stats, inventory, and story state
+              Higher = more state changes but slower generation
             </p>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={toolCallingEnabled}
-              onChange={(e) => {
-                const newValue = e.target.checked;
-                setToolCallingEnabled(newValue);
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                const newValue = Math.max(1, maxToolLoops - 1);
+                setMaxToolLoops(newValue);
                 if (typeof window !== "undefined") {
-                  localStorage.setItem("toolCallingEnabled", String(newValue));
+                  localStorage.setItem("maxToolLoops", String(newValue));
                 }
               }}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
-          </label>
+              disabled={maxToolLoops <= 1}
+              className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              -
+            </button>
+            <span className="w-8 text-center font-medium text-gray-900 dark:text-white">
+              {maxToolLoops}
+            </span>
+            <button
+              onClick={() => {
+                const newValue = Math.min(50, maxToolLoops + 1);
+                setMaxToolLoops(newValue);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("maxToolLoops", String(newValue));
+                }
+              }}
+              disabled={maxToolLoops >= 50}
+              className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              +
+            </button>
+          </div>
         </div>
-
-        {toolCallingEnabled && (
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                Max Tool Rounds
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Higher = more state changes but slower generation
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  const newValue = Math.max(1, maxToolLoops - 1);
-                  setMaxToolLoops(newValue);
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("maxToolLoops", String(newValue));
-                  }
-                }}
-                disabled={maxToolLoops <= 1}
-                className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                -
-              </button>
-              <span className="w-8 text-center font-medium text-gray-900 dark:text-white">
-                {maxToolLoops}
-              </span>
-              <button
-                onClick={() => {
-                  const newValue = Math.min(50, maxToolLoops + 1);
-                  setMaxToolLoops(newValue);
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("maxToolLoops", String(newValue));
-                  }
-                }}
-                disabled={maxToolLoops >= 50}
-                className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                +
-              </button>
-            </div>
-          </div>
-        )}
-
-        {toolCallingEnabled && (
-          <div className="flex items-center justify-between">
-            <div className="flex-1">
-              <p className="text-sm text-gray-700 dark:text-gray-300">
-                Display GM Thinking
-              </p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                Show AI&apos;s reasoning process in the story view
-              </p>
-            </div>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={displayGMThinking}
-                onChange={(e) => {
-                  const newValue = e.target.checked;
-                  setDisplayGMThinking(newValue);
-                  if (typeof window !== "undefined") {
-                    localStorage.setItem("displayGMThinking", String(newValue));
-                    // Dispatch custom event for same-tab updates
-                    window.dispatchEvent(new Event("displayGMThinkingChanged"));
-                  }
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
-            </label>
-          </div>
-        )}
       </div>
 
       {/* Semantic Search (Embeddings) Section */}

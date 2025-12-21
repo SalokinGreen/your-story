@@ -644,6 +644,14 @@ export default function Story({
     partIndex: number;
   }> = [];
 
+  const normalizeUserText = (text: string): string => {
+    return text
+      .trim()
+      .replace(/^>+\s*/g, "")
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+  };
+
   storyData.scene.parts.forEach((part, index) => {
     if (part.content.trim()) {
       chatMessages.push({
@@ -653,6 +661,24 @@ export default function Story({
       });
     }
   });
+
+  const pendingUserChoiceText: string = pendingUserChoice ?? "";
+
+  const shouldShowPendingUserChoice = React.useMemo(() => {
+    if (!pendingUserChoiceText.trim()) return false;
+    if (!loading) return false;
+
+    const lastMsg = chatMessages[chatMessages.length - 1];
+    if (!lastMsg || !lastMsg.isUser) return true;
+
+    const pendingNorm = normalizeUserText(pendingUserChoiceText);
+    const lastNorm = normalizeUserText(lastMsg.content);
+
+    // If the most recent rendered user message already contains the pending text
+    // (e.g., pending="Attack" but rendered=">Attack\n[Skill: ...]"), don't show it again.
+    if (!pendingNorm) return false;
+    return !(lastNorm === pendingNorm || lastNorm.includes(pendingNorm));
+  }, [pendingUserChoiceText, loading, chatMessages.length]);
 
   // Group messages into exchanges (user + following GM response)
   const exchanges: Array<{
@@ -742,38 +768,8 @@ export default function Story({
     return results;
   }, [gmToolCalls]);
 
-  // Check if user wants to display GM thinking (from settings)
-  // Use useState + useEffect to properly handle SSR and localStorage updates
-  const [displayGMThinkingEnabled, setDisplayGMThinkingEnabled] =
-    React.useState(false);
-
-  React.useEffect(() => {
-    // Read initial value from localStorage
-    const stored = localStorage.getItem("displayGMThinking") === "true";
-    setDisplayGMThinkingEnabled(stored);
-
-    // Listen for storage changes (from other tabs or same-tab updates)
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === "displayGMThinking") {
-        setDisplayGMThinkingEnabled(e.newValue === "true");
-      }
-    };
-
-    // Also listen for custom event for same-tab updates
-    const handleCustomEvent = () => {
-      setDisplayGMThinkingEnabled(
-        localStorage.getItem("displayGMThinking") === "true"
-      );
-    };
-
-    window.addEventListener("storage", handleStorage);
-    window.addEventListener("displayGMThinkingChanged", handleCustomEvent);
-
-    return () => {
-      window.removeEventListener("storage", handleStorage);
-      window.removeEventListener("displayGMThinkingChanged", handleCustomEvent);
-    };
-  }, []);
+  // GM thinking display is always enabled
+  const displayGMThinkingEnabled = true;
 
   // State for combat display expansion
   const [showCombat, setShowCombat] = React.useState(true);
@@ -795,10 +791,10 @@ export default function Story({
   }, [chatMessages.length, loading, storyText, pendingUserChoice]);
 
   return (
-    <div className="w-full px-1 sm:max-w-3xl mx-auto">
+    <div className="w-full px-0 sm:px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-xl border border-gray-500/30 overflow-hidden relative flex flex-col max-h-[calc(100vh-100px)] sm:max-h-[calc(100vh-180px)]"
+        className="rounded-none sm:rounded-xl border-0 sm:border sm:border-gray-500/30 overflow-hidden relative flex flex-col max-h-[calc(100vh-100px)] sm:max-h-[calc(100vh-180px)]"
         style={{
           backgroundColor: fontSettings.themeColors?.background,
         }}
@@ -913,21 +909,17 @@ export default function Story({
           })}
 
           {/* Pending user choice (shown immediately when submitted) */}
-          {pendingUserChoice &&
-            loading &&
-            !chatMessages.some(
-              (m) => m.isUser && m.content === pendingUserChoice
-            ) && (
-              <ChatMessage
-                isUser={true}
-                content={pendingUserChoice}
-                displayName={playerDisplayName}
-                avatarUrl={playerAvatarUrl}
-                isPrevious={false}
-                showHiddenMessages={showHiddenMessages}
-                fontSettings={fontSettings}
-              />
-            )}
+          {shouldShowPendingUserChoice && (
+            <ChatMessage
+              isUser={true}
+              content={pendingUserChoiceText}
+              displayName={playerDisplayName}
+              avatarUrl={playerAvatarUrl}
+              isPrevious={false}
+              showHiddenMessages={showHiddenMessages}
+              fontSettings={fontSettings}
+            />
+          )}
 
           {/* Loading indicator for GM response - shows live thinking during GM stage */}
           {loading && loadingStage !== "story" && (

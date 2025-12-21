@@ -2753,10 +2753,7 @@ function StoryPageContent() {
       novelaiKey,
       novelaiTemperature,
     } = getModelsFromPreset();
-    const toolCallingEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("toolCallingEnabled") !== "false"
-        : true;
+    const toolCallingEnabled = true;
 
     logger.ai_request("Starting generation (custom input)", {
       storyModel,
@@ -4981,10 +4978,7 @@ function StoryPageContent() {
       novelaiKey,
       novelaiTemperature,
     } = getModelsFromPreset();
-    const toolCallingEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("toolCallingEnabled") !== "false"
-        : true;
+    const toolCallingEnabled = true;
 
     logger.ai_request("Starting generation (choice)", {
       storyModel,
@@ -5594,10 +5588,7 @@ function StoryPageContent() {
       novelaiKey,
       novelaiTemperature,
     } = getModelsFromPreset();
-    const toolCallingEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("toolCallingEnabled") !== "false"
-        : true;
+    const toolCallingEnabled = true;
 
     logger.ai_request("Starting generation (retry)", {
       storyModel,
@@ -6682,10 +6673,10 @@ function StoryPageContent() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-4 px-4 pb-20">
-      <main className="flex gap-4 w-full px-2 sm:max-w-4xl mx-auto flex-col">
+    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20">
+      <main className="flex gap-2 sm:gap-4 w-full px-0 sm:px-2 sm:max-w-4xl mx-auto flex-col">
         {/* Compact Story Header */}
-        <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 px-4 py-3">
+        <div className="bg-blue-950/50 rounded-none sm:rounded-xl border-x-0 sm:border border-blue-800/30 px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <button
@@ -6728,7 +6719,7 @@ function StoryPageContent() {
         </div>
 
         {/* Tab Navigation */}
-        <div className="relative z-30 bg-blue-950/50 rounded-xl border border-blue-800/30 p-2">
+        <div className="relative z-30 bg-blue-950/50 rounded-none sm:rounded-xl border-x-0 sm:border border-blue-800/30 p-2">
           <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-1">
             {[
               { state: StoryState.STORY, icon: "BookOpen", label: "Story" },

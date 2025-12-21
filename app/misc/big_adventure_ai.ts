@@ -694,7 +694,10 @@ export function saveGenerationToHistory(
     localStorage.setItem(GENERATION_HISTORY_KEY, JSON.stringify(history));
   } catch (e) {
     // Handle QuotaExceededError - try removing oldest entries
-    console.warn("Failed to save generation history (quota exceeded), pruning...", e);
+    console.warn(
+      "Failed to save generation history (quota exceeded), pruning...",
+      e
+    );
     try {
       // Keep only the newest 3 entries
       const pruned = history.slice(0, 3);
@@ -1985,9 +1988,19 @@ export function buildBigAdventureMessages(
   }
 
   // Final user message to trigger generation
+  const conceptContext = [
+    `ADVENTURE CONCEPT:\n"${config.prompt}"`,
+    config.genre ? `GENRE/THEME: ${config.genre}` : null,
+    config.stylePreset && config.stylePreset !== "default"
+      ? `STYLE PRESET: ${config.stylePreset}`
+      : null,
+  ]
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+
   messages.push({
     role: "user",
-    content: `Generate the ${
+    content: `${conceptContext}\n\nGenerate the ${
       getStageInfo(stage).name
     } for this adventure. Output ONLY valid JSON matching the schema provided.`,
   });
@@ -2193,7 +2206,7 @@ export function attemptJSONRepair(content: string): string {
     /([^\\])"([^"]*?)\\?`{3,}(?:json)?\s*/gi,
     '$1"$2"'
   );
-  
+
   // Remove remaining embedded markdown markers outside of strings
   jsonContent = jsonContent.replace(/```json\s*/gi, "");
   jsonContent = jsonContent.replace(/```\s*/g, "");
