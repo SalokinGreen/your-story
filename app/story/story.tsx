@@ -89,41 +89,51 @@ function ChatMessage({
 }: ChatMessageProps) {
   const opacity = isPrevious ? "opacity-50" : "opacity-100";
 
-  // Player messages: flex-row-reverse (avatar on right)
-  // GM messages: flex-row (avatar on left)
-  const flexDirection = isUser ? "flex-row-reverse" : "flex-row";
-  const textAlign = isUser ? "text-right" : "text-left";
+  // Player messages: flex-row-reverse (avatar on right) on desktop
+  // GM messages: flex-row (avatar on left) on desktop
+  // On mobile: stack vertically with avatar + name in a row at top
+  const flexDirection = isUser ? "sm:flex-row-reverse" : "sm:flex-row";
+  const textAlign = isUser ? "sm:text-right" : "text-left";
+  const mobileAlign = isUser ? "justify-end" : "justify-start";
 
   return (
     <div
-      className={`flex gap-3 ${flexDirection} ${opacity} transition-opacity duration-300`}
+      className={`flex flex-col sm:flex-row gap-1 sm:gap-3 ${flexDirection} ${opacity} transition-opacity duration-300`}
     >
-      {/* Avatar */}
-      <div className="shrink-0">
+      {/* Avatar + Name row on mobile, just avatar on desktop */}
+      <div className={`flex items-center gap-2 ${mobileAlign} sm:block shrink-0`}>
         {isUser ? (
           avatarUrl ? (
             <img
               src={avatarUrl}
               alt={displayName}
-              className="w-10 h-10 rounded-full object-cover border-2 border-blue-500/30"
+              className="w-6 h-6 sm:w-10 sm:h-10 rounded-full object-cover border-2 border-blue-500/30"
             />
           ) : (
-            <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500/30">
-              <DynamicIcon name="User" className="w-5 h-5 text-white" />
+            <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500/30">
+              <DynamicIcon name="User" className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
             </div>
           )
         ) : (
-          <div className="w-10 h-10 rounded-full bg-purple-600 flex items-center justify-center border-2 border-purple-500/30">
-            <DynamicIcon name="Sparkles" className="w-5 h-5 text-white" />
+          <div className="w-6 h-6 sm:w-10 sm:h-10 rounded-full bg-purple-600 flex items-center justify-center border-2 border-purple-500/30">
+            <DynamicIcon name="Sparkles" className="w-3 h-3 sm:w-5 sm:h-5 text-white" />
           </div>
         )}
+        {/* Name shown inline on mobile only */}
+        <span
+          className={`text-xs font-semibold sm:hidden ${
+            isUser ? "text-blue-300" : "text-purple-300"
+          }`}
+        >
+          {displayName}
+        </span>
       </div>
 
       {/* Message Content */}
       <div className="flex-1 min-w-0">
-        {/* Name */}
+        {/* Name - desktop only */}
         <div
-          className={`text-sm font-semibold mb-1 ${textAlign} ${
+          className={`hidden sm:block text-sm font-semibold mb-1 ${textAlign} ${
             isUser ? "text-blue-300" : "text-purple-300"
           }`}
         >
@@ -132,7 +142,7 @@ function ChatMessage({
 
         {/* Content */}
         <div
-          className={`rounded-lg p-3 ${
+          className={`rounded-lg p-2 sm:p-3 ${
             isUser
               ? "bg-blue-900/30 border border-blue-700/30"
               : "bg-purple-900/20 border border-purple-700/20"
