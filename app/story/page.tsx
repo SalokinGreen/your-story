@@ -2814,8 +2814,8 @@ function StoryPageContent() {
           : 16000;
       const customMaxOutput =
         typeof window !== "undefined"
-          ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
-          : 4000;
+          ? parseInt(localStorage.getItem("customMaxOutput") || "8000", 10)
+          : 8000;
       const embeddingsEnabled =
         typeof window !== "undefined"
           ? localStorage.getItem("embeddingsEnabled") === "true"
@@ -5041,8 +5041,8 @@ function StoryPageContent() {
         : 16000;
     const customMaxOutput =
       typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
-        : 4000;
+        ? parseInt(localStorage.getItem("customMaxOutput") || "8000", 10)
+        : 8000;
     const embeddingsEnabled =
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"
@@ -5658,8 +5658,8 @@ function StoryPageContent() {
         : 16000;
     const customMaxOutput =
       typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("customMaxOutput") || "4000", 10)
-        : 4000;
+        ? parseInt(localStorage.getItem("customMaxOutput") || "8000", 10)
+        : 8000;
     const embeddingsEnabled =
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"

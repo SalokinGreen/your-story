@@ -1187,7 +1187,7 @@ export async function generateStoryTurn(
       const MIN_OUTPUT_TOKENS = 1000;
       const rawMaxOutput = useNovelAI
         ? options.customMaxOutput || 2000
-        : options.customMaxOutput || 4000;
+        : options.customMaxOutput || 8000;
       const storyMaxOutput = Math.max(rawMaxOutput, MIN_OUTPUT_TOKENS);
 
       // Determine if we should continue the GM conversation or build a new prompt

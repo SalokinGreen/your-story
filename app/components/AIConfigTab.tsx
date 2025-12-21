@@ -48,15 +48,15 @@ export default function AIConfigTab() {
   // Model configuration - direct model selection (no presets)
   const [storyModel, setStoryModel] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("aiModelStory") || "mistralSmall";
+      return localStorage.getItem("aiModelStory") || "Mistral Small 3.2";
     }
-    return "mistralSmall";
+    return "Mistral Small 3.2";
   });
   const [toolsModel, setToolsModel] = useState(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("aiModelTools") || "mistralSmall";
+      return localStorage.getItem("aiModelTools") || "Mistral Small 3.2";
     }
-    return "mistralSmall";
+    return "Mistral Small 3.2";
   });
   const [choicesModel, setChoicesModel] = useState(() => {
     if (typeof window !== "undefined") {
@@ -131,9 +131,9 @@ export default function AIConfigTab() {
   const [customMaxOutput, setCustomMaxOutput] = useState(() => {
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem("customMaxOutput");
-      return stored ? parseInt(stored, 10) : 4000;
+      return stored ? parseInt(stored, 10) : 8000;
     }
-    return 4000;
+    return 8000;
   });
   // Story stage context size (separate from GM stage Memory Size)
   const [storyContextSize, setStoryContextSize] = useState(() => {
@@ -377,7 +377,7 @@ export default function AIConfigTab() {
           customMaxContext:
             customMaxContext !== 36000 ? customMaxContext : undefined,
           customMaxOutput:
-            customMaxOutput !== 4000 ? customMaxOutput : undefined,
+            customMaxOutput !== 8000 ? customMaxOutput : undefined,
         };
         updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
       }, 1000); // Debounce 1 second
@@ -398,7 +398,7 @@ export default function AIConfigTab() {
           customMaxContext:
             customMaxContext !== 36000 ? customMaxContext : undefined,
           customMaxOutput:
-            customMaxOutput !== 4000 ? customMaxOutput : undefined,
+            customMaxOutput !== 8000 ? customMaxOutput : undefined,
         };
         updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
       }, 1000); // Debounce 1 second
@@ -465,7 +465,7 @@ export default function AIConfigTab() {
       choicesModel: choicesModel || undefined,
       customMaxContext:
         customMaxContext !== 36000 ? customMaxContext : undefined,
-      customMaxOutput: customMaxOutput !== 4000 ? customMaxOutput : undefined,
+      customMaxOutput: customMaxOutput !== 8000 ? customMaxOutput : undefined,
     };
 
     // Fire and forget - don't block UI
@@ -618,7 +618,7 @@ export default function AIConfigTab() {
       choicesModel: choicesModel || undefined,
       customMaxContext:
         customMaxContext !== 36000 ? customMaxContext : undefined,
-      customMaxOutput: customMaxOutput !== 4000 ? customMaxOutput : undefined,
+      customMaxOutput: customMaxOutput !== 8000 ? customMaxOutput : undefined,
     };
 
     const { error } = await updateUserSettings(

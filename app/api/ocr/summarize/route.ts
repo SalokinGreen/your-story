@@ -269,7 +269,7 @@ OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields
       "name": "Table name",
       "description": "What this table is for",
       "entries": [
-        { "min": 1, "max": 10, "result": "Result text" }
+        { "text": "Result text", "weight": 1 }  // weight = probability weight (higher = more likely)
       ]
     }
   ]
@@ -298,7 +298,7 @@ ${
 }
 ${
   focusAll || focus.includes("tables")
-    ? "- Extract ALL TABLES: Random tables, encounter tables, loot tables. Convert to our format with min/max/result."
+    ? "- Extract ALL TABLES: Random tables, encounter tables, loot tables. For each entry use 'text' for the result and 'weight' for the probability (use the range size as weight, e.g. 1-10 = weight 10)."
     : ""
 }
 ${
@@ -616,11 +616,25 @@ function processParserResult(parsed: any): {
       id: `table-ocr-${Date.now()}-${index}`,
       name: table.name || `Table ${index + 1}`,
       description: table.description || "",
-      entries: (table.entries || []).map((entry: any, entryIndex: number) => ({
-        min: entry.min ?? entryIndex + 1,
-        max: entry.max ?? entryIndex + 1,
-        result: entry.result || entry.text || "",
-      })),
+      entries: (table.entries || []).map((entry: any) => {
+        // Handle both formats: { text, weight } and { min, max, result }
+        // The CustomTableEntry interface expects { text: string, weight: number }
+        const text = entry.text || entry.result || "";
+        // If weight is provided, use it; otherwise calculate from min/max range or default to 1
+        let weight = entry.weight;
+        if (weight === undefined || weight === null || isNaN(Number(weight))) {
+          // If min/max are provided, use the range size as weight
+          if (entry.min !== undefined && entry.max !== undefined) {
+            weight = Math.max(1, Number(entry.max) - Number(entry.min) + 1);
+          } else {
+            weight = 1;
+          }
+        }
+        return {
+          text,
+          weight: Math.max(1, Number(weight) || 1), // Ensure weight is always a valid positive number
+        };
+      }),
     })
   );
 

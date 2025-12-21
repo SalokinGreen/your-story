@@ -586,7 +586,7 @@ export default function Story({
         className="rounded-xl border border-gray-500/30 overflow-hidden relative flex flex-col"
         style={{ 
           backgroundColor: fontSettings.themeColors?.background,
-          maxHeight: "80vh",
+          maxHeight: "calc(100vh - 180px)",
         }}
       >
         {/* Sync Status Indicator - top right corner */}
