@@ -211,8 +211,6 @@ export default function ChoicesModal({
     }
   }, [isOpen]);
 
-  if (!isOpen) return null;
-
   const hasSkillCheck = selectedChoice?.skill_used !== undefined;
   const canUseAdvantage = storyData.momentum >= 1 && hasSkillCheck;
   const canUseGuarantee = storyData.momentum >= 3 && hasSkillCheck;
@@ -572,6 +570,8 @@ export default function ChoicesModal({
       </div>
     );
   };
+
+  if (!isOpen) return null;
 
   return (
     <div
