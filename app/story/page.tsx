@@ -3093,6 +3093,35 @@ function StoryPageContent() {
     }
   }
 
+  function handleCommentSubmit(comment: string) {
+    if (!storyData) return;
+    const trimmed = comment.trim();
+    if (!trimmed) return;
+    if (!user) {
+      addNotification("Please sign in to comment", "warning");
+      return;
+    }
+
+    const nextPart: ScenePart = {
+      content: "",
+      imageUrl: "",
+      user: true,
+      role: "user",
+      playerComment: trimmed,
+      choices: [],
+    };
+
+    const updatedStory: StoryData = {
+      ...storyData,
+      scene: {
+        ...storyData.scene,
+        parts: [...storyData.scene.parts, nextPart],
+      },
+    };
+
+    setStoryData(updatedStory);
+  }
+
   // Handle freeform action submission - analyze the action and return metadata
   async function handleActionSubmit(
     actionText: string
@@ -6770,6 +6799,7 @@ function StoryPageContent() {
             onCustomInput={handleCustomInput}
             onActionSubmit={handleActionSubmit}
             onActionConfirm={handleActionConfirm}
+            onCommentSubmit={handleCommentSubmit}
             onRerollChoices={handleRerollChoices}
             onRetry={handleRetry}
             canRetry={canRetry}

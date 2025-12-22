@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Choice, Choices, StoryData, ActionAnalysis } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
+import { useAuth } from "@/app/misc/AuthContext";
 import {
   findStatMatch,
   findResourceMatch,
@@ -23,6 +24,7 @@ interface ChoicesModalProps {
     text: string
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
   onActionConfirm?: (choice: Choice, playerComment?: string) => void;
+  onCommentSubmit?: (comment: string) => void;
   onRerollChoices?: () => void;
   loading: boolean;
   momentumMode: "none" | "advantage" | "guarantee";
@@ -34,7 +36,6 @@ interface ChoicesModalProps {
 type PendingMultiplayerAction = {
   name: string;
   action: string;
-  comment?: string;
 };
 
 export default function ChoicesModal({
@@ -48,6 +49,7 @@ export default function ChoicesModal({
   onCustomInput,
   onActionSubmit,
   onActionConfirm,
+  onCommentSubmit,
   onRerollChoices,
   loading,
   momentumMode,
@@ -55,19 +57,37 @@ export default function ChoicesModal({
   actionMode = false,
   onActionModeChange,
 }: ChoicesModalProps) {
+  const { user } = useAuth();
+
   // Action mode state
   const [actionText, setActionText] = useState("");
-  const [playerComment, setPlayerComment] = useState("");
+  const [commentMode, setCommentMode] = useState(false);
   const [analyzingAction, setAnalyzingAction] = useState(false);
   const [showActionBuilder, setShowActionBuilder] = useState(false);
 
   const multiplayerEnabled = !!storyData.multiplayer?.enabled;
-  const multiplayerPlayers = storyData.multiplayer?.players || [];
-  const multiplayerHost = storyData.multiplayer?.host || "";
+  const multiplayerMode = storyData.multiplayer?.mode || "host";
+  const multiplayerHostUserId = storyData.multiplayer?.hostUserId || "";
+  const multiplayerTimerMinutes = storyData.multiplayer?.timerMinutes ?? 2;
   const [multiplayerName, setMultiplayerName] = useState("");
   const [pendingMultiplayer, setPendingMultiplayer] = useState<
     PendingMultiplayerAction[]
   >([]);
+
+  const [multiplayerTimerStart, setMultiplayerTimerStart] = useState<
+    number | null
+  >(null);
+  const [timerNow, setTimerNow] = useState<number>(() => Date.now());
+
+  const isHostUser =
+    !!user?.id && !!multiplayerHostUserId.trim() && user.id === multiplayerHostUserId;
+
+  const canManageTurn = (() => {
+    if (!multiplayerEnabled) return true;
+    if (multiplayerMode === "any") return true;
+    // host + timer modes
+    return isHostUser;
+  })();
 
   // Action builder state
   const [builderSkill, setBuilderSkill] = useState("");
@@ -96,7 +116,7 @@ export default function ChoicesModal({
   useEffect(() => {
     if (!isOpen) {
       setActionText("");
-      setPlayerComment("");
+      setCommentMode(false);
       setAnalyzingAction(false);
       setShowActionBuilder(false);
       setBuilderSkill("");
@@ -106,6 +126,7 @@ export default function ChoicesModal({
       setBuilderPlain(true);
       setPendingMultiplayer([]);
       setMultiplayerName("");
+      setMultiplayerTimerStart(null);
     }
   }, [isOpen, rpgSystem.dc.medium]);
 
@@ -115,14 +136,54 @@ export default function ChoicesModal({
     if (!multiplayerEnabled) return;
 
     const defaultName =
-      multiplayerHost || multiplayerPlayers[0] || storyData.displayName || "";
+      user?.user_metadata?.display_name ||
+      storyData.displayName ||
+      storyData.player_name ||
+      "";
     setMultiplayerName((prev) => prev || defaultName);
   }, [
     isOpen,
     multiplayerEnabled,
-    multiplayerHost,
-    multiplayerPlayers,
+    user?.user_metadata?.display_name,
     storyData.displayName,
+    storyData.player_name,
+  ]);
+
+  // Timer mode: start after first queued input; host auto-generates when elapsed.
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!multiplayerEnabled) return;
+    if (multiplayerMode !== "timer") {
+      setMultiplayerTimerStart(null);
+      return;
+    }
+
+    if (pendingMultiplayer.length === 0) {
+      setMultiplayerTimerStart(null);
+      return;
+    }
+
+    setMultiplayerTimerStart((prev) => prev ?? Date.now());
+  }, [isOpen, multiplayerEnabled, multiplayerMode, pendingMultiplayer.length]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!multiplayerEnabled) return;
+    if (multiplayerMode !== "timer") return;
+    if (!multiplayerTimerStart) return;
+    if (pendingMultiplayer.length === 0) return;
+
+    const interval = window.setInterval(() => {
+      setTimerNow(Date.now());
+    }, 250);
+
+    return () => window.clearInterval(interval);
+  }, [
+    isOpen,
+    multiplayerEnabled,
+    multiplayerMode,
+    multiplayerTimerStart,
+    pendingMultiplayer.length,
   ]);
 
   // Handle escape key
@@ -162,13 +223,28 @@ export default function ChoicesModal({
   ) => {
     const text = (overrideText ?? actionText).trim();
 
+    // Multiplayer (non-comment): queue the action instead of calling AI directly.
+    if (multiplayerEnabled && !commentMode) {
+      handleMultiplayerAdd();
+      return;
+    }
+
+    // Comment mode: post a player-visible comment only (no AI call)
+    if (commentMode) {
+      if (!onCommentSubmit) return;
+      if (!text) return;
+      onCommentSubmit(text);
+      onClose();
+      return;
+    }
+
     // If no text, just send "> continue"
     if (!text) {
       if (onActionConfirm) {
         const choice: Choice = {
           text: "continue",
         };
-        onActionConfirm(choice, playerComment.trim() || undefined);
+        onActionConfirm(choice, undefined);
         onClose();
       }
       return;
@@ -192,7 +268,7 @@ export default function ChoicesModal({
           table: result.analysis.table || undefined,
           stt_input: isStt || undefined,
         };
-        onActionConfirm(choice, playerComment.trim() || undefined);
+        onActionConfirm(choice, undefined);
         onClose();
       } else {
         // Analysis failed - show action builder
@@ -222,69 +298,97 @@ export default function ChoicesModal({
       if (builderResource) choice.resource_used = builderResource;
     }
 
-    onActionConfirm(choice, playerComment.trim() || undefined);
+    onActionConfirm(choice, undefined);
     onClose();
   };
 
   const handleMultiplayerAdd = () => {
     const name = multiplayerName.trim();
     const action = actionText.trim();
-    if (!name || !action) return;
+    if (!name) return;
+    const normalizedAction = action || "continue";
 
     setPendingMultiplayer((prev) => {
       // Replace existing action from same player (latest wins)
       const next = prev.filter(
         (p) => p.name.toLowerCase() !== name.toLowerCase()
       );
-      next.push({
-        name,
-        action,
-        comment: playerComment.trim() || undefined,
-      });
+      next.push({ name, action: normalizedAction });
       return next;
     });
 
     setActionText("");
-    setPlayerComment("");
     setShowActionBuilder(false);
   };
 
-  const handleMultiplayerSend = (force: boolean) => {
+  const handleMultiplayerSkip = () => {
+    const name = multiplayerName.trim();
+    if (!name) return;
+    setPendingMultiplayer((prev) => {
+      const next = prev.filter(
+        (p) => p.name.toLowerCase() !== name.toLowerCase()
+      );
+      next.push({ name, action: "continue" });
+      return next;
+    });
+    setActionText("");
+    setShowActionBuilder(false);
+  };
+
+  const handleMultiplayerClear = () => {
+    setPendingMultiplayer([]);
+    setMultiplayerTimerStart(null);
+  };
+
+  const handleMultiplayerSend = () => {
     if (!onCustomInput) return;
     if (pendingMultiplayer.length === 0) return;
 
-    const requiredPlayers = multiplayerPlayers
-      .map((p) => p.trim())
-      .filter(Boolean);
-    const hasByName = new Set(
-      pendingMultiplayer.map((p) => p.name.toLowerCase())
-    );
-    const allReady =
-      requiredPlayers.length === 0 ||
-      requiredPlayers.every((p) => hasByName.has(p.toLowerCase()));
-
-    if (!force && !allReady) return;
+    if (!canManageTurn) return;
 
     // Build a custom input payload that results in:
     // > Alice: action
     // > Bob: action
     const lines = pendingMultiplayer
-      .map((p, idx) =>
-        idx === 0 ? `${p.name}: ${p.action}` : `>${p.name}: ${p.action}`
-      )
+      .map((p) => `> ${p.name}: ${p.action}`)
       .join("\n");
 
-    const commentLines = pendingMultiplayer
-      .filter((p) => p.comment && p.comment.trim())
-      .map((p) => `${p.name}: ${p.comment}`)
-      .join("\n");
-
-    onCustomInput(lines, commentLines || undefined);
+    onCustomInput(lines, undefined);
     setPendingMultiplayer([]);
-    setPlayerComment("");
     setActionText("");
+    setMultiplayerTimerStart(null);
     onClose();
   };
+
+  // Auto-generate when timer expires (host only).
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!multiplayerEnabled) return;
+    if (multiplayerMode !== "timer") return;
+    if (!multiplayerTimerStart) return;
+    if (pendingMultiplayer.length === 0) return;
+    if (loading) return;
+    if (!canManageTurn) return;
+
+    const durationMs = Math.max(1, Math.floor(multiplayerTimerMinutes || 2)) *
+      60 *
+      1000;
+    const elapsed = timerNow - multiplayerTimerStart;
+    if (elapsed < durationMs) return;
+
+    handleMultiplayerSend();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isOpen,
+    multiplayerEnabled,
+    multiplayerMode,
+    multiplayerTimerStart,
+    pendingMultiplayer.length,
+    loading,
+    canManageTurn,
+    multiplayerTimerMinutes,
+    timerNow,
+  ]);
 
   const getChoiceDetails = (choice: Choice) => {
     const details: React.ReactNode[] = [];
@@ -540,9 +644,7 @@ export default function ChoicesModal({
                         value={multiplayerName}
                         onChange={(e) => setMultiplayerName(e.target.value)}
                         placeholder={
-                          multiplayerHost ||
-                          multiplayerPlayers[0] ||
-                          "Your name"
+                          user?.user_metadata?.display_name || "Your name"
                         }
                         className="w-full px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       />
@@ -552,7 +654,30 @@ export default function ChoicesModal({
                         Turn status
                       </label>
                       <div className="px-3 py-2 bg-blue-950/30 border border-blue-800/20 rounded-lg text-xs text-blue-200/60">
-                        {pendingMultiplayer.length} submitted
+                        {pendingMultiplayer.length} queued
+                        {multiplayerMode === "timer" && multiplayerTimerStart && (
+                          <div className="mt-1 text-[11px] text-blue-200/50">
+                            {(() => {
+                              const durationMs =
+                                Math.max(
+                                  1,
+                                  Math.floor(multiplayerTimerMinutes || 2)
+                                ) *
+                                60 *
+                                1000;
+                              const remainingMs = Math.max(
+                                0,
+                                durationMs - (timerNow - multiplayerTimerStart)
+                              );
+                              const remainingSec = Math.ceil(remainingMs / 1000);
+                              const m = Math.floor(remainingSec / 60);
+                              const s = remainingSec % 60;
+                              return `Auto-generate in ${m}:${s
+                                .toString()
+                                .padStart(2, "0")}`;
+                            })()}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -574,11 +699,6 @@ export default function ChoicesModal({
                             <div className="text-xs text-blue-100/80 whitespace-pre-wrap">
                               {p.action}
                             </div>
-                            {p.comment && (
-                              <div className="text-[11px] text-blue-200/60 italic mt-1">
-                                Comment: {p.comment}
-                              </div>
-                            )}
                           </div>
                           <button
                             onClick={() =>
@@ -604,6 +724,34 @@ export default function ChoicesModal({
 
               {/* Action Input */}
               <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-xs font-medium text-blue-200/70">
+                    Comment mode
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCommentMode((prev) => {
+                        const next = !prev;
+                        if (next) {
+                          setShowActionBuilder(false);
+                          setAnalyzingAction(false);
+                        }
+                        return next;
+                      });
+                    }}
+                    className={`px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-colors ${
+                      commentMode
+                        ? "bg-emerald-600/40 border-emerald-400/40 text-emerald-100"
+                        : "bg-blue-950/30 border-blue-800/20 text-blue-200/60 hover:bg-blue-950/50"
+                    }`}
+                    disabled={loading || analyzingAction}
+                    title="When enabled, anything you submit is posted as a player-visible comment and is not sent to the AI."
+                  >
+                    {commentMode ? "On" : "Off"}
+                  </button>
+                </div>
+
                 <div className="flex gap-2">
                   <textarea
                     ref={actionTextareaRef}
@@ -612,36 +760,29 @@ export default function ChoicesModal({
                       setActionText(e.target.value);
                       setShowActionBuilder(false);
                     }}
-                    placeholder="Describe your action... (e.g., 'I kick the door open' or 'I try to convince the guard to let us pass')"
+                    placeholder={
+                      commentMode
+                        ? "Write a comment for the other players..."
+                        : "Describe your action... (e.g., 'I kick the door open' or 'I try to convince the guard to let us pass')"
+                    }
                     rows={3}
                     disabled={analyzingAction || loading}
                     className="flex-1 px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && e.ctrlKey && actionText.trim()) {
+                      if (e.key === "Enter" && e.ctrlKey) {
                         e.preventDefault();
-                        handleActionAnalyze(undefined, undefined);
+                        if (multiplayerEnabled && !commentMode) {
+                          handleMultiplayerAdd();
+                        } else {
+                          handleActionAnalyze(undefined, undefined);
+                        }
                       }
                     }}
                   />
                 </div>
                 <p className="text-xs text-blue-200/40">
-                  {actionText.length} characters • Ctrl+Enter to act
+                  {actionText.length} characters • Ctrl+Enter to submit
                 </p>
-              </div>
-
-              {/* Player Comment (not sent to AI) */}
-              <div className="space-y-1">
-                <label className="block text-xs font-medium text-blue-200/70">
-                  Comment (not sent to AI)
-                </label>
-                <textarea
-                  value={playerComment}
-                  onChange={(e) => setPlayerComment(e.target.value)}
-                  placeholder="Write a note for the other players..."
-                  rows={2}
-                  disabled={analyzingAction || loading}
-                  className="w-full px-3 py-2 bg-blue-950/30 border border-blue-800/20 rounded-lg text-white placeholder-blue-200/30 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
-                />
               </div>
 
               {/* Action Builder (only shown when analysis fails) */}
@@ -652,58 +793,140 @@ export default function ChoicesModal({
                 <>
                   {multiplayerEnabled ? (
                     <div className="space-y-2">
-                      <button
-                        onClick={handleMultiplayerAdd}
-                        disabled={
-                          loading ||
-                          analyzingAction ||
-                          !multiplayerName.trim() ||
-                          !actionText.trim()
-                        }
-                        className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                          loading ||
-                          analyzingAction ||
-                          !multiplayerName.trim() ||
-                          !actionText.trim()
-                            ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                            : "bg-blue-600 hover:bg-blue-500 text-white"
-                        }`}
-                      >
-                        <DynamicIcon name="Plus" className="w-4 h-4" />
-                        Add To Turn
-                      </button>
+                      {commentMode ? (
+                        <button
+                          onClick={() => handleActionAnalyze()}
+                          disabled={
+                            analyzingAction ||
+                            loading ||
+                            (commentMode && !actionText.trim())
+                          }
+                          className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                            analyzingAction ||
+                            loading ||
+                            (commentMode && !actionText.trim())
+                              ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
+                              : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                          }`}
+                        >
+                          <DynamicIcon
+                            name="MessageSquare"
+                            className="w-4 h-4"
+                          />
+                          Send Comment
+                        </button>
+                      ) : (
+                        <>
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              onClick={handleMultiplayerAdd}
+                              disabled={
+                                loading ||
+                                analyzingAction ||
+                                !multiplayerName.trim()
+                              }
+                              className={`py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                                loading ||
+                                analyzingAction ||
+                                !multiplayerName.trim()
+                                  ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
+                                  : "bg-blue-600 hover:bg-blue-500 text-white"
+                              }`}
+                              title={
+                                actionText.trim()
+                                  ? "Submit your action for this turn"
+                                  : "Submit a skip (continue) for this turn"
+                              }
+                            >
+                              <DynamicIcon name="Plus" className="w-4 h-4" />
+                              Add To Turn
+                            </button>
+                            <button
+                              onClick={handleMultiplayerSkip}
+                              disabled={
+                                loading ||
+                                analyzingAction ||
+                                !multiplayerName.trim()
+                              }
+                              className={`py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                                loading ||
+                                analyzingAction ||
+                                !multiplayerName.trim()
+                                  ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
+                                  : "bg-blue-900/50 hover:bg-blue-900/70 text-blue-100"
+                              }`}
+                              title="Skip your turn (submit continue)"
+                            >
+                              <DynamicIcon
+                                name="FastForward"
+                                className="w-4 h-4"
+                              />
+                              Skip Turn
+                            </button>
+                          </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <button
-                          onClick={() => handleMultiplayerSend(false)}
-                          disabled={loading || pendingMultiplayer.length === 0}
-                          className={`py-3 rounded-lg font-medium transition-colors ${
-                            loading || pendingMultiplayer.length === 0
-                              ? "bg-purple-800/30 text-purple-300/40 cursor-not-allowed"
-                              : "bg-purple-600 hover:bg-purple-500 text-white"
-                          }`}
-                        >
-                          Generate (when ready)
-                        </button>
-                        <button
-                          onClick={() => handleMultiplayerSend(true)}
-                          disabled={loading || pendingMultiplayer.length === 0}
-                          className={`py-3 rounded-lg font-medium transition-colors ${
-                            loading || pendingMultiplayer.length === 0
-                              ? "bg-amber-800/30 text-amber-300/40 cursor-not-allowed"
-                              : "bg-amber-600 hover:bg-amber-500 text-white"
-                          }`}
-                        >
-                          Force Send
-                        </button>
-                      </div>
+                          <button
+                            onClick={handleMultiplayerSend}
+                            disabled={
+                              loading ||
+                              pendingMultiplayer.length === 0 ||
+                              !canManageTurn
+                            }
+                            className={`w-full py-3 rounded-lg font-medium transition-colors ${
+                              loading ||
+                              pendingMultiplayer.length === 0 ||
+                              !canManageTurn
+                                ? "bg-purple-800/30 text-purple-300/40 cursor-not-allowed"
+                                : "bg-purple-600 hover:bg-purple-500 text-white"
+                            }`}
+                            title={
+                              !canManageTurn
+                                ? "Only the host can generate"
+                                : undefined
+                            }
+                          >
+                            {multiplayerMode === "timer"
+                              ? "Generate Now"
+                              : "Generate"}
+                          </button>
+
+                          <button
+                            onClick={handleMultiplayerClear}
+                            disabled={
+                              loading ||
+                              pendingMultiplayer.length === 0 ||
+                              !canManageTurn
+                            }
+                            className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                              loading ||
+                              pendingMultiplayer.length === 0 ||
+                              !canManageTurn
+                                ? "bg-red-950/30 text-red-200/30 cursor-not-allowed"
+                                : "bg-red-600/60 hover:bg-red-600 text-white"
+                            }`}
+                            title={
+                              !canManageTurn
+                                ? "Only the host can clear the turn"
+                                : undefined
+                            }
+                          >
+                            Clear Turn
+                          </button>
+                        </>
+                      )}
                     </div>
                   ) : (
                     <button
                       onClick={() => handleActionAnalyze()}
-                      disabled={analyzingAction || loading}
+                      disabled={
+                        analyzingAction ||
+                        loading ||
+                        (commentMode && !actionText.trim())
+                      }
                       className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                        analyzingAction || loading
+                        analyzingAction ||
+                        loading ||
+                        (commentMode && !actionText.trim())
                           ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
                           : "bg-blue-600 hover:bg-blue-500 text-white"
                       }`}
@@ -715,6 +938,14 @@ export default function ChoicesModal({
                             className="w-4 h-4 animate-spin"
                           />
                           {analyzingAction ? "Processing..." : "Generating..."}
+                        </>
+                      ) : commentMode ? (
+                        <>
+                          <DynamicIcon
+                            name="MessageSquare"
+                            className="w-4 h-4"
+                          />
+                          Send Comment
                         </>
                       ) : actionText.trim() ? (
                         <>
@@ -887,26 +1118,11 @@ export default function ChoicesModal({
             </div>
           )}
 
-          {/* Player Comment (not sent to AI) */}
-          <div className="space-y-1">
-            <label className="block text-xs font-medium text-blue-200/70">
-              Comment (not sent to AI)
-            </label>
-            <textarea
-              value={playerComment}
-              onChange={(e) => setPlayerComment(e.target.value)}
-              placeholder="Write a note for the other players..."
-              rows={2}
-              disabled={loading}
-              className="w-full px-3 py-2 bg-blue-950/30 border border-blue-800/20 rounded-lg text-white placeholder-blue-200/30 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
-            />
-          </div>
-
           {/* Confirm Button - only for choice mode */}
           {!actionMode && (
             <button
               onClick={() => {
-                onConfirm(playerComment.trim() || undefined);
+                onConfirm(undefined);
                 onClose();
               }}
               disabled={!selectedChoice || loading}

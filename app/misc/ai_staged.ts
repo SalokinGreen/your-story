@@ -504,6 +504,12 @@ export function getPartsWithinTokenBudget(
   for (let i = parts.length - 1; i >= 0; i--) {
     const part = parts[i];
     const partText = part.raw || part.content;
+
+    // Comment-only user parts have empty content; never include them in AI context.
+    if (part.user && !cleanString(partText).trim()) {
+      continue;
+    }
+
     const partTokens = estimateTokens(partText);
 
     // Include tool call/response overhead if present

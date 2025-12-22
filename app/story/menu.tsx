@@ -5452,6 +5452,13 @@ export default function MenuPage({
   const [showSettings, setShowSettings] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [playerNotes, setPlayerNotes] = useState(storyData.player_notes || "");
+  const [editingChatDisplay, setEditingChatDisplay] = useState(false);
+  const [chatDisplayName, setChatDisplayName] = useState(
+    storyData.displayName || ""
+  );
+  const [chatDisplayAvatar, setChatDisplayAvatar] = useState(
+    storyData.displayAvatar || ""
+  );
 
   // Settings form state
   const [settingsForm, setSettingsForm] = useState<BasicSettingsForm>({
@@ -5477,7 +5484,6 @@ export default function MenuPage({
 
   const [activeTab, setActiveTab] = useState<
     | "basic"
-    | "display"
     | "multiplayer"
     | "stats"
     | "inventory"
@@ -5500,11 +5506,14 @@ export default function MenuPage({
   const [multiplayerEnabled, setMultiplayerEnabled] = useState<boolean>(
     !!storyData.multiplayer?.enabled
   );
-  const [multiplayerPlayersText, setMultiplayerPlayersText] = useState<string>(
-    (storyData.multiplayer?.players || []).join("\n")
+  const [multiplayerMode, setMultiplayerMode] = useState<
+    "host" | "any" | "timer"
+  >(storyData.multiplayer?.mode || "host");
+  const [multiplayerTimerMinutes, setMultiplayerTimerMinutes] = useState<number>(
+    storyData.multiplayer?.timerMinutes ?? 2
   );
-  const [multiplayerHost, setMultiplayerHost] = useState<string>(
-    storyData.multiplayer?.host || ""
+  const [multiplayerHostUserId, setMultiplayerHostUserId] = useState<string>(
+    storyData.multiplayer?.hostUserId || ""
   );
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -5541,6 +5550,20 @@ export default function MenuPage({
       addNotification("Notes saved!", "success");
     } catch (error) {
       addNotification("Failed to save notes", "failure");
+    }
+  };
+
+  const handleSaveChatDisplay = async () => {
+    try {
+      onUpdateStoryData({
+        displayName: chatDisplayName.trim() || undefined,
+        displayAvatar: chatDisplayAvatar.trim() || undefined,
+      });
+      await onSaveProgress();
+      setEditingChatDisplay(false);
+      addNotification("Chat display settings saved!", "success");
+    } catch (error) {
+      addNotification("Failed to save chat display settings", "failure");
     }
   };
 
@@ -5630,11 +5653,15 @@ export default function MenuPage({
 
   const handleSaveSettings = async () => {
     try {
-      const parsedPlayers = multiplayerPlayersText
-        .split(/\r?\n/)
-        .map((p) => p.trim())
-        .filter(Boolean);
-      const nextHost = (multiplayerHost || parsedPlayers[0] || "").trim();
+      const resolvedHostUserId =
+        multiplayerEnabled &&
+        (multiplayerMode === "host" || multiplayerMode === "timer")
+          ? (multiplayerHostUserId || user?.id || "").trim() || undefined
+          : undefined;
+      const resolvedTimerMinutes =
+        multiplayerMode === "timer"
+          ? Math.max(1, Math.floor(multiplayerTimerMinutes || 2))
+          : undefined;
 
       onUpdateStoryData({
         story_name: settingsForm.story_name,
@@ -5650,8 +5677,9 @@ export default function MenuPage({
         rpgSystem: settingsForm.rpgSystem,
         multiplayer: {
           enabled: multiplayerEnabled,
-          players: parsedPlayers,
-          host: nextHost || undefined,
+          mode: multiplayerMode,
+          timerMinutes: resolvedTimerMinutes,
+          hostUserId: resolvedHostUserId,
         },
       });
       await onSaveProgress();
@@ -5977,6 +6005,108 @@ export default function MenuPage({
         )}
       </div>
 
+      {/* Chat Display Settings - Collapsible */}
+      <div className="bg-[#0f1a2e] rounded-xl border border-blue-800/30 overflow-hidden">
+        <button
+          onClick={() => setEditingChatDisplay(!editingChatDisplay)}
+          className="w-full flex items-center justify-between p-3 hover:bg-blue-900/20 transition-colors"
+        >
+          <span className="text-sm font-medium text-white flex items-center gap-2">
+            <DynamicIcon
+              name="MessageCircle"
+              className="w-4 h-4 text-purple-300"
+            />
+            Chat Display Settings
+          </span>
+          <DynamicIcon
+            name={editingChatDisplay ? "ChevronUp" : "ChevronDown"}
+            className="w-4 h-4 text-blue-300/60"
+          />
+        </button>
+
+        {editingChatDisplay && (
+          <div className="p-3 pt-0 space-y-3">
+            <p className="text-xs text-blue-200/60">
+              Leave empty to use your account defaults.
+            </p>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-medium text-blue-200/70 mb-1">
+                  Display Name
+                </label>
+                <input
+                  type="text"
+                  value={chatDisplayName}
+                  onChange={(e) => setChatDisplayName(e.target.value)}
+                  placeholder={
+                    user?.user_metadata?.display_name ||
+                    storyData.player_name ||
+                    "Your name"
+                  }
+                  className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-blue-200/70 mb-1">
+                  Avatar URL
+                </label>
+                <input
+                  type="url"
+                  value={chatDisplayAvatar}
+                  onChange={(e) => setChatDisplayAvatar(e.target.value)}
+                  placeholder="https://..."
+                  className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                />
+              </div>
+            </div>
+
+            {chatDisplayAvatar.trim() && (
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-blue-200/60">Preview:</span>
+                <img
+                  src={chatDisplayAvatar}
+                  alt="Avatar preview"
+                  className="w-8 h-8 rounded-full object-cover border border-purple-500/40"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => {
+                  setChatDisplayName(storyData.displayName || "");
+                  setChatDisplayAvatar(storyData.displayAvatar || "");
+                  setEditingChatDisplay(false);
+                }}
+                className="px-3 py-1.5 text-xs bg-blue-800/50 text-blue-200 rounded-lg hover:bg-blue-700/50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveChatDisplay}
+                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded-lg"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        )}
+
+        {!editingChatDisplay && (chatDisplayName || chatDisplayAvatar) && (
+          <div className="px-3 pb-3">
+            <p className="text-xs text-blue-200/70 whitespace-pre-wrap line-clamp-2">
+              {chatDisplayName ? `Name: ${chatDisplayName}` : ""}
+              {chatDisplayName && chatDisplayAvatar ? "\n" : ""}
+              {chatDisplayAvatar ? "Avatar: set" : ""}
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Danger Zone - Compact */}
       <div className="bg-[#0f1a2e] rounded-xl border border-red-900/30 overflow-hidden">
         <div className="p-3 border-b border-red-900/20">
@@ -6270,7 +6400,6 @@ export default function MenuPage({
             >
               {[
                 { id: "basic", label: "Basic", icon: "FileText" },
-                { id: "display", label: "Display", icon: "MessageCircle" },
                 { id: "multiplayer", label: "Multiplayer", icon: "Users" },
                 { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
                 { id: "inventory", label: "Inventory", icon: "Backpack" },
@@ -6318,17 +6447,6 @@ export default function MenuPage({
                 </div>
               )}
 
-              {activeTab === "display" && (
-                <div className="mt-4 space-y-5">
-                  <ChatDisplaySettings
-                    form={settingsForm}
-                    onChange={(updates) =>
-                      setSettingsForm((prev) => ({ ...prev, ...updates }))
-                    }
-                  />
-                </div>
-              )}
-
               {activeTab === "multiplayer" && (
                 <div className="mt-4 space-y-5">
                   <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
@@ -6338,8 +6456,8 @@ export default function MenuPage({
                           Enable Multiplayer (Hot-seat)
                         </label>
                         <p className="text-xs text-blue-200/60">
-                          Collect multiple player actions (Name: action) before
-                          generating.
+                          Collect multiple player actions (as "&gt; Name: action")
+                          before generating.
                         </p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
@@ -6347,7 +6465,17 @@ export default function MenuPage({
                           type="checkbox"
                           checked={multiplayerEnabled}
                           onChange={(e) =>
-                            setMultiplayerEnabled(e.target.checked)
+                            setMultiplayerEnabled(() => {
+                              const checked = e.target.checked;
+                              if (
+                                checked &&
+                                !multiplayerHostUserId.trim() &&
+                                user?.id
+                              ) {
+                                setMultiplayerHostUserId(user.id);
+                              }
+                              return checked;
+                            })
                           }
                           className="sr-only peer"
                         />
@@ -6358,33 +6486,85 @@ export default function MenuPage({
 
                   <div className="space-y-2">
                     <label className="block text-sm font-semibold text-blue-200 mb-2">
-                      Players (one per line)
+                      Play Mode
                     </label>
-                    <textarea
-                      value={multiplayerPlayersText}
+                    <select
+                      value={multiplayerMode}
                       onChange={(e) =>
-                        setMultiplayerPlayersText(e.target.value)
+                        setMultiplayerMode(
+                          e.target.value as "host" | "any" | "timer"
+                        )
                       }
-                      placeholder={`Alice\nBob\nCharlie`}
-                      className="w-full h-32 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
-                    />
+                      className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    >
+                      <option value="host">Generate on host command</option>
+                      <option value="any">Generate on any command</option>
+                      <option value="timer">Generate after timer</option>
+                    </select>
                     <p className="text-xs text-blue-200/60">
-                      These names can be used in inputs like "Name: action".
+                      Timer starts after the first queued input.
                     </p>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-2">
-                      Host Name (optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={multiplayerHost}
-                      onChange={(e) => setMultiplayerHost(e.target.value)}
-                      placeholder="(defaults to first player)"
-                      className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                    />
-                  </div>
+                  {(multiplayerMode === "host" || multiplayerMode === "timer") && (
+                    <div className="p-4 bg-blue-950/30 rounded-lg border border-blue-700/30 space-y-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <label className="block text-sm font-semibold text-blue-200">
+                            Host
+                          </label>
+                          <p className="text-xs text-blue-200/60 break-all">
+                            {multiplayerHostUserId.trim()
+                              ? multiplayerHostUserId.trim()
+                              : "Not set"}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!user?.id) return;
+                            setMultiplayerHostUserId(user.id);
+                          }}
+                          disabled={!user?.id}
+                          className={`px-3 py-2 text-xs font-semibold rounded-lg transition-colors border ${
+                            user?.id
+                              ? "bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border-purple-500/30"
+                              : "bg-blue-900/20 text-blue-200/30 border-blue-800/20 cursor-not-allowed"
+                          }`}
+                          title={
+                            user?.id
+                              ? "Set the host to your user account"
+                              : "Sign in to set host"
+                          }
+                        >
+                          Set me as host
+                        </button>
+                      </div>
+                      <p className="text-xs text-blue-200/60">
+                        Only the host can generate/clear in host and timer
+                        modes.
+                      </p>
+                    </div>
+                  )}
+
+                  {multiplayerMode === "timer" && (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-blue-200 mb-2">
+                        Timer (minutes)
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        value={multiplayerTimerMinutes}
+                        onChange={(e) =>
+                          setMultiplayerTimerMinutes(
+                            parseInt(e.target.value) || 1
+                          )
+                        }
+                        className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -6807,10 +6987,11 @@ export default function MenuPage({
                     rpgSystem: storyData.rpgSystem || "3d6",
                   });
                   setMultiplayerEnabled(!!storyData.multiplayer?.enabled);
-                  setMultiplayerPlayersText(
-                    (storyData.multiplayer?.players || []).join("\n")
+                  setMultiplayerMode(storyData.multiplayer?.mode || "host");
+                  setMultiplayerTimerMinutes(
+                    storyData.multiplayer?.timerMinutes ?? 2
                   );
-                  setMultiplayerHost(storyData.multiplayer?.host || "");
+                  setMultiplayerHostUserId(storyData.multiplayer?.hostUserId || "");
                   setShowSettings(false);
                 }}
                 className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 text-sm sm:text-base font-semibold rounded-lg transition-colors"

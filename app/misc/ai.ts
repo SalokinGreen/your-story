@@ -346,7 +346,13 @@ Narrative Best Practices:
 - Preserve important information as lore: When you introduce crucial worldbuilding, key NPCs, locations, factions, or story-critical information that should persist permanently, use /create_lore to save it. Unlike memory entries, lore entries never disappear and can be referenced throughout the entire adventure.
 - Reference lore: Weave in lore entries when contextually appropriate to enrich worldbuilding and maintain narrative consistency.`;
 
-  const recentScene = storyData.scene.parts.at(-1)?.content ?? storyData.intro;
+  const recentScene = (() => {
+    for (let i = storyData.scene.parts.length - 1; i >= 0; i--) {
+      const c = storyData.scene.parts[i]?.content ?? "";
+      if (c.trim()) return c;
+    }
+    return storyData.intro;
+  })();
 
   // Dynamic caps based on context window
   // 1 token ~= 4 characters
@@ -400,6 +406,12 @@ Narrative Best Practices:
       const part = recentParts[i];
       const content =
         useRawContext && part.raw && !part.user ? part.raw : part.content;
+
+      // Comment-only user parts have empty content; never include them in AI context.
+      if (part.user && !cleanString(content).trim()) {
+        continue;
+      }
+
       const partLength = content.length;
 
       if (currentStoryLength + partLength <= story_cap) {
@@ -415,6 +427,9 @@ Narrative Best Practices:
 
     partsToInclude.forEach((part) => {
       if (part.user) {
+        if (!cleanString(part.content).trim()) {
+          return;
+        }
         // If last message was a tool response, add an assistant acknowledgment first
         // This is required by Mistral which doesn't allow user messages after tool messages
         if (lastWasToolResponse) {

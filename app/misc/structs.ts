@@ -656,6 +656,8 @@ export type Variable =
   | StringVariable
   | ListVariable;
 
+export type MultiplayerMode = "host" | "any" | "timer";
+
 export interface StoryData {
   story_name: string;
   premise: string;
@@ -667,8 +669,13 @@ export interface StoryData {
   // Local multiplayer configuration (hot-seat / same-device scaffolding)
   multiplayer?: {
     enabled: boolean;
-    players: string[]; // Display names used in "Name: action" inputs
-    host?: string; // Optional host display name
+    mode?: MultiplayerMode;
+    timerMinutes?: number; // Used when mode === "timer"
+    hostUserId?: string; // Auth user id of the host (used when mode === "host" | "timer")
+
+    // Legacy fields (no longer used by UI; kept for backward compatibility)
+    players?: string[]; // Legacy roster
+    host?: string; // Legacy host display name
   };
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;
