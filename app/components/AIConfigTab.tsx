@@ -429,12 +429,22 @@ export default function AIConfigTab() {
   const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["mistralLarge"];
 
   // Direct model selection - no preset fallback
-  const effectiveStoryModel = storyModel;
-  const effectiveToolsModel = toolsModel;
+  const effectiveStoryModel = storyModel || preset.storyModel;
+  const effectiveToolsModel = toolsModel || preset.toolsModel;
 
   // Apply advanced choices toggle - CHOICES NOW USES STORY MODEL
   // Choices stage uses the same model as Story stage for consistency
   const effectiveChoicesModel = effectiveStoryModel;
+
+  const effectiveStoryModelConfig = getModelConfig(effectiveStoryModel);
+  const bannerTitle =
+    novelaiEnabled && hasKey("novelaiKey")
+      ? "NovelAI GLM-4-6"
+      : effectiveStoryModelConfig.name;
+  const bannerDescription =
+    novelaiEnabled && hasKey("novelaiKey")
+      ? "NovelAI GLM-4-6 for story stage (BYOK)"
+      : effectiveStoryModelConfig.description || preset.description;
 
   // Helper to get display name for a model key (handles both built-in and custom models)
   const getModelDisplayName = (modelKey: string): string => {
@@ -797,7 +807,7 @@ export default function AIConfigTab() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <div className="text-xl font-bold flex items-center gap-2">
-              {preset.name}
+              {bannerTitle}
               {byokMode ? (
                 <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
                   BYOK
@@ -813,7 +823,7 @@ export default function AIConfigTab() {
                 </span>
               )}
             </div>
-            <div className="text-sm text-white/70">{preset.description}</div>
+            <div className="text-sm text-white/70">{bannerDescription}</div>
           </div>
           <div className="text-right">
             {byokMode ? (
@@ -877,7 +887,12 @@ export default function AIConfigTab() {
               if (typeof window !== "undefined") {
                 localStorage.setItem("aiModelStory", newModel);
                 localStorage.setItem("aiModelTools", newModel);
+
+                // Manual model selection means the effective config is now "custom"
+                localStorage.setItem("aiPreset", "custom");
               }
+
+              setCurrentPreset("custom");
             }}
             className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
           >

@@ -6848,7 +6848,9 @@ function StoryPageContent() {
             {...storyData}
             storyDbId={storyDbId}
             sourceAdventureId={sourceAdventureId}
-            onSaveProgress={() => saveProgress(storyData)}
+            onSaveProgress={(updatedStoryData) =>
+              saveProgress(updatedStoryData || storyData)
+            }
             onUpdateStoryData={updateStoryData}
             onViewLogs={() => setCurrentState(StoryState.LOGS)}
             onViewContext={() => setCurrentState(StoryState.CONTEXT)}

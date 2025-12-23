@@ -122,6 +122,9 @@ export default function LorePage(props: LorePageProps) {
     type: "lore",
   });
 
+  const isAutoPinned = (loreItem: StoryLore): boolean =>
+    (loreItem.type || "lore") === "character_sheet";
+
   // Add a new note
   const handleAddNote = () => {
     if (!onUpdateLore || !newNote.title) return;
@@ -148,6 +151,10 @@ export default function LorePage(props: LorePageProps) {
   // Toggle pin status for a note
   const handleTogglePin = (loreItem: StoryLore) => {
     if (!onUpdateLore) return;
+
+    // Character sheets are always pinned
+    if (isAutoPinned(loreItem)) return;
+
     const updatedLore = storyData.lore.map((l) =>
       l.title === loreItem.title ? { ...l, pinned: !l.pinned } : l
     );
@@ -188,8 +195,10 @@ export default function LorePage(props: LorePageProps) {
     });
     // Sort: pinned notes first, then alphabetically
     return filtered.sort((a, b) => {
-      if (a.pinned && !b.pinned) return -1;
-      if (!a.pinned && b.pinned) return 1;
+      const aPinned = !!a.pinned || isAutoPinned(a);
+      const bPinned = !!b.pinned || isAutoPinned(b);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
       return a.title.localeCompare(b.title);
     });
   }, [storyData.lore, selectedType, searchTerm]);
@@ -457,7 +466,7 @@ export default function LorePage(props: LorePageProps) {
               const isSecret = loreItem.secrtet;
               const isSelected = selectedLore?.title === loreItem.title;
               const isInactive = loreItem.on === false;
-              const isPinned = loreItem.pinned;
+              const isPinned = !!loreItem.pinned || itemType === "character_sheet";
 
               return (
                 <div
@@ -540,7 +549,7 @@ export default function LorePage(props: LorePageProps) {
                     )}
                   </div>
                   {/* Pin button */}
-                  {onUpdateLore && (
+                  {onUpdateLore && itemType !== "character_sheet" && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();

@@ -5422,7 +5422,7 @@ function StoryMetaEditor({
 interface MenuProps extends StoryData {
   storyDbId: string | null;
   sourceAdventureId?: string | null;
-  onSaveProgress: () => Promise<void>;
+  onSaveProgress: (updatedStoryData?: StoryData) => Promise<void>;
   onUpdateStoryData: (updates: Partial<StoryData>) => void;
   onViewLogs?: () => void;
   onViewContext?: () => void;
@@ -5459,6 +5459,15 @@ export default function MenuPage({
   const [chatDisplayAvatar, setChatDisplayAvatar] = useState(
     storyData.displayAvatar || ""
   );
+
+  useEffect(() => {
+    if (!editingChatDisplay) {
+      setChatDisplayName(storyData.displayName || "");
+      setChatDisplayAvatar(storyData.displayAvatar || "");
+    }
+    // Only resync when persisted values change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyData.displayName, storyData.displayAvatar]);
 
   // Settings form state
   const [settingsForm, setSettingsForm] = useState<BasicSettingsForm>({
@@ -5544,8 +5553,9 @@ export default function MenuPage({
 
   const handleSaveNotes = async () => {
     try {
-      onUpdateStoryData({ player_notes: playerNotes });
-      await onSaveProgress();
+      const updates: Partial<StoryData> = { player_notes: playerNotes };
+      onUpdateStoryData(updates);
+      await onSaveProgress({ ...storyData, ...updates } as StoryData);
       setEditingNotes(false);
       addNotification("Notes saved!", "success");
     } catch (error) {
@@ -5555,11 +5565,12 @@ export default function MenuPage({
 
   const handleSaveChatDisplay = async () => {
     try {
-      onUpdateStoryData({
+      const updates: Partial<StoryData> = {
         displayName: chatDisplayName.trim() || undefined,
         displayAvatar: chatDisplayAvatar.trim() || undefined,
-      });
-      await onSaveProgress();
+      };
+      onUpdateStoryData(updates);
+      await onSaveProgress({ ...storyData, ...updates } as StoryData);
       setEditingChatDisplay(false);
       addNotification("Chat display settings saved!", "success");
     } catch (error) {
@@ -5663,7 +5674,7 @@ export default function MenuPage({
           ? Math.max(1, Math.floor(multiplayerTimerMinutes || 2))
           : undefined;
 
-      onUpdateStoryData({
+      const updates: Partial<StoryData> = {
         story_name: settingsForm.story_name,
         player_name: settingsForm.player_name,
         player_summary: settingsForm.player_summary,
@@ -5681,8 +5692,9 @@ export default function MenuPage({
           timerMinutes: resolvedTimerMinutes,
           hostUserId: resolvedHostUserId,
         },
-      });
-      await onSaveProgress();
+      };
+      onUpdateStoryData(updates);
+      await onSaveProgress({ ...storyData, ...updates } as StoryData);
       setShowSettings(false);
       addNotification("Settings updated!", "success");
     } catch (error) {
