@@ -51,6 +51,9 @@ interface RequestBody {
   mistralKey?: string;
   deepinfraKey?: string;
   customModel?: CustomModel;
+  // Reasoning-tier router: "none" | "low" | "normal" | "high" | "xhigh" - best-effort,
+  // translated per-provider in callAI(). Ignored by providers/models with no lever for it.
+  reasoningEffort?: string;
 }
 
 interface AIResponse {
@@ -190,6 +193,39 @@ function normalizeMistralToolCallIds(messages: ChatMessage[]): ChatMessage[] {
   });
 }
 
+/**
+ * Best-effort reasoning-effort translation per provider. Never throws - if a
+ * provider/model has no lever for it, the field is simply omitted. Real
+ * protection against a bad interaction is the reasoning-tier router's
+ * fallback-to-lower-tier logic (app/misc/reasoningTiers.ts), not this.
+ */
+function applyReasoningEffort(
+  requestBody: any,
+  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra" | "google",
+  reasoningEffort?: string
+): void {
+  if (!reasoningEffort || reasoningEffort === "none") return;
+
+  if (provider === "mistral") {
+    // Mistral only accepts "high" | "none" - collapse the 5-level scale.
+    requestBody.reasoning_effort = "high";
+  } else if (provider === "openrouter") {
+    // OpenRouter accepts none/low/medium/high/xhigh/max across supported model families.
+    const effortMap: Record<string, string> = {
+      low: "low",
+      normal: "medium",
+      high: "high",
+      xhigh: "xhigh",
+    };
+    const mapped = effortMap[reasoningEffort];
+    if (mapped) {
+      requestBody.reasoning = { effort: mapped };
+    }
+  }
+  // deepseek/deepinfra/google: no confirmed lever for the models this app
+  // targets - left as a no-op rather than guessing at an unverified param.
+}
+
 async function callAI(
   messages: ChatMessage[],
   provider: "deepseek" | "openrouter" | "mistral" | "deepinfra" | "google",
@@ -198,6 +234,7 @@ async function callAI(
   maxTokens: number,
   temperature: number,
   tools?: any[],
+  reasoningEffort?: string
 ): Promise<AIResponse> {
   // Check if we have a prefill (trailing assistant message)
   const hasPrefill =
@@ -365,6 +402,8 @@ async function callAI(
     requestBody.tool_choice = provider === "google" ? "required" : "auto";
   }
 
+  applyReasoningEffort(requestBody, provider, reasoningEffort);
+
   const response = await fetch(endpoint, {
     method: "POST",
     headers,
@@ -472,6 +511,7 @@ export async function POST(req: NextRequest) {
       mistralKey,
       deepinfraKey,
       customModel,
+      reasoningEffort,
     } = body;
 
     const model = rawModel && rawModel.trim() ? rawModel : "Deepseek Chat";
@@ -541,6 +581,7 @@ export async function POST(req: NextRequest) {
       maxTokens,
       temperature,
       tools,
+      reasoningEffort,
     );
 
     const content = aiResponse.choices[0]?.message?.content || "";

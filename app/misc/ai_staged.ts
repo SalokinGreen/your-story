@@ -2759,6 +2759,8 @@ Write immersive prose. The player should experience the story, not see game mech
     "toggle_timer_pause",
     "cancel_timer",
     "trigger_timer",
+    // Reasoning-tier self-escalation
+    "set_reasoning_tier",
   ];
 
   // Import state tools to merge with GM tools

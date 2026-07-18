@@ -1788,18 +1788,18 @@ export default function PDFImporter({
                       onChange={(e) => setAIModel(e.target.value)}
                       className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white"
                     >
-                      <option value="ministral-14b-2512">
-                        Ministral 14B (Coins)
+                      <option value={AI_MODELS["Ministral 14B"].model}>
+                        {AI_MODELS["Ministral 14B"].name} (Coins)
                       </option>
-                      <option value="mistral-small-2506">
-                        Mistral Small 3.2 (Coins)
+                      <option value={AI_MODELS["Mistral Small 3.2"].model}>
+                        {AI_MODELS["Mistral Small 3.2"].name} (Coins)
                       </option>
-                      <option value="mistral-medium-2508">
-                        Mistral Medium 3.1 (Coins)
+                      <option value={AI_MODELS["Mistral Medium 3.1"].model}>
+                        {AI_MODELS["Mistral Medium 3.1"].name} (Coins)
                       </option>
                       {keys.deepseekKey && (
-                        <option value="deepseek-chat">
-                          DeepSeek Chat (BYOK)
+                        <option value={AI_MODELS["Deepseek Chat"].model}>
+                          {AI_MODELS["Deepseek Chat"].name} (BYOK)
                         </option>
                       )}
                       {keys.openRouterKey && (
@@ -1807,8 +1807,8 @@ export default function PDFImporter({
                           <option value="anthropic/claude-3.5-sonnet">
                             Claude 3.5 Sonnet (BYOK)
                           </option>
-                          <option value="google/gemini-2.5-flash">
-                            Gemini 2.5 Flash (BYOK)
+                          <option value={AI_MODELS["Gemini 2.5 Flash"].model}>
+                            {AI_MODELS["Gemini 2.5 Flash"].name} (BYOK)
                           </option>
                           <option value="custom-openrouter">
                             Custom OpenRouter Model (BYOK)

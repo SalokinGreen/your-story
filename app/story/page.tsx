@@ -39,7 +39,7 @@ import {
   GRADE_CONFIG,
   ItemGrade,
 } from "../misc/itemSystem";
-import { MODEL_PRESETS } from "../misc/ai_prices";
+import { NARRATION_MODEL_KEY } from "../misc/reasoningTiers";
 import Story from "./story";
 import StatsPage from "./stats";
 import LorePage from "./lore";
@@ -56,45 +56,35 @@ import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { useSearchParams, useRouter } from "next/navigation";
 
-// Helper function to get models from preset
+// Helper function to get models for generation options.
+// storyModel/toolsModel/choicesModel are no longer read from presets or
+// localStorage - the reasoning-tier router (generation.ts) picks the actual
+// model per stage/turn internally. These fields stay on GenerationOptions
+// for type compatibility with other callers, filled with the narration
+// model as an inert default that's never actually dispatched to.
 function getModelsFromPreset() {
   if (typeof window === "undefined") {
-    const preset = MODEL_PRESETS["custom"];
     return {
-      storyModel: preset.storyModel,
-      toolsModel: preset.toolsModel,
-      choicesModel: preset.choicesModel,
+      storyModel: NARRATION_MODEL_KEY,
+      toolsModel: NARRATION_MODEL_KEY,
+      choicesModel: NARRATION_MODEL_KEY,
       novelaiEnabled: false,
       novelaiKey: "",
       novelaiTemperature: 1,
     };
   }
 
-  // NovelAI settings (BYOK for story stage only)
+  // NovelAI settings (BYOK for story stage only) - still user-configurable
   const novelaiEnabled = localStorage.getItem("novelaiEnabled") === "true";
   const novelaiKey = localStorage.getItem("novelaiKey") || "";
   const novelaiTemperature = parseFloat(
     localStorage.getItem("novelaiTemperature") || "1",
   );
 
-  // Always read directly from localStorage model keys
-  // The preset system is deprecated - direct model selection is now the standard
-  const storedStoryModel = localStorage.getItem("aiModelStory");
-  const storedToolsModel = localStorage.getItem("aiModelTools");
-  const storedChoicesModel = localStorage.getItem("aiModelChoices");
-
-  // Debug logging
-  console.log(
-    `[getModelsFromPreset] Direct model read - storyModel: "${storedStoryModel}", toolsModel: "${storedToolsModel}"`,
-  );
-
-  // Use stored values, fall back to Mistral Large 3.0 for Coins mode defaults
-  const defaultModel = "Mistral Large 3.0";
-
   return {
-    storyModel: storedStoryModel || defaultModel,
-    toolsModel: storedToolsModel || storedStoryModel || defaultModel,
-    choicesModel: storedChoicesModel || storedStoryModel || defaultModel,
+    storyModel: NARRATION_MODEL_KEY,
+    toolsModel: NARRATION_MODEL_KEY,
+    choicesModel: NARRATION_MODEL_KEY,
     novelaiEnabled,
     novelaiKey,
     novelaiTemperature,
@@ -1498,7 +1488,8 @@ function StoryPageContent() {
 
   const { addNotification } = useNotification();
   const { keys: apiKeys } = useAPIKeys();
-  const { openRouterKey, deepseekKey, googleKey } = apiKeys;
+  const { openRouterKey, deepseekKey, googleKey, mistralKey, deepinfraKey } =
+    apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY,
   );
@@ -2562,6 +2553,8 @@ function StoryPageContent() {
           openRouterKey,
           deepseekKey,
           googleKey,
+          mistralKey,
+          deepinfraKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
@@ -2882,6 +2875,8 @@ function StoryPageContent() {
         openRouterKey,
         deepseekKey,
         googleKey,
+        mistralKey,
+        deepinfraKey,
       });
 
       logger.ai_response("Action analysis complete", {
@@ -4824,6 +4819,8 @@ function StoryPageContent() {
           openRouterKey,
           deepseekKey,
           googleKey,
+          mistralKey,
+          deepinfraKey,
         });
 
         // Update the part with choices
@@ -4894,6 +4891,8 @@ function StoryPageContent() {
             openRouterKey,
             deepseekKey,
             googleKey,
+            mistralKey,
+            deepinfraKey,
             storyId: storyDbId || undefined,
             abortSignal: generationAbortRef.current.signal,
             enableEmbeddings: embeddingsEnabled,
@@ -5427,6 +5426,8 @@ function StoryPageContent() {
           openRouterKey,
           deepseekKey,
           googleKey,
+          mistralKey,
+          deepinfraKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
@@ -5720,6 +5721,8 @@ function StoryPageContent() {
         openRouterKey,
         deepseekKey,
         googleKey,
+        mistralKey,
+        deepinfraKey,
       });
 
       // Update the last part with new choices
