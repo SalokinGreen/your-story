@@ -18,7 +18,15 @@ import { StoryData, StartingChoice } from "@/app/misc/structs";
 import { ChatMessage } from "@/app/misc/ai";
 import { ALL_GAME_ICON_IDS } from "@/app/misc/gameIcons";
 import { CHARACTER_SHEET_PRESET_TEMPLATES } from "@/app/misc/characterSheetTemplate";
+import { estimateTokens, truncateToTokenBudget } from "@/app/misc/tokenCounter";
 import JSON5 from "json5";
+
+// Budget for the "previously generated content" carried forward into later
+// stages (buildBigAdventureMessages). Unlike the gameplay loop, this is a
+// one-shot pipeline so there's no rolling history to prune - but the
+// mechanics-lore section can still grow large (a rich rules document), so
+// it's the one part that gets truncated if the whole context exceeds this.
+const BIG_ADVENTURE_CONTEXT_BUDGET = 20000;
 
 export type RPGSystemType =
   | "3d6"
@@ -1886,16 +1894,28 @@ export function buildBigAdventureMessages(
       contextMessage += `Premise: ${previousResults.storyTemplate.premise}\n\n`;
     }
 
-    // Include mechanics lore (game rules) - CRITICAL for later stages to reference
+    // Include mechanics lore (game rules) - CRITICAL for later stages to reference.
+    // This is the one part of "previously generated content" that can grow
+    // large (a rich rules document), so it's the part that gets truncated
+    // if the overall context would exceed budget - everything else here
+    // (title/description/premise/character sheet/abilities/variables) is
+    // already naturally bounded.
     const mechanicsLore = previousResults.storyTemplate?.lore?.filter(
       (l) => l.type === "mechanics"
     );
     if (mechanicsLore && mechanicsLore.length > 0) {
-      contextMessage += `\n## GAME RULES & MECHANICS:\n`;
+      let mechanicsSection = `\n## GAME RULES & MECHANICS:\n`;
       mechanicsLore.forEach((l) => {
-        contextMessage += `\n### ${l.title}\n${l.content}\n`;
+        mechanicsSection += `\n### ${l.title}\n${l.content}\n`;
       });
-      contextMessage += `\n`;
+      mechanicsSection += `\n`;
+
+      const otherContentTokens = estimateTokens(contextMessage);
+      const mechanicsBudget = Math.max(
+        1000,
+        BIG_ADVENTURE_CONTEXT_BUDGET - otherContentTokens
+      );
+      contextMessage += truncateToTokenBudget(mechanicsSection, mechanicsBudget);
     }
 
     // Include character sheet template - CRITICAL for presets stage

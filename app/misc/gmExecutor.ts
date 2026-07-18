@@ -20,6 +20,7 @@ import {
   NPCReaction,
   NPCStatus,
   NPCAttitude,
+  getMemoryContent,
 } from "./structs";
 import {
   StartChallengeParams,
@@ -41,10 +42,12 @@ import {
   ToggleTimerPauseParams,
   CancelTimerParams,
   TriggerTimerParams,
+  ManageTimerParams,
   // Combat tools
   StartCombatParams,
   AddCombatantParams,
   AddMultipleCombatantsParams,
+  AddCombatantUnifiedParams,
   RemoveCombatantParams,
   UpdateCombatantStatParams,
   ToggleCombatantConditionParams,
@@ -56,7 +59,15 @@ import {
   UpdateNPCParams,
   RemoveNPCParams,
   NPCReactionParams,
+  GM_TOOL_MAP,
 } from "./gmTools";
+import { validateToolArgs, formatValidationErrors } from "./toolValidation";
+import {
+  semanticSearchFallback,
+  SemanticSearchContext,
+} from "./semanticSearchFallback";
+import { askFate, generateElement, MYTHIC_TABLE_NAMES, ElementCategory } from "./mythic";
+import { getTableByName, rollOnCustomTable } from "./tableRoller";
 import {
   getRPGSystem,
   checkSuccess,
@@ -578,7 +589,8 @@ export interface GMExecutionResult {
  */
 export async function executeGMTools(
   toolCalls: { id: string; function: { name: string; arguments: string } }[],
-  storyData: StoryData
+  storyData: StoryData,
+  semanticContext: SemanticSearchContext = {}
 ): Promise<GMExecutionResult> {
   // Check for premature end_gm_thinking calls when there are other tools
   // The AI sometimes calls end_gm_thinking before processing roll results
@@ -590,8 +602,10 @@ export async function executeGMTools(
   );
   const hasOtherTools = otherToolCalls.length > 0;
 
-  // Clone storyData to avoid mutations
-  const modified = JSON.parse(JSON.stringify(storyData)) as StoryData;
+  // Clone storyData to avoid mutations. structuredClone (vs. the previous
+  // JSON.parse(JSON.stringify(...)) round-trip) is both faster and doesn't
+  // silently drop values JSON can't represent (undefined, Map/Set, etc.).
+  const modified = structuredClone(storyData);
   const results: GMToolResult[] = [];
   const contextParts: string[] = [];
 
@@ -644,6 +658,40 @@ export async function executeGMTools(
         }
       );
       continue;
+    }
+
+    // Validate arguments against the tool's declared schema (required
+    // params, types, enums) before dispatching - driven off the same schema
+    // sent to the LLM, so a malformed call gets a specific, correctable
+    // error fed back instead of crashing deep inside an executor function.
+    const gmToolSchema = GM_TOOL_MAP.get(call.function.name);
+    if (gmToolSchema) {
+      const argsRecord =
+        typeof params === "object" && params !== null && !Array.isArray(params)
+          ? (params as Record<string, unknown>)
+          : {};
+      const validationErrors = validateToolArgs(gmToolSchema, argsRecord);
+      if (validationErrors.length > 0) {
+        const errorMsg = formatValidationErrors(
+          call.function.name,
+          validationErrors
+        );
+        console.warn(`[GM Tool Validation] ${errorMsg}`, { params });
+        const errorResult: GMToolResult = {
+          toolName: call.function.name,
+          toolCallId: call.id,
+          success: false,
+          result: {
+            type: "state_change" as const,
+            message: errorMsg,
+            command: call.function.name,
+          },
+          contextForStory: `[ERROR: ${errorMsg}]`,
+        };
+        results.push(errorResult);
+        contextParts.push(errorResult.contextForStory);
+        continue;
+      }
     }
 
     let result: GMToolResult;
@@ -706,10 +754,11 @@ export async function executeGMTools(
           );
           break;
         case "search_memory":
-          result = executeSearchMemory(
+          result = await executeSearchMemory(
             call.id,
             params as SearchMemoryParams,
-            modified
+            modified,
+            semanticContext
           );
           break;
         case "request_continuation":
@@ -733,16 +782,9 @@ export async function executeGMTools(
           );
           break;
         case "add_combatant":
-          result = executeAddCombatant(
+          result = executeAddCombatantUnified(
             call.id,
-            params as AddCombatantParams,
-            modified
-          );
-          break;
-        case "add_multiple_combatants":
-          result = executeAddMultipleCombatants(
-            call.id,
-            params as AddMultipleCombatantsParams,
+            params as AddCombatantUnifiedParams,
             modified
           );
           break;
@@ -784,39 +826,11 @@ export async function executeGMTools(
             modified
           );
           break;
-        // Timer tools
-        case "create_timer":
-          result = executeCreateTimer(
+        // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
+        case "manage_timer":
+          result = executeManageTimer(
             call.id,
-            params as CreateTimerParams,
-            modified
-          );
-          break;
-        case "advance_timer":
-          result = executeAdvanceTimer(
-            call.id,
-            params as AdvanceTimerParams,
-            modified
-          );
-          break;
-        case "toggle_timer_pause":
-          result = executeToggleTimerPause(
-            call.id,
-            params as ToggleTimerPauseParams,
-            modified
-          );
-          break;
-        case "cancel_timer":
-          result = executeCancelTimer(
-            call.id,
-            params as CancelTimerParams,
-            modified
-          );
-          break;
-        case "trigger_timer":
-          result = executeTriggerTimer(
-            call.id,
-            params as TriggerTimerParams,
+            params as ManageTimerParams,
             modified
           );
           break;
@@ -861,6 +875,34 @@ export async function executeGMTools(
 
           if (stateResult.responses.length > 0) {
             const response = stateResult.responses[0];
+            let message = response.message;
+
+            // search_notes is a literal substring search - if it found
+            // nothing, try semantic search before reporting failure. See
+            // semanticSearchFallback.ts for why this is a fallback rather
+            // than the primary strategy.
+            if (
+              call.function.name === "search_notes" &&
+              /^No matches found for /.test(message)
+            ) {
+              const query =
+                (params as { query?: string } | undefined)?.query || "";
+              const semanticMatches = await semanticSearchFallback(
+                "lore",
+                query,
+                semanticContext
+              );
+              if (semanticMatches.length > 0) {
+                message += `\n\nNo exact matches, but found ${
+                  semanticMatches.length
+                } semantically related note${
+                  semanticMatches.length === 1 ? "" : "s"
+                }:\n${semanticMatches
+                  .map((m) => `• "${m.key}": ${m.content.slice(0, 200)}`)
+                  .join("\n")}`;
+              }
+            }
+
             // Convert state tool response to GM tool result format
             result = {
               toolName: call.function.name,
@@ -868,13 +910,13 @@ export async function executeGMTools(
               success: response.success === true,
               result: {
                 type: "state_change" as const,
-                message: response.message,
+                message,
                 command: response.command,
               },
               contextForStory:
                 response.success === true
-                  ? `[State: ${response.message}]`
-                  : `[State Failed: ${response.message}]`,
+                  ? `[State: ${message}]`
+                  : `[State Failed: ${message}]`,
             };
 
             // Add state changes to context
@@ -1856,14 +1898,6 @@ function executeFateQuestion(
   params: FateQuestionParams,
   storyData: StoryData
 ): GMToolResult {
-  // Import askFate dynamically to avoid circular dependencies
-  const { askFate } = require("./mythic") as {
-    askFate: (
-      likelihood: string,
-      chaosFactor: number
-    ) => { answer: string; randomEvent: boolean; roll: number };
-  };
-
   // Get chaos factor from agmtState or default to 5
   const chaosFactor = storyData.agmtState?.chaosFactor ?? 5;
 
@@ -1931,35 +1965,6 @@ function executeRollTable(
   params: RollTableParams,
   storyData: StoryData
 ): GMToolResult {
-  // Import table utilities
-  const { getTableByName, rollOnCustomTable } = require("./tableRoller") as {
-    getTableByName: (
-      tables: {
-        id: string;
-        name: string;
-        entries: { text: string; weight: number }[];
-      }[],
-      name: string
-    ) => {
-      id: string;
-      name: string;
-      entries: { text: string; weight: number }[];
-    } | null;
-    rollOnCustomTable: (table: {
-      entries: { text: string; weight: number }[];
-    }) => { text: string; weight: number } | null;
-  };
-
-  // Import AGMT element tables
-  const { generateElement, MYTHIC_TABLE_NAMES } = require("./mythic") as {
-    generateElement: (category: string) => {
-      element: string;
-      roll: number;
-      category: string;
-    };
-    MYTHIC_TABLE_NAMES: string[];
-  };
-
   // Use customTables from storyData
   const allTables = storyData.customTables || [];
 
@@ -1993,11 +1998,12 @@ function executeRollTable(
 
   // Try as AGMT element table (normalize name: spaces to underscores, lowercase)
   const normalizedName = params.table_name.toLowerCase().replace(/\s+/g, "_");
-  const isAgmtTable = MYTHIC_TABLE_NAMES.includes(normalizedName);
+  const isAgmtTable = (MYTHIC_TABLE_NAMES as string[]).includes(normalizedName);
 
   if (isAgmtTable) {
     // Roll on the AGMT element table
-    const result = generateElement(normalizedName);
+    // (isAgmtTable already confirmed normalizedName is a member of MYTHIC_TABLE_NAMES)
+    const result = generateElement(normalizedName as ElementCategory);
     const prettifiedName = params.table_name
       .replace(/_/g, " ")
       .replace(/\b\w/g, (l: string) => l.toUpperCase());
@@ -2158,13 +2164,16 @@ function executeReadNotes(
 }
 
 /**
- * Execute a search through memory entries
+ * Execute a search through memory entries. Falls back to semantic search
+ * (embeddings) when the literal pattern match finds nothing and semantic
+ * search is configured for this story - see semanticSearchFallback.ts.
  */
-function executeSearchMemory(
+async function executeSearchMemory(
   toolCallId: string,
   params: SearchMemoryParams,
-  storyData: StoryData
-): GMToolResult {
+  storyData: StoryData,
+  semanticContext: SemanticSearchContext
+): Promise<GMToolResult> {
   const { patterns, max_results = 10 } = params;
 
   if (!patterns || patterns.length === 0) {
@@ -2180,9 +2189,6 @@ function executeSearchMemory(
       contextForStory: "[Search Memory: No patterns provided]",
     };
   }
-
-  // Import helper to get memory content (handles both string and MemoryEntry)
-  const { getMemoryContent } = require("./structs");
 
   // Search through memory entries
   const memoryEntries = storyData.memory || [];
@@ -2204,7 +2210,35 @@ function executeSearchMemory(
 
   // Build context for the GM
   let contextForStory = `[Search Memory: ${patterns.join(", ")}]`;
+
   if (matches.length === 0) {
+    // Literal match found nothing - try semantic search before giving up.
+    const semanticMatches = await semanticSearchFallback(
+      "memory",
+      patterns.join(" "),
+      semanticContext
+    );
+    if (semanticMatches.length > 0) {
+      contextForStory += `\n[No exact matches, but found ${
+        semanticMatches.length
+      } semantically related ${
+        semanticMatches.length === 1 ? "memory" : "memories"
+      }]`;
+      for (let i = 0; i < semanticMatches.length; i++) {
+        contextForStory += `\n\n**Related memory ${i + 1}:** ${semanticMatches[i].content}`;
+      }
+      return {
+        toolName: "search_memory",
+        toolCallId,
+        success: true,
+        result: {
+          type: "search_memory",
+          matchCount: semanticMatches.length,
+          totalMemories: memoryEntries.length,
+        },
+        contextForStory,
+      };
+    }
     contextForStory += `\n[No matching memories found (searched ${memoryEntries.length} entries)]`;
   } else {
     contextForStory += `\n[Found ${matches.length} matching ${
@@ -2650,6 +2684,55 @@ function executeAddMultipleCombatants(
     contextForStory: `[${
       addedCombatants.length
     } Combatants Added]\n${summaryLines.join("\n")}`,
+  };
+}
+
+/**
+ * Unified add_combatant entry point: dispatches to the single- or
+ * batch-add executors above based on whether a `combatants` array was
+ * given, reusing their existing logic unchanged and relabeling the result's
+ * toolName to match what was actually called (mirrors executeManageTimer).
+ */
+function executeAddCombatantUnified(
+  toolCallId: string,
+  params: AddCombatantUnifiedParams,
+  storyData: StoryData
+): GMToolResult {
+  if (params.combatants && params.combatants.length > 0) {
+    const result = executeAddMultipleCombatants(
+      toolCallId,
+      { combatants: params.combatants },
+      storyData
+    );
+    return { ...result, toolName: "add_combatant" };
+  }
+
+  if (params.name && params.type && params.stats && params.initiative) {
+    return executeAddCombatant(
+      toolCallId,
+      {
+        name: params.name,
+        type: params.type,
+        stats: params.stats,
+        initiative: params.initiative,
+        lore_ref: params.lore_ref,
+        notes: params.notes,
+      },
+      storyData
+    );
+  }
+
+  return {
+    toolName: "add_combatant",
+    toolCallId,
+    success: false,
+    result: {
+      type: "state_change",
+      message:
+        'add_combatant requires either single-combatant fields ("name", "type", "stats", "initiative") or a "combatants" array',
+      command: "add_combatant",
+    },
+    contextForStory: `[ERROR: add_combatant requires either single-combatant fields ("name", "type", "stats", "initiative") or a "combatants" array]`,
   };
 }
 
@@ -3689,6 +3772,111 @@ function executeTriggerTimer(
       params.reason ? ` - ${params.reason}` : ""
     }${timer.description ? ` | Effect: ${timer.description}` : ""}]`,
   };
+}
+
+/**
+ * Unified timer tool entry point (manage_timer). Dispatches to the
+ * create/advance/toggle_pause/cancel/trigger executors above based on
+ * `params.action`, reusing their existing tested logic unchanged and only
+ * relabeling the result's toolName to match what was actually called.
+ *
+ * Per-action required-field checks live here rather than in the generic
+ * schema validator (toolValidation.ts), since "name and ticks are required,
+ * but only for action=create" is a conditional requirement the flat
+ * required-params schema can't express.
+ */
+function executeManageTimer(
+  toolCallId: string,
+  params: ManageTimerParams,
+  storyData: StoryData
+): GMToolResult {
+  const errorResult = (message: string): GMToolResult => ({
+    toolName: "manage_timer",
+    toolCallId,
+    success: false,
+    result: {
+      type: "state_change",
+      message,
+      command: "manage_timer",
+    },
+    contextForStory: `[ERROR: ${message}]`,
+  });
+
+  let result: GMToolResult;
+
+  switch (params.action) {
+    case "create": {
+      if (!params.name || params.ticks === undefined) {
+        return errorResult(
+          `manage_timer action "create" requires "name" and "ticks"`
+        );
+      }
+      result = executeCreateTimer(
+        toolCallId,
+        {
+          name: params.name,
+          description: params.description,
+          ticks: params.ticks,
+          auto_advance: params.auto_advance,
+          visibility: params.visibility,
+        },
+        storyData
+      );
+      break;
+    }
+    case "advance": {
+      if (!params.timer) {
+        return errorResult(`manage_timer action "advance" requires "timer"`);
+      }
+      result = executeAdvanceTimer(
+        toolCallId,
+        { timer: params.timer, ticks: params.ticks },
+        storyData
+      );
+      break;
+    }
+    case "toggle_pause": {
+      if (!params.timer) {
+        return errorResult(
+          `manage_timer action "toggle_pause" requires "timer"`
+        );
+      }
+      result = executeToggleTimerPause(
+        toolCallId,
+        { timer: params.timer },
+        storyData
+      );
+      break;
+    }
+    case "cancel": {
+      if (!params.timer) {
+        return errorResult(`manage_timer action "cancel" requires "timer"`);
+      }
+      result = executeCancelTimer(
+        toolCallId,
+        { timer: params.timer, reason: params.reason },
+        storyData
+      );
+      break;
+    }
+    case "trigger": {
+      if (!params.timer) {
+        return errorResult(`manage_timer action "trigger" requires "timer"`);
+      }
+      result = executeTriggerTimer(
+        toolCallId,
+        { timer: params.timer, reason: params.reason },
+        storyData
+      );
+      break;
+    }
+    default:
+      return errorResult(
+        `manage_timer called with unknown action "${params.action}" (expected create/advance/toggle_pause/cancel/trigger)`
+      );
+  }
+
+  return { ...result, toolName: "manage_timer" };
 }
 
 // ============================================

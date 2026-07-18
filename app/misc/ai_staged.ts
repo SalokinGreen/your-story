@@ -11,15 +11,14 @@
 } from "@/app/misc/structs";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
+import { MYTHIC_TABLE_NAMES } from "@/app/misc/mythic";
+import { cleanString } from "@/app/misc/textUtils";
+import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
+import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
+import { estimateTokens } from "@/app/misc/tokenCounter";
+import { ChatMessage } from "@/app/misc/chatMessage";
 
-export type ChatMessage = {
-  role: "system" | "user" | "assistant" | "tool";
-  content: string;
-  reasoning?: string;
-  reasoning_details?: any[];
-  tool_calls?: any[];
-  tool_call_id?: string;
-};
+export type { ChatMessage };
 
 // Storyteller mode: "narrator" (literary prose) vs "dm" (game master with inline mechanics)
 export type StorytellerMode = "narrator" | "dm";
@@ -472,9 +471,9 @@ export interface EmbeddingContext {
 }
 
 // Estimate tokens from text (rough approximation: ~4 chars per token)
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
-}
+// Real BPE-based token counting (with a chars/4 fallback before the
+// tokenizer finishes loading) - see tokenCounter.ts for details.
+export { estimateTokens };
 
 // Token budgets for different stages (these are for scene history only)
 // GM Stage uses customMaxContext (Memory Size slider) - it does the heavy lifting
@@ -484,6 +483,35 @@ export const CHOICES_STAGE_TOKEN_BUDGET = 4000; // ~4k tokens for choices stage 
 export const ACTION_ANALYSIS_TOKEN_BUDGET = 4000; // ~4k tokens for action analysis (legacy)
 export const STORY_STAGE_TOKEN_BUDGET = 16000; // ~16k fixed budget for story stage (translator mode)
 export const GM_STAGE_DEFAULT_BUDGET = 36000; // Default GM context if no customMaxContext set
+
+/**
+ * GM Stage context budget: customMaxContext (Memory Size slider), capped by
+ * the model's real limit, split 60% story history / 40% lore-mechanics-state.
+ * Shared by buildGMStagePrompt and compaction.ts's compaction-budget check so
+ * the two can't drift apart on what "the GM stage's history budget" means.
+ */
+export function computeGMStageBudget(
+  customMaxContext: number | undefined,
+  modelName: string
+): { historyBudget: number; infoBudget: number; totalContextBudget: number } {
+  const modelConfig = getModelConfig(modelName);
+  const modelMaxTokens = modelConfig.maxTokens;
+  const maxOutputTokens = modelConfig.maxOutputTokens || 4000;
+
+  const effectiveMaxTokens = Math.min(
+    customMaxContext && customMaxContext > 0
+      ? customMaxContext
+      : GM_STAGE_DEFAULT_BUDGET,
+    modelMaxTokens
+  );
+
+  const totalContextBudget = effectiveMaxTokens - maxOutputTokens;
+  return {
+    historyBudget: Math.floor(totalContextBudget * 0.6),
+    infoBudget: Math.floor(totalContextBudget * 0.4),
+    totalContextBudget,
+  };
+}
 
 /**
  * Get scene parts that fit within a token budget, taking most recent first
@@ -530,18 +558,9 @@ export function getPartsWithinTokenBudget(
   return selectedParts;
 }
 
-// Cleans text by removing problematic characters and normalizing whitespace
-export function cleanString(text: string): string {
-  if (!text) return "";
-  return text
-    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "")
-    .replace(/[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000]/g, " ")
-    .replace(/ {2,}/g, " ")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[ \t]+$/gm, "")
-    .replace(/^[ \t]+/gm, "")
-    .trim();
-}
+// cleanString moved to textUtils.ts (shared with ai.ts) - re-exported here
+// since callers in this file historically import it from ai_staged.ts.
+export { cleanString };
 
 /**
  * Format combat state for AI context
@@ -710,6 +729,25 @@ function getStatDescriptor(value: number): string {
   return "exceptional";
 }
 
+// Note types that are pinned (loaded in full every turn) for every stage.
+const BASE_PINNED_NOTE_TYPES = ["dm_instructions", "character_sheet", "gm_notes"];
+
+// Shared pinned-note-type check, parameterized so the GM-Stage/other-stage
+// difference is explicit instead of two copy-pasted closures silently
+// drifting apart. `includeMechanics` differs on purpose: the GM Stage needs
+// the full mechanics rules pinned every round to run dice checks correctly;
+// other stages (Choices, legacy Tools) only propose/parse actions and treat
+// mechanics as a lazy-loaded folder note (fetched via read_notes) instead.
+function isPinnedNoteType(
+  type: string | undefined,
+  includeMechanics: boolean
+): boolean {
+  return (
+    BASE_PINNED_NOTE_TYPES.includes(type as string) ||
+    (includeMechanics && type === "mechanics")
+  );
+}
+
 // Build info message for GM Stage
 // Note: Stats, resources, abilities, and rpgSystem are DEPRECATED.
 // All mechanics are now defined in "mechanics" type lore entries and handled by GM stage formula_roll.
@@ -738,16 +776,12 @@ export function buildInfoMessage(
   // Story Stage pinned types: story_instructions, character_sheet (see buildStoryInfoMessage)
   // Folder types: lore, secret (show titles only, use read_notes tool)
 
-  // Helper to check if a note type is "pinned" for GM Stage (always loaded in full)
-  // NOTE: mechanics is NO LONGER pinned - it uses read_notes like other folders
-  const isPinnedType = (type?: string): boolean => {
-    return (
-      type === "dm_instructions" ||
-      type === "character_sheet" ||
-      type === "gm_notes" // Legacy alias for dm_instructions
-      // NOTE: mechanics and story_instructions are NOT pinned for GM Stage
-    );
-  };
+  // Helper to check if a note type is "pinned" (always loaded in full).
+  // mechanics is NOT pinned for this consumer - it uses read_notes like other
+  // folders (see isPinnedNoteType's doc comment for why this differs from
+  // buildGMStagePrompt's version below).
+  const isPinnedType = (type?: string): boolean =>
+    isPinnedNoteType(type, false);
 
   // Helper to check if a note type should be excluded from World Lore folder
   const isExcludedFromWorldLore = (type?: string): boolean => {
@@ -2055,11 +2089,13 @@ export function buildChoicesPrompt({
   storyContent,
   embeddingContext,
   usePrefill = true,
+  customBudget,
 }: {
   storyData: StoryData;
   storyContent: string; // The story text just generated
   embeddingContext?: EmbeddingContext;
   usePrefill?: boolean;
+  customBudget?: number; // Overrides CHOICES_STAGE_TOKEN_BUDGET (used to retry smaller on context overflow)
 }): { messages: ChatMessage[] } {
   const systemPrompt = `You are a choice designer for an interactive text-based adventure game.
 Your role is to create meaningful player choices based on the narrative that was just written.
@@ -2108,7 +2144,7 @@ NARRATIVE FLOW:
   // Add scene parts within token budget for context
   const recentParts = getPartsWithinTokenBudget(
     storyData.scene.parts,
-    CHOICES_STAGE_TOKEN_BUDGET
+    customBudget || CHOICES_STAGE_TOKEN_BUDGET
   );
   for (const part of recentParts) {
     if (part.user) {
@@ -2155,56 +2191,10 @@ export function buildActionAnalysisPrompt({
   // Note: rpgSystem is DEPRECATED - all mechanics are in "mechanics" type lore entries
 
   // Build unified table list - custom tables first, then agmt tables
+  // (single source of truth: MYTHIC_TABLE_NAMES, derived from mythic.ts's
+  // ELEMENT_TABLES so it can't drift from the tables that actually exist)
   const customTableNames = storyData.customTables?.map((t) => t.name) || [];
-  const agmtTableNames = storyData.agmtState
-    ? [
-        "adventure_tone",
-        "alien_species",
-        "animal_actions",
-        "army",
-        "cavern",
-        "character_actions_combat",
-        "character_actions_general",
-        "character_appearance",
-        "character_background",
-        "character_conversations",
-        "character_descriptors",
-        "character_identity",
-        "character_motivations",
-        "character_personality",
-        "character_skills",
-        "character_traits_flaws",
-        "characters",
-        "city",
-        "civilization",
-        "creature_abilities",
-        "creature_descriptors",
-        "cryptic_message",
-        "curses",
-        "domicile",
-        "dungeon",
-        "dungeon_traps",
-        "forest",
-        "gods",
-        "legends",
-        "locations",
-        "magic_item",
-        "mutation",
-        "names",
-        "noble_house",
-        "objects",
-        "plot_twists",
-        "powers",
-        "scavenging_results",
-        "smells",
-        "sounds",
-        "spell_effects",
-        "starship",
-        "terrain",
-        "undead",
-        "visions_dreams",
-      ]
-    : [];
+  const agmtTableNames = storyData.agmtState ? [...MYTHIC_TABLE_NAMES] : [];
   const hasAnyTables = customTableNames.length > 0 || agmtTableNames.length > 0;
 
   const systemPrompt = `You are the Game Mechanics Engine. Your job is to translate player intent into strict game logic.
@@ -2438,28 +2428,10 @@ export function buildGMStagePrompt({
 }): { messages: ChatMessage[]; tools: any[] } {
   const difficulty = storyData.difficulty || "medium";
 
-  // Import GM tools dynamically to avoid circular deps
-  const { GM_TOOL_SCHEMAS } = require("./gmTools");
-
   // Calculate GM context budget from customMaxContext (Memory Size slider)
   // This is where the real context allocation happens now
-  const modelConfig = getModelConfig(modelName);
-  const modelMaxTokens = modelConfig.maxTokens;
-  const maxOutputTokens = modelConfig.maxOutputTokens || 4000;
-
-  // Use customMaxContext if set, otherwise default budget, capped by model limit
-  const effectiveMaxTokens = Math.min(
-    customMaxContext && customMaxContext > 0
-      ? customMaxContext
-      : GM_STAGE_DEFAULT_BUDGET,
-    modelMaxTokens
-  );
-
-  // GM Stage gets all context minus output tokens
-  // Allocate: 60% for story history, 40% for lore/mechanics/game state
-  const totalContextBudget = effectiveMaxTokens - maxOutputTokens;
-  const historyBudget = Math.floor(totalContextBudget * 0.6);
-  const infoBudget = Math.floor(totalContextBudget * 0.4);
+  const { historyBudget, infoBudget, totalContextBudget } =
+    computeGMStageBudget(customMaxContext, modelName);
 
   // Get recent story parts for context - now uses the calculated history budget
   const recentParts = getPartsWithinTokenBudget(
@@ -2470,15 +2442,11 @@ export function buildGMStagePrompt({
   // ============================================
   // AGENTIC NOTE SYSTEM for GM Stage
   // ============================================
-  // Helper to check if a note type is "pinned" (always loaded in full)
-  const isPinnedType = (type?: string): boolean => {
-    return (
-      type === "dm_instructions" ||
-      type === "character_sheet" ||
-      type === "mechanics" ||
-      type === "gm_notes" // Legacy alias for dm_instructions
-    );
-  };
+  // Helper to check if a note type is "pinned" (always loaded in full).
+  // mechanics IS pinned here (unlike buildInfoMessage's version above) - the
+  // GM Stage needs the full rules text every round to run dice checks.
+  const isPinnedType = (type?: string): boolean =>
+    isPinnedNoteType(type, true);
 
   // Helper to check if a note type is "secret" (hidden from player)
   const isSecretType = (type?: string): boolean => {
@@ -2689,7 +2657,7 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Player Stats:** Update their character sheet with \`edit_note\` as needed
 - **NPC Status:** Use \`update_npc\` to change attitudes, relationships, or conditions, or \`edit_note\` for detailed changes on their note
 - **Combatants:** Use \`update_combatant_stat\` or \`toggle_combatant_condition\` to adjust HP, conditions, or status effects during combat
-- **Timers:** Manage timed events with \`create_timer\`, \`advance_timer\`, etc.
+- **Timers:** Manage timed events with \`manage_timer\` (action: create/advance/toggle_pause/cancel/trigger)
 
 ### Story Progression
 - **Quest progress**: \`create_quest\`, \`update_quest\`, \`complete_quest\`
@@ -2753,16 +2721,11 @@ Write immersive prose. The player should experience the story, not see game mech
     "update_npc",
     "remove_npc",
     "npc_reaction",
-    // Timer tools
-    "create_timer",
-    "advance_timer",
-    "toggle_timer_pause",
-    "cancel_timer",
-    "trigger_timer",
+    // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
+    "manage_timer",
   ];
 
-  // Import state tools to merge with GM tools
-  const { TOOL_SCHEMAS } = require("./toolSchemas");
+  // (TOOL_SCHEMAS imported statically at the top of this file)
   const stateToolNames = [
     // Quest tools
     "create_quest",
@@ -2811,6 +2774,13 @@ Write immersive prose. The player should experience the story, not see game mech
 📋 CURRENT GAME STATE
 ═══════════════════════════════════════════════════════════════
 `;
+
+  // Story-so-far summary (see compaction.ts): earlier scene history that has
+  // aged out of the history budget below gets folded in here instead of
+  // silently disappearing.
+  if (storyData.scene.summary) {
+    stateMessage += `\n## 📖 STORY SO FAR (summary of earlier events, no longer shown in full below)\n${storyData.scene.summary}\n`;
+  }
 
   // Add lore/notes section
   if (loreSection) {

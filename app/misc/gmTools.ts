@@ -225,6 +225,24 @@ export interface AddMultipleCombatantsParams {
 }
 
 /**
+ * Unified add_combatant params: either the single-combatant fields directly,
+ * or a `combatants` array for adding several at once (replaces the
+ * previously-separate, never-actually-exposed add_multiple_combatants tool
+ * - see the dispatcher in gmExecutor.ts for which form takes precedence).
+ */
+export interface AddCombatantUnifiedParams {
+  // Single-combatant form
+  name?: string;
+  type?: "player" | "ally" | "enemy" | "neutral";
+  stats?: Record<string, number>;
+  initiative?: string;
+  lore_ref?: string;
+  notes?: string;
+  // Batch form
+  combatants?: AddMultipleCombatantsParams["combatants"];
+}
+
+/**
  * Remove Combatant - Remove a combatant from combat
  * Use when they're dead, fled, or incapacitated
  */
@@ -337,6 +355,30 @@ export interface TriggerTimerParams {
   reason?: string; // Why the timer was triggered early
 }
 
+/**
+ * Manage Timer - unified entry point covering create/advance/toggle_pause/
+ * cancel/trigger (replaces the 5 separate *_timer tools). Kept as one tool
+ * with an `action` discriminator instead of 5 tools since they all act on
+ * the same underlying concept (a single named timer) and differ only by verb.
+ */
+export type ManageTimerAction =
+  | "create"
+  | "advance"
+  | "toggle_pause"
+  | "cancel"
+  | "trigger";
+
+export interface ManageTimerParams {
+  action: ManageTimerAction;
+  timer?: string; // Timer name or ID - required for advance/toggle_pause/cancel/trigger
+  name?: string; // Display name - create only
+  description?: string; // What happens at 0 - create only
+  ticks?: number; // create: starting tick count. advance: how many ticks to advance (default 1)
+  auto_advance?: boolean; // create only (default: true)
+  visibility?: "visible" | "hidden"; // create only (default: visible)
+  reason?: string; // cancel/trigger only
+}
+
 // ============================================
 // NPC MANAGEMENT INTERFACES
 // ============================================
@@ -405,16 +447,11 @@ export type GMToolParams =
   | { name: "search_memory"; params: SearchMemoryParams }
   | { name: "request_continuation"; params: RequestContinuationParams }
   | { name: "end_gm_thinking"; params: RespondToPlayerParams }
-  // Timer tools
-  | { name: "create_timer"; params: CreateTimerParams }
-  | { name: "advance_timer"; params: AdvanceTimerParams }
-  | { name: "toggle_timer_pause"; params: ToggleTimerPauseParams }
-  | { name: "cancel_timer"; params: CancelTimerParams }
-  | { name: "trigger_timer"; params: TriggerTimerParams }
+  // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
+  | { name: "manage_timer"; params: ManageTimerParams }
   // Combat tools
   | { name: "start_combat"; params: StartCombatParams }
-  | { name: "add_combatant"; params: AddCombatantParams }
-  | { name: "add_multiple_combatants"; params: AddMultipleCombatantsParams }
+  | { name: "add_combatant"; params: AddCombatantUnifiedParams }
   | { name: "remove_combatant"; params: RemoveCombatantParams }
   | { name: "update_combatant_stat"; params: UpdateCombatantStatParams }
   | {
@@ -1099,7 +1136,10 @@ const addCombatantTool: ToolSchema = {
   type: "function",
   function: {
     name: "add_combatant",
-    description: `Add a combatant to the active combat.
+    description: `Add one or more combatants to the active combat.
+
+For a SINGLE combatant, pass name/type/stats/initiative directly.
+For MULTIPLE combatants (2+ enemies, allies, or NPCs), pass a \`combatants\` array instead - much more efficient than calling this multiple times. Duplicate names within the batch get auto-suffixed ("Goblin" -> "Goblin B").
 
 Stats are completely custom - use whatever makes sense for the RPG system:
 - D&D-style: { HP: 30, AC: 14, Attack: 5 }
@@ -1115,75 +1155,52 @@ For NPCs: Check if a matching lore entry exists to pull stats from.
 For the Player: Use "player" type and sync their current resources as stats.
 
 IMPORTANT: Always add the player as a combatant with type "player".
-Their stats will sync back to their character resources when combat ends.`,
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Combatant name (must be unique in this combat)",
-        },
-        type: {
-          type: "string",
-          enum: ["player", "ally", "enemy", "neutral"],
-          description:
-            "Combatant type determines behavior and victory conditions",
-        },
-        stats: {
-          type: "object",
-          additionalProperties: { type: "number" },
-          description:
-            "Custom stats object. Keys are stat names, values are numbers. e.g., { 'HP': 30, 'AC': 14 }",
-        },
-        initiative: {
-          type: "string",
-          description:
-            "Initiative value: fixed number ('10') or dice formula ('1d20+2')",
-        },
-        lore_ref: {
-          type: "string",
-          description:
-            "Optional: Reference to a lore entry title for full NPC details",
-        },
-        notes: {
-          type: "string",
-          description:
-            "Behavior notes (e.g., 'Cowardly - flees below 25% HP', 'Protects the wizard')",
-        },
-      },
-      required: ["name", "type", "stats", "initiative"],
-    },
-  },
-};
+Their stats will sync back to their character resources when combat ends.
 
-const addMultipleCombatantsTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "add_multiple_combatants",
-    description: `Add multiple combatants to combat at once.
-
-**USE THIS** when adding 2+ enemies, allies, or NPCs to a fight.
-Much more efficient than calling add_combatant multiple times.
-
-Each combatant needs:
-- name: Unique identifier (duplicates get auto-suffixed: "Goblin" → "Goblin B")
-- type: "player" | "ally" | "enemy" | "neutral"
-- stats: Custom stats object { HP: 30, AC: 14 }
-- initiative: Dice formula "1d20+2" or fixed "10"
-
-Example: Adding a pack of wolves
+Example (batch, adding a pack of wolves):
 { combatants: [
   { name: "Alpha Wolf", type: "enemy", stats: { HP: 40, AC: 13, Attack: 6 }, initiative: "1d20+2" },
-  { name: "Wolf", type: "enemy", stats: { HP: 20, AC: 12, Attack: 4 }, initiative: "1d20+2" },
-  { name: "Wolf", type: "enemy", stats: { HP: 20, AC: 12, Attack: 4 }, initiative: "1d20+2" },
   { name: "Wolf", type: "enemy", stats: { HP: 20, AC: 12, Attack: 4 }, initiative: "1d20+2" }
 ]}`,
     parameters: {
       type: "object",
       properties: {
+        name: {
+          type: "string",
+          description:
+            "Single-combatant form: combatant name (must be unique in this combat)",
+        },
+        type: {
+          type: "string",
+          enum: ["player", "ally", "enemy", "neutral"],
+          description:
+            "Single-combatant form: type determines behavior and victory conditions",
+        },
+        stats: {
+          type: "object",
+          additionalProperties: { type: "number" },
+          description:
+            "Single-combatant form: custom stats object. Keys are stat names, values are numbers. e.g., { 'HP': 30, 'AC': 14 }",
+        },
+        initiative: {
+          type: "string",
+          description:
+            "Single-combatant form: initiative value, fixed number ('10') or dice formula ('1d20+2')",
+        },
+        lore_ref: {
+          type: "string",
+          description:
+            "Single-combatant form: optional reference to a lore entry title for full NPC details",
+        },
+        notes: {
+          type: "string",
+          description:
+            "Single-combatant form: behavior notes (e.g., 'Cowardly - flees below 25% HP')",
+        },
         combatants: {
           type: "array",
-          description: "Array of combatants to add",
+          description:
+            "Batch form: array of combatants to add. When provided, this takes precedence over the single-combatant fields above.",
           items: {
             type: "object",
             properties: {
@@ -1218,7 +1235,7 @@ Example: Adding a pack of wolves
           },
         },
       },
-      required: ["combatants"],
+      required: [],
     },
   },
 };
@@ -1489,11 +1506,11 @@ Don't just let combat "fade out" - explicitly end it.`,
 // COUNTDOWN TIMER TOOL SCHEMAS
 // ============================================
 
-const createTimerTool: ToolSchema = {
+const manageTimerTool: ToolSchema = {
   type: "function",
   function: {
-    name: "create_timer",
-    description: `Create a countdown timer for deadlines, rituals, or timed events.
+    name: "manage_timer",
+    description: `Create, advance, pause/resume, cancel, or trigger a countdown timer for deadlines, rituals, or timed events.
 
 Timers count down from their starting ticks toward 0. When they hit 0, they trigger.
 
@@ -1503,152 +1520,58 @@ Use cases:
 - "The bomb explodes in 10 ticks" (urgent deadline)
 - "The sun sets in 2 ticks" (time passage)
 
-If auto_advance is true (default), the timer ticks down each GM turn.
-If false, you must manually call advance_timer.
+Actions:
+- "create": Start a new timer. Requires name + ticks. If auto_advance is true (default), it ticks down each GM turn; if false, you must manually call action "advance".
+- "advance": Manually tick a timer forward. Requires timer. Optional ticks (default 1). If it would reduce currentTicks to 0 or below, the timer triggers.
+- "toggle_pause": Pause an active timer, or resume a paused one. Requires timer.
+- "cancel": Remove a timer without triggering its effect (e.g. player disarmed the bomb). Requires timer, optional reason.
+- "trigger": Fire a timer's effect immediately regardless of remaining ticks. Requires timer, optional reason.
 
 Multiple timers can exist simultaneously - useful for overlapping deadlines.`,
     parameters: {
       type: "object",
       properties: {
+        action: {
+          type: "string",
+          enum: ["create", "advance", "toggle_pause", "cancel", "trigger"],
+          description: "Which timer operation to perform",
+        },
+        timer: {
+          type: "string",
+          description:
+            "Timer name or ID. Required for advance/toggle_pause/cancel/trigger; not used for create.",
+        },
         name: {
           type: "string",
           description:
-            "Timer display name (e.g., 'Ritual Completion', 'Reinforcements Arrive')",
+            "Timer display name (e.g., 'Ritual Completion', 'Reinforcements Arrive'). create only.",
         },
         description: {
           type: "string",
-          description: "What happens when the timer reaches 0",
+          description: "What happens when the timer reaches 0. create only.",
         },
         ticks: {
           type: "number",
-          description: "Starting tick count (will count down to 0)",
+          description:
+            "create: starting tick count (counts down to 0). advance: how many ticks to advance (default 1).",
         },
         auto_advance: {
           type: "boolean",
-          description: "Automatically tick down each GM turn? (default: true)",
+          description:
+            "Automatically tick down each GM turn? (default: true). create only.",
         },
         visibility: {
           type: "string",
           enum: ["visible", "hidden"],
           description:
-            "Show timer to player? Use 'hidden' for secret countdowns (default: visible)",
-        },
-      },
-      required: ["name", "ticks"],
-    },
-  },
-};
-
-const advanceTimerTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "advance_timer",
-    description: `Manually tick a timer forward.
-
-Use when:
-- Timer has auto_advance=false and needs manual advancement
-- "Time passes quickly" - advance multiple ticks at once
-- Player action accelerates or triggers time passage
-
-If ticks would reduce currentTicks to 0 or below, the timer triggers.`,
-    parameters: {
-      type: "object",
-      properties: {
-        timer: {
-          type: "string",
-          description: "Timer name or ID to advance",
-        },
-        ticks: {
-          type: "number",
-          description: "How many ticks to advance (default: 1)",
-        },
-      },
-      required: ["timer"],
-    },
-  },
-};
-
-const toggleTimerPauseTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "toggle_timer_pause",
-    description: `Toggle a timer between paused and active states.
-
-If timer is active, pauses it. If paused, resumes it.
-
-Use when:
-- Player action delays/resumes the countdown
-- Time is frozen/unfrozen narratively
-- Temporary reprieve from deadline
-
-Paused timers don't auto-advance and can't be manually advanced.`,
-    parameters: {
-      type: "object",
-      properties: {
-        timer: {
-          type: "string",
-          description: "Timer name or ID to toggle",
-        },
-      },
-      required: ["timer"],
-    },
-  },
-};
-
-const cancelTimerTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "cancel_timer",
-    description: `Cancel a timer without triggering its effect.
-
-Use when:
-- Player prevents the event (disarms bomb, stops ritual)
-- Timer is no longer relevant to the story
-- Circumstances have changed
-
-The timer is removed from tracking.`,
-    parameters: {
-      type: "object",
-      properties: {
-        timer: {
-          type: "string",
-          description: "Timer name or ID to cancel",
+            "Show timer to player? Use 'hidden' for secret countdowns (default: visible). create only.",
         },
         reason: {
           type: "string",
-          description: "Why the timer was cancelled (for narrative)",
+          description: "Why the timer was cancelled/triggered early. cancel/trigger only.",
         },
       },
-      required: ["timer"],
-    },
-  },
-};
-
-const triggerTimerTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "trigger_timer",
-    description: `Manually trigger a timer's effect immediately.
-
-Use when:
-- Player action causes early triggering
-- Circumstances accelerate the event
-- Dramatic timing calls for immediate resolution
-
-The timer fires regardless of remaining ticks.`,
-    parameters: {
-      type: "object",
-      properties: {
-        timer: {
-          type: "string",
-          description: "Timer name or ID to trigger",
-        },
-        reason: {
-          type: "string",
-          description: "Why the timer triggered early",
-        },
-      },
-      required: ["timer"],
+      required: ["action"],
     },
   },
 };
@@ -1884,16 +1807,11 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   readNotesTool,
   searchMemoryTool,
   requestContinuationTool,
-  // Countdown timer tools
-  createTimerTool,
-  advanceTimerTool,
-  toggleTimerPauseTool,
-  cancelTimerTool,
-  triggerTimerTool,
+  // Countdown timer tool (create/advance/toggle_pause/cancel/trigger via `action`)
+  manageTimerTool,
   // Combat tools
   startCombatTool,
   addCombatantTool,
-  addMultipleCombatantsTool,
   removeCombatantTool,
   updateCombatantStatTool,
   toggleCombatantConditionTool,
@@ -1913,6 +1831,14 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
  * GM tool names for validation
  */
 export const GM_TOOL_NAMES = GM_TOOL_SCHEMAS.map((t) => t.function.name);
+
+/**
+ * Name -> schema lookup, mirroring toolSchemas.ts's TOOL_MAP, used to
+ * validate GM tool call arguments against their declared schema.
+ */
+export const GM_TOOL_MAP = new Map(
+  GM_TOOL_SCHEMAS.map((tool) => [tool.function.name, tool])
+);
 
 /**
  * Check if a tool name is a GM tool
