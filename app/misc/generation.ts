@@ -32,7 +32,13 @@ import {
   TOOLS_AFFIRMATION,
   CHOICES_AFFIRMATION,
   GM_STAGE_AFFIRMATION,
+  GM_STAGE_DEFAULT_BUDGET,
+  computeGMStageBudget,
+  STORY_STAGE_TOKEN_BUDGET,
+  CHOICES_STAGE_TOKEN_BUDGET,
 } from "@/app/misc/ai_staged";
+import { isContextOverflowError } from "@/app/misc/apiErrors";
+import { ensureStoryCompacted } from "@/app/misc/compaction";
 import {
   outputToScenePart,
   stripThinkingTags,
@@ -45,7 +51,6 @@ import {
   GMExecutionResult,
 } from "@/app/misc/gmExecutor";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
-import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import { logger } from "@/app/misc/logger";
 import { getModelConfig } from "@/app/misc/ai_prices";
@@ -64,6 +69,7 @@ import {
   getSamplingSettings,
   filterSettingsForProvider,
 } from "@/app/misc/samplingSettings";
+import { MYTHIC_TABLE_NAMES } from "@/app/misc/mythic";
 import {
   REASONING_TIERS,
   NARRATION_MODEL_KEY,
@@ -85,6 +91,17 @@ import {
 // ============================================================
 // TYPES
 // ============================================================
+
+// Tools that roll dice against a DC: a "failed" result (success=false) means
+// the character failed the check, not that the tool call itself errored.
+// Only an explicit "ERROR" marker in contextForStory counts as a real failure.
+const DICE_TOOLS = [
+  "formula_roll",
+  "opposed_formula",
+  "formula_challenge_check",
+  "npc_roll",
+  "group_check",
+];
 
 /**
  * Strip affirmation prefill from AI response.
@@ -186,6 +203,10 @@ export interface GenerationCallbacks {
     usage: TokenUsage,
     thinking?: string[]
   ) => void;
+  // Fired when aging scene history was folded into a rolling summary
+  // (see compaction.ts) - lets the UI show a "recap" notice instead of
+  // silently condensing history the player can no longer scroll back to.
+  onCompaction?: (summary: string) => void;
   onComplete?: (result: GenerationResult) => void;
   onError?: (error: Error) => void;
 }
@@ -304,6 +325,114 @@ async function* parseSSEStream(
       }
       break;
     }
+  }
+}
+
+// ============================================================
+// CHOICES GENERATION (shared by the per-turn pipeline and generateChoicesOnly)
+// ============================================================
+
+interface ChoicesFetchOptions {
+  token: string;
+  model: string;
+  openRouterKey?: string;
+  deepseekKey?: string;
+  googleKey?: string;
+  mistralKey?: string;
+  deepinfraKey?: string;
+  abortSignal?: AbortSignal;
+}
+
+interface ChoicesGenerationResult {
+  content: string;
+  meta?: GenerationMeta;
+}
+
+/**
+ * Build + fetch the Choices stage, retrying once with a reduced history
+ * budget if the provider reports a context overflow - same pattern as the
+ * GM and Story stages above.
+ */
+async function generateChoicesWithRetry(
+  buildArgs: {
+    storyData: StoryData;
+    storyContent: string;
+    embeddingContext?: EmbeddingContext;
+    usePrefill?: boolean;
+  },
+  fetchOptions: ChoicesFetchOptions
+): Promise<ChoicesGenerationResult> {
+  let budget: number | undefined;
+  let overflowRetried = false;
+
+  choicesFetchLoop: while (true) {
+    const choicesPrompt = buildChoicesPrompt({ ...buildArgs, customBudget: budget });
+
+    const response = await fetch("/api/generate-stream", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${fetchOptions.token}`,
+      },
+      body: JSON.stringify({
+        messages: choicesPrompt.messages,
+        model: fetchOptions.model,
+        maxTokens: 1500,
+        temperature: 0.7,
+        openRouterKey: fetchOptions.openRouterKey,
+        deepseekKey: fetchOptions.deepseekKey,
+        googleKey: fetchOptions.googleKey,
+        mistralKey: fetchOptions.mistralKey,
+        deepinfraKey: fetchOptions.deepinfraKey,
+      }),
+      signal: fetchOptions.abortSignal,
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      const errMsg = `Choices generation failed: ${response.status} - ${errorText}`;
+      if (!overflowRetried && isContextOverflowError(errMsg)) {
+        overflowRetried = true;
+        budget = Math.max(1500, Math.floor((budget || CHOICES_STAGE_TOKEN_BUDGET) / 2));
+        logger.action(
+          "Choices stage hit context overflow, retrying with reduced budget",
+          { newBudget: budget }
+        );
+        continue choicesFetchLoop;
+      }
+      throw new Error(errMsg);
+    }
+
+    let content = "";
+    let meta: GenerationMeta | undefined;
+    let overflowMidStream = false;
+
+    for await (const event of parseSSEStream(response)) {
+      if (event.type === "error") {
+        const errMsg = event.error || "Choices generation failed";
+        if (!overflowRetried && isContextOverflowError(errMsg)) {
+          overflowRetried = true;
+          budget = Math.max(1500, Math.floor((budget || CHOICES_STAGE_TOKEN_BUDGET) / 2));
+          overflowMidStream = true;
+          logger.action(
+            "Choices stage hit context overflow mid-stream, retrying with reduced budget",
+            { newBudget: budget }
+          );
+          break;
+        }
+        throw new Error(errMsg);
+      }
+      if (event.type === "content" && event.content) {
+        content += event.content;
+      }
+      if (event.type === "done" && event.meta) {
+        meta = event.meta;
+      }
+    }
+
+    if (overflowMidStream) continue choicesFetchLoop;
+
+    return { content, meta };
   }
 }
 
@@ -466,68 +595,13 @@ export async function generateStoryTurn(
   try {
     // ========================================
     // STAGE 0: Embedding-based context retrieval
-    // DISABLED: Now using agentic model where GM uses read_notes and search_memory tools
-    // The embedding system is preserved but disabled - GM pulls notes on demand
+    // Automatic pre-fetch is intentionally not used: the GM instead pulls
+    // context on demand via the read_notes/search_memory tools (agentic
+    // retrieval instead of RAG pre-injection). embeddingContext stays
+    // undefined here; search_memory/search_notes fall back to semantic
+    // search directly (see gmExecutor.ts) when their substring match misses.
     // ========================================
     const embeddingContext: EmbeddingContext | undefined = undefined;
-
-    // NOTE: Embedding code preserved below but disabled.
-    // Instead of automatic embedding retrieval, the GM now:
-    // - Sees note titles in the info message (World Lore, Secrets folders)
-    // - Uses read_notes({ titles: [...] }) to fetch note content on demand
-    // - Uses search_memory({ patterns: [...] }) to search through memories
-    // This gives the GM explicit control over what context to load.
-
-    /*
-    // DISABLED: Old embedding-based retrieval
-    if (options.enableEmbeddings && options.storyId) {
-      logger.action("Stage 0: Retrieving embedding context");
-
-      try {
-        // Get recent story parts for context
-        const recentParts = storyData.scene.parts
-          .filter((p) => !p.user)
-          .slice(-3)
-          .map((p) => p.content);
-
-        const contextResult = await getRelevantContextForGeneration(
-          options.storyId,
-          userChoice,
-          recentParts,
-          token,
-          {
-            loreLimit: 10,
-            memoryLimit: 20,
-            minSimilarity: options.embeddingThreshold ?? 0.25,
-          }
-        );
-
-        if (!contextResult.error) {
-          embeddingContext = {
-            loreTitles: contextResult.loreTitles,
-            memories: contextResult.memories,
-          };
-          logger.action("Embedding context retrieved", {
-            loreCount: embeddingContext.loreTitles.length,
-            memoryCount: embeddingContext.memories.length,
-          });
-        } else {
-          logger.action("Embedding search failed, falling back to triggers", {
-            error: contextResult.error,
-          });
-        }
-      } catch (embeddingError: unknown) {
-        // Non-fatal: fall back to trigger-based context
-        const message =
-          embeddingError instanceof Error
-            ? embeddingError.message
-            : "Unknown error";
-        logger.action("Embedding retrieval error, falling back to triggers", {
-          error: message,
-        });
-      }
-    }
-    */
 
     // ========================================
     // STAGE 0.5: GM Stage (if enabled)
@@ -641,6 +715,49 @@ export async function generateStoryTurn(
           describe: describeTier(initialResolvedTier),
         });
 
+        // Compaction: fold any scene history that's about to age out of the
+        // GM stage's history budget into storyData.scene.summary instead of
+        // letting it silently drop. Safe/cheap to call every turn - it's a
+        // no-op unless enough new history has accumulated since the last
+        // summary (see compaction.ts). Runs before the round loop below so
+        // every round's rebuilt-or-cached prompt can include the summary.
+        try {
+          const { historyBudget: gmHistoryBudget } = computeGMStageBudget(
+            options.customMaxContext,
+            gmModel
+          );
+          const compactionResult = await ensureStoryCompacted(
+            storyData,
+            gmHistoryBudget,
+            {
+              model: options.storyModel || gmModel,
+              token,
+              openRouterKey: options.openRouterKey,
+              deepseekKey: options.deepseekKey,
+              googleKey: options.googleKey,
+              abortSignal: options.abortSignal,
+            }
+          );
+          if (compactionResult.ran) {
+            logger.action("Compacted aging scene history into summary", {
+              summaryLength: compactionResult.summary?.length,
+            });
+            if (compactionResult.summary) {
+              callbacks.onCompaction?.(compactionResult.summary);
+            }
+          }
+        } catch (compactionError) {
+          // Non-fatal: compaction is a nice-to-have, not required for the
+          // turn to proceed. The sliding window still drops old parts
+          // either way, so failing here can't make things worse.
+          logger.action("Compaction failed, continuing without it", {
+            error:
+              compactionError instanceof Error
+                ? compactionError.message
+                : String(compactionError),
+          });
+        }
+
         // GM stage loop - continues until no more tool calls (AI writes final story)
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         let gmRound = 0;
@@ -656,8 +773,30 @@ export async function generateStoryTurn(
         let isComplete = false;
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
         const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
+        // Client-side token budgeting is only an estimate, so a request can
+        // still overflow the model's real context window. currentGMBudget
+        // starts at the configured (or default) budget and is permanently
+        // halved, once, if the provider reports an overflow - retrying the
+        // same round instead of failing the whole turn.
+        let currentGMBudget = options.customMaxContext || GM_STAGE_DEFAULT_BUDGET;
+        let gmOverflowRetryUsed = false;
+        // The system prompt + state message (lore/NPCs/combat/timers) only
+        // need to be rebuilt when something that would change them happens:
+        // the first round, or a budget change after an overflow retry.
+        // Reusing the same messages array across rounds within a turn keeps
+        // that prefix byte-identical round to round, which is what lets
+        // providers with automatic prefix caching (DeepSeek, Gemini,
+        // OpenRouter) actually cache it - rebuilding from (possibly
+        // tool-mutated) storyData every round guaranteed a cache miss on
+        // every single round of every turn. Tool calls that change state
+        // mid-turn still reach the GM via their tool-result message in
+        // conversationHistory below, same as a coding agent doesn't
+        // re-render the whole file tree after every Edit - it reads the
+        // diff in the tool result.
+        let gmBaseTools: unknown[] = [];
+        let needsGMPromptRebuild = true;
 
-        while (gmRound < MAX_GM_ROUNDS && !isComplete) {
+        gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
 
           // Re-derive tier from storyData.reasoningTierState each round: if the
@@ -674,22 +813,21 @@ export async function generateStoryTurn(
             describe: describeTier(roundTier),
           });
 
-          // Build prompt - include conversation history for multi-turn
-          // GM Stage now receives customMaxContext (Memory Size slider) for context allocation
-          const gmPrompt = buildGMStagePrompt({
-            storyData,
-            userChoice: gmUserChoice,
-            customMaxContext: options.customMaxContext, // Memory Size slider controls GM context
-            modelName: gmModel,
-          });
-
-          // Store base messages on first round for story continuation
-          if (gmRound === 1) {
+          if (needsGMPromptRebuild) {
+            // GM Stage receives customMaxContext (Memory Size slider) for context allocation
+            const gmPrompt = buildGMStagePrompt({
+              storyData,
+              userChoice: gmUserChoice,
+              customMaxContext: currentGMBudget,
+              modelName: gmModel,
+            });
             gmBaseMessages = [...gmPrompt.messages];
+            gmBaseTools = gmPrompt.tools;
+            needsGMPromptRebuild = false;
           }
 
           // Add conversation history from previous rounds
-          const messagesWithHistory = [...gmPrompt.messages];
+          const messagesWithHistory = [...gmBaseMessages];
 
           // Add previous round history (assistant responses + tool results)
           for (const historyEntry of conversationHistory) {
@@ -735,7 +873,7 @@ export async function generateStoryTurn(
           const buildGmRequestBody = (model: string, effort: ReasoningEffort) =>
             JSON.stringify({
               messages: messagesWithHistory,
-              tools: gmPrompt.tools,
+              tools: gmBaseTools,
               model,
               reasoningEffort: effort,
               maxTokens: Math.min(
@@ -795,9 +933,19 @@ export async function generateStoryTurn(
 
           if (!gmResponse.ok) {
             const errorText = await gmResponse.text().catch(() => "");
-            throw new Error(
-              `GM stage failed: ${gmResponse.status} - ${errorText}`
-            );
+            const errMsg = `GM stage failed: ${gmResponse.status} - ${errorText}`;
+            if (!gmOverflowRetryUsed && isContextOverflowError(errMsg)) {
+              gmOverflowRetryUsed = true;
+              currentGMBudget = Math.max(8000, Math.floor(currentGMBudget / 2));
+              needsGMPromptRebuild = true;
+              gmRound--; // don't burn a round on a request that never actually ran
+              logger.action(
+                "GM stage hit context overflow, retrying with reduced budget",
+                { newBudget: currentGMBudget }
+              );
+              continue gmRoundLoop;
+            }
+            throw new Error(errMsg);
           }
 
           // Stream the GM response
@@ -807,9 +955,23 @@ export async function generateStoryTurn(
           let gmToolCalls: any[] = [];
           let gmResultMeta: any = null;
 
+          let gmOverflowMidStream = false;
           for await (const event of parseSSEStream(gmResponse)) {
             if (event.type === "error") {
-              throw new Error(event.error || "GM generation failed");
+              const errMsg = event.error || "GM generation failed";
+              if (!gmOverflowRetryUsed && isContextOverflowError(errMsg)) {
+                gmOverflowRetryUsed = true;
+                gmOverflowMidStream = true;
+                currentGMBudget = Math.max(8000, Math.floor(currentGMBudget / 2));
+                needsGMPromptRebuild = true;
+                gmRound--;
+                logger.action(
+                  "GM stage hit context overflow mid-stream, retrying with reduced budget",
+                  { newBudget: currentGMBudget }
+                );
+                break;
+              }
+              throw new Error(errMsg);
             }
             if (event.type === "content" && event.content) {
               gmContent += event.content;
@@ -853,6 +1015,10 @@ export async function generateStoryTurn(
             }
           }
 
+          if (gmOverflowMidStream) {
+            continue gmRoundLoop;
+          }
+
           // Build gmResult object from streamed data
           const gmResult = {
             content: gmContent,
@@ -862,10 +1028,7 @@ export async function generateStoryTurn(
             meta: gmResultMeta,
           };
 
-          console.log(
-            `[GM Stage Round ${gmRound}] Raw response:`,
-            JSON.stringify(gmResult, null, 2)
-          );
+          logger.action(`GM stage round ${gmRound} raw response`, gmResult);
 
           if (gmResult.meta) {
             // Accumulate meta across rounds
@@ -1005,7 +1168,12 @@ export async function generateStoryTurn(
 
             const gmExecution = await executeGMTools(
               gmResult.toolCalls,
-              storyData
+              storyData,
+              {
+                enabled: options.enableEmbeddings,
+                storyId: options.storyId,
+                token,
+              }
             );
 
             // Accumulate results across rounds
@@ -1033,14 +1201,7 @@ export async function generateStoryTurn(
               if (r.success) return false;
               // Check if this is a dice roll tool - these should never count as errors
               // even when the character fails the check (success=false just means roll < DC)
-              const diceTools = [
-                "formula_roll",
-                "opposed_formula",
-                "formula_challenge_check",
-                "npc_roll",
-                "group_check",
-              ];
-              if (diceTools.includes(r.toolName)) {
+              if (DICE_TOOLS.includes(r.toolName)) {
                 // Only count as error if contextForStory contains "ERROR" (invalid formula, etc.)
                 return r.contextForStory?.includes("ERROR") ?? false;
               }
@@ -1063,13 +1224,6 @@ export async function generateStoryTurn(
             // Add tool results to conversation history - one per tool call
             // Make error messages VERY clear so the AI can correct its mistake
             // BUT: Dice tools use success=false to mean "check failed", not "tool error"
-            const diceTools = [
-              "formula_roll",
-              "opposed_formula",
-              "formula_challenge_check",
-              "npc_roll",
-              "group_check",
-            ];
             for (let i = 0; i < gmResult.toolCalls.length; i++) {
               const tc = gmResult.toolCalls[i];
               const result = gmExecution.results[i];
@@ -1078,7 +1232,7 @@ export async function generateStoryTurn(
               if (result) {
                 // Check if this is a dice tool - these return success=false for failed checks,
                 // which is a VALID GAME OUTCOME, not an error
-                const isDiceTool = diceTools.includes(result.toolName);
+                const isDiceTool = DICE_TOOLS.includes(result.toolName);
                 // Only treat as error if: (1) not a dice tool AND (2) success is false
                 // OR if it's a dice tool but contextForStory contains "ERROR"
                 const isActualError = isDiceTool
@@ -1326,147 +1480,171 @@ export async function generateStoryTurn(
       // 2. NOT using NovelAI (which requires its own API)
       const continueGMConversation = gmBaseMessages.length > 0 && !useNovelAI;
 
-      let storyMessages: ChatMessage[];
       let storyPromptPrunedParts = 0;
-
-      if (continueGMConversation) {
-        // Continue the GM conversation with a brief story prompt
-        // This is more efficient: same model, single conversation, no context duplication
-        logger.action("Continuing GM conversation for story generation", {
-          baseMessages: gmBaseMessages.length,
-          historyEntries: gmConversationHistory.length,
-          gmAdjudicationModel: gmModel,
-          narrationModel: NARRATION_MODEL_KEY,
-        });
-
-        const storyContinuationPrompt = buildStoryContinuationPrompt(
-          options.storytellerMode || "narrator"
-        );
-
-        // Build messages: GM base + conversation history + story prompt
-        storyMessages = [
-          ...gmBaseMessages,
-          ...gmConversationHistory,
-          {
-            role: "user" as const,
-            content: storyContinuationPrompt,
-          },
-        ];
-      } else {
-        // Fall back to building a separate story prompt
-        // Used for: NovelAI, precomputed GM context, or when GM was skipped
-        const storyPrompt = buildStoryPrompt({
-          storyData,
-          userChoice,
-          commandResponses,
-          modelName: storyModelName,
-          customMaxContext: options.customMaxContext,
-          customStoryContext: options.customStoryContext, // Story Context slider
-          customMaxOutput: storyMaxOutput,
-          embeddingContext,
-          usePrefill: options.usePrefill !== false, // Default to true
-          gmStoryContext: gmStoryContext || undefined, // DEPRECATED: Use gmInterleavedConversation
-          gmThinking: gmThinking.length > 0 ? gmThinking : undefined, // DEPRECATED: Use gmInterleavedConversation
-          gmInterleavedConversation: gmInterleavedConversation || undefined, // NEW: Full interleaved GM conversation
-          storytellerMode: options.storytellerMode || "narrator", // Default to narrator mode
-        });
-
-        storyMessages = storyPrompt.messages;
-        storyPromptPrunedParts = storyPrompt.prunedParts;
-      }
-
-      // Clear pending player actions after they've been included in the prompt
-      // (they were shown to the AI in the user choice message)
-      if (
-        storyData.pendingPlayerActions &&
-        storyData.pendingPlayerActions.length > 0
-      ) {
-        logger.action(
-          `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`
-        );
-        storyData.pendingPlayerActions = [];
-      }
-
-      if (storyPromptPrunedParts > 0) {
-        logger.action(
-          `Pruned ${storyPromptPrunedParts} oldest scene parts to fit context`
-        );
-      }
-
-      // useNovelAI already computed above for model name selection
+      // Only the buildStoryPrompt branch below has a budget knob to reduce
+      // on overflow (continueGMConversation just replays the GM's own
+      // already-successful history plus a short prompt, so there's nothing
+      // to shrink there - see the retry loop below).
+      let storyContextBudget = options.customStoryContext;
+      let storyOverflowRetried = false;
 
       let storyResponse: Response;
-      if (useNovelAI) {
-        // Use NovelAI for story generation (BYOK)
-        logger.action("Using NovelAI for story generation (BYOK)");
-        storyResponse = await fetch("/api/novelai/generate-stream", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            messages: storyMessages,
-            novelaiKey: options.novelaiKey,
-            maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
-            temperature: options.novelaiTemperature ?? 1,
-          }),
-          signal: options.abortSignal,
-        });
-      } else {
-        // Use standard API (DeepSeek/OpenRouter/Mistral/DeepInfra)
-        // Build request body with optional sampling settings
-        // Narration always runs on the fixed narration model, regardless of
-        // which tier adjudication used - this is what keeps the GM's voice
-        // consistent even when a turn escalated to a heavier reasoning tier.
-        const storyModelToUse: string = NARRATION_MODEL_KEY;
+      storyFetchLoop: while (true) {
+        let storyMessages: ChatMessage[];
 
-        const storyRequestBody: Record<string, unknown> = {
-          messages: storyMessages,
-          model: storyModelToUse,
-          maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
-          temperature: options.samplingSettings?.temperature ?? 0.7,
-          openRouterKey: options.openRouterKey,
-          deepseekKey: options.deepseekKey,
-          googleKey: options.googleKey,
-          mistralKey: options.mistralKey,
-          deepinfraKey: options.deepinfraKey,
-          // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
-          // Also stop on [STOP] marker for player agency stopping points
-          stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
-        };
+        if (continueGMConversation) {
+          // Continue the GM conversation with a brief story prompt
+          // This is more efficient: same model, single conversation, no context duplication
+          logger.action("Continuing GM conversation for story generation", {
+            baseMessages: gmBaseMessages.length,
+            historyEntries: gmConversationHistory.length,
+            gmAdjudicationModel: gmModel,
+            narrationModel: NARRATION_MODEL_KEY,
+          });
 
-        // Add sampling settings for Coins mode (Mistral/DeepInfra)
-        if (options.samplingSettings) {
-          storyRequestBody.samplingSettings = options.samplingSettings;
+          const storyContinuationPrompt = buildStoryContinuationPrompt(
+            options.storytellerMode || "narrator"
+          );
+
+          // Build messages: GM base + conversation history + story prompt
+          storyMessages = [
+            ...gmBaseMessages,
+            ...gmConversationHistory,
+            {
+              role: "user" as const,
+              content: storyContinuationPrompt,
+            },
+          ];
+        } else {
+          // Fall back to building a separate story prompt
+          // Used for: NovelAI, precomputed GM context, or when GM was skipped
+          const storyPrompt = buildStoryPrompt({
+            storyData,
+            userChoice,
+            commandResponses,
+            modelName: storyModelName,
+            customMaxContext: options.customMaxContext,
+            customStoryContext: storyContextBudget, // Story Context slider (reduced on overflow retry)
+            customMaxOutput: storyMaxOutput,
+            embeddingContext,
+            usePrefill: options.usePrefill !== false, // Default to true
+            gmStoryContext: gmStoryContext || undefined, // DEPRECATED: Use gmInterleavedConversation
+            gmThinking: gmThinking.length > 0 ? gmThinking : undefined, // DEPRECATED: Use gmInterleavedConversation
+            gmInterleavedConversation: gmInterleavedConversation || undefined, // NEW: Full interleaved GM conversation
+            storytellerMode: options.storytellerMode || "narrator", // Default to narrator mode
+          });
+
+          storyMessages = storyPrompt.messages;
+          storyPromptPrunedParts = storyPrompt.prunedParts;
         }
 
-        storyResponse = await fetch("/api/generate-stream", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(storyRequestBody),
-          signal: options.abortSignal,
+        // Clear pending player actions after they've been included in the prompt
+        // (they were shown to the AI in the user choice message)
+        if (
+          storyData.pendingPlayerActions &&
+          storyData.pendingPlayerActions.length > 0
+        ) {
+          logger.action(
+            `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`
+          );
+          storyData.pendingPlayerActions = [];
+        }
+
+        if (storyPromptPrunedParts > 0) {
+          logger.action(
+            `Pruned ${storyPromptPrunedParts} oldest scene parts to fit context`
+          );
+        }
+
+        // useNovelAI already computed above for model name selection
+
+        if (useNovelAI) {
+          // Use NovelAI for story generation (BYOK)
+          logger.action("Using NovelAI for story generation (BYOK)");
+          storyResponse = await fetch("/api/novelai/generate-stream", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              messages: storyMessages,
+              novelaiKey: options.novelaiKey,
+              maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
+              temperature: options.novelaiTemperature ?? 1,
+            }),
+            signal: options.abortSignal,
+          });
+        } else {
+          // Use standard API (DeepSeek/OpenRouter/Mistral/DeepInfra)
+          // Build request body with optional sampling settings
+          // Narration always runs on the fixed narration model, regardless of
+          // which tier adjudication used - this is what keeps the GM's voice
+          // consistent even when a turn escalated to a heavier reasoning tier.
+          const storyModelToUse: string = NARRATION_MODEL_KEY;
+
+          const storyRequestBody: Record<string, unknown> = {
+            messages: storyMessages,
+            model: storyModelToUse,
+            maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
+            temperature: options.samplingSettings?.temperature ?? 0.7,
+            openRouterKey: options.openRouterKey,
+            deepseekKey: options.deepseekKey,
+            googleKey: options.googleKey,
+            mistralKey: options.mistralKey,
+            deepinfraKey: options.deepinfraKey,
+            // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
+            // Also stop on [STOP] marker for player agency stopping points
+            stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
+          };
+
+          // Add sampling settings for Coins mode (Mistral/DeepInfra)
+          if (options.samplingSettings) {
+            storyRequestBody.samplingSettings = options.samplingSettings;
+          }
+
+          storyResponse = await fetch("/api/generate-stream", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify(storyRequestBody),
+            signal: options.abortSignal,
+          });
+        }
+
+        logger.action("Story stage request sent", {
+          maxTokens: storyMaxOutput,
+          model: continueGMConversation ? gmModel : NARRATION_MODEL_KEY,
+          continueGM: continueGMConversation,
         });
-      }
 
-      // Debug: Log maxTokens being sent
-      console.log(
-        "[Generation] Story stage - maxTokens:",
-        storyMaxOutput,
-        "model:",
-        NARRATION_MODEL_KEY,
-        "continueGM:",
-        continueGMConversation
-      );
+        if (!storyResponse.ok) {
+          const errorText = await storyResponse.text().catch(() => "");
+          const errMsg = `Story generation failed: ${storyResponse.status} - ${errorText}`;
+          // Only the buildStoryPrompt branch has a budget to reduce - see
+          // the comment on storyContextBudget above.
+          if (
+            !continueGMConversation &&
+            !storyOverflowRetried &&
+            isContextOverflowError(errMsg)
+          ) {
+            storyOverflowRetried = true;
+            storyContextBudget = Math.max(
+              4000,
+              Math.floor((storyContextBudget || STORY_STAGE_TOKEN_BUDGET) / 2)
+            );
+            logger.action(
+              "Story stage hit context overflow, retrying with reduced budget",
+              { newBudget: storyContextBudget }
+            );
+            continue storyFetchLoop;
+          }
+          throw new Error(errMsg);
+        }
 
-      if (!storyResponse.ok) {
-        const errorText = await storyResponse.text().catch(() => "");
-        throw new Error(
-          `Story generation failed: ${storyResponse.status} - ${errorText}`
-        );
+        break storyFetchLoop;
       }
 
       // Process story stream with real-time prefill stripping
@@ -1719,296 +1897,41 @@ export async function generateStoryTurn(
     } // End of else block (no GM content - fallback to API call)
 
     // ========================================
-    // STAGE 2 & 3: Tools + Choices (in parallel)
+    // STAGE 3: Choices
     // ========================================
-
-    // Helper function for tools generation (DEPRECATED - GM Stage is now always used)
-    const runToolGeneration = async (): Promise<void> => {
-      // GM Stage is always enabled - legacy tool calling has been removed
-      // The enableGMStage option is now ignored and this function always returns early
-      logger.action(
-        "Skipping legacy tools stage (GM stage handles all state changes)"
-      );
-      return;
-
-      /* LEGACY CODE - KEPT FOR REFERENCE BUT NEVER EXECUTED
-      if (!options.enableTools) return;
-
-      callbacks.onToolsStart?.();
-      logger.action("Stage 2: Building tool prompt (parallel)");
-
-      const maxToolLoops = options.maxToolLoops || 1;
-      let toolLoopCount = 0;
-
-      // Determine fallback model based on what keys are available
-      // If using DeepSeek, no fallback (DeepSeek is reliable)
-      // If using OpenRouter/Google, fall back to MiniMax M2
-      // If using Coins (Mistral/DeepInfra), fall back to DeepInfra MiniMax M2
-      const primaryModelConfig = getModelConfig(options.toolsModel);
-      let FALLBACK_TOOLS_MODEL: string | null = null;
-
-      if (
-        primaryModelConfig.provider === "openrouter" ||
-        primaryModelConfig.provider === "google"
-      ) {
-        FALLBACK_TOOLS_MODEL = "MiniMax M2"; // OpenRouter fallback
-      } else if (
-        primaryModelConfig.provider === "mistral" ||
-        primaryModelConfig.provider === "deepinfra"
-      ) {
-        FALLBACK_TOOLS_MODEL = "DeepInfra MiniMax M2"; // Coins fallback
-      }
-      // For DeepSeek, no fallback (user only has DeepSeek key)
-
-      while (toolLoopCount < maxToolLoops) {
-        toolLoopCount++;
-
-        const toolPrompt = buildToolPrompt({
-          storyData,
-          storyContent,
-          existingToolCalls: allToolCalls,
-          existingToolResponses: allToolResponses,
-          embeddingContext,
-          usePrefill: options.usePrefill !== false, // Re-enabled with better prefill
-        });
-
-        // Try primary model first, then fallback on rate limit
-        const modelsToTry = [options.toolsModel];
-        if (
-          FALLBACK_TOOLS_MODEL &&
-          options.toolsModel !== FALLBACK_TOOLS_MODEL
-        ) {
-          modelsToTry.push(FALLBACK_TOOLS_MODEL);
-        }
-
-        let lastError: Error | null = null;
-        let success = false;
-        let newToolCalls: ToolCall[] = [];
-
-        for (const currentModel of modelsToTry) {
-          if (success) break;
-
-          // Check if user cancelled
-          if (options.abortSignal?.aborted) {
-            throw new Error("Generation cancelled by user");
-          }
-
-          // Add timeout to prevent infinite hanging
-          const toolAbortController = new AbortController();
-          const toolTimeout = setTimeout(() => {
-            toolAbortController.abort();
-          }, 55000); // 55 second timeout
-
-          // Link user abort signal to tool abort controller
-          const abortHandler = () => toolAbortController.abort();
-          options.abortSignal?.addEventListener("abort", abortHandler);
-
-          // Debug: Log tools being sent from frontend
-          console.log(
-            `[Tool Stage] Sending ${TOOL_SCHEMAS.length} tools:`,
-            TOOL_SCHEMAS.map((t) => t.function?.name).join(", ")
-          );
-          console.log(
-            `[Tool Stage] Using model: "${currentModel}" (options.toolsModel: "${options.toolsModel}")`
-          );
-
-          let toolResponse: Response;
-          try {
-            // Use non-streaming endpoint for tools to get full response and debug
-            const toolUrl = `/api/generate?t=${Date.now()}&stage=tools`;
-
-            // Get model config to respect max output limits (DeepSeek is 8K, others vary)
-            const toolModelConfig = getModelConfig(currentModel);
-            const toolMaxTokens = Math.min(
-              12000,
-              toolModelConfig.maxOutputTokens || 8000
-            );
-
-            toolResponse = await fetch(toolUrl, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${token}`,
-                "Cache-Control": "no-cache, no-store",
-              },
-              body: JSON.stringify({
-                messages: toolPrompt.messages,
-                tools: TOOL_SCHEMAS,
-                model: currentModel,
-                maxTokens: toolMaxTokens,
-                temperature: 0.3,
-                openRouterKey: options.openRouterKey,
-                deepseekKey: options.deepseekKey,
-                googleKey: options.googleKey,
-                mistralKey: options.mistralKey,
-                deepinfraKey: options.deepinfraKey,
-              }),
-              signal: toolAbortController.signal,
-              cache: "no-store",
-            });
-          } catch (fetchError: any) {
-            clearTimeout(toolTimeout);
-            lastError = fetchError;
-            continue; // Try next model
-          } finally {
-            clearTimeout(toolTimeout);
-          }
-
-          if (!toolResponse.ok) {
-            const errorText = await toolResponse.text().catch(() => "");
-            lastError = new Error(
-              `Tool generation failed: ${toolResponse.status} - ${errorText}`
-            );
-            continue; // Try next model
-          }
-
-          let toolStageContent = ""; // Capture any text content from tool stage
-
-          try {
-            // Parse the JSON response directly (non-streaming)
-            const toolResult = await toolResponse.json();
-
-            // Log the RAW response for debugging
-            console.log(
-              "[Tool Stage] RAW API Response:",
-              JSON.stringify(toolResult, null, 2)
-            );
-
-            // Extract content and tool calls from response
-            if (toolResult.content) {
-              toolStageContent = toolResult.content;
-            }
-            if (toolResult.toolCalls && toolResult.toolCalls.length > 0) {
-              newToolCalls = toolResult.toolCalls;
-            }
-            if (toolResult.meta) {
-              toolsMeta = toolResult.meta;
-              totalTokenCost += toolResult.meta.tokenCost || 0;
-              finalBalance = toolResult.meta.balance;
-            }
-
-            // Log tool stage content for debugging
-            if (toolStageContent) {
-              console.log(
-                `[Tool Stage] AI generated text content (${toolStageContent.length} chars):\n`,
-                toolStageContent
-              );
-            }
-          } catch (parseError: any) {
-            console.error("[Tool Stage] Failed to parse response:", parseError);
-            throw parseError;
-          }
-
-          success = true;
-        }
-
-        // If all models failed, throw the last error
-        if (!success && lastError) {
-          throw lastError;
-        }
-
-        // No more tool calls needed
-        if (newToolCalls.length === 0) {
-          logger.action("Tool loop complete - no more tools", {
-            iterations: toolLoopCount,
-          });
-          break;
-        }
-
-        // Log the tool calls for debugging
-        console.log(
-          `[Tool Stage] AI called ${newToolCalls.length} tools:`,
-          newToolCalls.map((tc: any) => ({
-            name: tc.function?.name,
-            args: tc.function?.arguments,
-          }))
-        );
-
-        // Execute tools LOCALLY on storyData
-        logger.action("Executing tools locally", {
-          count: newToolCalls.length,
-        });
-        const { responses: newResponses, stateChanges: newStateChanges } =
-          executeTools(newToolCalls, storyData);
-
-        allToolCalls = [...allToolCalls, ...newToolCalls];
-        allToolResponses = [...allToolResponses, ...newResponses];
-        allStateChanges = [...allStateChanges, ...newStateChanges];
-      }
-
-      callbacks.onToolsComplete?.(
-        allToolCalls,
-        allToolResponses,
-        allStateChanges,
-        toolsMeta?.usage || {
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0,
-        }
-      );
-      logger.action("Stage 2 complete", {
-        toolCalls: allToolCalls.length,
-        responses: allToolResponses.length,
-        stateChanges: allStateChanges.length,
-      });
-      END OF LEGACY CODE */
-    };
 
     // Helper function for choices generation
     const runChoicesGeneration = async (): Promise<void> => {
       callbacks.onChoicesStart?.();
       logger.action("Stage 3: Building choices prompt (parallel)");
 
-      const choicesPrompt = buildChoicesPrompt({
-        storyData,
-        storyContent,
-        embeddingContext,
-        usePrefill: options.usePrefill !== false, // Default to true
-      });
-
       // Choices are picked from already-decided narration - fixed cheap
       // model, not the (possibly escalated) adjudication tier.
-      const choicesResponse = await fetch("/api/generate-stream", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          messages: choicesPrompt.messages,
-          model: NARRATION_MODEL_KEY,
-          maxTokens: 1500,
-          temperature: 0.7,
-          openRouterKey: options.openRouterKey,
-          deepseekKey: options.deepseekKey,
-          googleKey: options.googleKey,
-          mistralKey: options.mistralKey,
-          deepinfraKey: options.deepinfraKey,
-        }),
-        signal: options.abortSignal,
-      });
-
-      if (!choicesResponse.ok) {
-        const errorText = await choicesResponse.text().catch(() => "");
-        throw new Error(
-          `Choices generation failed: ${choicesResponse.status} - ${errorText}`
+      const { content: rawChoicesContent, meta: choicesResultMeta } =
+        await generateChoicesWithRetry(
+          {
+            storyData,
+            storyContent,
+            embeddingContext,
+            usePrefill: options.usePrefill !== false, // Default to true
+          },
+          {
+            token,
+            model: NARRATION_MODEL_KEY,
+            openRouterKey: options.openRouterKey,
+            deepseekKey: options.deepseekKey,
+            googleKey: options.googleKey,
+            mistralKey: options.mistralKey,
+            deepinfraKey: options.deepinfraKey,
+            abortSignal: options.abortSignal,
+          }
         );
-      }
 
-      let choicesContent = "";
-
-      for await (const event of parseSSEStream(choicesResponse)) {
-        if (event.type === "error") {
-          throw new Error(event.error || "Choices generation failed");
-        }
-        if (event.type === "content" && event.content) {
-          choicesContent += event.content;
-        }
-        if (event.type === "done" && event.meta) {
-          choicesMeta = event.meta;
-          totalTokenCost += event.meta.tokenCost;
-          finalBalance = event.meta.balance;
-        }
+      let choicesContent = rawChoicesContent;
+      if (choicesResultMeta) {
+        choicesMeta = choicesResultMeta;
+        totalTokenCost += choicesResultMeta.tokenCost;
+        finalBalance = choicesResultMeta.balance;
       }
 
       // Strip affirmation prefill if present (some providers like Mistral include it in response)
@@ -2033,30 +1956,23 @@ export async function generateStoryTurn(
       logger.action("Stage 3 complete", { choicesCount: choices.length });
     };
 
-    // Run tools and choices in parallel (skip choices if requested)
-    console.log(
-      "[Generation] Starting parallel tasks. skipChoices:",
-      options.skipChoices
-    );
-    const parallelTasks = [runToolGeneration()];
+    // Legacy standalone "tools" stage was removed - the GM stage now handles
+    // all state changes via its own tool-calling loop (see STAGE 0.5 above).
     if (!options.skipChoices) {
-      parallelTasks.push(runChoicesGeneration());
+      logger.action("Stage 3: Running choices generation");
+      await runChoicesGeneration();
     }
-    console.log(
-      "[Generation] Awaiting",
-      parallelTasks.length,
-      "parallel tasks"
-    );
-    await Promise.all(parallelTasks);
-    console.log("[Generation] All parallel tasks complete");
 
     // ========================================
     // STAGE 4: Sync new memories to embeddings
-    // DISABLED: Now using agentic model where GM uses search_memory tool
-    // Memory syncing is preserved but disabled - memories are searched on demand
+    // The GM primarily uses search_memory's literal pattern match on demand
+    // (agentic retrieval, not automatic RAG pre-injection - see the STAGE 0
+    // comment above). But search_memory now has a semantic fallback for
+    // when that literal match misses (see semanticSearchFallback.ts and
+    // gmExecutor.ts's executeSearchMemory), and that fallback only finds
+    // anything if memories actually have embeddings - hence still syncing
+    // them here, fire-and-forget, same as lore sync in story/page.tsx.
     // ========================================
-    /*
-    // DISABLED: Old embedding-based memory sync
     if (
       options.enableEmbeddings &&
       options.storyId &&
@@ -2099,7 +2015,6 @@ export async function generateStoryTurn(
           logger.action("Memory embedding sync failed", { error: err.message });
         });
     }
-    */
 
     // ========================================
     // BUILD SCENE PART
@@ -2322,11 +2237,12 @@ export async function analyzeAction(
 
   const prompt = buildActionAnalysisPrompt({ storyData, userAction });
 
-  // Log the context being sent to AI for debugging
-  console.log("[analyzeAction] System prompt sent to AI:");
-  console.log(prompt.messages[0].content);
-  console.log("\n[analyzeAction] User message sent to AI:");
-  console.log(prompt.messages[1].content);
+  // Log the context being sent to AI for debugging (goes to the in-app
+  // LogViewer via sessionStorage, not the browser console)
+  logger.action("Action analysis prompt built", {
+    systemPrompt: prompt.messages[0].content,
+    userMessage: prompt.messages[1].content,
+  });
 
   const response = await fetch("/api/generate", {
     method: "POST",
@@ -2357,8 +2273,7 @@ export async function analyzeAction(
   const meta = data.meta;
 
   // Log raw AI response
-  console.log("\n[analyzeAction] Raw AI response:");
-  console.log(content);
+  logger.action("Action analysis raw AI response", { content });
 
   // Parse JSON from response
   let analysis: ActionAnalysis;
@@ -2547,55 +2462,9 @@ export async function analyzeAction(
     }
 
     // If not found in custom tables, check if it's a valid agmt table
-    const agmtTableNames = [
-      "adventure_tone",
-      "alien_species",
-      "animal_actions",
-      "army",
-      "cavern",
-      "character_actions_combat",
-      "character_actions_general",
-      "character_appearance",
-      "character_background",
-      "character_conversations",
-      "character_descriptors",
-      "character_identity",
-      "character_motivations",
-      "character_personality",
-      "character_skills",
-      "character_traits_flaws",
-      "characters",
-      "city",
-      "civilization",
-      "creature_abilities",
-      "creature_descriptors",
-      "cryptic_message",
-      "curses",
-      "domicile",
-      "dungeon",
-      "dungeon_traps",
-      "forest",
-      "gods",
-      "legends",
-      "locations",
-      "magic_item",
-      "mutation",
-      "names",
-      "noble_house",
-      "objects",
-      "plot_twists",
-      "powers",
-      "scavenging_results",
-      "smells",
-      "sounds",
-      "spell_effects",
-      "starship",
-      "terrain",
-      "undead",
-      "visions_dreams",
-    ];
-
-    const isAGMTTable = agmtTableNames.some(
+    // (single source of truth: MYTHIC_TABLE_NAMES, derived from mythic.ts's
+    // ELEMENT_TABLES so it can't drift from the tables that actually exist)
+    const isAGMTTable = MYTHIC_TABLE_NAMES.some(
       (name) => name.toLowerCase() === tableName.toLowerCase()
     );
     const isCustomTable = storyData.customTables?.some(
@@ -2693,47 +2562,18 @@ export async function generateChoicesOnly(
     contentLength: storyContent.length,
   });
 
-  const choicesPrompt = buildChoicesPrompt({
-    storyData,
-    storyContent,
-  });
-
-  const choicesResponse = await fetch("/api/generate-stream", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      messages: choicesPrompt.messages,
+  const { content: choicesContent } = await generateChoicesWithRetry(
+    { storyData, storyContent },
+    {
+      token,
       model: options.choicesModel,
-      maxTokens: 1500,
-      temperature: 0.7,
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,
       mistralKey: options.mistralKey,
       deepinfraKey: options.deepinfraKey,
-    }),
-  });
-
-  if (!choicesResponse.ok) {
-    const errorText = await choicesResponse.text().catch(() => "");
-    throw new Error(
-      `Choices generation failed: ${choicesResponse.status} - ${errorText}`
-    );
-  }
-
-  let choicesContent = "";
-
-  for await (const event of parseSSEStream(choicesResponse)) {
-    if (event.type === "error") {
-      throw new Error(event.error || "Choices generation failed");
     }
-    if (event.type === "content" && event.content) {
-      choicesContent += event.content;
-    }
-  }
+  );
 
   // Parse choices
   const choices = parseChoices(choicesContent, storyData);

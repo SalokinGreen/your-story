@@ -8,6 +8,9 @@ import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
 import STTButton from "../components/STTButton";
 import CombatDisplay from "../components/CombatDisplay";
+import { GMProgressPanel } from "../components/GMProgressPanel";
+import { ChapterNav } from "../components/ChapterNav";
+import { ObjectivesStrip } from "../components/ObjectivesStrip";
 import type { SyncStatus } from "../misc/localStoryManager";
 import type { GMToolResult } from "../misc/gmExecutor";
 import { stripThinkingTags } from "../misc/ai";
@@ -39,8 +42,10 @@ interface StoryProps {
   viewingPartIndex?: number | null;
   onNavigateLeft?: () => void;
   onNavigateRight?: () => void;
+  onNavigateToIndex?: (index: number) => void;
   onResetToCurrentPart?: () => void;
   syncStatus?: SyncStatus;
+  onOpenJournal?: () => void;
   // The last user choice that was submitted (shown while GM is thinking)
   pendingUserChoice?: string;
   // Interleaved GM streaming entries (thinking text and tool results in order)
@@ -349,8 +354,10 @@ export default function Story({
   viewingPartIndex,
   onNavigateLeft,
   onNavigateRight,
+  onNavigateToIndex,
   onResetToCurrentPart,
   syncStatus,
+  onOpenJournal,
   pendingUserChoice,
   liveGMEntries,
 }: StoryProps) {
@@ -800,20 +807,32 @@ export default function Story({
           </div>
         )}
 
-        {/* Header with story name and scroll indicator */}
+        {/* Header with story name, chapter nav, and scroll indicator */}
         <div className="flex items-center justify-between px-3 py-1 sm:px-4 sm:py-2 bg-blue-900/30 border-b border-blue-800/30">
-          <div className="flex items-center gap-2">
-            <DynamicIcon name="BookOpen" className="w-4 h-4 text-blue-300" />
+          <div className="flex items-center gap-2 min-w-0">
+            <DynamicIcon name="BookOpen" className="w-4 h-4 text-blue-300 shrink-0" />
             <span className="text-sm font-medium text-blue-200 truncate max-w-[200px]">
               {storyData.story_name || "Untitled Story"}
             </span>
           </div>
-          {exchanges.length > visibleExchangeCount && (
-            <span className="text-xs text-blue-400/60">
-              ↑ Scroll for history ({exchanges.length} turns)
-            </span>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {exchanges.length > visibleExchangeCount && (
+              <span className="text-xs text-blue-400/60 hidden sm:inline">
+                ↑ Scroll for history ({exchanges.length} turns)
+              </span>
+            )}
+            {onNavigateToIndex && (
+              <ChapterNav
+                parts={storyData.scene.parts}
+                currentIndex={viewingPartIndex ?? null}
+                onJump={onNavigateToIndex}
+              />
+            )}
+          </div>
         </div>
+
+        {/* Objectives Strip - glanceable active quests/threads */}
+        <ObjectivesStrip storyData={storyData} onOpenJournal={onOpenJournal} />
 
         {/* Combat Display - shows active combat state */}
         {storyData.combatState?.active && (
@@ -915,6 +934,11 @@ export default function Story({
               showHiddenMessages={showHiddenMessages}
               fontSettings={fontSettings}
             />
+          )}
+
+          {/* Always-visible step-by-step progress, independent of the "Show Thinking" toggle */}
+          {loadingStage === "gm" && liveGMEntries && liveGMEntries.length > 0 && (
+            <GMProgressPanel entries={liveGMEntries} active={true} />
           )}
 
           {/* Loading indicator for GM response - shows live thinking during GM stage */}

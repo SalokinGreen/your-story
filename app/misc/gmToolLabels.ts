@@ -1,0 +1,80 @@
+/**
+ * Human-friendly, present-tense labels for GM tool calls - used by the
+ * live GM progress indicator (GMProgressPanel) so players see "Rolling
+ * dice" instead of a raw tool name like "formula_roll".
+ */
+const TOOL_LABELS: Record<string, string> = {
+  // Dice / checks
+  formula_roll: "Rolling dice",
+  opposed_formula: "Rolling opposed check",
+  formula_challenge_check: "Rolling challenge check",
+  npc_roll: "Rolling for NPC",
+  calculate: "Calculating",
+  fate_question: "Consulting fate",
+  roll_table: "Rolling on a table",
+  start_challenge: "Starting a challenge",
+  take_rest: "Resting",
+
+  // Notes / memory lookup
+  read_notes: "Reading notes",
+  search_notes: "Searching notes",
+  search_memory: "Searching memory",
+  create_note: "Creating a note",
+  delete_note: "Deleting a note",
+  edit_note: "Updating a note",
+  edit_lore_replace: "Editing a note",
+  edit_lore_append: "Editing a note",
+  edit_lore_prepend: "Editing a note",
+  edit_lore_insert: "Editing a note",
+  merge_lore: "Merging notes",
+  duplicate_lore: "Duplicating a note",
+  add_memory: "Recording a memory",
+
+  // Combat
+  start_combat: "Starting combat",
+  add_combatant: "Adding combatant",
+  remove_combatant: "Removing combatant",
+  update_combatant_stat: "Updating combatant",
+  toggle_combatant_condition: "Updating condition",
+  advance_turn: "Advancing turn",
+  end_combat: "Ending combat",
+
+  // Conditions
+  upgrade_condition: "Worsening a condition",
+  downgrade_condition: "Improving a condition",
+  remove_condition: "Removing a condition",
+  modify_condition: "Updating a condition",
+
+  // NPCs
+  add_npc: "Adding NPC",
+  update_npc: "Updating NPC",
+  remove_npc: "Removing NPC",
+  npc_reaction: "NPC reacting",
+
+  // Timers
+  manage_timer: "Managing timer",
+
+  // Quests / threads / achievements
+  create_quest: "Creating quest",
+  update_quest: "Updating quest",
+  complete_quest: "Completing quest",
+  fail_quest: "Failing quest",
+  delete_quest: "Removing quest",
+  trigger_achievement: "Unlocking achievement",
+  create_thread: "Opening story thread",
+  update_thread: "Updating story thread",
+  resolve_thread: "Resolving story thread",
+  abandon_thread: "Abandoning story thread",
+
+  // Flow control
+  request_continuation: "Continuing",
+  end_gm_thinking: "Wrapping up",
+};
+
+/** Present-tense label for a tool call, for a live-progress indicator. */
+export function getToolProgressLabel(toolName: string): string {
+  if (TOOL_LABELS[toolName]) return TOOL_LABELS[toolName];
+  // Fallback: prettify unknown/future tool names ("some_new_tool" -> "Some new tool")
+  const words = toolName.replace(/_/g, " ");
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}

@@ -362,6 +362,14 @@ export interface Choice {
 }
 export interface Scene {
   parts: ScenePart[];
+  // Rolling summary of parts that have aged out of the per-stage token
+  // budget (see compaction.ts). Without this, pruned history was just
+  // silently dropped - the summary keeps a compressed trace of it instead.
+  summary?: string;
+  // How many parts (from the start of `parts`) are covered by `summary`,
+  // so compaction only needs to summarize newly-dropped parts, not redo it
+  // from scratch every turn.
+  summarizedThroughIndex?: number;
 }
 export interface Quest {
   id: string; // Unique identifier for the quest

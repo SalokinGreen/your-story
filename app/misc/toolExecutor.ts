@@ -23,6 +23,7 @@ import {
   getChaosAdjustmentReason,
 } from "@/app/misc/mythicChaos";
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
+import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
 import {
   parseDCValue,
   parsePointsValue,
@@ -379,18 +380,20 @@ export function executeTools(
         continue;
       }
 
-      // Validate required parameters
-      const required = toolSchema.function.parameters.required || [];
-      const missingParams = required.filter((param) => !(param in args));
-
-      if (missingParams.length > 0) {
-        const errorMsg = `Missing required parameters: ${missingParams.join(
-          ", "
-        )} (tool ${toolCall.function.name} args=${serializeArgs(args)})`;
+      // Validate arguments against the tool's declared schema (required
+      // params, types, enums) - driven off the same schema sent to the LLM,
+      // so the model gets a specific, correctable error instead of a
+      // generic crash deep inside the tool's executor.
+      const validationErrors = validateToolArgs(toolSchema, args);
+      if (validationErrors.length > 0) {
+        const errorMsg = `${formatValidationErrors(
+          toolCall.function.name,
+          validationErrors
+        )} (args=${serializeArgs(args)})`;
         logger.error(`Tool call failed: ${errorMsg}`, {
           toolCallId: toolId,
           toolName,
-          missingParams,
+          validationErrors,
         });
         responses.push({
           command: toolCall.function.name,

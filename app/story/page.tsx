@@ -109,6 +109,7 @@ import { DiceVisualizer } from "../components/DiceVisualizer";
 import {
   generateCommandResponses,
   formatResponsesForAI,
+  executeCommandWithResponse,
 } from "../misc/commandResponses";
 import {
   findItemMatch,
@@ -1746,11 +1747,6 @@ function StoryPageContent() {
           );
 
         if (commands.length > 0) {
-          // Import executeCommandWithResponse from commandResponses
-          const {
-            executeCommandWithResponse,
-          } = require("@/app/misc/commandResponses");
-
           for (const command of commands) {
             try {
               executeCommandWithResponse(command, storyData);
@@ -1934,6 +1930,20 @@ function StoryPageContent() {
     const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
     setStoryText(lastPart.content);
     setChoices({ choices: lastPart.choices || [] });
+  }
+
+  // Jump directly to a specific scene part index (used by chapter navigation).
+  // Mirrors handleNavigateRight's "snap to current when landing on the last
+  // part" behavior so jumping to the latest chapter re-enables live updates.
+  function handleNavigateToIndex(index: number) {
+    if (!storyData) return;
+    const part = storyData.scene.parts[index];
+    if (!part) return;
+
+    const isLastPart = index === storyData.scene.parts.length - 1;
+    setViewingPartIndex(isLastPart ? null : index);
+    setStoryText(part.content);
+    setChoices({ choices: part.choices || [] });
   }
 
   // Fetch token balance on mount
@@ -2570,6 +2580,16 @@ function StoryPageContent() {
             setLoadingStage("gm");
             setLiveGMEntries([]);
             logger.action("GM stage started (custom input)");
+          },
+          onCompaction: (summary) => {
+            addNotification(
+              "Recap: earlier events were condensed into a summary to save space",
+              "info",
+              6000
+            );
+            logger.action("Story history compacted", {
+              summaryLength: summary.length,
+            });
           },
           onGMContent: (delta, fullContent) => {
             // Update or add the current thinking entry (last one if streaming)
@@ -4910,6 +4930,16 @@ function StoryPageContent() {
               setLiveGMEntries([]);
               logger.action("GM stage started - determining mechanics");
             },
+            onCompaction: (summary) => {
+              addNotification(
+                "Recap: earlier events were condensed into a summary to save space",
+                "info",
+                6000
+              );
+              logger.action("Story history compacted", {
+                summaryLength: summary.length,
+              });
+            },
             onGMContent: (delta, fullContent) => {
               // Stream GM thinking content - accumulate entries properly
               setLiveGMEntries((prev) => {
@@ -6455,8 +6485,10 @@ function StoryPageContent() {
             viewingPartIndex={viewingPartIndex}
             onNavigateLeft={handleNavigateLeft}
             onNavigateRight={handleNavigateRight}
+            onNavigateToIndex={handleNavigateToIndex}
             onResetToCurrentPart={resetToCurrentPart}
             syncStatus={syncStatus}
+            onOpenJournal={() => setCurrentState(StoryState.QUESTS)}
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
           />
