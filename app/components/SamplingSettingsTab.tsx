@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { DynamicIcon } from "./DynamicIcon";
 import {
@@ -98,12 +97,11 @@ export default function SamplingSettingsTab({
   byokMode,
   hasOpenRouterKey = false,
 }: SamplingSettingsTabProps) {
-  const { user } = useAuth();
   const { addNotification } = useNotification();
 
   // Current settings
   const [settings, setSettings] = useState<SamplingSettings>(
-    DEFAULT_SAMPLING_SETTINGS
+    DEFAULT_SAMPLING_SETTINGS,
   );
   const [currentPresetId, setCurrentPresetId] = useState("default");
   const [customPresets, setCustomPresets] = useState<SamplingPreset[]>([]);
@@ -156,8 +154,6 @@ export default function SamplingSettingsTab({
       description: newPresetDescription.trim(),
       settings: { ...settings },
       isBuiltIn: false,
-      authorId: user?.id,
-      authorName: user?.user_metadata?.display_name || user?.email,
       createdAt: new Date().toISOString(),
     };
 
@@ -174,7 +170,7 @@ export default function SamplingSettingsTab({
   // Update an existing custom preset
   const updatePreset = (presetId: string) => {
     const updatedPresets = customPresets.map((p) =>
-      p.id === presetId ? { ...p, settings: { ...settings } } : p
+      p.id === presetId ? { ...p, settings: { ...settings } } : p,
     );
     setCustomPresets(updatedPresets);
     saveCustomSamplingPresets(updatedPresets);
@@ -192,7 +188,7 @@ export default function SamplingSettingsTab({
       setCurrentPresetId("default");
       saveCurrentSamplingPresetId("default");
       const defaultPreset = BUILT_IN_SAMPLING_PRESETS.find(
-        (p) => p.id === "default"
+        (p) => p.id === "default",
       );
       if (defaultPreset) {
         setSettings(defaultPreset.settings);
@@ -211,11 +207,7 @@ export default function SamplingSettingsTab({
 
   // Import a preset from JSON
   const handleImport = () => {
-    const preset = importPresetFromJson(
-      importJson,
-      user?.id,
-      user?.user_metadata?.display_name || user?.email
-    );
+    const preset = importPresetFromJson(importJson);
     if (!preset) {
       addNotification("Invalid preset JSON", "failure");
       return;

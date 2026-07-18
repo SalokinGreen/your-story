@@ -9,22 +9,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 import {
   OPENROUTER_IMAGE_MODELS,
   DEEPINFRA_IMAGE_MODELS,
-  calculateDeepInfraImageCost,
   type ImageModelKey,
   type DeepInfraImageModelKey,
 } from "@/app/misc/ai_prices";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // Allow up to 2 minutes for image generation
-
-const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // Image model config types
 type OpenRouterImageModelConfig =
@@ -43,7 +36,7 @@ interface RequestBody {
 
 // Get OpenRouter model config
 function getOpenRouterModelConfig(
-  modelKey: string
+  modelKey: string,
 ): OpenRouterImageModelConfig {
   if (modelKey in OPENROUTER_IMAGE_MODELS) {
     return OPENROUTER_IMAGE_MODELS[modelKey as ImageModelKey];
@@ -53,7 +46,7 @@ function getOpenRouterModelConfig(
 
 // Get DeepInfra model config
 function getDeepInfraModelConfig(
-  modelKey: string
+  modelKey: string,
 ): DeepInfraImageModelConfig | null {
   if (modelKey in DEEPINFRA_IMAGE_MODELS) {
     return DEEPINFRA_IMAGE_MODELS[modelKey as DeepInfraImageModelKey];
@@ -62,36 +55,6 @@ function getDeepInfraModelConfig(
 }
 
 export async function POST(req: NextRequest) {
-  const supabaseUrl = SUPABASE_URL;
-  const supabaseKey = process.env.SUPABASE_KEY!;
-
-  if (!supabaseUrl || !supabaseKey) {
-    return NextResponse.json(
-      { error: "Server configuration error" },
-      { status: 500 }
-    );
-  }
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
-  // Auth check
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader) {
-    return NextResponse.json(
-      { error: "Authentication required" },
-      { status: 401 }
-    );
-  }
-
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser(authHeader.replace("Bearer ", ""));
-
-  if (authError || !user) {
-    return NextResponse.json({ error: "Invalid session" }, { status: 401 });
-  }
-
   let body: RequestBody;
   try {
     body = await req.json();
@@ -115,27 +78,15 @@ export async function POST(req: NextRequest) {
   if (!imageType || !["thumbnail", "banner"].includes(imageType)) {
     return NextResponse.json(
       { error: "Invalid image type. Must be 'thumbnail' or 'banner'" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
   // Route to appropriate provider
   if (provider === "openrouter") {
-    return handleOpenRouter(
-      prompt,
-      requestedModel,
-      imageType,
-      openRouterKey,
-      user.id
-    );
+    return handleOpenRouter(prompt, requestedModel, imageType, openRouterKey);
   } else {
-    return handleDeepInfra(
-      prompt,
-      requestedModel,
-      imageType,
-      deepInfraKey,
-      user.id
-    );
+    return handleDeepInfra(prompt, requestedModel, imageType, deepInfraKey);
   }
 }
 
@@ -145,7 +96,6 @@ async function handleOpenRouter(
   requestedModel: string | undefined,
   imageType: "thumbnail" | "banner",
   openRouterKey: string | undefined,
-  userId: string
 ) {
   if (!openRouterKey) {
     return NextResponse.json(
@@ -153,7 +103,7 @@ async function handleOpenRouter(
         error:
           "OpenRouter API key required. Please add your API key in Settings.",
       },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -167,7 +117,7 @@ async function handleOpenRouter(
     modelConfig.model,
     ")",
     "Type:",
-    imageType
+    imageType,
   );
 
   try {
@@ -193,7 +143,7 @@ async function handleOpenRouter(
           model: modelConfig.model,
           messages: [{ role: "user", content: fullPrompt }],
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -201,10 +151,10 @@ async function handleOpenRouter(
       console.error(
         "[Image Gen] OpenRouter Error:",
         response.status,
-        errorText
+        errorText,
       );
       throw new Error(
-        `Image generation failed: ${response.status} - ${errorText}`
+        `Image generation failed: ${response.status} - ${errorText}`,
       );
     }
 
@@ -214,10 +164,10 @@ async function handleOpenRouter(
     if (!imageUrl) {
       console.error(
         "[Image Gen] Could not extract image URL from OpenRouter response:",
-        JSON.stringify(data).substring(0, 1000)
+        JSON.stringify(data).substring(0, 1000),
       );
       throw new Error(
-        "Could not extract image from AI response. The model may not support image generation."
+        "Could not extract image from AI response. The model may not support image generation.",
       );
     }
 
@@ -239,13 +189,12 @@ async function handleOpenRouter(
   }
 }
 
-// Handle DeepInfra image generation (Coins or BYOK)
+// Handle DeepInfra image generation (BYOK only)
 async function handleDeepInfra(
   prompt: string,
   requestedModel: string | undefined,
   imageType: "thumbnail" | "banner",
   deepInfraKey: string | undefined,
-  userId: string
 ) {
   const modelKey = requestedModel || "Bria 3.2";
   const modelConfig = getDeepInfraModelConfig(modelKey);
@@ -253,21 +202,19 @@ async function handleDeepInfra(
   if (!modelConfig) {
     return NextResponse.json(
       { error: `Invalid DeepInfra model: ${modelKey}` },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  // Determine if using BYOK or Coins
-  const isByok = !!deepInfraKey;
-  const apiKey = deepInfraKey || DEEPINFRA_API_KEY;
+  const apiKey = deepInfraKey;
 
   if (!apiKey) {
     return NextResponse.json(
       {
         error:
-          "DeepInfra API key not configured. Please add your API key or contact support.",
+          "DeepInfra API key required. Please add your API key in Settings.",
       },
-      { status: 500 }
+      { status: 400 },
     );
   }
 
@@ -279,35 +226,7 @@ async function handleDeepInfra(
     ")",
     "Type:",
     imageType,
-    "BYOK:",
-    isByok
   );
-
-  // Calculate cost and check balance (only for Coins mode)
-  let cost = 0;
-  if (!isByok) {
-    cost = calculateDeepInfraImageCost(modelKey);
-
-    // Check balance (only if cost > 0)
-    if (cost > 0) {
-      const serviceSupabase = createClient(
-        SUPABASE_URL,
-        SUPABASE_SERVICE_ROLE_KEY
-      );
-      const balance = await getUserTokenBalance(userId, serviceSupabase);
-
-      if (!balance || balance.total < cost) {
-        return NextResponse.json(
-          {
-            error: `Insufficient coins. Required: ${cost}, Available: ${
-              balance?.total ?? 0
-            }`,
-          },
-          { status: 402 }
-        );
-      }
-    }
-  }
 
   try {
     // DeepInfra uses OpenAI-compatible API for image generation
@@ -329,14 +248,14 @@ async function handleDeepInfra(
           size: sizeDescription,
           n: 1,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[Image Gen] DeepInfra Error:", response.status, errorText);
       throw new Error(
-        `Image generation failed: ${response.status} - ${errorText}`
+        `Image generation failed: ${response.status} - ${errorText}`,
       );
     }
 
@@ -361,29 +280,12 @@ async function handleDeepInfra(
     if (!imageUrl) {
       console.error(
         "[Image Gen] Could not extract image from DeepInfra response:",
-        JSON.stringify(data).substring(0, 1000)
+        JSON.stringify(data).substring(0, 1000),
       );
       throw new Error("Could not extract image from DeepInfra response.");
     }
 
-    // Deduct coins after successful generation (only for Coins mode with cost > 0)
-    let newBalance: number | null = null;
-    if (!isByok && cost > 0) {
-      const serviceSupabase = createClient(
-        SUPABASE_URL,
-        SUPABASE_SERVICE_ROLE_KEY
-      );
-      await deductTokens(userId, cost, serviceSupabase);
-      const updatedBalance = await getUserTokenBalance(userId, serviceSupabase);
-      newBalance = updatedBalance?.total ?? null;
-    }
-
-    console.log(
-      "[Image Gen] DeepInfra success, URL length:",
-      imageUrl.length,
-      "Cost:",
-      cost
-    );
+    console.log("[Image Gen] DeepInfra success, URL length:", imageUrl.length);
 
     return NextResponse.json({
       imageUrl,
@@ -391,9 +293,7 @@ async function handleDeepInfra(
         model: modelKey,
         imageType,
         provider: "deepinfra",
-        isByok,
-        cost,
-        newBalance,
+        isByok: true,
       },
     });
   } catch (error) {
@@ -439,7 +339,7 @@ function extractImageFromOpenRouterResponse(data: any): string | null {
     // Base64 data URL
     if (content.includes("data:image")) {
       const base64Match = content.match(
-        /(data:image\/[^;]+;base64,[A-Za-z0-9+/=]+)/
+        /(data:image\/[^;]+;base64,[A-Za-z0-9+/=]+)/,
       );
       if (base64Match) return base64Match[1];
     }

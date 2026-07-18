@@ -15,6 +15,7 @@ import {
   getMemoryContent,
   deduplicateMemories,
   NPCReaction,
+  Adventure,
 } from "../misc/structs";
 import {
   getRPGSystem,
@@ -52,9 +53,7 @@ import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
 import { logger } from "../misc/logger";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
-import { useAuth } from "../misc/AuthContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
-import { supabase } from "../misc/supabase";
 import { useSearchParams, useRouter } from "next/navigation";
 
 // Helper function to get models from preset
@@ -75,7 +74,7 @@ function getModelsFromPreset() {
   const novelaiEnabled = localStorage.getItem("novelaiEnabled") === "true";
   const novelaiKey = localStorage.getItem("novelaiKey") || "";
   const novelaiTemperature = parseFloat(
-    localStorage.getItem("novelaiTemperature") || "1"
+    localStorage.getItem("novelaiTemperature") || "1",
   );
 
   // Always read directly from localStorage model keys
@@ -86,7 +85,7 @@ function getModelsFromPreset() {
 
   // Debug logging
   console.log(
-    `[getModelsFromPreset] Direct model read - storyModel: "${storedStoryModel}", toolsModel: "${storedToolsModel}"`
+    `[getModelsFromPreset] Direct model read - storyModel: "${storedStoryModel}", toolsModel: "${storedToolsModel}"`,
   );
 
   // Use stored values, fall back to Mistral Large 3.0 for Coins mode defaults
@@ -107,11 +106,6 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import SyncConflictModal from "../components/SyncConflictModal";
 import SyncIndicator from "../components/SyncIndicator";
 import { authenticatedFetch, getAuthToken } from "../misc/getAuthToken";
-import {
-  encryptStoryData,
-  decryptStoryData,
-  isEncrypted,
-} from "../misc/encryption";
 import {
   syncLoreEmbeddings,
   syncNewMemories,
@@ -169,7 +163,7 @@ function getSecureRandomInt(min: number, max: number): number {
     crypto.getRandomValues(randomValues);
     randomNumber = randomValues.reduce(
       (acc, val, i) => acc + val * Math.pow(256, i),
-      0
+      0,
     );
   } while (randomNumber >= maxValue - (maxValue % range));
 
@@ -189,8 +183,8 @@ function processQuestNotifications(
   toolResponses: CommandResponse[],
   addNotification: (
     message: string,
-    type: "success" | "failure" | "info" | "warning"
-  ) => void
+    type: "success" | "failure" | "info" | "warning",
+  ) => void,
 ) {
   for (const response of toolResponses) {
     if (!response.success) continue;
@@ -214,7 +208,7 @@ function processQuestNotifications(
         if (pointsMatch) {
           addNotification(
             `✅ Quest Complete: ${match[1]} (+${pointsMatch[1]} points)`,
-            "success"
+            "success",
           );
         } else {
           addNotification(`✅ Quest Complete: ${match[1]}`, "success");
@@ -286,8 +280,8 @@ export function processCommands(
   storyData: StoryData,
   addNotification: (
     message: string,
-    type: "success" | "failure" | "info" | "warning"
-  ) => void
+    type: "success" | "failure" | "info" | "warning",
+  ) => void,
 ) {
   logger.action("Processing commands", { commands });
   for (const command of commands) {
@@ -295,7 +289,7 @@ export function processCommands(
 
     // /add_item: item name | description | type | quantity
     const addItemMatch = trimmed.match(
-      /^\/add_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)\s*\|\s*(\d+)$/i
+      /^\/add_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)\s*\|\s*(\d+)$/i,
     );
     if (addItemMatch) {
       const itemName = addItemMatch[1].trim();
@@ -341,7 +335,7 @@ export function processCommands(
       const amount = parseInt(itemMatch[2], 10);
 
       const itemIndex = storyData.inventory.findIndex(
-        (i) => i.name === itemName
+        (i) => i.name === itemName,
       );
       if (itemIndex !== -1) {
         storyData.inventory[itemIndex].quantity += amount;
@@ -375,7 +369,7 @@ export function processCommands(
 
     // /modify_item: item name | description | type (for updating item properties)
     const itemModifyPropsMatch = trimmed.match(
-      /^\/modify_item:\s*(.+?)\s*\|\s*(.+?)(?:\s*\|\s*(.+))?$/i
+      /^\/modify_item:\s*(.+?)\s*\|\s*(.+?)(?:\s*\|\s*(.+))?$/i,
     );
     if (itemModifyPropsMatch) {
       const itemName = itemModifyPropsMatch[1].trim();
@@ -442,7 +436,7 @@ export function processCommands(
 
       // Use exact match only - no fuzzy matching
       const existing = storyData.achievements.find(
-        (a) => a.title.toLowerCase() === achievementTitle.toLowerCase()
+        (a) => a.title.toLowerCase() === achievementTitle.toLowerCase(),
       );
 
       if (existing && !existing.dateAchieved) {
@@ -461,7 +455,7 @@ export function processCommands(
         });
         addNotification(
           `Achievement not found: ${achievementTitle}`,
-          "warning"
+          "warning",
         );
       }
       continue;
@@ -474,7 +468,7 @@ export function processCommands(
       const oldValue = storyData.momentum;
       storyData.momentum = Math.max(
         0,
-        Math.min(storyData.maxMomentum, storyData.momentum + amount)
+        Math.min(storyData.maxMomentum, storyData.momentum + amount),
       );
       logger.action("Momentum modified via command", {
         amount,
@@ -486,7 +480,7 @@ export function processCommands(
 
     // /create_quest: title | short description | full description | points
     const createQuestMatch = trimmed.match(
-      /^\/create_quest:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)$/i
+      /^\/create_quest:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)$/i,
     );
     if (createQuestMatch) {
       const title = createQuestMatch[1].trim();
@@ -619,7 +613,7 @@ export function processCommands(
 
     // /create_note: title | content | on_triggers | off_triggers
     const createNoteMatch = trimmed.match(
-      /^\/create_note:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+      /^\/create_note:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i,
     );
     if (createNoteMatch) {
       const noteTitle = createNoteMatch[1].trim();
@@ -666,7 +660,7 @@ export function processCommands(
 
     // /lore_replace_content: lore title | old text | new text
     const loreReplaceMatch = trimmed.match(
-      /^\/lore_replace_content:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$/i
+      /^\/lore_replace_content:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$/i,
     );
     if (loreReplaceMatch) {
       const loreTitle = loreReplaceMatch[1].trim();
@@ -698,7 +692,7 @@ export function processCommands(
 
     // /lore_add_content: lore title | new text
     const loreAddMatch = trimmed.match(
-      /^\/lore_add_content:\s*(.+?)\s*\|\s*(.+)$/i
+      /^\/lore_add_content:\s*(.+?)\s*\|\s*(.+)$/i,
     );
     if (loreAddMatch) {
       const loreTitle = loreAddMatch[1].trim();
@@ -721,7 +715,7 @@ export function processCommands(
 
     // /lore_delete_content: lore title | text to delete
     const loreDeleteMatch = trimmed.match(
-      /^\/lore_delete_content:\s*(.+?)\s*\|\s*(.+)$/i
+      /^\/lore_delete_content:\s*(.+?)\s*\|\s*(.+)$/i,
     );
     if (loreDeleteMatch) {
       const loreTitle = loreDeleteMatch[1].trim();
@@ -759,7 +753,7 @@ export function processCommands(
       if (!storyData.lore) storyData.lore = [];
 
       const loreIndex = storyData.lore.findIndex(
-        (l) => l.title.toLowerCase() === loreTitle.toLowerCase()
+        (l) => l.title.toLowerCase() === loreTitle.toLowerCase(),
       );
       if (loreIndex === -1) {
         logger.warn("Lore delete failed: entry not found", {
@@ -830,7 +824,7 @@ export function processCommands(
 
     // /lore_update: title | newTitle | content | on | onTriggers | offTriggers
     const loreUpdateMatch = trimmed.match(
-      /^\/lore_update:\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
+      /^\/lore_update:\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i,
     );
     if (loreUpdateMatch) {
       const loreTitle = loreUpdateMatch[1].trim();
@@ -843,7 +837,7 @@ export function processCommands(
       if (!storyData.lore) storyData.lore = [];
 
       const loreEntry = storyData.lore.find(
-        (l) => l.title.toLowerCase() === loreTitle.toLowerCase()
+        (l) => l.title.toLowerCase() === loreTitle.toLowerCase(),
       );
       if (!loreEntry) {
         logger.warn("Lore update failed: entry not found", {
@@ -877,7 +871,7 @@ export function processCommands(
 
     // /remove_item: item name | quantity
     const removeItemMatch = trimmed.match(
-      /^\/remove_item:\s*(.+?)\s*\|\s*(\d+)$/i
+      /^\/remove_item:\s*(.+?)\s*\|\s*(\d+)$/i,
     );
     if (removeItemMatch) {
       const itemName = removeItemMatch[1].trim();
@@ -906,7 +900,7 @@ export function processCommands(
         item.quantity -= quantity;
         if (item.quantity === 0) {
           storyData.inventory = storyData.inventory.filter(
-            (i) => i.name !== item.name
+            (i) => i.name !== item.name,
           );
           logger.action("Item removed (depleted) via command", {
             itemName: item.name,
@@ -925,7 +919,7 @@ export function processCommands(
 
     // /modify_item_quantity: item name | quantity_delta
     const modifyItemQuantityMatch = trimmed.match(
-      /^\/modify_item_quantity:\s*(.+?)\s*\|\s*(-?\d+)$/i
+      /^\/modify_item_quantity:\s*(.+?)\s*\|\s*(-?\d+)$/i,
     );
     if (modifyItemQuantityMatch) {
       const itemName = modifyItemQuantityMatch[1].trim();
@@ -952,7 +946,7 @@ export function processCommands(
 
         if (newQuantity === 0) {
           storyData.inventory = storyData.inventory.filter(
-            (i) => i.name !== item.name
+            (i) => i.name !== item.name,
           );
           logger.action("Item depleted via quantity modification", {
             itemName: item.name,
@@ -972,7 +966,7 @@ export function processCommands(
 
     // /transform_item: old_item | new_item | description | type
     const transformItemMatch = trimmed.match(
-      /^\/transform_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)$/i
+      /^\/transform_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)$/i,
     );
     if (transformItemMatch) {
       const oldItemName = transformItemMatch[1].trim();
@@ -1006,7 +1000,7 @@ export function processCommands(
 
         // Remove old item
         storyData.inventory = storyData.inventory.filter(
-          (i) => i.name !== oldItem.name
+          (i) => i.name !== oldItem.name,
         );
 
         // Add new item
@@ -1033,7 +1027,7 @@ export function processCommands(
 
     // /add_resource: name | description | current | max
     const addResourceMatch = trimmed.match(
-      /^\/add_resource:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*(\d+)$/i
+      /^\/add_resource:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*(\d+)$/i,
     );
     if (addResourceMatch) {
       const name = addResourceMatch[1].trim();
@@ -1060,7 +1054,7 @@ export function processCommands(
 
     // /modify_resource: name | current_delta | max_delta
     const modifyResourceMatch = trimmed.match(
-      /^\/modify_resource:\s*(.+?)\s*\|\s*(-?\d+)\s*\|\s*(-?\d+)$/i
+      /^\/modify_resource:\s*(.+?)\s*\|\s*(-?\d+)\s*\|\s*(-?\d+)$/i,
     );
     if (modifyResourceMatch) {
       const name = modifyResourceMatch[1].trim();
@@ -1094,7 +1088,7 @@ export function processCommands(
         resource.maxValue = Math.max(1, resource.maxValue + maxDelta);
         resource.value = Math.max(
           0,
-          Math.min(resource.maxValue, resource.value + currentDelta)
+          Math.min(resource.maxValue, resource.value + currentDelta),
         );
 
         logger.action("Resource modified via command", {
@@ -1130,7 +1124,7 @@ export function processCommands(
         logger.warn("Resource removal failed: resource not found", { name });
       } else {
         storyData.resources = storyData.resources.filter(
-          (r) => r.name !== resource.name
+          (r) => r.name !== resource.name,
         );
         logger.action("Resource removed via command", {
           name: resource.name,
@@ -1143,7 +1137,7 @@ export function processCommands(
 
     // /add_stat: name | description | value
     const addStatMatch = trimmed.match(
-      /^\/add_stat:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)$/i
+      /^\/add_stat:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)$/i,
     );
     if (addStatMatch) {
       const name = addStatMatch[1].trim();
@@ -1168,7 +1162,7 @@ export function processCommands(
 
     // /modify_stat: name | value_delta
     const modifyStatMatch = trimmed.match(
-      /^\/modify_stat:\s*(.+?)\s*\|\s*(-?\d+)$/i
+      /^\/modify_stat:\s*(.+?)\s*\|\s*(-?\d+)$/i,
     );
     if (modifyStatMatch) {
       const name = modifyStatMatch[1].trim();
@@ -1230,7 +1224,7 @@ export function processCommands(
 
     // /update_quest_description: quest title | new description
     const updateQuestDescMatch = trimmed.match(
-      /^\/update_quest_description:\s*(.+?)\s*\|\s*(.+)$/i
+      /^\/update_quest_description:\s*(.+?)\s*\|\s*(.+)$/i,
     );
     if (updateQuestDescMatch) {
       const questTitle = updateQuestDescMatch[1].trim();
@@ -1266,7 +1260,7 @@ export function processCommands(
 
     // /update_quest_short_description: quest title | new short description
     const updateQuestShortDescMatch = trimmed.match(
-      /^\/update_quest_short_description:\s*(.+?)\s*\|\s*(.+)$/i
+      /^\/update_quest_short_description:\s*(.+?)\s*\|\s*(.+)$/i,
     );
     if (updateQuestShortDescMatch) {
       const questTitle = updateQuestShortDescMatch[1].trim();
@@ -1302,7 +1296,7 @@ export function processCommands(
 
     // /add_relationship: name | value | description
     const addRelationshipMatch = trimmed.match(
-      /^\/add_relationship:\s*(.+?)\s*\|\s*(-?\d+)\s*\|\s*(.+)$/i
+      /^\/add_relationship:\s*(.+?)\s*\|\s*(-?\d+)\s*\|\s*(.+)$/i,
     );
     if (addRelationshipMatch) {
       const name = addRelationshipMatch[1].trim();
@@ -1320,7 +1314,7 @@ export function processCommands(
 
       // Check for duplicates
       const existing = storyData.relationships.find(
-        (r) => r.name.toLowerCase() === name.toLowerCase()
+        (r) => r.name.toLowerCase() === name.toLowerCase(),
       );
 
       if (existing) {
@@ -1329,7 +1323,7 @@ export function processCommands(
       } else if (value < -100 || value > 100) {
         addNotification(
           `Relationship value must be between -100 and 100`,
-          "warning"
+          "warning",
         );
         logger.warn("Relationship add failed: invalid value", {
           name,
@@ -1338,13 +1332,20 @@ export function processCommands(
       } else {
         // Determine symbol based on relationship value
         let symbol = "??"; // Default neutral
-        if (value >= 75) symbol = "??"; // Strong ally
-        else if (value >= 50) symbol = "??"; // Ally
-        else if (value >= 25) symbol = "??"; // Friend
-        else if (value >= 0) symbol = "??"; // Neutral/Acquaintance
-        else if (value >= -25) symbol = "??"; // Slight tension
-        else if (value >= -50) symbol = "??"; // Unfriendly
-        else if (value >= -75) symbol = "??"; // Enemy
+        if (value >= 75)
+          symbol = "??"; // Strong ally
+        else if (value >= 50)
+          symbol = "??"; // Ally
+        else if (value >= 25)
+          symbol = "??"; // Friend
+        else if (value >= 0)
+          symbol = "??"; // Neutral/Acquaintance
+        else if (value >= -25)
+          symbol = "??"; // Slight tension
+        else if (value >= -50)
+          symbol = "??"; // Unfriendly
+        else if (value >= -75)
+          symbol = "??"; // Enemy
         else symbol = "??"; // Hostile
 
         storyData.relationships.push({
@@ -1364,7 +1365,7 @@ export function processCommands(
 
     // /modify_relationship: name | value_delta
     const modifyRelationshipMatch = trimmed.match(
-      /^\/modify_relationship:\s*(.+?)\s*\|\s*(-?\d+)$/i
+      /^\/modify_relationship:\s*(.+?)\s*\|\s*(-?\d+)$/i,
     );
     if (modifyRelationshipMatch) {
       const name = modifyRelationshipMatch[1].trim();
@@ -1412,7 +1413,7 @@ export function processCommands(
 
     // /remove_relationship: name
     const removeRelationshipMatch = trimmed.match(
-      /^\/remove_relationship:\s*(.+)$/i
+      /^\/remove_relationship:\s*(.+)$/i,
     );
     if (removeRelationshipMatch) {
       const name = removeRelationshipMatch[1].trim();
@@ -1435,7 +1436,7 @@ export function processCommands(
         addNotification(`Relationship not found: ${name}`, "warning");
       } else {
         storyData.relationships = storyData.relationships.filter(
-          (r) => r !== relationship
+          (r) => r !== relationship,
         );
         logger.action("Relationship removed via command", {
           name: relationship.name,
@@ -1447,7 +1448,7 @@ export function processCommands(
 
     // /update_relationship_description: name | new description
     const updateRelationshipDescMatch = trimmed.match(
-      /^\/update_relationship_description:\s*(.+?)\s*\|\s*(.+)$/i
+      /^\/update_relationship_description:\s*(.+?)\s*\|\s*(.+)$/i,
     );
     if (updateRelationshipDescMatch) {
       const name = updateRelationshipDescMatch[1].trim();
@@ -1496,16 +1497,15 @@ function StoryPageContent() {
   const storyId = searchParams.get("storyId");
 
   const { addNotification } = useNotification();
-  const { user, getEncryptionPassword } = useAuth();
   const { keys: apiKeys } = useAPIKeys();
   const { openRouterKey, deepseekKey, googleKey } = apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
-    StoryState.STORY
+    StoryState.STORY,
   );
   const [storyData, setStoryData] = useState<StoryData | null>(null);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
   const [sourceAdventureId, setSourceAdventureId] = useState<string | null>(
-    null
+    null,
   );
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const hasLoadedStoryRef = useRef<string | null>(null); // Track loaded story ID to prevent re-fetching on tab focus
@@ -1551,7 +1551,7 @@ function StoryPageContent() {
   });
 
   const handleCharacterCreate = async (
-    characterData: Record<string, string>
+    characterData: Record<string, string>,
   ) => {
     if (!storyData || !selectedPreset) return;
     logger.action("User created custom character", { characterData });
@@ -1570,7 +1570,7 @@ function StoryPageContent() {
       // Use the proper fillTemplate function that handles "FieldName (Category)" syntax
       const filledSheet = fillTemplate(
         updatedStoryData.characterSheetTemplate.template,
-        characterData
+        characterData,
       );
       updatedStoryData.characterSheet = filledSheet;
 
@@ -1677,7 +1677,7 @@ function StoryPageContent() {
 
   // NPC Reaction notifications (social media style)
   const [pendingNPCReactions, setPendingNPCReactions] = useState<NPCReaction[]>(
-    []
+    [],
   );
 
   // YZE: Stress dice selection state
@@ -1735,8 +1735,8 @@ function StoryPageContent() {
     storyData: StoryData,
     addNotification: (
       message: string,
-      type: "success" | "failure" | "info" | "warning"
-    ) => void
+      type: "success" | "failure" | "info" | "warning",
+    ) => void,
   ) {
     if (!parts || parts.length === 0) return null;
 
@@ -1751,7 +1751,7 @@ function StoryPageContent() {
           .map((r: CommandResponse) => r.command)
           .filter(
             (cmd: string | undefined): cmd is string =>
-              cmd !== undefined && cmd !== null
+              cmd !== undefined && cmd !== null,
           );
 
         if (commands.length > 0) {
@@ -1772,11 +1772,11 @@ function StoryPageContent() {
         // Handle add_memory tool calls
         try {
           const memoryToolCalls = (part.toolCalls || []).filter(
-            (tc: any) => tc?.function?.name === "add_memory"
+            (tc: any) => tc?.function?.name === "add_memory",
           );
           if (memoryToolCalls.length > 0) {
             const existingMemoryLower = storyData.memory.map((m) =>
-              getMemoryContent(m).toLowerCase().trim()
+              getMemoryContent(m).toLowerCase().trim(),
             );
             for (const tc of memoryToolCalls) {
               let args: any = tc.function?.arguments;
@@ -1799,7 +1799,7 @@ function StoryPageContent() {
                   `Memory added: ${entry.substring(0, 80)}${
                     entry.length > 80 ? "..." : ""
                   }`,
-                  "success"
+                  "success",
                 );
               }
             }
@@ -1822,11 +1822,11 @@ function StoryPageContent() {
       // Handle memory entries (legacy system)
       if (part.memoryEntries && part.memoryEntries.length > 0) {
         const existingMemoryLower = storyData.memory.map((m) =>
-          getMemoryContent(m).toLowerCase().trim()
+          getMemoryContent(m).toLowerCase().trim(),
         );
         const newMemories = part.memoryEntries.filter(
           (entry: string) =>
-            !existingMemoryLower.includes(entry.toLowerCase().trim())
+            !existingMemoryLower.includes(entry.toLowerCase().trim()),
         );
         if (newMemories.length > 0) {
           logger.action("New memory entries added", {
@@ -1838,7 +1838,7 @@ function StoryPageContent() {
             ...newMemories.map((content: string) => ({
               content,
               embedded: false,
-            }))
+            })),
           );
         }
       }
@@ -1862,7 +1862,7 @@ function StoryPageContent() {
 
     // Filter to only AI story parts with actual content and deduplicate consecutive identical content
     const storyParts = storyData.scene.parts.filter(
-      (part) => !part.user && part.content.trim().length > 0
+      (part) => !part.user && part.content.trim().length > 0,
     );
 
     // Remove consecutive duplicates (same content)
@@ -1896,7 +1896,7 @@ function StoryPageContent() {
 
     // Filter to only AI story parts with actual content and deduplicate consecutive identical content
     const storyParts = storyData.scene.parts.filter(
-      (part) => !part.user && part.content.trim().length > 0
+      (part) => !part.user && part.content.trim().length > 0,
     );
 
     // Remove consecutive duplicates (same content)
@@ -1987,15 +1987,10 @@ function StoryPageContent() {
       return;
     }
 
-    //Wait for user to be loaded before attempting to load story
-    if (!user) {
-      return;
-    }
-
     // Skip re-fetching if we've already loaded this story (prevents reload on tab focus)
     if (hasLoadedStoryRef.current === storyId && storyData) {
       console.log(
-        "Story already loaded, skipping re-fetch (tab focus protection)"
+        "Story already loaded, skipping re-fetch (tab focus protection)",
       );
       return;
     }
@@ -2011,12 +2006,12 @@ function StoryPageContent() {
         ({ migrateAGMTState, migrateItemGrades }) => {
           if (loadedStoryData.agmtState) {
             loadedStoryData.agmtState = migrateAGMTState(
-              loadedStoryData.agmtState!
+              loadedStoryData.agmtState!,
             );
           }
           // Migrate item grades from "mythic" to "mythic"
           migrateItemGrades(loadedStoryData);
-        }
+        },
       );
 
       //Initializequestarraysiftheydon'texist(forbackwardscompatibility)
@@ -2032,7 +2027,7 @@ function StoryPageContent() {
         const removedCount = originalCount - loadedStoryData.memory.length;
         if (removedCount > 0) {
           console.log(
-            `[Story Load] Removed ${removedCount} duplicate memories`
+            `[Story Load] Removed ${removedCount} duplicate memories`,
           );
         }
       }
@@ -2055,7 +2050,7 @@ function StoryPageContent() {
       const inputs =
         lastPart.choices?.reduce(
           (acc, choice) => ({ ...acc, [choice.text]: false }),
-          {} as Record<string, boolean>
+          {} as Record<string, boolean>,
         ) || {};
       setInput(inputs);
       setStarted(true);
@@ -2064,172 +2059,18 @@ function StoryPageContent() {
 
     async function loadStory() {
       try {
-        //Checkifthisisalocalstory (local-only, no sync needed)
-        if (storyId?.startsWith("local_")) {
-          const { getLocalStory } = await import(
-            "@/app/misc/localStoryManager"
-          );
-          const localStory = await getLocalStory(storyId);
-
-          if (!localStory) {
-            throw new Error("Local story not found");
-          }
-
-          console.log("Local story loaded:", localStory);
-          setStoryDbId(localStory.id);
-          setSyncStatus("local-only");
-
-          if (setupUIFromStory(localStory.storyData)) return;
-          setLoadingStory(false);
-          return;
-        }
-
-        // ONLINE STORY - Try offline cache first for instant loading
-        const { getLocalStory, saveLocalStory, determineSyncAction } =
-          await import("@/app/misc/localStoryManager");
-
-        // storyId is guaranteed non-null at this point (checked at function start)
+        const { getLocalStory } = await import("@/app/misc/localStoryManager");
         const localStory = await getLocalStory(storyId!);
-        let usedLocalCache = false;
 
-        // If we have a local cache, show it immediately
-        if (localStory && localStory.storyData) {
-          console.log("Loading from offline cache for instant display...");
-          setStoryDbId(storyId!);
-          setSyncStatus(localStory.syncStatus || "synced");
-          if (setupUIFromStory(localStory.storyData)) {
-            setLoadingStory(false);
-            return;
-          }
-          usedLocalCache = true;
-          setLoadingStory(false);
+        if (!localStory) {
+          throw new Error("Local story not found");
         }
 
-        // Fetch from server in background (or foreground if no cache)
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+        console.log("Local story loaded:", localStory);
+        setStoryDbId(localStory.id);
+        setSyncStatus("local-only");
 
-        const headers: HeadersInit = {
-          "Content-Type": "application/json",
-        };
-
-        if (session?.access_token) {
-          headers["Authorization"] = `Bearer ${session.access_token}`;
-        }
-
-        const response = await fetch(`/api/stories/${storyId}`, { headers });
-        console.log("Story fetch response status:", response.status);
-
-        if (!response.ok) {
-          if (usedLocalCache) {
-            // We already showed local cache, just warn about sync
-            console.warn("Server fetch failed, using offline cache");
-            setSyncStatus("pending");
-            return;
-          }
-          const errorData = await response
-            .json()
-            .catch(() => ({ error: "Unknown error" }));
-          console.error("Story fetch failed:", errorData);
-          throw new Error(errorData.error || "Failed to load story");
-        }
-
-        const { story } = await response.json();
-        console.log("Story loaded from server:", story);
-        setStoryDbId(story.id);
-        setSourceAdventureId(story.adventureId || null);
-
-        //Checkifstorydataisencrypted
-        let serverStoryData: StoryData;
-        if (isEncrypted(story.storyData)) {
-          console.log("Story is encrypted, attempting decryption...");
-
-          //Getusercredentialsfordecryption
-          const password = getEncryptionPassword();
-          const email = user?.email;
-
-          if (!password || !email) {
-            throw new Error(
-              "Cannot decrypt story: credentials not available. Please sign out and sign back in."
-            );
-          }
-
-          try {
-            //Decryptthestorydata
-            serverStoryData = await decryptStoryData(
-              story.storyData,
-              email,
-              password
-            );
-            console.log("Story decrypted successfully");
-          } catch (decryptError) {
-            console.error("Decryption failed:", decryptError);
-            throw new Error(
-              "Failed to decrypt story. Your credentials may have changed."
-            );
-          }
-        } else {
-          //Storyisnotencrypted,useas-is
-          serverStoryData = story.storyData;
-        }
-
-        // Determine sync action
-        const syncAction = determineSyncAction(localStory, story.updated_at);
-        console.log("Sync action determined:", syncAction, {
-          localUpdatedAt: localStory?.updatedAt,
-          serverUpdatedAt: story.updated_at,
-        });
-
-        if (syncAction === "none" || syncAction === "download") {
-          // Server is same or newer - use server data
-          if (usedLocalCache && syncAction === "download") {
-            console.log("Server has newer data, updating...");
-          }
-
-          // Save to local cache (mark as synced)
-          await saveLocalStory(storyId!, serverStoryData, null, {
-            serverUpdatedAt: story.updated_at,
-            markAsSynced: true,
-          });
-
-          setSyncStatus("synced");
-          if (!usedLocalCache || syncAction === "download") {
-            setupUIFromStory(serverStoryData);
-          }
-        } else if (syncAction === "upload") {
-          // Local is newer and was edited on this device - auto-sync to server
-          console.log(
-            "Local changes detected from this device, syncing to server..."
-          );
-          setSyncStatus("pending");
-
-          // We'll upload in the background - keep using local data
-          if (!usedLocalCache && localStory) {
-            setupUIFromStory(localStory.storyData);
-          }
-
-          // Trigger upload (will be handled by save mechanism)
-          // For now just mark as pending - the next save will push it
-        } else if (syncAction === "conflict") {
-          // Conflict - show modal
-          console.log("Sync conflict detected!");
-          setSyncStatus("conflict");
-
-          setSyncConflict({
-            isOpen: true,
-            serverData: serverStoryData,
-            serverUpdatedAt: story.updated_at,
-            localPartCount: localStory?.storyData.scene.parts.length || 0,
-            serverPartCount: serverStoryData.scene.parts.length,
-          });
-
-          // Keep using local data until user decides
-          if (!usedLocalCache && localStory) {
-            setupUIFromStory(localStory.storyData);
-          }
-        }
-
+        if (setupUIFromStory(localStory.storyData)) return;
         setLoadingStory(false);
       } catch (error: any) {
         console.error("Error loading story:", error);
@@ -2239,7 +2080,7 @@ function StoryPageContent() {
     }
 
     loadStory();
-  }, [storyId, addNotification, user, getEncryptionPassword]);
+  }, [storyId, addNotification]);
 
   // Sync lore and memory embeddings when story is first loaded (if embeddings enabled and dirty)
   useEffect(() => {
@@ -2276,12 +2117,12 @@ function StoryPageContent() {
       try {
         existingKeys = await getExistingEmbeddingKeys(storyDbId, token);
         console.log(
-          `[Embeddings] Found existing keys: ${existingKeys.lore.length} lore, ${existingKeys.memory.length} memories`
+          `[Embeddings] Found existing keys: ${existingKeys.lore.length} lore, ${existingKeys.memory.length} memories`,
         );
       } catch (err) {
         console.warn(
           "[Embeddings] Failed to get existing keys, will sync all:",
-          err
+          err,
         );
       }
 
@@ -2294,12 +2135,12 @@ function StoryPageContent() {
             content: l.content,
             embedded: l.embedded,
           })),
-          token
+          token,
         )
           .then((result) => {
             if (result.synced > 0 || result.cleaned > 0) {
               console.log(
-                `[Embeddings] Lore sync: ${result.synced} entries, ${result.cleaned} cleaned`
+                `[Embeddings] Lore sync: ${result.synced} entries, ${result.cleaned} cleaned`,
               );
             }
             // Mark successfully embedded lore entries and clear dirty flag
@@ -2310,7 +2151,7 @@ function StoryPageContent() {
               const updatedLore = storyData.lore.map((l) =>
                 result.embeddedTitles.includes(l.title)
                   ? { ...l, embedded: true }
-                  : l
+                  : l,
               );
               setStoryData({
                 ...storyData,
@@ -2330,12 +2171,12 @@ function StoryPageContent() {
           storyDbId,
           storyData.memory,
           new Set(existingKeys.memory), // Pass existing keys to skip already-synced
-          token
+          token,
         )
           .then((result) => {
             if (result.synced > 0 || result.cleaned > 0) {
               console.log(
-                `[Embeddings] Memory sync: ${result.synced} entries, ${result.cleaned} cleaned`
+                `[Embeddings] Memory sync: ${result.synced} entries, ${result.cleaned} cleaned`,
               );
             }
             // Mark successfully embedded memory entries
@@ -2374,25 +2215,23 @@ function StoryPageContent() {
       // If not in storyData, try to fetch from the source adventure
       if (!templateWithFields?.fields?.length && sourceAdventureId) {
         try {
-          const adventureRes = await fetch(
-            `/api/adventures/${sourceAdventureId}`
-          );
-          if (adventureRes.ok) {
-            const { adventure } = await adventureRes.json();
-            if (adventure?.characterSheetTemplate?.fields?.length) {
-              templateWithFields = adventure.characterSheetTemplate;
-              // Also update storyData so we have it for later
-              setStoryData((prev) =>
-                prev
-                  ? { ...prev, characterSheetTemplate: templateWithFields }
-                  : prev
-              );
-            }
+          const { getLocalAdventure } =
+            await import("@/app/misc/localAdventureManager");
+          const localAdv = await getLocalAdventure(sourceAdventureId);
+          const adventure = localAdv?.adventureData;
+          if (adventure?.characterSheetTemplate?.fields?.length) {
+            templateWithFields = adventure.characterSheetTemplate;
+            // Also update storyData so we have it for later
+            setStoryData((prev) =>
+              prev
+                ? { ...prev, characterSheetTemplate: templateWithFields }
+                : prev,
+            );
           }
         } catch (error) {
           console.error(
             "Failed to fetch adventure for character template:",
-            error
+            error,
           );
         }
       }
@@ -2437,19 +2276,19 @@ function StoryPageContent() {
         updatedStoryData.stats = JSON.parse(JSON.stringify(preset.stats));
       if (preset.resources?.length)
         updatedStoryData.resources = JSON.parse(
-          JSON.stringify(preset.resources)
+          JSON.stringify(preset.resources),
         );
       if (preset.inventory?.length)
         updatedStoryData.inventory = JSON.parse(
-          JSON.stringify(preset.inventory)
+          JSON.stringify(preset.inventory),
         );
       if (preset.relationships?.length)
         updatedStoryData.relationships = JSON.parse(
-          JSON.stringify(preset.relationships)
+          JSON.stringify(preset.relationships),
         );
       if (preset.conditions?.length)
         updatedStoryData.conditions = JSON.parse(
-          JSON.stringify(preset.conditions)
+          JSON.stringify(preset.conditions),
         );
       if (preset.authorNotes)
         updatedStoryData.author_notes = preset.authorNotes;
@@ -2484,48 +2323,9 @@ function StoryPageContent() {
     //Updatestoryindatabasewithpresetapplied
     if (storyDbId) {
       try {
-        if (storyDbId.startsWith("local_")) {
-          const { saveLocalStory } = await import(
-            "@/app/misc/localStoryManager"
-          );
-          updatedStoryData.selected_preset = preset.id;
-          await saveLocalStory(storyDbId, updatedStoryData);
-        } else {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          const headers: HeadersInit = {
-            "Content-Type": "application/json",
-          };
-          if (session?.access_token) {
-            headers["Authorization"] = `Bearer ${session.access_token}`;
-          }
-
-          const response = await fetch(`/api/stories/${storyDbId}`, {
-            method: "PATCH",
-            headers,
-            body: JSON.stringify({
-              storyData: updatedStoryData,
-              selectedPreset: preset.id,
-            }),
-          });
-
-          if (!response.ok) {
-            console.error("Failed to save preset selection");
-          } else {
-            // Also save to local cache for offline-first loading
-            const { saveLocalStory } = await import(
-              "@/app/misc/localStoryManager"
-            );
-            const result = await response.json().catch(() => null);
-            await saveLocalStory(storyDbId, updatedStoryData, null, {
-              serverUpdatedAt:
-                result?.story?.updated_at || new Date().toISOString(),
-              markAsSynced: true,
-              isLocalEdit: true,
-            });
-          }
-        }
+        const { saveLocalStory } = await import("@/app/misc/localStoryManager");
+        updatedStoryData.selected_preset = preset.id;
+        await saveLocalStory(storyDbId, updatedStoryData);
       } catch (error) {
         console.error("Error saving preset:", error);
       }
@@ -2545,12 +2345,12 @@ function StoryPageContent() {
       setCurrentState(StoryState.MENU);
       addNotification(
         "Customize your character in the menu, then return to the story!",
-        "success"
+        "success",
       );
     } else {
       addNotification(
         `Character preset "${preset.name}" applied! ?`,
-        "success"
+        "success",
       );
     }
   };
@@ -2575,109 +2375,33 @@ function StoryPageContent() {
     }, 3000); //3seconddebounce
   }
 
-  //Actualsa velogicisolated
+  //Actualsavelogicisolated
   async function performSave(updatedStoryData: StoryData) {
     if (!storyDbId) return;
 
     try {
       logger.info("Saving story progress...");
-      //Handlelocalstorysaving
-      if (storyDbId.startsWith("local_")) {
-        const { saveLocalStory } = await import("@/app/misc/localStoryManager");
-        //Trimscenehistorybeforesavingtoreducedatasize
-        const trimmedData = trimStoryData(updatedStoryData);
-
-        // Log what we're saving
-        const lastPartBeingSaved =
-          trimmedData.scene.parts[trimmedData.scene.parts.length - 1];
-        console.log("Saving local story - last part:", {
-          user: lastPartBeingSaved?.user,
-          role: lastPartBeingSaved?.role,
-          choicesCount: lastPartBeingSaved?.choices?.length || 0,
-          contentPreview: lastPartBeingSaved?.content.substring(0, 50),
-        });
-
-        await saveLocalStory(storyDbId, trimmedData);
-        console.log("Local story saved successfully");
-        return;
-      }
-
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) return;
-
-      //Checkforencryptioncredentials
-      const password = getEncryptionPassword();
-      const email = user?.email;
-
-      if (!password || !email) {
-        //No credentials available - require user to re-login for security
-        console.error(
-          "Cannot save story: encryption credentials not available"
-        );
-        addNotification(
-          "Please sign out and sign back in to enable encrypted story saving",
-          "warning"
-        );
-        return; //Abortsavetopreventunencrypteddatastorage
-      }
-
+      const { saveLocalStory } = await import("@/app/misc/localStoryManager");
       //Trimscenehistorybeforesavingtoreducedatasize
       const trimmedData = trimStoryData(updatedStoryData);
 
-      //Encryptthestorydatabeforesaving
-      let dataToSave: any;
-      try {
-        dataToSave = await encryptStoryData(trimmedData, email, password);
-        console.log("Story data encrypted for saving");
-      } catch (encryptError) {
-        console.error("Encryption failed:", encryptError);
-        addNotification(
-          "Failed to encrypt story data. Please sign out and sign back in.",
-          "failure"
-        );
-        return; //Abortsaveonencryptionfailure
-      }
-
-      // Save to server
-      const response = await fetch(`/api/stories/${storyDbId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          storyData: dataToSave,
-        }),
+      // Log what we're saving
+      const lastPartBeingSaved =
+        trimmedData.scene.parts[trimmedData.scene.parts.length - 1];
+      console.log("Saving local story - last part:", {
+        user: lastPartBeingSaved?.user,
+        role: lastPartBeingSaved?.role,
+        choicesCount: lastPartBeingSaved?.choices?.length || 0,
+        contentPreview: lastPartBeingSaved?.content.substring(0, 50),
       });
 
-      // Also save to local cache for offline access
-      if (response.ok) {
-        const { saveLocalStory } = await import("@/app/misc/localStoryManager");
-        const result = await response.json().catch(() => null);
-        await saveLocalStory(storyDbId, trimmedData, null, {
-          serverUpdatedAt:
-            result?.story?.updated_at || new Date().toISOString(),
-          markAsSynced: true,
-          isLocalEdit: true,
-        });
-        setSyncStatus("synced");
-        console.log("Story saved to server and local cache");
-      } else {
-        // Server save failed - save locally as pending
-        const { saveLocalStory } = await import("@/app/misc/localStoryManager");
-        await saveLocalStory(storyDbId, trimmedData, null, {
-          isLocalEdit: true,
-        });
-        setSyncStatus("pending");
-        console.warn("Server save failed, saved to local cache as pending");
-      }
+      await saveLocalStory(storyDbId, trimmedData);
+      console.log("Local story saved successfully");
     } catch (error) {
       console.error("Error saving progress:", error);
       addNotification(
         "Failed to save story progress. Please try again.",
-        "failure"
+        "failure",
       );
     }
   }
@@ -2710,7 +2434,7 @@ function StoryPageContent() {
     //Trimmemoryiftoolarge
     let totalMemoryLength = storyData.memory.reduce(
       (acc, entry) => acc + getMemoryContent(entry).length,
-      0
+      0,
     );
     while (totalMemoryLength > memory_cap && storyData.memory.length > 0) {
       const removed = storyData.memory.shift();
@@ -2725,10 +2449,6 @@ function StoryPageContent() {
   async function handleCustomInput(customText: string, playerComment?: string) {
     if (!storyData) return;
     logger.action("User custom input", { customText });
-    if (!user) {
-      addNotification("Please sign in to continue the story", "warning");
-      return;
-    }
 
     setLoading(true);
     setLoadingStage("story");
@@ -2883,7 +2603,7 @@ function StoryPageContent() {
               const updated = prev.map((entry) =>
                 entry.type === "thinking" && entry.isStreaming
                   ? { ...entry, isStreaming: false }
-                  : entry
+                  : entry,
               );
               return [...updated, { type: "tool", result }];
             });
@@ -2910,7 +2630,7 @@ function StoryPageContent() {
 
             // Extract NPC reactions from GM results and show as toast notifications
             const npcReactionResults = gmResults.filter(
-              (r) => r.toolName === "npc_reaction"
+              (r) => r.toolName === "npc_reaction",
             );
             if (npcReactionResults.length > 0) {
               const newReactions = npcReactionResults
@@ -3023,7 +2743,7 @@ function StoryPageContent() {
             if (result.meta.totalTokenCost) {
               addNotification(
                 `Used ${result.meta.totalTokenCost} tokens`,
-                "success"
+                "success",
               );
             }
 
@@ -3033,7 +2753,7 @@ function StoryPageContent() {
               if (offCooldown.length > 0) {
                 addNotification(
                   `Abilities ready: ${offCooldown.join(", ")}`,
-                  "success"
+                  "success",
                 );
               }
             }
@@ -3063,7 +2783,7 @@ function StoryPageContent() {
             console.log(
               "Saving story (custom input) - last part choices:",
               lastPartForSave.choices?.length || 0,
-              "choices"
+              "choices",
             );
             saveProgress(storyData, true);
 
@@ -3081,7 +2801,9 @@ function StoryPageContent() {
             });
           },
         },
-        pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined
+        pendingCommandResponses.length > 0
+          ? pendingCommandResponses
+          : undefined,
       );
     } catch (error: any) {
       addNotification(`Error: ${error.message}`, "failure");
@@ -3097,10 +2819,6 @@ function StoryPageContent() {
     if (!storyData) return;
     const trimmed = comment.trim();
     if (!trimmed) return;
-    if (!user) {
-      addNotification("Please sign in to comment", "warning");
-      return;
-    }
 
     const nextPart: ScenePart = {
       content: "",
@@ -3124,13 +2842,9 @@ function StoryPageContent() {
 
   // Handle freeform action submission - analyze the action and return metadata
   async function handleActionSubmit(
-    actionText: string
+    actionText: string,
   ): Promise<{ analysis: any; warnings: string[] } | null> {
     if (!storyData) return null;
-    if (!user) {
-      addNotification("Please sign in to continue the story", "warning");
-      return null;
-    }
 
     // Check if GM Stage is enabled - if so, skip action analysis
     // The GM Stage will determine mechanics during generation
@@ -3192,11 +2906,6 @@ function StoryPageContent() {
 
     logger.action("Freeform action confirmed", { choice });
 
-    if (!user) {
-      addNotification("Please sign in to continue the story", "warning");
-      return;
-    }
-
     // Directly call handleChoice with the action choice
     // We pass the choice directly to avoid state timing issues
     handleChoiceWithAction(choice, playerComment);
@@ -3210,7 +2919,7 @@ function StoryPageContent() {
   // Internal function that handles both regular choices and freeform actions
   async function handleChoiceWithAction(
     actionChoice?: Choice,
-    playerComment?: string
+    playerComment?: string,
   ) {
     if (!storyData) return;
 
@@ -3230,11 +2939,6 @@ function StoryPageContent() {
 
     logger.action("User selected choice", { choice: choice.text, index: key });
 
-    if (!user) {
-      addNotification("Please sign in to continue the story", "warning");
-      return;
-    }
-
     // Get RPG system configuration
     const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
 
@@ -3245,7 +2949,7 @@ function StoryPageContent() {
       choice.skill_dc = parseDCValue(
         choice.skill_dc_tier,
         rpgSystem.id as any,
-        difficulty
+        difficulty,
       );
       logger.action("Converted tier to DC", {
         tier: choice.skill_dc_tier,
@@ -3271,7 +2975,7 @@ function StoryPageContent() {
         choice.skill_dc = parseDCValue(
           dcString as any,
           rpgSystem.id as any,
-          difficulty
+          difficulty,
         );
         logger.action("Converted string DC to numeric", {
           original: dcString,
@@ -3312,7 +3016,7 @@ function StoryPageContent() {
       });
       addNotification(
         `Spent 1 Momentum for Advantage! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
-        "info"
+        "info",
       );
     } else if (momentumMode === "guarantee" && storyData.momentum >= 3) {
       storyData.momentum -= 3;
@@ -3323,7 +3027,7 @@ function StoryPageContent() {
       });
       addNotification(
         `Spent 3 Momentum for Guaranteed Success! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
-        "success"
+        "success",
       );
     }
 
@@ -3368,7 +3072,7 @@ function StoryPageContent() {
       try {
         // Parse format: "question (likelihood)" or just "question"
         const match = choice.agmt_check.match(
-          /^(.+?)(?:\s*\(\s*([^)]+)\s*\))?$/
+          /^(.+?)(?:\s*\(\s*([^)]+)\s*\))?$/,
         );
         if (match) {
           const question = match[1].trim();
@@ -3390,7 +3094,7 @@ function StoryPageContent() {
           ];
           if (!validLikelihoods.includes(likelihood)) {
             console.warn(
-              `Invalid AGMT likelihood "${likelihood}", defaulting to 50/50`
+              `Invalid AGMT likelihood "${likelihood}", defaulting to 50/50`,
             );
             likelihood = "50/50";
           }
@@ -3412,7 +3116,7 @@ function StoryPageContent() {
           // Add context flag if skill check exists or agmt_context_only is set
           if (choice.skill_used || choice.agmt_context_only) {
             agmtDetails.push(
-              `[Note: AGMT is context only - skill check determines success/failure]`
+              `[Note: AGMT is context only - skill check determines success/failure]`,
             );
           }
 
@@ -3438,14 +3142,14 @@ function StoryPageContent() {
       try {
         // First, check if it's a custom table
         const customTable = storyData.customTables?.find(
-          (t) => t.name.toLowerCase() === tableToRoll.toLowerCase()
+          (t) => t.name.toLowerCase() === tableToRoll.toLowerCase(),
         );
 
         if (customTable) {
           // Roll on custom table
           const totalWeight = customTable.entries.reduce(
             (sum, e) => sum + e.weight,
-            0
+            0,
           );
           const roll = Math.random() * totalWeight;
           let cumulative = 0;
@@ -3544,9 +3248,9 @@ function StoryPageContent() {
         });
         addNotification(
           `Matched "${choice.item_used}" → "${matchResult.name}" (${Math.round(
-            matchResult.score * 100
+            matchResult.score * 100,
           )}% match)`,
-          "info"
+          "info",
         );
         // Update choice to use the exact matched name
         choice.item_used = matchResult.name;
@@ -3576,7 +3280,7 @@ function StoryPageContent() {
           //Misc items don't give advantage, but prevent disadvantage
           addNotification(
             `Used item: ${choice.item_used}${itemGradeLabel} (No disadvantage)`,
-            "info"
+            "info",
           );
         } else {
           //Normal, consumable, and story items give advantage
@@ -3585,7 +3289,7 @@ function StoryPageContent() {
           const bonusText = itemGradeBonus > 0 ? ` +${itemGradeBonus}` : "";
           addNotification(
             `Used item: ${choice.item_used}${itemGradeLabel} (Advantage${bonusText}!)`,
-            "info"
+            "info",
           );
         }
 
@@ -3593,7 +3297,7 @@ function StoryPageContent() {
         // Consumable: Always consumed when used (durability doesn't apply)
         if (itemType === "consumable") {
           const itemIndex = storyData.inventory.findIndex(
-            (i) => i.name === choice.item_used
+            (i) => i.name === choice.item_used,
           );
           if (itemIndex !== -1) {
             if (storyData.inventory[itemIndex].quantity > 1) {
@@ -3615,7 +3319,7 @@ function StoryPageContent() {
         disadvantageSources.push(`missing ${choice.item_used}`);
         addNotification(
           `Missing item: ${choice.item_used} (Disadvantage!)`,
-          "warning"
+          "warning",
         );
       }
     }
@@ -3630,7 +3334,7 @@ function StoryPageContent() {
       // Try fuzzy matching first
       const matchResult = findAbilityMatch(
         choice.ability_used,
-        storyData.abilities
+        storyData.abilities,
       );
       // Get the actual typed ability from array
       const ability: Ability | undefined = matchResult
@@ -3648,7 +3352,7 @@ function StoryPageContent() {
           `Matched "${choice.ability_used}" → "${
             matchResult.name
           }" (${Math.round(matchResult.score * 100)}% match)`,
-          "info"
+          "info",
         );
         // Update choice to use the exact matched name
         choice.ability_used = matchResult.name;
@@ -3659,7 +3363,7 @@ function StoryPageContent() {
         if ((ability.currentCooldown ?? 0) > 0) {
           addNotification(
             `${ability.name} is on cooldown (${ability.currentCooldown} turns remaining)`,
-            "warning"
+            "warning",
           );
           // Clear ability_used since it can't be activated
           choice.ability_used = undefined;
@@ -3672,7 +3376,7 @@ function StoryPageContent() {
             const missingStr = affordability.missingCosts.join("; ");
             addNotification(
               `Cannot use ${ability.name}: ${missingStr}`,
-              "warning"
+              "warning",
             );
             // Clear ability_used since it can't be activated
             choice.ability_used = undefined;
@@ -3692,7 +3396,7 @@ function StoryPageContent() {
               abilityGradeBonus > 0 ? ` +${abilityGradeBonus}` : "";
             addNotification(
               `Using ability: ${ability.name}${abilityGradeLabel} (Advantage${bonusText}!)`,
-              "success"
+              "success",
             );
 
             // Deduct costs immediately
@@ -3722,7 +3426,7 @@ function StoryPageContent() {
               abilityCooldownStarted = true;
               addNotification(
                 `${ability.name} is now on cooldown (${ability.cooldown} turns)`,
-                "info"
+                "info",
               );
             }
           }
@@ -3750,7 +3454,7 @@ function StoryPageContent() {
       // Try fuzzy matching first
       const matchResult = findResourceMatch(
         choice.resource_used,
-        storyData.resources
+        storyData.resources,
       );
       matchedResource = matchResult ? (matchResult.item as Resource) : null;
 
@@ -3765,7 +3469,7 @@ function StoryPageContent() {
           `Matched "${choice.resource_used}" ? "${
             matchResult.name
           }" (${Math.round(matchResult.score * 100)}% match)`,
-          "info"
+          "info",
         );
         // Update choice to use the exact matched name
         choice.resource_used = matchResult.name;
@@ -3798,14 +3502,14 @@ function StoryPageContent() {
           });
           addNotification(
             `Insufficient ${matchedResource.name}! Need ${requiredAmount}, have ${matchedResource.value}. Disadvantage on roll!`,
-            "warning"
+            "warning",
           );
         }
       } else {
         logger.warn("Resource not found", { resource: choice.resource_used });
         addNotification(
           `Resource not found: ${choice.resource_used}`,
-          "warning"
+          "warning",
         );
       }
     }
@@ -3834,7 +3538,7 @@ function StoryPageContent() {
           `${isAdvantage ? "🎲 Advantage" : "⚠️ Disadvantage"}${stackText}: ${
             isAdvantage ? "+" : "-"
           }${Math.abs(netAdvantage)} modifier from ${sourcesList}`,
-          isAdvantage ? "success" : "warning"
+          isAdvantage ? "success" : "warning",
         );
         logger.action("Fate modifier shift from advantage/disadvantage", {
           netAdvantage,
@@ -3876,12 +3580,12 @@ function StoryPageContent() {
           dc <= -2
             ? "trivial"
             : dc === -1
-            ? "easy"
-            : dc === 1
-            ? "hard"
-            : dc === 2
-            ? "very hard"
-            : "impossible";
+              ? "easy"
+              : dc === 1
+                ? "hard"
+                : dc === 2
+                  ? "very hard"
+                  : "impossible";
 
         logger.action("PbtA DC-based advantage/disadvantage", {
           dc,
@@ -3902,9 +3606,9 @@ function StoryPageContent() {
           `${
             isAdvantage ? "🎲 Advantage" : "⚠️ Disadvantage"
           }${stackText}: ${difficultyLabel} difficulty - kept ${selectedDice.join(
-            ","
+            ",",
           )} from [${pool.join(",")}]`,
-          isAdvantage ? "success" : "warning"
+          isAdvantage ? "success" : "warning",
         );
       }
     } else if (rpgSystem.id !== "yze" && rpgSystem.id !== "explosive") {
@@ -3951,9 +3655,9 @@ function StoryPageContent() {
             `${
               isAdvantage ? "🎲 Advantage" : "⚠️ Disadvantage"
             }${stackText}: kept ${selectedDice.join(",")} from [${pool.join(
-              ","
+              ",",
             )}]`,
-            isAdvantage ? "success" : "warning"
+            isAdvantage ? "success" : "warning",
           );
         } else {
           // Existing multi-roll set logic for other systems
@@ -3967,7 +3671,7 @@ function StoryPageContent() {
               advantageSources,
               disadvantageSources,
               rollsToMake,
-            }
+            },
           );
           for (let i = 0; i < rollsToMake; i++) {
             const extraResult = rollDice(rpgSystem);
@@ -3996,7 +3700,7 @@ function StoryPageContent() {
             `${
               isAdvantage ? "? Advantage" : "?? Disadvantage"
             }${stackText} from: ${sourcesList}`,
-            isAdvantage ? "success" : "warning"
+            isAdvantage ? "success" : "warning",
           );
         }
       }
@@ -4018,7 +3722,7 @@ function StoryPageContent() {
           `Situational modifier: ${bonusSign}${choice.stat_bonus} to ${
             matchResult?.name || choice.skill_used
           } (${baseStatValue} → ${statValue})`,
-          choice.stat_bonus > 0 ? "success" : "warning"
+          choice.stat_bonus > 0 ? "success" : "warning",
         );
       }
 
@@ -4047,12 +3751,12 @@ function StoryPageContent() {
         if (applicableConditions.length > 0) {
           // Find highest tier condition
           const highestTierCondition = applicableConditions.reduce((max, c) =>
-            c.tier > max.tier ? c : max
+            c.tier > max.tier ? c : max,
           );
 
           const penalty = getConditionPenalty(
             storyData.rpgSystem,
-            highestTierCondition.tier
+            highestTierCondition.tier,
           );
 
           appliedCondition = {
@@ -4072,11 +3776,11 @@ function StoryPageContent() {
               conditionPenaltyModifier = -penalty.value;
               disadvantageCount++;
               disadvantageSources.push(
-                `${highestTierCondition.name} (Tier ${tierLabel})`
+                `${highestTierCondition.name} (Tier ${tierLabel})`,
               );
               addNotification(
                 `Condition penalty: ${highestTierCondition.name} (Tier ${tierLabel}) → ${penalty.value} to roll`,
-                "warning"
+                "warning",
               );
               break;
             case "auto-fail":
@@ -4085,14 +3789,14 @@ function StoryPageContent() {
               conditionAutoFail = true;
               addNotification(
                 `Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Auto-fail!`,
-                "failure"
+                "failure",
               );
               break;
             case "game-over":
               conditionGameOver = true;
               addNotification(
                 `PERMANENT CONDITION: ${highestTierCondition.name} (Tier ${tierLabel}) ? The story may end here.`,
-                "failure"
+                "failure",
               );
               break;
             case "die-size-down":
@@ -4100,22 +3804,22 @@ function StoryPageContent() {
               // This is handled specially in the explosive dice section
               disadvantageCount += penalty.value; // Each step down counts as disadvantage
               disadvantageSources.push(
-                `${highestTierCondition.name} (Tier ${tierLabel})`
+                `${highestTierCondition.name} (Tier ${tierLabel})`,
               );
               addNotification(
                 `Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Die size reduced by ${penalty.value}`,
-                "warning"
+                "warning",
               );
               break;
             case "d4-only":
               // For explosive system: force d4
               disadvantageCount += 4; // Severe penalty
               disadvantageSources.push(
-                `${highestTierCondition.name} (Tier ${tierLabel})`
+                `${highestTierCondition.name} (Tier ${tierLabel})`,
               );
               addNotification(
                 `Severe Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Forced to use d4!`,
-                "failure"
+                "failure",
               );
               break;
             case "none":
@@ -4192,7 +3896,7 @@ function StoryPageContent() {
             storyData.stress = Math.min(10, currentStress + stressDiceCount);
             addNotification(
               `Added ${stressDiceCount} stress dice (+${stressDiceCount} stress ? ${storyData.stress}/10)`,
-              "warning"
+              "warning",
             );
           }
 
@@ -4322,7 +4026,7 @@ function StoryPageContent() {
 
             addNotification(
               `Advantage Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} → Best: ${dice_roll}`,
-              "success"
+              "success",
             );
           }
 
@@ -4340,7 +4044,7 @@ function StoryPageContent() {
             `Matched "${choice.skill_used}" ? "${
               matchResult.name
             }" (${Math.round(matchResult.score * 100)}% match)`,
-            "info"
+            "info",
           );
           // Update choice to use the exact matched name
           choice.skill_used = matchResult.name;
@@ -4366,7 +4070,7 @@ function StoryPageContent() {
           });
           addNotification(
             `Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
-            "success"
+            "success",
           );
         } else {
           let dc_passed: boolean;
@@ -4393,7 +4097,7 @@ function StoryPageContent() {
               dc,
               conditionPenaltyModifier - itemGradeBonus - abilityGradeBonus, // Apply condition penalty (positive) and grade bonuses (negative to add)
               lastRoll,
-              storyData.reverseDC // Call of Cthulhu style - roll under DC
+              storyData.reverseDC, // Call of Cthulhu style - roll under DC
             );
 
             yzeData.successes = successResult.successes;
@@ -4420,7 +4124,7 @@ function StoryPageContent() {
                 // Find panic effect from table
                 if (rpgSystem.panicTable) {
                   const panicEntry = rpgSystem.panicTable.find(
-                    (entry) => panicRoll >= entry.min && panicRoll <= entry.max
+                    (entry) => panicRoll >= entry.min && panicRoll <= entry.max,
                   );
                   if (panicEntry) {
                     yzeData.panicEffect = `${panicEntry.effect}: ${panicEntry.description}`;
@@ -4442,7 +4146,7 @@ function StoryPageContent() {
                 itemGradeBonus -
                 abilityGradeBonus, // Condition penalty is positive (subtracts), grade bonuses are negative (adds)
               undefined, // rolls array (only needed for YZE)
-              storyData.reverseDC // Call of Cthulhu style - roll under DC
+              storyData.reverseDC, // Call of Cthulhu style - roll under DC
             );
 
             dc_passed = successResult.success;
@@ -4482,9 +4186,8 @@ function StoryPageContent() {
 
           // Track skill check for AGMT chaos adjustment
           if (storyData.agmtState && choice.skill_used) {
-            const { addSkillCheckResult } = await import(
-              "@/app/misc/mythicChaos"
-            );
+            const { addSkillCheckResult } =
+              await import("@/app/misc/mythicChaos");
             const skillResult = {
               sceneNumber: storyData.agmtState.sceneCount,
               success: dc_passed,
@@ -4495,7 +4198,7 @@ function StoryPageContent() {
             };
             storyData.agmtState = addSkillCheckResult(
               storyData.agmtState,
-              skillResult
+              skillResult,
             );
           }
 
@@ -4574,7 +4277,7 @@ function StoryPageContent() {
                 if (storyData.momentum < storyData.maxMomentum) {
                   const earned = Math.min(
                     2,
-                    storyData.maxMomentum - storyData.momentum
+                    storyData.maxMomentum - storyData.momentum,
                   );
                   storyData.momentum += earned;
                   logger.action("Momentum earned (Critical Success)", {
@@ -4597,7 +4300,7 @@ function StoryPageContent() {
             // Apply durability loss on success (-1 durability) for non-consumable items
             if (choice.item_used) {
               const item = storyData.inventory.find(
-                (i) => i.name === choice.item_used
+                (i) => i.name === choice.item_used,
               );
               const itemType = item?.type || "normal";
 
@@ -4611,7 +4314,7 @@ function StoryPageContent() {
                   // Item broke from durability loss
                   itemBroken = true;
                   const itemIndex = storyData.inventory.findIndex(
-                    (i) => i.name === choice.item_used
+                    (i) => i.name === choice.item_used,
                   );
                   if (itemIndex !== -1) {
                     if (storyData.inventory[itemIndex].quantity > 1) {
@@ -4634,7 +4337,7 @@ function StoryPageContent() {
                 } else {
                   // Update durability on the item
                   const itemIndex = storyData.inventory.findIndex(
-                    (i) => i.name === choice.item_used
+                    (i) => i.name === choice.item_used,
                   );
                   if (itemIndex !== -1) {
                     storyData.inventory[itemIndex].durability =
@@ -4654,7 +4357,7 @@ function StoryPageContent() {
             // Handle item durability on failure (-2 durability for non-consumable items)
             if (choice.item_used) {
               const item = storyData.inventory.find(
-                (i) => i.name === choice.item_used
+                (i) => i.name === choice.item_used,
               );
               const itemType = item?.type || "normal";
 
@@ -4668,7 +4371,7 @@ function StoryPageContent() {
                   // Item broke from durability loss
                   itemBroken = true;
                   const itemIndex = storyData.inventory.findIndex(
-                    (i) => i.name === choice.item_used
+                    (i) => i.name === choice.item_used,
                   );
                   if (itemIndex !== -1) {
                     if (storyData.inventory[itemIndex].quantity > 1) {
@@ -4691,7 +4394,7 @@ function StoryPageContent() {
                 } else {
                   // Update durability on the item
                   const itemIndex = storyData.inventory.findIndex(
-                    (i) => i.name === choice.item_used
+                    (i) => i.name === choice.item_used,
                   );
                   if (itemIndex !== -1) {
                     storyData.inventory[itemIndex].durability =
@@ -4782,7 +4485,7 @@ function StoryPageContent() {
           challengeResolved = true;
           addNotification(
             `🏆 Challenge WON: ${challenge.name}! (+${challenge.pointsAwarded} XP)`,
-            "success"
+            "success",
           );
         } else if (challenge.currentFailures >= majority) {
           challenge.active = false;
@@ -4820,7 +4523,7 @@ function StoryPageContent() {
         const initialScore = isSuccess ? "1-0" : "0-1";
 
         choiceDetails.push(
-          `[Start Challenge "${challengeName}": ${initialScore}]`
+          `[Start Challenge "${challengeName}": ${initialScore}]`,
         );
 
         logger.action("New challenge signaled from action analysis", {
@@ -4847,17 +4550,17 @@ function StoryPageContent() {
       if (itemBroken) {
         // Item broke (durability hit 0)
         choiceDetails.push(
-          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore} → broken]`
+          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore} → broken]`,
         );
       } else if (itemType === "consumable") {
         // Consumable items show quantity change
         if (itemQuantityAfter !== itemQuantityBefore) {
           choiceDetails.push(
-            `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore} → ${itemQuantityAfter}]`
+            `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore} → ${itemQuantityAfter}]`,
           );
         } else {
           choiceDetails.push(
-            `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`
+            `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`,
           );
         }
       } else if (
@@ -4866,17 +4569,17 @@ function StoryPageContent() {
       ) {
         // Non-consumable items show durability change
         choiceDetails.push(
-          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ${itemDurabilityBefore}/${itemMaxDurability} → ${itemDurabilityAfter}/${itemMaxDurability}]`
+          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ${itemDurabilityBefore}/${itemMaxDurability} → ${itemDurabilityAfter}/${itemMaxDurability}]`,
         );
       } else if (itemMaxDurability === Infinity || itemMaxDurability === -1) {
         // AGMT items have infinite durability
         choiceDetails.push(
-          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ∞]`
+          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ∞]`,
         );
       } else {
         // No durability change (or item has no durability tracking)
         choiceDetails.push(
-          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`
+          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`,
         );
       }
     }
@@ -4895,7 +4598,7 @@ function StoryPageContent() {
           ? `; Cooldown: ${abilityUsed.cooldown} turns`
           : "";
       choiceDetails.push(
-        `[Ability Used: ${abilityUsed.name}${abilityGradeLabel}${bonusText}${costsText}${cooldownText}]`
+        `[Ability Used: ${abilityUsed.name}${abilityGradeLabel}${bonusText}${costsText}${cooldownText}]`,
       );
     }
 
@@ -4909,12 +4612,11 @@ function StoryPageContent() {
     const tableForChoiceDetails = choice.table || choice.custom_table;
     if (tableForChoiceDetails && storyData.customTables) {
       try {
-        const { getTableByName, rollOnCustomTable } = await import(
-          "../misc/tableRoller"
-        );
+        const { getTableByName, rollOnCustomTable } =
+          await import("../misc/tableRoller");
         const table = getTableByName(
           storyData.customTables,
-          tableForChoiceDetails
+          tableForChoiceDetails,
         );
 
         if (table) {
@@ -4961,11 +4663,11 @@ function StoryPageContent() {
             const modStr =
               modifier !== 0 ? `${modifier > 0 ? "+" : ""}${modifier}` : "";
             choiceDetails.push(
-              `[Context: ${roll.description} (${roll.dice}) = ${rollStr}${modStr} → ${total}]`
+              `[Context: ${roll.description} (${roll.dice}) = ${rollStr}${modStr} → ${total}]`,
             );
             addNotification(
               `Context Roll: ${roll.description} = ${total}`,
-              "success"
+              "success",
             );
           } else {
             // Invalid dice notation, skip
@@ -5162,7 +4864,7 @@ function StoryPageContent() {
     console.log(
       "[page.tsx] About to call generateStoryTurn. actionChoice:",
       !!actionChoice,
-      actionChoice?.text?.slice(0, 50)
+      actionChoice?.text?.slice(0, 50),
     );
 
     // Create abort controller for this generation
@@ -5243,7 +4945,7 @@ function StoryPageContent() {
                 const updated = prev.map((entry) =>
                   entry.type === "thinking" && entry.isStreaming
                     ? { ...entry, isStreaming: false }
-                    : entry
+                    : entry,
                 );
                 // Add the tool result
                 return [...updated, { type: "tool", result }];
@@ -5277,7 +4979,7 @@ function StoryPageContent() {
               const formulaResult = gmResults.find(
                 (r) =>
                   r.toolName === "formula_roll" &&
-                  (r.result as GMFormulaRollResult)?.showToPlayer !== false
+                  (r.result as GMFormulaRollResult)?.showToPlayer !== false,
               );
 
               if (formulaResult && formulaResult.result) {
@@ -5314,13 +5016,13 @@ function StoryPageContent() {
                     total: result.total,
                     dc: result.dc,
                     success: result.success,
-                  }
+                  },
                 );
               }
 
               // Extract NPC reactions from GM results and show as toast notifications
               const npcReactionResults = gmResults.filter(
-                (r) => r.toolName === "npc_reaction"
+                (r) => r.toolName === "npc_reaction",
               );
               if (npcReactionResults.length > 0) {
                 const newReactions = npcReactionResults
@@ -5383,7 +5085,7 @@ function StoryPageContent() {
               toolCalls,
               toolResponses,
               stateChanges,
-              usage
+              usage,
             ) => {
               // Update the last part with tool data including stateChanges
               const lastPartIndex = storyData.scene.parts.length - 1;
@@ -5448,7 +5150,7 @@ function StoryPageContent() {
                 const currentChapter = storyData.chapters.length;
                 addNotification(
                   `Chapter ${currentChapter} Complete!`,
-                  "success"
+                  "success",
                 );
               }
 
@@ -5458,7 +5160,7 @@ function StoryPageContent() {
                 if (offCooldown.length > 0) {
                   addNotification(
                     `Abilities ready: ${offCooldown.join(", ")}`,
-                    "success"
+                    "success",
                   );
                 }
               }
@@ -5474,7 +5176,7 @@ function StoryPageContent() {
                 console.log(
                   "[onComplete] Saved gmConversation:",
                   result.scenePart.gmConversation.length,
-                  "messages"
+                  "messages",
                 );
               }
 
@@ -5493,7 +5195,7 @@ function StoryPageContent() {
               console.log(
                 "Saving story - last part choices:",
                 lastPartForSave.choices?.length || 0,
-                "choices"
+                "choices",
               );
               saveProgress(storyData, true);
 
@@ -5519,7 +5221,7 @@ function StoryPageContent() {
           },
           pendingCommandResponses.length > 0
             ? pendingCommandResponses
-            : undefined
+            : undefined,
         ),
         diceAnimationPromise, // Wait for dice animation to complete too
       ]);
@@ -5878,7 +5580,9 @@ function StoryPageContent() {
             });
           },
         },
-        pendingCommandResponses.length > 0 ? pendingCommandResponses : undefined
+        pendingCommandResponses.length > 0
+          ? pendingCommandResponses
+          : undefined,
       );
     } catch (error: any) {
       addNotification(`Error: ${error.message}`, "failure");
@@ -5923,7 +5627,7 @@ function StoryPageContent() {
       const inputs =
         previousPart.choices?.reduce(
           (acc, choice) => ({ ...acc, [choice.text]: false }),
-          {} as Record<string, boolean>
+          {} as Record<string, boolean>,
         ) || {};
       setInput(inputs);
     }
@@ -6037,7 +5741,7 @@ function StoryPageContent() {
       console.error("Error regenerating choices:", error);
       addNotification(
         `Failed to regenerate choices: ${error.message}`,
-        "failure"
+        "failure",
       );
     } finally {
       setLoading(false);
@@ -6073,7 +5777,7 @@ function StoryPageContent() {
             />
             <p className="text-blue-200/60 mb-4">Story not found</p>
             <button
-              onClick={() => router.push("/explorer")}
+              onClick={() => router.push("/library")}
               className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
             >
               Browse Adventures
@@ -6087,7 +5791,7 @@ function StoryPageContent() {
   //GameOverScreen
   if (isGameOver && storyData) {
     const achievedCount = storyData.achievements.filter(
-      (a) => a.dateAchieved
+      (a) => a.dateAchieved,
     ).length;
     const totalAchievements = storyData.achievements.length;
     const completedQuests =
@@ -6236,31 +5940,20 @@ function StoryPageContent() {
                       //Replaysamestory-resettobeginning
                       if (!storyDbId) return;
                       try {
-                        const {
-                          data: { session },
-                        } = await supabase.auth.getSession();
-                        if (!session) {
-                          addNotification(
-                            "Please sign in to replay",
-                            "warning"
-                          );
-                          return;
-                        }
-
                         // Try to fetch fresh adventure data if we have a source adventure
                         let freshTemplate: Partial<StoryData> | null = null;
                         if (sourceAdventureId) {
                           try {
-                            const adventureRes = await fetch(
-                              `/api/adventures/${sourceAdventureId}`
-                            );
-                            if (adventureRes.ok) {
-                              const { adventure } = await adventureRes.json();
-                              freshTemplate = adventure.storyTemplate;
-                            }
+                            const { getLocalAdventure } =
+                              await import("@/app/misc/localAdventureManager");
+                            const localAdv =
+                              await getLocalAdventure(sourceAdventureId);
+                            freshTemplate =
+                              (localAdv?.adventureData as Partial<Adventure>)
+                                ?.storyTemplate || null;
                           } catch (e) {
                             console.warn(
-                              "Could not fetch fresh adventure data, using current story values"
+                              "Could not fetch fresh adventure data, using current story values",
                             );
                           }
                         }
@@ -6323,7 +6016,7 @@ function StoryPageContent() {
                                 ...q,
                                 fulfilled: false,
                                 active: false,
-                              })
+                              }),
                             ) || [],
                           lore: (freshTemplate?.lore || storyData.lore).map(
                             (l) => ({
@@ -6332,39 +6025,19 @@ function StoryPageContent() {
                                 l.on_triggers && l.on_triggers.length > 0
                                   ? false
                                   : true,
-                            })
+                            }),
                           ),
                           newGamePlusMode: false,
                         };
 
-                        // Encrypt before saving
-                        const password = getEncryptionPassword();
-                        const email = user?.email;
-                        if (!password || !email) {
-                          addNotification(
-                            "Please sign out and sign back in to save encrypted stories",
-                            "warning"
-                          );
-                          return;
-                        }
-                        const encryptedData = await encryptStoryData(
-                          resetStoryData,
-                          email,
-                          password
-                        );
-
-                        await fetch(`/api/stories/${storyDbId}`, {
-                          method: "PATCH",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${session.access_token}`,
-                          },
-                          body: JSON.stringify({ storyData: encryptedData }),
-                        });
+                        // Save reset story locally
+                        const { saveLocalStory } =
+                          await import("@/app/misc/localStoryManager");
+                        await saveLocalStory(storyDbId, resetStoryData);
 
                         addNotification(
                           "Story reset! Starting fresh...",
-                          "success"
+                          "success",
                         );
                         router.push(`/story?storyId=${storyDbId}`);
                         window.location.reload();
@@ -6400,17 +6073,6 @@ function StoryPageContent() {
                       //New Game Plus - keep achievements and increase difficulty
                       if (!storyDbId) return;
                       try {
-                        const {
-                          data: { session },
-                        } = await supabase.auth.getSession();
-                        if (!session) {
-                          addNotification(
-                            "Please sign in for New Game Plus",
-                            "warning"
-                          );
-                          return;
-                        }
-
                         const ngPlusCount =
                           (storyData.newGamePlusCount || 0) + 1;
                         const bonusPoints = ngPlusCount * 50; //50pointsperNG+run
@@ -6420,16 +6082,16 @@ function StoryPageContent() {
                         let freshTemplate: Partial<StoryData> | null = null;
                         if (sourceAdventureId) {
                           try {
-                            const adventureRes = await fetch(
-                              `/api/adventures/${sourceAdventureId}`
-                            );
-                            if (adventureRes.ok) {
-                              const { adventure } = await adventureRes.json();
-                              freshTemplate = adventure.storyTemplate;
-                            }
+                            const { getLocalAdventure } =
+                              await import("@/app/misc/localAdventureManager");
+                            const localAdv =
+                              await getLocalAdventure(sourceAdventureId);
+                            freshTemplate =
+                              (localAdv?.adventureData as Partial<Adventure>)
+                                ?.storyTemplate || null;
                           } catch (e) {
                             console.warn(
-                              "Could not fetch fresh adventure data, using current story values"
+                              "Could not fetch fresh adventure data, using current story values",
                             );
                           }
                         }
@@ -6476,7 +6138,7 @@ function StoryPageContent() {
                                 ...q,
                                 fulfilled: false,
                                 active: false,
-                              })
+                              }),
                             ) || [],
                           // Reset lore from fresh adventure or current story
                           lore: (freshTemplate?.lore || storyData.lore).map(
@@ -6486,40 +6148,20 @@ function StoryPageContent() {
                                 l.on_triggers && l.on_triggers.length > 0
                                   ? false
                                   : true,
-                            })
+                            }),
                           ),
                           newGamePlusCount: ngPlusCount,
                           newGamePlusMode: true,
                         };
 
-                        // Encrypt before saving
-                        const password = getEncryptionPassword();
-                        const email = user?.email;
-                        if (!password || !email) {
-                          addNotification(
-                            "Please sign out and sign back in to save encrypted stories",
-                            "warning"
-                          );
-                          return;
-                        }
-                        const encryptedData = await encryptStoryData(
-                          ngPlusStoryData,
-                          email,
-                          password
-                        );
-
-                        await fetch(`/api/stories/${storyDbId}`, {
-                          method: "PATCH",
-                          headers: {
-                            "Content-Type": "application/json",
-                            Authorization: `Bearer ${session.access_token}`,
-                          },
-                          body: JSON.stringify({ storyData: encryptedData }),
-                        });
+                        // Save NG+ story locally
+                        const { saveLocalStory } =
+                          await import("@/app/misc/localStoryManager");
+                        await saveLocalStory(storyDbId, ngPlusStoryData);
 
                         addNotification(
                           `New Game Plus ${ngPlusCount} activated! +${bonusPoints} points, +${bonusMomentum} max momentum`,
-                          "success"
+                          "success",
                         );
                         router.push(`/story?storyId=${storyDbId}`);
                         window.location.reload();
@@ -6527,7 +6169,7 @@ function StoryPageContent() {
                         console.error("Error starting NG+:", error);
                         addNotification(
                           "Failed to start New Game Plus",
-                          "failure"
+                          "failure",
                         );
                       }
                     },
@@ -6554,7 +6196,7 @@ function StoryPageContent() {
               </button>
 
               <button
-                onClick={() => router.push("/explorer")}
+                onClick={() => router.push("/creator")}
                 className="p-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
               >
                 <DynamicIcon name="Map" className="w-5 h-5" />
@@ -6734,10 +6376,10 @@ function StoryPageContent() {
                   syncStatus === "synced"
                     ? "bg-green-500"
                     : syncStatus === "pending"
-                    ? "bg-yellow-500 animate-pulse"
-                    : syncStatus === "local-only"
-                    ? "bg-blue-500"
-                    : "bg-red-500"
+                      ? "bg-yellow-500 animate-pulse"
+                      : syncStatus === "local-only"
+                        ? "bg-blue-500"
+                        : "bg-red-500"
                 }`}
                 title={`Sync: ${syncStatus}`}
               />
@@ -6909,15 +6551,14 @@ function StoryPageContent() {
             }
             addNotification(
               "Local version kept, syncing to cloud...",
-              "success"
+              "success",
             );
           }}
           onKeepServer={async () => {
             // Keep server version - update local
             if (syncConflict.serverData && storyDbId) {
-              const { saveLocalStory } = await import(
-                "@/app/misc/localStoryManager"
-              );
+              const { saveLocalStory } =
+                await import("@/app/misc/localStoryManager");
               await saveLocalStory(storyDbId, syncConflict.serverData, null, {
                 serverUpdatedAt: syncConflict.serverUpdatedAt,
                 markAsSynced: true,
@@ -6961,8 +6602,8 @@ function StoryPageContent() {
                 <span className="font-bold text-blue-400">
                   {Math.floor(
                     (storyData.stats.find(
-                      (s) => s.name === yzePendingChoice.skill_used
-                    )?.value || 0) / 20
+                      (s) => s.name === yzePendingChoice.skill_used,
+                    )?.value || 0) / 20,
                   )}
                 </span>
               </p>

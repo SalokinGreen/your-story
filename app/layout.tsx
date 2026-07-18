@@ -1,16 +1,12 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "./misc/AuthContext";
 import { NotificationProvider } from "./misc/NotificationContext";
 import { APIKeysProvider } from "./misc/APIKeysContext";
-import { SubscriptionProvider } from "./misc/SubscriptionContext";
 import NotificationContainer from "./components/NotificationContainer";
 import PWAInstallPrompt from "./components/PWAInstallPrompt";
 import SiteHeader from "./components/SiteHeader";
 import FontInitializer from "./components/FontInitializer";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Analytics } from "@vercel/analytics/react";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -79,20 +75,14 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <NotificationProvider>
-          <AuthProvider>
-            <SubscriptionProvider>
-              <APIKeysProvider>
-                <SiteHeader />
-                {children}
-              </APIKeysProvider>
-            </SubscriptionProvider>
-          </AuthProvider>
+          <APIKeysProvider>
+            <SiteHeader />
+            {children}
+          </APIKeysProvider>
           <NotificationContainer />
           <PWAInstallPrompt />
           <FontInitializer />
         </NotificationProvider>
-        <SpeedInsights />
-        <Analytics />
       </body>
     </html>
   );

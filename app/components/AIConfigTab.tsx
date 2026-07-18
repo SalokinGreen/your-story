@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { DynamicIcon } from "./DynamicIcon";
@@ -19,11 +18,9 @@ import {
   CustomModel,
   AIConfig,
 } from "@/app/misc/user_settings";
-import { supabase } from "@/app/misc/supabase";
 import SamplingSettingsTab from "./SamplingSettingsTab";
 
 export default function AIConfigTab() {
-  const { user } = useAuth();
   const { keys, hasKey } = useAPIKeys();
   const { addNotification } = useNotification();
 
@@ -139,7 +136,7 @@ export default function AIConfigTab() {
         stored === "-1" ||
         (stored !== null &&
           ![8000, 16000, 36000, 72000, 120000, 200000].includes(
-            parseInt(stored, 10)
+            parseInt(stored, 10),
           ))
       );
     }
@@ -164,12 +161,12 @@ export default function AIConfigTab() {
           stored === "-1" ||
           (stored !== null &&
             ![8000, 16000, 36000, 72000, 120000, 200000].includes(
-              parseInt(stored, 10)
+              parseInt(stored, 10),
             ))
         );
       }
       return false;
-    }
+    },
   );
   // Temporary input values for custom fields - initialize from stored values if in custom mode
   const [customContextInput, setCustomContextInput] = useState(() => {
@@ -249,11 +246,11 @@ export default function AIConfigTab() {
     return false;
   });
 
-  // Load settings from Supabase (custom models + AI config) - only once per session
+  // Load settings from local storage (custom models + AI config) - only once per session
   useEffect(() => {
-    if (user && !hasLoadedSettings) {
+    if (!hasLoadedSettings) {
       setIsLoadingSettings(true);
-      getUserSettings(user.id, supabase)
+      getUserSettings()
         .then((settings) => {
           if (settings) {
             setCustomModels(settings.custom_models || []);
@@ -261,16 +258,16 @@ export default function AIConfigTab() {
             if (settings.custom_models?.length) {
               localStorage.setItem(
                 "customModels",
-                JSON.stringify(settings.custom_models)
+                JSON.stringify(settings.custom_models),
               );
             }
 
-            // Load AI config from cloud ONLY if localStorage doesn't have values
-            // This prevents cloud from overwriting user's recent selections
+            // Load AI config ONLY if localStorage doesn't have values
+            // This prevents overwriting user's recent selections
             if (settings.ai_config) {
               const config = settings.ai_config;
 
-              // Only apply cloud settings if localStorage is empty for that key
+              // Only apply settings if localStorage is empty for that key
               if (config.currentPreset && !localStorage.getItem("aiPreset")) {
                 setCurrentPreset(config.currentPreset);
                 localStorage.setItem("aiPreset", config.currentPreset);
@@ -303,7 +300,7 @@ export default function AIConfigTab() {
                 setCustomMaxContext(config.customMaxContext);
                 localStorage.setItem(
                   "customMaxContext",
-                  config.customMaxContext.toString()
+                  config.customMaxContext.toString(),
                 );
               }
               if (
@@ -313,7 +310,7 @@ export default function AIConfigTab() {
                 setCustomMaxOutput(config.customMaxOutput);
                 localStorage.setItem(
                   "customMaxOutput",
-                  config.customMaxOutput.toString()
+                  config.customMaxOutput.toString(),
                 );
               }
             }
@@ -326,7 +323,7 @@ export default function AIConfigTab() {
         })
         .finally(() => setIsLoadingSettings(false));
     }
-  }, [user, hasLoadedSettings]);
+  }, [hasLoadedSettings]);
 
   // Persist stage model selections to localStorage
   useEffect(() => {
@@ -379,11 +376,10 @@ export default function AIConfigTab() {
     }
   }, [byokMode]);
 
-  // Auto-save context settings to cloud when they change (after initial load)
+  // Auto-save context settings when they change (after initial load)
   useEffect(() => {
-    if (typeof window !== "undefined" && hasLoadedSettings && user) {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("customMaxContext", customMaxContext.toString());
-      // Debounced cloud sync - only save if user is logged in
       const timeoutId = setTimeout(() => {
         const aiConfig: AIConfig = {
           currentPreset,
@@ -395,16 +391,15 @@ export default function AIConfigTab() {
           customMaxOutput:
             customMaxOutput !== 8000 ? customMaxOutput : undefined,
         };
-        updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
+        updateUserSettings({ ai_config: aiConfig });
       }, 1000); // Debounce 1 second
       return () => clearTimeout(timeoutId);
     }
-  }, [customMaxContext, hasLoadedSettings, user]);
+  }, [customMaxContext, hasLoadedSettings]);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && hasLoadedSettings && user) {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("customMaxOutput", customMaxOutput.toString());
-      // Debounced cloud sync - only save if user is logged in
       const timeoutId = setTimeout(() => {
         const aiConfig: AIConfig = {
           currentPreset,
@@ -416,11 +411,11 @@ export default function AIConfigTab() {
           customMaxOutput:
             customMaxOutput !== 8000 ? customMaxOutput : undefined,
         };
-        updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
+        updateUserSettings({ ai_config: aiConfig });
       }, 1000); // Debounce 1 second
       return () => clearTimeout(timeoutId);
     }
-  }, [customMaxOutput, hasLoadedSettings, user]);
+  }, [customMaxOutput, hasLoadedSettings]);
 
   // Check if user has any AI keys configured
   const hasAnyAIKey = hasKey("openRouterKey") || hasKey("deepseekKey");
@@ -469,7 +464,7 @@ export default function AIConfigTab() {
     effectiveStoryModel,
     effectiveToolsModel,
     effectiveChoicesModel,
-    effectiveContextSize
+    effectiveContextSize,
   );
 
   const contextForSavings = effectiveContextSize || 120000;
@@ -480,10 +475,8 @@ export default function AIConfigTab() {
 
   const estimatedCost = Math.max(0, baseEstimatedCost - novelaiSavings);
 
-  // Auto-sync AI config to cloud when preset changes
+  // Auto-sync AI config when preset changes
   const syncAIConfig = async (presetToSync?: string) => {
-    if (!user) return;
-
     const aiConfig: AIConfig = {
       currentPreset: presetToSync || currentPreset,
       storyModel: storyModel || undefined,
@@ -495,15 +488,15 @@ export default function AIConfigTab() {
     };
 
     // Fire and forget - don't block UI
-    updateUserSettings(user.id, { ai_config: aiConfig }, supabase).catch(
-      (err) => console.error("Failed to sync AI config:", err)
+    updateUserSettings({ ai_config: aiConfig }).catch((err) =>
+      console.error("Failed to sync AI config:", err),
     );
   };
 
-  // Auto-sync custom model selections to cloud when they change
-  // This effect runs AFTER initial cloud load (hasLoadedSettings) and only for custom preset
+  // Auto-sync custom model selections when they change
+  // This effect runs AFTER initial load (hasLoadedSettings) and only for custom preset
   useEffect(() => {
-    if (hasLoadedSettings && user && currentPreset === "custom") {
+    if (hasLoadedSettings && currentPreset === "custom") {
       // Debounce the sync to avoid too many requests
       const timeoutId = setTimeout(() => {
         syncAIConfig();
@@ -511,14 +504,7 @@ export default function AIConfigTab() {
       return () => clearTimeout(timeoutId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    storyModel,
-    toolsModel,
-    choicesModel,
-    hasLoadedSettings,
-    currentPreset,
-    user,
-  ]);
+  }, [storyModel, toolsModel, choicesModel, hasLoadedSettings, currentPreset]);
 
   const handlePresetChange = (newPreset: string) => {
     if (typeof window !== "undefined") {
@@ -526,7 +512,7 @@ export default function AIConfigTab() {
       setCurrentPreset(newPreset);
       addNotification(
         `Preset changed to ${MODEL_PRESETS[newPreset].name}`,
-        "success"
+        "success",
       );
       // Auto-sync to cloud
       syncAIConfig(newPreset);
@@ -561,7 +547,7 @@ export default function AIConfigTab() {
     setNewOutputPrice(0);
     addNotification(
       "Model added! Click Sync to save to your account.",
-      "success"
+      "success",
     );
   };
 
@@ -572,7 +558,7 @@ export default function AIConfigTab() {
     localStorage.setItem("customModels", JSON.stringify(updatedModels));
     addNotification(
       "Model removed! Click Sync to save to your account.",
-      "warning"
+      "warning",
     );
   };
 
@@ -603,7 +589,7 @@ export default function AIConfigTab() {
             inputPrice: newInputPrice,
             outputPrice: newOutputPrice,
           }
-        : m
+        : m,
     );
 
     setCustomModels(updatedModels);
@@ -618,7 +604,7 @@ export default function AIConfigTab() {
     setNewOutputPrice(0);
     addNotification(
       "Model updated! Click Sync to save to your account.",
-      "success"
+      "success",
     );
   };
 
@@ -633,7 +619,6 @@ export default function AIConfigTab() {
   };
 
   const handleSaveSettings = async () => {
-    if (!user) return;
     setIsSaving(true);
 
     // Build AI config object
@@ -647,18 +632,17 @@ export default function AIConfigTab() {
       customMaxOutput: customMaxOutput !== 8000 ? customMaxOutput : undefined,
     };
 
-    const { error } = await updateUserSettings(
-      user.id,
-      { custom_models: customModels, ai_config: aiConfig },
-      supabase
-    );
+    const { error } = await updateUserSettings({
+      custom_models: customModels,
+      ai_config: aiConfig,
+    });
 
     setIsSaving(false);
 
     if (error) {
       addNotification("Failed to save settings", "failure");
     } else {
-      addNotification("AI presets synced to your account!", "success");
+      addNotification("AI presets saved!", "success");
     }
   };
 
@@ -745,13 +729,13 @@ export default function AIConfigTab() {
                     localStorage.setItem("aiModelTools", defaultCoinsModel);
                     addNotification(
                       "Switched to Coins mode with Mistral Large 3.0",
-                      "success"
+                      "success",
                     );
                   } else {
                     // Switching to BYOK mode - keep current model selection
                     addNotification(
                       "Switched to BYOK mode - use your own API keys",
-                      "success"
+                      "success",
                     );
                   }
                 }}
@@ -800,8 +784,8 @@ export default function AIConfigTab() {
           novelaiEnabled && hasKey("novelaiKey")
             ? "bg-linear-to-r from-green-600 to-teal-600"
             : byokMode
-            ? "bg-linear-to-r from-purple-600 to-blue-600"
-            : "bg-linear-to-r from-amber-500 to-orange-600"
+              ? "bg-linear-to-r from-purple-600 to-blue-600"
+              : "bg-linear-to-r from-amber-500 to-orange-600"
         } rounded-lg p-4 text-white`}
       >
         <div className="flex items-center justify-between mb-2">
@@ -861,7 +845,7 @@ export default function AIConfigTab() {
                 <span className="text-white/40 ml-1">
                   -{" "}
                   {Math.round(
-                    getModelConfig(effectiveStoryModel).maxTokens / 1000
+                    getModelConfig(effectiveStoryModel).maxTokens / 1000,
                   )}
                   K context
                 </span>
@@ -956,7 +940,7 @@ export default function AIConfigTab() {
                     if (val === -1) {
                       setIsCustomContextMode(true);
                       setCustomContextInput(
-                        customMaxContext > 0 ? String(customMaxContext) : ""
+                        customMaxContext > 0 ? String(customMaxContext) : "",
                       );
                     } else {
                       setIsCustomContextMode(false);
@@ -1048,7 +1032,7 @@ export default function AIConfigTab() {
                     if (val === -1) {
                       setIsCustomOutputMode(true);
                       setCustomOutputInput(
-                        customMaxOutput > 0 ? String(customMaxOutput) : ""
+                        customMaxOutput > 0 ? String(customMaxOutput) : "",
                       );
                     } else {
                       setIsCustomOutputMode(false);
@@ -1170,7 +1154,7 @@ export default function AIConfigTab() {
                                 value={newContextSize}
                                 onChange={(e) =>
                                   setNewContextSize(
-                                    parseInt(e.target.value) || 4096
+                                    parseInt(e.target.value) || 4096,
                                   )
                                 }
                                 placeholder="Context Size"
@@ -1181,7 +1165,7 @@ export default function AIConfigTab() {
                                 value={newMaxOutput}
                                 onChange={(e) =>
                                   setNewMaxOutput(
-                                    parseInt(e.target.value) || 1000
+                                    parseInt(e.target.value) || 1000,
                                   )
                                 }
                                 placeholder="Max Output"
@@ -1361,10 +1345,10 @@ export default function AIConfigTab() {
               {customModels.length > 0 && (
                 <button
                   onClick={handleSaveSettings}
-                  disabled={isSaving || !user}
+                  disabled={isSaving}
                   className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
                 >
-                  {isSaving ? "Saving..." : "Sync Custom Models"}
+                  {isSaving ? "Saving..." : "Save Custom Models"}
                 </button>
               )}
             </div>

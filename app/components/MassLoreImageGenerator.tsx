@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { DynamicIcon } from "./DynamicIcon";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
-import { getAuthToken } from "@/app/misc/getAuthToken";
 import {
   getSavedImageGenSettings,
   saveImageGenSettings,
@@ -27,7 +24,6 @@ export default function MassLoreImageGenerator({
   lore,
   onLoreUpdate,
 }: MassLoreImageGeneratorProps) {
-  const { user } = useAuth();
   const { keys: apiKeys } = useAPIKeys();
   const { addNotification } = useNotification();
 
@@ -84,10 +80,6 @@ export default function MassLoreImageGenerator({
   // Process a single lore entry - returns the updated entry or null on failure
   const processLoreEntry = async (
     loreEntry: StoryLore,
-    index: number,
-    token: string,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    supabase: any
   ): Promise<{ loreEntry: StoryLore; success: boolean }> => {
     try {
       const prompt = generatePromptForLore(loreEntry);
@@ -97,7 +89,6 @@ export default function MassLoreImageGenerator({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           prompt,
@@ -106,6 +97,8 @@ export default function MassLoreImageGenerator({
           provider: imageProvider,
           openRouterKey:
             imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
+          deepInfraKey:
+            imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
         }),
       });
 
@@ -116,33 +109,14 @@ export default function MassLoreImageGenerator({
 
       const { imageUrl } = await response.json();
 
-      // Upload to Supabase storage
-      const imageResponse = await fetch(imageUrl);
-      const imageBlob = await imageResponse.blob();
-
-      const fileName = `${Date.now()}-ai-lore-thumb-${index}-${Math.random()
-        .toString(36)
-        .slice(2, 7)}.webp`;
-      const filePath = `${user!.id}/lore-thumbnails/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("adventure-images")
-        .upload(filePath, imageBlob, { cacheControl: "3600", upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from("adventure-images")
-        .getPublicUrl(filePath);
-
       return {
-        loreEntry: { ...loreEntry, thumbnailUrl: data.publicUrl },
+        loreEntry: { ...loreEntry, thumbnailUrl: imageUrl },
         success: true,
       };
     } catch (error) {
       console.error(
         `Failed to generate image for "${loreEntry.title}":`,
-        error
+        error,
       );
       return { loreEntry, success: false };
     }
@@ -150,22 +124,18 @@ export default function MassLoreImageGenerator({
 
   // Generate all images in batches of 5
   const generateAll = useCallback(async () => {
-    if (!user) {
-      addNotification("Please sign in to generate images", "warning");
-      return;
-    }
-
-    const token = await getAuthToken();
-    if (!token) {
-      addNotification("Authentication required", "warning");
-      return;
-    }
-
-    // Validate API key for OpenRouter provider
+    // Validate API key for the selected provider
     if (imageProvider === "openrouter" && !apiKeys.openRouterKey) {
       addNotification(
         "OpenRouter API key required. Please add your API key in Settings.",
-        "warning"
+        "warning",
+      );
+      return;
+    }
+    if (imageProvider === "deepinfra" && !apiKeys.deepinfraKey) {
+      addNotification(
+        "DeepInfra API key required. Please add your API key in Settings.",
+        "warning",
       );
       return;
     }
@@ -177,11 +147,6 @@ export default function MassLoreImageGenerator({
 
     setIsGenerating(true);
     setProgress({ current: 0, total: count });
-
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-    const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY!;
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const supabase: any = createClient(supabaseUrl, supabaseKey);
 
     let successCount = 0;
     let failCount = 0;
@@ -196,20 +161,18 @@ export default function MassLoreImageGenerator({
     ) {
       const batch = loreWithoutImages.slice(
         batchStart,
-        batchStart + BATCH_SIZE
+        batchStart + BATCH_SIZE,
       );
       const batchTitles = batch.map((l) => l.title || "Untitled").join(", ");
       setCurrentLoreTitle(
         `Batch: ${batchTitles.substring(0, 50)}${
           batchTitles.length > 50 ? "..." : ""
-        }`
+        }`,
       );
 
       // Process batch in parallel
       const results = await Promise.all(
-        batch.map((loreEntry, i) =>
-          processLoreEntry(loreEntry, batchStart + i, token, supabase)
-        )
+        batch.map((loreEntry) => processLoreEntry(loreEntry)),
       );
 
       // Update results
@@ -218,7 +181,7 @@ export default function MassLoreImageGenerator({
           successCount++;
           // Find and update the lore entry in updatedLore
           const loreIndex = lore.findIndex(
-            (l) => l.title === result.loreEntry.title
+            (l) => l.title === result.loreEntry.title,
           );
           if (loreIndex !== -1) {
             updatedLore[loreIndex] = result.loreEntry;
@@ -248,22 +211,22 @@ export default function MassLoreImageGenerator({
     if (failCount === 0) {
       addNotification(
         `Successfully generated ${successCount} images!`,
-        "success"
+        "success",
       );
     } else {
       addNotification(
         `Generated ${successCount} images, ${failCount} failed`,
-        failCount > successCount ? "failure" : "warning"
+        failCount > successCount ? "failure" : "warning",
       );
     }
   }, [
-    user,
     count,
     lore,
     loreWithoutImages,
     imageModel,
     imageProvider,
     apiKeys.openRouterKey,
+    apiKeys.deepinfraKey,
     addNotification,
     onLoreUpdate,
   ]);
@@ -301,7 +264,7 @@ export default function MassLoreImageGenerator({
                 value={imageProvider}
                 onChange={(e) =>
                   handleProviderChange(
-                    e.target.value as "deepinfra" | "openrouter"
+                    e.target.value as "deepinfra" | "openrouter",
                   )
                 }
                 disabled={isGenerating}
@@ -327,7 +290,7 @@ export default function MassLoreImageGenerator({
                           {key} (
                           {config.cost === 0 ? "FREE" : `${config.cost} coins`})
                         </option>
-                      )
+                      ),
                     )
                   : Object.entries(OPENROUTER_IMAGE_MODELS).map(
                       ([key, config]) => {
@@ -337,15 +300,15 @@ export default function MassLoreImageGenerator({
                           ? key.includes("Flux 2 Pro")
                             ? "~$0.030"
                             : key.includes("Flux 2 Flex")
-                            ? "~$0.015"
-                            : "varies"
+                              ? "~$0.015"
+                              : "varies"
                           : `~$${(config.inputPrice || 0).toFixed(3)}`;
                         return (
                           <option key={key} value={key}>
                             {key} ({displayCost})
                           </option>
                         );
-                      }
+                      },
                     )}
               </select>
             </div>

@@ -20,11 +20,7 @@ import {
 // Import client components
 import LandingAuthSection from "./components/LandingAuthSection";
 import QuickStartGenres from "./components/QuickStartGenres";
-import PopularAdventures from "./components/PopularAdventures";
 import InfoTabs from "./components/InfoTabs";
-
-// Server-side data fetching
-import { getPopularAdventures } from "./misc/getPopularAdventures";
 
 // Enable ISR with 5 minute revalidation for the entire page
 export const revalidate = 300;
@@ -111,9 +107,6 @@ const features = [
 ];
 
 export default async function Home() {
-  // Server-side fetch popular adventures
-  const popularAdventures = await getPopularAdventures(6);
-
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
       <main className="max-w-6xl mx-auto px-4 py-6">
@@ -133,9 +126,6 @@ export default async function Home() {
 
         {/* Quick Start Genres - Client component */}
         <QuickStartGenres />
-
-        {/* Featured Adventures - Server-fetched, client-rendered */}
-        <PopularAdventures adventures={popularAdventures} />
 
         {/* How It Works - Static server-rendered */}
         <div className="mb-8">
@@ -185,8 +175,8 @@ export default async function Home() {
                   item.status === "done"
                     ? "bg-green-500/10 border-green-500/30"
                     : item.status === "wip"
-                    ? "bg-blue-500/10 border-blue-500/30"
-                    : "bg-blue-950/30 border-blue-800/20"
+                      ? "bg-blue-500/10 border-blue-500/30"
+                      : "bg-blue-950/30 border-blue-800/20"
                 }`}
               >
                 <div className="flex items-center gap-2 mb-2">
@@ -195,8 +185,8 @@ export default async function Home() {
                       item.status === "done"
                         ? "text-green-400"
                         : item.status === "wip"
-                        ? "text-blue-400"
-                        : "text-blue-200/40"
+                          ? "text-blue-400"
+                          : "text-blue-200/40"
                     }`}
                   />
                   <span
@@ -204,15 +194,15 @@ export default async function Home() {
                       item.status === "done"
                         ? "bg-green-500/20 text-green-300"
                         : item.status === "wip"
-                        ? "bg-blue-500/20 text-blue-300"
-                        : "bg-blue-800/20 text-blue-200/40"
+                          ? "bg-blue-500/20 text-blue-300"
+                          : "bg-blue-800/20 text-blue-200/40"
                     }`}
                   >
                     {item.status === "done"
                       ? "Done"
                       : item.status === "wip"
-                      ? "WIP"
-                      : "Planned"}
+                        ? "WIP"
+                        : "Planned"}
                   </span>
                 </div>
                 <h3 className="font-medium text-white text-sm mb-1">

@@ -6,12 +6,7 @@
  */
 
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import {
-  getModelConfig,
-  calculateTokenCost,
-  calculateCostFromEstimatedCost,
-} from "@/app/misc/ai_prices";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 import {
   BigAdventureConfig,
@@ -22,13 +17,9 @@ import {
   parseRegenerateSectionOutput,
 } from "@/app/misc/big_adventure_ai";
 import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
-import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
 
 // NovelAI API endpoint
 const NOVELAI_API_URL = "https://text.novelai.net/oa/v1/completions";
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // 2 minutes max for single section
@@ -43,24 +34,26 @@ interface RequestBody {
   openRouterKey?: string;
   deepseekKey?: string;
   novelaiKey?: string;
+  mistralKey?: string;
+  deepinfraKey?: string;
 }
 
 function getApiKey(
   provider: "deepseek" | "openrouter" | "novelai" | "mistral" | "deepinfra",
   userProvidedOpenRouterKey?: string,
   userProvidedDeepseekKey?: string,
-  novelaiKey?: string
+  novelaiKey?: string,
+  mistralKey?: string,
+  deepinfraKey?: string,
 ): string | null {
   if (provider === "deepseek") {
     return userProvidedDeepseekKey || null;
   } else if (provider === "novelai") {
     return novelaiKey || null;
   } else if (provider === "mistral") {
-    // Mistral uses server-side API key - users pay with coins
-    return process.env.MISTRAL_API_KEY || null;
+    return mistralKey || null;
   } else if (provider === "deepinfra") {
-    // DeepInfra uses server-side API key - users pay with coins
-    return process.env.DEEPINFRA_API_KEY || null;
+    return deepinfraKey || null;
   } else {
     return userProvidedOpenRouterKey || null;
   }
@@ -96,7 +89,7 @@ async function streamNovelAIResponse(
   maxOutputTokens: number,
   temperature: number,
   controller: ReadableStreamDefaultController,
-  encoder: TextEncoder
+  encoder: TextEncoder,
 ): Promise<{
   content: string;
   promptTokens: number;
@@ -107,7 +100,7 @@ async function streamNovelAIResponse(
     messages.map((m) => ({
       role: m.role as "system" | "user" | "assistant" | "tool",
       content: m.content,
-    }))
+    })),
   );
 
   const requestBody = {
@@ -176,8 +169,8 @@ async function streamNovelAIResponse(
               `data: ${JSON.stringify({
                 type: "content",
                 content: textContent,
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
         }
       } catch {
@@ -201,43 +194,7 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Validate auth
-        const authHeader = req.headers.get("authorization");
-        if (!authHeader) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: "Unauthorized",
-              })}\n\n`
-            )
-          );
-          controller.close();
-          return;
-        }
-
-        const token = authHeader.replace("Bearer ", "");
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser(token);
-
-        if (authError || !user) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: "Unauthorized",
-              })}\n\n`
-            )
-          );
-          controller.close();
-          return;
-        }
-
-        // Parse request
+        // Parse request (no auth required - BYOK only)
         const body: RequestBody = await req.json();
         const {
           section,
@@ -249,6 +206,8 @@ export async function POST(req: NextRequest) {
           openRouterKey,
           deepseekKey,
           novelaiKey,
+          mistralKey,
+          deepinfraKey,
         } = body;
 
         if (!section || !REGENERATE_SECTIONS[section]) {
@@ -257,8 +216,8 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({
                 type: "error",
                 error: "Invalid section specified",
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
@@ -270,8 +229,8 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({
                 type: "error",
                 error: "Config and currentResult are required",
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
@@ -279,13 +238,6 @@ export async function POST(req: NextRequest) {
 
         // Get model config
         const modelConfig = getModelConfig(model);
-        const isByok =
-          modelConfig.provider === "openrouter" ||
-          modelConfig.provider === "deepseek" ||
-          modelConfig.provider === "novelai";
-        const isCoinsProvider =
-          modelConfig.provider === "mistral" ||
-          modelConfig.provider === "deepinfra";
 
         // Get API key
         const apiKey = getApiKey(
@@ -297,57 +249,34 @@ export async function POST(req: NextRequest) {
             | "deepinfra",
           openRouterKey,
           deepseekKey,
-          novelaiKey
+          novelaiKey,
+          mistralKey,
+          deepinfraKey,
         );
 
         if (!apiKey) {
-          let errorMessage: string;
-
-          if (modelConfig.provider === "mistral") {
-            errorMessage =
-              "Mistral API is not configured on the server. Please contact support.";
-          } else if (modelConfig.provider === "deepinfra") {
-            errorMessage =
-              "DeepInfra API is not configured on the server. Please contact support.";
-          } else {
-            const providerName =
-              modelConfig.provider === "deepseek"
-                ? "DeepSeek"
-                : modelConfig.provider === "openrouter"
+          const providerName =
+            modelConfig.provider === "deepseek"
+              ? "DeepSeek"
+              : modelConfig.provider === "openrouter"
                 ? "OpenRouter"
-                : "NovelAI";
-            errorMessage = `${providerName} API key required. Please add your API key in Settings.`;
-          }
+                : modelConfig.provider === "mistral"
+                  ? "Mistral"
+                  : modelConfig.provider === "deepinfra"
+                    ? "DeepInfra"
+                    : "NovelAI";
+          const errorMessage = `${providerName} API key required. Please add your API key in Settings.`;
 
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
                 error: errorMessage,
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
-        }
-
-        // Check token balance for Coins mode providers (Mistral/DeepInfra) before making request
-        if (isCoinsProvider) {
-          const balance = await getUserTokenBalance(user.id, supabase);
-          const estimatedCost = Math.max(1, modelConfig.cost || 1);
-          const currentBalance = balance?.total ?? 0;
-          if (currentBalance < estimatedCost) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "error",
-                  error: `Insufficient coins. You need at least ${estimatedCost} coins. Current balance: ${currentBalance}`,
-                })}\n\n`
-              )
-            );
-            controller.close();
-            return;
-          }
         }
 
         const sectionInfo = REGENERATE_SECTIONS[section];
@@ -359,8 +288,8 @@ export async function POST(req: NextRequest) {
               type: "start",
               section,
               sectionName: sectionInfo.name,
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
 
         // Build messages
@@ -368,7 +297,7 @@ export async function POST(req: NextRequest) {
           section,
           config,
           existingResult,
-          additionalInstructions
+          additionalInstructions,
         );
 
         let fullContent = "";
@@ -384,7 +313,7 @@ export async function POST(req: NextRequest) {
             maxOutputTokens,
             config.temperature ?? 0.8,
             controller,
-            encoder
+            encoder,
           );
           fullContent = result.content;
           promptTokens = result.promptTokens;
@@ -472,8 +401,8 @@ export async function POST(req: NextRequest) {
                         `data: ${JSON.stringify({
                           type: "content",
                           content: textContent,
-                        })}\n\n`
-                      )
+                        })}\n\n`,
+                      ),
                     );
                   }
                 }
@@ -501,45 +430,12 @@ export async function POST(req: NextRequest) {
           throw new Error("Failed to parse regenerated content");
         }
 
-        // Deduct tokens for Coins mode providers (Mistral/DeepInfra)
-        let tokenCost = 0;
-        if (
-          isCoinsProvider &&
-          (promptTokens > 0 ||
-            completionTokens > 0 ||
-            estimatedCostDollars !== undefined)
-        ) {
-          if (
-            modelConfig.provider === "deepinfra" &&
-            estimatedCostDollars !== undefined
-          ) {
-            tokenCost = calculateCostFromEstimatedCost(estimatedCostDollars);
-          } else {
-            tokenCost = calculateTokenCost(
-              model,
-              promptTokens,
-              completionTokens
-            );
-          }
-          const deductResult = await deductTokens(user.id, tokenCost, supabase);
-          if (!deductResult.success) {
-            logger.warn("Failed to deduct tokens for regenerate section", {
-              userId: user.id,
-              provider: modelConfig.provider,
-              tokenCost,
-              error: deductResult.error,
-            });
-          }
-        }
-
         logger.action("Section regeneration complete", {
-          userId: user.id,
           model: modelConfig.model,
           provider: modelConfig.provider,
           section,
           promptTokens,
           completionTokens,
-          tokenCost,
         });
 
         // Send final result
@@ -559,11 +455,10 @@ export async function POST(req: NextRequest) {
                   completionTokens,
                   totalTokens: promptTokens + completionTokens,
                 },
-                tokenCost: tokenCost > 0 ? tokenCost : undefined,
-                isByok,
+                isByok: true,
               },
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
 
         controller.close();
@@ -578,8 +473,8 @@ export async function POST(req: NextRequest) {
             `data: ${JSON.stringify({
               type: "error",
               error: errorMessage || "Internal server error",
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
         controller.close();
       }
