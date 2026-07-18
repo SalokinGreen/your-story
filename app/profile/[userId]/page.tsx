@@ -10,8 +10,6 @@ import AdminControls from "@/app/components/AdminControls";
 import EditDisplayName from "@/app/components/EditDisplayName";
 import EditProfile from "@/app/components/EditProfile";
 import UserOptions from "@/app/components/UserOptions";
-import SubscriptionCard from "@/app/components/SubscriptionCard";
-import PricingTable from "@/app/components/PricingTable";
 import { Adventure } from "@/app/misc/structs";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 
@@ -51,7 +49,6 @@ export default function ProfilePage() {
   const [adventures, setAdventures] = useState<Adventure[]>([]);
   const [loadingAdventures, setLoadingAdventures] = useState(true);
   const [showGiftForm, setShowGiftForm] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
   const [activeTab, setActiveTab] = useState<"adventures" | "activity">(
     "adventures"
   );
@@ -520,13 +517,6 @@ export default function ProfilePage() {
           </div>
         </div>
 
-        {/* Subscription Card (only for own profile) */}
-        {isOwnProfile && (
-          <div className="mb-4">
-            <SubscriptionCard onUpgrade={() => setShowPricing(true)} />
-          </div>
-        )}
-
         {/* User Options (only for own profile) */}
         {isOwnProfile && (
           <div className="mb-4">
@@ -723,26 +713,6 @@ export default function ProfilePage() {
           </div>
         )}
       </div>
-
-      {/* Pricing Modal */}
-      {showPricing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-blue-950 rounded-2xl border border-blue-800/30 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-blue-950 border-b border-blue-800/30 px-4 py-3 flex items-center justify-between">
-              <h2 className="text-lg font-bold text-white">
-                Subscription Plans
-              </h2>
-              <button
-                onClick={() => setShowPricing(false)}
-                className="p-1.5 hover:bg-blue-900/50 rounded-lg transition-colors"
-              >
-                <DynamicIcon name="X" className="w-5 h-5 text-blue-200/60" />
-              </button>
-            </div>
-            <PricingTable onClose={() => setShowPricing(false)} />
-          </div>
-        </div>
-      )}
     </div>
   );
 }

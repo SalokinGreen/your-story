@@ -6,8 +6,6 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/app/misc/supabase";
 import { DynamicIcon } from "./DynamicIcon";
 import APIKeysModal from "./APIKeysModal";
-import SubscriptionBadge from "./SubscriptionBadge";
-import PricingTable from "./PricingTable";
 
 interface ProfileData {
   avatar_url?: string;
@@ -20,7 +18,6 @@ export default function SiteHeader() {
   const [profileData, setProfileData] = useState<ProfileData | null>(null);
   const [displayName, setDisplayName] = useState<string>("");
   const [showAPIKeysModal, setShowAPIKeysModal] = useState(false);
-  const [showPricing, setShowPricing] = useState(false);
 
   useEffect(() => {
     if (!user) return;
@@ -161,16 +158,8 @@ export default function SiteHeader() {
               </button>
             </nav>
 
-            {/* Right side - Subscription + Settings + Profile + Mobile Menu */}
+            {/* Right side - Settings + Profile + Mobile Menu */}
             <div className="flex items-center gap-1">
-              {/* Subscription Badge */}
-              <div className="hidden sm:block">
-                <SubscriptionBadge
-                  compact
-                  onClick={() => setShowPricing(true)}
-                />
-              </div>
-
               {/* Settings Button */}
               <button
                 onClick={() => setShowAPIKeysModal(true)}
@@ -301,29 +290,6 @@ export default function SiteHeader() {
           onClose={() => setShowAPIKeysModal(false)}
         />
       </header>
-
-      {/* Pricing Modal - Outside header to avoid sticky positioning issues */}
-      {showPricing && (
-        <div
-          className="fixed inset-0 z-100 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm"
-          onClick={(e) => e.target === e.currentTarget && setShowPricing(false)}
-        >
-          <div className="bg-blue-950 rounded-2xl border border-blue-800/30 max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-blue-950 border-b border-blue-800/30 px-4 py-3 flex items-center justify-between z-10">
-              <h2 className="text-lg font-bold text-white">
-                Subscription Plans
-              </h2>
-              <button
-                onClick={() => setShowPricing(false)}
-                className="p-1.5 hover:bg-blue-900/50 rounded-lg transition-colors"
-              >
-                <DynamicIcon name="X" className="w-5 h-5 text-blue-200/60" />
-              </button>
-            </div>
-            <PricingTable onClose={() => setShowPricing(false)} />
-          </div>
-        </div>
-      )}
     </>
   );
 }

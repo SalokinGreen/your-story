@@ -512,6 +512,18 @@ export interface Combatant {
  * Active combat state tracking
  * Only one combat can be active at a time
  */
+/**
+ * Reasoning-tier router state — tracks self-escalation decay and the
+ * per-scene top-tier call cap across turns. Scene boundaries aren't a
+ * formal concept elsewhere in StoryData, so `lastSceneKey` is an opaque
+ * heuristic string (see reasoningTiers.ts) rather than a real scene id.
+ */
+export interface ReasoningTierState {
+  currentTier: number; // Tier used for adjudication last turn (decays toward baseline each turn)
+  tier3CallsInScene: number; // Top-tier calls used against MAX_TIER3_CALLS_PER_SCENE
+  lastSceneKey?: string; // Opaque scene-boundary key; resets tier3CallsInScene when it changes
+}
+
 export interface CombatState {
   active: boolean; // Is combat ongoing?
   name?: string; // Combat name (e.g., "Battle in the Tavern", "Ambush on the Forest Road")
@@ -706,6 +718,7 @@ export interface StoryData {
   timers?: CountdownTimer[]; // Countdown timers for deadlines/events
   combatState?: CombatState; // Active tactical combat state (turn-based combat tracking)
   threads?: StoryThread[]; // Active story threads/plotlines (independent of AGMT)
+  reasoningTierState?: ReasoningTierState; // Reasoning-tier router: decay/cap tracking across turns
   author_notes?: string;
   player_notes?: string;
   selected_preset?: string; // ID of the preset used

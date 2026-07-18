@@ -263,21 +263,16 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 
 ### Subscription System
 
-- **Tiers**: free (100 coins/week, no BYOK), starter ($10/month, 700 coins/week + BYOK), pro ($15/month, 1200 coins/week + BYOK), premium ($30/month, 2800 coins/week + BYOK).
-- **Database**: user_subscriptions table with subscription_tier enum, Stripe IDs, period tracking, weekly coin refills. See docs/subscription-migration.sql.
-- **Stripe Integration**: Uses Stripe Checkout for subscription creation, Customer Portal for management, webhooks for lifecycle events.
-- **Weekly Coins**: Refilled automatically on first request after 7 days since last refill. Coins don't roll over - reset to tier amount.
-- **Coin Purchases**: Paid subscribers can buy additional coin packages ($5-$40) via one-time Stripe Checkout. Packages in COIN_PACKAGES (subscriptions.ts).
+- **Stripe purchasing removed**: checkout/webhook/portal/coins routes, BuyCoinsModal, PricingTable, SubscriptionCard, SubscriptionBadge, UpgradePrompt are all gone. Paid tiers are currently unreachable - only the free tier exists in practice.
+- **Coin ledger still live**: app/misc/tokens.ts still deducts coins per generation call (generate/generate-stream/tts/stt/ocr/creator routes) - this was intentionally kept, only the purchase/billing UI was removed.
+- **Database**: user_subscriptions table with subscription_tier enum, Stripe ID columns (now always null), period tracking, weekly coin refills. See docs/subscription-migration.sql.
+- **Weekly Coins**: Refilled automatically on first request after 7 days since last refill (free tier only reachable, via /api/subscriptions GET). Coins don't roll over - reset to tier amount.
 - **API Routes**:
-  - /api/subscriptions - GET current subscription status
-  - /api/subscriptions/checkout - POST to create Stripe checkout session
-  - /api/subscriptions/portal - POST to create Stripe customer portal session
-  - /api/subscriptions/webhook - POST for Stripe webhook events (handles both subscriptions and coin purchases)
-  - /api/subscriptions/coins - GET/POST for coin package purchases (requires paid subscription)
-- **Client Context**: SubscriptionContext provides tier, hasByokAccess, coinsRemaining, canBuyCoins, coinPackages, startCheckout(), openCustomerPortal(), purchaseCoins(), refreshSubscription().
-- **UI Components**: SubscriptionCard (profile display with Buy Coins button), BuyCoinsModal (coin purchase interface), PricingTable (plan comparison).
-- **BYOK Gating**: APIKeysContext checks hasByokAccess from SubscriptionContext before allowing key usage.
-- **Environment Variables**: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_STARTER, STRIPE_PRICE_PRO, STRIPE_PRICE_PREMIUM, STRIPE_PRICE_COINS_500, STRIPE_PRICE_COINS_1200, STRIPE_PRICE_COINS_2500, STRIPE_PRICE_COINS_5500.
+  - /api/subscriptions - GET current subscription status, auto-creates free tier, handles weekly refill
+  - /api/subscriptions/admin - POST, admin-only grant/revoke/set_coins/add_coins (support tooling, no Stripe dependency)
+- **Client Context**: SubscriptionContext provides tier, hasByokAccess (force-enabled `true` for everyone since there's no purchase flow to reach a paid tier), weeklyCoins, daysUntilRefill, refreshSubscription().
+- **BYOK Gating**: APIKeysContext checks hasByokAccess from SubscriptionContext before allowing key usage - always true now.
+- **Reasoning-tier router**: app/misc/reasoningTiers.ts picks (model, reasoning_effort) automatically per GM turn - see REASONING_TIERS, NARRATION_MODEL_KEY. Replaces the old manual per-stage model picker in AIConfigTab.tsx.
 - **Markup**: MARKUP_MULTIPLIER in ai_prices.ts is 2.5x (platform takes 60% margin on Coins usage).
 
 ### Adventure Visibility System
@@ -375,11 +370,6 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - SUPABASE_URL=<your_url> (same as NEXT_PUBLIC)
   - SUPABASE_KEY=<your_anon_key> (same as NEXT_PUBLIC)
   - SUPABASE_SERVICE_ROLE_KEY=<your_service_role_key>
-  - STRIPE_SECRET_KEY=<your_stripe_secret_key>
-  - STRIPE_WEBHOOK_SECRET=<your_webhook_secret>
-  - STRIPE_PRICE_STARTER=<stripe_price_id_for_starter>
-  - STRIPE_PRICE_PRO=<stripe_price_id_for_pro>
-  - STRIPE_PRICE_PREMIUM=<stripe_price_id_for_premium>
   - Optional: DEFAULT_AI_MODEL=Deepseek Chat
   - Optional: DEEPSEEK_MODEL=deepseek-chat
   - Optional: NEXT_PUBLIC_SITE_URL=<your_site_url>

@@ -183,6 +183,17 @@ export interface RespondToPlayerParams {
   dramatic_moment?: boolean; // Mark as particularly dramatic (affects narration style)
 }
 
+/**
+ * Set Reasoning Tier - GM's self-escalation request, intercepted by the
+ * reasoning-tier router (reasoningTiers.ts) in generation.ts. Does not
+ * mutate story state directly - the controller applies decay/cap policy
+ * and swaps the model for subsequent GM stage rounds.
+ */
+export interface SetReasoningTierParams {
+  tier: number; // 0-3, requested reasoning tier
+  reason: string; // One line: why this needs more reasoning
+}
+
 // ============================================
 // COMBAT SYSTEM INTERFACES
 // ============================================
@@ -963,6 +974,31 @@ DO NOT call if:
         },
       },
       required: ["summary", "outcome"],
+    },
+  },
+};
+
+const setReasoningTierTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "set_reasoning_tier",
+    description:
+      "Request that the NEXT reasoning step run at a higher brain-power tier. Use only when the current task genuinely exceeds your ability (complex multi-entity adjudication, tricky rules interaction, pivotal plot decision). Do not use for ordinary narration.",
+    parameters: {
+      type: "object",
+      properties: {
+        tier: {
+          type: "integer",
+          minimum: 0,
+          maximum: 3,
+          description: "Requested reasoning tier (0 = lightest, 3 = heaviest).",
+        },
+        reason: {
+          type: "string",
+          description: "One line: why this needs more reasoning.",
+        },
+      },
+      required: ["tier", "reason"],
     },
   },
 };
@@ -1907,6 +1943,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   npcReactionTool,
   // Terminal tool - ends GM loop
   endGmThinkingTool,
+  // Reasoning-tier self-escalation
+  setReasoningTierTool,
 ];
 
 /**

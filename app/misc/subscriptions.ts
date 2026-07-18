@@ -28,7 +28,6 @@ export interface SubscriptionTierConfig {
   byokAccess: boolean;
   description: string;
   features: string[];
-  stripePriceId?: string; // Set from environment variables
 }
 
 export interface UserSubscription {
@@ -220,34 +219,6 @@ export function formatPrice(tier: SubscriptionTier): string {
 }
 
 // ============================================
-// STRIPE CONFIGURATION
-// ============================================
-
-// These should be set from environment variables in production
-export interface StripeConfig {
-  publishableKey: string;
-  priceIds: Record<SubscriptionTier, string | undefined>;
-}
-
-/**
- * Get Stripe price ID for a tier
- * Returns undefined for free tier (no Stripe product)
- */
-export function getStripePriceId(tier: SubscriptionTier): string | undefined {
-  if (tier === "free") return undefined;
-
-  // These environment variables should be set in .env.local
-  const priceIds: Record<SubscriptionTier, string | undefined> = {
-    free: undefined,
-    starter: process.env.NEXT_PUBLIC_STRIPE_PRICE_STARTER,
-    pro: process.env.NEXT_PUBLIC_STRIPE_PRICE_PRO,
-    premium: process.env.NEXT_PUBLIC_STRIPE_PRICE_PREMIUM,
-  };
-
-  return priceIds[tier];
-}
-
-// ============================================
 // CONSTANTS
 // ============================================
 
@@ -261,49 +232,7 @@ export const SUBSCRIPTION_GRACE_PERIOD_DAYS = 3;
 export const DEFAULT_TIER: SubscriptionTier = "free";
 
 // Minimum tier required for BYOK access
+// Note: BYOK is force-enabled for everyone in SubscriptionContext.tsx now
+// that there's no purchase flow to reach a paid tier - this constant is
+// unused but left for reference.
 export const BYOK_MINIMUM_TIER: SubscriptionTier = "starter";
-
-// ============================================
-// COIN PACKAGES (One-time purchases for subscribers)
-// ============================================
-
-export interface CoinPackage {
-  id: string;
-  name: string;
-  coins: number;
-  price: number; // in dollars
-  bonusPercent: number;
-  stripePriceId?: string;
-}
-
-export const COIN_PACKAGES: CoinPackage[] = [
-  { id: "coins_500", name: "500 Coins", coins: 500, price: 5, bonusPercent: 0 },
-  {
-    id: "coins_1200",
-    name: "1,200 Coins",
-    coins: 1200,
-    price: 10,
-    bonusPercent: 20,
-  },
-  {
-    id: "coins_2500",
-    name: "2,500 Coins",
-    coins: 2500,
-    price: 20,
-    bonusPercent: 25,
-  },
-  {
-    id: "coins_5500",
-    name: "5,500 Coins",
-    coins: 5500,
-    price: 40,
-    bonusPercent: 37,
-  },
-];
-
-/**
- * Get coin package by ID
- */
-export function getCoinPackage(id: string): CoinPackage | undefined {
-  return COIN_PACKAGES.find((pkg) => pkg.id === id);
-}
