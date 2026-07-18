@@ -71,8 +71,6 @@ import {
 } from "@/app/misc/samplingSettings";
 import { MYTHIC_TABLE_NAMES } from "@/app/misc/mythic";
 import {
-  REASONING_TIERS,
-  NARRATION_MODEL_KEY,
   SCENE_BASELINE_TIER,
   ReasoningEffort,
   resolveTier,
@@ -86,7 +84,10 @@ import {
   fallbackTier,
   describeTier,
   getTierState,
+  getEffectiveTiers,
+  getEffectiveNarrationModelKey,
 } from "@/app/misc/reasoningTiers";
+import { getCustomModelIfUUID, CustomModel } from "@/app/misc/user_settings";
 
 // ============================================================
 // TYPES
@@ -188,7 +189,7 @@ export interface GenerationCallbacks {
     toolCalls: ToolCall[],
     responses: CommandResponse[],
     stateChanges: string[],
-    usage: TokenUsage
+    usage: TokenUsage,
   ) => void;
   onChoicesStart?: () => void;
   onChoicesComplete?: (choices: Choice[], usage: TokenUsage) => void;
@@ -201,7 +202,7 @@ export interface GenerationCallbacks {
     results: GMToolResult[],
     storyContext: string,
     usage: TokenUsage,
-    thinking?: string[]
+    thinking?: string[],
   ) => void;
   // Fired when aging scene history was folded into a rolling summary
   // (see compaction.ts) - lets the UI show a "recap" notice instead of
@@ -269,7 +270,7 @@ interface StreamEvent {
 }
 
 async function* parseSSEStream(
-  response: Response
+  response: Response,
 ): AsyncGenerator<StreamEvent> {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("No response body");
@@ -333,7 +334,7 @@ async function* parseSSEStream(
 // ============================================================
 
 interface ChoicesFetchOptions {
-  token: string;
+  token: string | null;
   model: string;
   openRouterKey?: string;
   deepseekKey?: string;
@@ -360,13 +361,16 @@ async function generateChoicesWithRetry(
     embeddingContext?: EmbeddingContext;
     usePrefill?: boolean;
   },
-  fetchOptions: ChoicesFetchOptions
+  fetchOptions: ChoicesFetchOptions,
 ): Promise<ChoicesGenerationResult> {
   let budget: number | undefined;
   let overflowRetried = false;
 
   choicesFetchLoop: while (true) {
-    const choicesPrompt = buildChoicesPrompt({ ...buildArgs, customBudget: budget });
+    const choicesPrompt = buildChoicesPrompt({
+      ...buildArgs,
+      customBudget: budget,
+    });
 
     const response = await fetch("/api/generate-stream", {
       method: "POST",
@@ -384,6 +388,7 @@ async function generateChoicesWithRetry(
         googleKey: fetchOptions.googleKey,
         mistralKey: fetchOptions.mistralKey,
         deepinfraKey: fetchOptions.deepinfraKey,
+        customModel: getCustomModelIfUUID(fetchOptions.model),
       }),
       signal: fetchOptions.abortSignal,
     });
@@ -393,10 +398,13 @@ async function generateChoicesWithRetry(
       const errMsg = `Choices generation failed: ${response.status} - ${errorText}`;
       if (!overflowRetried && isContextOverflowError(errMsg)) {
         overflowRetried = true;
-        budget = Math.max(1500, Math.floor((budget || CHOICES_STAGE_TOKEN_BUDGET) / 2));
+        budget = Math.max(
+          1500,
+          Math.floor((budget || CHOICES_STAGE_TOKEN_BUDGET) / 2),
+        );
         logger.action(
           "Choices stage hit context overflow, retrying with reduced budget",
-          { newBudget: budget }
+          { newBudget: budget },
         );
         continue choicesFetchLoop;
       }
@@ -412,11 +420,14 @@ async function generateChoicesWithRetry(
         const errMsg = event.error || "Choices generation failed";
         if (!overflowRetried && isContextOverflowError(errMsg)) {
           overflowRetried = true;
-          budget = Math.max(1500, Math.floor((budget || CHOICES_STAGE_TOKEN_BUDGET) / 2));
+          budget = Math.max(
+            1500,
+            Math.floor((budget || CHOICES_STAGE_TOKEN_BUDGET) / 2),
+          );
           overflowMidStream = true;
           logger.action(
             "Choices stage hit context overflow mid-stream, retrying with reduced budget",
-            { newBudget: budget }
+            { newBudget: budget },
           );
           break;
         }
@@ -462,7 +473,7 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
       // Parse use_skill: name (DC number), (tier name), or (X success(es) needed/required)
       // Supports: "Stealth (DC 15)", "Stealth (hard)", "Stealth (15)", "Combat (2 successes needed)"
       const skillMatch = metadata.match(
-        /use_skill:\s*([^(;]+?)(?:\s*\((?:DC\s*)?(\d+|trivial|easy|average|hard|very_hard|impossible)(?:\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)?\))?(?:;|$)/i
+        /use_skill:\s*([^(;]+?)(?:\s*\((?:DC\s*)?(\d+|trivial|easy|average|hard|very_hard|impossible)(?:\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?)?\))?(?:;|$)/i,
       );
       if (skillMatch) {
         const skillName = skillMatch[1].trim();
@@ -492,7 +503,7 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
           .replace(/\s*\(DC\s*\d+\)/gi, "")
           .replace(
             /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
-            ""
+            "",
           )
           .trim();
         if (resourceName.toLowerCase() !== "none" && resourceName.length > 0) {
@@ -509,7 +520,7 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
           .replace(/\s*\(DC\s*\d+\)/gi, "")
           .replace(
             /\s*\(\d+\s*succ(?:ess)?(?:es)?\s*(?:needed|required)?\)/gi,
-            ""
+            "",
           )
           .trim();
         if (itemName.toLowerCase() !== "none" && itemName.length > 0) {
@@ -546,7 +557,7 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
 
       // Legacy support: Parse custom_table: table name (migrate to unified table field)
       const customTableMatch = metadata.match(
-        /custom_table:\s*([^;]+?)(?:;|$)/i
+        /custom_table:\s*([^;]+?)(?:;|$)/i,
       );
       if (customTableMatch && !choice.table) {
         const customTable = customTableMatch[1].trim();
@@ -569,14 +580,9 @@ export async function generateStoryTurn(
   userChoice: string,
   options: GenerationOptions,
   callbacks: GenerationCallbacks,
-  commandResponses?: CommandResponse[]
+  commandResponses?: CommandResponse[],
 ): Promise<GenerationResult> {
   const token = await getAuthToken();
-  if (!token) {
-    const error = new Error("Not authenticated");
-    callbacks.onError?.(error);
-    throw error;
-  }
 
   let totalTokenCost = 0;
   let finalBalance = 0;
@@ -617,6 +623,9 @@ export async function generateStoryTurn(
     let gmBaseMessages: ChatMessage[] = []; // Base GM prompt for story continuation
     let gmConversationHistory: ChatMessage[] = []; // Full GM conversation history for continuation
     let gmModel = ""; // Track which model was used for GM stage
+    // Resolved once per turn so a mid-turn override change doesn't cause the
+    // narration voice to shift inconsistently within a single generation.
+    const narrationModel = getEffectiveNarrationModelKey();
 
     // Use precomputed context if provided (skip GM stage for retry flows)
     if (options.precomputedGMContext) {
@@ -663,15 +672,16 @@ export async function generateStoryTurn(
         let startingTier = Math.max(
           hardRuleFloor(storyData),
           classifyTier(storyData, gmUserChoice),
-          decayedTier
+          decayedTier,
         );
 
         if (isClassificationAmbiguous(storyData, gmUserChoice)) {
           try {
+            const classifierModel = getEffectiveTiers()[0].modelKey;
             const classifierResult = await generateSimple(
               [{ role: "user", content: buildClassifierPrompt(gmUserChoice) }],
               {
-                model: REASONING_TIERS[0].modelKey,
+                model: classifierModel,
                 maxTokens: 10,
                 temperature: 0,
                 openRouterKey: options.openRouterKey,
@@ -679,11 +689,12 @@ export async function generateStoryTurn(
                 googleKey: options.googleKey,
                 mistralKey: options.mistralKey,
                 deepinfraKey: options.deepinfraKey,
-              }
+                customModel: getCustomModelIfUUID(classifierModel),
+              },
             );
             startingTier = Math.max(
               startingTier,
-              classificationLabelToTier(classifierResult.content || "")
+              classificationLabelToTier(classifierResult.content || ""),
             );
           } catch (classifyError) {
             logger.action(
@@ -693,7 +704,7 @@ export async function generateStoryTurn(
                   classifyError instanceof Error
                     ? classifyError.message
                     : String(classifyError),
-              }
+              },
             );
           }
         }
@@ -710,7 +721,8 @@ export async function generateStoryTurn(
         };
 
         gmModel = initialResolvedTier.modelKey;
-        let gmReasoningEffort: ReasoningEffort = initialResolvedTier.reasoningEffort;
+        let gmReasoningEffort: ReasoningEffort =
+          initialResolvedTier.reasoningEffort;
         logger.action("Reasoning tier resolved for GM stage", {
           describe: describeTier(initialResolvedTier),
         });
@@ -724,7 +736,7 @@ export async function generateStoryTurn(
         try {
           const { historyBudget: gmHistoryBudget } = computeGMStageBudget(
             options.customMaxContext,
-            gmModel
+            gmModel,
           );
           const compactionResult = await ensureStoryCompacted(
             storyData,
@@ -736,7 +748,7 @@ export async function generateStoryTurn(
               deepseekKey: options.deepseekKey,
               googleKey: options.googleKey,
               abortSignal: options.abortSignal,
-            }
+            },
           );
           if (compactionResult.ran) {
             logger.action("Compacted aging scene history into summary", {
@@ -778,7 +790,8 @@ export async function generateStoryTurn(
         // starts at the configured (or default) budget and is permanently
         // halved, once, if the provider reports an overflow - retrying the
         // same round instead of failing the whole turn.
-        let currentGMBudget = options.customMaxContext || GM_STAGE_DEFAULT_BUDGET;
+        let currentGMBudget =
+          options.customMaxContext || GM_STAGE_DEFAULT_BUDGET;
         let gmOverflowRetryUsed = false;
         // The system prompt + state message (lore/NPCs/combat/timers) only
         // need to be rebuilt when something that would change them happens:
@@ -805,7 +818,7 @@ export async function generateStoryTurn(
           // decay/cap policy and mutated this state - picking it up here is
           // what makes self-escalation take effect for the NEXT round.
           const roundTier = resolveTier(
-            storyData.reasoningTierState?.currentTier ?? SCENE_BASELINE_TIER
+            storyData.reasoningTierState?.currentTier ?? SCENE_BASELINE_TIER,
           );
           gmModel = roundTier.modelKey;
           gmReasoningEffort = roundTier.reasoningEffort;
@@ -878,7 +891,7 @@ export async function generateStoryTurn(
               reasoningEffort: effort,
               maxTokens: Math.min(
                 12000,
-                getModelConfig(model).maxOutputTokens || 4000
+                getModelConfig(model).maxOutputTokens || 4000,
               ),
               temperature: 0.4, // Slightly higher for more natural GM thinking
               openRouterKey: options.openRouterKey,
@@ -886,6 +899,7 @@ export async function generateStoryTurn(
               googleKey: options.googleKey,
               mistralKey: options.mistralKey,
               deepinfraKey: options.deepinfraKey,
+              customModel: getCustomModelIfUUID(model),
             });
 
           let gmResponse = await fetch("/api/generate-stream", {
@@ -911,7 +925,7 @@ export async function generateStoryTurn(
                   failedModel: gmModel,
                   fallbackTier: lower,
                   status: gmResponse.status,
-                }
+                },
               );
               gmModel = fallbackResolved.modelKey;
               gmReasoningEffort = fallbackResolved.reasoningEffort;
@@ -941,7 +955,7 @@ export async function generateStoryTurn(
               gmRound--; // don't burn a round on a request that never actually ran
               logger.action(
                 "GM stage hit context overflow, retrying with reduced budget",
-                { newBudget: currentGMBudget }
+                { newBudget: currentGMBudget },
               );
               continue gmRoundLoop;
             }
@@ -962,12 +976,15 @@ export async function generateStoryTurn(
               if (!gmOverflowRetryUsed && isContextOverflowError(errMsg)) {
                 gmOverflowRetryUsed = true;
                 gmOverflowMidStream = true;
-                currentGMBudget = Math.max(8000, Math.floor(currentGMBudget / 2));
+                currentGMBudget = Math.max(
+                  8000,
+                  Math.floor(currentGMBudget / 2),
+                );
                 needsGMPromptRebuild = true;
                 gmRound--;
                 logger.action(
                   "GM stage hit context overflow mid-stream, retrying with reduced budget",
-                  { newBudget: currentGMBudget }
+                  { newBudget: currentGMBudget },
                 );
                 break;
               }
@@ -1111,7 +1128,7 @@ export async function generateStoryTurn(
                     )
                       return true;
                     return false;
-                  }
+                  },
                 );
 
                 if (!isAlreadyAccumulated) {
@@ -1173,7 +1190,7 @@ export async function generateStoryTurn(
                 enabled: options.enableEmbeddings,
                 storyId: options.storyId,
                 token,
-              }
+              },
             );
 
             // Accumulate results across rounds
@@ -1182,7 +1199,7 @@ export async function generateStoryTurn(
               allGMContextParts.push(gmExecution.storyContext);
               // Add tool results to interleaved parts
               gmInterleavedParts.push(
-                `[GAME MASTER]\n${gmExecution.storyContext}`
+                `[GAME MASTER]\n${gmExecution.storyContext}`,
               );
             }
 
@@ -1217,7 +1234,7 @@ export async function generateStoryTurn(
                 `GM stage round ${gmRound} - all tools had errors`,
                 {
                   errorTools: actualToolErrors.map((r) => r.toolName),
-                }
+                },
               );
             }
 
@@ -1236,7 +1253,7 @@ export async function generateStoryTurn(
                 // Only treat as error if: (1) not a dice tool AND (2) success is false
                 // OR if it's a dice tool but contextForStory contains "ERROR"
                 const isActualError = isDiceTool
-                  ? result.contextForStory?.includes("ERROR") ?? false
+                  ? (result.contextForStory?.includes("ERROR") ?? false)
                   : !result.success;
 
                 if (!isActualError) {
@@ -1309,7 +1326,7 @@ export async function generateStoryTurn(
             // Continue looping - AI may make more tool calls
             // Loop ends when AI produces content WITHOUT tool calls
             logger.action(
-              "GM stage round complete, continuing to see if more tools needed"
+              "GM stage round complete, continuing to see if more tools needed",
             );
             continue;
           } else {
@@ -1333,10 +1350,10 @@ export async function generateStoryTurn(
 
             if (isRepetitive) {
               logger.action(
-                "GM stage detected repetitive content - forcing end"
+                "GM stage detected repetitive content - forcing end",
               );
               allGMContextParts.push(
-                `[GAME MASTER: AI got stuck in repetition loop.]`
+                `[GAME MASTER: AI got stuck in repetition loop.]`,
               );
             } else if (content.trim()) {
               // Add raw content to context parts (with thinking) for backward compat
@@ -1349,7 +1366,7 @@ export async function generateStoryTurn(
                 {
                   rawLength: content.length,
                   totalAccumulatedParts: gmAccumulatedStory.length,
-                }
+                },
               );
             }
 
@@ -1407,7 +1424,7 @@ export async function generateStoryTurn(
           completionTokens: 0,
           totalTokens: 0,
         },
-        gmThinking.length > 0 ? gmThinking : undefined
+        gmThinking.length > 0 ? gmThinking : undefined,
       );
     }
 
@@ -1423,7 +1440,7 @@ export async function generateStoryTurn(
         "Using GM's final content as story (no separate API call needed)",
         {
           contentLength: gmFinalStoryContent.length,
-        }
+        },
       );
 
       // Use GM's content directly as the story
@@ -1452,7 +1469,7 @@ export async function generateStoryTurn(
           promptTokens: 0,
           completionTokens: 0,
           totalTokens: 0,
-        }
+        },
       );
       logger.action("Stage 1 complete (from GM content)", {
         contentLength: storyContent.length,
@@ -1463,7 +1480,7 @@ export async function generateStoryTurn(
 
       // When NovelAI is enabled, use its model name for proper context sizing
       const useNovelAI = options.novelaiEnabled && options.novelaiKey;
-      const storyModelName = useNovelAI ? "NovelAI GLM-4-6" : NARRATION_MODEL_KEY;
+      const storyModelName = useNovelAI ? "NovelAI GLM-4-6" : narrationModel;
 
       // Calculate actual max output for NovelAI or standard models
       // Enforce minimum 1000 tokens to account for prefill overhead
@@ -1499,11 +1516,11 @@ export async function generateStoryTurn(
             baseMessages: gmBaseMessages.length,
             historyEntries: gmConversationHistory.length,
             gmAdjudicationModel: gmModel,
-            narrationModel: NARRATION_MODEL_KEY,
+            narrationModel,
           });
 
           const storyContinuationPrompt = buildStoryContinuationPrompt(
-            options.storytellerMode || "narrator"
+            options.storytellerMode || "narrator",
           );
 
           // Build messages: GM base + conversation history + story prompt
@@ -1545,14 +1562,14 @@ export async function generateStoryTurn(
           storyData.pendingPlayerActions.length > 0
         ) {
           logger.action(
-            `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`
+            `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`,
           );
           storyData.pendingPlayerActions = [];
         }
 
         if (storyPromptPrunedParts > 0) {
           logger.action(
-            `Pruned ${storyPromptPrunedParts} oldest scene parts to fit context`
+            `Pruned ${storyPromptPrunedParts} oldest scene parts to fit context`,
           );
         }
 
@@ -1578,10 +1595,11 @@ export async function generateStoryTurn(
         } else {
           // Use standard API (DeepSeek/OpenRouter/Mistral/DeepInfra)
           // Build request body with optional sampling settings
-          // Narration always runs on the fixed narration model, regardless of
-          // which tier adjudication used - this is what keeps the GM's voice
-          // consistent even when a turn escalated to a heavier reasoning tier.
-          const storyModelToUse: string = NARRATION_MODEL_KEY;
+          // Narration always runs on the (user-configurable) narration model,
+          // regardless of which tier adjudication used - this is what keeps
+          // the GM's voice consistent even when a turn escalated to a
+          // heavier reasoning tier.
+          const storyModelToUse: string = narrationModel;
 
           const storyRequestBody: Record<string, unknown> = {
             messages: storyMessages,
@@ -1593,9 +1611,14 @@ export async function generateStoryTurn(
             googleKey: options.googleKey,
             mistralKey: options.mistralKey,
             deepinfraKey: options.deepinfraKey,
+            customModel: getCustomModelIfUUID(storyModelToUse),
             // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
             // Also stop on [STOP] marker for player agency stopping points
-            stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
+            stop: [
+              "[GAME MASTER State Update]",
+              "[GAME MASTER State",
+              "[STOP]",
+            ],
           };
 
           // Add sampling settings for Coins mode (Mistral/DeepInfra)
@@ -1616,7 +1639,7 @@ export async function generateStoryTurn(
 
         logger.action("Story stage request sent", {
           maxTokens: storyMaxOutput,
-          model: continueGMConversation ? gmModel : NARRATION_MODEL_KEY,
+          model: continueGMConversation ? gmModel : narrationModel,
           continueGM: continueGMConversation,
         });
 
@@ -1633,11 +1656,11 @@ export async function generateStoryTurn(
             storyOverflowRetried = true;
             storyContextBudget = Math.max(
               4000,
-              Math.floor((storyContextBudget || STORY_STAGE_TOKEN_BUDGET) / 2)
+              Math.floor((storyContextBudget || STORY_STAGE_TOKEN_BUDGET) / 2),
             );
             logger.action(
               "Story stage hit context overflow, retrying with reduced budget",
-              { newBudget: storyContextBudget }
+              { newBudget: storyContextBudget },
             );
             continue storyFetchLoop;
           }
@@ -1719,7 +1742,7 @@ export async function generateStoryTurn(
               }
               stopMarkerHit = true;
               logger.action(
-                "Hit [STOP] marker during streaming - stopping content emission"
+                "Hit [STOP] marker during streaming - stopping content emission",
               );
             } else {
               storyContent += event.content;
@@ -1848,7 +1871,7 @@ export async function generateStoryTurn(
       storyContent = storyContent
         .replace(
           /\n*[-*_]{3,}\s*\*?\[(?:(?:GM|GAME MASTER) State Update|STOP)[^\]]*\][\s\S]*$/i,
-          ""
+          "",
         )
         .trimEnd();
 
@@ -1872,7 +1895,7 @@ export async function generateStoryTurn(
       storyContent = storyContent
         .replace(
           /\n*\[(?:GM|GAME MASTER) State Update\]\n(?:• [^\n]+\n?)*/gi,
-          ""
+          "",
         )
         .trim();
 
@@ -1891,7 +1914,7 @@ export async function generateStoryTurn(
           promptTokens: 0,
           completionTokens: 0,
           totalTokens: 0,
-        }
+        },
       );
       logger.action("Stage 1 complete", { contentLength: storyContent.length });
     } // End of else block (no GM content - fallback to API call)
@@ -1917,14 +1940,14 @@ export async function generateStoryTurn(
           },
           {
             token,
-            model: NARRATION_MODEL_KEY,
+            model: narrationModel,
             openRouterKey: options.openRouterKey,
             deepseekKey: options.deepseekKey,
             googleKey: options.googleKey,
             mistralKey: options.mistralKey,
             deepinfraKey: options.deepinfraKey,
             abortSignal: options.abortSignal,
-          }
+          },
         );
 
       let choicesContent = rawChoicesContent;
@@ -1938,7 +1961,7 @@ export async function generateStoryTurn(
       if (options.usePrefill !== false) {
         choicesContent = stripAffirmationPrefill(
           choicesContent,
-          CHOICES_AFFIRMATION
+          CHOICES_AFFIRMATION,
         );
       }
 
@@ -1951,7 +1974,7 @@ export async function generateStoryTurn(
           promptTokens: 0,
           completionTokens: 0,
           totalTokens: 0,
-        }
+        },
       );
       logger.action("Stage 3 complete", { choicesCount: choices.length });
     };
@@ -1984,7 +2007,7 @@ export async function generateStoryTurn(
         options.storyId,
         storyData.memory,
         new Set(), // We'll embed all memories; duplicates handled by upsert
-        token
+        token,
       )
         .then((result) => {
           if (result.synced > 0 || result.cleaned > 0) {
@@ -2108,16 +2131,14 @@ export async function generateSimple(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
-  }
+    customModel?: CustomModel;
+  },
 ): Promise<{
   content: string;
   toolCalls: ToolCall[];
   meta: GenerationMeta;
 }> {
   const token = await getAuthToken();
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
 
   const response = await fetch("/api/generate", {
     method: "POST",
@@ -2136,6 +2157,7 @@ export async function generateSimple(
       googleKey: options.googleKey,
       mistralKey: options.mistralKey,
       deepinfraKey: options.deepinfraKey,
+      customModel: options.customModel,
     }),
   });
 
@@ -2168,12 +2190,9 @@ export async function* generateSimpleStream(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
-  }
+  },
 ): AsyncGenerator<StreamEvent> {
   const token = await getAuthToken();
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
 
   const response = await fetch("/api/generate-stream", {
     method: "POST",
@@ -2226,12 +2245,9 @@ export async function analyzeAction(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
-  }
+  },
 ): Promise<ActionAnalysisResult> {
   const token = await getAuthToken();
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
 
   logger.action("Analyzing freeform action", { userAction, model });
 
@@ -2318,13 +2334,13 @@ export async function analyzeAction(
     if (matchResult) {
       if (!matchResult.isExact) {
         validationWarnings.push(
-          `Matched skill "${analysis.skill_used}" → "${matchResult.name}"`
+          `Matched skill "${analysis.skill_used}" → "${matchResult.name}"`,
         );
       }
       analysis.skill_used = matchResult.name;
     } else {
       validationWarnings.push(
-        `Skill "${analysis.skill_used}" not found, removing skill check`
+        `Skill "${analysis.skill_used}" not found, removing skill check`,
       );
       analysis.skill_used = null;
       analysis.skill_dc = null;
@@ -2351,7 +2367,7 @@ export async function analyzeAction(
         const systemId = storyData.rpgSystem || "3d6";
         analysis.skill_dc = parseDCValue(lowerDc, systemId, difficulty);
         validationWarnings.push(
-          `Converted DC tier "${lowerDc}" → ${analysis.skill_dc} (${systemId}, ${difficulty} difficulty)`
+          `Converted DC tier "${lowerDc}" → ${analysis.skill_dc} (${systemId}, ${difficulty} difficulty)`,
         );
       } else {
         // Try parsing as number
@@ -2360,7 +2376,7 @@ export async function analyzeAction(
           analysis.skill_dc = parsed;
         } else {
           validationWarnings.push(
-            `Invalid skill_dc "${analysis.skill_dc}", defaulting to null`
+            `Invalid skill_dc "${analysis.skill_dc}", defaulting to null`,
           );
           analysis.skill_dc = null;
         }
@@ -2372,18 +2388,18 @@ export async function analyzeAction(
   if (analysis.resource_used) {
     const matchResult = findResourceMatch(
       analysis.resource_used,
-      storyData.resources
+      storyData.resources,
     );
     if (matchResult) {
       if (!matchResult.isExact) {
         validationWarnings.push(
-          `Matched resource "${analysis.resource_used}" → "${matchResult.name}"`
+          `Matched resource "${analysis.resource_used}" → "${matchResult.name}"`,
         );
       }
       analysis.resource_used = matchResult.name;
     } else {
       validationWarnings.push(
-        `Resource "${analysis.resource_used}" not found, removing`
+        `Resource "${analysis.resource_used}" not found, removing`,
       );
       analysis.resource_used = null;
     }
@@ -2395,13 +2411,13 @@ export async function analyzeAction(
     if (matchResult) {
       if (!matchResult.isExact) {
         validationWarnings.push(
-          `Matched item "${analysis.item_used}" → "${matchResult.name}"`
+          `Matched item "${analysis.item_used}" → "${matchResult.name}"`,
         );
       }
       analysis.item_used = matchResult.name;
     } else {
       validationWarnings.push(
-        `Item "${analysis.item_used}" not found, removing`
+        `Item "${analysis.item_used}" not found, removing`,
       );
       analysis.item_used = null;
     }
@@ -2411,21 +2427,21 @@ export async function analyzeAction(
   if (analysis.ability_used) {
     const matchResult = findAbilityMatch(
       analysis.ability_used,
-      storyData.abilities || []
+      storyData.abilities || [],
     );
     if (matchResult) {
       if (!matchResult.isExact) {
         validationWarnings.push(
-          `Matched ability "${analysis.ability_used}" → "${matchResult.name}"`
+          `Matched ability "${analysis.ability_used}" → "${matchResult.name}"`,
         );
       }
       // Also check if ability is on cooldown
       const ability = storyData.abilities?.find(
-        (a) => a.name === matchResult.name
+        (a) => a.name === matchResult.name,
       );
       if (ability && (ability.currentCooldown || 0) > 0) {
         validationWarnings.push(
-          `Ability "${matchResult.name}" is on cooldown (${ability.currentCooldown} turns remaining), removing`
+          `Ability "${matchResult.name}" is on cooldown (${ability.currentCooldown} turns remaining), removing`,
         );
         analysis.ability_used = null;
       } else {
@@ -2433,7 +2449,7 @@ export async function analyzeAction(
       }
     } else {
       validationWarnings.push(
-        `Ability "${analysis.ability_used}" not found, removing`
+        `Ability "${analysis.ability_used}" not found, removing`,
       );
       analysis.ability_used = null;
     }
@@ -2454,7 +2470,7 @@ export async function analyzeAction(
     // First, check custom tables
     if (storyData.customTables && storyData.customTables.length > 0) {
       const customTable = storyData.customTables.find(
-        (t) => t.name.toLowerCase() === tableName.toLowerCase()
+        (t) => t.name.toLowerCase() === tableName.toLowerCase(),
       );
       if (customTable) {
         analysis.table = customTable.name; // Use exact name
@@ -2465,15 +2481,15 @@ export async function analyzeAction(
     // (single source of truth: MYTHIC_TABLE_NAMES, derived from mythic.ts's
     // ELEMENT_TABLES so it can't drift from the tables that actually exist)
     const isAGMTTable = MYTHIC_TABLE_NAMES.some(
-      (name) => name.toLowerCase() === tableName.toLowerCase()
+      (name) => name.toLowerCase() === tableName.toLowerCase(),
     );
     const isCustomTable = storyData.customTables?.some(
-      (t) => t.name.toLowerCase() === tableName.toLowerCase()
+      (t) => t.name.toLowerCase() === tableName.toLowerCase(),
     );
 
     if (!isAGMTTable && !isCustomTable) {
       validationWarnings.push(
-        `Table "${tableName}" not found in custom or agmt tables, removing`
+        `Table "${tableName}" not found in custom or agmt tables, removing`,
       );
       analysis.table = null;
     }
@@ -2498,7 +2514,7 @@ export async function analyzeAction(
   // Log final parsed analysis
   console.log(
     "\n[analyzeAction] Parsed analysis:",
-    JSON.stringify(analysis, null, 2)
+    JSON.stringify(analysis, null, 2),
   );
   if (validationWarnings.length > 0) {
     console.log("[analyzeAction] Validation warnings:", validationWarnings);
@@ -2516,7 +2532,7 @@ export async function analyzeAction(
  */
 export function analysisToChoice(
   analysis: ActionAnalysis,
-  originalAction: string
+  originalAction: string,
 ): Choice {
   // Since the GM stage now handles all dice mechanics via formula_roll,
   // we only need to copy the plain text. The deprecated fields are
@@ -2544,12 +2560,9 @@ export async function generateChoicesOnly(
     googleKey?: string;
     mistralKey?: string;
     deepinfraKey?: string;
-  }
+  },
 ): Promise<Choice[]> {
   const token = await getAuthToken();
-  if (!token) {
-    throw new Error("Authentication required");
-  }
 
   // Get the last AI content from scene parts
   const lastAIPart = [...storyData.scene.parts]
@@ -2572,7 +2585,7 @@ export async function generateChoicesOnly(
       googleKey: options.googleKey,
       mistralKey: options.mistralKey,
       deepinfraKey: options.deepinfraKey,
-    }
+    },
   );
 
   // Parse choices

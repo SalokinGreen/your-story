@@ -92,7 +92,7 @@ export async function POST(request: NextRequest) {
         maxTokens,
         mistralKey,
       );
-    } else if (model === "deepseek-chat" && deepseekKey) {
+    } else if (model === "deepseek-v4-flash" && deepseekKey) {
       aiResponse = await callDeepSeekAI(
         systemPrompt,
         userPrompt,
@@ -149,7 +149,7 @@ export async function POST(request: NextRequest) {
             2000, // Small limit for just closing JSON
             mistralKey,
           );
-        } else if (model === "deepseek-chat" && deepseekKey) {
+        } else if (model === "deepseek-v4-flash" && deepseekKey) {
           continuationResponse = await callDeepSeekAI(
             "You are a JSON completion assistant. Output ONLY the minimal characters needed to close the JSON.",
             continuationPrompt,
@@ -386,7 +386,7 @@ async function callDeepSeekAI(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-chat",
+        model: "deepseek-v4-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

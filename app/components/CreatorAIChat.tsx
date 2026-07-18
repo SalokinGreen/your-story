@@ -55,7 +55,7 @@ interface CreatorAIChatProps {
       shortDescription?: string;
       description?: string;
       startingChoices?: StartingChoice[];
-    }
+    },
   ) => void;
   // Pinned mode props (desktop only)
   isPinned?: boolean;
@@ -110,7 +110,7 @@ export default function CreatorAIChat({
               id: crypto.randomUUID(),
               name: "Migrated Chat",
               messages: oldMessages.filter(
-                (msg: ChatMessage) => msg.content && msg.content.trim()
+                (msg: ChatMessage) => msg.content && msg.content.trim(),
               ),
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -171,7 +171,7 @@ export default function CreatorAIChat({
         });
       });
     },
-    [activeThreadId]
+    [activeThreadId],
   );
 
   const [input, setInput] = useState("");
@@ -327,7 +327,7 @@ export default function CreatorAIChat({
     const coinCost = calculateTokenCost(
       model,
       estimatedInputTokens,
-      maxOutputTokens
+      maxOutputTokens,
     );
 
     return { coins: Math.max(1, coinCost), dollars: dollarCost };
@@ -386,7 +386,7 @@ export default function CreatorAIChat({
 
     // If in BYOK mode but current model is coins-only, switch to default BYOK model
     if (byokMode && isCoinsProvider) {
-      setModel("Deepseek Chat");
+      setModel("DeepSeek V4 Flash");
     }
     // If in Coins mode but current model is BYOK-only, switch to default coins model
     if (!byokMode && isBYOKProvider) {
@@ -541,7 +541,7 @@ export default function CreatorAIChat({
           .catch(() => ({ error: "Unknown error" }));
         console.error("API Error:", response.status, errorData);
         throw new Error(
-          errorData.error || `Failed to get AI response (${response.status})`
+          errorData.error || `Failed to get AI response (${response.status})`,
         );
       }
 
@@ -587,7 +587,7 @@ export default function CreatorAIChat({
         console.log("=== CALLING executeCreatorTools ===");
         console.log(
           "Tool calls:",
-          toolCalls.map((t) => t.function.name)
+          toolCalls.map((t) => t.function.name),
         );
 
         const { results, mergedChanges } = executeCreatorTools(toolCalls, {
@@ -692,7 +692,9 @@ export default function CreatorAIChat({
             // If we're deleting the active thread, switch to another or clear
             if (activeThreadId === threadId) {
               setActiveThreadId(
-                remaining.length > 0 ? remaining[remaining.length - 1].id : null
+                remaining.length > 0
+                  ? remaining[remaining.length - 1].id
+                  : null,
               );
             }
             return remaining;
@@ -701,7 +703,7 @@ export default function CreatorAIChat({
         },
       });
     },
-    [activeThreadId, threads]
+    [activeThreadId, threads],
   );
 
   const handleClearChat = () => {
@@ -1145,7 +1147,7 @@ export default function CreatorAIChat({
                                 <p className="text-[10px] text-gray-400 dark:text-gray-500">
                                   {thread.messages.length} messages •{" "}
                                   {new Date(
-                                    thread.updatedAt
+                                    thread.updatedAt,
                                   ).toLocaleDateString()}
                                 </p>
                               </div>
@@ -1242,8 +1244,8 @@ export default function CreatorAIChat({
                     {byokMode
                       ? ""
                       : m.cost > 0
-                      ? `(~${m.cost} coins)`
-                      : "(Free)"}
+                        ? `(~${m.cost} coins)`
+                        : "(Free)"}
                   </option>
                 ))}
               </select>
@@ -1503,7 +1505,7 @@ function MessageItem({
       title?: string;
       shortDescription?: string;
       description?: string;
-    }
+    },
   ) => void;
 }) {
   const isUser = message.role === "user";
@@ -1523,7 +1525,7 @@ function MessageItem({
     // Check if this is a custom model (UUID format)
     const isUUID =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        modelName
+        modelName,
       );
 
     let inputPrice = 0;
@@ -2058,7 +2060,7 @@ function ChangeSummary({
 
 // Helper to get icon for tool category
 function getToolIcon(
-  toolName: string
+  toolName: string,
 ):
   | "BarChart2"
   | "Diamond"
@@ -2529,7 +2531,7 @@ function ToolArgsDisplay({
     };
 
     const entries = Object.entries(args).filter(
-      ([, v]) => v !== undefined && v !== null
+      ([, v]) => v !== undefined && v !== null,
     );
     if (entries.length === 0) return null;
 
@@ -2651,7 +2653,7 @@ function ToolArgsDisplay({
 
   // Generic fallback for other tools
   const entries = Object.entries(args).filter(
-    ([, v]) => v !== undefined && v !== null
+    ([, v]) => v !== undefined && v !== null,
   );
   if (entries.length === 0) return null;
 
@@ -2689,7 +2691,7 @@ function ToolResultsDisplay({
       title?: string;
       shortDescription?: string;
       description?: string;
-    }
+    },
   ) => void;
 }) {
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
@@ -2770,8 +2772,8 @@ function ToolResultsDisplay({
                         action.type === "add"
                           ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
                           : action.type === "remove"
-                          ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                          : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+                            ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                            : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
                       }`}
                     >
                       {action.type}
@@ -2797,12 +2799,13 @@ function ToolResultsDisplay({
                                     ? "✓"
                                     : "✗"
                                   : typeof value === "number"
-                                  ? String(value)
-                                  : Array.isArray(value)
-                                  ? `${value.length} items`
-                                  : typeof value === "object" && value !== null
-                                  ? "configured"
-                                  : String(value).substring(0, 20);
+                                    ? String(value)
+                                    : Array.isArray(value)
+                                      ? `${value.length} items`
+                                      : typeof value === "object" &&
+                                          value !== null
+                                        ? "configured"
+                                        : String(value).substring(0, 20);
                               return (
                                 <span
                                   key={i}
@@ -2954,14 +2957,14 @@ function ToolResultsDisplay({
             onClick={() => {
               console.log(
                 "[ToolResultsDisplay] Applying toolChanges:",
-                JSON.stringify(toolChanges, null, 2)
+                JSON.stringify(toolChanges, null, 2),
               );
               onApplyChanges(
                 toolChanges as Partial<StoryData> & {
                   title?: string;
                   shortDescription?: string;
                   description?: string;
-                }
+                },
               );
             }}
             className="w-full rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white py-2.5 text-sm font-bold transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2"

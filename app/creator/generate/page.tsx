@@ -59,7 +59,6 @@ import {
 } from "@/app/misc/generation_orchestrator";
 import {
   AI_MODELS,
-  calculateTokenCost,
   getModelConfig,
   OPENROUTER_IMAGE_MODELS,
   DEEPINFRA_IMAGE_MODELS,
@@ -1266,53 +1265,17 @@ function BigAdventureCreatorPage() {
     temperature: 0.7,
     stylePreset: "default",
   });
-  const [selectedModel, setSelectedModel] = useState("Mistral Large 3.0");
+  const [selectedModel, setSelectedModel] = useState("DeepSeek V4 Flash");
   const [novelaiKey, setNovelaiKey] = useState("");
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
-  const [byokMode, setByokMode] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("bigAdventureByokMode");
-      return stored === "true";
-    }
-    return false;
-  });
 
-  // Load NovelAI key from localStorage on mount and sync byokMode
+  // Load NovelAI key from localStorage on mount
   useEffect(() => {
     const storedKey = localStorage.getItem("novelaiKey");
     if (storedKey) {
       setNovelaiKey(storedKey);
     }
   }, []);
-
-  // Persist byokMode to localStorage
-  useEffect(() => {
-    localStorage.setItem("bigAdventureByokMode", byokMode.toString());
-  }, [byokMode]);
-
-  // When switching modes, auto-select a compatible model
-  useEffect(() => {
-    const currentModelConfig = (
-      AI_MODELS as Record<string, { provider?: string }>
-    )[selectedModel];
-    const currentProvider = currentModelConfig?.provider;
-    const isBYOKProvider =
-      currentProvider === "openrouter" ||
-      currentProvider === "deepseek" ||
-      currentProvider === "novelai" ||
-      currentProvider === "google";
-    const isCoinsProvider =
-      currentProvider === "mistral" || currentProvider === "deepinfra";
-
-    // If in BYOK mode but current model is coins-only, switch to default BYOK model
-    if (byokMode && isCoinsProvider) {
-      setSelectedModel("Deepseek Chat");
-    }
-    // If in Coins mode but current model is BYOK-only, switch to default coins model
-    if (!byokMode && isBYOKProvider) {
-      setSelectedModel("Mistral Large 3.0");
-    }
-  }, [byokMode, selectedModel]);
 
   // Check if selected model is NovelAI
   const isNovelAISelected =
@@ -1333,21 +1296,15 @@ function BigAdventureCreatorPage() {
     localStorage.setItem("bigAdventureParallelMode", parallelMode.toString());
   }, [parallelMode]);
 
-  // Filter models based on BYOK mode
+  // BYOK-only: show openrouter, deepseek, novelai, google models
   const filteredModels = Object.entries(AI_MODELS).filter(([, model]) => {
     const provider = (model as { provider?: string }).provider;
-    if (byokMode) {
-      // BYOK mode: show openrouter, deepseek, novelai, google
-      return (
-        provider === "openrouter" ||
-        provider === "deepseek" ||
-        provider === "novelai" ||
-        provider === "google"
-      );
-    } else {
-      // Coins mode: show mistral, deepinfra
-      return provider === "mistral" || provider === "deepinfra";
-    }
+    return (
+      provider === "openrouter" ||
+      provider === "deepseek" ||
+      provider === "novelai" ||
+      provider === "google"
+    );
   });
 
   // Check if user has any BYOK keys configured
@@ -1401,60 +1358,19 @@ function BigAdventureCreatorPage() {
   const [extensionContent, setExtensionContent] = useState("");
   const [extensionOutputSize, setExtensionOutputSize] = useState(4000);
   const [extensionInstructions, setExtensionInstructions] = useState("");
-  const [extensionModel, setExtensionModel] = useState("Mistral Large 3.0");
-  const [extensionByokMode, setExtensionByokMode] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("bigAdventureExtensionByokMode");
-      return stored === "true";
-    }
-    return false;
-  });
+  const [extensionModel, setExtensionModel] = useState("DeepSeek V4 Flash");
 
-  // Persist extensionByokMode to localStorage
-  useEffect(() => {
-    localStorage.setItem(
-      "bigAdventureExtensionByokMode",
-      extensionByokMode.toString(),
-    );
-  }, [extensionByokMode]);
-
-  // When switching extension modes, auto-select a compatible model
-  useEffect(() => {
-    const currentModelConfig = (
-      AI_MODELS as Record<string, { provider?: string }>
-    )[extensionModel];
-    const currentProvider = currentModelConfig?.provider;
-    const isBYOKProvider =
-      currentProvider === "openrouter" ||
-      currentProvider === "deepseek" ||
-      currentProvider === "novelai" ||
-      currentProvider === "google";
-    const isCoinsProvider =
-      currentProvider === "mistral" || currentProvider === "deepinfra";
-
-    if (extensionByokMode && isCoinsProvider) {
-      setExtensionModel("Deepseek Chat");
-    }
-    if (!extensionByokMode && isBYOKProvider) {
-      setExtensionModel("Mistral Large 3.0");
-    }
-  }, [extensionByokMode, extensionModel]);
-
-  // Filter extension models based on BYOK mode
+  // BYOK-only: show openrouter, deepseek, novelai, google models
   // Note: NovelAI may not work well for complex JSON sections, but user can try
   const filteredExtensionModels = Object.entries(AI_MODELS).filter(
     ([, model]) => {
       const provider = (model as { provider?: string }).provider;
-      if (extensionByokMode) {
-        return (
-          provider === "openrouter" ||
-          provider === "deepseek" ||
-          provider === "novelai" ||
-          provider === "google"
-        );
-      } else {
-        return provider === "mistral" || provider === "deepinfra";
-      }
+      return (
+        provider === "openrouter" ||
+        provider === "deepseek" ||
+        provider === "novelai" ||
+        provider === "google"
+      );
     },
   );
 
@@ -1558,6 +1474,7 @@ function BigAdventureCreatorPage() {
     const quickStart = searchParams.get("quickStart");
     const genre = searchParams.get("genre");
     const prompt = searchParams.get("prompt");
+    const model = searchParams.get("model") || "DeepSeek V4 Flash";
     const size = searchParams.get("size") || "standard";
 
     console.log("[Quick Start Effect] Params:", {
@@ -1687,11 +1604,9 @@ function BigAdventureCreatorPage() {
         stylePreset: genreStyleMap[genre] || "default",
       });
 
-      // Use Mistral Large 3.0 for ALL stages (Coins mode)
-      setByokMode(false);
-      setSelectedModel("Mistral Large 3.0");
-      setExtensionByokMode(false);
-      setExtensionModel("Mistral Large 3.0");
+      // Use the user-selected BYOK model for all stages
+      setSelectedModel(model);
+      setExtensionModel(model);
 
       // Enable auto-publish and play for quick start
       setAutoPublishAndPlay(true);
@@ -1890,7 +1805,7 @@ function BigAdventureCreatorPage() {
     return modelConfig.maxOutputTokens || 8000;
   }, [selectedModel]);
 
-  // Calculate estimated cost (returns both coins and dollars)
+  // Calculate estimated cost in dollars (BYOK - paid directly to the provider)
   const estimatedCost = useCallback(() => {
     const estimate = estimateBigAdventureCost(config);
     const modelConfig = getModelConfig(selectedModel);
@@ -1900,14 +1815,7 @@ function BigAdventureCreatorPage() {
       (modelConfig.inputPrice * estimate.inputTokens) / 1000000 +
       (modelConfig.outputPrice * estimate.outputTokens) / 1000000;
 
-    // Calculate coin cost
-    const coinCost = calculateTokenCost(
-      selectedModel,
-      estimate.inputTokens,
-      estimate.outputTokens,
-    );
-
-    return { coins: coinCost, dollars: dollarCost };
+    return dollarCost;
   }, [config, selectedModel]);
 
   // Update config
@@ -2190,13 +2098,12 @@ function BigAdventureCreatorPage() {
         });
         setCompletedStages((prev) => [...prev, stage]);
         setCompletedTasks((prev) => prev + 1);
-        // Calculate actual coin cost from tokens
-        const coinCost = calculateTokenCost(
-          selectedModel,
-          promptTokens,
-          completionTokens,
-        );
-        setTokenCost((prev) => prev + coinCost);
+        // Calculate actual dollar cost from tokens (BYOK - informational only)
+        const modelConfig = getModelConfig(selectedModel);
+        const dollarCost =
+          (modelConfig.inputPrice * promptTokens) / 1000000 +
+          (modelConfig.outputPrice * completionTokens) / 1000000;
+        setTokenCost((prev) => prev + dollarCost);
 
         if (stageResult) {
           setPartialResults((prev) => ({
@@ -2367,7 +2274,7 @@ function BigAdventureCreatorPage() {
       setQuickStartReady(false);
       setIsQuickStart(false); // Clear quick start flag once we start
       addNotification(
-        `Quick Start: Generating ${config.genre} adventure with Mistral Large 3.0...`,
+        `Quick Start: Generating ${config.genre} adventure with ${selectedModel}...`,
         "success",
       );
       // Call startGeneration directly, no delay needed
@@ -3085,7 +2992,7 @@ ${result.description || ""}`;
             Preparing Your Adventure
           </h2>
           <p className="text-blue-300/60">
-            Setting up {config.genre} adventure with Mistral Large 3.0...
+            Setting up {config.genre} adventure with {selectedModel}...
           </p>
         </div>
       </div>
@@ -3401,7 +3308,7 @@ ${result.description || ""}`;
                             </span>
                             <span>•</span>
                             <span className="text-amber-400">
-                              {entry.tokenCost} coins
+                              {entry.tokenCost} tokens
                             </span>
                             <span>•</span>
                             <span>{entry.config.complexity}</span>
@@ -3482,14 +3389,8 @@ ${result.description || ""}`;
                   {getTotalGenerationTasks(config)} stages
                 </span>
                 Estimated cost:{" "}
-                <span
-                  className={`font-medium ${
-                    byokMode ? "text-green-400" : "text-amber-400"
-                  }`}
-                >
-                  {byokMode
-                    ? `~$${estimatedCost().dollars.toFixed(3)}`
-                    : `~${estimatedCost().coins} coins`}
+                <span className="font-medium text-green-400">
+                  ~${estimatedCost().toFixed(3)}
                 </span>
               </div>
             )}
@@ -3994,56 +3895,8 @@ ${result.description || ""}`;
                 {/* AI Model Selection */}
                 <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-700/30">
                   <label className="block text-sm text-blue-300/60 mb-2">
-                    AI Model
+                    AI Model (BYOK - Bring Your Own Key)
                   </label>
-
-                  {/* BYOK/Coins Toggle */}
-                  <div className="mb-3 p-3 bg-blue-900/30 rounded-lg border border-blue-700/30">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-lg ${byokMode ? "opacity-50" : ""}`}
-                        >
-                          🪙
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium text-white">
-                            {byokMode ? "Using Your API Keys" : "Using Coins"}
-                          </p>
-                          <p className="text-xs text-blue-300/60">
-                            {byokMode
-                              ? "Free generation with your own keys"
-                              : "Pay with coins from your balance"}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`text-xs font-medium ${
-                            !byokMode ? "text-amber-400" : "text-gray-500"
-                          }`}
-                        >
-                          Coins
-                        </span>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={byokMode}
-                            onChange={(e) => setByokMode(e.target.checked)}
-                            className="sr-only peer"
-                          />
-                          <div className="w-10 h-5 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-600" />
-                        </label>
-                        <span
-                          className={`text-xs font-medium ${
-                            byokMode ? "text-green-400" : "text-gray-500"
-                          }`}
-                        >
-                          BYOK
-                        </span>
-                      </div>
-                    </div>
-                  </div>
 
                   <select
                     value={selectedModel}
@@ -4052,18 +3905,13 @@ ${result.description || ""}`;
                   >
                     {filteredModels.map(([key, model]) => (
                       <option key={key} value={key}>
-                        {model.name}{" "}
-                        {byokMode
-                          ? "(Free - BYOK)"
-                          : model.cost > 0
-                            ? `(~${model.cost} coins base)`
-                            : "(Free)"}
+                        {model.name}
                       </option>
                     ))}
                   </select>
 
-                  {/* BYOK mode warning if no keys configured */}
-                  {byokMode && !hasAnyBYOKKey && (
+                  {/* Warning if no keys configured */}
+                  {!hasAnyBYOKKey && (
                     <div className="mt-2 p-2 bg-red-900/20 border border-red-700/30 rounded-lg">
                       <p className="text-xs text-red-300">
                         ⚠️ No API keys configured. Add keys in Settings (gear
@@ -4600,14 +4448,8 @@ ${result.description || ""}`;
                     <span className="text-sm text-blue-200">
                       Estimated Cost
                     </span>
-                    <span
-                      className={`text-lg font-bold ${
-                        byokMode ? "text-green-400" : "text-amber-400"
-                      }`}
-                    >
-                      {byokMode
-                        ? `~$${estimatedCost().dollars.toFixed(3)}`
-                        : `~${estimatedCost().coins} coins`}
+                    <span className="text-lg font-bold text-green-400">
+                      ~${estimatedCost().toFixed(3)}
                     </span>
                   </div>
                 </div>
@@ -4784,7 +4626,9 @@ ${result.description || ""}`;
               <h2 className="text-2xl font-bold text-green-400 mb-2">
                 ✓ Adventure Generated!
               </h2>
-              <p className="text-blue-300/60">Total cost: {tokenCost} coins</p>
+              <p className="text-blue-300/60">
+                Total cost: ~${tokenCost.toFixed(3)}
+              </p>
             </div>
 
             {/* Preview */}
@@ -5183,59 +5027,8 @@ ${result.description || ""}`;
                   {/* Extension model selector */}
                   <div className="mt-4">
                     <label className="block text-sm text-blue-300/60 mb-2">
-                      Model for Extend/Regenerate:
+                      Model for Extend/Regenerate (BYOK):
                     </label>
-
-                    {/* BYOK/Coins Toggle for Extension */}
-                    <div className="mb-2 p-2 bg-blue-900/30 rounded-lg border border-blue-700/30">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`text-sm ${
-                              extensionByokMode ? "opacity-50" : ""
-                            }`}
-                          >
-                            🪙
-                          </span>
-                          <span className="text-xs text-blue-300/80">
-                            {extensionByokMode
-                              ? "Using Your Keys"
-                              : "Using Coins"}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <span
-                            className={`text-xs ${
-                              !extensionByokMode
-                                ? "text-amber-400"
-                                : "text-gray-500"
-                            }`}
-                          >
-                            Coins
-                          </span>
-                          <label className="relative inline-flex items-center cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={extensionByokMode}
-                              onChange={(e) =>
-                                setExtensionByokMode(e.target.checked)
-                              }
-                              className="sr-only peer"
-                            />
-                            <div className="w-8 h-4 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-600" />
-                          </label>
-                          <span
-                            className={`text-xs ${
-                              extensionByokMode
-                                ? "text-green-400"
-                                : "text-gray-500"
-                            }`}
-                          >
-                            BYOK
-                          </span>
-                        </div>
-                      </div>
-                    </div>
 
                     <select
                       value={extensionModel}
@@ -5289,29 +5082,14 @@ ${result.description || ""}`;
                   {/* Estimated cost display */}
                   <div className="mt-2 text-xs text-blue-400/60 flex items-center gap-2">
                     <span>💰 Estimated cost:</span>
-                    <span
-                      className={`font-medium ${
-                        extensionByokMode ? "text-green-400" : "text-amber-400"
-                      }`}
-                    >
-                      {extensionByokMode
-                        ? `~$${(
-                            (extensionModelConfig.inputPrice * 4000) / 1000000 +
-                            (extensionModelConfig.outputPrice *
-                              extensionOutputSize) /
-                              1000000
-                          ).toFixed(4)}`
-                        : `~${Math.ceil(
-                            ((extensionModelConfig.inputPrice * 4000) /
-                              1000000 +
-                              (extensionModelConfig.outputPrice *
-                                extensionOutputSize) /
-                                1000000) *
-                              100,
-                          )} coins`}
-                    </span>
-                    <span className="text-blue-400/40">
-                      ({extensionByokMode ? "BYOK" : "Coins"})
+                    <span className="font-medium text-green-400">
+                      ~$
+                      {(
+                        (extensionModelConfig.inputPrice * 4000) / 1000000 +
+                        (extensionModelConfig.outputPrice *
+                          extensionOutputSize) /
+                          1000000
+                      ).toFixed(4)}
                     </span>
                   </div>
 

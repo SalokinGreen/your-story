@@ -56,7 +56,7 @@ export const STORY_AFFIRMATION_FALLBACK = `I am the NARRATOR. No mechanical reso
 export function buildStoryAffirmation(
   gmInterleavedConversation?: string,
   gmThinking?: string[],
-  gmStoryContext?: string
+  gmStoryContext?: string,
 ): string {
   let gmReasoning = "";
 
@@ -115,7 +115,7 @@ export function buildStoryAffirmation(
   // Build the prefill with GM reasoning in thinking tags
   return STORY_AFFIRMATION_TEMPLATE.replace(
     "{{GM_REASONING}}",
-    cleanedReasoning
+    cleanedReasoning,
   );
 }
 
@@ -377,7 +377,7 @@ Your curved dagger presses against your hip. The exit is three stalls away, bloc
  * @param mode - "narrator" for literary prose, "dm" for game master with inline mechanics
  */
 export function buildStoryFewShotMessages(
-  mode: StorytellerMode = "narrator"
+  mode: StorytellerMode = "narrator",
 ): ChatMessage[] {
   // Select examples based on mode
   const example1 =
@@ -492,7 +492,7 @@ export const GM_STAGE_DEFAULT_BUDGET = 36000; // Default GM context if no custom
  */
 export function computeGMStageBudget(
   customMaxContext: number | undefined,
-  modelName: string
+  modelName: string,
 ): { historyBudget: number; infoBudget: number; totalContextBudget: number } {
   const modelConfig = getModelConfig(modelName);
   const modelMaxTokens = modelConfig.maxTokens;
@@ -502,7 +502,7 @@ export function computeGMStageBudget(
     customMaxContext && customMaxContext > 0
       ? customMaxContext
       : GM_STAGE_DEFAULT_BUDGET,
-    modelMaxTokens
+    modelMaxTokens,
   );
 
   const totalContextBudget = effectiveMaxTokens - maxOutputTokens;
@@ -521,7 +521,7 @@ export function computeGMStageBudget(
  */
 export function getPartsWithinTokenBudget(
   parts: StoryData["scene"]["parts"],
-  tokenBudget: number
+  tokenBudget: number,
 ): StoryData["scene"]["parts"] {
   if (!parts || parts.length === 0) return [];
 
@@ -566,7 +566,7 @@ export { cleanString };
  * Format combat state for AI context
  */
 export function formatCombatState(
-  combatState: CombatState | undefined
+  combatState: CombatState | undefined,
 ): string {
   if (!combatState?.active) return "";
 
@@ -577,11 +577,11 @@ export function formatCombatState(
   // Current turn
   const currentId = combatState.turnOrder[combatState.currentTurnIndex];
   const currentCombatant = combatState.combatants.find(
-    (c) => c.id === currentId
+    (c) => c.id === currentId,
   );
   if (currentCombatant) {
     lines.push(
-      `**Current Turn:** ${currentCombatant.name} (${currentCombatant.type})`
+      `**Current Turn:** ${currentCombatant.name} (${currentCombatant.type})`,
     );
   }
 
@@ -613,7 +613,7 @@ export function formatCombatState(
         c.conditions.length > 0
           ? ` | Conditions: ${c.conditions
               .map((cond) =>
-                cond.duration ? `${cond.name}(${cond.duration}t)` : cond.name
+                cond.duration ? `${cond.name}(${cond.duration}t)` : cond.name,
               )
               .join(", ")}`
           : "";
@@ -653,13 +653,13 @@ export function formatCombatState(
  * Format countdown timers for AI context
  */
 export function formatTimersState(
-  timers: CountdownTimer[] | undefined
+  timers: CountdownTimer[] | undefined,
 ): string {
   if (!timers || timers.length === 0) return "";
 
   // Only show active or paused timers (not triggered/cancelled)
   const activeTimers = timers.filter(
-    (t) => t.status === "active" || t.status === "paused"
+    (t) => t.status === "active" || t.status === "paused",
   );
   if (activeTimers.length === 0) return "";
 
@@ -672,7 +672,7 @@ export function formatTimersState(
     const visibilityNote = timer.visibility === "hidden" ? " [HIDDEN]" : "";
 
     lines.push(
-      `${statusIcon} **${timer.name}**: ${timer.currentTicks}/${timer.totalTicks} ticks${advanceNote}${visibilityNote}`
+      `${statusIcon} **${timer.name}**: ${timer.currentTicks}/${timer.totalTicks} ticks${advanceNote}${visibilityNote}`,
     );
     if (timer.description) {
       lines.push(`   → When triggered: ${timer.description}`);
@@ -730,7 +730,11 @@ function getStatDescriptor(value: number): string {
 }
 
 // Note types that are pinned (loaded in full every turn) for every stage.
-const BASE_PINNED_NOTE_TYPES = ["dm_instructions", "character_sheet", "gm_notes"];
+const BASE_PINNED_NOTE_TYPES = [
+  "dm_instructions",
+  "character_sheet",
+  "gm_notes",
+];
 
 // Shared pinned-note-type check, parameterized so the GM-Stage/other-stage
 // difference is explicit instead of two copy-pasted closures silently
@@ -740,7 +744,7 @@ const BASE_PINNED_NOTE_TYPES = ["dm_instructions", "character_sheet", "gm_notes"
 // mechanics as a lazy-loaded folder note (fetched via read_notes) instead.
 function isPinnedNoteType(
   type: string | undefined,
-  includeMechanics: boolean
+  includeMechanics: boolean,
 ): boolean {
   return (
     BASE_PINNED_NOTE_TYPES.includes(type as string) ||
@@ -757,11 +761,11 @@ function isPinnedNoteType(
 // - story_instructions: NOT included here (only used by Story Stage)
 export function buildInfoMessage(
   storyData: StoryData,
-  embeddingContext?: EmbeddingContext // DEPRECATED - kept for backward compat but ignored
+  embeddingContext?: EmbeddingContext, // DEPRECATED - kept for backward compat but ignored
 ): string {
   // Build achievements section - show LOCKED achievements with ai_hint
   const lockedAchievements = storyData.achievements.filter(
-    (a) => !a.dateAchieved
+    (a) => !a.dateAchieved,
   );
   const achievementsSection = lockedAchievements.length
     ? `## Locked Achievements\n${lockedAchievements
@@ -807,31 +811,31 @@ export function buildInfoMessage(
   const dmInstructionsLore = storyData.lore.filter(
     (l) =>
       l.enabled !== false &&
-      (l.type === "dm_instructions" || l.type === "gm_notes")
+      (l.type === "dm_instructions" || l.type === "gm_notes"),
   );
   const dmInstructionsSection = dmInstructionsLore.length
     ? `## 📌 DM Instructions\nGuidelines for running this adventure. Follow these precisely.\n${dmInstructionsLore
         .map(
-          (l) => `### ${formatNoteTitle(l.title)}\n${cleanString(l.content)}`
+          (l) => `### ${formatNoteTitle(l.title)}\n${cleanString(l.content)}`,
         )
         .join("\n\n")}`
     : "";
 
   // 📌 Character Sheet - Always loaded in full
   const characterSheetLore = storyData.lore.filter(
-    (l) => l.enabled !== false && l.type === "character_sheet"
+    (l) => l.enabled !== false && l.type === "character_sheet",
   );
   const characterSheetSection = characterSheetLore.length
     ? `## 📌 Character Sheet\nThe player's character details. Reference these for personality, abilities, and backstory.\n${characterSheetLore
         .map(
-          (l) => `### ${formatNoteTitle(l.title)}\n${cleanString(l.content)}`
+          (l) => `### ${formatNoteTitle(l.title)}\n${cleanString(l.content)}`,
         )
         .join("\n\n")}`
     : "";
 
   // � Game Mechanics - Titles only (use read_notes to view rules)
   const mechanicsLore = storyData.lore.filter(
-    (l) => l.enabled !== false && l.type === "mechanics"
+    (l) => l.enabled !== false && l.type === "mechanics",
   );
   const mechanicsSection = mechanicsLore.length
     ? `## 📁 Game Mechanics (use read_notes to view rules)\n${mechanicsLore
@@ -876,7 +880,7 @@ export function buildInfoMessage(
     worldLoreSections.push(
       `### 📁 NPCs (use read_notes to view)\n${loreByCategory.npc
         .map((l) => `- ${formatNoteTitle(l.title)}`)
-        .join("\n")}`
+        .join("\n")}`,
     );
   }
 
@@ -885,7 +889,7 @@ export function buildInfoMessage(
     worldLoreSections.push(
       `### 📁 Locations (use read_notes to view)\n${loreByCategory.location
         .map((l) => `- ${formatNoteTitle(l.title)}`)
-        .join("\n")}`
+        .join("\n")}`,
     );
   }
 
@@ -894,7 +898,7 @@ export function buildInfoMessage(
     worldLoreSections.push(
       `### 📁 Items (use read_notes to view)\n${loreByCategory.item
         .map((l) => `- ${formatNoteTitle(l.title)}`)
-        .join("\n")}`
+        .join("\n")}`,
     );
   }
 
@@ -903,7 +907,7 @@ export function buildInfoMessage(
     worldLoreSections.push(
       `### 📁 Factions (use read_notes to view)\n${loreByCategory.faction
         .map((l) => `- ${formatNoteTitle(l.title)}`)
-        .join("\n")}`
+        .join("\n")}`,
     );
   }
 
@@ -912,7 +916,7 @@ export function buildInfoMessage(
     worldLoreSections.push(
       `### 📁 Events (use read_notes to view)\n${loreByCategory.event
         .map((l) => `- ${formatNoteTitle(l.title)}`)
-        .join("\n")}`
+        .join("\n")}`,
     );
   }
 
@@ -921,7 +925,7 @@ export function buildInfoMessage(
     worldLoreSections.push(
       `### 📁 World Notes (use read_notes to view)\n${loreByCategory.lore
         .map((l) => `- ${formatNoteTitle(l.title)}`)
-        .join("\n")}`
+        .join("\n")}`,
     );
   }
 
@@ -949,7 +953,7 @@ export function buildInfoMessage(
 
   // 🔒 Secrets - Titles only (hidden from player, use read_notes to view)
   const secretNotes = storyData.lore.filter(
-    (l) => l.enabled !== false && isSecretType(l.type)
+    (l) => l.enabled !== false && isSecretType(l.type),
   );
   const secretsSection = secretNotes.length
     ? `## 🔒 Secrets (use read_notes to view)\n${secretNotes
@@ -990,7 +994,7 @@ export function buildInfoMessage(
   const agmtSection = storyData.agmtState
     ? `## Advanced RPG Tools
 - Chaos Factor: ${storyData.agmtState.chaosFactor}/9 (${getChaosDescription(
-        storyData.agmtState.chaosFactor
+        storyData.agmtState.chaosFactor,
       )})
 - Scene Count: ${storyData.agmtState.sceneCount}`
     : "";
@@ -1028,7 +1032,7 @@ export function buildInfoMessage(
     storyData.threads?.filter((t) => t.status === "active") || [];
   const completedThreads =
     storyData.threads?.filter(
-      (t) => t.status === "resolved" || t.status === "abandoned"
+      (t) => t.status === "resolved" || t.status === "abandoned",
     ) || [];
   // Truncate thread descriptions to prevent context bloat (max 200 chars)
   const truncateDesc = (desc: string, max = 200) =>
@@ -1042,8 +1046,8 @@ ${
         .map(
           (t) =>
             `- [${t.priority || "side"}] **${t.title}**: ${truncateDesc(
-              t.description
-            )}`
+              t.description,
+            )}`,
         )
         .join("\n")}`
     : ""
@@ -1127,7 +1131,7 @@ ${
 export function buildStoryInfoMessage(storyData: StoryData): string {
   // 📌 Story Instructions - Always loaded (narrator-specific guidance)
   const storyInstructionsLore = storyData.lore.filter(
-    (l) => l.enabled !== false && l.type === "story_instructions"
+    (l) => l.enabled !== false && l.type === "story_instructions",
   );
   const storyInstructionsSection = storyInstructionsLore.length
     ? `## 📌 Story Instructions\nGuidance for writing the narrative. Follow these precisely.\n${storyInstructionsLore
@@ -1137,7 +1141,7 @@ export function buildStoryInfoMessage(storyData: StoryData): string {
 
   // 📌 Character Sheet - Always loaded (for character voice and personality)
   const characterSheetLore = storyData.lore.filter(
-    (l) => l.enabled !== false && l.type === "character_sheet"
+    (l) => l.enabled !== false && l.type === "character_sheet",
   );
   const characterSheetSection = characterSheetLore.length
     ? `## 📌 Character Sheet\nThe player's character. Use this for voice, personality, and mannerisms.\n${characterSheetLore
@@ -1287,7 +1291,7 @@ export function buildStoryPrompt({
   storyData,
   userChoice,
   commandResponses,
-  modelName = "Deepseek Chat",
+  modelName = "DeepSeek V4 Flash",
   customMaxContext, // DEPRECATED: Use customStoryContext instead
   customStoryContext, // Story stage context size (from Story Context slider)
   customMaxOutput,
@@ -1351,7 +1355,7 @@ export function buildStoryPrompt({
   // If info exceeds its budget, we still include it but reduce story budget
   const actualStoryBudget = Math.max(
     storyBudget,
-    maxContextTokens - infoTokens - 1000
+    maxContextTokens - infoTokens - 1000,
   ); // Keep 1000 tokens buffer
 
   const messages: ChatMessage[] = [
@@ -1364,7 +1368,7 @@ export function buildStoryPrompt({
   if (useFewShot) {
     messages.push(...buildStoryFewShotMessages(storytellerMode));
     console.log(
-      `[buildStoryPrompt] Using few-shot examples (${storyData.scene.parts.length} parts < ${FEW_SHOT_THRESHOLD} threshold, mode: ${storytellerMode})`
+      `[buildStoryPrompt] Using few-shot examples (${storyData.scene.parts.length} parts < ${FEW_SHOT_THRESHOLD} threshold, mode: ${storytellerMode})`,
     );
   }
 
@@ -1389,7 +1393,7 @@ export function buildStoryPrompt({
 
   // Helper to format GAME MASTER reasoning from a scene part
   const formatGMReasoning = (
-    part: (typeof storyData.scene.parts)[0]
+    part: (typeof storyData.scene.parts)[0],
   ): string => {
     const sections: string[] = [];
 
@@ -1414,7 +1418,7 @@ export function buildStoryPrompt({
             }
             // Also strip variations like [STORY] or [OUTPUT]
             const altStoryIndex = processed.search(
-              /\[(STORY|OUTPUT|NARRATIVE)\s*(OUTPUT|CONTENT)?\]/i
+              /\[(STORY|OUTPUT|NARRATIVE)\s*(OUTPUT|CONTENT)?\]/i,
             );
             if (altStoryIndex !== -1) {
               processed = processed.substring(0, altStoryIndex).trim();
@@ -1428,7 +1432,7 @@ export function buildStoryPrompt({
               : `[GAME MASTER]\n${processed}`;
           })
           .filter((s) => s.length > 0) // Remove empty entries
-          .join("\n\n")
+          .join("\n\n"),
       );
     }
 
@@ -1541,7 +1545,7 @@ export function buildStoryPrompt({
     ? buildStoryAffirmation(
         gmInterleavedConversation,
         gmThinking,
-        gmStoryContext
+        gmStoryContext,
       )
     : "";
   const prefillTokens = estimateTokens(affirmation);
@@ -1589,10 +1593,10 @@ export function buildStoryPrompt({
 
   if (prunedParts > 0) {
     console.log(
-      `[buildStoryPrompt] Pruned ${prunedParts} oldest parts to fit context budget. Kept ${prunedHistory.length} parts.`
+      `[buildStoryPrompt] Pruned ${prunedParts} oldest parts to fit context budget. Kept ${prunedHistory.length} parts.`,
     );
     console.log(
-      `[buildStoryPrompt] Token budget: ${adjustedStoryBudget} (base ${actualStoryBudget} - prefill ${prefillTokens}), Used: ${currentTokens}, Info: ${infoTokens}`
+      `[buildStoryPrompt] Token budget: ${adjustedStoryBudget} (base ${actualStoryBudget} - prefill ${prefillTokens}), Used: ${currentTokens}, Info: ${infoTokens}`,
     );
   }
 
@@ -1604,7 +1608,7 @@ export function buildStoryPrompt({
       content: affirmation,
     });
     console.log(
-      `[buildStoryPrompt] Added prefill with GM reasoning (${affirmation.length} chars, ~${prefillTokens} tokens)`
+      `[buildStoryPrompt] Added prefill with GM reasoning (${affirmation.length} chars, ~${prefillTokens} tokens)`,
     );
   }
 
@@ -1885,7 +1889,7 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
   if (useFewShot) {
     messages.push(...buildToolsFewShotMessages());
     console.log(
-      `[buildToolPrompt] Using few-shot examples (${storyData.scene.parts.length} parts < ${FEW_SHOT_THRESHOLD} threshold)`
+      `[buildToolPrompt] Using few-shot examples (${storyData.scene.parts.length} parts < ${FEW_SHOT_THRESHOLD} threshold)`,
     );
   }
 
@@ -1895,7 +1899,7 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
   // Add scene parts within token budget for context (INCLUDING PAST TOOL CALLS)
   const recentParts = getPartsWithinTokenBudget(
     storyData.scene.parts,
-    TOOL_STAGE_TOKEN_BUDGET
+    TOOL_STAGE_TOKEN_BUDGET,
   );
   let lastWasToolResponse = false; // Track if last message was a tool response
 
@@ -1936,7 +1940,7 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
               function: tc.function,
               // Preserve extra_content for Google (contains thought_signature for thinking models)
               ...(tc.extra_content ? { extra_content: tc.extra_content } : {}),
-            })
+            }),
           ),
         });
 
@@ -1955,7 +1959,7 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
         console.log(
           `[buildToolPrompt] Including tool history: ${
             part.toolCalls.length
-          } calls, ${part.toolResponses?.length || 0} responses`
+          } calls, ${part.toolResponses?.length || 0} responses`,
         );
       } else {
         // Regular assistant message without tools
@@ -1981,14 +1985,14 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
   messages.push({
     role: "user",
     content: cleanString(
-      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`
+      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative, what game state changes (commands and memory) should happen? Think out loud in your message content, then call all necessary tools.`,
     ),
   });
 
   // Debug: Log tool context details
   const totalTokens = messages.reduce(
     (sum, m) => sum + estimateTokens(m.content),
-    0
+    0,
   );
   console.log(`[buildToolPrompt] Context breakdown:`);
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
@@ -1997,8 +2001,8 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
   console.log(
     `  - Scene parts tokens: ${recentParts.reduce(
       (sum, p) => sum + estimateTokens(p.raw || p.content),
-      0
-    )} tokens`
+      0,
+    )} tokens`,
   );
   console.log(`  - Story content: ${estimateTokens(storyContent)} tokens`);
   console.log(`  - Total messages: ${messages.length}`);
@@ -2032,7 +2036,7 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
           function: tc.function,
           // Preserve extra_content for Google (contains thought_signature for thinking models)
           ...(tc.extra_content ? { extra_content: tc.extra_content } : {}),
-        })
+        }),
       ),
     });
 
@@ -2044,7 +2048,7 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
           content: cleanString(
             `${
               response.success ? "✓" : response.success === false ? "✗" : "⚠"
-            } ${response.message}`
+            } ${response.message}`,
           ),
           tool_call_id: response.toolCallId,
         });
@@ -2075,7 +2079,7 @@ Think through the narrative sentence-by-sentence, then execute the required Tool
     messages.push({
       role: "user",
       content: cleanString(
-        `You already called these tools:\n${toolCallSummary}\n\nAnything else needed? Review the story and game state carefully. Return NO tool calls if everything is handled, or call additional tools if you missed something.`
+        `You already called these tools:\n${toolCallSummary}\n\nAnything else needed? Review the story and game state carefully. Return NO tool calls if everything is handled, or call additional tools if you missed something.`,
       ),
     });
   }
@@ -2144,7 +2148,7 @@ NARRATIVE FLOW:
   // Add scene parts within token budget for context
   const recentParts = getPartsWithinTokenBudget(
     storyData.scene.parts,
-    customBudget || CHOICES_STAGE_TOKEN_BUDGET
+    customBudget || CHOICES_STAGE_TOKEN_BUDGET,
   );
   for (const part of recentParts) {
     if (part.user) {
@@ -2165,7 +2169,7 @@ NARRATIVE FLOW:
   messages.push({
     role: "user",
     content: cleanString(
-      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`
+      `Story content that was just generated:\n\n${storyContent}\n\nBased on this narrative and the current game state, what meaningful choices should the player have?`,
     ),
   });
 
@@ -2294,7 +2298,7 @@ ${
     ? storyData.stats
         .map(
           (s) =>
-            `  • ${s.name} (${s.value}): ${s.description || "No description"}`
+            `  • ${s.name} (${s.value}): ${s.description || "No description"}`,
         )
         .join("\n")
     : "  None"
@@ -2308,7 +2312,7 @@ ${
           (r) =>
             `  • ${r.name} (${r.value}/${r.maxValue}): ${
               r.description || "No description"
-            }`
+            }`,
         )
         .join("\n")
     : "  None"
@@ -2357,11 +2361,11 @@ RESPOND WITH JSON ONLY.`;
   // Build minimal context within token budget for situational awareness
   const recentParts = getPartsWithinTokenBudget(
     storyData.scene.parts,
-    ACTION_ANALYSIS_TOKEN_BUDGET
+    ACTION_ANALYSIS_TOKEN_BUDGET,
   );
   const recentContext = recentParts
     .map((p) =>
-      p.user ? `Player: ${p.content}` : `Story: ${p.content.slice(0, 300)}...`
+      p.user ? `Player: ${p.content}` : `Story: ${p.content.slice(0, 300)}...`,
     )
     .join("\n\n");
 
@@ -2386,8 +2390,8 @@ Analyze this action and return the JSON object.`;
   console.log(
     `  - Total estimated tokens: ${messages.reduce(
       (sum, m) => sum + estimateTokens(m.content),
-      0
-    )}`
+      0,
+    )}`,
   );
 
   return { messages };
@@ -2419,7 +2423,7 @@ export function buildGMStagePrompt({
   storyData,
   userChoice,
   customMaxContext,
-  modelName = "Deepseek Chat",
+  modelName = "DeepSeek V4 Flash",
 }: {
   storyData: StoryData;
   userChoice: string;
@@ -2436,7 +2440,7 @@ export function buildGMStagePrompt({
   // Get recent story parts for context - now uses the calculated history budget
   const recentParts = getPartsWithinTokenBudget(
     storyData.scene.parts,
-    historyBudget
+    historyBudget,
   );
 
   // ============================================
@@ -2445,8 +2449,7 @@ export function buildGMStagePrompt({
   // Helper to check if a note type is "pinned" (always loaded in full).
   // mechanics IS pinned here (unlike buildInfoMessage's version above) - the
   // GM Stage needs the full rules text every round to run dice checks.
-  const isPinnedType = (type?: string): boolean =>
-    isPinnedNoteType(type, true);
+  const isPinnedType = (type?: string): boolean => isPinnedNoteType(type, true);
 
   // Helper to check if a note type is "secret" (hidden from player)
   const isSecretType = (type?: string): boolean => {
@@ -2457,17 +2460,17 @@ export function buildGMStagePrompt({
   const dmInstructionsLore = (storyData.lore || []).filter(
     (l) =>
       l.enabled !== false &&
-      (l.type === "dm_instructions" || l.type === "gm_notes")
+      (l.type === "dm_instructions" || l.type === "gm_notes"),
   );
 
   // 📌 Character Sheet - Always loaded in full
   const characterSheetLore = (storyData.lore || []).filter(
-    (l) => l.enabled !== false && l.type === "character_sheet"
+    (l) => l.enabled !== false && l.type === "character_sheet",
   );
 
   // 📌 Game Mechanics - Always loaded in full
   const mechanicsLore = (storyData.lore || []).filter(
-    (l) => l.enabled !== false && l.type === "mechanics"
+    (l) => l.enabled !== false && l.type === "mechanics",
   );
 
   // Categorize notes by type for better organization
@@ -2764,10 +2767,10 @@ Write immersive prose. The player should experience the story, not see game mech
   ];
 
   const gmTools = GM_TOOL_SCHEMAS.filter((t: any) =>
-    legacyToolNames.includes(t.function.name)
+    legacyToolNames.includes(t.function.name),
   );
   const stateTools = TOOL_SCHEMAS.filter((t: any) =>
-    stateToolNames.includes(t.function.name)
+    stateToolNames.includes(t.function.name),
   );
   const toolsToUse = [...gmTools, ...stateTools];
 
@@ -3045,7 +3048,7 @@ Write immersive prose. The player should experience the story, not see game mech
   // Story context is now in the previous assistant message, so just include the action
   const playerActionMessage = `> ${userChoice.replace(
     /^>\s*/,
-    ""
+    "",
   )}\n\n**INSTRUCTIONS:**
 1. First, read through the Game Mechanics Notes if needed.
 2. Use reasoning and planning before talking back to the player.
@@ -3068,20 +3071,20 @@ Write immersive prose. The player should experience the story, not see game mech
       !p.user &&
       (p.gmConversation?.length ||
         p.gmThinking?.length ||
-        p.gmToolCalls?.length)
+        p.gmToolCalls?.length),
   ).length;
   const partsWithNewFormat = partsToInclude.filter(
-    (p) => !p.user && p.gmConversation?.length
+    (p) => !p.user && p.gmConversation?.length,
   ).length;
 
   // Debug logging
   console.log(
-    `[buildGMStagePrompt] Context budget: ${totalContextBudget} tokens (history: ${historyBudget}, info: ${infoBudget})`
+    `[buildGMStagePrompt] Context budget: ${totalContextBudget} tokens (history: ${historyBudget}, info: ${infoBudget})`,
   );
   console.log(`  - System prompt: ${estimateTokens(systemPrompt)} tokens`);
   console.log(`  - State message: ${estimateTokens(stateMessage)} tokens`);
   console.log(
-    `  - Chat history: ${recentParts.length} parts (${partsWithGMHistory} with GM data, ${partsWithNewFormat} with new gmConversation format)`
+    `  - Chat history: ${recentParts.length} parts (${partsWithGMHistory} with GM data, ${partsWithNewFormat} with new gmConversation format)`,
   );
   console.log(`  - Available tools: ${toolsToUse.length}`);
 
@@ -3098,7 +3101,7 @@ Write immersive prose. The player should experience the story, not see game mech
  * This is appended to the GM conversation to continue in the same context.
  */
 export function buildStoryContinuationPrompt(
-  storytellerMode: StorytellerMode = "narrator"
+  storytellerMode: StorytellerMode = "narrator",
 ): string {
   const basePrompt = `Now write the story from the player's perspective. WRAP ALL PLAYER-VISIBLE PROSE IN <output>...</output> TAGS.`;
 

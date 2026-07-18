@@ -215,51 +215,58 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                           className="w-3.5 h-3.5 text-green-500"
                         />
                       )}
-                    </div>
-                    {!hasKey("openRouterKey") ? (
-                      <button
-                        onClick={connectOpenRouter}
-                        disabled={isConnectingOpenRouter}
-                        className="mt-1 text-xs text-purple-500 hover:text-purple-600 flex items-center gap-1"
+                      <a
+                        href="https://openrouter.ai/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline ml-auto"
                       >
-                        {isConnectingOpenRouter ? (
-                          <>
-                            <DynamicIcon
-                              name="Loader2"
-                              className="w-3 h-3 animate-spin"
-                            />
-                            Connecting...
-                          </>
-                        ) : (
-                          <>
-                            <DynamicIcon
-                              name="ExternalLink"
-                              className="w-3 h-3"
-                            />
-                            Connect with OAuth
-                          </>
-                        )}
-                      </button>
-                    ) : (
-                      <div className="flex items-center gap-1 mt-1">
-                        <input
-                          type={showKeys ? "text" : "password"}
-                          value={keys.openRouterKey}
-                          onChange={(e) =>
-                            setKey("openRouterKey", e.target.value)
-                          }
-                          placeholder="sk-or-..."
-                          className="flex-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
-                        />
+                        Get key →
+                      </a>
+                    </div>
+                    <div className="flex items-center gap-1 mt-1">
+                      <input
+                        type={showKeys ? "text" : "password"}
+                        value={keys.openRouterKey}
+                        onChange={(e) =>
+                          setKey("openRouterKey", e.target.value)
+                        }
+                        placeholder="sk-or-..."
+                        className="flex-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                      />
+                      {hasKey("openRouterKey") && (
                         <button
                           onClick={disconnectOpenRouter}
                           className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                          title="Disconnect"
+                          title="Clear key"
                         >
                           <DynamicIcon name="X" className="w-3.5 h-3.5" />
                         </button>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                    <button
+                      onClick={connectOpenRouter}
+                      disabled={isConnectingOpenRouter}
+                      className="mt-1 text-xs text-purple-500 hover:text-purple-600 flex items-center gap-1"
+                    >
+                      {isConnectingOpenRouter ? (
+                        <>
+                          <DynamicIcon
+                            name="Loader2"
+                            className="w-3 h-3 animate-spin"
+                          />
+                          Connecting...
+                        </>
+                      ) : (
+                        <>
+                          <DynamicIcon
+                            name="ExternalLink"
+                            className="w-3 h-3"
+                          />
+                          Or connect with OAuth instead
+                        </>
+                      )}
+                    </button>
                   </div>
                 </div>
 

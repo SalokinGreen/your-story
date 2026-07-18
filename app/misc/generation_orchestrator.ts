@@ -10,7 +10,6 @@
  */
 
 import React from "react";
-import { getAuthToken } from "@/app/misc/getAuthToken";
 import {
   BigAdventureConfig,
   BigAdventureResult,
@@ -47,31 +46,31 @@ const POST_STAGES: GenerationStage[] = ["icons"];
 export interface GenerationCallbacks {
   onStageStart: (
     stage: GenerationStage,
-    stageInfo: ReturnType<typeof getStageInfo>
+    stageInfo: ReturnType<typeof getStageInfo>,
   ) => void;
   onStageContent: (stage: GenerationStage, content: string) => void;
   onStageContinuation: (
     stage: GenerationStage,
     attempt: number,
-    maxAttempts: number
+    maxAttempts: number,
   ) => void;
   onStageComplete: (
     stage: GenerationStage,
     result: Partial<BigAdventureResult> | null,
     promptTokens: number,
-    completionTokens: number
+    completionTokens: number,
   ) => void;
   onStageError: (
     stage: GenerationStage,
     error: string,
     canRetry: boolean,
-    rawContent?: string // The raw content that failed to parse - for manual repair
+    rawContent?: string, // The raw content that failed to parse - for manual repair
   ) => void;
   onStageWarning: (stage: GenerationStage, message: string) => void;
   onProgress: (completedStages: GenerationStage[], totalStages: number) => void;
   onComplete: (
     result: BigAdventureResult,
-    totalTokens: { prompt: number; completion: number }
+    totalTokens: { prompt: number; completion: number },
   ) => void;
   onError: (error: string) => void;
   onAutosave: (autosave: BigAdventureAutosave) => void;
@@ -112,20 +111,8 @@ async function generateSingleStage(
   previousResults: Partial<BigAdventureResult> | undefined,
   options: GenerationOptions,
   callbacks: GenerationCallbacks,
-  continueFrom?: string
+  continueFrom?: string,
 ): Promise<StageResult> {
-  const token = await getAuthToken();
-  if (!token) {
-    return {
-      success: false,
-      result: null,
-      rawContent: continueFrom || "",
-      promptTokens: 0,
-      completionTokens: 0,
-      error: "Not authenticated",
-    };
-  }
-
   const startTime = Date.now();
   let lastHeartbeat = Date.now();
   let fullContent = continueFrom || "";
@@ -137,7 +124,6 @@ async function generateSingleStage(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         config,
@@ -214,7 +200,7 @@ async function generateSingleStage(
               resolved = true;
               resolve({ done: true, value: undefined, timedOut: false });
             }
-          }
+          },
         );
 
         // Periodically check for timeout while read is pending
@@ -299,7 +285,7 @@ async function generateSingleStage(
               callbacks.onStageContinuation(
                 stage,
                 event.attempt,
-                event.maxAttempts
+                event.maxAttempts,
               );
               lastHeartbeat = Date.now();
               break;
@@ -396,20 +382,8 @@ async function generateSingleStageFinishEarly(
   previousResults: Partial<BigAdventureResult> | undefined,
   options: GenerationOptions,
   callbacks: GenerationCallbacks,
-  partialContent: string
+  partialContent: string,
 ): Promise<StageResult> {
-  const token = await getAuthToken();
-  if (!token) {
-    return {
-      success: false,
-      result: null,
-      rawContent: partialContent,
-      promptTokens: 0,
-      completionTokens: 0,
-      error: "Not authenticated",
-    };
-  }
-
   try {
     // Make a request with finishEarly=true to wrap up the JSON
     // Note: We don't use the abortSignal here since we want this to complete
@@ -417,7 +391,6 @@ async function generateSingleStageFinishEarly(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         config,
@@ -551,7 +524,7 @@ async function generateSingleStageFinishEarly(
 export async function generateAdventureSequential(
   config: BigAdventureConfig,
   options: GenerationOptions,
-  callbacks: GenerationCallbacks
+  callbacks: GenerationCallbacks,
 ): Promise<void> {
   const stages = getStagesToRun(config);
   const completedStages: GenerationStage[] = options.skipStages
@@ -570,10 +543,10 @@ export async function generateAdventureSequential(
 
   // Determine which stages need sequential vs parallel processing
   const sequentialStagesToRun = stages.filter(
-    (s) => SEQUENTIAL_STAGES.includes(s) && !completedStages.includes(s)
+    (s) => SEQUENTIAL_STAGES.includes(s) && !completedStages.includes(s),
   );
   const parallelizableStagesToRun = stages.filter(
-    (s) => PARALLELIZABLE_STAGES.includes(s) && !completedStages.includes(s)
+    (s) => PARALLELIZABLE_STAGES.includes(s) && !completedStages.includes(s),
   );
 
   // Check if we should use parallel mode (not for NovelAI)
@@ -590,7 +563,7 @@ export async function generateAdventureSequential(
       stageResults,
       completedStages,
       options,
-      callbacks
+      callbacks,
     );
 
     if (!result.success) {
@@ -607,13 +580,13 @@ export async function generateAdventureSequential(
       stage,
       result.result,
       result.promptTokens,
-      result.completionTokens
+      result.completionTokens,
     );
     callbacks.onProgress(completedStages, stages.length);
 
     // Save autosave
     const mergedResults = mergeBigAdventureResults(
-      ...stageResults.filter((r) => r !== null)
+      ...stageResults.filter((r) => r !== null),
     );
     const autosave: BigAdventureAutosave = {
       id: options.sessionId,
@@ -645,7 +618,7 @@ export async function generateAdventureSequential(
         options,
         callbacks,
         completedStages,
-        stageResults
+        stageResults,
       );
 
       // Collect results (callbacks and autosaves already fired in runStagesInParallel)
@@ -676,7 +649,7 @@ export async function generateAdventureSequential(
         const currentPreviousResults =
           stageResults.length > 0
             ? mergeBigAdventureResults(
-                ...stageResults.filter((r) => r !== null)
+                ...stageResults.filter((r) => r !== null),
               )
             : undefined;
 
@@ -687,7 +660,7 @@ export async function generateAdventureSequential(
           completedStages,
           options,
           callbacks,
-          currentPreviousResults
+          currentPreviousResults,
         );
 
         if (!result.success) {
@@ -704,13 +677,13 @@ export async function generateAdventureSequential(
           stage,
           result.result,
           result.promptTokens,
-          result.completionTokens
+          result.completionTokens,
         );
         callbacks.onProgress(completedStages, stages.length);
 
         // Save autosave
         const mergedResults = mergeBigAdventureResults(
-          ...stageResults.filter((r) => r !== null)
+          ...stageResults.filter((r) => r !== null),
         );
         const autosave: BigAdventureAutosave = {
           id: options.sessionId,
@@ -728,7 +701,7 @@ export async function generateAdventureSequential(
 
   // Phase 3: Post-stages (icons) - run after all content is generated
   const postStagesToRun = stages.filter(
-    (s) => POST_STAGES.includes(s) && !completedStages.includes(s)
+    (s) => POST_STAGES.includes(s) && !completedStages.includes(s),
   );
 
   for (const stage of postStagesToRun) {
@@ -751,7 +724,7 @@ export async function generateAdventureSequential(
       completedStages,
       options,
       callbacks,
-      currentPreviousResults
+      currentPreviousResults,
     );
 
     if (!result.success) {
@@ -769,14 +742,14 @@ export async function generateAdventureSequential(
       stage,
       result.result,
       result.promptTokens,
-      result.completionTokens
+      result.completionTokens,
     );
     callbacks.onProgress(completedStages, stages.length);
 
     // Save autosave
     if (stageResults.length > 0) {
       const mergedResults = mergeBigAdventureResults(
-        ...stageResults.filter((r) => r !== null)
+        ...stageResults.filter((r) => r !== null),
       );
       const autosave: BigAdventureAutosave = {
         id: options.sessionId,
@@ -793,7 +766,7 @@ export async function generateAdventureSequential(
 
   // All stages completed (or at least some succeeded)
   const finalResult = mergeBigAdventureResults(
-    ...stageResults.filter((r) => r !== null)
+    ...stageResults.filter((r) => r !== null),
   );
 
   // Merge imported content from config (PDF imports)
@@ -847,7 +820,7 @@ async function runSingleStageWithRetry(
   completedStages: GenerationStage[],
   options: GenerationOptions,
   callbacks: GenerationCallbacks,
-  previousResultsOverride?: Partial<BigAdventureResult>
+  previousResultsOverride?: Partial<BigAdventureResult>,
 ): Promise<StageResult> {
   // Check for abort
   if (options.abortSignal?.aborted) {
@@ -887,7 +860,7 @@ async function runSingleStageWithRetry(
       previousResults,
       options,
       callbacks,
-      undefined // Don't continue from partial - we'll use finish early instead
+      undefined, // Don't continue from partial - we'll use finish early instead
     );
 
     // Accumulate content regardless of success
@@ -909,7 +882,7 @@ async function runSingleStageWithRetry(
       // Handle user-triggered finish early
       callbacks.onStageWarning(
         stage,
-        `Finishing early with ${partialContent.length} characters...`
+        `Finishing early with ${partialContent.length} characters...`,
       );
 
       const wrapUpResult = await generateSingleStageFinishEarly(
@@ -918,7 +891,7 @@ async function runSingleStageWithRetry(
         previousResults,
         options,
         callbacks,
-        partialContent
+        partialContent,
       );
 
       if (options.finishEarlyRef) {
@@ -940,7 +913,7 @@ async function runSingleStageWithRetry(
           stage,
           wrapUpResult.error || "Failed to finish early",
           false,
-          partialContent // Raw content for manual repair
+          partialContent, // Raw content for manual repair
         );
         return {
           success: false,
@@ -960,7 +933,7 @@ async function runSingleStageWithRetry(
       retryCount++;
       callbacks.onStageWarning(
         stage,
-        `Timeout/error with ${partialContent.length} chars. Retrying with finish-now request...`
+        `Timeout/error with ${partialContent.length} chars. Retrying with finish-now request...`,
       );
 
       // Use finish early to wrap up what we have
@@ -970,7 +943,7 @@ async function runSingleStageWithRetry(
         previousResults,
         options,
         callbacks,
-        partialContent
+        partialContent,
       );
 
       totalPromptTokens += wrapUpResult.promptTokens;
@@ -1004,7 +977,7 @@ async function runSingleStageWithRetry(
       // Save partial progress
       if (stageResults.length > 0) {
         const partialMerged = mergeBigAdventureResults(
-          ...stageResults.filter((r) => r !== null)
+          ...stageResults.filter((r) => r !== null),
         );
         const autosave: BigAdventureAutosave = {
           id: options.sessionId,
@@ -1023,7 +996,7 @@ async function runSingleStageWithRetry(
           `Progress saved (${completedStages.length}/${
             completedStages.length + 1
           } stages completed). ` +
-          `You can resume later.`
+          `You can resume later.`,
       );
 
       return {
@@ -1059,12 +1032,12 @@ async function runStagesInParallel(
   options: GenerationOptions,
   callbacks: GenerationCallbacks,
   existingCompletedStages: GenerationStage[],
-  existingStageResults: (Partial<BigAdventureResult> | null)[]
+  existingStageResults: (Partial<BigAdventureResult> | null)[],
 ): Promise<{ stage: GenerationStage; result: StageResult }[]> {
   // Notify about parallel execution
   callbacks.onStageWarning(
     stages[0],
-    `Starting parallel generation of ${stages.length} stages...`
+    `Starting parallel generation of ${stages.length} stages...`,
   );
 
   const results: { stage: GenerationStage; result: StageResult }[] = [];
@@ -1111,7 +1084,7 @@ async function runStagesInParallel(
         previousResults,
         options,
         callbacks,
-        undefined // Don't continue from partial
+        undefined, // Don't continue from partial
       );
 
       if (genResult.rawContent) {
@@ -1142,7 +1115,7 @@ async function runStagesInParallel(
           stage,
           genResult.result,
           stageResult.result.promptTokens,
-          stageResult.result.completionTokens
+          stageResult.result.completionTokens,
         );
 
         // Save autosave immediately after each parallel stage completes
@@ -1155,7 +1128,7 @@ async function runStagesInParallel(
           ...parallelStageResults,
         ];
         const mergedResults = mergeBigAdventureResults(
-          ...allStageResults.filter((r) => r !== null)
+          ...allStageResults.filter((r) => r !== null),
         );
         const autosave: BigAdventureAutosave = {
           id: options.sessionId,
@@ -1178,7 +1151,7 @@ async function runStagesInParallel(
         retryCount++;
         callbacks.onStageWarning(
           stage,
-          `Timeout/error with ${partialContent.length} chars. Retrying with finish-now request...`
+          `Timeout/error with ${partialContent.length} chars. Retrying with finish-now request...`,
         );
 
         const wrapUpResult = await generateSingleStageFinishEarly(
@@ -1187,7 +1160,7 @@ async function runStagesInParallel(
           previousResults,
           options,
           callbacks,
-          partialContent
+          partialContent,
         );
 
         totalPromptTokens += wrapUpResult.promptTokens;
@@ -1214,7 +1187,7 @@ async function runStagesInParallel(
             stage,
             wrapUpResult.result,
             stageResult.result.promptTokens,
-            stageResult.result.completionTokens
+            stageResult.result.completionTokens,
           );
 
           // Save autosave immediately after each parallel stage completes
@@ -1227,7 +1200,7 @@ async function runStagesInParallel(
             ...parallelStageResults,
           ];
           const mergedResults = mergeBigAdventureResults(
-            ...allStageResults.filter((r) => r !== null)
+            ...allStageResults.filter((r) => r !== null),
           );
           const autosave: BigAdventureAutosave = {
             id: options.sessionId,
@@ -1266,7 +1239,7 @@ async function runStagesInParallel(
           stage,
           stageResult.result.error || "Unknown error",
           false,
-          partialContent
+          partialContent,
         );
 
         return stageResult;
@@ -1291,7 +1264,7 @@ async function runStagesInParallel(
       stage,
       "Max retries exceeded",
       false,
-      partialContent
+      partialContent,
     );
 
     return stageResult;
@@ -1320,7 +1293,7 @@ export async function generateSingleStageOnly(
     | "onStageError"
     | "onStageWarning"
   >,
-  continueFrom?: string
+  continueFrom?: string,
 ): Promise<StageResult> {
   return generateSingleStage(
     config,
@@ -1328,6 +1301,6 @@ export async function generateSingleStageOnly(
     previousResults,
     options as GenerationOptions,
     callbacks as GenerationCallbacks,
-    continueFrom
+    continueFrom,
   );
 }

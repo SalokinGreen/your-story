@@ -18,22 +18,40 @@ export const AI_MODELS = {
     finetunes: [],
   },
 
-  "Deepseek Chat": {
-    name: "Deepseek Chat",
-    original_model: "Deepseek Chat",
-    model: "deepseek-chat",
-    maxTokens: 128000,
-    maxOutputTokens: 8000,
+  "DeepSeek V4 Flash": {
+    name: "DeepSeek V4 Flash",
+    original_model: "DeepSeek V4 Flash",
+    model: "deepseek-v4-flash",
+    maxTokens: 1000000,
+    maxOutputTokens: 65000,
     provider: "deepseek",
     supportsToolCalling: true,
     cost: 1,
-    inputPrice: 0.28,
-    outputPrice: 0.42,
+    inputPrice: 0.14,
+    outputPrice: 0.28,
     finetunes: [],
     strengths: ["creativity", "nsfw"],
     weaknesses: ["price"],
     description:
-      "A versatile model known for its creativity and ability to handle long-form content, making it suitable for detailed storytelling and complex narratives.",
+      "DeepSeek's fast successor to DeepSeek Chat, known for its creativity and ability to handle long-form content, making it suitable for detailed storytelling and complex narratives.",
+    bannerUrl: undefined,
+  },
+  "DeepSeek V4 Pro": {
+    name: "DeepSeek V4 Pro",
+    original_model: "DeepSeek V4 Pro",
+    model: "deepseek-v4-pro",
+    maxTokens: 1000000,
+    maxOutputTokens: 65000,
+    provider: "deepseek",
+    supportsToolCalling: true,
+    cost: 2,
+    inputPrice: 0.435,
+    outputPrice: 0.87,
+    finetunes: [],
+    strengths: ["creativity", "smarts", "nsfw"],
+    weaknesses: ["price"],
+    description:
+      "DeepSeek's higher-quality flagship model with deeper reasoning, ideal for complex narratives that need stronger consistency.",
     bannerUrl: undefined,
   },
   "Gemini 2.5 Flash": {
@@ -222,25 +240,6 @@ export const AI_MODELS = {
     weaknesses: ["price"],
     description:
       "A robust model designed for handling extensive context and delivering powerful performance, making it suitable for complex storytelling and detailed narratives.",
-    bannerUrl: undefined,
-  },
-
-  "Deepseek R1": {
-    name: "DeepSeek R1",
-    original_model: "DeepSeek R1",
-    model: "deepseek-reasoner",
-    maxTokens: 128000,
-    maxOutputTokens: 64000,
-    provider: "deepseek",
-    supportsToolCalling: false,
-    cost: 2,
-    inputPrice: 0.28,
-    outputPrice: 0.42,
-    finetunes: [],
-    strengths: ["reasoning", "coding", "complex logic"],
-    weaknesses: ["speed", "no tool calling"],
-    description:
-      "A reasoning-focused model that excels at complex logic, planning, and structured generation. Perfect for intricate scenario design.",
     bannerUrl: undefined,
   },
 
@@ -655,44 +654,6 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
-  "DeepInfra DeepSeek R1": {
-    name: "DeepInfra DeepSeek R1",
-    original_model: "deepseek-ai/DeepSeek-R1",
-    model: "deepseek-ai/DeepSeek-R1",
-    maxTokens: 160000,
-    maxOutputTokens: 32000,
-    provider: "deepinfra",
-    supportsToolCalling: false,
-    cost: 2,
-    inputPrice: 0.7,
-    outputPrice: 2.4,
-    finetunes: [],
-    strengths: ["reasoning", "complex logic", "planning"],
-    weaknesses: ["speed", "no tool calling"],
-    description:
-      "DeepSeek R1 reasoning model via DeepInfra. Excellent for complex problem solving. Uses Coins.",
-    bannerUrl: undefined,
-  },
-
-  "DeepInfra DeepSeek R1-0528": {
-    name: "DeepInfra DeepSeek R1-0528",
-    original_model: "deepseek-ai/DeepSeek-R1-0528",
-    model: "deepseek-ai/DeepSeek-R1-0528",
-    maxTokens: 160000,
-    maxOutputTokens: 32000,
-    provider: "deepinfra",
-    supportsToolCalling: false,
-    cost: 2,
-    inputPrice: 0.5,
-    outputPrice: 2.15,
-    finetunes: [],
-    strengths: ["reasoning", "creative", "complex logic", "planning"],
-    weaknesses: ["speed", "no tool calling"],
-    description:
-      "DeepSeek R1-0528 reasoning model via DeepInfra. Latest R1 with improved creative writing. Uses Coins.",
-    bannerUrl: undefined,
-  },
-
   "DeepInfra Qwen3 235B": {
     name: "DeepInfra Qwen3 235B",
     original_model: "Qwen/Qwen3-235B-A22B-Instruct-2507",
@@ -1083,7 +1044,7 @@ export function calculateDeepInfraImageCost(modelKey: string): number {
 export function calculateImageTokenCost(
   modelKey: string,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
 ): number {
   const model = OPENROUTER_IMAGE_MODELS[modelKey as ImageModelKey];
   if (!model) {
@@ -1131,7 +1092,7 @@ export function estimateImageCost(modelKey: string): number {
   return calculateImageTokenCost(
     modelKey,
     estimatedInputTokens,
-    estimatedOutputTokens
+    estimatedOutputTokens,
   );
 }
 
@@ -1158,7 +1119,7 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
     id: "custom",
     name: "Custom",
     description: "Choose your own models for each stage",
-    storyModel: "Deepseek Chat", // Defaults
+    storyModel: "DeepSeek V4 Flash", // Defaults
     toolsModel: "Devstral Small 2",
     choicesModel: "DeepInfra Phi 4",
     estimatedCost: 12,
@@ -1341,10 +1302,11 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
   byokDeepseek: {
     id: "byokDeepseek",
     name: "BYOK DeepSeek",
-    description: "DeepSeek Chat for all stages - uses your DeepSeek API key",
-    storyModel: "Deepseek Chat",
-    toolsModel: "Deepseek Chat",
-    choicesModel: "Deepseek Chat",
+    description:
+      "DeepSeek V4 Flash for all stages - uses your DeepSeek API key",
+    storyModel: "DeepSeek V4 Flash",
+    toolsModel: "DeepSeek V4 Flash",
+    choicesModel: "DeepSeek V4 Flash",
     estimatedCost: 0,
     category: "byok",
   },
@@ -1392,7 +1354,7 @@ export interface APIKeysAvailable {
  * @returns Array of [modelKey, config] entries for available models
  */
 export function getAvailableModels(
-  keys: APIKeysAvailable
+  keys: APIKeysAvailable,
 ): [string, AIModelConfig][] {
   const entries = Object.entries(AI_MODELS) as [string, AIModelConfig][];
 
@@ -1437,7 +1399,7 @@ export function hasAnyAIKey(keys: APIKeysAvailable): boolean {
  * Get the required provider key name for a model
  */
 export function getRequiredKeyForModel(
-  modelKey: string
+  modelKey: string,
 ): keyof APIKeysAvailable | null {
   const config = AI_MODELS[modelKey as AIModelKey];
   if (!config) return null;
@@ -1463,7 +1425,7 @@ export function getRequiredKeyForModel(
  */
 export function isModelAvailable(
   modelKey: string,
-  keys: APIKeysAvailable
+  keys: APIKeysAvailable,
 ): boolean {
   const requiredKey = getRequiredKeyForModel(modelKey);
   if (!requiredKey) return false;
@@ -1532,7 +1494,7 @@ export type TTSModelKey = keyof typeof TTS_MODELS;
  */
 export function calculateTTSCost(
   characterCount: number,
-  model: TTSModelKey = "kokoro"
+  model: TTSModelKey = "kokoro",
 ): number {
   const ttsModel = TTS_MODELS[model] || TTS_MODELS.kokoro;
 
@@ -1557,7 +1519,7 @@ export function calculateTTSCost(
 export function calculateTokenCost(
   modelKey: string,
   inputTokens: number,
-  outputTokens: number
+  outputTokens: number,
 ): number {
   const model = getModelConfig(modelKey);
 
@@ -1599,12 +1561,12 @@ export function calculateCostFromEstimatedCost(estimatedCost: number): number {
 export function estimateGenerationCost(
   modelKey: string,
   estimatedInputTokens: number = 3000,
-  estimatedOutputTokens: number = 1500
+  estimatedOutputTokens: number = 1500,
 ): number {
   return calculateTokenCost(
     modelKey,
     estimatedInputTokens,
-    estimatedOutputTokens
+    estimatedOutputTokens,
   );
 }
 
@@ -1621,7 +1583,7 @@ export function estimateFullTurnCost(
   storyModel: string,
   toolsModel: string,
   choicesModel: string,
-  contextSize: number = 120000
+  contextSize: number = 120000,
 ): number {
   // Scale context usage based on provided size
   // Story: full context + system prompt, ~1.5k output
@@ -1653,12 +1615,12 @@ export function estimateFullTurnWithTTS(
   storyModel: string,
   toolsModel: string,
   choicesModel: string,
-  includeTTS: boolean = true
+  includeTTS: boolean = true,
 ): number {
   const generationCost = estimateFullTurnCost(
     storyModel,
     toolsModel,
-    choicesModel
+    choicesModel,
   );
   const ttsCost = includeTTS ? calculateTTSCost(AVERAGE_TTS_CHARACTERS) : 0;
   return generationCost + ttsCost;
@@ -1686,7 +1648,7 @@ export function getPresetCostBreakdown(presetId: string): {
   const generationCost = estimateFullTurnCost(
     preset.storyModel,
     preset.toolsModel,
-    preset.choicesModel
+    preset.choicesModel,
   );
   const ttsCost = calculateTTSCost(AVERAGE_TTS_CHARACTERS);
 
@@ -1729,7 +1691,7 @@ export function getModelConfig(modelKey: string): AIModelConfig {
   // UUIDs are 36 chars with format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
   const isUUID =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-      modelKey
+      modelKey,
     );
 
   if (isUUID) {
@@ -1755,11 +1717,11 @@ export function getModelConfig(modelKey: string): AIModelConfig {
     };
   }
 
-  // Fallback to Deepseek Chat if key not found
+  // Fallback to DeepSeek V4 Flash if key not found
   console.warn(
-    `Model key "${modelKey}" not found, falling back to Deepseek Chat`
+    `Model key "${modelKey}" not found, falling back to DeepSeek V4 Flash`,
   );
-  return AI_MODELS["Deepseek Chat"] as unknown as AIModelConfig;
+  return AI_MODELS["DeepSeek V4 Flash"] as unknown as AIModelConfig;
 }
 
 /**
@@ -1770,7 +1732,7 @@ export function getModelConfig(modelKey: string): AIModelConfig {
  */
 export function getPresetEstimatedCost(
   presetId: string,
-  contextSize?: number
+  contextSize?: number,
 ): number {
   const preset = MODEL_PRESETS[presetId];
   if (!preset) {
@@ -1780,7 +1742,7 @@ export function getPresetEstimatedCost(
     preset.storyModel,
     preset.toolsModel,
     preset.choicesModel,
-    contextSize
+    contextSize,
   );
 }
 
@@ -1793,7 +1755,7 @@ export function getPresetEstimatedCost(
  */
 export function getStoryStageCost(
   storyModel: string,
-  contextSize: number = 120000
+  contextSize: number = 120000,
 ): number {
   return calculateTokenCost(storyModel, contextSize, 1500);
 }
@@ -1810,12 +1772,12 @@ export function getCustomEstimatedCost(
   storyModel: string,
   toolsModel: string,
   choicesModel: string,
-  contextSize?: number
+  contextSize?: number,
 ): number {
   return estimateFullTurnCost(
     storyModel,
     toolsModel,
     choicesModel,
-    contextSize
+    contextSize,
   );
 }

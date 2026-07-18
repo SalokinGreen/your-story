@@ -107,7 +107,7 @@ ${
 
 export interface CompactionApiOptions {
   model: string;
-  token: string;
+  token: string | null;
   openRouterKey?: string;
   deepseekKey?: string;
   googleKey?: string;

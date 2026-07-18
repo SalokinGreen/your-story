@@ -99,7 +99,7 @@ export default function StoryCreativeAssistant({
               id: crypto.randomUUID(),
               name: "Migrated Chat",
               messages: oldMessages.filter(
-                (msg: ChatMessage) => msg.content && msg.content.trim()
+                (msg: ChatMessage) => msg.content && msg.content.trim(),
               ),
               createdAt: Date.now(),
               updatedAt: Date.now(),
@@ -160,7 +160,7 @@ export default function StoryCreativeAssistant({
         });
       });
     },
-    [activeThreadId]
+    [activeThreadId],
   );
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -307,7 +307,7 @@ export default function StoryCreativeAssistant({
     const coinCost = calculateTokenCost(
       model,
       estimatedInputTokens,
-      maxOutputTokens
+      maxOutputTokens,
     );
     return { coins: Math.max(1, coinCost), dollars: dollarCost };
   }, [storyData, modelConfig, maxOutputTokens, model]);
@@ -337,7 +337,7 @@ export default function StoryCreativeAssistant({
       localStorage.setItem("storyCreatorAiByokMode", byokMode.toString());
       localStorage.setItem(
         "storyCreatorAiMaxOutput",
-        maxOutputTokens.toString()
+        maxOutputTokens.toString(),
       );
     }
   }, [model, byokMode, maxOutputTokens]);
@@ -354,7 +354,7 @@ export default function StoryCreativeAssistant({
       currentProvider === "mistral" || currentProvider === "deepinfra";
 
     if (byokMode && isCoinsProvider) {
-      setModel("Deepseek Chat");
+      setModel("DeepSeek V4 Flash");
     }
     if (!byokMode && isBYOKProvider) {
       setModel("DeepInfra DeepSeek V3.2");
@@ -502,7 +502,7 @@ export default function StoryCreativeAssistant({
           .json()
           .catch(() => ({ error: "Unknown error" }));
         throw new Error(
-          errorData.error || `Failed to get AI response (${response.status})`
+          errorData.error || `Failed to get AI response (${response.status})`,
         );
       }
 
@@ -620,7 +620,9 @@ export default function StoryCreativeAssistant({
             // If we're deleting the active thread, switch to another or clear
             if (activeThreadId === threadId) {
               setActiveThreadId(
-                remaining.length > 0 ? remaining[remaining.length - 1].id : null
+                remaining.length > 0
+                  ? remaining[remaining.length - 1].id
+                  : null,
               );
             }
             return remaining;
@@ -629,16 +631,16 @@ export default function StoryCreativeAssistant({
         },
       });
     },
-    [activeThreadId, threads]
+    [activeThreadId, threads],
   );
 
   const handleRenameThread = useCallback(
     (threadId: string, newName: string) => {
       setThreads((prev) =>
-        prev.map((t) => (t.id === threadId ? { ...t, name: newName } : t))
+        prev.map((t) => (t.id === threadId ? { ...t, name: newName } : t)),
       );
     },
-    []
+    [],
   );
 
   const handleClearChat = () => {
@@ -659,7 +661,7 @@ export default function StoryCreativeAssistant({
 
   const handleApplyChanges = (
     data: Partial<StoryData> & { _command?: string },
-    isToolChanges: boolean = false
+    isToolChanges: boolean = false,
   ) => {
     // For tool-based changes, the data already contains final computed values
     // (arrays are complete replacements, scalars like level/points are direct values)
@@ -1115,7 +1117,7 @@ export default function StoryCreativeAssistant({
                                 <p className="text-[10px] text-gray-400 dark:text-gray-500">
                                   {thread.messages.length} messages •{" "}
                                   {new Date(
-                                    thread.updatedAt
+                                    thread.updatedAt,
                                   ).toLocaleDateString()}
                                 </p>
                               </div>
@@ -1210,8 +1212,8 @@ export default function StoryCreativeAssistant({
                     {byokMode
                       ? ""
                       : m.cost > 0
-                      ? `(~${m.cost} coins)`
-                      : "(Free)"}
+                        ? `(~${m.cost} coins)`
+                        : "(Free)"}
                   </option>
                 ))}
               </select>
@@ -1471,7 +1473,7 @@ function MessageItem({
     // Check if this is a custom model (UUID format)
     const isUUID =
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        modelName
+        modelName,
       );
 
     let inputPrice = 0;
@@ -1691,7 +1693,7 @@ function MessageItem({
 
 // Helper to get icon for tool type
 function getToolIcon(
-  toolName: string
+  toolName: string,
 ):
   | "BarChart2"
   | "Diamond"
@@ -1862,8 +1864,8 @@ function ToolResultsDisplay({
                         action.type === "add"
                           ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
                           : action.type === "remove"
-                          ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                          : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+                            ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                            : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
                       }`}
                     >
                       {action.type}
@@ -1888,12 +1890,13 @@ function ToolResultsDisplay({
                                     ? "✓"
                                     : "✗"
                                   : typeof value === "number"
-                                  ? String(value)
-                                  : Array.isArray(value)
-                                  ? `${value.length} items`
-                                  : typeof value === "object" && value !== null
-                                  ? "configured"
-                                  : String(value).substring(0, 20);
+                                    ? String(value)
+                                    : Array.isArray(value)
+                                      ? `${value.length} items`
+                                      : typeof value === "object" &&
+                                          value !== null
+                                        ? "configured"
+                                        : String(value).substring(0, 20);
                               return (
                                 <span
                                   key={i}
@@ -2356,8 +2359,8 @@ function ToolArgsDisplay({
           const displayTitle = titleVal
             ? String(titleVal)
             : newTitleVal
-            ? String(newTitleVal)
-            : "(No Title)";
+              ? String(newTitleVal)
+              : "(No Title)";
 
           return (
             <div
@@ -2406,7 +2409,7 @@ function ToolArgsDisplay({
                       .map((k) =>
                         k
                           .replace(/_/g, " ")
-                          .replace(/\b\w/g, (l) => l.toUpperCase())
+                          .replace(/\b\w/g, (l) => l.toUpperCase()),
                       )
                       .join(", ") || "No changes specified"}
                   </p>
@@ -2493,10 +2496,10 @@ function ToolArgsDisplay({
               ? value >= 50
                 ? "text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/50"
                 : value >= 0
-                ? "text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50"
-                : value >= -50
-                ? "text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50"
-                : "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50"
+                  ? "text-blue-600 dark:text-blue-400 bg-blue-100 dark:bg-blue-900/50"
+                  : value >= -50
+                    ? "text-amber-600 dark:text-amber-400 bg-amber-100 dark:bg-amber-900/50"
+                    : "text-red-600 dark:text-red-400 bg-red-100 dark:bg-red-900/50"
               : "text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-900/50";
 
           return (
@@ -2607,7 +2610,7 @@ function ToolArgsDisplay({
     };
 
     const entries = Object.entries(args).filter(
-      ([, v]) => v !== undefined && v !== null
+      ([, v]) => v !== undefined && v !== null,
     );
     if (entries.length === 0) return null;
 
@@ -2662,7 +2665,7 @@ function ToolArgsDisplay({
     };
 
     const entries = Object.entries(args).filter(
-      ([, v]) => v !== undefined && v !== null
+      ([, v]) => v !== undefined && v !== null,
     );
     if (entries.length === 0) return null;
 
@@ -2716,8 +2719,8 @@ function ToolArgsDisplay({
                 ? "Yes"
                 : "No"
               : typeof value === "object"
-              ? JSON.stringify(value)
-              : String(value);
+                ? JSON.stringify(value)
+                : String(value);
 
           return (
             <div key={key} className="flex items-start gap-2 py-1">
@@ -3368,8 +3371,8 @@ function DetailsDisplay({
                       item.status === "completed"
                         ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
                         : item.status === "failed"
-                        ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                        : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+                          ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                          : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
                     }`}
                   >
                     {String(item.status)}
@@ -3407,8 +3410,8 @@ function DetailsDisplay({
                       Number(item.affinity) > 0
                         ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
                         : Number(item.affinity) < 0
-                        ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                        : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
+                          ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
+                          : "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300"
                     }`}
                   >
                     {Number(item.affinity) > 0 ? "+" : ""}
@@ -3497,7 +3500,7 @@ function DetailsDisplay({
   if (typeof details === "object" && details !== null) {
     const obj = details as Record<string, unknown>;
     const entries = Object.entries(obj).filter(
-      ([, v]) => v !== undefined && v !== null
+      ([, v]) => v !== undefined && v !== null,
     );
 
     // Leveling/Upgrade settings with icons
@@ -3549,8 +3552,8 @@ function DetailsDisplay({
                           {key === "customCurve"
                             ? `Lvl ${item.level}: ${item.cumulativeXP} XP`
                             : key === "upgradeOverrides"
-                            ? `Lvl ${item.level}: ${item.upgrades} pts`
-                            : JSON.stringify(item)}
+                              ? `Lvl ${item.level}: ${item.upgrades} pts`
+                              : JSON.stringify(item)}
                         </span>
                       ))}
                   </div>
@@ -3580,7 +3583,7 @@ function DetailsDisplay({
                           <span className="text-gray-500 capitalize">{k}:</span>{" "}
                           <span className="font-medium">{String(v)}</span>
                         </span>
-                      )
+                      ),
                     )}
                   </div>
                 </div>
@@ -3624,8 +3627,8 @@ function DetailsDisplay({
                 ? "Yes"
                 : "No"
               : typeof value === "object"
-              ? JSON.stringify(value)
-              : String(value);
+                ? JSON.stringify(value)
+                : String(value);
 
           return (
             <div key={key} className="flex items-start gap-2 py-1">
@@ -3720,7 +3723,7 @@ function StoryContextDisplay({ storyData }: { storyData: StoryData }) {
       icon: "Backpack",
       label: "Inventory",
       value: `${storyData.inventory.length} items: ${itemNames.join(
-        ", "
+        ", ",
       )}${more}`,
       color: "text-yellow-500",
     });
@@ -3745,7 +3748,7 @@ function StoryContextDisplay({ storyData }: { storyData: StoryData }) {
   if (storyData.skillTrees?.length) {
     const totalNodes = storyData.skillTrees.reduce(
       (sum, t) => sum + (t.nodes?.length || 0),
-      0
+      0,
     );
     const treeNames = storyData.skillTrees.map((t) => t.name).join(", ");
     contextItems.push({
@@ -3806,7 +3809,7 @@ function StoryContextDisplay({ storyData }: { storyData: StoryData }) {
   // Achievements
   if (storyData.achievements?.length) {
     const unlocked = storyData.achievements.filter(
-      (a) => a.dateAchieved !== null
+      (a) => a.dateAchieved !== null,
     );
     contextItems.push({
       icon: "Trophy",

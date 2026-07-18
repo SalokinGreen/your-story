@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   if (!supabaseUrl || !supabaseKey || !supabaseServiceKey) {
     return NextResponse.json(
       { error: "Server configuration error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
   if (!authHeader) {
     return NextResponse.json(
       { error: "Authentication required" },
-      { status: 401 }
+      { status: 401 },
     );
   }
 
@@ -93,9 +93,9 @@ export async function POST(req: NextRequest) {
     deepseekKey,
   } = body;
 
-  // Model config - requestedModel is the model key (e.g., "Deepseek Chat")
-  // Use getModelConfig which handles fallback to Deepseek Chat if model not found
-  const modelKey = requestedModel || "Deepseek Chat";
+  // Model config - requestedModel is the model key (e.g., "DeepSeek V4 Flash")
+  // Use getModelConfig which handles fallback to DeepSeek V4 Flash if model not found
+  const modelKey = requestedModel || "DeepSeek V4 Flash";
   const modelConfig = getModelConfig(modelKey);
   const isNovelAI = modelConfig.provider === "novelai";
 
@@ -105,7 +105,7 @@ export async function POST(req: NextRequest) {
     "Using:",
     modelKey,
     "Provider:",
-    modelConfig.provider
+    modelConfig.provider,
   );
 
   // Estimate tokens (for usage display only, no billing)
@@ -119,7 +119,7 @@ export async function POST(req: NextRequest) {
   if (isNovelAI && !novelaiKey) {
     return NextResponse.json(
       { error: "NovelAI API key required for NovelAI models" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
           error:
             "OpenRouter API key required. Please add your API key in Settings.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
   } else {
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
           error:
             "DeepSeek API key required. Please add your API key in Settings.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
   }
@@ -199,7 +199,7 @@ export async function POST(req: NextRequest) {
         console.error("NovelAI API error:", text);
         return NextResponse.json(
           { error: `NovelAI error: ${resp.status}` },
-          { status: 502 }
+          { status: 502 },
         );
       }
 
@@ -239,7 +239,7 @@ export async function POST(req: NextRequest) {
         console.error("Creator AI API error:", text);
         return NextResponse.json(
           { error: `AI Provider error: ${resp.status}` },
-          { status: 502 }
+          { status: 502 },
         );
       }
 
@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
     console.error("Error in creator AI route:", err);
     return NextResponse.json(
       { error: "Internal Server Error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

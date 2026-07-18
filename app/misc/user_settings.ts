@@ -55,3 +55,58 @@ export async function updateUserSettings(
     return { error };
   }
 }
+
+// ============================================================
+// CUSTOM MODELS (user-added OpenRouter models, BYOK only)
+// ============================================================
+// Stored under their own localStorage key (not nested in STORAGE_KEY above)
+// since several components (CreatorAIChat, StoryCreativeAssistant) already
+// read/write "customModels" directly - these helpers are additive, reading
+// and writing the exact same key/shape so all call sites stay in sync.
+
+const CUSTOM_MODELS_KEY = "customModels";
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export function getCustomModels(): CustomModel[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const stored = localStorage.getItem(CUSTOM_MODELS_KEY);
+    return stored ? (JSON.parse(stored) as CustomModel[]) : [];
+  } catch (error) {
+    console.error("Error reading custom models:", error);
+    return [];
+  }
+}
+
+export function saveCustomModels(models: CustomModel[]): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(CUSTOM_MODELS_KEY, JSON.stringify(models));
+  window.dispatchEvent(new Event("custom-models-changed"));
+}
+
+export function addCustomModel(model: Omit<CustomModel, "id">): CustomModel {
+  const newModel: CustomModel = {
+    ...model,
+    id: crypto.randomUUID(),
+  };
+  saveCustomModels([...getCustomModels(), newModel]);
+  return newModel;
+}
+
+export function removeCustomModel(id: string): void {
+  saveCustomModels(getCustomModels().filter((m) => m.id !== id));
+}
+
+/** True for the UUID-shaped IDs assigned to custom (OpenRouter BYOK) models. */
+export function isCustomModelId(modelKey: string): boolean {
+  return UUID_RE.test(modelKey);
+}
+
+/** Resolves a model key to its CustomModel entry, only if it's a UUID custom-model id. */
+export function getCustomModelIfUUID(
+  modelKey: string,
+): CustomModel | undefined {
+  if (!isCustomModelId(modelKey)) return undefined;
+  return getCustomModels().find((m) => m.id === modelKey);
+}

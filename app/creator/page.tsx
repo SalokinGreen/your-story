@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { StaticIcon } from "@/app/components/StaticIcon";
+import { AI_MODELS } from "@/app/misc/ai_prices";
+import { useAPIKeys } from "@/app/misc/APIKeysContext";
 
 // Genre options for quick generation
 const genres = [
@@ -143,7 +145,6 @@ const sizePresets = [
     timeMin: 6,
     timeMax: 10,
     description: "Basic adventure, fewer details",
-    estimatedCoins: 15,
   },
   {
     name: "Standard",
@@ -152,7 +153,6 @@ const sizePresets = [
     timeMin: 12,
     timeMax: 20,
     description: "Well-rounded adventure",
-    estimatedCoins: 35,
   },
   {
     name: "Detailed",
@@ -161,7 +161,6 @@ const sizePresets = [
     timeMin: 25,
     timeMax: 40,
     description: "Rich lore and content",
-    estimatedCoins: 65,
   },
   {
     name: "Epic",
@@ -170,12 +169,23 @@ const sizePresets = [
     timeMin: 45,
     timeMax: 70,
     description: "Maximum depth and detail",
-    estimatedCoins: 120,
   },
 ];
 
+// BYOK-only models available for Quick Generation
+const quickGenModels = Object.entries(AI_MODELS).filter(([, model]) => {
+  const provider = (model as { provider?: string }).provider;
+  return (
+    provider === "openrouter" ||
+    provider === "deepseek" ||
+    provider === "novelai" ||
+    provider === "google"
+  );
+});
+
 export default function CreatorLandingPage() {
   const router = useRouter();
+  const { hasKey } = useAPIKeys();
 
   // Quick generation state
   const [showQuickModal, setShowQuickModal] = useState(false);
@@ -186,8 +196,12 @@ export default function CreatorLandingPage() {
   const [sizeIndex, setSizeIndex] = useState(1); // Default to "Standard"
   const [showCustomGenreInput, setShowCustomGenreInput] = useState(false);
   const [customGenreName, setCustomGenreName] = useState("");
+  const [quickModel, setQuickModel] = useState("DeepSeek V4 Flash");
 
   const selectedSize = sizePresets[sizeIndex];
+
+  const hasAnyBYOKKey =
+    hasKey("openRouterKey") || hasKey("deepseekKey") || hasKey("googleKey");
 
   const handleQuickGenerate = () => {
     if (!selectedGenre) return;
@@ -197,6 +211,7 @@ export default function CreatorLandingPage() {
       quickStart: "true",
       genre: selectedGenre.name.toLowerCase(),
       size: selectedSize.value,
+      model: quickModel,
     });
 
     if (customPrompt.trim()) {
@@ -576,12 +591,33 @@ export default function CreatorLandingPage() {
                         <div className="text-sm font-medium text-purple-300">
                           ~{selectedSize.timeMin}-{selectedSize.timeMax} min
                         </div>
-                        <div className="text-xs text-amber-400">
-                          ~{selectedSize.estimatedCoins} coins
-                        </div>
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Model Selection */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-blue-200 mb-2">
+                    AI Model (BYOK - Bring Your Own Key)
+                  </label>
+                  <select
+                    value={quickModel}
+                    onChange={(e) => setQuickModel(e.target.value)}
+                    className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  >
+                    {quickGenModels.map(([key, model]) => (
+                      <option key={key} value={key}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </select>
+                  {!hasAnyBYOKKey && (
+                    <p className="mt-2 text-xs text-red-300">
+                      ⚠️ No API keys configured. Add keys in Settings (gear icon
+                      in header).
+                    </p>
+                  )}
                 </div>
 
                 {/* Info Box */}
@@ -593,7 +629,7 @@ export default function CreatorLandingPage() {
                     />
                     <div className="text-sm text-purple-200/80">
                       <p className="font-medium mb-1">
-                        Powered by Mistral Large!
+                        Powered by Your Own API Key!
                       </p>
                       <p className="text-purple-300/60 text-xs">
                         AI will choose the best RPG system, complexity, and

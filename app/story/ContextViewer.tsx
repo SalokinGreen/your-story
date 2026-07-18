@@ -18,9 +18,9 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [contextString, setContextString] = useState("");
   const [estimatedTokens, setEstimatedTokens] = useState(0);
-  const [activeModelName, setActiveModelName] = useState("Deepseek Chat");
+  const [activeModelName, setActiveModelName] = useState("DeepSeek V4 Flash");
   const [activeModelConfig, setActiveModelConfig] = useState(
-    getModelConfig("Deepseek Chat")
+    getModelConfig("DeepSeek V4 Flash"),
   );
   const [showRawJSON, setShowRawJSON] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
@@ -97,7 +97,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     // Estimate tokens (rough approximation: 1 token ≈ 4 characters)
     const totalChars = contextMessages.reduce(
       (sum, msg) => sum + msg.content.length,
-      0
+      0,
     );
     const estimatedTokenCount = Math.ceil(totalChars / 4);
     setEstimatedTokens(estimatedTokenCount);
@@ -111,7 +111,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       availableSceneParts: storyData.scene.parts.length,
       includedSceneParts:
         contextMessages.filter(
-          (m) => m.role === "user" || m.role === "assistant"
+          (m) => m.role === "user" || m.role === "assistant",
         ).length - 1, // Subtract the info message
       messagesBreakdown: contextMessages.map((msg, i) => ({
         index: i,
@@ -285,15 +285,15 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                   estimatedTokens > activeModelConfig.maxTokens * 0.9
                     ? "bg-red-100 dark:bg-red-900/30 border-red-300 dark:border-red-700 text-red-700 dark:text-red-400"
                     : estimatedTokens > activeModelConfig.maxTokens * 0.7
-                    ? "bg-yellow-100 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400"
-                    : "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-700 dark:text-green-400"
+                      ? "bg-yellow-100 dark:bg-yellow-900/30 border-yellow-300 dark:border-yellow-700 text-yellow-700 dark:text-yellow-400"
+                      : "bg-green-100 dark:bg-green-900/30 border-green-300 dark:border-green-700 text-green-700 dark:text-green-400"
                 }`}
               >
                 {estimatedTokens > activeModelConfig.maxTokens * 0.9
                   ? "⚠️ Near Limit"
                   : estimatedTokens > activeModelConfig.maxTokens * 0.7
-                  ? "⚡ High Usage"
-                  : "✓ Normal"}
+                    ? "⚡ High Usage"
+                    : "✓ Normal"}
               </div>
             </div>
 
@@ -322,7 +322,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                 {messages.map((msg, i) => {
                   const tokens = Math.ceil(msg.content.length / 4);
                   const percentage = ((tokens / estimatedTokens) * 100).toFixed(
-                    1
+                    1,
                   );
                   return (
                     <div
@@ -331,7 +331,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                     >
                       <span
                         className={`${getRoleColor(
-                          msg.role
+                          msg.role,
                         )} font-medium truncate`}
                       >
                         {i}. {formatRole(msg.role)}
@@ -412,7 +412,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                               </span>
                             )}
                           </li>
-                        )
+                        ),
                       )}
                     </ul>
                     {lastAssistantPart.gmStoryContext && (
@@ -511,7 +511,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                                 </span>
                               )}
                             </li>
-                          )
+                          ),
                         )}
                       </ul>
                       {lastAssistantPart.gmStoryContext && (
@@ -650,7 +650,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                                   {typeof tc.function?.arguments === "string"
                                     ? tc.function.arguments.substring(0, 100)
                                     : JSON.stringify(
-                                        tc.function?.arguments
+                                        tc.function?.arguments,
                                       )?.substring(0, 100)}
                                   {(tc.function?.arguments?.length || 0) > 100
                                     ? "..."
@@ -669,7 +669,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                           {msg.content}
                         </pre>
                       </div>
-                    )
+                    ),
                   )}
                 </div>
                 {lastAssistantPart.gmStoryContext && (
@@ -709,7 +709,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             <div
               key={i}
               className={`${getRoleBgColor(
-                msg.role
+                msg.role,
               )} rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 mx-2 sm:mx-4`}
             >
               <div className="flex justify-between items-center p-2 sm:p-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-blue-950">
@@ -719,14 +719,14 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                       msg.role === "system"
                         ? "Settings"
                         : msg.role === "user"
-                        ? "User"
-                        : "Bot"
+                          ? "User"
+                          : "Bot"
                     }
                     className={`w-4 h-4 shrink-0 ${getRoleColor(msg.role)}`}
                   />
                   <span
                     className={`font-bold text-xs sm:text-sm ${getRoleColor(
-                      msg.role
+                      msg.role,
                     )}`}
                   >
                     {formatRole(msg.role)}

@@ -362,7 +362,7 @@ export async function syncNewMemories(
   storyId: string,
   memories: (string | MemoryEntry)[],
   existingKeys: Set<string>,
-  authToken: string
+  authToken: string | null
 ): Promise<{
   synced: number;
   cleaned: number;
@@ -420,7 +420,7 @@ export async function syncNewMemories(
           type,
           importance,
         })),
-        authToken
+        authToken ?? ""
       );
       synced = result.upserted;
       // Track which indices were successfully embedded
@@ -437,7 +437,7 @@ export async function syncNewMemories(
       storyId,
       "memory",
       validKeys,
-      authToken
+      authToken ?? ""
     );
     cleaned = cleanupResult.deleted;
   } catch (error: unknown) {

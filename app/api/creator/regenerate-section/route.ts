@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
           section,
           config,
           existingResult,
-          model = "Deepseek Chat",
+          model = "DeepSeek V4 Flash",
           maxOutputTokens = 4000,
           additionalInstructions,
           openRouterKey,

@@ -20,7 +20,7 @@ import { searchRelevantContext } from "./embeddings";
 
 export interface SemanticSearchContext {
   storyId?: string;
-  token?: string;
+  token?: string | null;
   enabled?: boolean; // options.enableEmbeddings - off by default (requires an embeddings API key)
 }
 

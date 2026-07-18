@@ -18,13 +18,16 @@
     "js-tiktoken": "^1.0.21",
     "json5": "^2.2.3",
     "lucide-react": "^0.554.0",
-    "next": "16.0.7",
+    "next": "^16.2.10",
     "pdf-lib": "^1.17.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-markdown": "^10.1.0",
     "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
   },
   "devDependencies": {
     "@ducanh2912/next-pwa": "^10.2.9",
@@ -33,9 +36,9 @@
     "@types/react-dom": "^19",
     "baseline-browser-mapping": "^2.8.32",
     "eslint": "^9",
-    "eslint-config-next": "16.0.2",
+    "eslint-config-next": "^16.2.10",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^1.0.0"
+    "vitest": "^4.1.10"
   }
 }

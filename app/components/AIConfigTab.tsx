@@ -1,11 +1,29 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAPIKeys, APIKeys } from "@/app/misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
-import { AI_MODELS } from "@/app/misc/ai_prices";
-import { REASONING_TIERS, NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
-import { getUserSettings, updateUserSettings, AIConfig } from "@/app/misc/user_settings";
+import { AI_MODELS, getModelConfig } from "@/app/misc/ai_prices";
+import {
+  REASONING_TIERS,
+  NARRATION_MODEL_KEY,
+  ReasoningEffort,
+  TierOverride,
+  getTierOverrides,
+  setTierOverride,
+  resetTierOverrides,
+  getNarrationModelOverride,
+  setNarrationModelOverride,
+} from "@/app/misc/reasoningTiers";
+import {
+  getUserSettings,
+  updateUserSettings,
+  AIConfig,
+  CustomModel,
+  getCustomModels,
+  addCustomModel,
+  removeCustomModel,
+} from "@/app/misc/user_settings";
 import { logger, LogEntry } from "@/app/misc/logger";
 import SamplingSettingsTab from "./SamplingSettingsTab";
 
@@ -20,8 +38,163 @@ const PROVIDER_KEY_FIELD: Record<string, keyof APIKeys | undefined> = {
   novelai: "novelaiKey",
 };
 
+const REASONING_EFFORTS: ReasoningEffort[] = [
+  "none",
+  "low",
+  "normal",
+  "high",
+  "xhigh",
+];
+
+/**
+ * Model dropdown grouped by provider, with an extra "Custom" group for
+ * user-added OpenRouter models. Used for both reasoning-tier slots and the
+ * narration voice. NovelAI is excluded - it has its own dedicated toggle
+ * elsewhere in Settings and isn't picked via model key. When
+ * `requireToolCalling` is set, models with supportsToolCalling===false are
+ * excluded too (the GM stage calls tools mid-turn, so tiers need a model
+ * that supports it - narration doesn't).
+ */
+function ModelSelect({
+  value,
+  onChange,
+  customModels,
+  requireToolCalling,
+  className,
+}: {
+  value: string;
+  onChange: (modelKey: string) => void;
+  customModels: CustomModel[];
+  requireToolCalling?: boolean;
+  className?: string;
+}) {
+  const groups = new Map<string, { key: string; name: string }[]>();
+  for (const [key, cfg] of Object.entries(AI_MODELS)) {
+    if (cfg.provider === "novelai") continue;
+    if (requireToolCalling && !cfg.supportsToolCalling) continue;
+    if (!groups.has(cfg.provider)) groups.set(cfg.provider, []);
+    groups.get(cfg.provider)!.push({ key, name: cfg.name });
+  }
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className={
+        className ||
+        "text-xs bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white"
+      }
+    >
+      {Array.from(groups.entries()).map(([provider, models]) => (
+        <optgroup key={provider} label={provider}>
+          {models.map((m) => (
+            <option key={m.key} value={m.key}>
+              {m.name}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+      {customModels.length > 0 && (
+        <optgroup label="custom (openrouter)">
+          {customModels.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+            </option>
+          ))}
+        </optgroup>
+      )}
+    </select>
+  );
+}
+
 export default function AIConfigTab() {
   const { hasKey } = useAPIKeys();
+
+  // Reasoning-tier + narration model overrides, and user-added custom
+  // (OpenRouter BYOK) models. All persisted to localStorage - see
+  // app/misc/reasoningTiers.ts and app/misc/user_settings.ts.
+  const [tierOverrides, setTierOverridesState] = useState<
+    (TierOverride | null)[]
+  >(() => getTierOverrides());
+  const [narrationOverride, setNarrationOverrideState] = useState<
+    string | null
+  >(() => getNarrationModelOverride());
+  const [customModels, setCustomModelsState] = useState<CustomModel[]>(() =>
+    getCustomModels(),
+  );
+  const [showAddCustomModel, setShowAddCustomModel] = useState(false);
+  const [newModelName, setNewModelName] = useState("");
+  const [newModelId, setNewModelId] = useState("");
+  const [newModelContext, setNewModelContext] = useState(128000);
+  const [newModelMaxOutput, setNewModelMaxOutput] = useState(8000);
+
+  const refreshCustomModels = useCallback(
+    () => setCustomModelsState(getCustomModels()),
+    [],
+  );
+  useEffect(() => {
+    window.addEventListener("custom-models-changed", refreshCustomModels);
+    return () =>
+      window.removeEventListener("custom-models-changed", refreshCustomModels);
+  }, [refreshCustomModels]);
+
+  const handleTierModelChange = (index: number, modelKey: string) => {
+    const effort =
+      tierOverrides[index]?.reasoningEffort ??
+      REASONING_TIERS[index].reasoningEffort;
+    setTierOverride(index, { modelKey, reasoningEffort: effort });
+    setTierOverridesState(getTierOverrides());
+  };
+
+  const handleTierEffortChange = (index: number, effort: ReasoningEffort) => {
+    const modelKey =
+      tierOverrides[index]?.modelKey ?? REASONING_TIERS[index].modelKey;
+    setTierOverride(index, { modelKey, reasoningEffort: effort });
+    setTierOverridesState(getTierOverrides());
+  };
+
+  const handleResetTier = (index: number) => {
+    setTierOverride(index, null);
+    setTierOverridesState(getTierOverrides());
+  };
+
+  const handleResetAllTiers = () => {
+    resetTierOverrides();
+    setTierOverridesState(getTierOverrides());
+  };
+
+  const handleNarrationChange = (modelKey: string) => {
+    const override = modelKey === NARRATION_MODEL_KEY ? null : modelKey;
+    setNarrationModelOverride(override);
+    setNarrationOverrideState(getNarrationModelOverride());
+  };
+
+  const handleAddCustomModel = () => {
+    if (!newModelName.trim() || !newModelId.trim()) return;
+    addCustomModel({
+      name: newModelName.trim(),
+      modelId: newModelId.trim(),
+      contextSize: newModelContext,
+      maxOutputTokens: newModelMaxOutput,
+    });
+    refreshCustomModels();
+    setNewModelName("");
+    setNewModelId("");
+    setNewModelContext(128000);
+    setNewModelMaxOutput(8000);
+    setShowAddCustomModel(false);
+  };
+
+  const handleRemoveCustomModel = (id: string) => {
+    removeCustomModel(id);
+    refreshCustomModels();
+    // Clear any tier/narration overrides that pointed at the removed model
+    // so they cleanly fall back to defaults instead of dangling.
+    tierOverrides.forEach((o, i) => {
+      if (o?.modelKey === id) handleResetTier(i);
+    });
+    if (narrationOverride === id) handleNarrationChange(NARRATION_MODEL_KEY);
+  };
 
   // Generation settings
   const toolCallingEnabled = true;
@@ -75,7 +248,7 @@ export default function AIConfigTab() {
         stored === "-1" ||
         (stored !== null &&
           ![8000, 16000, 36000, 72000, 120000, 200000].includes(
-            parseInt(stored, 10)
+            parseInt(stored, 10),
           ))
       );
     }
@@ -157,7 +330,7 @@ export default function AIConfigTab() {
           (l) =>
             l.message === "Reasoning tier resolved for GM stage" ||
             l.message.startsWith("GM stage round") ||
-            l.message.startsWith("GM stage model unavailable")
+            l.message.startsWith("GM stage model unavailable"),
         )
         .slice(-8)
         .reverse();
@@ -185,7 +358,7 @@ export default function AIConfigTab() {
               setCustomMaxContext(config.customMaxContext);
               localStorage.setItem(
                 "customMaxContext",
-                config.customMaxContext.toString()
+                config.customMaxContext.toString(),
               );
             }
             if (
@@ -195,7 +368,7 @@ export default function AIConfigTab() {
               setCustomMaxOutput(config.customMaxOutput);
               localStorage.setItem(
                 "customMaxOutput",
-                config.customMaxOutput.toString()
+                config.customMaxOutput.toString(),
               );
             }
           }
@@ -268,71 +441,121 @@ export default function AIConfigTab() {
     );
   }
 
-  const narrationModelConfig = AI_MODELS[NARRATION_MODEL_KEY];
+  const effectiveNarrationKey = narrationOverride || NARRATION_MODEL_KEY;
 
   return (
     <div className="space-y-6">
       {/* Narration Voice Banner */}
-      <div className="bg-linear-to-r from-purple-600 to-blue-600 rounded-lg p-4 text-white">
-        <div className="text-xl font-bold flex items-center gap-2">
-          {narrationModelConfig.name}
-          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-            Narration Voice
-          </span>
-        </div>
-        <div className="text-sm text-white/70 mt-1">
+      <div className="bg-linear-to-r from-purple-600 to-blue-600 rounded-lg p-4 text-white space-y-2.5">
+        <span className="inline-block text-[11px] font-semibold uppercase tracking-wide bg-white/20 px-2 py-0.5 rounded-full">
+          Narration Voice
+        </span>
+        <ModelSelect
+          value={effectiveNarrationKey}
+          onChange={handleNarrationChange}
+          customModels={customModels}
+          className="w-full text-sm font-semibold bg-white/15 border border-white/30 rounded-md px-3 py-2 text-white [&>option]:text-gray-900"
+        />
+        <p className="text-xs text-white/75">
           Always used for player-facing prose, no matter which reasoning tier
           handles adjudication - this is what keeps the GM&rsquo;s voice
           consistent even during a boss fight.
-        </div>
+        </p>
       </div>
 
       {/* Reasoning Tier Ladder */}
       <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-3">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-          <DynamicIcon name="Brain" className="w-4 h-4" />
-          Reasoning Tiers
-        </h4>
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <DynamicIcon name="Brain" className="w-4 h-4" />
+            Reasoning Tiers
+          </h4>
+          {tierOverrides.some((o) => o !== null) && (
+            <button
+              onClick={handleResetAllTiers}
+              className="text-xs text-purple-500 hover:text-purple-600"
+            >
+              Reset all to defaults
+            </button>
+          )}
+        </div>
         <p className="text-xs text-gray-500 dark:text-gray-400">
-          The GM automatically picks a model per turn based on what&rsquo;s
-          happening - banter runs cheap, combat and boss fights escalate
-          automatically. Tier selection isn&rsquo;t manual anymore.
+          The GM automatically escalates through these tiers per turn based on
+          what&rsquo;s happening - banter runs cheap, combat and boss fights
+          escalate automatically. Pick which model/effort fills each tier below,
+          mixing any provider you like.
         </p>
         <div className="space-y-2">
-          {REASONING_TIERS.map((tier, index) => {
-            const config = AI_MODELS[tier.modelKey];
+          {REASONING_TIERS.map((defaultTier, index) => {
+            const override = tierOverrides[index];
+            const tier = override ?? defaultTier;
+            const config = getModelConfig(tier.modelKey);
             const keyField = PROVIDER_KEY_FIELD[config.provider];
             const keyConfigured = keyField ? hasKey(keyField) : true;
             return (
               <div
                 key={index}
-                className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+                className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2"
               >
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded">
-                      Tier {index}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 text-[11px] font-bold">
+                      {index}
                     </span>
-                    <span className="text-sm font-medium text-gray-900 dark:text-white">
-                      {config.name}
-                    </span>
-                    <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 truncate">
                       {config.provider}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
                     {!keyConfigured && (
-                      <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full flex items-center gap-1">
-                        <DynamicIcon name="AlertTriangle" className="w-2.5 h-2.5" />
-                        no key
+                      <span
+                        title="No API key configured for this provider"
+                        className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400"
+                      >
+                        <DynamicIcon name="AlertTriangle" className="w-3 h-3" />
+                        No key
                       </span>
                     )}
+                    {override && (
+                      <button
+                        onClick={() => handleResetTier(index)}
+                        className="text-[10px] text-purple-500 hover:text-purple-600 hover:underline"
+                        title="Reset this tier to its default model"
+                      >
+                        Reset
+                      </button>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                    {tier.note}
-                  </p>
                 </div>
-                <div className="text-right text-xs text-gray-400 shrink-0">
-                  <div>{(config.maxTokens / 1000).toFixed(0)}K context</div>
-                  <div className="capitalize">{tier.reasoningEffort} effort</div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  {defaultTier.note}
+                </p>
+                <div className="flex items-center gap-2">
+                  <ModelSelect
+                    value={tier.modelKey}
+                    onChange={(modelKey) =>
+                      handleTierModelChange(index, modelKey)
+                    }
+                    customModels={customModels}
+                    requireToolCalling
+                    className="flex-1 min-w-0 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1.5 text-gray-900 dark:text-white"
+                  />
+                  <select
+                    value={tier.reasoningEffort}
+                    onChange={(e) =>
+                      handleTierEffortChange(
+                        index,
+                        e.target.value as ReasoningEffort,
+                      )
+                    }
+                    className="w-24 shrink-0 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1.5 text-gray-900 dark:text-white capitalize"
+                  >
+                    {REASONING_EFFORTS.map((effort) => (
+                      <option key={effort} value={effort}>
+                        {effort}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               </div>
             );
@@ -340,9 +563,111 @@ export default function AIConfigTab() {
         </div>
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Tiers with &ldquo;no key&rdquo; will automatically fall back to the
-          next-lower tier until one has a configured key. Add provider keys
-          in the API Keys tab.
+          next-lower tier until one has a configured key. Add provider keys in
+          the API Keys tab.
         </p>
+      </div>
+
+      {/* Custom Models */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <DynamicIcon name="Plus" className="w-4 h-4" />
+            Custom Models
+          </h4>
+          <button
+            onClick={() => setShowAddCustomModel((v) => !v)}
+            className="text-xs text-purple-500 hover:text-purple-600"
+          >
+            {showAddCustomModel ? "Cancel" : "+ Add model"}
+          </button>
+        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Register any OpenRouter model ID to use it for narration or any
+          reasoning tier above, in addition to the built-in models. Requires an
+          OpenRouter key in the API Keys tab.
+        </p>
+
+        {customModels.length > 0 && (
+          <div className="space-y-1.5">
+            {customModels.map((m) => (
+              <div
+                key={m.id}
+                className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm text-gray-900 dark:text-white truncate">
+                    {m.name}
+                  </div>
+                  <div className="text-xs text-gray-400 font-mono truncate">
+                    {m.modelId}
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleRemoveCustomModel(m.id)}
+                  className="text-gray-400 hover:text-red-500 shrink-0"
+                  title="Remove custom model"
+                >
+                  <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showAddCustomModel && (
+          <div className="space-y-2 p-3 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+            <input
+              type="text"
+              value={newModelName}
+              onChange={(e) => setNewModelName(e.target.value)}
+              placeholder="Display name (e.g. Claude Opus)"
+              className="w-full px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <input
+              type="text"
+              value={newModelId}
+              onChange={(e) => setNewModelId(e.target.value)}
+              placeholder="OpenRouter model ID (e.g. anthropic/claude-opus-4.1)"
+              className="w-full px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
+            />
+            <div className="flex items-center gap-2">
+              <label className="text-xs text-gray-500 dark:text-gray-400 flex-1">
+                Context size
+                <input
+                  type="number"
+                  value={newModelContext}
+                  onChange={(e) =>
+                    setNewModelContext(parseInt(e.target.value, 10) || 0)
+                  }
+                  min="1000"
+                  step="1000"
+                  className="w-full mt-0.5 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </label>
+              <label className="text-xs text-gray-500 dark:text-gray-400 flex-1">
+                Max output tokens
+                <input
+                  type="number"
+                  value={newModelMaxOutput}
+                  onChange={(e) =>
+                    setNewModelMaxOutput(parseInt(e.target.value, 10) || 0)
+                  }
+                  min="500"
+                  step="500"
+                  className="w-full mt-0.5 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                />
+              </label>
+            </div>
+            <button
+              onClick={handleAddCustomModel}
+              disabled={!newModelName.trim() || !newModelId.trim()}
+              className="w-full py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:dark:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+            >
+              Add model
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Recent Reasoning Tier Calls */}
@@ -393,7 +718,7 @@ export default function AIConfigTab() {
                     if (val === -1) {
                       setIsCustomContextMode(true);
                       setCustomContextInput(
-                        customMaxContext > 0 ? String(customMaxContext) : ""
+                        customMaxContext > 0 ? String(customMaxContext) : "",
                       );
                     } else {
                       setIsCustomContextMode(false);
@@ -485,7 +810,7 @@ export default function AIConfigTab() {
                     if (val === -1) {
                       setIsCustomOutputMode(true);
                       setCustomOutputInput(
-                        customMaxOutput > 0 ? String(customMaxOutput) : ""
+                        customMaxOutput > 0 ? String(customMaxOutput) : "",
                       );
                     } else {
                       setIsCustomOutputMode(false);
@@ -552,7 +877,10 @@ export default function AIConfigTab() {
       </div>
 
       {/* Sampling Settings - all reasoning tiers are Mistral/DeepInfra (Coins mode) */}
-      <SamplingSettingsTab byokMode={false} hasOpenRouterKey={hasKey("openRouterKey")} />
+      <SamplingSettingsTab
+        byokMode={false}
+        hasOpenRouterKey={hasKey("openRouterKey")}
+      />
 
       {/* Tool Calling Settings */}
       <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">

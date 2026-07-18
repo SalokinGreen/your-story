@@ -16,16 +16,16 @@
  */
 
 import { AI_MODELS, AIModelKey, getModelConfig } from "@/app/misc/ai_prices";
-import {
-  StoryData,
-  CombatState,
-  ReasoningTierState,
-} from "@/app/misc/structs";
+import { getCustomModelIfUUID } from "@/app/misc/user_settings";
+import { StoryData, CombatState, ReasoningTierState } from "@/app/misc/structs";
 
 export type ReasoningEffort = "none" | "low" | "normal" | "high" | "xhigh";
 
+/** An AI_MODELS key, or a user-added custom (OpenRouter BYOK) model's UUID. */
+export type AnyModelKey = AIModelKey | string;
+
 export interface ReasoningTier {
-  modelKey: AIModelKey;
+  modelKey: AnyModelKey;
   reasoningEffort: ReasoningEffort;
   note: string;
 }
@@ -79,14 +79,108 @@ export const TOP_TIER = REASONING_TIERS.length - 1;
 
 export interface ResolvedTier {
   tier: number;
-  modelKey: AIModelKey;
+  modelKey: AnyModelKey;
   reasoningEffort: ReasoningEffort;
 }
 
 export function resolveTier(tier: number): ResolvedTier {
-  const clamped = Math.max(0, Math.min(TOP_TIER, tier));
-  const entry = REASONING_TIERS[clamped];
-  return { tier: clamped, modelKey: entry.modelKey, reasoningEffort: entry.reasoningEffort };
+  const tiers = getEffectiveTiers();
+  const clamped = Math.max(0, Math.min(tiers.length - 1, tier));
+  const entry = tiers[clamped];
+  return {
+    tier: clamped,
+    modelKey: entry.modelKey,
+    reasoningEffort: entry.reasoningEffort,
+  };
+}
+
+// ============================================================
+// USER OVERRIDES
+// ============================================================
+// Lets Settings > AI Config swap which model/effort fills each tier slot
+// (and which model handles narration) without touching REASONING_TIERS -
+// the tier *count* and the hard-rule/classifier logic that assigns turns to
+// tier indices stay fixed; only the (modelKey, reasoningEffort) each index
+// resolves to is user-configurable. Persisted to localStorage since there's
+// no backend/account system.
+
+const TIER_OVERRIDES_KEY = "reasoningTierOverrides";
+const NARRATION_OVERRIDE_KEY = "narrationModelOverride";
+export const REASONING_CONFIG_CHANGED_EVENT = "reasoning-tier-config-changed";
+
+export interface TierOverride {
+  modelKey: AnyModelKey;
+  reasoningEffort: ReasoningEffort;
+}
+
+function notifyConfigChanged() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(REASONING_CONFIG_CHANGED_EVENT));
+  }
+}
+
+/** Raw overrides array, one slot per REASONING_TIERS index (null = use default). */
+export function getTierOverrides(): (TierOverride | null)[] {
+  if (typeof window === "undefined") return REASONING_TIERS.map(() => null);
+  try {
+    const raw = localStorage.getItem(TIER_OVERRIDES_KEY);
+    const parsed: (TierOverride | null)[] = raw ? JSON.parse(raw) : [];
+    return REASONING_TIERS.map((_, i) => parsed[i] ?? null);
+  } catch {
+    return REASONING_TIERS.map(() => null);
+  }
+}
+
+export function setTierOverride(
+  index: number,
+  override: TierOverride | null,
+): void {
+  if (typeof window === "undefined") return;
+  const current = getTierOverrides();
+  current[index] = override;
+  localStorage.setItem(TIER_OVERRIDES_KEY, JSON.stringify(current));
+  notifyConfigChanged();
+}
+
+export function resetTierOverrides(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(TIER_OVERRIDES_KEY);
+  notifyConfigChanged();
+}
+
+/** REASONING_TIERS with any user overrides applied - this is what resolveTier() reads. */
+export function getEffectiveTiers(): ReasoningTier[] {
+  const overrides = getTierOverrides();
+  return REASONING_TIERS.map((tier, i) => {
+    const o = overrides[i];
+    return o
+      ? {
+          modelKey: o.modelKey,
+          reasoningEffort: o.reasoningEffort,
+          note: tier.note,
+        }
+      : tier;
+  });
+}
+
+export function getNarrationModelOverride(): AnyModelKey | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(NARRATION_OVERRIDE_KEY) || null;
+}
+
+export function setNarrationModelOverride(modelKey: AnyModelKey | null): void {
+  if (typeof window === "undefined") return;
+  if (modelKey) {
+    localStorage.setItem(NARRATION_OVERRIDE_KEY, modelKey);
+  } else {
+    localStorage.removeItem(NARRATION_OVERRIDE_KEY);
+  }
+  notifyConfigChanged();
+}
+
+/** NARRATION_MODEL_KEY with any user override applied - always used in place of the constant. */
+export function getEffectiveNarrationModelKey(): AnyModelKey {
+  return getNarrationModelOverride() || NARRATION_MODEL_KEY;
 }
 
 // ============================================================
@@ -100,7 +194,7 @@ export function resolveTier(tier: number): ResolvedTier {
  */
 function isBossFight(combatState: CombatState): boolean {
   const activeEnemies = combatState.combatants.filter(
-    (c) => c.type === "enemy" && c.isActive
+    (c) => c.type === "enemy" && c.isActive,
   );
   return activeEnemies.length === 1;
 }
@@ -125,7 +219,9 @@ export function classifyTierDeterministic(state: StoryData): number {
   if (state.activeChallenge?.active) {
     return 1;
   }
-  if (state.threads?.some((t) => t.status === "active" && t.priority === "main")) {
+  if (
+    state.threads?.some((t) => t.status === "active" && t.priority === "main")
+  ) {
     return 2;
   }
   return 0;
@@ -136,11 +232,16 @@ export function classifyTierDeterministic(state: StoryData): number {
  * enough to plausibly be a plot-shaping action rather than simple banter —
  * the only case worth spending a tier-0 LLM classification call on.
  */
-export function isClassificationAmbiguous(state: StoryData, playerInput: string): boolean {
+export function isClassificationAmbiguous(
+  state: StoryData,
+  playerInput: string,
+): boolean {
   const hasStateSignal =
     !!state.combatState?.active ||
     !!state.activeChallenge?.active ||
-    !!state.threads?.some((t) => t.status === "active" && t.priority === "main");
+    !!state.threads?.some(
+      (t) => t.status === "active" && t.priority === "main",
+    );
   return !hasStateSignal && playerInput.trim().length > 200;
 }
 
@@ -218,13 +319,16 @@ export interface EscalationDecision {
 export function resolveTierEscalation(
   request: EscalationRequest,
   currentTier: number,
-  tierState: ReasoningTierState
+  tierState: ReasoningTierState,
 ): EscalationDecision {
   const requested = Math.max(0, Math.min(TOP_TIER, request.tier));
   if (requested <= currentTier) {
     return { grantedTier: currentTier, capped: false };
   }
-  if (requested === TOP_TIER && tierState.tier3CallsInScene >= MAX_TIER3_CALLS_PER_SCENE) {
+  if (
+    requested === TOP_TIER &&
+    tierState.tier3CallsInScene >= MAX_TIER3_CALLS_PER_SCENE
+  ) {
     // Cap hit — clamp to one below top tier instead of granting another top-tier call.
     return { grantedTier: Math.max(currentTier, TOP_TIER - 1), capped: true };
   }
@@ -238,7 +342,12 @@ export function resolveTierEscalation(
 /** Model name/provider for logging — matches the AI_MODELS entry shown in generation logs. */
 export function describeTier(resolved: ResolvedTier): string {
   const config = getModelConfig(resolved.modelKey);
-  return `tier ${resolved.tier} (${AI_MODELS[resolved.modelKey]?.name ?? resolved.modelKey}, ${config.provider}, effort=${resolved.reasoningEffort})`;
+  const customModel = getCustomModelIfUUID(resolved.modelKey);
+  const displayName =
+    customModel?.name ??
+    AI_MODELS[resolved.modelKey as AIModelKey]?.name ??
+    resolved.modelKey;
+  return `tier ${resolved.tier} (${displayName}, ${config.provider}, effort=${resolved.reasoningEffort})`;
 }
 
 /** Next-lower tier to retry at when a model call fails outright. Tier 0 is the floor. */

@@ -1798,8 +1798,8 @@ export default function PDFImporter({
                         {AI_MODELS["Mistral Medium 3.1"].name} (Coins)
                       </option>
                       {keys.deepseekKey && (
-                        <option value={AI_MODELS["Deepseek Chat"].model}>
-                          {AI_MODELS["Deepseek Chat"].name} (BYOK)
+                        <option value={AI_MODELS["DeepSeek V4 Flash"].model}>
+                          {AI_MODELS["DeepSeek V4 Flash"].name} (BYOK)
                         </option>
                       )}
                       {keys.openRouterKey && (

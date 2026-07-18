@@ -65,7 +65,7 @@ interface RequestBody {
 function applyReasoningEffort(
   requestBody: any,
   provider: string,
-  reasoningEffort?: string
+  reasoningEffort?: string,
 ): void {
   if (!reasoningEffort || reasoningEffort === "none") return;
 
@@ -337,7 +337,8 @@ export async function POST(req: NextRequest) {
           reasoningEffort,
         } = body;
 
-        const model = rawModel && rawModel.trim() ? rawModel : "Deepseek Chat";
+        const model =
+          rawModel && rawModel.trim() ? rawModel : "DeepSeek V4 Flash";
 
         if (!messages || messages.length === 0) {
           controller.enqueue(
@@ -639,7 +640,11 @@ export async function POST(req: NextRequest) {
             modelConfig.provider === "google" ? "required" : "auto";
         }
 
-        applyReasoningEffort(requestBody, modelConfig.provider, reasoningEffort);
+        applyReasoningEffort(
+          requestBody,
+          modelConfig.provider,
+          reasoningEffort,
+        );
 
         // Add stop sequences if provided (supported by all providers)
         if (stop && stop.length > 0) {

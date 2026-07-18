@@ -4,7 +4,14 @@ import { StoryData, UPGRADE_COSTS } from "@/app/misc/structs";
 
 describe("processCommands", () => {
   let mockStoryData: StoryData;
-  let mockNotification: ReturnType<typeof vi.fn>;
+  let mockNotification: ReturnType<
+    typeof vi.fn<
+      (
+        message: string,
+        type: "success" | "failure" | "info" | "warning",
+      ) => void
+    >
+  >;
 
   beforeEach(() => {
     mockNotification = vi.fn();

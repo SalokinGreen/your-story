@@ -587,7 +587,7 @@ export async function POST(req: NextRequest) {
         const body: RequestBody = await req.json();
         const {
           config,
-          model = "Deepseek Chat",
+          model = "DeepSeek V4 Flash",
           openRouterKey,
           deepseekKey,
           novelaiKey,

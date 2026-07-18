@@ -202,7 +202,7 @@ function normalizeMistralToolCallIds(messages: ChatMessage[]): ChatMessage[] {
 function applyReasoningEffort(
   requestBody: any,
   provider: "deepseek" | "openrouter" | "mistral" | "deepinfra" | "google",
-  reasoningEffort?: string
+  reasoningEffort?: string,
 ): void {
   if (!reasoningEffort || reasoningEffort === "none") return;
 
@@ -234,7 +234,7 @@ async function callAI(
   maxTokens: number,
   temperature: number,
   tools?: any[],
-  reasoningEffort?: string
+  reasoningEffort?: string,
 ): Promise<AIResponse> {
   // Check if we have a prefill (trailing assistant message)
   const hasPrefill =
@@ -514,7 +514,7 @@ export async function POST(req: NextRequest) {
       reasoningEffort,
     } = body;
 
-    const model = rawModel && rawModel.trim() ? rawModel : "Deepseek Chat";
+    const model = rawModel && rawModel.trim() ? rawModel : "DeepSeek V4 Flash";
 
     // Log model for debugging
     console.log(

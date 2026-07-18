@@ -2419,8 +2419,8 @@ function StoryPageContent() {
     //Getcurrentmodelconfigfordynamicmemorycap
     const modelKey =
       typeof window !== "undefined"
-        ? localStorage.getItem("aiModel") || "Deepseek Chat"
-        : "Deepseek Chat";
+        ? localStorage.getItem("aiModel") || "DeepSeek V4 Flash"
+        : "DeepSeek V4 Flash";
     const modelConfig = getModelConfig(modelKey);
 
     // Dynamic memory cap: Reserve maxOutputTokens, then use 25% of remaining for memory
@@ -2585,7 +2585,7 @@ function StoryPageContent() {
             addNotification(
               "Recap: earlier events were condensed into a summary to save space",
               "info",
-              6000
+              6000,
             );
             logger.action("Story history compacted", {
               summaryLength: summary.length,
@@ -4934,7 +4934,7 @@ function StoryPageContent() {
               addNotification(
                 "Recap: earlier events were condensed into a summary to save space",
                 "info",
-                6000
+                6000,
               );
               logger.action("Story history compacted", {
                 summaryLength: summary.length,

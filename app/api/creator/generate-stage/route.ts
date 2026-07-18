@@ -460,7 +460,7 @@ export async function POST(req: NextRequest) {
           config,
           stage,
           previousResults,
-          model = "Deepseek Chat",
+          model = "DeepSeek V4 Flash",
           openRouterKey,
           deepseekKey,
           novelaiKey,
