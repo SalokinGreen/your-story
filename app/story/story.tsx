@@ -14,8 +14,6 @@ import { ObjectivesStrip } from "../components/ObjectivesStrip";
 import type { SyncStatus } from "../misc/localStoryManager";
 import type { GMToolResult } from "../misc/gmExecutor";
 import { stripThinkingTags } from "../misc/ai";
-import { useAuth } from "../misc/AuthContext";
-import { supabase } from "../misc/supabase";
 
 interface StoryProps {
   storyData: StoryData;
@@ -30,7 +28,7 @@ interface StoryProps {
   handleSelect: (index: number) => void;
   onCustomInput?: (text: string, playerComment?: string) => void;
   onActionSubmit?: (
-    text: string
+    text: string,
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
   onActionConfirm?: (choice: Choice, playerComment?: string) => void;
   onCommentSubmit?: (comment: string) => void;
@@ -183,8 +181,8 @@ function ChatMessage({
               {isExpanded
                 ? "Hide thinking"
                 : isStreaming
-                ? "Thinking..."
-                : "Show thinking"}
+                  ? "Thinking..."
+                  : "Show thinking"}
             </span>
             <DynamicIcon
               name={isExpanded ? "ChevronUp" : "ChevronDown"}
@@ -236,64 +234,64 @@ function ChatMessage({
                         )}
                       </div>
                     </div>
-                  ) : null
+                  ) : null,
                 )
               : gmConversation && gmConversation.length > 0
-              ? /* Saved GM conversation - interleaved thinking and tool results */
-                gmConversation.map((msg, idx) => {
-                  if (msg.role === "assistant") {
-                    return (
-                      <React.Fragment key={`gm-${idx}`}>
-                        {/* Thinking text */}
-                        {msg.content && (
-                          <p className="whitespace-pre-wrap">{msg.content}</p>
-                        )}
-                        {/* Tool calls made by this message */}
-                        {msg.tool_calls &&
-                          msg.tool_calls.map((tc, tcIdx) => {
-                            const result = toolResults?.get(tc.id);
-                            return (
-                              <div
-                                key={`tc-${idx}-${tcIdx}`}
-                                className="not-italic text-xs bg-gray-800/50 rounded px-2 py-1.5 flex items-start gap-2"
-                              >
-                                <span
-                                  className={`shrink-0 ${
-                                    result?.success
-                                      ? "text-green-400"
-                                      : result?.success === false
-                                      ? "text-red-400"
-                                      : "text-gray-500"
-                                  }`}
+                ? /* Saved GM conversation - interleaved thinking and tool results */
+                  gmConversation.map((msg, idx) => {
+                    if (msg.role === "assistant") {
+                      return (
+                        <React.Fragment key={`gm-${idx}`}>
+                          {/* Thinking text */}
+                          {msg.content && (
+                            <p className="whitespace-pre-wrap">{msg.content}</p>
+                          )}
+                          {/* Tool calls made by this message */}
+                          {msg.tool_calls &&
+                            msg.tool_calls.map((tc, tcIdx) => {
+                              const result = toolResults?.get(tc.id);
+                              return (
+                                <div
+                                  key={`tc-${idx}-${tcIdx}`}
+                                  className="not-italic text-xs bg-gray-800/50 rounded px-2 py-1.5 flex items-start gap-2"
                                 >
-                                  {result?.success
-                                    ? "✓"
-                                    : result?.success === false
-                                    ? "✗"
-                                    : "•"}
-                                </span>
-                                <div>
-                                  <span className="text-gray-300 font-medium">
-                                    {(
-                                      result?.toolName || tc.function.name
-                                    )?.replace(/_/g, " ")}
+                                  <span
+                                    className={`shrink-0 ${
+                                      result?.success
+                                        ? "text-green-400"
+                                        : result?.success === false
+                                          ? "text-red-400"
+                                          : "text-gray-500"
+                                    }`}
+                                  >
+                                    {result?.success
+                                      ? "✓"
+                                      : result?.success === false
+                                        ? "✗"
+                                        : "•"}
                                   </span>
-                                  {result?.contextForStory && (
-                                    <p className="text-gray-500 mt-0.5">
-                                      {result.contextForStory}
-                                    </p>
-                                  )}
+                                  <div>
+                                    <span className="text-gray-300 font-medium">
+                                      {(
+                                        result?.toolName || tc.function.name
+                                      )?.replace(/_/g, " ")}
+                                    </span>
+                                    {result?.contextForStory && (
+                                      <p className="text-gray-500 mt-0.5">
+                                        {result.contextForStory}
+                                      </p>
+                                    )}
+                                  </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                      </React.Fragment>
-                    );
-                  }
-                  // Skip tool role messages - results are shown inline with their tool_calls above
-                  return null;
-                })
-              : null}
+                              );
+                            })}
+                        </React.Fragment>
+                      );
+                    }
+                    // Skip tool role messages - results are shown inline with their tool_calls above
+                    return null;
+                  })
+                : null}
           </div>
         )}
 
@@ -363,42 +361,11 @@ export default function Story({
   pendingUserChoice,
   liveGMEntries,
 }: StoryProps) {
-  const { user } = useAuth();
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
   const [editedText, setEditedText] = React.useState("");
   const [isHovering, setIsHovering] = React.useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [userProfile, setUserProfile] = useState<{
-    avatar_url?: string;
-  } | null>(null);
-
-  // Fetch user profile for avatar fallback
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchProfile = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (!session) return;
-
-        const response = await fetch(`/api/profiles/${user.id}`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          setUserProfile(data);
-        }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
-      }
-    };
-
-    fetchProfile();
-  }, [user]);
 
   // Show hidden messages setting - persisted to localStorage
   const [showHiddenMessages, setShowHiddenMessages] = React.useState(() => {
@@ -411,7 +378,7 @@ export default function Story({
     const handleStorageChange = () => {
       if (typeof window !== "undefined") {
         setShowHiddenMessages(
-          localStorage.getItem("showHiddenMessages") === "true"
+          localStorage.getItem("showHiddenMessages") === "true",
         );
       }
     };
@@ -476,10 +443,10 @@ export default function Story({
           localStorage.getItem("storyFontFamily") ||
           "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         lineHeight: parseFloat(
-          localStorage.getItem("storyLineHeight") || "1.6"
+          localStorage.getItem("storyLineHeight") || "1.6",
         ),
         paragraphSpacing: parseFloat(
-          localStorage.getItem("storyParagraphSpacing") || "0.5"
+          localStorage.getItem("storyParagraphSpacing") || "0.5",
         ),
         theme: localStorage.getItem("storyTheme") || "default",
         themeColors: {
@@ -658,11 +625,8 @@ export default function Story({
 
   // Get display name and avatar for chat display
   const playerDisplayName =
-    storyData.displayName ||
-    storyData.player_name ||
-    user?.user_metadata?.display_name ||
-    "Player";
-  const playerAvatarUrl = storyData.displayAvatar || userProfile?.avatar_url;
+    storyData.displayName || storyData.player_name || "Player";
+  const playerAvatarUrl = storyData.displayAvatar;
 
   // Build chat messages from scene parts - pairs of user input + GM response
   const chatMessages: Array<{
@@ -1142,8 +1106,8 @@ export default function Story({
                   {loadingStage === "gm"
                     ? "Thinking..."
                     : loadingStage === "choices"
-                    ? "Preparing choices..."
-                    : "Generating..."}
+                      ? "Preparing choices..."
+                      : "Generating..."}
                   <span className="text-blue-400/80 text-sm ml-1">Cancel</span>
                 </button>
               ) : (
@@ -1200,7 +1164,7 @@ const prettify = (
   text: string,
   animate: boolean = true,
   showHiddenMessages: boolean = false,
-  fontSettings?: FontSettings
+  fontSettings?: FontSettings,
 ) => {
   // Process tags and hidden text before rendering
   const cleanedText = stripThinkingTags(text);
@@ -1237,7 +1201,7 @@ const prettify = (
             // Process children to handle hidden text markers
             const processChildren = (
               child: React.ReactNode,
-              key: number | string
+              key: number | string,
             ): React.ReactNode => {
               if (typeof child === "string") {
                 const parts = child.split(/(⟦HIDDEN_START⟧|⟦HIDDEN_END⟧)/);

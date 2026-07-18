@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import { calculateOCRCost } from "@/app/misc/ocr";
-import { deductTokens, hasEnoughTokens } from "@/app/misc/tokens";
 
 // Allow up to 2 minutes for OCR processing of large PDFs
 export const maxDuration = 120;
@@ -13,15 +10,17 @@ export const dynamic = "force-dynamic";
 /**
  * POST /api/ocr/process
  *
- * Calls Mistral OCR API to extract text from a PDF
+ * Calls Mistral OCR API to extract text from a PDF using the user's own
+ * Mistral API key (BYOK).
  *
  * Request: {
- *   signedUrl?: string,  // Supabase signed URL to the PDF
+ *   signedUrl?: string,  // Signed URL to the PDF
  *   base64Data?: string, // Base64 encoded file data (fallback)
  *   fileName?: string,   // Original file name (for base64 mode)
  *   mimeType?: string,   // MIME type (for base64 mode)
  *   pages?: number[],    // Optional: specific pages to process (0-indexed)
- *   includeImages?: boolean
+ *   includeImages?: boolean,
+ *   mistralKey: string   // User's own Mistral API key
  * }
  *
  * Response: {
@@ -29,44 +28,13 @@ export const dynamic = "force-dynamic";
  *   pages: OCRPageResult[],
  *   totalPages: number,
  *   markdown: string,    // Combined markdown from all pages
- *   cost: number         // Coins deducted
  * }
  */
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
 const MISTRAL_OCR_ENDPOINT = "https://api.mistral.ai/v1/ocr";
 
 export async function POST(request: NextRequest) {
   try {
-    // Validate API key exists
-    if (!MISTRAL_API_KEY) {
-      return NextResponse.json(
-        { error: "OCR service not configured" },
-        { status: 500 }
-      );
-    }
-
-    // Validate auth
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
     const body = await request.json();
     const {
       signedUrl,
@@ -75,12 +43,23 @@ export async function POST(request: NextRequest) {
       mimeType,
       pages,
       includeImages = false,
+      mistralKey,
     } = body;
+
+    if (!mistralKey || typeof mistralKey !== "string") {
+      return NextResponse.json(
+        {
+          error:
+            "Mistral API key is required. Please add your own key in Settings.",
+        },
+        { status: 400 },
+      );
+    }
 
     if (!signedUrl && !base64Data) {
       return NextResponse.json(
         { error: "Either signedUrl or base64Data is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -125,7 +104,7 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${MISTRAL_API_KEY}`,
+        Authorization: `Bearer ${mistralKey}`,
       },
       body: JSON.stringify(ocrRequest),
     });
@@ -135,38 +114,14 @@ export async function POST(request: NextRequest) {
       console.error("Mistral OCR error:", errorData);
       return NextResponse.json(
         { error: `OCR failed: ${ocrResponse.statusText}` },
-        { status: ocrResponse.status }
+        { status: ocrResponse.status },
       );
     }
 
     const ocrResult = await ocrResponse.json();
 
-    // Calculate cost and deduct coins
     const totalPages =
       ocrResult.usage_info?.pages_processed || ocrResult.pages?.length || 1;
-    const coinCost = calculateOCRCost(totalPages);
-
-    // Check if user has enough coins (pass service role client)
-    const hasCoins = await hasEnoughTokens(user.id, coinCost, supabase);
-    if (!hasCoins) {
-      return NextResponse.json(
-        {
-          error: `Insufficient coins. OCR requires ${coinCost} coins for ${totalPages} pages.`,
-          required: coinCost,
-          pages: totalPages,
-        },
-        { status: 402 }
-      );
-    }
-
-    // Deduct coins (pass service role client)
-    const deducted = await deductTokens(user.id, coinCost, supabase);
-    if (!deducted) {
-      return NextResponse.json(
-        { error: "Failed to deduct coins" },
-        { status: 500 }
-      );
-    }
 
     // Combine all pages into single markdown
     const combinedMarkdown = ocrResult.pages
@@ -182,17 +137,15 @@ export async function POST(request: NextRequest) {
       totalPages,
       markdown: combinedMarkdown,
       model: ocrResult.model,
-      cost: coinCost,
       meta: {
         pagesProcessed: totalPages,
-        coinsDeducted: coinCost,
       },
     });
   } catch (error: any) {
     console.error("OCR process error:", error);
     return NextResponse.json(
       { error: error.message || "OCR processing failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

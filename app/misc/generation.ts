@@ -70,6 +70,23 @@ import {
   filterSettingsForProvider,
 } from "@/app/misc/samplingSettings";
 import { MYTHIC_TABLE_NAMES } from "@/app/misc/mythic";
+import {
+  REASONING_TIERS,
+  NARRATION_MODEL_KEY,
+  SCENE_BASELINE_TIER,
+  ReasoningEffort,
+  resolveTier,
+  hardRuleFloor,
+  classifyTier,
+  isClassificationAmbiguous,
+  buildClassifierPrompt,
+  classificationLabelToTier,
+  decayTierTowardBaseline,
+  computeSceneKey,
+  fallbackTier,
+  describeTier,
+  getTierState,
+} from "@/app/misc/reasoningTiers";
 
 // ============================================================
 // TYPES
@@ -137,10 +154,12 @@ export interface GenerationOptions {
   novelaiEnabled?: boolean;
   novelaiKey?: string;
   novelaiTemperature?: number;
-  // BYOK API keys (required for non-NovelAI models)
+  // BYOK API keys (required for non-NovelAI models; all providers are BYOK)
   openRouterKey?: string;
   deepseekKey?: string;
   googleKey?: string;
+  mistralKey?: string;
+  deepinfraKey?: string;
   // Embedding-based context retrieval
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
@@ -319,6 +338,8 @@ interface ChoicesFetchOptions {
   openRouterKey?: string;
   deepseekKey?: string;
   googleKey?: string;
+  mistralKey?: string;
+  deepinfraKey?: string;
   abortSignal?: AbortSignal;
 }
 
@@ -361,6 +382,8 @@ async function generateChoicesWithRetry(
         openRouterKey: fetchOptions.openRouterKey,
         deepseekKey: fetchOptions.deepseekKey,
         googleKey: fetchOptions.googleKey,
+        mistralKey: fetchOptions.mistralKey,
+        deepinfraKey: fetchOptions.deepinfraKey,
       }),
       signal: fetchOptions.abortSignal,
     });
@@ -629,7 +652,68 @@ export async function generateStoryTurn(
         logger.action("GM stage skipped - no user choice found");
         gmStoryContext = "";
       } else {
-        gmModel = options.gmStageModel || options.toolsModel;
+        // ============================================
+        // Reasoning-Tier Router: pick the starting tier for this turn.
+        // Priority: hard rules (combat) > deterministic classifier > decayed
+        // tier from last turn. Self-escalation (set_reasoning_tier tool)
+        // is applied per-round below via storyData.reasoningTierState.
+        // ============================================
+        const priorTierState = getTierState(storyData);
+        const decayedTier = decayTierTowardBaseline(priorTierState.currentTier);
+        let startingTier = Math.max(
+          hardRuleFloor(storyData),
+          classifyTier(storyData, gmUserChoice),
+          decayedTier
+        );
+
+        if (isClassificationAmbiguous(storyData, gmUserChoice)) {
+          try {
+            const classifierResult = await generateSimple(
+              [{ role: "user", content: buildClassifierPrompt(gmUserChoice) }],
+              {
+                model: REASONING_TIERS[0].modelKey,
+                maxTokens: 10,
+                temperature: 0,
+                openRouterKey: options.openRouterKey,
+                deepseekKey: options.deepseekKey,
+                googleKey: options.googleKey,
+                mistralKey: options.mistralKey,
+                deepinfraKey: options.deepinfraKey,
+              }
+            );
+            startingTier = Math.max(
+              startingTier,
+              classificationLabelToTier(classifierResult.content || "")
+            );
+          } catch (classifyError) {
+            logger.action(
+              "Reasoning-tier classifier call failed, using deterministic default",
+              {
+                error:
+                  classifyError instanceof Error
+                    ? classifyError.message
+                    : String(classifyError),
+              }
+            );
+          }
+        }
+
+        const sceneKey = computeSceneKey(storyData);
+        const initialResolvedTier = resolveTier(startingTier);
+        storyData.reasoningTierState = {
+          currentTier: initialResolvedTier.tier,
+          tier3CallsInScene:
+            sceneKey === priorTierState.lastSceneKey
+              ? priorTierState.tier3CallsInScene
+              : 0,
+          lastSceneKey: sceneKey,
+        };
+
+        gmModel = initialResolvedTier.modelKey;
+        let gmReasoningEffort: ReasoningEffort = initialResolvedTier.reasoningEffort;
+        logger.action("Reasoning tier resolved for GM stage", {
+          describe: describeTier(initialResolvedTier),
+        });
 
         // Compaction: fold any scene history that's about to age out of the
         // GM stage's history budget into storyData.scene.summary instead of
@@ -714,7 +798,20 @@ export async function generateStoryTurn(
 
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
-          logger.action(`GM stage round ${gmRound}`);
+
+          // Re-derive tier from storyData.reasoningTierState each round: if the
+          // previous round's tool execution included a set_reasoning_tier call,
+          // executeSetReasoningTier (gmExecutor.ts) already applied the
+          // decay/cap policy and mutated this state - picking it up here is
+          // what makes self-escalation take effect for the NEXT round.
+          const roundTier = resolveTier(
+            storyData.reasoningTierState?.currentTier ?? SCENE_BASELINE_TIER
+          );
+          gmModel = roundTier.modelKey;
+          gmReasoningEffort = roundTier.reasoningEffort;
+          logger.action(`GM stage round ${gmRound}`, {
+            describe: describeTier(roundTier),
+          });
 
           if (needsGMPromptRebuild) {
             // GM Stage receives customMaxContext (Memory Size slider) for context allocation
@@ -773,27 +870,66 @@ export async function generateStoryTurn(
           }
 
           // Use streaming for GM stage so user can see thinking in real-time
-          const gmResponse = await fetch("/api/generate-stream", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
+          const buildGmRequestBody = (model: string, effort: ReasoningEffort) =>
+            JSON.stringify({
               messages: messagesWithHistory,
               tools: gmBaseTools,
-              model: gmModel,
+              model,
+              reasoningEffort: effort,
               maxTokens: Math.min(
                 12000,
-                getModelConfig(gmModel).maxOutputTokens || 4000
+                getModelConfig(model).maxOutputTokens || 4000
               ),
               temperature: 0.4, // Slightly higher for more natural GM thinking
               openRouterKey: options.openRouterKey,
               deepseekKey: options.deepseekKey,
               googleKey: options.googleKey,
-            }),
+              mistralKey: options.mistralKey,
+              deepinfraKey: options.deepinfraKey,
+            });
+
+          let gmResponse = await fetch("/api/generate-stream", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: buildGmRequestBody(gmModel, gmReasoningEffort),
             signal: options.abortSignal,
           });
+
+          // Model unavailable - fall back to the next-lower tier instead of crashing.
+          if (!gmResponse.ok) {
+            const failedTier = roundTier.tier;
+            const lower = fallbackTier(failedTier);
+            if (lower !== null) {
+              const fallbackResolved = resolveTier(lower);
+              logger.action(
+                "GM stage model unavailable - falling back to lower tier",
+                {
+                  failedTier,
+                  failedModel: gmModel,
+                  fallbackTier: lower,
+                  status: gmResponse.status,
+                }
+              );
+              gmModel = fallbackResolved.modelKey;
+              gmReasoningEffort = fallbackResolved.reasoningEffort;
+              storyData.reasoningTierState = {
+                ...getTierState(storyData),
+                currentTier: fallbackResolved.tier,
+              };
+              gmResponse = await fetch("/api/generate-stream", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`,
+                },
+                body: buildGmRequestBody(gmModel, gmReasoningEffort),
+                signal: options.abortSignal,
+              });
+            }
+          }
 
           if (!gmResponse.ok) {
             const errorText = await gmResponse.text().catch(() => "");
@@ -1327,9 +1463,7 @@ export async function generateStoryTurn(
 
       // When NovelAI is enabled, use its model name for proper context sizing
       const useNovelAI = options.novelaiEnabled && options.novelaiKey;
-      const storyModelName = useNovelAI
-        ? "NovelAI GLM-4-6"
-        : options.storyModel;
+      const storyModelName = useNovelAI ? "NovelAI GLM-4-6" : NARRATION_MODEL_KEY;
 
       // Calculate actual max output for NovelAI or standard models
       // Enforce minimum 1000 tokens to account for prefill overhead
@@ -1364,7 +1498,8 @@ export async function generateStoryTurn(
           logger.action("Continuing GM conversation for story generation", {
             baseMessages: gmBaseMessages.length,
             historyEntries: gmConversationHistory.length,
-            model: gmModel,
+            gmAdjudicationModel: gmModel,
+            narrationModel: NARRATION_MODEL_KEY,
           });
 
           const storyContinuationPrompt = buildStoryContinuationPrompt(
@@ -1443,10 +1578,10 @@ export async function generateStoryTurn(
         } else {
           // Use standard API (DeepSeek/OpenRouter/Mistral/DeepInfra)
           // Build request body with optional sampling settings
-          // When continuing GM conversation, use the same model
-          const storyModelToUse = continueGMConversation
-            ? gmModel
-            : options.storyModel;
+          // Narration always runs on the fixed narration model, regardless of
+          // which tier adjudication used - this is what keeps the GM's voice
+          // consistent even when a turn escalated to a heavier reasoning tier.
+          const storyModelToUse: string = NARRATION_MODEL_KEY;
 
           const storyRequestBody: Record<string, unknown> = {
             messages: storyMessages,
@@ -1456,6 +1591,8 @@ export async function generateStoryTurn(
             openRouterKey: options.openRouterKey,
             deepseekKey: options.deepseekKey,
             googleKey: options.googleKey,
+            mistralKey: options.mistralKey,
+            deepinfraKey: options.deepinfraKey,
             // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
             // Also stop on [STOP] marker for player agency stopping points
             stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
@@ -1479,7 +1616,7 @@ export async function generateStoryTurn(
 
         logger.action("Story stage request sent", {
           maxTokens: storyMaxOutput,
-          model: continueGMConversation ? gmModel : options.storyModel,
+          model: continueGMConversation ? gmModel : NARRATION_MODEL_KEY,
           continueGM: continueGMConversation,
         });
 
@@ -1768,6 +1905,8 @@ export async function generateStoryTurn(
       callbacks.onChoicesStart?.();
       logger.action("Stage 3: Building choices prompt (parallel)");
 
+      // Choices are picked from already-decided narration - fixed cheap
+      // model, not the (possibly escalated) adjudication tier.
       const { content: rawChoicesContent, meta: choicesResultMeta } =
         await generateChoicesWithRetry(
           {
@@ -1778,10 +1917,12 @@ export async function generateStoryTurn(
           },
           {
             token,
-            model: options.choicesModel,
+            model: NARRATION_MODEL_KEY,
             openRouterKey: options.openRouterKey,
             deepseekKey: options.deepseekKey,
             googleKey: options.googleKey,
+            mistralKey: options.mistralKey,
+            deepinfraKey: options.deepinfraKey,
             abortSignal: options.abortSignal,
           }
         );
@@ -1965,6 +2106,8 @@ export async function generateSimple(
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
+    mistralKey?: string;
+    deepinfraKey?: string;
   }
 ): Promise<{
   content: string;
@@ -1991,6 +2134,8 @@ export async function generateSimple(
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,
+      mistralKey: options.mistralKey,
+      deepinfraKey: options.deepinfraKey,
     }),
   });
 
@@ -2021,6 +2166,8 @@ export async function* generateSimpleStream(
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
+    mistralKey?: string;
+    deepinfraKey?: string;
   }
 ): AsyncGenerator<StreamEvent> {
   const token = await getAuthToken();
@@ -2043,6 +2190,8 @@ export async function* generateSimpleStream(
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,
+      mistralKey: options.mistralKey,
+      deepinfraKey: options.deepinfraKey,
     }),
   });
 
@@ -2071,7 +2220,13 @@ export async function analyzeAction(
   storyData: StoryData,
   userAction: string,
   model: string,
-  apiKeys?: { openRouterKey?: string; deepseekKey?: string; googleKey?: string }
+  apiKeys?: {
+    openRouterKey?: string;
+    deepseekKey?: string;
+    googleKey?: string;
+    mistralKey?: string;
+    deepinfraKey?: string;
+  }
 ): Promise<ActionAnalysisResult> {
   const token = await getAuthToken();
   if (!token) {
@@ -2103,6 +2258,8 @@ export async function analyzeAction(
       openRouterKey: apiKeys?.openRouterKey,
       deepseekKey: apiKeys?.deepseekKey,
       googleKey: apiKeys?.googleKey,
+      mistralKey: apiKeys?.mistralKey,
+      deepinfraKey: apiKeys?.deepinfraKey,
     }),
   });
 
@@ -2385,6 +2542,8 @@ export async function generateChoicesOnly(
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
+    mistralKey?: string;
+    deepinfraKey?: string;
   }
 ): Promise<Choice[]> {
   const token = await getAuthToken();
@@ -2411,6 +2570,8 @@ export async function generateChoicesOnly(
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,
+      mistralKey: options.mistralKey,
+      deepinfraKey: options.deepinfraKey,
     }
   );
 

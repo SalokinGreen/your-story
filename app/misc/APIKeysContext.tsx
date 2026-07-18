@@ -7,31 +7,24 @@ import React, {
   useEffect,
   useCallback,
 } from "react";
-import { useAuth } from "./AuthContext";
-import { useSubscription } from "./SubscriptionContext";
-import { supabase } from "./supabase";
 
 export interface APIKeys {
   openRouterKey: string;
   deepseekKey: string;
   novelaiKey: string;
   googleKey: string;
+  mistralKey: string;
+  deepinfraKey: string;
 }
 
 export interface APIKeysContextType {
-  // Keys (from localStorage or DB)
+  // Keys (from localStorage)
   keys: APIKeys;
   // Whether keys are loaded
   isLoaded: boolean;
-  // Whether user has enabled global (DB) key storage
-  useGlobalKeys: boolean;
-  // Whether user has BYOK access (based on subscription tier)
-  hasByokAccess: boolean;
   // Update a specific key
   setKey: (provider: keyof APIKeys, key: string) => void;
-  // Toggle global key storage
-  setUseGlobalKeys: (enabled: boolean) => Promise<void>;
-  // Check if a provider is configured AND user has access
+  // Check if a provider is configured
   hasKey: (provider: keyof APIKeys) => boolean;
   // Refresh keys from storage
   refreshKeys: () => Promise<void>;
@@ -46,6 +39,8 @@ const defaultKeys: APIKeys = {
   deepseekKey: "",
   novelaiKey: "",
   googleKey: "",
+  mistralKey: "",
+  deepinfraKey: "",
 };
 
 const APIKeysContext = createContext<APIKeysContextType | undefined>(undefined);
@@ -56,70 +51,41 @@ const LOCAL_KEYS = {
   deepseekKey: "deepseekKey",
   novelaiKey: "novelaiKey",
   googleKey: "googleKey",
-  useGlobalKeys: "useGlobalKeys",
+  mistralKey: "mistralKey",
+  deepinfraKey: "deepinfraKey",
   oauthCodeVerifier: "openrouter_code_verifier",
 };
 
 export function APIKeysProvider({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  const { hasByokAccess } = useSubscription();
   const [keys, setKeys] = useState<APIKeys>(defaultKeys);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [useGlobalKeys, setUseGlobalKeysState] = useState(false);
   const [isConnectingOpenRouter, setIsConnectingOpenRouter] = useState(false);
 
-  // Load keys from localStorage and optionally from DB
+  // Load keys from localStorage
   const loadKeys = useCallback(async () => {
-    // Always load from localStorage first
     const localKeys: APIKeys = {
       openRouterKey: localStorage.getItem(LOCAL_KEYS.openRouterKey) || "",
       deepseekKey: localStorage.getItem(LOCAL_KEYS.deepseekKey) || "",
       novelaiKey: localStorage.getItem(LOCAL_KEYS.novelaiKey) || "",
       googleKey: localStorage.getItem(LOCAL_KEYS.googleKey) || "",
+      mistralKey: localStorage.getItem(LOCAL_KEYS.mistralKey) || "",
+      deepinfraKey: localStorage.getItem(LOCAL_KEYS.deepinfraKey) || "",
     };
-
-    const globalEnabled =
-      localStorage.getItem(LOCAL_KEYS.useGlobalKeys) === "true";
-    setUseGlobalKeysState(globalEnabled);
-
-    // If global keys enabled and user is logged in, fetch from DB
-    if (globalEnabled && user) {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session) {
-          const response = await fetch("/api/settings/api-keys", {
-            headers: {
-              Authorization: `Bearer ${session.access_token}`,
-            },
-          });
-          if (response.ok) {
-            const dbKeys = await response.json();
-            // DB keys override local keys if present
-            setKeys({
-              openRouterKey: dbKeys.openRouterKey || localKeys.openRouterKey,
-              deepseekKey: dbKeys.deepseekKey || localKeys.deepseekKey,
-              novelaiKey: dbKeys.novelaiKey || localKeys.novelaiKey,
-              googleKey: dbKeys.googleKey || localKeys.googleKey,
-            });
-            setIsLoaded(true);
-            return;
-          }
-        }
-      } catch (error) {
-        console.error("Error loading API keys from DB:", error);
-      }
-    }
 
     setKeys(localKeys);
     setIsLoaded(true);
-  }, [user]);
+  }, []);
 
-  // Load keys on mount and when user changes
+  // Load keys on mount
   useEffect(() => {
     loadKeys();
   }, [loadKeys]);
+
+  // Set a specific key
+  const setKey = useCallback((provider: keyof APIKeys, key: string) => {
+    setKeys((prev) => ({ ...prev, [provider]: key }));
+    localStorage.setItem(LOCAL_KEYS[provider], key);
+  }, []);
 
   // Handle OpenRouter OAuth callback
   useEffect(() => {
@@ -144,7 +110,7 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
                 code_verifier: codeVerifier,
                 code_challenge_method: "S256",
               }),
-            }
+            },
           );
 
           if (response.ok) {
@@ -156,14 +122,14 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
               window.history.replaceState(
                 {},
                 document.title,
-                window.location.pathname
+                window.location.pathname,
               );
               localStorage.removeItem(LOCAL_KEYS.oauthCodeVerifier);
             }
           } else {
             console.error(
               "Failed to exchange OAuth code:",
-              await response.text()
+              await response.text(),
             );
           }
         } catch (error) {
@@ -175,82 +141,14 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
     };
 
     handleOAuthCallback();
-  }, []);
+  }, [setKey]);
 
-  // Set a specific key
-  const setKey = useCallback(
-    async (provider: keyof APIKeys, key: string) => {
-      // Update state
-      setKeys((prev) => ({ ...prev, [provider]: key }));
-
-      // Always save to localStorage
-      localStorage.setItem(LOCAL_KEYS[provider], key);
-
-      // If global keys enabled and user logged in, also save to DB
-      if (useGlobalKeys && user) {
-        try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          if (session) {
-            await fetch("/api/settings/api-keys", {
-              method: "PATCH",
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({ [provider]: key }),
-            });
-          }
-        } catch (error) {
-          console.error("Error saving API key to DB:", error);
-        }
-      }
-    },
-    [useGlobalKeys, user]
-  );
-
-  // Toggle global key storage
-  const setUseGlobalKeys = useCallback(
-    async (enabled: boolean) => {
-      setUseGlobalKeysState(enabled);
-      localStorage.setItem(
-        LOCAL_KEYS.useGlobalKeys,
-        enabled ? "true" : "false"
-      );
-
-      if (enabled && user) {
-        // Sync current local keys to DB
-        try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-          if (session) {
-            await fetch("/api/settings/api-keys", {
-              method: "PUT",
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(keys),
-            });
-          }
-        } catch (error) {
-          console.error("Error syncing keys to DB:", error);
-        }
-      }
-    },
-    [user, keys]
-  );
-
-  // Check if a provider has a key configured AND user has BYOK access
-  // Note: Keys are always stored, but only usable if user has BYOK access
+  // Check if a provider has a key configured
   const hasKey = useCallback(
     (provider: keyof APIKeys) => {
-      // Key must exist AND user must have BYOK access to use it
-      return !!keys[provider] && hasByokAccess;
+      return !!keys[provider];
     },
-    [keys, hasByokAccess]
+    [keys],
   );
 
   // Generate code verifier and challenge for PKCE
@@ -259,7 +157,7 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
     const array = new Uint8Array(32);
     crypto.getRandomValues(array);
     const codeVerifier = Array.from(array, (byte) =>
-      byte.toString(16).padStart(2, "0")
+      byte.toString(16).padStart(2, "0"),
     ).join("");
 
     // Generate code challenge (SHA-256 hash)
@@ -309,10 +207,7 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
       value={{
         keys,
         isLoaded,
-        useGlobalKeys,
-        hasByokAccess,
         setKey,
-        setUseGlobalKeys,
         hasKey,
         refreshKeys: loadKeys,
         isConnectingOpenRouter,

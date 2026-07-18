@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/app/misc/AuthContext";
 import { StaticIcon } from "@/app/components/StaticIcon";
 
 // Genre options for quick generation
@@ -177,12 +176,11 @@ const sizePresets = [
 
 export default function CreatorLandingPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
 
   // Quick generation state
   const [showQuickModal, setShowQuickModal] = useState(false);
   const [selectedGenre, setSelectedGenre] = useState<(typeof genres)[0] | null>(
-    null
+    null,
   );
   const [customPrompt, setCustomPrompt] = useState("");
   const [sizeIndex, setSizeIndex] = useState(1); // Default to "Standard"
@@ -227,45 +225,6 @@ export default function CreatorLandingPage() {
     setSelectedGenre(customGenre);
     setShowCustomGenreInput(false);
   };
-
-  // Show loading while checking auth
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
-        <div className="text-blue-300 flex items-center gap-3">
-          <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
-          Loading...
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect to login if not authenticated
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
-        <div className="text-center p-8 bg-blue-950/50 rounded-xl border border-blue-700/30 max-w-md">
-          <StaticIcon
-            name="Lock"
-            className="w-12 h-12 text-blue-400 mx-auto mb-4"
-          />
-          <h2 className="text-xl font-bold text-white mb-2">
-            Sign In Required
-          </h2>
-          <p className="text-blue-300/70 mb-4">
-            Please sign in to create adventures.
-          </p>
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors"
-          >
-            <StaticIcon name="LogIn" className="w-4 h-4" />
-            Go to Sign In
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
@@ -431,11 +390,11 @@ export default function CreatorLandingPage() {
           </Link>
           <span className="text-blue-800">•</span>
           <Link
-            href="/explorer"
+            href="/creator/manual"
             className="text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
           >
             <StaticIcon name="Compass" className="w-4 h-4" />
-            Explore Adventures
+            Build Manually
           </Link>
         </div>
       </main>

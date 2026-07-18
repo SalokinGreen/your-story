@@ -1,49 +1,17 @@
-import { supabase } from "./supabase";
-
 /**
- * Gets the current Supabase session access token.
- * This helper ensures we get a fresh, valid token for API calls.
- * 
- * @returns The access token string, or null if not authenticated
+ * Legacy auth helpers, kept as no-ops now that the app is fully local/BYOK
+ * and no longer has a backend authentication system. Call sites that only
+ * used these for adding an Authorization header can be left as-is since the
+ * API routes no longer require auth.
  */
+
 export async function getAuthToken(): Promise<string | null> {
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    
-    if (error) {
-      console.error("Error getting session:", error);
-      return null;
-    }
-    
-    return session?.access_token || null;
-  } catch (error) {
-    console.error("Failed to get auth token:", error);
-    return null;
-  }
+  return null;
 }
 
-/**
- * Makes an authenticated fetch request with automatic token injection.
- * 
- * @param url - The URL to fetch
- * @param options - Standard fetch options
- * @returns The fetch response
- */
 export async function authenticatedFetch(
   url: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<Response> {
-  const token = await getAuthToken();
-  
-  if (!token) {
-    throw new Error("Not authenticated");
-  }
-  
-  const headers = new Headers(options.headers);
-  headers.set("Authorization", `Bearer ${token}`);
-  
-  return fetch(url, {
-    ...options,
-    headers,
-  });
+  return fetch(url, options);
 }

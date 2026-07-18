@@ -1,12 +1,9 @@
 "use client";
 
 import { useState, useCallback, useEffect } from "react";
-import { createClient } from "@supabase/supabase-js";
 import { DynamicIcon } from "./DynamicIcon";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
-import { getAuthToken } from "@/app/misc/getAuthToken";
 import {
   DEEPINFRA_IMAGE_MODELS,
   OPENROUTER_IMAGE_MODELS,
@@ -39,7 +36,7 @@ export function getSavedImageGenSettings(): {
 // Helper to save settings
 export function saveImageGenSettings(
   provider: "deepinfra" | "openrouter",
-  model: string
+  model: string,
 ) {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY_PROVIDER, provider);
@@ -49,7 +46,7 @@ export function saveImageGenSettings(
 // Helper to get model cost for display
 export function getImageModelCost(
   provider: "deepinfra" | "openrouter",
-  model: string
+  model: string,
 ): { cost: number; isByok: boolean; display: string; dollarCost: number } {
   if (provider === "deepinfra") {
     const config =
@@ -104,7 +101,6 @@ export default function LoreImageGenerator({
   onImageGenerated,
   className = "",
 }: LoreImageGeneratorProps) {
-  const { user } = useAuth();
   const { keys: apiKeys } = useAPIKeys();
   const { addNotification } = useNotification();
 
@@ -158,28 +154,24 @@ export default function LoreImageGenerator({
 
   // Generate image
   const generateImage = useCallback(async () => {
-    if (!user) {
-      addNotification("Please sign in to generate images", "warning");
-      return;
-    }
-
-    const token = await getAuthToken();
-    if (!token) {
-      addNotification("Authentication required", "warning");
-      return;
-    }
-
     const currentPrompt = prompt || getDefaultPrompt();
     if (!currentPrompt.trim()) {
       addNotification("Please enter a prompt", "warning");
       return;
     }
 
-    // Validate API key for OpenRouter provider
+    // Validate API key for the selected provider
     if (imageProvider === "openrouter" && !apiKeys.openRouterKey) {
       addNotification(
         "OpenRouter API key required. Please add your API key in Settings.",
-        "warning"
+        "warning",
+      );
+      return;
+    }
+    if (imageProvider === "deepinfra" && !apiKeys.deepinfraKey) {
+      addNotification(
+        "DeepInfra API key required. Please add your API key in Settings.",
+        "warning",
       );
       return;
     }
@@ -192,7 +184,6 @@ export default function LoreImageGenerator({
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           prompt: currentPrompt,
@@ -201,6 +192,8 @@ export default function LoreImageGenerator({
           provider: imageProvider,
           openRouterKey:
             imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
+          deepInfraKey:
+            imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
         }),
       });
 
@@ -209,39 +202,11 @@ export default function LoreImageGenerator({
         throw new Error(error.error || "Image generation failed");
       }
 
-      const { imageUrl, meta } = await response.json();
+      const { imageUrl } = await response.json();
 
-      // Upload to Supabase storage
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      onImageGenerated(imageUrl);
 
-      // Fetch the image and convert to blob
-      const imageResponse = await fetch(imageUrl);
-      const imageBlob = await imageResponse.blob();
-
-      const fileName = `${Date.now()}-ai-lore-thumb.webp`;
-      const filePath = `${user.id}/lore-thumbnails/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("adventure-images")
-        .upload(filePath, imageBlob, { cacheControl: "3600", upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from("adventure-images")
-        .getPublicUrl(filePath);
-
-      onImageGenerated(data.publicUrl);
-
-      // Show appropriate success message
-      const costMessage = meta.isByok
-        ? "(BYOK - no coins)"
-        : meta.cost > 0
-        ? `Cost: ${meta.cost} coins`
-        : "(FREE)";
-      addNotification(`Lore image generated! ${costMessage}`, "success");
+      addNotification("Lore image generated!", "success");
       setShowPromptEditor(false);
     } catch (error) {
       const errorMessage =
@@ -251,12 +216,12 @@ export default function LoreImageGenerator({
       setIsGenerating(false);
     }
   }, [
-    user,
     prompt,
     imageModel,
     imageProvider,
     addNotification,
     apiKeys.openRouterKey,
+    apiKeys.deepinfraKey,
     getDefaultPrompt,
     onImageGenerated,
   ]);
@@ -328,7 +293,7 @@ export default function LoreImageGenerator({
               value={imageProvider}
               onChange={(e) =>
                 handleProviderChange(
-                  e.target.value as "deepinfra" | "openrouter"
+                  e.target.value as "deepinfra" | "openrouter",
                 )
               }
               className="px-2 py-1 bg-blue-900/50 border border-blue-700/40 rounded text-white"
@@ -349,7 +314,7 @@ export default function LoreImageGenerator({
                         {key} (
                         {config.cost === 0 ? "FREE" : `${config.cost} coins`})
                       </option>
-                    )
+                    ),
                   )
                 : Object.entries(OPENROUTER_IMAGE_MODELS).map(
                     ([key, config]) => {
@@ -361,15 +326,15 @@ export default function LoreImageGenerator({
                         ? key.includes("Flux 2 Pro")
                           ? "~$0.030"
                           : key.includes("Flux 2 Flex")
-                          ? "~$0.015"
-                          : "varies"
+                            ? "~$0.015"
+                            : "varies"
                         : `~$${(config.inputPrice || 0).toFixed(3)}`;
                       return (
                         <option key={key} value={key}>
                           {key} ({displayCost})
                         </option>
                       );
-                    }
+                    },
                   )}
             </select>
           </div>

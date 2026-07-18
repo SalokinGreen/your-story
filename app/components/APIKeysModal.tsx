@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { DynamicIcon } from "./DynamicIcon";
 import AIConfigTab from "./AIConfigTab";
@@ -16,14 +15,11 @@ interface APIKeysModalProps {
 }
 
 export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
-  const { user } = useAuth();
   const { addNotification } = useNotification();
   const {
     keys,
     isLoaded,
-    useGlobalKeys,
     setKey,
-    setUseGlobalKeys,
     hasKey,
     connectOpenRouter,
     disconnectOpenRouter,
@@ -53,12 +49,12 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
       setTtsAutoGenerate(localStorage.getItem("ttsAutoGenerate") === "true");
       setTtsVoice(localStorage.getItem("ttsLastVoice") || "af_heart");
       setTtsModel(
-        (localStorage.getItem("ttsModel") as "kokoro" | "orpheus") || "kokoro"
+        (localStorage.getItem("ttsModel") as "kokoro" | "orpheus") || "kokoro",
       );
       setTtsVolume(parseFloat(localStorage.getItem("ttsVolume") || "1.0"));
       setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
       setShowHiddenMessages(
-        localStorage.getItem("showHiddenMessages") === "true"
+        localStorage.getItem("showHiddenMessages") === "true",
       );
       setDefaultUserNotes(localStorage.getItem("defaultUserNotes") || "");
       try {
@@ -201,49 +197,6 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <AIConfigTab />
           ) : activeTab === "llm" ? (
             <>
-              {/* Sync Toggle - Prominent at top */}
-              {user && (
-                <div className="flex items-center justify-between p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700/50 -mt-2 mb-4">
-                  <div className="flex items-center gap-2">
-                    <DynamicIcon
-                      name="Cloud"
-                      className="w-4 h-4 text-blue-600 dark:text-blue-400"
-                    />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900 dark:text-white">
-                        Sync across devices
-                      </p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">
-                        Keys are encrypted and stored securely
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {useGlobalKeys && (
-                      <button
-                        onClick={async () => {
-                          await setUseGlobalKeys(true);
-                          addNotification("Keys synced to cloud", "success");
-                        }}
-                        className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors"
-                        title="Force sync all keys to cloud"
-                      >
-                        Sync Now
-                      </button>
-                    )}
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={useGlobalKeys}
-                        onChange={(e) => setUseGlobalKeys(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
-                    </label>
-                  </div>
-                </div>
-              )}
-
               {/* Compact API Keys Grid */}
               <div className="space-y-3">
                 {/* OpenRouter */}
@@ -400,6 +353,82 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     />
                   </div>
                 </div>
+
+                {/* Mistral */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-orange-500 to-red-600 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">M</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        Mistral
+                      </span>
+                      {hasKey("mistralKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
+                      <a
+                        href="https://console.mistral.ai/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline ml-auto"
+                      >
+                        Get key →
+                      </a>
+                    </div>
+                    <input
+                      type={showKeys ? "text" : "password"}
+                      value={keys.mistralKey}
+                      onChange={(e) => setKey("mistralKey", e.target.value)}
+                      placeholder="..."
+                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                    />
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Used for Mistral models, OCR, and speech-to-text.
+                    </p>
+                  </div>
+                </div>
+
+                {/* DeepInfra */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-indigo-500 to-purple-600 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">DI</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        DeepInfra
+                      </span>
+                      {hasKey("deepinfraKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
+                      <a
+                        href="https://deepinfra.com/dash/api_keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline ml-auto"
+                      >
+                        Get key →
+                      </a>
+                    </div>
+                    <input
+                      type={showKeys ? "text" : "password"}
+                      value={keys.deepinfraKey}
+                      onChange={(e) => setKey("deepinfraKey", e.target.value)}
+                      placeholder="..."
+                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                    />
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Used for text-to-speech and image generation.
+                    </p>
+                  </div>
+                </div>
               </div>
 
               {/* Show/Hide Keys & Privacy Info */}
@@ -465,11 +494,11 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                         setTtsEnabled(e.target.checked);
                         localStorage.setItem(
                           "ttsEnabled",
-                          e.target.checked.toString()
+                          e.target.checked.toString(),
                         );
                         addNotification(
                           e.target.checked ? "TTS Enabled" : "TTS Disabled",
-                          "success"
+                          "success",
                         );
                       }}
                       className="sr-only peer"
@@ -496,13 +525,13 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                         setTtsAutoGenerate(e.target.checked);
                         localStorage.setItem(
                           "ttsAutoGenerate",
-                          e.target.checked.toString()
+                          e.target.checked.toString(),
                         );
                         addNotification(
                           e.target.checked
                             ? "Auto-generate enabled"
                             : "Auto-generate disabled",
-                          "success"
+                          "success",
                         );
                       }}
                       className="sr-only peer"
@@ -533,7 +562,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                             ? "Orpheus (Premium)"
                             : "Kokoro (Fast)"
                         }`,
-                        "success"
+                        "success",
                       );
                     }}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -561,7 +590,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                         `Voice changed to ${
                           e.target.options[e.target.selectedIndex].text
                         }`,
-                        "success"
+                        "success",
                       );
                     }}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -666,13 +695,13 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                         setSttEnabled(e.target.checked);
                         localStorage.setItem(
                           "sttEnabled",
-                          e.target.checked.toString()
+                          e.target.checked.toString(),
                         );
                         addNotification(
                           e.target.checked
                             ? "Speech input enabled"
                             : "Speech input disabled",
-                          "success"
+                          "success",
                         );
                         // Force re-render for story page
                         window.dispatchEvent(new Event("storage"));
@@ -747,13 +776,13 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                         setShowHiddenMessages(e.target.checked);
                         localStorage.setItem(
                           "showHiddenMessages",
-                          e.target.checked.toString()
+                          e.target.checked.toString(),
                         );
                         addNotification(
                           e.target.checked
                             ? "Hidden messages visible"
                             : "Hidden messages hidden",
-                          "success"
+                          "success",
                         );
                         // Force re-render for story page
                         window.dispatchEvent(new Event("storage"));

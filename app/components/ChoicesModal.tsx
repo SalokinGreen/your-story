@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Choice, Choices, StoryData, ActionAnalysis } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
-import { useAuth } from "@/app/misc/AuthContext";
+import { getLocalPlayerId } from "@/app/misc/localPlayerId";
 import {
   findStatMatch,
   findResourceMatch,
@@ -21,7 +21,7 @@ interface ChoicesModalProps {
   onConfirm: (playerComment?: string) => void;
   onCustomInput?: (text: string, playerComment?: string) => void;
   onActionSubmit?: (
-    text: string
+    text: string,
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
   onActionConfirm?: (choice: Choice, playerComment?: string) => void;
   onCommentSubmit?: (comment: string) => void;
@@ -57,7 +57,7 @@ export default function ChoicesModal({
   actionMode = false,
   onActionModeChange,
 }: ChoicesModalProps) {
-  const { user } = useAuth();
+  const localPlayerId = getLocalPlayerId();
 
   // Action mode state
   const [actionText, setActionText] = useState("");
@@ -80,7 +80,7 @@ export default function ChoicesModal({
   const [timerNow, setTimerNow] = useState<number>(() => Date.now());
 
   const isHostUser =
-    !!user?.id && !!multiplayerHostUserId.trim() && user.id === multiplayerHostUserId;
+    !!multiplayerHostUserId.trim() && localPlayerId === multiplayerHostUserId;
 
   const canManageTurn = (() => {
     if (!multiplayerEnabled) return true;
@@ -135,16 +135,11 @@ export default function ChoicesModal({
     if (!isOpen) return;
     if (!multiplayerEnabled) return;
 
-    const defaultName =
-      user?.user_metadata?.display_name ||
-      storyData.displayName ||
-      storyData.player_name ||
-      "";
+    const defaultName = storyData.displayName || storyData.player_name || "";
     setMultiplayerName((prev) => prev || defaultName);
   }, [
     isOpen,
     multiplayerEnabled,
-    user?.user_metadata?.display_name,
     storyData.displayName,
     storyData.player_name,
   ]);
@@ -217,7 +212,7 @@ export default function ChoicesModal({
 
   const handleActionAnalyze = async (
     overrideText?: string,
-    isStt?: boolean
+    isStt?: boolean,
   ) => {
     const text = (overrideText ?? actionText).trim();
 
@@ -309,7 +304,7 @@ export default function ChoicesModal({
     setPendingMultiplayer((prev) => {
       // Replace existing action from same player (latest wins)
       const next = prev.filter(
-        (p) => p.name.toLowerCase() !== name.toLowerCase()
+        (p) => p.name.toLowerCase() !== name.toLowerCase(),
       );
       next.push({ name, action: normalizedAction });
       return next;
@@ -324,7 +319,7 @@ export default function ChoicesModal({
     if (!name) return;
     setPendingMultiplayer((prev) => {
       const next = prev.filter(
-        (p) => p.name.toLowerCase() !== name.toLowerCase()
+        (p) => p.name.toLowerCase() !== name.toLowerCase(),
       );
       next.push({ name, action: "continue" });
       return next;
@@ -368,9 +363,8 @@ export default function ChoicesModal({
     if (loading) return;
     if (!canManageTurn) return;
 
-    const durationMs = Math.max(1, Math.floor(multiplayerTimerMinutes || 2)) *
-      60 *
-      1000;
+    const durationMs =
+      Math.max(1, Math.floor(multiplayerTimerMinutes || 2)) * 60 * 1000;
     const elapsed = timerNow - multiplayerTimerStart;
     if (elapsed < durationMs) return;
 
@@ -407,7 +401,7 @@ export default function ChoicesModal({
               <span className="text-gray-400 ml-1">(+{skill.value})</span>
             )}
           </span>
-        </div>
+        </div>,
       );
     }
 
@@ -415,7 +409,7 @@ export default function ChoicesModal({
     if (choice.resource_used) {
       const matchResult = findResourceMatch(
         choice.resource_used,
-        storyData.resources
+        storyData.resources,
       );
       const resource = matchResult?.item;
       details.push(
@@ -429,7 +423,7 @@ export default function ChoicesModal({
               </span>
             )}
           </span>
-        </div>
+        </div>,
       );
     }
 
@@ -448,7 +442,7 @@ export default function ChoicesModal({
               </span>
             )}
           </span>
-        </div>
+        </div>,
       );
     }
 
@@ -458,7 +452,7 @@ export default function ChoicesModal({
         <div key="mythic" className="flex items-center gap-2 text-purple-400">
           <DynamicIcon name="Sparkles" className="w-4 h-4" />
           <span className="text-sm">Fate Check</span>
-        </div>
+        </div>,
       );
     }
 
@@ -470,7 +464,7 @@ export default function ChoicesModal({
         <div key="table" className="flex items-center gap-2 text-indigo-400">
           <DynamicIcon name="Dices" className="w-4 h-4" />
           <span className="text-sm">Table: {tableToShow}</span>
-        </div>
+        </div>,
       );
     }
 
@@ -643,9 +637,7 @@ export default function ChoicesModal({
                       <input
                         value={multiplayerName}
                         onChange={(e) => setMultiplayerName(e.target.value)}
-                        placeholder={
-                          user?.user_metadata?.display_name || "Your name"
-                        }
+                        placeholder={storyData.player_name || "Your name"}
                         className="w-full px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                       />
                     </div>
@@ -655,29 +647,33 @@ export default function ChoicesModal({
                       </label>
                       <div className="px-3 py-2 bg-blue-950/30 border border-blue-800/20 rounded-lg text-xs text-blue-200/60">
                         {pendingMultiplayer.length} queued
-                        {multiplayerMode === "timer" && multiplayerTimerStart && (
-                          <div className="mt-1 text-[11px] text-blue-200/50">
-                            {(() => {
-                              const durationMs =
-                                Math.max(
-                                  1,
-                                  Math.floor(multiplayerTimerMinutes || 2)
-                                ) *
-                                60 *
-                                1000;
-                              const remainingMs = Math.max(
-                                0,
-                                durationMs - (timerNow - multiplayerTimerStart)
-                              );
-                              const remainingSec = Math.ceil(remainingMs / 1000);
-                              const m = Math.floor(remainingSec / 60);
-                              const s = remainingSec % 60;
-                              return `Auto-generate in ${m}:${s
-                                .toString()
-                                .padStart(2, "0")}`;
-                            })()}
-                          </div>
-                        )}
+                        {multiplayerMode === "timer" &&
+                          multiplayerTimerStart && (
+                            <div className="mt-1 text-[11px] text-blue-200/50">
+                              {(() => {
+                                const durationMs =
+                                  Math.max(
+                                    1,
+                                    Math.floor(multiplayerTimerMinutes || 2),
+                                  ) *
+                                  60 *
+                                  1000;
+                                const remainingMs = Math.max(
+                                  0,
+                                  durationMs -
+                                    (timerNow - multiplayerTimerStart),
+                                );
+                                const remainingSec = Math.ceil(
+                                  remainingMs / 1000,
+                                );
+                                const m = Math.floor(remainingSec / 60);
+                                const s = remainingSec % 60;
+                                return `Auto-generate in ${m}:${s
+                                  .toString()
+                                  .padStart(2, "0")}`;
+                              })()}
+                            </div>
+                          )}
                       </div>
                     </div>
                   </div>
@@ -706,8 +702,8 @@ export default function ChoicesModal({
                                 prev.filter(
                                   (x) =>
                                     x.name.toLowerCase() !==
-                                    p.name.toLowerCase()
-                                )
+                                    p.name.toLowerCase(),
+                                ),
                               )
                             }
                             className="px-2 py-1 text-xs bg-red-600/70 hover:bg-red-600 text-white rounded"
@@ -1030,8 +1026,8 @@ export default function ChoicesModal({
                       {loading
                         ? "Generating..."
                         : choices.choices.length === 0
-                        ? "Generate Choices"
-                        : "Reroll Choices"}
+                          ? "Generate Choices"
+                          : "Reroll Choices"}
                     </span>
                   </div>
                 </button>
@@ -1068,7 +1064,7 @@ export default function ChoicesModal({
                   <button
                     onClick={() =>
                       onMomentumModeChange(
-                        momentumMode === "advantage" ? "none" : "advantage"
+                        momentumMode === "advantage" ? "none" : "advantage",
                       )
                     }
                     title={
@@ -1093,7 +1089,7 @@ export default function ChoicesModal({
                   <button
                     onClick={() =>
                       onMomentumModeChange(
-                        momentumMode === "guarantee" ? "none" : "guarantee"
+                        momentumMode === "guarantee" ? "none" : "guarantee",
                       )
                     }
                     title={

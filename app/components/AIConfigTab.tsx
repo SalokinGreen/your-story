@@ -1,83 +1,27 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/app/misc/AuthContext";
-import { useAPIKeys } from "@/app/misc/APIKeysContext";
-import { useNotification } from "@/app/misc/NotificationContext";
+import { useAPIKeys, APIKeys } from "@/app/misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
-import {
-  AI_MODELS,
-  MODEL_PRESETS,
-  getPresetEstimatedCost,
-  getCustomEstimatedCost,
-  getStoryStageCost,
-  getModelConfig,
-} from "@/app/misc/ai_prices";
-import {
-  getUserSettings,
-  updateUserSettings,
-  CustomModel,
-  AIConfig,
-} from "@/app/misc/user_settings";
-import { supabase } from "@/app/misc/supabase";
+import { AI_MODELS } from "@/app/misc/ai_prices";
+import { REASONING_TIERS, NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
+import { getUserSettings, updateUserSettings, AIConfig } from "@/app/misc/user_settings";
+import { logger, LogEntry } from "@/app/misc/logger";
 import SamplingSettingsTab from "./SamplingSettingsTab";
 
+// Maps an AI_MODELS provider string to the APIKeys field that must be
+// configured for that provider - used to flag tiers with a missing key.
+const PROVIDER_KEY_FIELD: Record<string, keyof APIKeys | undefined> = {
+  openrouter: "openRouterKey",
+  deepseek: "deepseekKey",
+  google: "googleKey",
+  mistral: "mistralKey",
+  deepinfra: "deepinfraKey",
+  novelai: "novelaiKey",
+};
+
 export default function AIConfigTab() {
-  const { user } = useAuth();
-  const { keys, hasKey } = useAPIKeys();
-  const { addNotification } = useNotification();
-
-  // BYOK Mode toggle - true = use own keys, false = use coins
-  const [byokMode, setByokMode] = useState(() => {
-    if (typeof window !== "undefined") {
-      // Default to BYOK if user has any keys configured
-      const stored = localStorage.getItem("byokMode");
-      if (stored !== null) return stored === "true";
-      return true; // Default to BYOK for now
-    }
-    return true;
-  });
-
-  const [currentPreset, setCurrentPreset] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("aiPreset") || "custom";
-    }
-    return "custom";
-  });
-
-  // Model configuration - direct model selection (no presets)
-  const [storyModel, setStoryModel] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("aiModelStory") || "Mistral Small 3.2";
-    }
-    return "Mistral Small 3.2";
-  });
-  const [toolsModel, setToolsModel] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("aiModelTools") || "Mistral Small 3.2";
-    }
-    return "Mistral Small 3.2";
-  });
-  const [choicesModel, setChoicesModel] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("aiModelChoices") || "";
-    }
-    return "";
-  });
-
-  // Advanced toggle states
-  const [advancedTools, setAdvancedTools] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("advancedTools") === "true";
-    }
-    return false;
-  });
-  const [advancedChoices, setAdvancedChoices] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("advancedChoices") === "true";
-    }
-    return false;
-  });
+  const { hasKey } = useAPIKeys();
 
   // Generation settings
   const toolCallingEnabled = true;
@@ -123,14 +67,6 @@ export default function AIConfigTab() {
     }
     return 8000;
   });
-  // Story stage context size (separate from GM stage Memory Size)
-  const [storyContextSize, setStoryContextSize] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("storyContextSize");
-      return stored ? parseInt(stored, 10) : 16000; // Default 16K
-    }
-    return 16000;
-  });
   // Track if user is in custom input mode (separate from the value)
   const [isCustomContextMode, setIsCustomContextMode] = useState(() => {
     if (typeof window !== "undefined") {
@@ -156,21 +92,6 @@ export default function AIConfigTab() {
     }
     return false;
   });
-  const [isCustomStoryContextMode, setIsCustomStoryContextMode] = useState(
-    () => {
-      if (typeof window !== "undefined") {
-        const stored = localStorage.getItem("storyContextSize");
-        return (
-          stored === "-1" ||
-          (stored !== null &&
-            ![8000, 16000, 36000, 72000, 120000, 200000].includes(
-              parseInt(stored, 10)
-            ))
-        );
-      }
-      return false;
-    }
-  );
   // Temporary input values for custom fields - initialize from stored values if in custom mode
   const [customContextInput, setCustomContextInput] = useState(() => {
     if (typeof window !== "undefined") {
@@ -197,20 +118,6 @@ export default function AIConfigTab() {
     }
     return "";
   });
-  const [customStoryContextInput, setCustomStoryContextInput] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("storyContextSize");
-      const storedVal = stored ? parseInt(stored, 10) : 0;
-      // If stored value is not a preset, show it in custom input
-      if (
-        stored &&
-        ![8000, 16000, 36000, 72000, 120000, 200000].includes(storedVal)
-      ) {
-        return stored;
-      }
-    }
-    return "";
-  });
 
   // NovelAI settings
   const [novelaiEnabled, setNovelaiEnabled] = useState(() => {
@@ -227,20 +134,7 @@ export default function AIConfigTab() {
     return 1;
   });
 
-  // Custom Models State
-  const [customModels, setCustomModels] = useState<CustomModel[]>([]);
-  const [showCustomModels, setShowCustomModels] = useState(false);
-  const [showModelConfig, setShowModelConfig] = useState(false);
-  const [editingModelId, setEditingModelId] = useState<string | null>(null);
-  const [newModelId, setNewModelId] = useState("");
-  const [newModelName, setNewModelName] = useState("");
-  const [newContextSize, setNewContextSize] = useState(4096);
-  const [newMaxOutput, setNewMaxOutput] = useState(1000);
-  const [newInputPrice, setNewInputPrice] = useState(0);
-  const [newOutputPrice, setNewOutputPrice] = useState(0);
-
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [hasLoadedSettings, setHasLoadedSettings] = useState(() => {
     // Check if we've already loaded settings this session
     if (typeof window !== "undefined") {
@@ -249,73 +143,60 @@ export default function AIConfigTab() {
     return false;
   });
 
-  // Load settings from Supabase (custom models + AI config) - only once per session
+  // Recent reasoning-tier calls, for cost-tuning visibility (replaces the old
+  // per-model coin-cost estimate UI). Sourced from the existing session log
+  // (app/misc/logger.ts) - generation.ts logs a tier resolution on every GM
+  // stage round and dispatch.
+  const [recentTierLogs, setRecentTierLogs] = useState<LogEntry[]>([]);
   useEffect(() => {
-    if (user && !hasLoadedSettings) {
+    if (typeof window === "undefined") return;
+    const refresh = () => {
+      const logs = logger.getLogs();
+      const tierLogs = logs
+        .filter(
+          (l) =>
+            l.message === "Reasoning tier resolved for GM stage" ||
+            l.message.startsWith("GM stage round") ||
+            l.message.startsWith("GM stage model unavailable")
+        )
+        .slice(-8)
+        .reverse();
+      setRecentTierLogs(tierLogs);
+    };
+    refresh();
+    window.addEventListener("story-log-update", refresh);
+    return () => window.removeEventListener("story-log-update", refresh);
+  }, []);
+
+  // Load settings from local storage (AI config) - only once per session
+  useEffect(() => {
+    if (!hasLoadedSettings) {
       setIsLoadingSettings(true);
-      getUserSettings(user.id, supabase)
+      getUserSettings()
         .then((settings) => {
-          if (settings) {
-            setCustomModels(settings.custom_models || []);
-            // Cache custom models to localStorage for use in other components
-            if (settings.custom_models?.length) {
+          if (settings?.ai_config) {
+            const config = settings.ai_config;
+
+            // Only apply cloud settings if localStorage is empty for that key
+            if (
+              config.customMaxContext !== undefined &&
+              !localStorage.getItem("customMaxContext")
+            ) {
+              setCustomMaxContext(config.customMaxContext);
               localStorage.setItem(
-                "customModels",
-                JSON.stringify(settings.custom_models)
+                "customMaxContext",
+                config.customMaxContext.toString()
               );
             }
-
-            // Load AI config from cloud ONLY if localStorage doesn't have values
-            // This prevents cloud from overwriting user's recent selections
-            if (settings.ai_config) {
-              const config = settings.ai_config;
-
-              // Only apply cloud settings if localStorage is empty for that key
-              if (config.currentPreset && !localStorage.getItem("aiPreset")) {
-                setCurrentPreset(config.currentPreset);
-                localStorage.setItem("aiPreset", config.currentPreset);
-              }
-              if (
-                config.storyModel !== undefined &&
-                !localStorage.getItem("aiModelStory")
-              ) {
-                setStoryModel(config.storyModel);
-                localStorage.setItem("aiModelStory", config.storyModel);
-              }
-              if (
-                config.toolsModel !== undefined &&
-                !localStorage.getItem("aiModelTools")
-              ) {
-                setToolsModel(config.toolsModel);
-                localStorage.setItem("aiModelTools", config.toolsModel);
-              }
-              if (
-                config.choicesModel !== undefined &&
-                !localStorage.getItem("aiModelChoices")
-              ) {
-                setChoicesModel(config.choicesModel);
-                localStorage.setItem("aiModelChoices", config.choicesModel);
-              }
-              if (
-                config.customMaxContext !== undefined &&
-                !localStorage.getItem("customMaxContext")
-              ) {
-                setCustomMaxContext(config.customMaxContext);
-                localStorage.setItem(
-                  "customMaxContext",
-                  config.customMaxContext.toString()
-                );
-              }
-              if (
-                config.customMaxOutput !== undefined &&
-                !localStorage.getItem("customMaxOutput")
-              ) {
-                setCustomMaxOutput(config.customMaxOutput);
-                localStorage.setItem(
-                  "customMaxOutput",
-                  config.customMaxOutput.toString()
-                );
-              }
+            if (
+              config.customMaxOutput !== undefined &&
+              !localStorage.getItem("customMaxOutput")
+            ) {
+              setCustomMaxOutput(config.customMaxOutput);
+              localStorage.setItem(
+                "customMaxOutput",
+                config.customMaxOutput.toString()
+              );
             }
           }
           setHasLoadedSettings(true);
@@ -326,38 +207,7 @@ export default function AIConfigTab() {
         })
         .finally(() => setIsLoadingSettings(false));
     }
-  }, [user, hasLoadedSettings]);
-
-  // Persist stage model selections to localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined" && hasLoadedSettings) {
-      localStorage.setItem("aiModelStory", storyModel);
-    }
-  }, [storyModel, hasLoadedSettings]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && hasLoadedSettings) {
-      localStorage.setItem("aiModelTools", toolsModel);
-    }
-  }, [toolsModel, hasLoadedSettings]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && hasLoadedSettings) {
-      localStorage.setItem("aiModelChoices", choicesModel);
-    }
-  }, [choicesModel, hasLoadedSettings]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("advancedTools", advancedTools.toString());
-    }
-  }, [advancedTools]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("advancedChoices", advancedChoices.toString());
-    }
-  }, [advancedChoices]);
+  }, [hasLoadedSettings]);
 
   // Persist NovelAI settings
   useEffect(() => {
@@ -372,308 +222,40 @@ export default function AIConfigTab() {
     }
   }, [novelaiTemperature]);
 
-  // Persist BYOK mode
+  // Auto-save context settings (after initial load)
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("byokMode", byokMode.toString());
-    }
-  }, [byokMode]);
-
-  // Auto-save context settings to cloud when they change (after initial load)
-  useEffect(() => {
-    if (typeof window !== "undefined" && hasLoadedSettings && user) {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("customMaxContext", customMaxContext.toString());
-      // Debounced cloud sync - only save if user is logged in
       const timeoutId = setTimeout(() => {
         const aiConfig: AIConfig = {
-          currentPreset,
-          storyModel: storyModel || undefined,
-          toolsModel: toolsModel || undefined,
-          choicesModel: choicesModel || undefined,
+          currentPreset: "auto", // reasoning-tier router manages model selection now
           customMaxContext:
             customMaxContext !== 36000 ? customMaxContext : undefined,
           customMaxOutput:
             customMaxOutput !== 8000 ? customMaxOutput : undefined,
         };
-        updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
+        updateUserSettings({ ai_config: aiConfig });
       }, 1000); // Debounce 1 second
       return () => clearTimeout(timeoutId);
     }
-  }, [customMaxContext, hasLoadedSettings, user]);
+  }, [customMaxContext, hasLoadedSettings]);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && hasLoadedSettings && user) {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("customMaxOutput", customMaxOutput.toString());
-      // Debounced cloud sync - only save if user is logged in
       const timeoutId = setTimeout(() => {
         const aiConfig: AIConfig = {
-          currentPreset,
-          storyModel: storyModel || undefined,
-          toolsModel: toolsModel || undefined,
-          choicesModel: choicesModel || undefined,
+          currentPreset: "auto",
           customMaxContext:
             customMaxContext !== 36000 ? customMaxContext : undefined,
           customMaxOutput:
             customMaxOutput !== 8000 ? customMaxOutput : undefined,
         };
-        updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
+        updateUserSettings({ ai_config: aiConfig });
       }, 1000); // Debounce 1 second
       return () => clearTimeout(timeoutId);
     }
-  }, [customMaxOutput, hasLoadedSettings, user]);
-
-  // Check if user has any AI keys configured
-  const hasAnyAIKey = hasKey("openRouterKey") || hasKey("deepseekKey");
-
-  // Get current preset configuration (for cost estimation only)
-  const preset = MODEL_PRESETS[currentPreset] || MODEL_PRESETS["mistralLarge"];
-
-  // Direct model selection - no preset fallback
-  const effectiveStoryModel = storyModel || preset.storyModel;
-  const effectiveToolsModel = toolsModel || preset.toolsModel;
-
-  // Apply advanced choices toggle - CHOICES NOW USES STORY MODEL
-  // Choices stage uses the same model as Story stage for consistency
-  const effectiveChoicesModel = effectiveStoryModel;
-
-  const effectiveStoryModelConfig = getModelConfig(effectiveStoryModel);
-  const bannerTitle =
-    novelaiEnabled && hasKey("novelaiKey")
-      ? "NovelAI GLM-4-6"
-      : effectiveStoryModelConfig.name;
-  const bannerDescription =
-    novelaiEnabled && hasKey("novelaiKey")
-      ? "NovelAI GLM-4-6 for story stage (BYOK)"
-      : effectiveStoryModelConfig.description || preset.description;
-
-  // Helper to get display name for a model key (handles both built-in and custom models)
-  const getModelDisplayName = (modelKey: string): string => {
-    // Check if it's a built-in model
-    if (modelKey in AI_MODELS) {
-      return AI_MODELS[modelKey as keyof typeof AI_MODELS].name;
-    }
-    // Check if it's a custom model (by UUID)
-    const customModel = customModels.find((m) => m.id === modelKey);
-    if (customModel) {
-      return customModel.name;
-    }
-    // Fallback to the key itself
-    return modelKey;
-  };
-
-  const effectiveContextSize =
-    customMaxContext > 0 ? customMaxContext : undefined;
-
-  // Calculate dynamic estimated cost - always use effective models to account for advanced toggles
-  const baseEstimatedCost = getCustomEstimatedCost(
-    effectiveStoryModel,
-    effectiveToolsModel,
-    effectiveChoicesModel,
-    effectiveContextSize
-  );
-
-  const contextForSavings = effectiveContextSize || 120000;
-  const novelaiSavings =
-    novelaiEnabled && hasKey("novelaiKey")
-      ? getStoryStageCost(effectiveStoryModel, contextForSavings)
-      : 0;
-
-  const estimatedCost = Math.max(0, baseEstimatedCost - novelaiSavings);
-
-  // Auto-sync AI config to cloud when preset changes
-  const syncAIConfig = async (presetToSync?: string) => {
-    if (!user) return;
-
-    const aiConfig: AIConfig = {
-      currentPreset: presetToSync || currentPreset,
-      storyModel: storyModel || undefined,
-      toolsModel: toolsModel || undefined,
-      choicesModel: choicesModel || undefined,
-      customMaxContext:
-        customMaxContext !== 36000 ? customMaxContext : undefined,
-      customMaxOutput: customMaxOutput !== 8000 ? customMaxOutput : undefined,
-    };
-
-    // Fire and forget - don't block UI
-    updateUserSettings(user.id, { ai_config: aiConfig }, supabase).catch(
-      (err) => console.error("Failed to sync AI config:", err)
-    );
-  };
-
-  // Auto-sync custom model selections to cloud when they change
-  // This effect runs AFTER initial cloud load (hasLoadedSettings) and only for custom preset
-  useEffect(() => {
-    if (hasLoadedSettings && user && currentPreset === "custom") {
-      // Debounce the sync to avoid too many requests
-      const timeoutId = setTimeout(() => {
-        syncAIConfig();
-      }, 500);
-      return () => clearTimeout(timeoutId);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    storyModel,
-    toolsModel,
-    choicesModel,
-    hasLoadedSettings,
-    currentPreset,
-    user,
-  ]);
-
-  const handlePresetChange = (newPreset: string) => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("aiPreset", newPreset);
-      setCurrentPreset(newPreset);
-      addNotification(
-        `Preset changed to ${MODEL_PRESETS[newPreset].name}`,
-        "success"
-      );
-      // Auto-sync to cloud
-      syncAIConfig(newPreset);
-    }
-  };
-
-  const handleAddModel = () => {
-    if (!newModelId || !newModelName) {
-      addNotification("Please fill in model ID and name", "warning");
-      return;
-    }
-
-    const newModel: CustomModel = {
-      id: crypto.randomUUID(),
-      modelId: newModelId,
-      name: newModelName,
-      contextSize: newContextSize,
-      maxOutputTokens: newMaxOutput,
-      inputPrice: newInputPrice,
-      outputPrice: newOutputPrice,
-    };
-
-    const updatedModels = [...customModels, newModel];
-    setCustomModels(updatedModels);
-    // Update localStorage cache
-    localStorage.setItem("customModels", JSON.stringify(updatedModels));
-    setNewModelId("");
-    setNewModelName("");
-    setNewContextSize(4096);
-    setNewMaxOutput(1000);
-    setNewInputPrice(0);
-    setNewOutputPrice(0);
-    addNotification(
-      "Model added! Click Sync to save to your account.",
-      "success"
-    );
-  };
-
-  const handleDeleteModel = (id: string) => {
-    const updatedModels = customModels.filter((m) => m.id !== id);
-    setCustomModels(updatedModels);
-    // Update localStorage cache
-    localStorage.setItem("customModels", JSON.stringify(updatedModels));
-    addNotification(
-      "Model removed! Click Sync to save to your account.",
-      "warning"
-    );
-  };
-
-  const handleEditModel = (model: CustomModel) => {
-    setEditingModelId(model.id);
-    setNewModelId(model.modelId);
-    setNewModelName(model.name);
-    setNewContextSize(model.contextSize);
-    setNewMaxOutput(model.maxOutputTokens);
-    setNewInputPrice(model.inputPrice || 0);
-    setNewOutputPrice(model.outputPrice || 0);
-  };
-
-  const handleUpdateModel = () => {
-    if (!editingModelId || !newModelId || !newModelName) {
-      addNotification("Please fill in model ID and name", "warning");
-      return;
-    }
-
-    const updatedModels = customModels.map((m) =>
-      m.id === editingModelId
-        ? {
-            ...m,
-            modelId: newModelId,
-            name: newModelName,
-            contextSize: newContextSize,
-            maxOutputTokens: newMaxOutput,
-            inputPrice: newInputPrice,
-            outputPrice: newOutputPrice,
-          }
-        : m
-    );
-
-    setCustomModels(updatedModels);
-    // Update localStorage cache
-    localStorage.setItem("customModels", JSON.stringify(updatedModels));
-    setEditingModelId(null);
-    setNewModelId("");
-    setNewModelName("");
-    setNewContextSize(4096);
-    setNewMaxOutput(1000);
-    setNewInputPrice(0);
-    setNewOutputPrice(0);
-    addNotification(
-      "Model updated! Click Sync to save to your account.",
-      "success"
-    );
-  };
-
-  const handleCancelEdit = () => {
-    setEditingModelId(null);
-    setNewModelId("");
-    setNewModelName("");
-    setNewContextSize(4096);
-    setNewMaxOutput(1000);
-    setNewInputPrice(0);
-    setNewOutputPrice(0);
-  };
-
-  const handleSaveSettings = async () => {
-    if (!user) return;
-    setIsSaving(true);
-
-    // Build AI config object
-    const aiConfig: AIConfig = {
-      currentPreset,
-      storyModel: storyModel || undefined,
-      toolsModel: toolsModel || undefined,
-      choicesModel: choicesModel || undefined,
-      customMaxContext:
-        customMaxContext !== 36000 ? customMaxContext : undefined,
-      customMaxOutput: customMaxOutput !== 8000 ? customMaxOutput : undefined,
-    };
-
-    const { error } = await updateUserSettings(
-      user.id,
-      { custom_models: customModels, ai_config: aiConfig },
-      supabase
-    );
-
-    setIsSaving(false);
-
-    if (error) {
-      addNotification("Failed to save settings", "failure");
-    } else {
-      addNotification("AI presets synced to your account!", "success");
-    }
-  };
-
-  // Build available models list including custom models
-  const availableModels: Record<string, any> = { ...AI_MODELS };
-  customModels.forEach((model) => {
-    availableModels[model.id] = {
-      name: model.name,
-      original_model: model.modelId,
-      cost: 0,
-      maxTokens: model.contextSize,
-      inputPrice: model.inputPrice || 0,
-      outputPrice: model.outputPrice || 0,
-    };
-  });
+  }, [customMaxOutput, hasLoadedSettings]);
 
   if (isLoadingSettings) {
     return (
@@ -686,247 +268,102 @@ export default function AIConfigTab() {
     );
   }
 
+  const narrationModelConfig = AI_MODELS[NARRATION_MODEL_KEY];
+
   return (
     <div className="space-y-6">
-      {/* BYOK Mode Toggle */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div
-              className={`p-2 rounded-lg ${
-                byokMode
-                  ? "bg-green-100 dark:bg-green-900/30"
-                  : "bg-amber-100 dark:bg-amber-900/30"
-              }`}
-            >
-              <DynamicIcon
-                name={byokMode ? "Key" : "Coins"}
-                className={`w-5 h-5 ${
-                  byokMode
-                    ? "text-green-600 dark:text-green-400"
-                    : "text-amber-600 dark:text-amber-400"
-                }`}
-              />
-            </div>
-            <div>
-              <h3 className="text-sm font-medium text-gray-900 dark:text-white">
-                {byokMode ? "Bring Your Own Key" : "Use Coins"}
-              </h3>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
-                {byokMode
-                  ? "Using your own API keys - free generation"
-                  : "Using our API - costs coins per generation"}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={`text-xs font-medium ${
-                !byokMode
-                  ? "text-amber-600 dark:text-amber-400"
-                  : "text-gray-400"
-              }`}
-            >
-              Coins
-            </span>
-            <label className="relative inline-flex items-center cursor-pointer">
-              <input
-                type="checkbox"
-                checked={byokMode}
-                onChange={(e) => {
-                  const newValue = e.target.checked;
-                  setByokMode(newValue);
-                  if (!newValue) {
-                    // Switching to Coins mode - set default Coins model
-                    const defaultCoinsModel = "Mistral Large 3.0";
-                    setStoryModel(defaultCoinsModel);
-                    setToolsModel(defaultCoinsModel);
-                    localStorage.setItem("aiModelStory", defaultCoinsModel);
-                    localStorage.setItem("aiModelTools", defaultCoinsModel);
-                    addNotification(
-                      "Switched to Coins mode with Mistral Large 3.0",
-                      "success"
-                    );
-                  } else {
-                    // Switching to BYOK mode - keep current model selection
-                    addNotification(
-                      "Switched to BYOK mode - use your own API keys",
-                      "success"
-                    );
-                  }
-                }}
-                className="sr-only peer"
-              />
-              <div className="w-11 h-6 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600" />
-            </label>
-            <span
-              className={`text-xs font-medium ${
-                byokMode
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-gray-400"
-              }`}
-            >
-              BYOK
-            </span>
-          </div>
+      {/* Narration Voice Banner */}
+      <div className="bg-linear-to-r from-purple-600 to-blue-600 rounded-lg p-4 text-white">
+        <div className="text-xl font-bold flex items-center gap-2">
+          {narrationModelConfig.name}
+          <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+            Narration Voice
+          </span>
         </div>
-
-        {/* Warning if no keys configured in BYOK mode */}
-        {byokMode && !hasAnyAIKey && (
-          <div className="mt-3 p-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-            <p className="text-xs text-amber-700 dark:text-amber-300 flex items-center gap-1.5">
-              <DynamicIcon name="AlertTriangle" className="w-3.5 h-3.5" />
-              No API keys configured. Add your OpenRouter or DeepSeek key in the
-              API Keys tab.
-            </p>
-          </div>
-        )}
-
-        {/* Info about Coins mode */}
-        {!byokMode && (
-          <div className="mt-3 p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-            <p className="text-xs text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
-              <DynamicIcon name="Coins" className="w-3.5 h-3.5" />
-              Using Mistral models. Each generation costs coins based on token
-              usage.
-            </p>
-          </div>
-        )}
+        <div className="text-sm text-white/70 mt-1">
+          Always used for player-facing prose, no matter which reasoning tier
+          handles adjudication - this is what keeps the GM&rsquo;s voice
+          consistent even during a boss fight.
+        </div>
       </div>
 
-      {/* Current Preset Banner */}
-      <div
-        className={`${
-          novelaiEnabled && hasKey("novelaiKey")
-            ? "bg-linear-to-r from-green-600 to-teal-600"
-            : byokMode
-            ? "bg-linear-to-r from-purple-600 to-blue-600"
-            : "bg-linear-to-r from-amber-500 to-orange-600"
-        } rounded-lg p-4 text-white`}
-      >
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <div className="text-xl font-bold flex items-center gap-2">
-              {bannerTitle}
-              {byokMode ? (
-                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                  BYOK
-                </span>
-              ) : (
-                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                  💰 Coins
-                </span>
-              )}
-              {novelaiEnabled && hasKey("novelaiKey") && (
-                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
-                  + NovelAI
-                </span>
-              )}
-            </div>
-            <div className="text-sm text-white/70">{bannerDescription}</div>
-          </div>
-          <div className="text-right">
-            {byokMode ? (
-              <>
-                <div className="text-2xl font-bold text-green-200">FREE</div>
-                <div className="text-xs text-white/70">with your keys</div>
-              </>
-            ) : (
-              <>
-                <div className="text-2xl font-bold">~{estimatedCost}</div>
-                <div className="text-xs text-white/70">
-                  coins/gen
-                  {novelaiEnabled &&
-                    hasKey("novelaiKey") &&
-                    novelaiSavings > 0 && (
-                      <span className="text-green-200 ml-1">
-                        (-{novelaiSavings})
+      {/* Reasoning Tier Ladder */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-3">
+        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+          <DynamicIcon name="Brain" className="w-4 h-4" />
+          Reasoning Tiers
+        </h4>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          The GM automatically picks a model per turn based on what&rsquo;s
+          happening - banter runs cheap, combat and boss fights escalate
+          automatically. Tier selection isn&rsquo;t manual anymore.
+        </p>
+        <div className="space-y-2">
+          {REASONING_TIERS.map((tier, index) => {
+            const config = AI_MODELS[tier.modelKey];
+            const keyField = PROVIDER_KEY_FIELD[config.provider];
+            const keyConfigured = keyField ? hasKey(keyField) : true;
+            return (
+              <div
+                key={index}
+                className="flex items-center justify-between p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+              >
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-1.5 py-0.5 rounded">
+                      Tier {index}
+                    </span>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      {config.name}
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                      {config.provider}
+                    </span>
+                    {!keyConfigured && (
+                      <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                        <DynamicIcon name="AlertTriangle" className="w-2.5 h-2.5" />
+                        no key
                       </span>
                     )}
+                  </div>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                    {tier.note}
+                  </p>
                 </div>
-              </>
-            )}
-          </div>
+                <div className="text-right text-xs text-gray-400 shrink-0">
+                  <div>{(config.maxTokens / 1000).toFixed(0)}K context</div>
+                  <div className="capitalize">{tier.reasoningEffort} effort</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
-        <div className="flex flex-col gap-1 text-xs mt-2">
-          <div>
-            <span className="text-white/60">Model:</span>{" "}
-            {novelaiEnabled && hasKey("novelaiKey") ? (
-              <span className="text-green-200">
-                NovelAI GLM-4-6 (BYOK) - 28K context
-              </span>
-            ) : (
-              <>
-                {getModelDisplayName(effectiveStoryModel)}
-                <span className="text-white/40 ml-1">
-                  -{" "}
-                  {Math.round(
-                    getModelConfig(effectiveStoryModel).maxTokens / 1000
-                  )}
-                  K context
-                </span>
-              </>
-            )}
-          </div>
-        </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Tiers with &ldquo;no key&rdquo; will automatically fall back to the
+          next-lower tier until one has a configured key. Add provider keys
+          in the API Keys tab.
+        </p>
       </div>
 
-      {/* Model Selection */}
-      <div className="space-y-4">
-        <div>
-          <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-            AI Model
-          </label>
-          <select
-            value={storyModel}
-            onChange={(e) => {
-              const newModel = e.target.value;
-              setStoryModel(newModel);
-              // Also update GM model to match (merged GM+Story stages)
-              setToolsModel(newModel);
-              if (typeof window !== "undefined") {
-                localStorage.setItem("aiModelStory", newModel);
-                localStorage.setItem("aiModelTools", newModel);
-
-                // Manual model selection means the effective config is now "custom"
-                localStorage.setItem("aiPreset", "custom");
-              }
-
-              setCurrentPreset("custom");
-            }}
-            className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-          >
-            {Object.entries(AI_MODELS)
-              .filter(([, config]) => {
-                const isBYOKProvider =
-                  config.provider === "openrouter" ||
-                  config.provider === "deepseek" ||
-                  config.provider === "novelai" ||
-                  config.provider === "google";
-                return byokMode ? isBYOKProvider : !isBYOKProvider;
-              })
-              .map(([key, config]) => (
-                <option key={key} value={key}>
-                  {config.name} ({config.cost} coin
-                  {config.cost > 1 ? "s" : ""},{" "}
-                  {(config.maxTokens / 1000).toFixed(0)}K)
-                </option>
-              ))}
-            {byokMode && customModels.length > 0 && (
-              <optgroup label="Custom Models">
-                {[...customModels]
-                  .sort((a, b) => a.name.localeCompare(b.name))
-                  .map((model) => (
-                    <option key={model.id} value={model.id}>
-                      {model.name} (FREE,{" "}
-                      {(model.contextSize / 1000).toFixed(0)}K)
-                    </option>
-                  ))}
-              </optgroup>
-            )}
-          </select>
+      {/* Recent Reasoning Tier Calls */}
+      {recentTierLogs.length > 0 && (
+        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-2">
+          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+            <DynamicIcon name="History" className="w-4 h-4" />
+            Recent Tier Calls
+          </h4>
+          <div className="space-y-1 max-h-40 overflow-y-auto">
+            {recentTierLogs.map((log, i) => (
+              <div
+                key={`${log.timestamp}-${i}`}
+                className="text-xs text-gray-500 dark:text-gray-400 font-mono"
+              >
+                {log.data?.describe || log.message}
+              </div>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Memory Size Slider */}
       <div className="space-y-2">
@@ -1114,269 +551,8 @@ export default function AIConfigTab() {
         </p>
       </div>
 
-      {/* Custom Models Management - Only in BYOK mode */}
-      {byokMode && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-          <button
-            onClick={() => setShowCustomModels(!showCustomModels)}
-            className="flex items-center justify-between w-full text-left"
-          >
-            <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-              <DynamicIcon name="Plus" className="w-4 h-4" />
-              Custom Models
-              {customModels.length > 0 && (
-                <span className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 px-2 py-0.5 rounded-full">
-                  {customModels.length}
-                </span>
-              )}
-            </h4>
-            <DynamicIcon
-              name={showCustomModels ? "ChevronUp" : "ChevronDown"}
-              className="w-4 h-4 text-gray-500"
-            />
-          </button>
-
-          {showCustomModels && (
-            <div className="space-y-4 pt-2">
-              {/* Existing Custom Models */}
-              {customModels.length > 0 && (
-                <div className="space-y-2">
-                  {[...customModels]
-                    .sort((a, b) => a.name.localeCompare(b.name))
-                    .map((model) => (
-                      <div
-                        key={model.id}
-                        className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
-                      >
-                        {editingModelId === model.id ? (
-                          <div className="space-y-2">
-                            <input
-                              type="text"
-                              value={newModelId}
-                              onChange={(e) => setNewModelId(e.target.value)}
-                              placeholder="Model ID"
-                              className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                            />
-                            <input
-                              type="text"
-                              value={newModelName}
-                              onChange={(e) => setNewModelName(e.target.value)}
-                              placeholder="Display Name"
-                              className="w-full px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                            />
-                            <div className="grid grid-cols-2 gap-2">
-                              <input
-                                type="number"
-                                value={newContextSize}
-                                onChange={(e) =>
-                                  setNewContextSize(
-                                    parseInt(e.target.value) || 4096
-                                  )
-                                }
-                                placeholder="Context Size"
-                                className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                              />
-                              <input
-                                type="number"
-                                value={newMaxOutput}
-                                onChange={(e) =>
-                                  setNewMaxOutput(
-                                    parseInt(e.target.value) || 1000
-                                  )
-                                }
-                                placeholder="Max Output"
-                                className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                              />
-                            </div>
-                            <div className="grid grid-cols-2 gap-2">
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={newInputPrice}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(",", ".");
-                                  const num = parseFloat(val);
-                                  setNewInputPrice(isNaN(num) ? 0 : num);
-                                }}
-                                placeholder="Input $/M tokens"
-                                className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                              />
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                value={newOutputPrice}
-                                onChange={(e) => {
-                                  const val = e.target.value.replace(",", ".");
-                                  const num = parseFloat(val);
-                                  setNewOutputPrice(isNaN(num) ? 0 : num);
-                                }}
-                                placeholder="Output $/M tokens"
-                                className="px-2 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm"
-                              />
-                            </div>
-                            <div className="flex gap-2">
-                              <button
-                                onClick={handleUpdateModel}
-                                className="flex-1 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-medium"
-                              >
-                                Save
-                              </button>
-                              <button
-                                onClick={handleCancelEdit}
-                                className="flex-1 py-1.5 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded text-xs font-medium"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                {model.name}
-                              </p>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                {model.modelId} • {model.contextSize} tokens
-                              </p>
-                            </div>
-                            <div className="flex gap-1">
-                              <button
-                                onClick={() => handleEditModel(model)}
-                                className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
-                              >
-                                <DynamicIcon
-                                  name="Edit2"
-                                  className="w-3.5 h-3.5"
-                                />
-                              </button>
-                              <button
-                                onClick={() => handleDeleteModel(model.id)}
-                                className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                              >
-                                <DynamicIcon
-                                  name="Trash2"
-                                  className="w-3.5 h-3.5"
-                                />
-                              </button>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                </div>
-              )}
-
-              {/* Add New Model Form */}
-              {!editingModelId && (
-                <div className="space-y-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                  <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
-                    Add New Model
-                  </p>
-                  <input
-                    type="text"
-                    value={newModelId}
-                    onChange={(e) => setNewModelId(e.target.value)}
-                    placeholder="Model ID (e.g., anthropic/claude-3-opus)"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                  />
-                  <input
-                    type="text"
-                    value={newModelName}
-                    onChange={(e) => setNewModelName(e.target.value)}
-                    placeholder="Display Name (e.g., Claude 3 Opus)"
-                    className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                  />
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Context Size
-                      </label>
-                      <input
-                        type="number"
-                        value={newContextSize}
-                        onChange={(e) =>
-                          setNewContextSize(parseInt(e.target.value) || 4096)
-                        }
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Max Output
-                      </label>
-                      <input
-                        type="number"
-                        value={newMaxOutput}
-                        onChange={(e) =>
-                          setNewMaxOutput(parseInt(e.target.value) || 1000)
-                        }
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Input $/M tokens
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={newInputPrice}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(",", ".");
-                          const num = parseFloat(val);
-                          setNewInputPrice(isNaN(num) ? 0 : num);
-                        }}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-500 mb-1">
-                        Output $/M tokens
-                      </label>
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={newOutputPrice}
-                        onChange={(e) => {
-                          const val = e.target.value.replace(",", ".");
-                          const num = parseFloat(val);
-                          setNewOutputPrice(isNaN(num) ? 0 : num);
-                        }}
-                        className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
-                      />
-                    </div>
-                  </div>
-                  <button
-                    onClick={handleAddModel}
-                    className="w-full py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium"
-                  >
-                    Add Model
-                  </button>
-                </div>
-              )}
-
-              {/* Sync Button */}
-              {customModels.length > 0 && (
-                <button
-                  onClick={handleSaveSettings}
-                  disabled={isSaving || !user}
-                  className="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
-                >
-                  {isSaving ? "Saving..." : "Sync Custom Models"}
-                </button>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Sampling Settings - For Coins mode and OpenRouter */}
-      <SamplingSettingsTab
-        byokMode={byokMode}
-        hasOpenRouterKey={hasKey("openRouterKey")}
-      />
+      {/* Sampling Settings - all reasoning tiers are Mistral/DeepInfra (Coins mode) */}
+      <SamplingSettingsTab byokMode={false} hasOpenRouterKey={hasKey("openRouterKey")} />
 
       {/* Tool Calling Settings */}
       <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
@@ -1593,7 +769,7 @@ export default function AIConfigTab() {
 
         <p className="text-xs text-gray-500 dark:text-gray-400">
           Use your NovelAI API key for story generation. Tools and choices will
-          still use OpenRouter/DeepSeek.
+          still use the reasoning-tier router.
         </p>
 
         {novelaiEnabled && (

@@ -2,57 +2,35 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useNotification } from "@/app/misc/NotificationContext";
-import { Adventure } from "@/app/misc/structs";
-import { supabase } from "@/app/misc/supabase";
-import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { IconPicker } from "@/app/components/IconPicker";
-import { isEncrypted } from "@/app/misc/encryption";
-import EncryptionMigration from "@/app/components/EncryptionMigration";
 import { DraggableScroll } from "../components/DraggableScroll";
 import {
   LibrarySkeleton,
-  StoryGridSkeleton,
   AdventureGridSkeleton,
-  FolderSidebarSkeleton,
 } from "@/app/components/Skeleton";
 import {
   listLocalStories,
   LocalStory,
   deleteLocalStory,
+  saveLocalStory,
+  getLocalStory,
+  startAdventureLocally,
 } from "@/app/misc/localStoryManager";
 import {
   listLocalAdventures,
   deleteLocalAdventure,
-  cacheAdventuresFromServer,
   LocalAdventure,
 } from "@/app/misc/localAdventureManager";
-
-interface Story {
-  id: string;
-  adventure_id: string | null;
-  user_id: string;
-  story_name: string;
-  story_data: any;
-  is_completed: boolean;
-  is_public: boolean;
-  created_at: string;
-  updated_at: string;
-  folder_id: string | null;
-}
-
-interface StoryFolder {
-  id: string;
-  user_id: string;
-  name: string;
-  color: string;
-  icon: string;
-  created_at: string;
-  updated_at: string;
-}
+import {
+  listLocalFolders,
+  createLocalFolder,
+  updateLocalFolder,
+  deleteLocalFolder,
+  LocalFolder,
+} from "@/app/misc/localFolderManager";
 
 type LibraryView = "stories" | "adventures";
 type StorySortBy = "updated" | "created" | "name" | "chapter";
@@ -77,20 +55,15 @@ function getRelativeTime(dateString: string): string {
 
 export default function LibraryPage() {
   const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
   const { addNotification } = useNotification();
   const [view, setView] = useState<LibraryView>("stories");
-  const [stories, setStories] = useState<Story[]>([]);
   const [localStories, setLocalStories] = useState<LocalStory[]>([]);
-  const [adventures, setAdventures] = useState<Adventure[]>([]);
   const [localAdventures, setLocalAdventures] = useState<LocalAdventure[]>([]);
-  const [folders, setFolders] = useState<StoryFolder[]>([]);
+  const [folders, setFolders] = useState<LocalFolder[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false); // Background sync indicator
   const [deleting, setDeleting] = useState<string | null>(null);
 
   // Ref to track if we've already loaded data (prevents reload on tab focus)
-  const hasLoadedRef = useRef(false);
   const hasLoadedLocalRef = useRef(false); // Track if local data has been loaded
 
   // Filter and sort states
@@ -110,7 +83,7 @@ export default function LibraryPage() {
   // Mass selection states
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedStories, setSelectedStories] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
   const [showMassMoveDropdown, setShowMassMoveDropdown] = useState(false);
 
@@ -119,7 +92,7 @@ export default function LibraryPage() {
   const [newFolderName, setNewFolderName] = useState("");
   const [newFolderIcon, setNewFolderIcon] = useState("Folder");
   const [newFolderColor, setNewFolderColor] = useState("#9333ea");
-  const [editingFolder, setEditingFolder] = useState<StoryFolder | null>(null);
+  const [editingFolder, setEditingFolder] = useState<LocalFolder | null>(null);
   const [movingStory, setMovingStory] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -137,27 +110,18 @@ export default function LibraryPage() {
     onConfirm: () => {},
   });
 
+  // Initial load: everything lives locally now, so this is instant.
   useEffect(() => {
-    if (!authLoading && !user) {
-      addNotification("Please sign in to view your library", "warning");
-      router.push("/");
+    if (!hasLoadedLocalRef.current) {
+      loadLocalData();
     }
-  }, [user, authLoading, router, addNotification]);
+  }, []);
 
-  // Initial load: Load local data first (instant), then sync with server
-  useEffect(() => {
-    if (user && !hasLoadedLocalRef.current) {
-      // Load local data immediately (fast)
-      loadLocalDataFirst();
-    }
-  }, [user]);
-
-  // Load local data first for instant display
-  const loadLocalDataFirst = async () => {
+  const loadLocalData = async () => {
     hasLoadedLocalRef.current = true;
+    setLoading(true);
 
     try {
-      // Load local data in parallel - this is instant from IndexedDB
       const [localStoriesList, localAdvs] = await Promise.all([
         listLocalStories(),
         listLocalAdventures().catch((error) => {
@@ -168,164 +132,14 @@ export default function LibraryPage() {
 
       setLocalStories(localStoriesList);
       setLocalAdventures(localAdvs);
-
-      // Determine if we have local data to show immediately
-      const hasLocalData = localStoriesList.length > 0 || localAdvs.length > 0;
-
-      // If we have local data, hide loading immediately
-      if (hasLocalData) {
-        setLoading(false);
-      }
-
-      // Now fetch server data in background (pass hasLocalData to avoid stale state)
-      fetchServerData(hasLocalData);
-    } catch (error) {
+      setFolders(listLocalFolders());
+    } catch (error: any) {
       console.error("Error loading local data:", error);
-      // Fall back to server fetch
-      fetchServerData(false);
-    }
-  };
-
-  // Fetch server data (can run in background)
-  const fetchServerData = async (hasLocalData: boolean = false) => {
-    if (!user) return;
-
-    // Show syncing indicator instead of full loading if we already have local data
-    if (hasLocalData) {
-      setSyncing(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      // Fetch everything in parallel
-      const [foldersResponse, storiesResponse, adventuresResponse] =
-        await Promise.all([
-          authenticatedFetch("/api/folders"),
-          authenticatedFetch(`/api/stories?userId=${user.id}`),
-          authenticatedFetch(`/api/adventures?userId=${user.id}`),
-        ]);
-
-      // Process folders
-      if (foldersResponse.ok) {
-        const foldersData = await foldersResponse.json();
-        setFolders(foldersData.folders || []);
-      }
-
-      // Process stories
-      if (storiesResponse.ok) {
-        const storiesData = await storiesResponse.json();
-        setStories(storiesData.stories || []);
-      } else {
-        console.error("Failed to fetch stories");
-      }
-
-      // Process adventures
-      if (adventuresResponse.ok) {
-        const adventuresData = await adventuresResponse.json();
-        const serverAdventures = adventuresData.adventures || [];
-        setAdventures(serverAdventures);
-
-        // Cache adventures locally for offline access (fire and forget)
-        cacheAdventuresFromServer(serverAdventures).catch((err) => {
-          console.error("Failed to cache adventures locally:", err);
-        });
-      } else {
-        console.error("Failed to fetch adventures");
-      }
-
-      // Mark as fully loaded
-      hasLoadedRef.current = true;
-    } catch (error: any) {
-      console.error("Error fetching server data:", error);
-      // Only show error if we don't have local data to fall back on
-      if (!hasLocalData) {
-        addNotification(`Failed to load library: ${error.message}`, "failure");
-      }
-    } finally {
-      setLoading(false);
-      setSyncing(false);
-    }
-  };
-
-  // Fetch all data (stories and adventures) for accurate counts
-  const fetchAllData = async (forceRefresh = false) => {
-    if (!user) return;
-
-    // Skip if already loaded (prevents reload on tab focus)
-    if (hasLoadedRef.current && !forceRefresh) {
-      return;
-    }
-
-    // For force refresh, reload everything
-    if (forceRefresh) {
-      setSyncing(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      // Fetch everything in parallel
-      const [foldersResponse, storiesResponse, adventuresResponse] =
-        await Promise.all([
-          authenticatedFetch("/api/folders"),
-          authenticatedFetch(`/api/stories?userId=${user.id}`),
-          authenticatedFetch(`/api/adventures?userId=${user.id}`),
-        ]);
-
-      // Process folders
-      if (foldersResponse.ok) {
-        const foldersData = await foldersResponse.json();
-        setFolders(foldersData.folders || []);
-      }
-
-      // Process stories
-      if (storiesResponse.ok) {
-        const storiesData = await storiesResponse.json();
-        setStories(storiesData.stories || []);
-      } else {
-        console.error("Failed to fetch stories");
-      }
-
-      // Process adventures
-      if (adventuresResponse.ok) {
-        const adventuresData = await adventuresResponse.json();
-        const serverAdventures = adventuresData.adventures || [];
-        setAdventures(serverAdventures);
-
-        // Cache adventures locally for offline access (fire and forget)
-        cacheAdventuresFromServer(serverAdventures).catch((err) => {
-          console.error("Failed to cache adventures locally:", err);
-        });
-      } else {
-        console.error("Failed to fetch adventures");
-      }
-
-      // Load local data in parallel
-      const [localStoriesList, localAdvs] = await Promise.all([
-        listLocalStories(),
-        listLocalAdventures().catch((error) => {
-          console.error("Error loading local adventures:", error);
-          return [];
-        }),
-      ]);
-
-      setLocalStories(localStoriesList);
-      setLocalAdventures(localAdvs);
-
-      // Mark as loaded to prevent re-fetching on tab focus
-      hasLoadedRef.current = true;
-    } catch (error: any) {
-      console.error("Error fetching library data:", error);
       addNotification(`Failed to load library: ${error.message}`, "failure");
     } finally {
       setLoading(false);
-      setSyncing(false);
     }
   };
-
-  // Kept for backwards compatibility - used by refresh operations
-  const fetchLibraryData = fetchAllData;
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -342,10 +156,7 @@ export default function LibraryPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMassMoveDropdown]);
 
-  const handleDeleteStory = async (
-    storyId: string,
-    isOffline: boolean = false
-  ) => {
+  const handleDeleteStory = async (storyId: string) => {
     setConfirmDialog({
       isOpen: true,
       title: "Delete Story?",
@@ -358,28 +169,8 @@ export default function LibraryPage() {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
           setDeleting(storyId);
-
-          if (isOffline) {
-            // Delete local story
-            await deleteLocalStory(storyId);
-            setLocalStories((prev) => prev.filter((s) => s.id !== storyId));
-          } else {
-            // Delete online story
-            const response = await authenticatedFetch(
-              `/api/stories/${storyId}`,
-              {
-                method: "DELETE",
-              }
-            );
-
-            if (!response.ok) {
-              const error = await response.json();
-              throw new Error(error.error || "Failed to delete story");
-            }
-
-            setStories((prev) => prev.filter((s) => s.id !== storyId));
-          }
-
+          await deleteLocalStory(storyId);
+          setLocalStories((prev) => prev.filter((s) => s.id !== storyId));
           addNotification("Story deleted successfully", "success");
         } catch (error: any) {
           console.error("Error deleting story:", error);
@@ -391,10 +182,7 @@ export default function LibraryPage() {
     });
   };
 
-  const handleDeleteAdventure = async (
-    adventureId: string,
-    isOffline: boolean = false
-  ) => {
+  const handleDeleteAdventure = async (adventureId: string) => {
     setConfirmDialog({
       isOpen: true,
       title: "Delete Adventure?",
@@ -407,30 +195,10 @@ export default function LibraryPage() {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
           setDeleting(adventureId);
-
-          if (isOffline) {
-            // Delete local adventure using localAdventureManager
-            await deleteLocalAdventure(adventureId);
-            setLocalAdventures((prev) =>
-              prev.filter((a) => a.id !== adventureId)
-            );
-          } else {
-            // Delete online adventure
-            const response = await authenticatedFetch(
-              `/api/adventures/${adventureId}`,
-              {
-                method: "DELETE",
-              }
-            );
-
-            if (!response.ok) {
-              const error = await response.json();
-              throw new Error(error.error || "Failed to delete adventure");
-            }
-
-            setAdventures((prev) => prev.filter((a) => a.id !== adventureId));
-          }
-
+          await deleteLocalAdventure(adventureId);
+          setLocalAdventures((prev) =>
+            prev.filter((a) => a.id !== adventureId),
+          );
           addNotification("Adventure deleted successfully", "success");
         } catch (error: any) {
           console.error("Error deleting adventure:", error);
@@ -442,6 +210,16 @@ export default function LibraryPage() {
     });
   };
 
+  const handlePlayAdventure = async (adventure: LocalAdventure) => {
+    try {
+      const localId = await startAdventureLocally(adventure.adventureData);
+      router.push(`/story?storyId=${localId}`);
+    } catch (error: any) {
+      console.error("Error starting adventure:", error);
+      addNotification(`Failed to start: ${error.message}`, "failure");
+    }
+  };
+
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) {
       addNotification("Please enter a folder name", "warning");
@@ -449,24 +227,11 @@ export default function LibraryPage() {
     }
 
     try {
-      const response = await authenticatedFetch("/api/folders", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: newFolderName,
-          icon: newFolderIcon,
-          color: newFolderColor,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to create folder");
-      }
-
-      const { folder } = await response.json();
+      const folder = createLocalFolder(
+        newFolderName,
+        newFolderIcon,
+        newFolderColor,
+      );
       setFolders([...folders, folder]);
       setNewFolderName("");
       setNewFolderIcon("Folder");
@@ -481,23 +246,13 @@ export default function LibraryPage() {
 
   const handleUpdateFolder = async (
     folderId: string,
-    updates: Partial<StoryFolder>
+    updates: Partial<Pick<LocalFolder, "name" | "icon" | "color">>,
   ) => {
     try {
-      const response = await authenticatedFetch(`/api/folders/${folderId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(updates),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to update folder");
+      const folder = updateLocalFolder(folderId, updates);
+      if (!folder) {
+        throw new Error("Folder not found");
       }
-
-      const { folder } = await response.json();
       setFolders(folders.map((f) => (f.id === folderId ? folder : f)));
       setEditingFolder(null);
       addNotification("Folder updated successfully", "success");
@@ -519,32 +274,21 @@ export default function LibraryPage() {
       onConfirm: async () => {
         setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
         try {
-          const response = await authenticatedFetch(
-            `/api/folders/${folderId}`,
-            {
-              method: "DELETE",
-            }
-          );
-
-          if (!response.ok) {
-            const error = await response.json();
-            throw new Error(error.error || "Failed to delete folder");
-          }
-
+          deleteLocalFolder(folderId);
           setFolders((prev) => prev.filter((f) => f.id !== folderId));
           setSelectedFolder((prev) => (prev === folderId ? null : prev));
           // Update stories to remove folder reference
-          setStories((prev) =>
+          setLocalStories((prev) =>
             prev.map((s) =>
-              s.folder_id === folderId ? { ...s, folder_id: null } : s
-            )
+              s.folder_id === folderId ? { ...s, folder_id: null } : s,
+            ),
           );
           addNotification("Folder deleted successfully", "success");
         } catch (error: any) {
           console.error("Error deleting folder:", error);
           addNotification(
             `Failed to delete folder: ${error.message}`,
-            "failure"
+            "failure",
           );
         }
       },
@@ -553,65 +297,23 @@ export default function LibraryPage() {
 
   const handleMoveStory = async (storyId: string, folderId: string | null) => {
     try {
-      const response = await authenticatedFetch(`/api/stories/${storyId}`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ folderId }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to move story");
+      const localStory = await getLocalStory(storyId);
+      if (!localStory) {
+        throw new Error("Story not found");
       }
 
-      setStories(
-        stories.map((s) =>
-          s.id === storyId ? { ...s, folder_id: folderId } : s
-        )
+      await saveLocalStory(storyId, localStory.storyData, folderId);
+
+      setLocalStories(
+        localStories.map((s) =>
+          s.id === storyId ? { ...s, folder_id: folderId } : s,
+        ),
       );
       setMovingStory(null);
       addNotification("Story moved successfully", "success");
     } catch (error: any) {
       console.error("Error moving story:", error);
       addNotification(`Failed to move story: ${error.message}`, "failure");
-    }
-  };
-
-  const handleMoveLocalStory = async (
-    storyId: string,
-    folderId: string | null
-  ) => {
-    try {
-      // Import the save function
-      const { saveLocalStory, getLocalStory } = await import(
-        "@/app/misc/localStoryManager"
-      );
-
-      // Get the local story
-      const localStory = await getLocalStory(storyId);
-      if (!localStory) {
-        throw new Error("Local story not found");
-      }
-
-      // Save with updated folder_id
-      await saveLocalStory(storyId, localStory.storyData, folderId);
-
-      // Update local state
-      setLocalStories(
-        localStories.map((s) =>
-          s.id === storyId ? { ...s, folder_id: folderId } : s
-        )
-      );
-      setMovingStory(null);
-      addNotification("Local story moved successfully", "success");
-    } catch (error: any) {
-      console.error("Error moving local story:", error);
-      addNotification(
-        `Failed to move local story: ${error.message}`,
-        "failure"
-      );
     }
   };
 
@@ -632,10 +334,7 @@ export default function LibraryPage() {
   };
 
   const selectAllStories = () => {
-    const allIds = new Set([
-      ...filteredStories.map((s) => s.id),
-      ...filteredLocalStories.map((s) => s.id),
-    ]);
+    const allIds = new Set(filteredLocalStories.map((s) => s.id));
     setSelectedStories(allIds);
   };
 
@@ -646,10 +345,8 @@ export default function LibraryPage() {
   const handleMassDelete = () => {
     if (selectedStories.size === 0) return;
 
-    // Capture the current selection and local story IDs to avoid stale closure
+    // Capture the current selection to avoid stale closure
     const storiesToDelete = Array.from(selectedStories);
-    // Create a set of local story IDs for quick lookup
-    const localStoryIds = new Set(localStories.map((s) => s.id));
 
     setConfirmDialog({
       isOpen: true,
@@ -671,27 +368,8 @@ export default function LibraryPage() {
         // Process deletions sequentially to avoid race conditions
         for (const storyId of storiesToDelete) {
           try {
-            // Check if this story exists in localStories (not just by prefix)
-            const isLocalStory = localStoryIds.has(storyId);
-
-            if (isLocalStory) {
-              // Delete from IndexedDB
-              await deleteLocalStory(storyId);
-              deletedIds.push(storyId);
-            } else {
-              // Delete from server
-              const response = await authenticatedFetch(
-                `/api/stories/${storyId}`,
-                {
-                  method: "DELETE",
-                }
-              );
-              if (response.ok) {
-                deletedIds.push(storyId);
-              } else {
-                failedIds.push(storyId);
-              }
-            }
+            await deleteLocalStory(storyId);
+            deletedIds.push(storyId);
           } catch (error) {
             console.error(`Failed to delete story ${storyId}:`, error);
             failedIds.push(storyId);
@@ -700,7 +378,6 @@ export default function LibraryPage() {
 
         // Update state for successfully deleted stories
         const deletedSet = new Set(deletedIds);
-        setStories((prev) => prev.filter((s) => !deletedSet.has(s.id)));
         setLocalStories((prev) => prev.filter((s) => !deletedSet.has(s.id)));
         setSelectedStories(new Set());
         setSelectionMode(false);
@@ -710,14 +387,14 @@ export default function LibraryPage() {
             `Deleted ${deletedIds.length} ${
               deletedIds.length === 1 ? "story" : "stories"
             }, ${failedIds.length} failed`,
-            "warning"
+            "warning",
           );
         } else if (deletedIds.length > 0) {
           addNotification(
             `${deletedIds.length} ${
               deletedIds.length === 1 ? "story" : "stories"
             } deleted successfully`,
-            "success"
+            "success",
           );
         }
       },
@@ -731,32 +408,12 @@ export default function LibraryPage() {
       try {
         const movePromises = Array.from(selectedStories).map(
           async (storyId) => {
-            const isLocal = storyId.startsWith("local_");
-            if (isLocal) {
-              const { saveLocalStory, getLocalStory } = await import(
-                "@/app/misc/localStoryManager"
-              );
-              const localStory = await getLocalStory(storyId);
-              if (localStory) {
-                await saveLocalStory(storyId, localStory.storyData, folderId);
-              }
-            } else {
-              const response = await authenticatedFetch(
-                `/api/stories/${storyId}`,
-                {
-                  method: "PATCH",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({ folderId }),
-                }
-              );
-              if (!response.ok) {
-                throw new Error(`Failed to move story ${storyId}`);
-              }
+            const localStory = await getLocalStory(storyId);
+            if (localStory) {
+              await saveLocalStory(storyId, localStory.storyData, folderId);
             }
             return storyId;
-          }
+          },
         );
 
         // Use allSettled to continue even if some moves fail
@@ -773,15 +430,10 @@ export default function LibraryPage() {
         }).length;
 
         // Update state for successfully moved stories
-        setStories(
-          stories.map((s) =>
-            movedIds.has(s.id) ? { ...s, folder_id: folderId } : s
-          )
-        );
         setLocalStories(
           localStories.map((s) =>
-            movedIds.has(s.id) ? { ...s, folder_id: folderId } : s
-          )
+            movedIds.has(s.id) ? { ...s, folder_id: folderId } : s,
+          ),
         );
         setSelectedStories(new Set());
         setSelectionMode(false);
@@ -795,21 +447,21 @@ export default function LibraryPage() {
             `Moved ${movedIds.size} ${
               movedIds.size === 1 ? "story" : "stories"
             } to ${folderName}, ${failedCount} failed`,
-            "warning"
+            "warning",
           );
         } else {
           addNotification(
             `${movedIds.size} ${
               movedIds.size === 1 ? "story" : "stories"
             } moved to ${folderName}`,
-            "success"
+            "success",
           );
         }
       } catch (error: any) {
         console.error("Error moving stories:", error);
         addNotification(
           `Failed to move some stories: ${error.message}`,
-          "failure"
+          "failure",
         );
       }
     };
@@ -818,72 +470,12 @@ export default function LibraryPage() {
   };
 
   // Filter and sort stories
-  const filteredStories = stories
-    .filter((story) => {
-      // Folder filter
-      if (selectedFolder !== null) {
-        if (selectedFolder === "uncategorized") {
-          if (story.folder_id !== null) return false;
-        } else if (story.folder_id !== selectedFolder) {
-          return false;
-        }
-      }
-      // Search filter
-      if (
-        storySearch &&
-        !story.story_name.toLowerCase().includes(storySearch.toLowerCase())
-      ) {
-        return false;
-      }
-      // Completion filter
-      if (storyFilter === "completed" && !story.is_completed) return false;
-      if (storyFilter === "inProgress" && story.is_completed) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      switch (storySortBy) {
-        case "updated":
-          return (
-            new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-          );
-        case "created":
-          return (
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-          );
-        case "name":
-          return a.story_name.localeCompare(b.story_name);
-        case "chapter":
-          const chapterA = a.story_data?.currentChapter ?? 0;
-          const chapterB = b.story_data?.currentChapter ?? 0;
-          return chapterB - chapterA;
-        default:
-          return 0;
-      }
-    });
-
-  // Get set of online story IDs for filtering
-  const onlineStoryIds = new Set(stories.map((s) => s.id));
-
-  // Filter out offline cache copies from localStories for counting purposes
-  // Only include true local-only stories (local_* prefix) or local stories that don't exist online
-  const trueLocalStories = localStories.filter(
-    (s) => s.id.startsWith("local_") || !onlineStoryIds.has(s.id)
-  );
-
-  // Filter local stories - exclude offline cache copies of online stories
-  // Only show true local-only stories (local_* prefix) or local stories that don't exist online
   const filteredLocalStories = localStories
     .filter((story) => {
-      // Skip offline cache copies - these have the same ID as online stories
-      // Only show stories with local_ prefix (true local-only) or that don't exist online
-      if (!story.id.startsWith("local_") && onlineStoryIds.has(story.id)) {
-        return false;
-      }
-
       // Folder filter
       if (selectedFolder !== null) {
         if (selectedFolder === "uncategorized") {
-          if (story.folder_id !== null) return false;
+          if (story.folder_id) return false;
         } else if (story.folder_id !== selectedFolder) {
           return false;
         }
@@ -918,61 +510,8 @@ export default function LibraryPage() {
     });
 
   // Filter and sort adventures
-  const filteredAdventures = adventures
-    .filter((adventure) => {
-      // Search filter
-      if (
-        adventureSearch &&
-        !adventure.title
-          .toLowerCase()
-          .includes(adventureSearch.toLowerCase()) &&
-        !adventure.description
-          .toLowerCase()
-          .includes(adventureSearch.toLowerCase())
-      ) {
-        return false;
-      }
-      // Published filter
-      if (adventureFilter === "published" && !adventure.isPublished)
-        return false;
-      if (adventureFilter === "draft" && adventure.isPublished) return false;
-      return true;
-    })
-    .sort((a, b) => {
-      switch (adventureSortBy) {
-        case "updated":
-          return (
-            new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-          );
-        case "created":
-          return (
-            new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-          );
-        case "title":
-          return a.title.localeCompare(b.title);
-        case "rating":
-          return (b.rating || 0) - (a.rating || 0);
-        case "plays":
-          return (b.playCount || 0) - (a.playCount || 0);
-        default:
-          return 0;
-      }
-    });
-
-  // Get set of online adventure IDs for filtering
-  const onlineAdventureIds = new Set(adventures.map((a) => a.id));
-
-  // Filter local adventures - only show true local-only adventures (local: prefix or not synced from server)
   const filteredLocalAdventures = localAdventures
     .filter((adventure) => {
-      // Skip cached server adventures - only show local-only adventures
-      if (
-        adventure.syncStatus === "synced" ||
-        onlineAdventureIds.has(adventure.id)
-      ) {
-        return false;
-      }
-
       // Search filter
       if (
         adventureSearch &&
@@ -1003,14 +542,7 @@ export default function LibraryPage() {
       }
     });
 
-  // Count of true local-only adventures (not cached server copies)
-  const trueLocalAdventures = localAdventures.filter(
-    (a) =>
-      a.syncStatus === "local-only" ||
-      (!onlineAdventureIds.has(a.id) && a.id.startsWith("local:"))
-  );
-
-  if (authLoading || !user) {
+  if (loading && localStories.length === 0 && localAdventures.length === 0) {
     return (
       <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
@@ -1031,21 +563,13 @@ export default function LibraryPage() {
               <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
             </button>
             <h1 className="text-lg font-bold">Library</h1>
-            {/* Syncing indicator */}
-            {syncing && (
-              <div className="flex items-center gap-1.5 text-xs text-blue-300/70">
-                <DynamicIcon
-                  name="RefreshCw"
-                  className="w-3.5 h-3.5 animate-spin"
-                />
-                <span className="hidden sm:inline">Syncing...</span>
-              </div>
-            )}
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() =>
-                router.push(view === "stories" ? "/explorer" : "/creator")
+                view === "stories"
+                  ? setView("adventures")
+                  : router.push("/creator")
               }
               className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl transition-colors text-sm font-medium"
             >
@@ -1070,7 +594,7 @@ export default function LibraryPage() {
             }`}
           >
             <DynamicIcon name="Book" className="w-4 h-4 inline-block mr-2" />
-            Stories ({stories.length + localStories.length})
+            Stories ({localStories.length})
           </button>
           <button
             onClick={() => setView("adventures")}
@@ -1084,7 +608,7 @@ export default function LibraryPage() {
               name="Gamepad2"
               className="w-4 h-4 inline-block mr-2"
             />
-            Adventures ({adventures.length + trueLocalAdventures.length})
+            Adventures ({localAdventures.length})
           </button>
         </div>
 
@@ -1097,12 +621,6 @@ export default function LibraryPage() {
           )
         ) : view === "stories" ? (
           <div className="space-y-4">
-            {/* Encryption Migration Banner */}
-            <EncryptionMigration
-              stories={stories}
-              onMigrationComplete={fetchLibraryData}
-            />
-
             {/* Search + Folder Dropdown + Sort */}
             <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1 relative">
@@ -1123,7 +641,7 @@ export default function LibraryPage() {
                   value={selectedFolder || "all"}
                   onChange={(e) =>
                     setSelectedFolder(
-                      e.target.value === "all" ? null : e.target.value
+                      e.target.value === "all" ? null : e.target.value,
                     )
                   }
                   className="px-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white focus:outline-none focus:border-purple-500/50 transition-all"
@@ -1162,7 +680,7 @@ export default function LibraryPage() {
                 }`}
               >
                 <DynamicIcon name="Book" className="w-3.5 h-3.5" />
-                All ({stories.length + trueLocalStories.length})
+                All ({localStories.length})
               </button>
               <button
                 onClick={() => setSelectedFolder("uncategorized")}
@@ -1173,9 +691,7 @@ export default function LibraryPage() {
                 }`}
               >
                 <DynamicIcon name="FileText" className="w-3.5 h-3.5" />
-                Uncategorized (
-                {stories.filter((s) => !s.folder_id).length +
-                  trueLocalStories.filter((s) => !s.folder_id).length}
+                Uncategorized ({localStories.filter((s) => !s.folder_id).length}
                 )
               </button>
               {folders.map((folder) => (
@@ -1191,9 +707,7 @@ export default function LibraryPage() {
                 >
                   <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
                   {folder.name} (
-                  {stories.filter((s) => s.folder_id === folder.id).length +
-                    trueLocalStories.filter((s) => s.folder_id === folder.id)
-                      .length}
+                  {localStories.filter((s) => s.folder_id === folder.id).length}
                   )
                 </button>
               ))}
@@ -1214,7 +728,7 @@ export default function LibraryPage() {
                     key={filter}
                     onClick={() =>
                       setStoryFilter(
-                        filter as "all" | "completed" | "inProgress"
+                        filter as "all" | "completed" | "inProgress",
                       )
                     }
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
@@ -1226,15 +740,14 @@ export default function LibraryPage() {
                     {filter === "all"
                       ? "All"
                       : filter === "inProgress"
-                      ? "In Progress"
-                      : "Completed"}
+                        ? "In Progress"
+                        : "Completed"}
                   </button>
                 ))}
               </div>
 
               {/* Select mode button - only show when there are stories */}
-              {(filteredStories.length > 0 ||
-                filteredLocalStories.length > 0) && (
+              {filteredLocalStories.length > 0 && (
                 <button
                   onClick={toggleSelectionMode}
                   className={`ml-auto px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
@@ -1319,26 +832,25 @@ export default function LibraryPage() {
             )}
 
             {/* Stories List */}
-            {filteredStories.length === 0 &&
-            filteredLocalStories.length === 0 ? (
+            {filteredLocalStories.length === 0 ? (
               <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
                 <DynamicIcon
                   name="BookOpen"
                   className="w-16 h-16 text-blue-400/30 mx-auto mb-4"
                 />
                 <h3 className="text-xl font-bold mb-2">
-                  {stories.length === 0
+                  {localStories.length === 0
                     ? "No Stories Yet"
                     : "No Stories Match Filters"}
                 </h3>
                 <p className="text-blue-200/60 mb-6">
-                  {stories.length === 0
-                    ? "Start an adventure from the Explorer to create your first story!"
+                  {localStories.length === 0
+                    ? "Start an adventure to create your first story!"
                     : "Try adjusting your search or filters."}
                 </p>
-                {stories.length === 0 && (
+                {localStories.length === 0 && (
                   <button
-                    onClick={() => router.push("/explorer")}
+                    onClick={() => setView("adventures")}
                     className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
                   >
                     Explore Adventures
@@ -1347,134 +859,11 @@ export default function LibraryPage() {
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {/* Cloud Stories */}
-                {filteredStories.map((story) => {
-                  const chapter = story.story_data?.currentChapter ?? 0;
-                  const totalChapters = story.story_data?.chapters?.length ?? 1;
-                  const progress = Math.min(
-                    100,
-                    Math.round((chapter / Math.max(totalChapters, 1)) * 100)
-                  );
-                  const timeSinceUpdate = getRelativeTime(story.updated_at);
-
-                  return (
-                    <div
-                      key={story.id}
-                      onClick={() =>
-                        selectionMode
-                          ? toggleStorySelection(story.id)
-                          : router.push(`/story?storyId=${story.id}`)
-                      }
-                      className={`group relative p-4 rounded-xl border transition-all cursor-pointer ${
-                        selectionMode && selectedStories.has(story.id)
-                          ? "bg-purple-900/30 border-purple-500"
-                          : "bg-blue-950/50 border-blue-800/30 hover:bg-blue-900/50 hover:border-blue-700/50"
-                      }`}
-                    >
-                      <div className="flex items-start gap-3">
-                        {selectionMode && (
-                          <div
-                            className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
-                              selectedStories.has(story.id)
-                                ? "bg-purple-600 border-purple-600"
-                                : "border-blue-600"
-                            }`}
-                          >
-                            {selectedStories.has(story.id) && (
-                              <DynamicIcon name="Check" className="w-3 h-3" />
-                            )}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                            <h3 className="font-semibold">
-                              {story.story_name}
-                            </h3>
-                            {story.is_completed && (
-                              <span className="px-1.5 py-0.5 bg-green-500/20 text-green-400 text-xs rounded">
-                                ?
-                              </span>
-                            )}
-                            {isEncrypted(story.story_data) && (
-                              <DynamicIcon
-                                name="Lock"
-                                className="w-3 h-3 text-emerald-400"
-                              />
-                            )}
-                            {story.is_public && (
-                              <DynamicIcon
-                                name="Globe"
-                                className="w-3 h-3 text-blue-400"
-                              />
-                            )}
-                          </div>
-                          <div className="flex items-center gap-3 text-xs text-blue-200/50 mb-2">
-                            <span>{timeSinceUpdate}</span>
-                            <span>Ch. {chapter + 1}</span>
-                          </div>
-                          {/* Progress Bar */}
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
-                              <div
-                                className={`h-full rounded-full transition-all ${
-                                  story.is_completed
-                                    ? "bg-green-500"
-                                    : "bg-linear-to-r from-purple-500 to-blue-500"
-                                }`}
-                                style={{
-                                  width: `${
-                                    story.is_completed ? 100 : progress
-                                  }%`,
-                                }}
-                              />
-                            </div>
-                            <span className="text-xs text-blue-200/40">
-                              {story.is_completed ? "100%" : `${progress}%`}
-                            </span>
-                          </div>
-                        </div>
-                        {!selectionMode && (
-                          <div
-                            className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              onClick={() => setMovingStory(story.id)}
-                              className="p-1.5 hover:bg-blue-800/50 rounded-lg transition-colors"
-                              title="Move"
-                            >
-                              <DynamicIcon name="Folder" className="w-4 h-4" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteStory(story.id)}
-                              disabled={deleting === story.id}
-                              className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                              title="Delete"
-                            >
-                              {deleting === story.id ? (
-                                <DynamicIcon
-                                  name="Loader2"
-                                  className="w-4 h-4 animate-spin"
-                                />
-                              ) : (
-                                <DynamicIcon
-                                  name="Trash2"
-                                  className="w-4 h-4"
-                                />
-                              )}
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-
                 {/* Local Stories */}
                 {filteredLocalStories.map((story) => {
                   const chapter = story.storyData?.currentChapter ?? 0;
                   const timeSinceUpdate = getRelativeTime(
-                    String(story.updatedAt)
+                    String(story.updatedAt),
                   );
 
                   return (
@@ -1546,7 +935,7 @@ export default function LibraryPage() {
                               <DynamicIcon name="Folder" className="w-4 h-4" />
                             </button>
                             <button
-                              onClick={() => handleDeleteStory(story.id, true)}
+                              onClick={() => handleDeleteStory(story.id)}
                               disabled={deleting === story.id}
                               className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
                               title="Delete"
@@ -1594,7 +983,7 @@ export default function LibraryPage() {
                   value={adventureFilter}
                   onChange={(e) =>
                     setAdventureFilter(
-                      e.target.value as "all" | "published" | "draft"
+                      e.target.value as "all" | "published" | "draft",
                     )
                   }
                   className="px-4 py-2.5 bg-blue-900/50 border border-blue-700/50 rounded-xl text-white focus:outline-none focus:border-purple-500/50 transition-all"
@@ -1613,161 +1002,44 @@ export default function LibraryPage() {
                   <option value="updated">Recent</option>
                   <option value="created">Created</option>
                   <option value="title">A-Z</option>
-                  <option value="rating">Rating</option>
-                  <option value="plays">Plays</option>
                 </select>
               </div>
             </div>
 
             {/* Adventures Grid */}
-            {filteredAdventures.length === 0 &&
-            filteredLocalAdventures.length === 0 ? (
+            {filteredLocalAdventures.length === 0 ? (
               <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
                 <DynamicIcon
                   name="Gamepad2"
                   className="w-16 h-16 text-blue-400/30 mx-auto mb-4"
                 />
                 <h3 className="text-xl font-bold mb-2">
-                  {adventures.length === 0 && trueLocalAdventures.length === 0
+                  {localAdventures.length === 0
                     ? "No Adventures Yet"
                     : "No Adventures Match Filters"}
                 </h3>
                 <p className="text-blue-200/60 mb-6">
-                  {adventures.length === 0 && trueLocalAdventures.length === 0
-                    ? "Create your first adventure and share it with the community!"
+                  {localAdventures.length === 0
+                    ? "Create your first adventure!"
                     : "Try adjusting your search or filters."}
                 </p>
-                {adventures.length === 0 &&
-                  trueLocalAdventures.length === 0 && (
-                    <button
-                      onClick={() => router.push("/creator")}
-                      className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
-                    >
-                      Create Adventure
-                    </button>
-                  )}
+                {localAdventures.length === 0 && (
+                  <button
+                    onClick={() => router.push("/creator")}
+                    className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 font-semibold rounded-xl transition-colors"
+                  >
+                    Create Adventure
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {/* Cloud Adventures */}
-                {filteredAdventures.map((adventure) => (
-                  <div
-                    key={adventure.id}
-                    className="group relative bg-blue-950/50 rounded-xl overflow-hidden border border-blue-800/30 hover:border-blue-700/50 transition-all cursor-pointer"
-                    onClick={() => router.push(`/explorer/${adventure.id}`)}
-                  >
-                    {/* Thumbnail */}
-                    <div className="relative h-32">
-                      {adventure.thumbnailUrl ? (
-                        <div
-                          className="absolute inset-0 bg-cover bg-center"
-                          style={{
-                            backgroundImage: `url(${adventure.thumbnailUrl})`,
-                          }}
-                        />
-                      ) : (
-                        <div className="absolute inset-0 bg-linear-to-br from-purple-600 via-pink-600 to-blue-600" />
-                      )}
-                      <div className="absolute inset-0 bg-linear-to-t from-gray-900/90 via-transparent to-transparent" />
-
-                      {/* Badges */}
-                      <div className="absolute top-2 right-2 flex gap-1">
-                        {adventure.isPublished && (
-                          <span className="px-1.5 py-0.5 bg-green-500/20 backdrop-blur text-green-400 text-xs rounded">
-                            Published
-                          </span>
-                        )}
-                        {adventure.isFeatured && (
-                          <span className="px-1.5 py-0.5 bg-yellow-500/20 backdrop-blur text-yellow-400 text-xs rounded flex items-center gap-0.5">
-                            <DynamicIcon
-                              name="Star"
-                              className="w-3 h-3 fill-current"
-                            />{" "}
-                            Featured
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Content */}
-                    <div className="p-3">
-                      <h3 className="font-semibold truncate mb-1">
-                        {adventure.title}
-                      </h3>
-                      <p className="text-xs text-blue-200/50 line-clamp-2 mb-2">
-                        {adventure.shortDescription}
-                      </p>
-
-                      {/* Tags */}
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {adventure.tags.slice(0, 2).map((tag) => (
-                          <span
-                            key={tag}
-                            className="px-1.5 py-0.5 bg-purple-500/20 text-purple-300 text-xs rounded"
-                          >
-                            {tag}
-                          </span>
-                        ))}
-                        {adventure.tags.length > 2 && (
-                          <span className="px-1.5 py-0.5 bg-blue-900/50 text-blue-300/50 text-xs rounded">
-                            +{adventure.tags.length - 2}
-                          </span>
-                        )}
-                      </div>
-
-                      {/* Stats */}
-                      <div className="flex items-center gap-3 text-xs text-blue-200/40 mb-3">
-                        <span className="flex items-center gap-1">
-                          <DynamicIcon
-                            name="Star"
-                            className="w-3 h-3 text-yellow-500"
-                          />
-                          {adventure.rating?.toFixed(1) || "-"}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <DynamicIcon name="Play" className="w-3 h-3" />
-                          {adventure.playCount || 0}
-                        </span>
-                      </div>
-
-                      {/* Actions */}
-                      <div
-                        className="flex gap-2"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <button
-                          onClick={() =>
-                            router.push(`/creator/manual?edit=${adventure.id}`)
-                          }
-                          className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-sm rounded-lg transition-colors"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          onClick={() => handleDeleteAdventure(adventure.id)}
-                          disabled={deleting === adventure.id}
-                          className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg transition-colors"
-                        >
-                          {deleting === adventure.id ? (
-                            <DynamicIcon
-                              name="Loader2"
-                              className="w-4 h-4 animate-spin"
-                            />
-                          ) : (
-                            <DynamicIcon name="Trash2" className="w-4 h-4" />
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
                 {/* Local Adventures */}
                 {filteredLocalAdventures.map((adventure) => (
                   <div
                     key={adventure.id}
                     className="group relative bg-blue-950/50 rounded-xl overflow-hidden border border-blue-800/30 hover:border-blue-700/50 transition-all cursor-pointer"
-                    onClick={() => router.push(`/explorer/${adventure.id}`)}
+                    onClick={() => handlePlayAdventure(adventure)}
                   >
                     {/* Thumbnail */}
                     <div className="relative h-32">
@@ -1826,17 +1098,21 @@ export default function LibraryPage() {
                         onClick={(e) => e.stopPropagation()}
                       >
                         <button
+                          onClick={() => handlePlayAdventure(adventure)}
+                          className="flex-1 px-3 py-1.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-sm rounded-lg transition-colors"
+                        >
+                          Play
+                        </button>
+                        <button
                           onClick={() =>
                             router.push(`/creator/manual?edit=${adventure.id}`)
                           }
-                          className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-sm rounded-lg transition-colors"
+                          className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
                         >
                           Edit
                         </button>
                         <button
-                          onClick={() =>
-                            handleDeleteAdventure(adventure.id, true)
-                          }
+                          onClick={() => handleDeleteAdventure(adventure.id)}
                           disabled={deleting === adventure.id}
                           className="px-3 py-1.5 bg-red-600/20 hover:bg-red-600/40 text-red-400 rounded-lg transition-colors"
                         >
@@ -2009,15 +1285,7 @@ export default function LibraryPage() {
               <button
                 onClick={() => {
                   if (!movingStory) return;
-                  // Check if it's a local story by checking filteredLocalStories
-                  const isLocalStory = filteredLocalStories.some(
-                    (s) => s.id === movingStory
-                  );
-                  if (isLocalStory) {
-                    handleMoveLocalStory(movingStory, null);
-                  } else {
-                    handleMoveStory(movingStory, null);
-                  }
+                  handleMoveStory(movingStory, null);
                 }}
                 className="w-full p-3 text-left rounded-lg border-2 border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-400 transition-colors"
               >
@@ -2031,15 +1299,7 @@ export default function LibraryPage() {
                   key={folder.id}
                   onClick={() => {
                     if (!movingStory) return;
-                    // Check if it's a local story by checking filteredLocalStories
-                    const isLocalStory = filteredLocalStories.some(
-                      (s) => s.id === movingStory
-                    );
-                    if (isLocalStory) {
-                      handleMoveLocalStory(movingStory, folder.id);
-                    } else {
-                      handleMoveStory(movingStory, folder.id);
-                    }
+                    handleMoveStory(movingStory, folder.id);
                   }}
                   className="w-full p-3 text-left rounded-lg border-2 hover:border-purple-500 dark:hover:border-purple-400 transition-colors"
                   style={{

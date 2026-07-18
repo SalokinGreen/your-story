@@ -2723,6 +2723,8 @@ Write immersive prose. The player should experience the story, not see game mech
     "npc_reaction",
     // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
     "manage_timer",
+    // Reasoning-tier self-escalation
+    "set_reasoning_tier",
   ];
 
   // (TOOL_SCHEMAS imported statically at the top of this file)

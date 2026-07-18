@@ -11,7 +11,6 @@
  */
 
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { logger } from "@/app/misc/logger";
 import {
   BigAdventureConfig,
@@ -24,16 +23,8 @@ import {
   detectIncompleteJSON,
   cleanContinuationContent,
 } from "@/app/misc/big_adventure_ai";
-import {
-  getModelConfig,
-  calculateTokenCost,
-  calculateCostFromEstimatedCost,
-} from "@/app/misc/ai_prices";
-import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 // NovelAI API endpoint
 
@@ -104,6 +95,8 @@ interface RequestBody {
   openRouterKey?: string;
   deepseekKey?: string;
   novelaiKey?: string;
+  mistralKey?: string;
+  deepinfraKey?: string;
   // For continuation after timeout - the partial content generated so far
   continueFrom?: string;
   // Signal to wrap up the current stage early
@@ -114,16 +107,18 @@ function getApiKey(
   provider: "deepseek" | "openrouter" | "novelai" | "mistral" | "deepinfra",
   userProvidedOpenRouterKey?: string,
   userProvidedDeepseekKey?: string,
-  novelaiKey?: string
+  novelaiKey?: string,
+  mistralKey?: string,
+  deepinfraKey?: string,
 ): string | null {
   if (provider === "deepseek") {
     return userProvidedDeepseekKey || null;
   } else if (provider === "novelai") {
     return novelaiKey || null;
   } else if (provider === "mistral") {
-    return process.env.MISTRAL_API_KEY || null;
+    return mistralKey || null;
   } else if (provider === "deepinfra") {
-    return process.env.DEEPINFRA_API_KEY || null;
+    return deepinfraKey || null;
   } else {
     return userProvidedOpenRouterKey || null;
   }
@@ -163,7 +158,7 @@ async function streamAIResponse(
   encoder: TextEncoder,
   stage: GenerationStage,
   heartbeatInterval: NodeJS.Timeout | null,
-  streamContent: boolean = true // Set to false to skip streaming events (for continuation)
+  streamContent: boolean = true, // Set to false to skip streaming events (for continuation)
 ): Promise<{
   content: string;
   promptTokens: number;
@@ -180,7 +175,7 @@ async function streamAIResponse(
       controller,
       encoder,
       stage,
-      heartbeatInterval
+      heartbeatInterval,
     );
   }
 
@@ -297,8 +292,8 @@ async function streamAIResponse(
                     type: "stage_content",
                     stage,
                     content,
-                  })}\n\n`
-                )
+                  })}\n\n`,
+                ),
               );
             }
           }
@@ -336,7 +331,7 @@ async function streamNovelAIResponse(
   controller: ReadableStreamDefaultController,
   encoder: TextEncoder,
   stage: GenerationStage,
-  heartbeatInterval: NodeJS.Timeout | null
+  heartbeatInterval: NodeJS.Timeout | null,
 ): Promise<{
   content: string;
   promptTokens: number;
@@ -347,7 +342,7 @@ async function streamNovelAIResponse(
     messages.map((m) => ({
       role: m.role as "system" | "user" | "assistant" | "tool",
       content: m.content,
-    }))
+    })),
   );
 
   const requestBody = {
@@ -411,8 +406,8 @@ async function streamNovelAIResponse(
                 type: "stage_content",
                 stage,
                 content: text,
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
         }
       } catch {
@@ -438,8 +433,8 @@ export async function POST(req: NextRequest) {
             `data: ${JSON.stringify({
               type: "heartbeat",
               timestamp: Date.now(),
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
 
         // Start heartbeat interval to keep connection alive
@@ -450,50 +445,15 @@ export async function POST(req: NextRequest) {
                 `data: ${JSON.stringify({
                   type: "heartbeat",
                   timestamp: Date.now(),
-                })}\n\n`
-              )
+                })}\n\n`,
+              ),
             );
           } catch {
             // Controller may be closed
           }
         }, HEARTBEAT_INTERVAL_MS);
 
-        // Validate auth
-        const authHeader = req.headers.get("authorization");
-        if (!authHeader) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: "Unauthorized",
-              })}\n\n`
-            )
-          );
-          controller.close();
-          return;
-        }
-
-        const token = authHeader.replace("Bearer ", "");
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser(token);
-
-        if (authError || !user) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: "Unauthorized",
-              })}\n\n`
-            )
-          );
-          controller.close();
-          return;
-        }
-
+        // Validate request has a body (no auth required - BYOK only)
         // Parse request
         const body: RequestBody = await req.json();
         const {
@@ -504,6 +464,8 @@ export async function POST(req: NextRequest) {
           openRouterKey,
           deepseekKey,
           novelaiKey,
+          mistralKey,
+          deepinfraKey,
           continueFrom,
           finishEarly,
         } = body;
@@ -514,8 +476,8 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({
                 type: "error",
                 error: "Adventure prompt is required",
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
@@ -527,8 +489,8 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({
                 type: "error",
                 error: "Stage is required",
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
@@ -547,7 +509,9 @@ export async function POST(req: NextRequest) {
             | "deepinfra",
           openRouterKey,
           deepseekKey,
-          novelaiKey
+          novelaiKey,
+          mistralKey,
+          deepinfraKey,
         );
 
         if (!apiKey) {
@@ -555,51 +519,23 @@ export async function POST(req: NextRequest) {
             modelConfig.provider === "deepseek"
               ? "DeepSeek"
               : modelConfig.provider === "openrouter"
-              ? "OpenRouter"
-              : modelConfig.provider === "mistral"
-              ? "Mistral"
-              : modelConfig.provider === "deepinfra"
-              ? "DeepInfra"
-              : "NovelAI";
-          const errorMessage =
-            modelConfig.provider === "mistral" ||
-            modelConfig.provider === "deepinfra"
-              ? `${providerName} server configuration error. Please try again later or use a different model.`
-              : `${providerName} API key required. Please add your API key in Settings.`;
+                ? "OpenRouter"
+                : modelConfig.provider === "mistral"
+                  ? "Mistral"
+                  : modelConfig.provider === "deepinfra"
+                    ? "DeepInfra"
+                    : "NovelAI";
+          const errorMessage = `${providerName} API key required. Please add your API key in Settings.`;
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
                 error: errorMessage,
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
-        }
-
-        // Check token balance for Coins mode providers (Mistral/DeepInfra) before starting
-        const isCoinsMode =
-          modelConfig.provider === "mistral" ||
-          modelConfig.provider === "deepinfra";
-        if (isCoinsMode) {
-          const balance = await getUserTokenBalance(user.id, supabase);
-          // Estimate minimum cost for a single stage
-          const estimatedMinCost = Math.max(10, modelConfig.cost || 1);
-          const currentBalance = balance?.total ?? 0;
-          if (currentBalance < estimatedMinCost) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "error",
-                  error: `Insufficient coins. Stage generation requires at least ${estimatedMinCost} coins. Current balance: ${currentBalance}`,
-                  code: "INSUFFICIENT_BALANCE",
-                })}\n\n`
-              )
-            );
-            controller.close();
-            return;
-          }
         }
 
         const stageInfo = getStageInfo(stage);
@@ -618,15 +554,15 @@ export async function POST(req: NextRequest) {
               stageNumber: stageInfo.number,
               maxOutputTokens,
               isContinuation: !!continueFrom,
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
 
         // Build messages for this stage
         const messages = buildBigAdventureMessages(
           config,
           stage,
-          previousResults
+          previousResults,
         );
 
         let fullContent = "";
@@ -641,7 +577,7 @@ export async function POST(req: NextRequest) {
           // If content is too short, use minimal fallback JSON
           if (partialContent.length < MIN_CONTENT_FOR_WRAPUP) {
             logger.info(
-              `Stage ${stage} finishing early with insufficient content (${partialContent.length} chars), using minimal fallback`
+              `Stage ${stage} finishing early with insufficient content (${partialContent.length} chars), using minimal fallback`,
             );
 
             // Notify client we're using fallback
@@ -654,8 +590,8 @@ export async function POST(req: NextRequest) {
                   maxAttempts: 1,
                   message:
                     "Content too short to repair, using minimal fallback...",
-                })}\n\n`
-              )
+                })}\n\n`,
+              ),
             );
 
             fullContent = getMinimalFallbackJSON(stage);
@@ -673,7 +609,7 @@ export async function POST(req: NextRequest) {
             ];
 
             logger.info(
-              `Stage ${stage} finishing early from ${fullContent.length} chars`
+              `Stage ${stage} finishing early from ${fullContent.length} chars`,
             );
 
             // Notify client we're wrapping up
@@ -685,8 +621,8 @@ export async function POST(req: NextRequest) {
                   attempt: 1,
                   maxAttempts: 1,
                   message: "Finishing stage early, closing JSON...",
-                })}\n\n`
-              )
+                })}\n\n`,
+              ),
             );
 
             // Request wrap-up with low token count
@@ -699,7 +635,7 @@ export async function POST(req: NextRequest) {
               controller,
               encoder,
               stage,
-              heartbeatInterval
+              heartbeatInterval,
             );
 
             fullContent += wrapUpResult.content;
@@ -717,7 +653,7 @@ export async function POST(req: NextRequest) {
           const incompleteCheck = detectIncompleteJSON(fullContent);
           if (incompleteCheck.isIncomplete) {
             logger.info(
-              `Stage ${stage} resuming from ${fullContent.length} chars of incomplete content, will attempt local repair`
+              `Stage ${stage} resuming from ${fullContent.length} chars of incomplete content, will attempt local repair`,
             );
           }
         } else {
@@ -731,7 +667,7 @@ export async function POST(req: NextRequest) {
             controller,
             encoder,
             stage,
-            heartbeatInterval
+            heartbeatInterval,
           );
 
           fullContent = initialResult.content;
@@ -753,7 +689,7 @@ export async function POST(req: NextRequest) {
 
             if (supportsPrefill) {
               logger.info(
-                `Stage ${stage} JSON incomplete, attempting AI continuation first`
+                `Stage ${stage} JSON incomplete, attempting AI continuation first`,
               );
 
               const MAX_CONTINUATIONS = 2;
@@ -765,7 +701,7 @@ export async function POST(req: NextRequest) {
               ) {
                 continuationAttempts++;
                 logger.info(
-                  `Stage ${stage} using prefill continuation (attempt ${continuationAttempts})`
+                  `Stage ${stage} using prefill continuation (attempt ${continuationAttempts})`,
                 );
                 controller.enqueue(
                   encoder.encode(
@@ -773,8 +709,8 @@ export async function POST(req: NextRequest) {
                       type: "stage_warning",
                       stage,
                       message: `Response was cut off. Continuing generation... (${continuationAttempts}/${MAX_CONTINUATIONS})`,
-                    })}\n\n`
-                  )
+                    })}\n\n`,
+                  ),
                 );
 
                 const continuationMessages = [
@@ -798,19 +734,19 @@ export async function POST(req: NextRequest) {
                     encoder,
                     stage,
                     heartbeatInterval,
-                    true
+                    true,
                   );
 
                   // Clean continuation content to handle overlap/restart issues
                   const cleanedContinuation = cleanContinuationContent(
                     fullContent,
-                    continuationResult.content
+                    continuationResult.content,
                   );
                   if (cleanedContinuation) {
                     fullContent += cleanedContinuation;
                   } else {
                     logger.warn(
-                      `Stage ${stage} continuation was discarded (bad restart detected)`
+                      `Stage ${stage} continuation was discarded (bad restart detected)`,
                     );
                   }
                   totalPromptTokens += continuationResult.promptTokens;
@@ -829,12 +765,12 @@ export async function POST(req: NextRequest) {
             // If still incomplete after AI continuation (or no prefill support), try local repair
             if (incompleteCheck.isIncomplete) {
               logger.info(
-                `Stage ${stage} still incomplete after AI continuation, trying local repair`
+                `Stage ${stage} still incomplete after AI continuation, trying local repair`,
               );
 
               const localRepairResult = parseBigAdventureStageOutput(
                 fullContent,
-                stage
+                stage,
               );
 
               if (localRepairResult !== null) {
@@ -845,8 +781,8 @@ export async function POST(req: NextRequest) {
                       type: "stage_warning",
                       stage,
                       message: `Response was cut off. Local repair successful.`,
-                    })}\n\n`
-                  )
+                    })}\n\n`,
+                  ),
                 );
 
                 // Send stage complete event
@@ -861,48 +797,12 @@ export async function POST(req: NextRequest) {
                       completionTokens: totalCompletionTokens,
                       partialResult: localRepairResult,
                       rawContent: fullContent,
-                    })}\n\n`
-                  )
+                    })}\n\n`,
+                  ),
                 );
 
                 // Clear heartbeat and send done
                 if (heartbeatInterval) clearInterval(heartbeatInterval);
-
-                // Deduct coins for Coins mode providers (Mistral/DeepInfra)
-                let tokenCost = 0;
-                let newBalance: number | undefined;
-                if (
-                  isCoinsMode &&
-                  (totalPromptTokens > 0 ||
-                    totalCompletionTokens > 0 ||
-                    totalEstimatedCost > 0)
-                ) {
-                  if (
-                    modelConfig.provider === "deepinfra" &&
-                    totalEstimatedCost > 0
-                  ) {
-                    tokenCost =
-                      calculateCostFromEstimatedCost(totalEstimatedCost);
-                  } else {
-                    tokenCost = calculateTokenCost(
-                      model,
-                      totalPromptTokens,
-                      totalCompletionTokens
-                    );
-                  }
-                  const deductResult = await deductTokens(
-                    user.id,
-                    tokenCost,
-                    supabase
-                  );
-                  if (deductResult.success) {
-                    const balanceResult = await getUserTokenBalance(
-                      user.id,
-                      supabase
-                    );
-                    newBalance = balanceResult?.total;
-                  }
-                }
 
                 controller.enqueue(
                   encoder.encode(
@@ -921,12 +821,10 @@ export async function POST(req: NextRequest) {
                           totalTokens:
                             totalPromptTokens + totalCompletionTokens,
                         },
-                        tokenCost: tokenCost > 0 ? tokenCost : undefined,
-                        balance: newBalance,
-                        isByok: !isCoinsMode,
+                        isByok: true,
                       },
-                    })}\n\n`
-                  )
+                    })}\n\n`,
+                  ),
                 );
 
                 controller.close();
@@ -951,51 +849,17 @@ export async function POST(req: NextRequest) {
               completionTokens: totalCompletionTokens,
               partialResult: result,
               rawContent: fullContent, // Include raw content for debugging/recovery
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
 
         logger.action("Stage generation complete", {
-          userId: user.id,
           model: modelConfig.model,
           stage,
           promptTokens: totalPromptTokens,
           completionTokens: totalCompletionTokens,
           success: result !== null,
         });
-
-        // Deduct coins for Coins mode providers (Mistral/DeepInfra)
-        let tokenCost = 0;
-        let newBalance: number | undefined;
-        if (
-          isCoinsMode &&
-          (totalPromptTokens > 0 ||
-            totalCompletionTokens > 0 ||
-            totalEstimatedCost > 0)
-        ) {
-          // Use estimated_cost from DeepInfra if available, otherwise calculate from tokens
-          if (modelConfig.provider === "deepinfra" && totalEstimatedCost > 0) {
-            tokenCost = calculateCostFromEstimatedCost(totalEstimatedCost);
-          } else {
-            tokenCost = calculateTokenCost(
-              model,
-              totalPromptTokens,
-              totalCompletionTokens
-            );
-          }
-          const deductResult = await deductTokens(user.id, tokenCost, supabase);
-          if (!deductResult.success) {
-            logger.warn("Failed to deduct tokens for stage generation", {
-              userId: user.id,
-              provider: modelConfig.provider,
-              tokenCost,
-              error: deductResult.error,
-            });
-          } else {
-            const balanceResult = await getUserTokenBalance(user.id, supabase);
-            newBalance = balanceResult?.total;
-          }
-        }
 
         // Send done event
         controller.enqueue(
@@ -1014,12 +878,10 @@ export async function POST(req: NextRequest) {
                   completionTokens: totalCompletionTokens,
                   totalTokens: totalPromptTokens + totalCompletionTokens,
                 },
-                tokenCost: tokenCost > 0 ? tokenCost : undefined,
-                balance: newBalance,
-                isByok: !isCoinsMode,
+                isByok: true,
               },
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
 
         controller.close();
@@ -1032,8 +894,8 @@ export async function POST(req: NextRequest) {
             `data: ${JSON.stringify({
               type: "error",
               error: errorMessage || "Internal server error",
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
         controller.close();
       } finally {

@@ -60,6 +60,7 @@ import {
   RemoveNPCParams,
   NPCReactionParams,
   GM_TOOL_MAP,
+  SetReasoningTierParams,
 } from "./gmTools";
 import { validateToolArgs, formatValidationErrors } from "./toolValidation";
 import {
@@ -68,6 +69,11 @@ import {
 } from "./semanticSearchFallback";
 import { askFate, generateElement, MYTHIC_TABLE_NAMES, ElementCategory } from "./mythic";
 import { getTableByName, rollOnCustomTable } from "./tableRoller";
+import {
+  getTierState,
+  resolveTierEscalation,
+  TOP_TIER,
+} from "./reasoningTiers";
 import {
   getRPGSystem,
   checkSuccess,
@@ -108,6 +114,7 @@ export interface GMToolResult {
     | GMSearchMemoryResult
     | GMRequestContinuationResult
     | GMEndGmThinkingResult
+    | GMSetReasoningTierResult
     | GMStateChangeResult
     // Timer results
     | GMCreateTimerResult
@@ -300,6 +307,14 @@ export interface GMEndGmThinkingResult {
   outcome: "success" | "failure" | "mixed" | "neutral";
   narrativeHints?: string;
   dramaticMoment?: boolean;
+}
+
+export interface GMSetReasoningTierResult {
+  type: "set_reasoning_tier";
+  requestedTier: number;
+  grantedTier: number;
+  capped: boolean;
+  reason: string;
 }
 
 // ============================================
@@ -856,6 +871,13 @@ export async function executeGMTools(
           result = executeNPCReaction(
             call.id,
             params as NPCReactionParams,
+            modified
+          );
+          break;
+        case "set_reasoning_tier":
+          result = executeSetReasoningTier(
+            call.id,
+            params as SetReasoningTierParams,
             modified
           );
           break;
@@ -2333,6 +2355,62 @@ function executeEndGmThinking(
       narrativeHints,
       dramaticMoment,
     } as GMEndGmThinkingResult,
+    contextForStory,
+  };
+}
+
+/**
+ * Self-escalation request from the GM model, intercepted by the
+ * reasoning-tier router. Applies decay/cap policy and updates
+ * storyData.reasoningTierState directly (mutating `modified`, same as
+ * every other GM tool) - generation.ts re-reads that state each round
+ * to pick which model handles the next round.
+ */
+function executeSetReasoningTier(
+  toolCallId: string,
+  params: SetReasoningTierParams,
+  storyData: StoryData
+): GMToolResult {
+  const requestedTier = typeof params?.tier === "number" ? params.tier : 0;
+  const reason = params?.reason || "(no reason given)";
+
+  const tierState = getTierState(storyData);
+  const decision = resolveTierEscalation(
+    { tier: requestedTier, reason },
+    tierState.currentTier,
+    tierState
+  );
+  const grantedTier = decision.grantedTier;
+
+  storyData.reasoningTierState = {
+    currentTier: grantedTier,
+    tier3CallsInScene:
+      grantedTier === TOP_TIER
+        ? tierState.tier3CallsInScene + 1
+        : tierState.tier3CallsInScene,
+    lastSceneKey: tierState.lastSceneKey,
+  };
+
+  let contextForStory: string;
+  if (decision.capped) {
+    contextForStory = `[Reasoning tier escalation to ${requestedTier} capped at ${grantedTier} - scene top-tier limit reached]`;
+  } else if (grantedTier > tierState.currentTier) {
+    contextForStory = `[Reasoning tier escalated to ${grantedTier}: ${reason}]`;
+  } else {
+    contextForStory = `[Reasoning tier escalation request ignored - already at tier ${grantedTier}]`;
+  }
+
+  return {
+    toolName: "set_reasoning_tier",
+    toolCallId,
+    success: true,
+    result: {
+      type: "set_reasoning_tier",
+      requestedTier,
+      grantedTier,
+      capped: decision.capped,
+      reason,
+    } as GMSetReasoningTierResult,
     contextForStory,
   };
 }
