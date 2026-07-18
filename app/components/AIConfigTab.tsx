@@ -1,18 +1,15 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 import { REASONING_TIERS, NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
 import { getUserSettings, updateUserSettings, AIConfig } from "@/app/misc/user_settings";
-import { supabase } from "@/app/misc/supabase";
 import { logger, LogEntry } from "@/app/misc/logger";
 import SamplingSettingsTab from "./SamplingSettingsTab";
 
 export default function AIConfigTab() {
-  const { user } = useAuth();
   const { hasKey } = useAPIKeys();
 
   // Generation settings
@@ -160,11 +157,11 @@ export default function AIConfigTab() {
     return () => window.removeEventListener("story-log-update", refresh);
   }, []);
 
-  // Load settings from Supabase (AI config) - only once per session
+  // Load settings from local storage (AI config) - only once per session
   useEffect(() => {
-    if (user && !hasLoadedSettings) {
+    if (!hasLoadedSettings) {
       setIsLoadingSettings(true);
-      getUserSettings(user.id, supabase)
+      getUserSettings()
         .then((settings) => {
           if (settings?.ai_config) {
             const config = settings.ai_config;
@@ -199,7 +196,7 @@ export default function AIConfigTab() {
         })
         .finally(() => setIsLoadingSettings(false));
     }
-  }, [user, hasLoadedSettings]);
+  }, [hasLoadedSettings]);
 
   // Persist NovelAI settings
   useEffect(() => {
@@ -214,11 +211,10 @@ export default function AIConfigTab() {
     }
   }, [novelaiTemperature]);
 
-  // Auto-save context settings to cloud when they change (after initial load)
+  // Auto-save context settings (after initial load)
   useEffect(() => {
-    if (typeof window !== "undefined" && hasLoadedSettings && user) {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("customMaxContext", customMaxContext.toString());
-      // Debounced cloud sync - only save if user is logged in
       const timeoutId = setTimeout(() => {
         const aiConfig: AIConfig = {
           currentPreset: "auto", // reasoning-tier router manages model selection now
@@ -227,16 +223,15 @@ export default function AIConfigTab() {
           customMaxOutput:
             customMaxOutput !== 8000 ? customMaxOutput : undefined,
         };
-        updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
+        updateUserSettings({ ai_config: aiConfig });
       }, 1000); // Debounce 1 second
       return () => clearTimeout(timeoutId);
     }
-  }, [customMaxContext, hasLoadedSettings, user]);
+  }, [customMaxContext, hasLoadedSettings]);
 
   useEffect(() => {
-    if (typeof window !== "undefined" && hasLoadedSettings && user) {
+    if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("customMaxOutput", customMaxOutput.toString());
-      // Debounced cloud sync - only save if user is logged in
       const timeoutId = setTimeout(() => {
         const aiConfig: AIConfig = {
           currentPreset: "auto",
@@ -245,11 +240,11 @@ export default function AIConfigTab() {
           customMaxOutput:
             customMaxOutput !== 8000 ? customMaxOutput : undefined,
         };
-        updateUserSettings(user.id, { ai_config: aiConfig }, supabase);
+        updateUserSettings({ ai_config: aiConfig });
       }, 1000); // Debounce 1 second
       return () => clearTimeout(timeoutId);
     }
-  }, [customMaxOutput, hasLoadedSettings, user]);
+  }, [customMaxOutput, hasLoadedSettings]);
 
   if (isLoadingSettings) {
     return (

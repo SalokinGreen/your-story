@@ -1,4 +1,7 @@
-import { SupabaseClient } from "@supabase/supabase-js";
+/**
+ * Local-only user settings. Persisted in localStorage since the app no
+ * longer has a backend/account system.
+ */
 
 export interface CustomModel {
   id: string; // Unique ID for this custom model
@@ -20,129 +23,35 @@ export interface AIConfig {
 }
 
 export interface UserSettings {
-  user_id: string;
-  byok_enabled: boolean;
-  is_subscriber: boolean;
-  save_stories_locally?: boolean;
   custom_models?: CustomModel[]; // Array of custom models
   ai_config?: AIConfig; // AI preset configuration
 }
 
-export async function getUserSettings(
-  userId: string,
-  supabase: SupabaseClient
-): Promise<UserSettings | null> {
-  const { data, error } = await supabase
-    .from("user_settings")
-    .select("*")
-    .eq("user_id", userId)
-    .maybeSingle();
+const STORAGE_KEY = "yourStory_userSettings";
 
-  if (error) {
-    console.error("Error fetching user settings:", error);
+export async function getUserSettings(): Promise<UserSettings | null> {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as UserSettings) : {};
+  } catch (error) {
+    console.error("Error reading user settings:", error);
     return null;
   }
-
-  if (!data) {
-    // Settings not found - this should have been auto-created by the database trigger
-    // Try to create using service role as fallback
-    try {
-      const { createClient } = await import("@supabase/supabase-js");
-      const serviceRoleClient = createClient(
-        process.env.SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        {
-          auth: {
-            autoRefreshToken: false,
-            persistSession: false,
-          },
-        }
-      );
-
-      const { data: newData, error: insertError } = await serviceRoleClient
-        .from("user_settings")
-        .insert([{ user_id: userId }])
-        .select()
-        .single();
-
-      if (insertError) {
-        console.error("Error creating user settings:", insertError);
-        return null;
-      }
-      return newData as UserSettings;
-    } catch (serviceError) {
-      console.error(
-        "Error using service role for settings creation:",
-        serviceError
-      );
-      return null;
-    }
-  }
-
-  return data as UserSettings;
 }
 
 export async function updateUserSettings(
-  userId: string,
   settings: Partial<UserSettings>,
-  supabase: SupabaseClient
-): Promise<{ error: any }> {
-  // First check if settings exist
-  const { data: existingSettings } = await supabase
-    .from("user_settings")
-    .select("user_id")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  // Clean up undefined values and prepare the update object
-  const updateData: any = {};
-
-  // Only include defined fields (excluding user_id for update)
-  if (settings.byok_enabled !== undefined) {
-    updateData.byok_enabled = settings.byok_enabled;
-  }
-  if (settings.is_subscriber !== undefined) {
-    updateData.is_subscriber = settings.is_subscriber;
-  }
-  if (settings.save_stories_locally !== undefined) {
-    updateData.save_stories_locally = settings.save_stories_locally;
-  }
-  if (settings.custom_models !== undefined) {
-    // Convert undefined to empty array for JSONB field
-    updateData.custom_models = settings.custom_models || [];
-  }
-  if (settings.ai_config !== undefined) {
-    updateData.ai_config = settings.ai_config || {};
-  }
-
-  let error;
-  if (existingSettings) {
-    // Update existing record
-    const result = await supabase
-      .from("user_settings")
-      .update(updateData)
-      .eq("user_id", userId);
-    error = result.error;
-  } else {
-    // Insert new record
-    const result = await supabase
-      .from("user_settings")
-      .insert({ user_id: userId, ...updateData });
-    error = result.error;
-  }
-
-  if (error) {
+): Promise<{ error: unknown }> {
+  if (typeof window === "undefined") return { error: null };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const existing: UserSettings = raw ? JSON.parse(raw) : {};
+    const updated: UserSettings = { ...existing, ...settings };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    return { error: null };
+  } catch (error) {
     console.error("Error updating user settings:", error);
-
-    // Check if it's a schema/table issue
-    if (error.code === "PGRST204" || error.code === "42P01") {
-      console.error(
-        "⚠️  The user_settings table may not exist. Please run the migration:",
-        "\n\n  Run this SQL in your Supabase SQL Editor:",
-        "\n  docs/user_settings.sql\n"
-      );
-    }
+    return { error };
   }
-
-  return { error };
 }

@@ -3,10 +3,8 @@
 import { useState, useCallback, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
-import { getAuthToken } from "@/app/misc/getAuthToken";
 import PDFImporter from "@/app/components/PDFImporter";
 import {
   BigAdventureConfig,
@@ -68,7 +66,6 @@ import {
   estimateImageCost,
   calculateDeepInfraImageCost,
 } from "@/app/misc/ai_prices";
-import { createClient } from "@supabase/supabase-js";
 import {
   Adventure,
   Stat,
@@ -83,6 +80,8 @@ import {
   CustomTable,
 } from "@/app/misc/structs";
 import { parseTemplateFields } from "@/app/misc/characterSheetTemplate";
+import { saveLocalAdventure } from "@/app/misc/localAdventureManager";
+import { startAdventureLocally } from "@/app/misc/localStoryManager";
 import { AdventureVisualization } from "./AdventureVisualization";
 
 // Autosave Recovery Modal
@@ -213,7 +212,7 @@ function JsonRepairModal({
       // Extract JSON from content
       let jsonContent = editedContent.trim();
       const jsonBlockMatch = jsonContent.match(
-        /```(?:json)?\s*([\s\S]*?)\s*```/
+        /```(?:json)?\s*([\s\S]*?)\s*```/,
       );
       if (jsonBlockMatch) {
         jsonContent = jsonBlockMatch[1].trim();
@@ -233,7 +232,7 @@ function JsonRepairModal({
       setParseError(null);
     } catch (e) {
       setParseError(
-        "Cannot format - JSON is not valid. Try fixing the errors first."
+        "Cannot format - JSON is not valid. Try fixing the errors first.",
       );
     }
   };
@@ -354,10 +353,10 @@ function StageToggle({
     stage === "content"
       ? "content-lore"
       : stage === "advanced"
-      ? "advanced-presets"
-      : stage === "mechanics"
-      ? "mechanics-notes"
-      : stage;
+        ? "advanced-presets"
+        : stage === "mechanics"
+          ? "mechanics-notes"
+          : stage;
   const info = getStageInfo(substage);
 
   // Custom names for legacy stages in UI
@@ -418,8 +417,8 @@ function ConfigStep({
             isComplete
               ? "bg-green-500 text-white"
               : isActive
-              ? "bg-purple-500 text-white"
-              : "bg-blue-900/50 text-blue-300/50"
+                ? "bg-purple-500 text-white"
+                : "bg-blue-900/50 text-blue-300/50"
           }`}
         >
           {isComplete ? "✓" : step}
@@ -458,10 +457,10 @@ function StageProgress({
               isActive
                 ? "bg-purple-500/20 border border-purple-500/50"
                 : isComplete
-                ? "bg-green-500/10 border border-green-500/30"
-                : isFailed
-                ? "bg-red-500/10 border border-red-500/30"
-                : "bg-blue-900/30 border border-blue-700/30"
+                  ? "bg-green-500/10 border border-green-500/30"
+                  : isFailed
+                    ? "bg-red-500/10 border border-red-500/30"
+                    : "bg-blue-900/30 border border-blue-700/30"
             }`}
           >
             <div
@@ -469,10 +468,10 @@ function StageProgress({
                 isComplete
                   ? "bg-green-500 text-white"
                   : isFailed
-                  ? "bg-red-500 text-white"
-                  : isActive
-                  ? "bg-purple-500 text-white animate-pulse"
-                  : "bg-blue-900/50 text-blue-300/50"
+                    ? "bg-red-500 text-white"
+                    : isActive
+                      ? "bg-purple-500 text-white animate-pulse"
+                      : "bg-blue-900/50 text-blue-300/50"
               }`}
             >
               {isComplete ? "✓" : isFailed ? "✗" : info.number}
@@ -506,13 +505,13 @@ function LiveOutput({
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [selectedStage, setSelectedStage] = useState<GenerationStage | null>(
-    null
+    null,
   );
   const [autoScroll, setAutoScroll] = useState(false);
 
   // All stages that have content (active or completed)
   const stagesWithContent = Array.from(stageContents.keys()).filter((stage) =>
-    stageContents.get(stage)
+    stageContents.get(stage),
   );
 
   // Auto-select the first active stage when a new stage starts
@@ -950,7 +949,7 @@ function ContentBrowser({
             <button
               onClick={() =>
                 setSelectedItemIndex((prev) =>
-                  Math.min(currentSection.items.length - 1, prev + 1)
+                  Math.min(currentSection.items.length - 1, prev + 1),
                 )
               }
               disabled={selectedItemIndex === currentSection.items.length - 1}
@@ -1166,7 +1165,7 @@ function ExpandableContentCard({
               colorClass.hover
             } disabled:bg-blue-900/30 ${colorClass.text.replace(
               "400",
-              "300"
+              "300",
             )} rounded transition-all`}
             title={`Regenerate all ${label.toLowerCase()}`}
           >
@@ -1232,7 +1231,6 @@ function ExpandableContentCard({
 function BigAdventureCreatorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
   const { keys: apiKeys, hasKey } = useAPIKeys();
   const { addNotification } = useNotification();
 
@@ -1416,7 +1414,7 @@ function BigAdventureCreatorPage() {
   useEffect(() => {
     localStorage.setItem(
       "bigAdventureExtensionByokMode",
-      extensionByokMode.toString()
+      extensionByokMode.toString(),
     );
   }, [extensionByokMode]);
 
@@ -1457,14 +1455,14 @@ function BigAdventureCreatorPage() {
       } else {
         return provider === "mistral" || provider === "deepinfra";
       }
-    }
+    },
   );
 
   // Get the selected extension model config
   const extensionModelConfig = getModelConfig(extensionModel);
   const extensionMaxOutput = Math.min(
     extensionModelConfig.maxOutputTokens || 8000,
-    65000
+    65000,
   );
 
   // Content preview expansion state
@@ -1510,7 +1508,7 @@ function BigAdventureCreatorPage() {
   const [selectedTemplate, setSelectedTemplate] =
     useState<PromptTemplate | null>(null);
   const [guidedAnswers, setGuidedAnswers] = useState<Record<string, string>>(
-    {}
+    {},
   );
 
   // AI Image generation state
@@ -1737,7 +1735,7 @@ function BigAdventureCreatorPage() {
       setAutosaveTimeStr(
         timeAgo < 60
           ? `${Math.round(timeAgo)} minutes ago`
-          : `${Math.round(timeAgo / 60)} hours ago`
+          : `${Math.round(timeAgo / 60)} hours ago`,
       );
       setShowAutosaveModal(true);
     } else {
@@ -1807,7 +1805,7 @@ function BigAdventureCreatorPage() {
         setResult(pendingAutosave.partialResults as BigAdventureResult);
         addNotification(
           "Progress restored! Your adventure is ready.",
-          "success"
+          "success",
         );
       }
     } else {
@@ -1820,7 +1818,7 @@ function BigAdventureCreatorPage() {
         `Progress restored! ${pendingAutosave.completedStages.length} of ${
           getStagesToRun(pendingAutosave.config).length
         } stages completed. Click "Continue Generation" to resume.`,
-        "success"
+        "success",
       );
     }
   }, [pendingAutosave, addNotification]);
@@ -1843,7 +1841,7 @@ function BigAdventureCreatorPage() {
         if (!parsedResult) {
           addNotification(
             "Failed to parse fixed JSON - please check the format",
-            "warning"
+            "warning",
           );
           return;
         }
@@ -1872,18 +1870,18 @@ function BigAdventureCreatorPage() {
           `Successfully recovered ${
             getStageInfo(stage).name
           } stage from fixed JSON!`,
-          "success"
+          "success",
         );
       } catch (err) {
         addNotification(
           `Error applying fixed JSON: ${
             err instanceof Error ? err.message : "Unknown error"
           }`,
-          "warning"
+          "warning",
         );
       }
     },
-    [addNotification]
+    [addNotification],
   );
 
   // Get model's max output tokens
@@ -1906,7 +1904,7 @@ function BigAdventureCreatorPage() {
     const coinCost = calculateTokenCost(
       selectedModel,
       estimate.inputTokens,
-      estimate.outputTokens
+      estimate.outputTokens,
     );
 
     return { coins: coinCost, dollars: dollarCost };
@@ -1958,7 +1956,7 @@ function BigAdventureCreatorPage() {
         stylePreset: template.suggestedStyle,
       });
     },
-    [updateConfig]
+    [updateConfig],
   );
 
   // Update a guided builder answer
@@ -1971,7 +1969,7 @@ function BigAdventureCreatorPage() {
         return newAnswers;
       });
     },
-    [updateConfig]
+    [updateConfig],
   );
 
   // Finalize the guided prompt
@@ -2004,7 +2002,7 @@ function BigAdventureCreatorPage() {
     } else if (promptMode === "guided") {
       // Check required questions
       const missingRequired = PROMPT_BUILDER_QUESTIONS.filter(
-        (q) => q.required && !guidedAnswers[q.id]?.trim()
+        (q) => q.required && !guidedAnswers[q.id]?.trim(),
       ).map((q) => q.question.replace(/\?$/, ""));
 
       if (missingRequired.length > 0) {
@@ -2038,7 +2036,7 @@ function BigAdventureCreatorPage() {
       setValidationError(validation.error);
       addNotification(
         validation.error || "Please fill in required fields",
-        "warning"
+        "warning",
       );
       return;
     }
@@ -2061,7 +2059,7 @@ function BigAdventureCreatorPage() {
     } else if (promptMode === "guided") {
       // Check if all required questions are answered
       return PROMPT_BUILDER_QUESTIONS.filter((q) => q.required).every(
-        (q) => !!guidedAnswers[q.id]?.trim()
+        (q) => !!guidedAnswers[q.id]?.trim(),
       );
     }
     return false;
@@ -2092,7 +2090,7 @@ function BigAdventureCreatorPage() {
         };
       });
     },
-    []
+    [],
   );
 
   // Start generation using sequential orchestrator (handles Vercel timeout limits)
@@ -2106,7 +2104,7 @@ function BigAdventureCreatorPage() {
     if (isNovelAISelected && !novelaiKey.trim()) {
       addNotification(
         "Please enter your NovelAI API key to use this model",
-        "warning"
+        "warning",
       );
       return;
     }
@@ -2179,7 +2177,7 @@ function BigAdventureCreatorPage() {
           newMap.set(
             stage,
             currentContent +
-              `\n\n/* Continuing generation (${attempt}/${maxAttempts})... */\n`
+              `\n\n/* Continuing generation (${attempt}/${maxAttempts})... */\n`,
           );
           return newMap;
         });
@@ -2196,7 +2194,7 @@ function BigAdventureCreatorPage() {
         const coinCost = calculateTokenCost(
           selectedModel,
           promptTokens,
-          completionTokens
+          completionTokens,
         );
         setTokenCost((prev) => prev + coinCost);
 
@@ -2255,14 +2253,14 @@ function BigAdventureCreatorPage() {
             `Stage ${
               getStageInfo(stage).name
             } failed - you can try to fix the JSON manually`,
-            "warning"
+            "warning",
           );
         } else {
           addNotification(
             canRetry
               ? error
               : `Stage ${getStageInfo(stage).name} failed: ${error}`,
-            "warning"
+            "warning",
           );
         }
         // Remove from active stages (keep content in map for debugging)
@@ -2296,7 +2294,7 @@ function BigAdventureCreatorPage() {
           `Adventure generated! Total tokens: ${
             tokens.prompt + tokens.completion
           }`,
-          "success"
+          "success",
         );
         setIsGenerating(false);
         setActiveStages([]);
@@ -2308,7 +2306,7 @@ function BigAdventureCreatorPage() {
         if (error.includes("cancelled")) {
           addNotification(
             "Generation cancelled. Progress has been saved.",
-            "warning"
+            "warning",
           );
         } else {
           addNotification(error || "Generation failed", "failure");
@@ -2341,7 +2339,7 @@ function BigAdventureCreatorPage() {
         finishEarlyRef,
         parallelMode: parallelMode && !isNovelAISelected, // Disable for NovelAI
       },
-      callbacks
+      callbacks,
     );
   }, [
     config,
@@ -2358,21 +2356,19 @@ function BigAdventureCreatorPage() {
     parallelMode,
   ]);
 
-  // Auto-start generation when quick start is ready and user is authenticated
+  // Auto-start generation when quick start is ready
   useEffect(() => {
     console.log("[Auto-Start Effect] Checking:", {
       quickStartReady,
-      hasUser: !!user,
-      authLoading,
       isGenerating,
     });
-    if (quickStartReady && user && !authLoading && !isGenerating) {
+    if (quickStartReady && !isGenerating) {
       console.log("[Auto-Start] All conditions met! Starting generation...");
       setQuickStartReady(false);
       setIsQuickStart(false); // Clear quick start flag once we start
       addNotification(
         `Quick Start: Generating ${config.genre} adventure with Mistral Large 3.0...`,
-        "success"
+        "success",
       );
       // Call startGeneration directly, no delay needed
       console.log("[Auto-Start] Calling startGeneration()...");
@@ -2380,8 +2376,6 @@ function BigAdventureCreatorPage() {
     }
   }, [
     quickStartReady,
-    user,
-    authLoading,
     isGenerating,
     startGeneration,
     addNotification,
@@ -2398,13 +2392,7 @@ function BigAdventureCreatorPage() {
   // Regenerate a specific section
   const handleRegenerateSection = useCallback(
     async (section: RegenerateSection, customInstructions?: string) => {
-      if (!result || !user) return;
-
-      const token = await getAuthToken();
-      if (!token) {
-        addNotification("Please sign in to regenerate", "warning");
-        return;
-      }
+      if (!result) return;
 
       // Add section to regenerating set
       setRegeneratingSections((prev) => new Set(prev).add(section));
@@ -2415,7 +2403,6 @@ function BigAdventureCreatorPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             section,
@@ -2500,7 +2487,7 @@ function BigAdventureCreatorPage() {
 
                   addNotification(
                     `${REGENERATE_SECTIONS[section].name} regenerated!`,
-                    "success"
+                    "success",
                   );
                 }
               } else if (event.type === "error") {
@@ -2516,7 +2503,7 @@ function BigAdventureCreatorPage() {
           error instanceof Error ? error.message : String(error);
         addNotification(
           errorMessage || "Failed to regenerate section",
-          "failure"
+          "failure",
         );
       } finally {
         // Remove section from regenerating set
@@ -2531,13 +2518,12 @@ function BigAdventureCreatorPage() {
     [
       result,
       config,
-      user,
       addNotification,
       apiKeys.openRouterKey,
       apiKeys.deepseekKey,
       extensionModel,
       extensionOutputSize,
-    ]
+    ],
   );
 
   // Extend a section (add more content)
@@ -2545,21 +2531,15 @@ function BigAdventureCreatorPage() {
     async (
       section: RegenerateSection,
       maxOutputTokens: number = 4000,
-      customInstructions?: string
+      customInstructions?: string,
     ) => {
-      if (!result || !user) return;
+      if (!result) return;
 
       if (!canExtendSection(section)) {
         addNotification(
           `Cannot add more to ${REGENERATE_SECTIONS[section].name}`,
-          "warning"
+          "warning",
         );
-        return;
-      }
-
-      const token = await getAuthToken();
-      if (!token) {
-        addNotification("Please sign in to extend content", "warning");
         return;
       }
 
@@ -2572,7 +2552,6 @@ function BigAdventureCreatorPage() {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             section,
@@ -2640,17 +2619,17 @@ function BigAdventureCreatorPage() {
 
                   addNotification(
                     `Added more ${REGENERATE_SECTIONS[section].name}!`,
-                    "success"
+                    "success",
                   );
                 } else {
                   // Parsing failed - show error to user
                   console.error(
                     "Extend section: Failed to parse result",
-                    event.rawContent
+                    event.rawContent,
                   );
                   addNotification(
                     `Failed to parse extended ${REGENERATE_SECTIONS[section].name} - check console for details`,
-                    "warning"
+                    "warning",
                   );
                 }
               } else if (event.type === "error") {
@@ -2678,12 +2657,11 @@ function BigAdventureCreatorPage() {
     [
       result,
       config,
-      user,
       addNotification,
       apiKeys.openRouterKey,
       apiKeys.deepseekKey,
       extensionModel,
-    ]
+    ],
   );
 
   // Export adventure as JSON
@@ -2764,7 +2742,7 @@ function BigAdventureCreatorPage() {
       // Reset input
       event.target.value = "";
     },
-    [addNotification]
+    [addNotification],
   );
 
   // Save current config as template
@@ -2803,7 +2781,7 @@ function BigAdventureCreatorPage() {
       });
       addNotification(`Template "${template.name}" loaded!`, "success");
     },
-    [config.prompt, addNotification]
+    [config.prompt, addNotification],
   );
 
   // Delete a template
@@ -2813,7 +2791,7 @@ function BigAdventureCreatorPage() {
       setTemplates(loadConfigTemplates());
       addNotification("Template deleted", "success");
     },
-    [addNotification]
+    [addNotification],
   );
 
   // Load from history
@@ -2829,7 +2807,7 @@ function BigAdventureCreatorPage() {
       setShowHistoryModal(false);
       addNotification(`Loaded "${entry.title}" from history`, "success");
     },
-    [addNotification]
+    [addNotification],
   );
 
   // Delete history entry
@@ -2839,7 +2817,7 @@ function BigAdventureCreatorPage() {
       setHistory(loadGenerationHistory());
       addNotification("History entry deleted", "success");
     },
-    [addNotification]
+    [addNotification],
   );
 
   // Clear all history
@@ -2864,7 +2842,7 @@ ${result.shortDescription || ""}
 ${result.description || ""}`;
       return base;
     },
-    [result]
+    [result],
   );
 
   // Initialize prompts when result changes
@@ -2880,28 +2858,24 @@ ${result.description || ""}`;
   // Generate and upload image
   const generateImage = useCallback(
     async (type: "thumbnail" | "banner") => {
-      if (!user) {
-        addNotification("Please sign in to generate images", "warning");
-        return;
-      }
-
-      const token = await getAuthToken();
-      if (!token) {
-        addNotification("Authentication required", "warning");
-        return;
-      }
-
       const prompt = type === "thumbnail" ? thumbnailPrompt : bannerPrompt;
       if (!prompt.trim()) {
         addNotification("Please enter a prompt", "warning");
         return;
       }
 
-      // Validate API key for OpenRouter provider
+      // Validate API key for the selected provider
       if (imageProvider === "openrouter" && !apiKeys.openRouterKey) {
         addNotification(
           "OpenRouter API key required. Please add your API key in Settings.",
-          "warning"
+          "warning",
+        );
+        return;
+      }
+      if (imageProvider === "deepinfra" && !apiKeys.deepinfraKey) {
+        addNotification(
+          "DeepInfra API key required. Please add your API key in Settings.",
+          "warning",
         );
         return;
       }
@@ -2918,7 +2892,6 @@ ${result.description || ""}`;
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
             prompt,
@@ -2929,7 +2902,8 @@ ${result.description || ""}`;
               imageProvider === "openrouter"
                 ? apiKeys.openRouterKey
                 : undefined,
-            // DeepInfra uses server-side key (Coins mode) - no BYOK for images
+            deepInfraKey:
+              imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
           }),
         });
 
@@ -2938,43 +2912,13 @@ ${result.description || ""}`;
           throw new Error(error.error || "Image generation failed");
         }
 
-        const { imageUrl, meta } = await response.json();
+        const { imageUrl } = await response.json();
 
-        // Upload to Supabase storage
-        const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-        const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_KEY!;
-        const supabase = createClient(supabaseUrl, supabaseKey);
+        setUrl(imageUrl);
 
-        // Fetch the image and convert to blob
-        const imageResponse = await fetch(imageUrl);
-        const imageBlob = await imageResponse.blob();
-
-        const fileName = `${Date.now()}-ai-${type}.webp`;
-        const filePath = `${user.id}/adventure-${type}s/${fileName}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from("adventure-images")
-          .upload(filePath, imageBlob, { cacheControl: "3600", upsert: false });
-
-        if (uploadError) throw uploadError;
-
-        const { data } = supabase.storage
-          .from("adventure-images")
-          .getPublicUrl(filePath);
-
-        setUrl(data.publicUrl);
-
-        // Show appropriate success message
-        const costMessage = meta.isByok
-          ? "(BYOK - no coins)"
-          : meta.cost > 0
-          ? `Cost: ${meta.cost} coins`
-          : "(FREE)";
         addNotification(
-          `${
-            type === "thumbnail" ? "Thumbnail" : "Banner"
-          } generated! ${costMessage}`,
-          "success"
+          `${type === "thumbnail" ? "Thumbnail" : "Banner"} generated!`,
+          "success",
         );
       } catch (error) {
         const errorMessage =
@@ -2985,47 +2929,40 @@ ${result.description || ""}`;
       }
     },
     [
-      user,
       thumbnailPrompt,
       bannerPrompt,
       imageModel,
       imageProvider,
       addNotification,
       apiKeys.openRouterKey,
-    ]
+      apiKeys.deepinfraKey,
+    ],
   );
 
   // Save adventure
   const saveAdventure = useCallback(async () => {
-    if (!result || !user) return;
-
-    const token = await getAuthToken();
-    if (!token) {
-      addNotification("Please sign in to save adventures", "warning");
-      return;
-    }
+    if (!result) return;
 
     setIsSaving(true);
 
     try {
-      const adventure: Partial<Adventure> & { authorId: string } = {
+      const adventure: Partial<Adventure> = {
         title: result.title || "Untitled Adventure",
         description: result.description || "",
         shortDescription: result.shortDescription || "",
-        authorId: user.id,
         tags: config.genre ? [config.genre] : [],
         difficulty:
           config.complexity === "simple"
             ? "easy"
             : config.complexity === "complex"
-            ? "hard"
-            : "medium",
+              ? "hard"
+              : "medium",
         estimatedDuration:
           config.targetDuration === "short"
             ? "1-2 hours"
             : config.targetDuration === "long"
-            ? "4-6 hours"
-            : "2-4 hours",
+              ? "4-6 hours"
+              : "2-4 hours",
         nsfw: config.nsfw,
         storyTemplate: result.storyTemplate,
         startingChoices: result.startingChoices,
@@ -3034,7 +2971,7 @@ ${result.description || ""}`;
           ? {
               template: result.characterSheetTemplate.template,
               fields: parseTemplateFields(
-                result.characterSheetTemplate.template
+                result.characterSheetTemplate.template,
               ),
             }
           : undefined,
@@ -3046,25 +2983,14 @@ ${result.description || ""}`;
         popularity: 0,
       };
 
-      const response = await fetch("/api/adventures", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(adventure),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || "Failed to save adventure");
-      }
-
-      const { adventure: savedAdventure } = await response.json();
-      addNotification("Adventure saved successfully!", "success");
+      const localId = `local:${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+      await saveLocalAdventure(localId, adventure);
+      addNotification("Adventure saved locally!", "success");
 
       // Navigate to the creator to edit the adventure
-      router.push(`/creator/manual?edit=${savedAdventure.id}`);
+      router.push(`/creator/manual?edit=${localId}`);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -3072,41 +2998,35 @@ ${result.description || ""}`;
     } finally {
       setIsSaving(false);
     }
-  }, [result, config, addNotification, router, user, thumbnailUrl, bannerUrl]);
+  }, [result, config, addNotification, router, thumbnailUrl, bannerUrl]);
 
   // Auto-publish and start playing when quick start generation completes
   useEffect(() => {
-    if (!autoPublishAndPlay || !result || !user || isSaving) return;
+    if (!autoPublishAndPlay || !result || isSaving) return;
 
     const autoPublishAndStartPlaying = async () => {
       setAutoPublishAndPlay(false); // Prevent re-running
       setIsSaving(true);
 
       try {
-        const token = await getAuthToken();
-        if (!token) {
-          throw new Error("Not authenticated");
-        }
-
-        // 1. Save the adventure as private
-        const adventure: Partial<Adventure> & { authorId: string } = {
+        // 1. Save the adventure locally
+        const adventure: Partial<Adventure> = {
           title: result.title || "Untitled Adventure",
           description: result.description || "",
           shortDescription: result.shortDescription || "",
-          authorId: user.id,
           tags: config.genre ? [config.genre] : [],
           difficulty:
             config.complexity === "simple"
               ? "easy"
               : config.complexity === "complex"
-              ? "hard"
-              : "medium",
+                ? "hard"
+                : "medium",
           estimatedDuration:
             config.targetDuration === "short"
               ? "1-2 hours"
               : config.targetDuration === "long"
-              ? "4-6 hours"
-              : "2-4 hours",
+                ? "4-6 hours"
+                : "2-4 hours",
           nsfw: config.nsfw,
           storyTemplate: result.storyTemplate,
           startingChoices: result.startingChoices,
@@ -3115,7 +3035,7 @@ ${result.description || ""}`;
             ? {
                 template: result.characterSheetTemplate.template,
                 fields: parseTemplateFields(
-                  result.characterSheetTemplate.template
+                  result.characterSheetTemplate.template,
                 ),
               }
             : undefined,
@@ -3128,56 +3048,20 @@ ${result.description || ""}`;
 
         addNotification("Saving adventure...", "success");
 
-        const adventureResponse = await fetch("/api/adventures", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(adventure),
-        });
+        const localAdventureId = `local:${Date.now()}_${Math.random()
+          .toString(36)
+          .substr(2, 9)}`;
+        await saveLocalAdventure(localAdventureId, adventure);
 
-        if (!adventureResponse.ok) {
-          const error = await adventureResponse.json();
-          throw new Error(error.error || "Failed to save adventure");
-        }
-
-        const { adventure: savedAdventure } = await adventureResponse.json();
-
-        // 2. Create a new story from the adventure
+        // 2. Create a new local story from the adventure
         addNotification("Starting your adventure...", "success");
 
-        const storyResponse = await fetch("/api/stories", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            adventureId: savedAdventure.id,
-            userId: user.id,
-            storyName: `${
-              savedAdventure.title
-            } - ${new Date().toLocaleDateString()}`,
-            storyData: {
-              ...result.storyTemplate,
-              starting_choices: result.startingChoices,
-            },
-            isPublic: false,
-          }),
-        });
-
-        if (!storyResponse.ok) {
-          const error = await storyResponse.json();
-          throw new Error(error.error || "Failed to start story");
-        }
-
-        const { story } = await storyResponse.json();
+        const localStoryId = await startAdventureLocally(adventure);
 
         addNotification("Adventure ready! Let's play! 🎮", "success");
 
         // 3. Navigate to the story page
-        router.push(`/story?storyId=${story.id}`);
+        router.push(`/story?storyId=${localStoryId}`);
       } catch (error) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
@@ -3189,26 +3073,9 @@ ${result.description || ""}`;
     };
 
     autoPublishAndStartPlaying();
-  }, [
-    autoPublishAndPlay,
-    result,
-    user,
-    isSaving,
-    config,
-    router,
-    addNotification,
-  ]);
+  }, [autoPublishAndPlay, result, isSaving, config, router, addNotification]);
 
-  // Auth check
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
-        <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  // Quick start loading - show while waiting for auth and preparing generation
+  // Quick start loading - show while waiting for generation prep
   if (isQuickStart && quickStartReady) {
     return (
       <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
@@ -3220,27 +3087,6 @@ ${result.description || ""}`;
           <p className="text-blue-300/60">
             Setting up {config.genre} adventure with Mistral Large 3.0...
           </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-white mb-4">
-            Sign In Required
-          </h1>
-          <p className="text-blue-300/60 mb-6">
-            Please sign in to use the Big Adventure Creator.
-          </p>
-          <Link
-            href="/"
-            className="px-6 py-3 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-colors"
-          >
-            Go to Home
-          </Link>
         </div>
       </div>
     );
@@ -3315,7 +3161,7 @@ ${result.description || ""}`;
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
                     {previewStageData.partialResult.storyTemplate.lore &&
                       Array.isArray(
-                        previewStageData.partialResult.storyTemplate.lore
+                        previewStageData.partialResult.storyTemplate.lore,
                       ) && (
                         <div className="bg-blue-900/30 rounded px-3 py-2">
                           <span className="text-purple-400 font-bold">
@@ -3331,7 +3177,7 @@ ${result.description || ""}`;
                       .achievements &&
                       Array.isArray(
                         previewStageData.partialResult.storyTemplate
-                          .achievements
+                          .achievements,
                       ) && (
                         <div className="bg-blue-900/30 rounded px-3 py-2">
                           <span className="text-red-400 font-bold">
@@ -3349,7 +3195,7 @@ ${result.description || ""}`;
                       .relationships &&
                       Array.isArray(
                         previewStageData.partialResult.storyTemplate
-                          .relationships
+                          .relationships,
                       ) && (
                         <div className="bg-blue-900/30 rounded px-3 py-2">
                           <span className="text-pink-400 font-bold">
@@ -3911,8 +3757,8 @@ ${result.description || ""}`;
                                   (l) =>
                                     `- **${l.title}**: ${l.content.slice(
                                       0,
-                                      200
-                                    )}...`
+                                      200,
+                                    )}...`,
                                 )
                                 .join("\n")}`
                             : "",
@@ -3922,8 +3768,8 @@ ${result.description || ""}`;
                                   (n: StoryLore) =>
                                     `- **${n.title}**: ${n.content.slice(
                                       0,
-                                      200
-                                    )}...`
+                                      200,
+                                    )}...`,
                                 )
                                 .join("\n")}`
                             : "",
@@ -3931,7 +3777,7 @@ ${result.description || ""}`;
                             ? `\n\n## Tables from Source Material:\n${result.customTables
                                 .map(
                                   (t: CustomTable) =>
-                                    `- **${t.name}**: ${t.entries.length} entries`
+                                    `- **${t.name}**: ${t.entries.length} entries`,
                                 )
                                 .join("\n")}`
                             : "",
@@ -3950,7 +3796,7 @@ ${result.description || ""}`;
                           } mechanics, ${
                             result.customTables?.length || 0
                           } tables - will be merged into final adventure`,
-                          "success"
+                          "success",
                         );
                       }}
                     />
@@ -3988,7 +3834,7 @@ ${result.description || ""}`;
                             });
                             addNotification(
                               "Cleared all imported content",
-                              "success"
+                              "success",
                             );
                           }}
                           className="text-red-400 hover:text-red-300 underline text-xs"
@@ -4210,8 +4056,8 @@ ${result.description || ""}`;
                         {byokMode
                           ? "(Free - BYOK)"
                           : model.cost > 0
-                          ? `(~${model.cost} coins base)`
-                          : "(Free)"}
+                            ? `(~${model.cost} coins base)`
+                            : "(Free)"}
                       </option>
                     ))}
                   </select>
@@ -4333,7 +4179,7 @@ ${result.description || ""}`;
                       {(
                         Object.entries(STYLE_PRESETS) as [
                           StylePreset,
-                          (typeof STYLE_PRESETS)[StylePreset]
+                          (typeof STYLE_PRESETS)[StylePreset],
                         ][]
                       ).map(([key, style]) => (
                         <button
@@ -4421,7 +4267,7 @@ ${result.description || ""}`;
                       step={getModelMaxTokens() <= 2000 ? 100 : 500}
                       value={Math.min(
                         config.maxOutputTokens,
-                        getModelMaxTokens()
+                        getModelMaxTokens(),
                       )}
                       onChange={(e) =>
                         updateConfig({
@@ -4602,7 +4448,7 @@ ${result.description || ""}`;
                           const stageValue = Math.min(
                             config.stageConfigs?.[stage]?.maxOutputTokens ??
                               config.maxOutputTokens,
-                            getModelMaxTokens()
+                            getModelMaxTokens(),
                           );
                           // Map legacy stage to first substage for getStageInfo
                           // NOTE: "mechanics" maps to "mechanics-notes" (abilities stage is deprecated)
@@ -4610,10 +4456,10 @@ ${result.description || ""}`;
                             stage === "content"
                               ? "content-lore"
                               : stage === "advanced"
-                              ? "advanced-presets"
-                              : stage === "mechanics"
-                              ? "mechanics-notes"
-                              : stage;
+                                ? "advanced-presets"
+                                : stage === "mechanics"
+                                  ? "mechanics-notes"
+                                  : stage;
                           return (
                             <div
                               key={stage}
@@ -4668,10 +4514,10 @@ ${result.description || ""}`;
                             stage === "content"
                               ? "content-lore"
                               : stage === "advanced"
-                              ? "advanced-presets"
-                              : stage === "mechanics"
-                              ? "mechanics-notes"
-                              : stage;
+                                ? "advanced-presets"
+                                : stage === "mechanics"
+                                  ? "mechanics-notes"
+                                  : stage;
                           const info = getStageInfo(substage);
                           const legacyNames: Record<LegacyStage, string> = {
                             core: "Core Concept",
@@ -4807,7 +4653,7 @@ ${result.description || ""}`;
                         clearAutosave();
                         addNotification(
                           "Cleared previous progress. Ready to start fresh.",
-                          "success"
+                          "success",
                         );
                       }}
                       className="text-xs text-amber-400/70 hover:text-amber-300 underline"
@@ -4912,8 +4758,8 @@ ${result.description || ""}`;
                   activeStages.length > 1
                     ? "Cannot finish early while multiple stages are running in parallel"
                     : activeStages.length === 0
-                    ? "No stage is currently generating"
-                    : "Tell AI to finish the current stage and move on"
+                      ? "No stage is currently generating"
+                      : "Tell AI to finish the current stage and move on"
                 }
               >
                 Finish Stage Early
@@ -5010,7 +4856,7 @@ ${result.description || ""}`;
                           "customTables",
                         ];
                         const allExpanded = allSections.every((s) =>
-                          expandedSections.has(s)
+                          expandedSections.has(s),
                         );
                         if (allExpanded) {
                           setExpandedSections(new Set());
@@ -5042,7 +4888,7 @@ ${result.description || ""}`;
                         handleExtendSection(
                           "lore",
                           extensionOutputSize,
-                          extensionInstructions
+                          extensionInstructions,
                         )
                       }
                       isRegenerating={regeneratingSections.has("lore")}
@@ -5076,14 +4922,14 @@ ${result.description || ""}`;
                       onRegenerate={() =>
                         handleRegenerateSection(
                           "achievements",
-                          extensionInstructions
+                          extensionInstructions,
                         )
                       }
                       onExtend={() =>
                         handleExtendSection(
                           "achievements",
                           extensionOutputSize,
-                          extensionInstructions
+                          extensionInstructions,
                         )
                       }
                       isRegenerating={regeneratingSections.has("achievements")}
@@ -5127,7 +4973,7 @@ ${result.description || ""}`;
                         handleExtendSection(
                           "quests",
                           extensionOutputSize,
-                          extensionInstructions
+                          extensionInstructions,
                         )
                       }
                       isRegenerating={regeneratingSections.has("quests")}
@@ -5159,14 +5005,14 @@ ${result.description || ""}`;
                       onRegenerate={() =>
                         handleRegenerateSection(
                           "presets",
-                          extensionInstructions
+                          extensionInstructions,
                         )
                       }
                       onExtend={() =>
                         handleExtendSection(
                           "presets",
                           extensionOutputSize,
-                          extensionInstructions
+                          extensionInstructions,
                         )
                       }
                       isRegenerating={regeneratingSections.has("presets")}
@@ -5203,14 +5049,14 @@ ${result.description || ""}`;
                       onRegenerate={() =>
                         handleRegenerateSection(
                           "variables",
-                          extensionInstructions
+                          extensionInstructions,
                         )
                       }
                       onExtend={() =>
                         handleExtendSection(
                           "variables",
                           extensionOutputSize,
-                          extensionInstructions
+                          extensionInstructions,
                         )
                       }
                       isRegenerating={regeneratingSections.has("variables")}
@@ -5255,12 +5101,12 @@ ${result.description || ""}`;
                       onRegenerate={() =>
                         handleRegenerateSection(
                           "startingChoices",
-                          extensionInstructions
+                          extensionInstructions,
                         )
                       }
                       onExtend={() => {}}
                       isRegenerating={regeneratingSections.has(
-                        "startingChoices"
+                        "startingChoices",
                       )}
                       isExtending={false}
                       canExtend={false}
@@ -5300,18 +5146,18 @@ ${result.description || ""}`;
                           onRegenerate={() =>
                             handleRegenerateSection(
                               "customTables",
-                              extensionInstructions
+                              extensionInstructions,
                             )
                           }
                           onExtend={() =>
                             handleExtendSection(
                               "customTables",
                               extensionOutputSize,
-                              extensionInstructions
+                              extensionInstructions,
                             )
                           }
                           isRegenerating={regeneratingSections.has(
-                            "customTables"
+                            "customTables",
                           )}
                           isExtending={extendingSections.has("customTables")}
                           renderItem={(item) => {
@@ -5399,7 +5245,7 @@ ${result.description || ""}`;
                         const newConfig = getModelConfig(e.target.value);
                         const newMax = Math.min(
                           newConfig.maxOutputTokens || 8000,
-                          65000
+                          65000,
                         );
                         if (extensionOutputSize > newMax) {
                           setExtensionOutputSize(newMax);
@@ -5427,7 +5273,7 @@ ${result.description || ""}`;
                         step="1000"
                         value={Math.min(
                           extensionOutputSize,
-                          extensionMaxOutput
+                          extensionMaxOutput,
                         )}
                         onChange={(e) =>
                           setExtensionOutputSize(parseInt(e.target.value))
@@ -5461,7 +5307,7 @@ ${result.description || ""}`;
                               (extensionModelConfig.outputPrice *
                                 extensionOutputSize) /
                                 1000000) *
-                              100
+                              100,
                           )} coins`}
                     </span>
                     <span className="text-blue-400/40">
@@ -5565,7 +5411,7 @@ ${result.description || ""}`;
                   value={imageModel}
                   onChange={(e) =>
                     setImageModel(
-                      e.target.value as ImageModelKey | DeepInfraImageModelKey
+                      e.target.value as ImageModelKey | DeepInfraImageModelKey,
                     )
                   }
                   className="w-full md:w-auto px-4 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
@@ -5579,7 +5425,7 @@ ${result.description || ""}`;
                               ? `(~${model.cost} coins)`
                               : "(FREE)"}
                           </option>
-                        )
+                        ),
                       )
                     : Object.entries(OPENROUTER_IMAGE_MODELS).map(([key]) => (
                         <option key={key} value={key}>
@@ -5649,7 +5495,7 @@ ${result.description || ""}`;
                         <button
                           onClick={() =>
                             setThumbnailPrompt(
-                              getDefaultImagePrompt("thumbnail")
+                              getDefaultImagePrompt("thumbnail"),
                             )
                           }
                           className="text-xs px-3 py-1.5 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"

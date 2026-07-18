@@ -6,32 +6,22 @@
  * streams raw response. All context building and tool execution
  * happens on the frontend.
  *
- * Provider modes:
- * - BYOK (OpenRouter/DeepSeek): Users provide their own API keys, no token billing
- * - Coins (Mistral/DeepInfra): Server-side API key, users pay with coins
+ * BYOK only: users always provide their own API key for whichever provider
+ * they select (OpenRouter, DeepSeek, Google, Mistral, DeepInfra).
  *
- * Request: { messages, tools?, model, maxTokens, openRouterKey?, deepseekKey? }
+ * Request: { messages, tools?, model, maxTokens, openRouterKey?, deepseekKey?,
+ *            googleKey?, mistralKey?, deepinfraKey?, customModel? }
  * Response: SSE stream with events: content, tool_calls, done, error
  */
 
 import { NextRequest } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import {
-  getModelConfig,
-  calculateTokenCost,
-  calculateCostFromEstimatedCost,
-  AIModelConfig,
-} from "@/app/misc/ai_prices";
-import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
+import { getModelConfig, AIModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
-import { getUserSettings, CustomModel } from "@/app/misc/user_settings";
+import { CustomModel } from "@/app/misc/user_settings";
 import {
   SamplingSettings,
   filterSettingsForProvider,
 } from "@/app/misc/samplingSettings";
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Allow up to 60 seconds for streaming
@@ -54,7 +44,10 @@ interface RequestBody {
   openRouterKey?: string;
   deepseekKey?: string;
   googleKey?: string;
-  // Sampling settings (for Coins mode: Mistral/DeepInfra)
+  mistralKey?: string;
+  deepinfraKey?: string;
+  customModel?: CustomModel;
+  // Sampling settings
   samplingSettings?: SamplingSettings;
   // Stop sequences to halt generation
   stop?: string[];
@@ -171,10 +164,10 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
 
 function filterToolsForGoogle(tools: any[]): any[] {
   const filtered = tools.filter(
-    (t) => t?.function?.name && GOOGLE_ESSENTIAL_TOOLS.has(t.function.name)
+    (t) => t?.function?.name && GOOGLE_ESSENTIAL_TOOLS.has(t.function.name),
   );
   console.log(
-    `[API] Filtered tools for Google: ${tools.length} -> ${filtered.length}`
+    `[API] Filtered tools for Google: ${tools.length} -> ${filtered.length}`,
   );
   return filtered;
 }
@@ -249,16 +242,16 @@ function getApiKey(
   provider: "deepseek" | "openrouter" | "mistral" | "deepinfra" | "google",
   openRouterKey?: string,
   deepseekKey?: string,
-  googleKey?: string
+  googleKey?: string,
+  mistralKey?: string,
+  deepinfraKey?: string,
 ): string | null {
   if (provider === "deepseek") {
     return deepseekKey || null;
   } else if (provider === "mistral") {
-    // Mistral uses server-side API key - users pay with coins
-    return process.env.MISTRAL_API_KEY || null;
+    return mistralKey || null;
   } else if (provider === "deepinfra") {
-    // DeepInfra uses server-side API key - users pay with coins
-    return process.env.DEEPINFRA_API_KEY || null;
+    return deepinfraKey || null;
   } else if (provider === "google") {
     return googleKey || null;
   } else {
@@ -271,28 +264,23 @@ function getApiKey(
  */
 function isUUID(str: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    str
+    str,
   );
 }
 
 /**
- * Resolve a model key to its config, handling custom models stored in user settings
+ * Resolve a model key to its config. Custom models are defined client-side
+ * (stored in localStorage) and sent directly in the request body.
  */
-async function resolveModelConfig(
+function resolveModelConfig(
   modelKey: string,
-  userId: string,
-  supabase: any // eslint-disable-line @typescript-eslint/no-explicit-any
-): Promise<{ config: AIModelConfig; actualModelId: string }> {
+  customModel?: CustomModel,
+): { config: AIModelConfig; actualModelId: string } {
   // If it's a known model, use it directly
   if (!isUUID(modelKey)) {
     const config = getModelConfig(modelKey);
     return { config, actualModelId: config.model };
   }
-
-  // It's a UUID - look up custom model from user settings
-  const settings = await getUserSettings(userId, supabase);
-  const customModels = settings?.custom_models || [];
-  const customModel = customModels.find((m: CustomModel) => m.id === modelKey);
 
   if (customModel) {
     // Found custom model - create config for OpenRouter
@@ -316,9 +304,9 @@ async function resolveModelConfig(
     return { config, actualModelId: customModel.modelId };
   }
 
-  // UUID not found in custom models - fall back to default
+  // UUID not provided in the request - fall back to default
   console.warn(
-    `Custom model UUID "${modelKey}" not found in user settings, falling back to default`
+    `Custom model UUID "${modelKey}" was not provided in the request, falling back to default`,
   );
   const config = getModelConfig(modelKey); // Will return DeepSeek fallback
   return { config, actualModelId: config.model };
@@ -330,42 +318,6 @@ export async function POST(req: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       try {
-        // Validate auth
-        const authHeader = req.headers.get("authorization");
-        if (!authHeader) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: "Unauthorized",
-              })}\n\n`
-            )
-          );
-          controller.close();
-          return;
-        }
-
-        const token = authHeader.replace("Bearer ", "");
-        const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-        const {
-          data: { user },
-          error: authError,
-        } = await supabase.auth.getUser(token);
-
-        if (authError || !user) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "error",
-                error: "Unauthorized",
-              })}\n\n`
-            )
-          );
-          controller.close();
-          return;
-        }
-
         // Parse request
         const body: RequestBody = await req.json();
         const {
@@ -377,13 +329,15 @@ export async function POST(req: NextRequest) {
           openRouterKey,
           deepseekKey,
           googleKey,
+          mistralKey,
+          deepinfraKey,
+          customModel,
           samplingSettings,
           stop,
           reasoningEffort,
         } = body;
 
-        // Use Coins-mode fallback only if model is truly undefined/empty
-        const model = rawModel && rawModel.trim() ? rawModel : "Ministral 8B";
+        const model = rawModel && rawModel.trim() ? rawModel : "Deepseek Chat";
 
         if (!messages || messages.length === 0) {
           controller.enqueue(
@@ -391,8 +345,8 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({
                 type: "error",
                 error: "Messages are required",
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
@@ -403,17 +357,16 @@ export async function POST(req: NextRequest) {
           "[API] generate-stream received - maxTokens:",
           maxTokens,
           "model:",
-          model
-        );
-
-        // Get model config (resolves custom models from user settings)
-        const { config: modelConfig, actualModelId } = await resolveModelConfig(
           model,
-          user.id,
-          supabase
         );
 
-        // Get API key from user's provided keys (or server key for Mistral/DeepInfra)
+        // Get model config (custom models are sent directly from the client)
+        const { config: modelConfig, actualModelId } = resolveModelConfig(
+          model,
+          customModel,
+        );
+
+        // Get API key from user's provided keys (BYOK for all providers)
         const apiKey = getApiKey(
           modelConfig.provider as
             | "deepseek"
@@ -423,62 +376,33 @@ export async function POST(req: NextRequest) {
             | "google",
           openRouterKey,
           deepseekKey,
-          googleKey
+          googleKey,
+          mistralKey,
+          deepinfraKey,
         );
 
         if (!apiKey) {
-          let errorMessage: string;
-          if (modelConfig.provider === "mistral") {
-            errorMessage =
-              "Mistral API is not configured on the server. Please contact support.";
-          } else if (modelConfig.provider === "deepinfra") {
-            errorMessage =
-              "DeepInfra API is not configured on the server. Please contact support.";
-          } else {
-            const providerNames: Record<string, string> = {
-              deepseek: "DeepSeek",
-              openrouter: "OpenRouter",
-              google: "Google AI Studio",
-            };
-            const providerName =
-              providerNames[modelConfig.provider] || modelConfig.provider;
-            errorMessage = `No API key configured for ${providerName}. Please add your API key in Settings.`;
-          }
+          const providerNames: Record<string, string> = {
+            deepseek: "DeepSeek",
+            openrouter: "OpenRouter",
+            google: "Google AI Studio",
+            mistral: "Mistral",
+            deepinfra: "DeepInfra",
+          };
+          const providerName =
+            providerNames[modelConfig.provider] || modelConfig.provider;
+          const errorMessage = `No API key configured for ${providerName}. Please add your API key in Settings.`;
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: "error",
                 error: errorMessage,
                 code: "NO_API_KEY",
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
-        }
-
-        // Check token balance for Coins mode providers (Mistral/DeepInfra) before making request
-        if (
-          modelConfig.provider === "mistral" ||
-          modelConfig.provider === "deepinfra"
-        ) {
-          const balance = await getUserTokenBalance(user.id, supabase);
-          // Estimate minimum cost (at least 1 coin)
-          const estimatedCost = Math.max(1, modelConfig.cost || 1);
-          const currentBalance = balance?.total ?? 0;
-          if (currentBalance < estimatedCost) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "error",
-                  error: `Insufficient coins. You need at least ${estimatedCost} coins for this model. Current balance: ${currentBalance}`,
-                  code: "INSUFFICIENT_BALANCE",
-                })}\n\n`
-              )
-            );
-            controller.close();
-            return;
-          }
         }
 
         // Build request
@@ -530,7 +454,7 @@ export async function POST(req: NextRequest) {
         ) {
           processedMessages = messages.slice(0, -1);
           console.log(
-            `[API] Stripped prefill for ${modelConfig.provider} tool calling`
+            `[API] Stripped prefill for ${modelConfig.provider} tool calling`,
           );
         }
 
@@ -574,8 +498,8 @@ export async function POST(req: NextRequest) {
                         typeof tc.function.arguments === "string"
                           ? tc.function.arguments
                           : tc.function.arguments
-                          ? JSON.stringify(tc.function.arguments)
-                          : "{}",
+                            ? JSON.stringify(tc.function.arguments)
+                            : "{}",
                     },
                   };
                   // Preserve extra_content (contains Google's thought_signature for thinking models)
@@ -600,7 +524,7 @@ export async function POST(req: NextRequest) {
                       (d: any) =>
                         d.id === tc.id ||
                         (d.type === "reasoning.encrypted" &&
-                          details.length === 1)
+                          details.length === 1),
                     );
                     if (
                       matchingDetail?.data &&
@@ -649,7 +573,7 @@ export async function POST(req: NextRequest) {
         ) {
           const filteredSettings = filterSettingsForProvider(
             samplingSettings,
-            modelConfig.provider as "mistral" | "deepinfra" | "openrouter"
+            modelConfig.provider as "mistral" | "deepinfra" | "openrouter",
           );
 
           // Override temperature from sampling settings if provided
@@ -698,7 +622,7 @@ export async function POST(req: NextRequest) {
             "[API] Applied sampling settings for",
             modelConfig.provider,
             ":",
-            filteredSettings
+            filteredSettings,
           );
         }
 
@@ -727,7 +651,7 @@ export async function POST(req: NextRequest) {
           "[API] Sending to",
           modelConfig.provider,
           "- max_tokens:",
-          requestBody.max_tokens
+          requestBody.max_tokens,
         );
 
         // Make streaming request
@@ -744,8 +668,8 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({
                 type: "error",
                 error: `AI API error: ${response.status} - ${errorText}`,
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
@@ -758,8 +682,8 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({
                 type: "error",
                 error: "No response body",
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
           controller.close();
           return;
@@ -809,8 +733,8 @@ export async function POST(req: NextRequest) {
                       `data: ${JSON.stringify({
                         type: "content",
                         content: textContent,
-                      })}\n\n`
-                    )
+                      })}\n\n`,
+                    ),
                   );
                 }
               }
@@ -822,8 +746,8 @@ export async function POST(req: NextRequest) {
                     `data: ${JSON.stringify({
                       type: "reasoning",
                       content: delta.reasoning,
-                    })}\n\n`
-                  )
+                    })}\n\n`,
+                  ),
                 );
               }
 
@@ -838,7 +762,8 @@ export async function POST(req: NextRequest) {
                         (reasoningDetails[index].text || "") + detail.text;
                     if (detail.summary)
                       reasoningDetails[index].summary =
-                        (reasoningDetails[index].summary || "") + detail.summary;
+                        (reasoningDetails[index].summary || "") +
+                        detail.summary;
                     if (detail.data)
                       reasoningDetails[index].data =
                         (reasoningDetails[index].data || "") + detail.data;
@@ -851,15 +776,15 @@ export async function POST(req: NextRequest) {
                     `data: ${JSON.stringify({
                       type: "reasoning_details",
                       details: delta.reasoning_details,
-                    })}\n\n`
-                  )
+                    })}\n\n`,
+                  ),
                 );
               }
 
               if (delta?.tool_calls) {
                 console.log(
                   "[API] Raw delta.tool_calls chunk:",
-                  JSON.stringify(delta.tool_calls)
+                  JSON.stringify(delta.tool_calls),
                 );
                 for (const tc of delta.tool_calls) {
                   const index = tc.index ?? 0;
@@ -868,7 +793,7 @@ export async function POST(req: NextRequest) {
                       tc.id
                     }, name: ${
                       tc.function?.name
-                    }, args chunk: ${tc.function?.arguments?.substring(0, 100)}`
+                    }, args chunk: ${tc.function?.arguments?.substring(0, 100)}`,
                   );
                   if (!toolCalls[index]) {
                     toolCalls[index] = {
@@ -895,8 +820,8 @@ export async function POST(req: NextRequest) {
                       id: tc?.id,
                       name: tc?.function?.name,
                       argsLen: tc?.function?.arguments?.length,
-                    }))
-                  )
+                    })),
+                  ),
                 );
               }
 
@@ -940,7 +865,7 @@ export async function POST(req: NextRequest) {
                 if (delta?.tool_calls) {
                   console.log(
                     "[API] Processing final buffer tool_calls:",
-                    JSON.stringify(delta.tool_calls)
+                    JSON.stringify(delta.tool_calls),
                   );
                   for (const tc of delta.tool_calls) {
                     const index = tc.index ?? 0;
@@ -982,7 +907,7 @@ export async function POST(req: NextRequest) {
         // Parse tool call arguments
         console.log(
           "[API] Final toolCalls before parsing:",
-          JSON.stringify(toolCalls)
+          JSON.stringify(toolCalls),
         );
         const parsedToolCalls = toolCalls
           .filter((tc) => tc && tc.function?.name)
@@ -1012,7 +937,7 @@ export async function POST(req: NextRequest) {
                     parseError instanceof Error
                       ? parseError.message
                       : String(parseError),
-                }
+                },
               );
               // Return with empty object as fallback to avoid downstream undefined errors
               return {
@@ -1028,7 +953,7 @@ export async function POST(req: NextRequest) {
           "[API] Parsed tool calls count:",
           parsedToolCalls.length,
           "names:",
-          parsedToolCalls.map((tc) => tc.function?.name)
+          parsedToolCalls.map((tc) => tc.function?.name),
         );
 
         // Send tool calls if any
@@ -1038,13 +963,12 @@ export async function POST(req: NextRequest) {
               `data: ${JSON.stringify({
                 type: "tool_calls",
                 toolCalls: parsedToolCalls,
-              })}\n\n`
-            )
+              })}\n\n`,
+            ),
           );
         }
 
         logger.action("AI generation (stream) complete", {
-          userId: user.id,
           model: modelConfig.model,
           provider: modelConfig.provider,
           promptTokens,
@@ -1052,43 +976,6 @@ export async function POST(req: NextRequest) {
           hasToolCalls: parsedToolCalls.length > 0,
           estimatedCost,
         });
-
-        // Deduct tokens for Coins mode providers (Mistral/DeepInfra) - other providers are BYOK
-        let tokenCost = 0;
-        let newBalance: number | undefined;
-        if (
-          (modelConfig.provider === "mistral" ||
-            modelConfig.provider === "deepinfra") &&
-          (promptTokens > 0 ||
-            completionTokens > 0 ||
-            estimatedCost !== undefined)
-        ) {
-          // Use estimated_cost from DeepInfra if available, otherwise calculate from tokens
-          if (
-            modelConfig.provider === "deepinfra" &&
-            estimatedCost !== undefined
-          ) {
-            tokenCost = calculateCostFromEstimatedCost(estimatedCost);
-          } else {
-            tokenCost = calculateTokenCost(
-              model,
-              promptTokens,
-              completionTokens
-            );
-          }
-          const deductResult = await deductTokens(user.id, tokenCost, supabase);
-          if (!deductResult.success) {
-            logger.warn("Failed to deduct tokens for generation", {
-              userId: user.id,
-              provider: modelConfig.provider,
-              tokenCost,
-              error: deductResult.error,
-            });
-          } else {
-            const balanceResult = await getUserTokenBalance(user.id, supabase);
-            newBalance = balanceResult?.total;
-          }
-        }
 
         // Send done event
         controller.enqueue(
@@ -1104,11 +991,9 @@ export async function POST(req: NextRequest) {
                   completionTokens,
                   totalTokens: promptTokens + completionTokens,
                 },
-                tokenCost: tokenCost > 0 ? tokenCost : undefined,
-                balance: newBalance,
               },
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
 
         controller.close();
@@ -1119,8 +1004,8 @@ export async function POST(req: NextRequest) {
             `data: ${JSON.stringify({
               type: "error",
               error: error.message || "Internal server error",
-            })}\n\n`
-          )
+            })}\n\n`,
+          ),
         );
         controller.close();
       }

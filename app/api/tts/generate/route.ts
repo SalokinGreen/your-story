@@ -1,11 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
-import { createClient } from "@supabase/supabase-js";
-import { calculateTTSCost, TTSModelKey } from "@/app/misc/ai_prices";
-
-const DEEPINFRA_API_KEY = process.env.DEEPINFRA_API_KEY;
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { TTSModelKey } from "@/app/misc/ai_prices";
 
 // DeepInfra TTS endpoints
 const KOKORO_ENDPOINT =
@@ -71,7 +65,7 @@ function splitTextIntoChunks(text: string, maxChunkSize: number): string[] {
       searchArea.lastIndexOf("! "),
       searchArea.lastIndexOf("!\n"),
       searchArea.lastIndexOf("? "),
-      searchArea.lastIndexOf("?\n")
+      searchArea.lastIndexOf("?\n"),
     );
 
     if (lastPeriod > maxChunkSize / 3) {
@@ -126,56 +120,27 @@ function concatenateAudioBuffers(buffers: ArrayBuffer[]): ArrayBuffer {
 
 export async function POST(req: NextRequest) {
   try {
-    if (!DEEPINFRA_API_KEY) {
-      return NextResponse.json(
-        { error: "DeepInfra API key not configured" },
-        { status: 500 }
-      );
-    }
-
-    // Get the authorization token from the request
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Authentication required" },
-        { status: 401 }
-      );
-    }
-
-    const token = authHeader.split(" ")[1];
-
-    // Create Supabase client with service role for auth check
-    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
-      auth: {
-        persistSession: false,
-      },
-    });
-
-    // Verify the user's token
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: "Invalid authentication token" },
-        { status: 401 }
-      );
-    }
-
-    const userId = user.id;
-
     const {
       text,
       voiceId = "af_heart",
       model = "kokoro" as TTSModelKey,
+      deepinfraKey,
     } = await req.json();
+
+    if (!deepinfraKey || typeof deepinfraKey !== "string") {
+      return NextResponse.json(
+        {
+          error:
+            "DeepInfra API key is required. Please add your own key in Settings.",
+        },
+        { status: 400 },
+      );
+    }
 
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       return NextResponse.json(
         { error: "Text content is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -216,7 +181,7 @@ export async function POST(req: NextRequest) {
     if (cleanText.length === 0) {
       return NextResponse.json(
         { error: "Text is empty after cleaning" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -260,7 +225,7 @@ export async function POST(req: NextRequest) {
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${DEEPINFRA_API_KEY}`,
+            Authorization: `Bearer ${deepinfraKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify(requestBody),
@@ -282,7 +247,7 @@ export async function POST(req: NextRequest) {
           }
 
           throw new Error(
-            `DeepInfra API error: ${response.status} - ${errorText}`
+            `DeepInfra API error: ${response.status} - ${errorText}`,
           );
         }
 
@@ -308,14 +273,14 @@ export async function POST(req: NextRequest) {
           console.log(
             `TTS chunk ${i + 1}/${chunks.length} complete (${
               chunk.length
-            } chars, size: ${audioBuffer.byteLength})`
+            } chars, size: ${audioBuffer.byteLength})`,
           );
 
           return {
             index: i,
             buffer: audioBuffer.buffer.slice(
               audioBuffer.byteOffset,
-              audioBuffer.byteOffset + audioBuffer.byteLength
+              audioBuffer.byteOffset + audioBuffer.byteLength,
             ),
           };
         } else {
@@ -356,13 +321,13 @@ export async function POST(req: NextRequest) {
               error:
                 "TTS rate limit reached. Please wait a moment before trying again.",
             },
-            { status: 429 }
+            { status: 429 },
           );
         }
         if (parallelError.message === "AUTH_FAILED") {
           return NextResponse.json(
             { error: "TTS authentication failed." },
-            { status: 403 }
+            { status: 403 },
           );
         }
       }
@@ -379,36 +344,20 @@ export async function POST(req: NextRequest) {
     if (audioBuffers.length === 0) {
       return NextResponse.json(
         { error: "No audio generated" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
     // Concatenate all audio buffers
     const finalAudioBuffer = concatenateAudioBuffers(audioBuffers);
 
-    // Calculate dynamic TTS cost based on character count and model
-    const ttsCost = calculateTTSCost(cleanText.length, ttsModel);
-
-    // Deduct tokens after successful generation
-    try {
-      await deductTokens(userId, ttsCost, supabase);
-    } catch (deductError: unknown) {
-      console.error("Failed to deduct tokens:", deductError);
-      // Still return the audio since generation succeeded
-    }
-
-    // Get updated balance
-    const newBalance = await getUserTokenBalance(userId, supabase);
-
-    // Return audio with appropriate headers and balance info
+    // Return audio with appropriate headers
     return new NextResponse(finalAudioBuffer, {
       status: 200,
       headers: {
         "Content-Type": "audio/mpeg",
         "Content-Length": finalAudioBuffer.byteLength.toString(),
         "Cache-Control": "public, max-age=3600",
-        "X-Token-Cost": ttsCost.toString(),
-        "X-Token-Balance": (newBalance?.total ?? 0).toString(),
         "X-Chunks-Generated": chunks.length.toString(),
         "X-TTS-Model": ttsModel,
       },

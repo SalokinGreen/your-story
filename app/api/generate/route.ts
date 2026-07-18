@@ -5,28 +5,18 @@
  * forwards to AI provider, returns raw response. All context building and
  * tool execution happens on the frontend.
  *
- * Provider modes:
- * - BYOK (OpenRouter/DeepSeek): Users provide their own API keys, no token billing
- * - Coins (Mistral/DeepInfra): Server-side API key, users pay with coins
+ * BYOK only: users always provide their own API key for whichever provider
+ * they select (OpenRouter, DeepSeek, Google, Mistral, DeepInfra).
  *
- * Request: { messages, tools?, model, maxTokens, openRouterKey?, deepseekKey? }
+ * Request: { messages, tools?, model, maxTokens, openRouterKey?, deepseekKey?,
+ *            googleKey?, mistralKey?, deepinfraKey?, customModel? }
  * Response: { content, toolCalls?, meta }
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-import {
-  getModelConfig,
-  calculateTokenCost,
-  calculateCostFromEstimatedCost,
-  AIModelConfig,
-} from "@/app/misc/ai_prices";
-import { deductTokens, getUserTokenBalance } from "@/app/misc/tokens";
+import { getModelConfig, AIModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
-import { getUserSettings, CustomModel } from "@/app/misc/user_settings";
-
-const supabaseUrl = process.env.SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+import { CustomModel } from "@/app/misc/user_settings";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Allow up to 60 seconds for generation
@@ -58,6 +48,9 @@ interface RequestBody {
   openRouterKey?: string;
   deepseekKey?: string;
   googleKey?: string;
+  mistralKey?: string;
+  deepinfraKey?: string;
+  customModel?: CustomModel;
   // Reasoning-tier router: "none" | "low" | "normal" | "high" | "xhigh" - best-effort,
   // translated per-provider in callAI(). Ignored by providers/models with no lever for it.
   reasoningEffort?: string;
@@ -126,10 +119,10 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
 
 function filterToolsForGoogle(tools: any[]): any[] {
   const filtered = tools.filter(
-    (t) => t?.function?.name && GOOGLE_ESSENTIAL_TOOLS.has(t.function.name)
+    (t) => t?.function?.name && GOOGLE_ESSENTIAL_TOOLS.has(t.function.name),
   );
   console.log(
-    `[API] Filtered tools for Google: ${tools.length} -> ${filtered.length}`
+    `[API] Filtered tools for Google: ${tools.length} -> ${filtered.length}`,
   );
   return filtered;
 }
@@ -252,7 +245,7 @@ async function callAI(
   console.log(
     `[callAI] provider: ${provider}, hasPrefill: ${hasPrefill}, hasTools: ${hasTools}, toolCount: ${
       tools?.length || 0
-    }`
+    }`,
   );
 
   let endpoint: string;
@@ -267,7 +260,7 @@ async function callAI(
     console.log(
       `[callAI] DeepSeek endpoint: ${
         useBeta ? "BETA" : "REGULAR"
-      } - ${endpoint}`
+      } - ${endpoint}`,
     );
   } else if (provider === "mistral") {
     endpoint = "https://api.mistral.ai/v1/chat/completions";
@@ -339,8 +332,8 @@ async function callAI(
                   typeof tc.function.arguments === "string"
                     ? tc.function.arguments
                     : tc.function.arguments
-                    ? JSON.stringify(tc.function.arguments)
-                    : "{}",
+                      ? JSON.stringify(tc.function.arguments)
+                      : "{}",
               },
             };
             // Preserve extra_content (contains Google's thought_signature for thinking models)
@@ -362,7 +355,7 @@ async function callAI(
               const matchingDetail = details.find(
                 (d: any) =>
                   d.id === tc.id ||
-                  (d.type === "reasoning.encrypted" && details.length === 1)
+                  (d.type === "reasoning.encrypted" && details.length === 1),
               );
               if (
                 matchingDetail?.data &&
@@ -421,10 +414,10 @@ async function callAI(
     const errorText = await response.text();
     console.error(
       `[callAI] ${provider} API error: ${response.status} ${response.statusText}`,
-      errorText
+      errorText,
     );
     throw new Error(
-      `AI API request failed: ${response.status} ${response.statusText} - ${errorText}`
+      `AI API request failed: ${response.status} ${response.statusText} - ${errorText}`,
     );
   }
 
@@ -435,16 +428,16 @@ function getApiKey(
   provider: "deepseek" | "openrouter" | "mistral" | "deepinfra" | "google",
   openRouterKey?: string,
   deepseekKey?: string,
-  googleKey?: string
+  googleKey?: string,
+  mistralKey?: string,
+  deepinfraKey?: string,
 ): string | null {
   if (provider === "deepseek") {
     return deepseekKey || null;
   } else if (provider === "mistral") {
-    // Mistral uses server-side API key - users pay with coins
-    return process.env.MISTRAL_API_KEY || null;
+    return mistralKey || null;
   } else if (provider === "deepinfra") {
-    // DeepInfra uses server-side API key - users pay with coins
-    return process.env.DEEPINFRA_API_KEY || null;
+    return deepinfraKey || null;
   } else if (provider === "google") {
     return googleKey || null;
   } else {
@@ -457,27 +450,22 @@ function getApiKey(
  */
 function isUUID(str: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    str
+    str,
   );
 }
 
 /**
- * Resolve a model key to its config, handling custom models stored in user settings
+ * Resolve a model key to its config. Custom models are defined client-side
+ * (stored in localStorage) and sent directly in the request body.
  */
-async function resolveModelConfig(
+function resolveModelConfig(
   modelKey: string,
-  userId: string,
-  supabase: any // eslint-disable-line @typescript-eslint/no-explicit-any
-): Promise<AIModelConfig> {
+  customModel?: CustomModel,
+): AIModelConfig {
   // If it's a known model, use it directly
   if (!isUUID(modelKey)) {
     return getModelConfig(modelKey);
   }
-
-  // It's a UUID - look up custom model from user settings
-  const settings = await getUserSettings(userId, supabase);
-  const customModels = settings?.custom_models || [];
-  const customModel = customModels.find((m: CustomModel) => m.id === modelKey);
 
   if (customModel) {
     // Found custom model - create config for OpenRouter
@@ -500,33 +488,15 @@ async function resolveModelConfig(
     };
   }
 
-  // UUID not found in custom models - fall back to default
+  // UUID not found in the request - fall back to default
   console.warn(
-    `Custom model UUID "${modelKey}" not found in user settings, falling back to default`
+    `Custom model UUID "${modelKey}" was not provided in the request, falling back to default`,
   );
   return getModelConfig(modelKey);
 }
 
 export async function POST(req: NextRequest) {
   try {
-    // Validate auth
-    const authHeader = req.headers.get("authorization");
-    if (!authHeader) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.replace("Bearer ", "");
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     // Parse request
     const body: RequestBody = await req.json();
     const {
@@ -538,30 +508,32 @@ export async function POST(req: NextRequest) {
       openRouterKey,
       deepseekKey,
       googleKey,
+      mistralKey,
+      deepinfraKey,
+      customModel,
       reasoningEffort,
     } = body;
 
-    // Use Coins-mode fallback only if model is truly undefined/empty
-    const model = rawModel && rawModel.trim() ? rawModel : "Ministral 8B";
+    const model = rawModel && rawModel.trim() ? rawModel : "Deepseek Chat";
 
     // Log model for debugging
     console.log(
       `[API Generate] Received model: "${model}" (from request: ${
         body.model ? `"${body.model}"` : "undefined/empty"
-      })`
+      })`,
     );
 
     if (!messages || messages.length === 0) {
       return NextResponse.json(
         { error: "Messages are required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
-    // Get model config (resolves custom models from user settings)
-    const modelConfig = await resolveModelConfig(model, user.id, supabase);
+    // Get model config (custom models are sent directly from the client)
+    const modelConfig = resolveModelConfig(model, customModel);
 
-    // Get API key from user's provided keys (or server key for Mistral/DeepInfra)
+    // Get API key from user's provided keys (BYOK for all providers)
     const apiKey = getApiKey(
       modelConfig.provider as
         | "deepseek"
@@ -571,53 +543,28 @@ export async function POST(req: NextRequest) {
         | "google",
       openRouterKey,
       deepseekKey,
-      googleKey
+      googleKey,
+      mistralKey,
+      deepinfraKey,
     );
 
     if (!apiKey) {
-      let errorMessage: string;
-      if (modelConfig.provider === "mistral") {
-        errorMessage =
-          "Mistral API is not configured on the server. Please contact support.";
-      } else if (modelConfig.provider === "deepinfra") {
-        errorMessage =
-          "DeepInfra API is not configured on the server. Please contact support.";
-      } else {
-        const providerNames: Record<string, string> = {
-          deepseek: "DeepSeek",
-          openrouter: "OpenRouter",
-          google: "Google AI Studio",
-        };
-        const providerName =
-          providerNames[modelConfig.provider] || modelConfig.provider;
-        errorMessage = `No API key configured for ${providerName}. Please add your API key in Settings.`;
-      }
+      const providerNames: Record<string, string> = {
+        deepseek: "DeepSeek",
+        openrouter: "OpenRouter",
+        google: "Google AI Studio",
+        mistral: "Mistral",
+        deepinfra: "DeepInfra",
+      };
+      const providerName =
+        providerNames[modelConfig.provider] || modelConfig.provider;
       return NextResponse.json(
         {
-          error: errorMessage,
+          error: `No API key configured for ${providerName}. Please add your API key in Settings.`,
           code: "NO_API_KEY",
         },
-        { status: 400 }
+        { status: 400 },
       );
-    }
-
-    // Check token balance for Coins mode providers (Mistral/DeepInfra) before making request
-    if (
-      modelConfig.provider === "mistral" ||
-      modelConfig.provider === "deepinfra"
-    ) {
-      const balance = await getUserTokenBalance(user.id, supabase);
-      const estimatedCost = Math.max(1, modelConfig.cost || 1);
-      const currentBalance = balance?.total ?? 0;
-      if (currentBalance < estimatedCost) {
-        return NextResponse.json(
-          {
-            error: `Insufficient coins. You need at least ${estimatedCost} coins for this model. Current balance: ${currentBalance}`,
-            code: "INSUFFICIENT_BALANCE",
-          },
-          { status: 402 }
-        );
-      }
     }
 
     // Call AI
@@ -634,12 +581,13 @@ export async function POST(req: NextRequest) {
       maxTokens,
       temperature,
       tools,
-      reasoningEffort
+      reasoningEffort,
     );
 
     const content = aiResponse.choices[0]?.message?.content || "";
     const reasoning = aiResponse.choices[0]?.message?.reasoning || "";
-    const reasoning_details = aiResponse.choices[0]?.message?.reasoning_details || [];
+    const reasoning_details =
+      aiResponse.choices[0]?.message?.reasoning_details || [];
     const toolCalls = aiResponse.choices[0]?.message?.tool_calls;
     const usage = aiResponse.usage || {
       prompt_tokens: 0,
@@ -648,50 +596,12 @@ export async function POST(req: NextRequest) {
     };
 
     logger.action("AI generation complete", {
-      userId: user.id,
       model: modelConfig.model,
       provider: modelConfig.provider,
       promptTokens: usage.prompt_tokens,
       completionTokens: usage.completion_tokens,
       hasToolCalls: !!toolCalls,
     });
-
-    // Deduct tokens for Coins mode providers (Mistral/DeepInfra)
-    let tokenCost = 0;
-    let newBalance: number | undefined;
-    if (
-      (modelConfig.provider === "mistral" ||
-        modelConfig.provider === "deepinfra") &&
-      (usage.prompt_tokens > 0 ||
-        usage.completion_tokens > 0 ||
-        usage.estimated_cost !== undefined)
-    ) {
-      // Use estimated_cost from DeepInfra if available, otherwise calculate from tokens
-      if (
-        modelConfig.provider === "deepinfra" &&
-        usage.estimated_cost !== undefined
-      ) {
-        tokenCost = calculateCostFromEstimatedCost(usage.estimated_cost);
-      } else {
-        tokenCost = calculateTokenCost(
-          model,
-          usage.prompt_tokens,
-          usage.completion_tokens
-        );
-      }
-      const deductResult = await deductTokens(user.id, tokenCost, supabase);
-      if (!deductResult.success) {
-        logger.warn("Failed to deduct tokens for generation", {
-          userId: user.id,
-          provider: modelConfig.provider,
-          tokenCost,
-          error: deductResult.error,
-        });
-      } else {
-        const balanceResult = await getUserTokenBalance(user.id, supabase);
-        newBalance = balanceResult?.total;
-      }
-    }
 
     return NextResponse.json({
       content,
@@ -707,8 +617,6 @@ export async function POST(req: NextRequest) {
           completionTokens: usage.completion_tokens,
           totalTokens: usage.total_tokens,
         },
-        tokenCost: tokenCost > 0 ? tokenCost : undefined,
-        newBalance,
       },
     });
   } catch (error: any) {
@@ -716,7 +624,7 @@ export async function POST(req: NextRequest) {
     logger.error("Generation API error", { error: error.message });
     return NextResponse.json(
       { error: error.message || "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

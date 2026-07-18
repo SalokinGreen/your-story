@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { StoryLore, CustomTable } from "@/app/misc/structs";
 import {
   detectContentType,
@@ -19,7 +18,8 @@ export const maxDuration = 300;
  * POST /api/ocr/summarize
  *
  * Uses AI to convert raw OCR markdown into structured RPG notes
- * (lore entries, mechanic notes, custom tables, etc.)
+ * (lore entries, mechanic notes, custom tables, etc.). BYOK only - the
+ * caller must provide their own API key for the selected provider.
  *
  * Request: {
  *   markdown: string,           // OCR-extracted markdown
@@ -30,7 +30,8 @@ export const maxDuration = 300;
  *   model?: string,             // AI model to use
  *   maxTokens?: number,         // Max output tokens
  *   openRouterKey?: string,     // BYOK for OpenRouter
- *   deepseekKey?: string        // BYOK for DeepSeek
+ *   deepseekKey?: string,       // BYOK for DeepSeek
+ *   mistralKey?: string         // BYOK for Mistral
  * }
  *
  * Response: {
@@ -42,32 +43,8 @@ export const maxDuration = 300;
  * }
  */
 
-const supabase = createClient(
-  process.env.SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-const MISTRAL_API_KEY = process.env.MISTRAL_API_KEY;
-const DEEPSEEK_API_KEY = process.env.DEEPSEEK_API_KEY;
-
 export async function POST(request: NextRequest) {
   try {
-    // Validate auth
-    const authHeader = request.headers.get("authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
-    const token = authHeader.substring(7);
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
-    }
-
     const body = await request.json();
     const {
       markdown,
@@ -77,12 +54,13 @@ export async function POST(request: NextRequest) {
       maxTokens = 16000, // Increased for comprehensive extraction
       openRouterKey,
       deepseekKey,
+      mistralKey,
     } = body;
 
     if (!markdown || markdown.trim().length === 0) {
       return NextResponse.json(
         { error: "No markdown content provided" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -106,19 +84,20 @@ export async function POST(request: NextRequest) {
       model.startsWith("codestral-") ||
       model.startsWith("devstral-");
 
-    if (isMistralModel && MISTRAL_API_KEY) {
+    if (isMistralModel && mistralKey) {
       aiResponse = await callMistralAI(
         systemPrompt,
         userPrompt,
         model,
-        maxTokens
+        maxTokens,
+        mistralKey,
       );
-    } else if (model === "deepseek-chat" && (deepseekKey || DEEPSEEK_API_KEY)) {
+    } else if (model === "deepseek-chat" && deepseekKey) {
       aiResponse = await callDeepSeekAI(
         systemPrompt,
         userPrompt,
         maxTokens,
-        deepseekKey || DEEPSEEK_API_KEY!
+        deepseekKey,
       );
     } else if (openRouterKey) {
       aiResponse = await callOpenRouterAI(
@@ -126,22 +105,22 @@ export async function POST(request: NextRequest) {
         userPrompt,
         model,
         maxTokens,
-        openRouterKey
+        openRouterKey,
       );
     } else {
       return NextResponse.json(
         {
           error:
-            "No valid AI configuration. Provide API key or use Mistral models.",
+            "No valid AI configuration. Please provide your own API key in Settings.",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!aiResponse.success) {
       return NextResponse.json(
         { error: aiResponse.error || "AI processing failed" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 
@@ -162,22 +141,20 @@ export async function POST(request: NextRequest) {
         let continuationResponse;
 
         // Use the same provider for continuation
-        if (isMistralModel && MISTRAL_API_KEY) {
+        if (isMistralModel && mistralKey) {
           continuationResponse = await callMistralAI(
             "You are a JSON completion assistant. Output ONLY the minimal characters needed to close the JSON.",
             continuationPrompt,
             model,
-            2000 // Small limit for just closing JSON
+            2000, // Small limit for just closing JSON
+            mistralKey,
           );
-        } else if (
-          model === "deepseek-chat" &&
-          (deepseekKey || DEEPSEEK_API_KEY)
-        ) {
+        } else if (model === "deepseek-chat" && deepseekKey) {
           continuationResponse = await callDeepSeekAI(
             "You are a JSON completion assistant. Output ONLY the minimal characters needed to close the JSON.",
             continuationPrompt,
             2000,
-            deepseekKey || DEEPSEEK_API_KEY!
+            deepseekKey,
           );
         } else if (openRouterKey) {
           continuationResponse = await callOpenRouterAI(
@@ -185,14 +162,14 @@ export async function POST(request: NextRequest) {
             continuationPrompt,
             model,
             2000,
-            openRouterKey
+            openRouterKey,
           );
         }
 
         if (continuationResponse?.success && continuationResponse.content) {
           const cleanedContinuation = cleanContinuationContent(
             content,
-            continuationResponse.content
+            continuationResponse.content,
           );
 
           if (cleanedContinuation) {
@@ -224,7 +201,7 @@ export async function POST(request: NextRequest) {
     console.error("OCR summarize error:", error);
     return NextResponse.json(
       { error: error.message || "Summarization failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -235,7 +212,7 @@ export async function POST(request: NextRequest) {
 
 function buildSystemPrompt(
   focus: string[],
-  customInstructions: string
+  customInstructions: string,
 ): string {
   const focusAll = focus.includes("all");
 
@@ -320,7 +297,7 @@ ${customInstructions ? `ADDITIONAL INSTRUCTIONS:\n${customInstructions}` : ""}`;
 function buildUserPrompt(
   markdown: string,
   contentType: string,
-  extractedTables: { headers: string[]; rows: string[][] }[]
+  extractedTables: { headers: string[]; rows: string[][] }[],
 ): string {
   // Truncate very long documents
   const maxChars = 50000;
@@ -357,14 +334,15 @@ async function callMistralAI(
   systemPrompt: string,
   userPrompt: string,
   model: string,
-  maxTokens: number
+  maxTokens: number,
+  apiKey: string,
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
     const response = await fetch("https://api.mistral.ai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${MISTRAL_API_KEY}`,
+        Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
         model,
@@ -398,7 +376,7 @@ async function callDeepSeekAI(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number,
-  apiKey: string
+  apiKey: string,
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
     const response = await fetch("https://api.deepseek.com/chat/completions", {
@@ -440,7 +418,7 @@ async function callOpenRouterAI(
   userPrompt: string,
   model: string,
   maxTokens: number,
-  apiKey: string
+  apiKey: string,
 ): Promise<{ success: boolean; content?: string; error?: string }> {
   try {
     const response = await fetch(
@@ -462,7 +440,7 @@ async function callOpenRouterAI(
           max_tokens: maxTokens,
           temperature: 0.3,
         }),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -586,7 +564,7 @@ function processParserResult(parsed: any): {
       untrigger_lores: [],
       var_on_triggers: [],
       var_off_triggers: [],
-    })
+    }),
   );
 
   // Process mechanic notes (same structure but with type: "mechanics")
@@ -607,7 +585,7 @@ function processParserResult(parsed: any): {
       untrigger_lores: [],
       var_on_triggers: [],
       var_off_triggers: [],
-    })
+    }),
   );
 
   // Process custom tables
@@ -635,7 +613,7 @@ function processParserResult(parsed: any): {
           weight: Math.max(1, Number(weight) || 1), // Ensure weight is always a valid positive number
         };
       }),
-    })
+    }),
   );
 
   return {

@@ -2,9 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useNotification } from "@/app/misc/NotificationContext";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
-import { getAuthToken } from "@/app/misc/getAuthToken";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import {
   validateOCRFile,
@@ -40,7 +38,7 @@ const MAX_RETRIES = 2;
 async function runWithConcurrency<T>(
   tasks: (() => Promise<T>)[],
   concurrency: number,
-  onProgress?: (completed: number, total: number) => void
+  onProgress?: (completed: number, total: number) => void,
 ): Promise<T[]> {
   const results: T[] = [];
   let completed = 0;
@@ -64,7 +62,7 @@ async function fetchWithRetry(
   url: string,
   options: RequestInit,
   timeoutMs: number = SUMMARIZE_TIMEOUT_MS,
-  maxRetries: number = MAX_RETRIES
+  maxRetries: number = MAX_RETRIES,
 ): Promise<Response> {
   let lastError: Error | null = null;
 
@@ -94,7 +92,7 @@ async function fetchWithRetry(
         console.log(
           `Request failed, retrying in ${delay}ms (attempt ${
             attempt + 1
-          }/${maxRetries})...`
+          }/${maxRetries})...`,
         );
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
@@ -121,7 +119,7 @@ function isTextImportFile(file: File): boolean {
  */
 async function splitPDFIntoChunks(
   file: File,
-  onProgress?: (message: string) => void
+  onProgress?: (message: string) => void,
 ): Promise<{ base64: string; pageStart: number; pageEnd: number }[]> {
   onProgress?.("Loading PDF for splitting...");
 
@@ -138,7 +136,7 @@ async function splitPDFIntoChunks(
   const targetChunkSize = MAX_CHUNK_SIZE_MB * 1024 * 1024;
   const pagesPerChunk = Math.max(
     5,
-    Math.min(PAGES_PER_CHUNK, Math.floor(targetChunkSize / avgPageSize))
+    Math.min(PAGES_PER_CHUNK, Math.floor(targetChunkSize / avgPageSize)),
   );
 
   const totalChunks = Math.ceil(totalPages / pagesPerChunk);
@@ -150,14 +148,14 @@ async function splitPDFIntoChunks(
     onProgress?.(
       `Splitting chunk ${chunkIndex + 1}/${totalChunks} (pages ${
         startPage + 1
-      }-${endPage + 1})...`
+      }-${endPage + 1})...`,
     );
 
     // Create a new PDF with just the pages for this chunk
     const chunkDoc = await PDFDocument.create();
     const pageIndicesToCopy = Array.from(
       { length: endPage - startPage + 1 },
-      (_, i) => startPage + i
+      (_, i) => startPage + i,
     );
 
     const copiedPages = await chunkDoc.copyPages(pdfDoc, pageIndicesToCopy);
@@ -168,8 +166,8 @@ async function splitPDFIntoChunks(
     const base64 = btoa(
       new Uint8Array(chunkBytes).reduce(
         (data, byte) => data + String.fromCharCode(byte),
-        ""
-      )
+        "",
+      ),
     );
 
     chunks.push({
@@ -185,27 +183,6 @@ async function splitPDFIntoChunks(
 // SavedPDFImport interface moved to localPDFImportManager.ts as LocalPDFImport
 // Re-export for backward compatibility in this file
 type SavedPDFImport = LocalPDFImport;
-
-// Community import data structure (from API)
-interface CommunityImport {
-  id: string;
-  name: string;
-  description: string | null;
-  source_book: string | null;
-  system: string | null;
-  tags: string[];
-  lore_count: number;
-  mechanics_count: number;
-  tables_count: number;
-  downloads: number;
-  is_public: boolean;
-  created_at: string;
-  user_id: string;
-  // Full content (only when fetching single import)
-  lore?: StoryLore[];
-  mechanic_notes?: StoryLore[];
-  custom_tables?: CustomTable[];
-}
 
 interface PDFImporterProps {
   /** Called when import completes with extracted data */
@@ -253,7 +230,6 @@ export default function PDFImporter({
   buttonText = "Import from PDF",
   compact = false,
 }: PDFImporterProps) {
-  const { user } = useAuth();
   const { keys } = useAPIKeys();
   const { addNotification } = useNotification();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -281,30 +257,6 @@ export default function PDFImporter({
   const [savedImports, setSavedImports] = useState<SavedPDFImport[]>([]);
   const [showSavedImports, setShowSavedImports] = useState(false);
   const [expandedImport, setExpandedImport] = useState<string | null>(null);
-
-  // Community imports
-  const [showCommunityImports, setShowCommunityImports] = useState(false);
-  const [communityImports, setCommunityImports] = useState<CommunityImport[]>(
-    []
-  );
-  const [communityLoading, setCommunityLoading] = useState(false);
-  const [communitySearch, setCommunitySearch] = useState("");
-  const [communitySystem, setCommunitySystem] = useState("");
-  const [communitySort, setCommunitySort] = useState<"recent" | "popular">(
-    "popular"
-  );
-  const [communityTotal, setCommunityTotal] = useState(0);
-
-  // Share modal state
-  const [showShareModal, setShowShareModal] = useState(false);
-  const [shareData, setShareData] = useState<SavedPDFImport | null>(null);
-  const [shareName, setShareName] = useState("");
-  const [shareDescription, setShareDescription] = useState("");
-  const [shareSourceBook, setShareSourceBook] = useState("");
-  const [shareSystem, setShareSystem] = useState("");
-  const [shareTags, setShareTags] = useState("");
-  const [sharePublic, setSharePublic] = useState(true);
-  const [shareUploading, setShareUploading] = useState(false);
 
   // Chunk tracking state for large PDFs
   const [chunkStatuses, setChunkStatuses] = useState<ChunkStatus[]>([]);
@@ -352,7 +304,7 @@ export default function PDFImporter({
         console.warn("Failed to save PDF import:", e);
       }
     },
-    [selectedFiles]
+    [selectedFiles],
   );
 
   // Delete a saved import from IndexedDB
@@ -378,199 +330,12 @@ export default function PDFImporter({
         `Loaded ${imp.lore.length + imp.mechanicNotes.length} notes, ${
           imp.customTables.length
         } tables from saved import`,
-        "success"
+        "success",
       );
       setIsOpen(false);
     },
-    [onImportComplete, addNotification]
+    [onImportComplete, addNotification],
   );
-
-  // Fetch community imports
-  const fetchCommunityImports = useCallback(async () => {
-    setCommunityLoading(true);
-    try {
-      const params = new URLSearchParams();
-      if (communitySearch) params.set("search", communitySearch);
-      if (communitySystem) params.set("system", communitySystem);
-      params.set("sort", communitySort);
-      params.set("limit", "20");
-
-      const response = await fetch(`/api/book-imports?${params}`);
-
-      // Handle non-JSON responses (e.g., if table doesn't exist yet)
-      if (!response.ok) {
-        const text = await response.text();
-        console.error("Community imports API error:", response.status, text);
-        // Don't show error notification for 403/404 - table might not exist yet
-        if (response.status !== 403 && response.status !== 404) {
-          addNotification("Failed to load community imports", "failure");
-        }
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data.error) {
-        addNotification(data.error, "failure");
-        return;
-      }
-
-      setCommunityImports(data.imports || []);
-      setCommunityTotal(data.total || 0);
-    } catch (error) {
-      console.error("Failed to fetch community imports:", error);
-      // Silently fail - table might not be set up yet
-    } finally {
-      setCommunityLoading(false);
-    }
-  }, [communitySearch, communitySystem, communitySort, addNotification]);
-
-  // Load community imports when section opens
-  useEffect(() => {
-    if (showCommunityImports && communityImports.length === 0) {
-      fetchCommunityImports();
-    }
-  }, [showCommunityImports, fetchCommunityImports, communityImports.length]);
-
-  // Use a community import
-  const useCommunityImport = useCallback(
-    async (imp: CommunityImport) => {
-      try {
-        // Fetch full import data if not already loaded
-        const token = await getAuthToken();
-        const response = await fetch(`/api/book-imports/${imp.id}`, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {},
-        });
-
-        if (!response.ok) {
-          const text = await response.text();
-          console.error("Community import fetch error:", response.status, text);
-          addNotification("Failed to load import", "failure");
-          return;
-        }
-
-        const data = await response.json();
-
-        if (data.error) {
-          addNotification(data.error, "failure");
-          return;
-        }
-
-        const fullImport = data.import;
-        onImportComplete({
-          lore: fullImport.lore || [],
-          mechanicNotes: fullImport.mechanic_notes || [],
-          customTables: fullImport.custom_tables || [],
-          summary: `Imported from: ${fullImport.name}`,
-        });
-
-        addNotification(
-          `Loaded ${
-            fullImport.lore_count + fullImport.mechanics_count
-          } notes, ${fullImport.tables_count} tables from "${fullImport.name}"`,
-          "success"
-        );
-        setIsOpen(false);
-      } catch (error) {
-        console.error("Failed to use community import:", error);
-        addNotification("Failed to load import", "failure");
-      }
-    },
-    [onImportComplete, addNotification]
-  );
-
-  // Share a saved import to community
-  const shareImportToCommunity = useCallback(async () => {
-    if (!shareData || !user) {
-      addNotification("Please sign in to share imports", "warning");
-      return;
-    }
-
-    if (!shareName.trim()) {
-      addNotification("Please enter a name for this import", "warning");
-      return;
-    }
-
-    setShareUploading(true);
-    try {
-      const token = await getAuthToken();
-      const response = await fetch("/api/book-imports", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({
-          name: shareName.trim(),
-          description: shareDescription.trim() || null,
-          source_book: shareSourceBook.trim() || null,
-          system: shareSystem.trim() || null,
-          tags: shareTags
-            .split(",")
-            .map((t) => t.trim())
-            .filter(Boolean),
-          lore: shareData.lore,
-          mechanicNotes: shareData.mechanicNotes,
-          customTables: shareData.customTables,
-          is_public: sharePublic,
-        }),
-      });
-
-      if (!response.ok) {
-        const text = await response.text();
-        console.error("Share import error:", response.status, text);
-        addNotification(
-          "Failed to share import. Make sure you're signed in.",
-          "failure"
-        );
-        return;
-      }
-
-      const data = await response.json();
-
-      if (data.error) {
-        addNotification(data.error, "failure");
-        return;
-      }
-
-      addNotification(
-        `Successfully shared "${shareName}" to the community!`,
-        "success"
-      );
-      setShowShareModal(false);
-      setShareData(null);
-      // Reset form
-      setShareName("");
-      setShareDescription("");
-      setShareSourceBook("");
-      setShareSystem("");
-      setShareTags("");
-      setSharePublic(true);
-    } catch (error) {
-      console.error("Failed to share import:", error);
-      addNotification("Failed to share import", "failure");
-    } finally {
-      setShareUploading(false);
-    }
-  }, [
-    shareData,
-    user,
-    shareName,
-    shareDescription,
-    shareSourceBook,
-    shareSystem,
-    shareTags,
-    sharePublic,
-    addNotification,
-  ]);
-
-  // Open share modal for a saved import
-  const openShareModal = useCallback((imp: SavedPDFImport) => {
-    setShareData(imp);
-    setShareName(imp.fileName);
-    setShareDescription(imp.summary || "");
-    setShowShareModal(true);
-  }, []);
 
   // Retry a failed chunk
   const retryChunk = useCallback(
@@ -581,19 +346,13 @@ export default function PDFImporter({
         return;
       }
 
-      const token = await getAuthToken();
-      if (!token) {
-        addNotification("Please sign in to retry", "warning");
-        return;
-      }
-
       // Update status to summarizing
       setChunkStatuses((prev) =>
         prev.map((cs) =>
           cs.chunkIndex === chunkIndex
             ? { ...cs, status: "summarizing", error: undefined }
-            : cs
-        )
+            : cs,
+        ),
       );
 
       try {
@@ -603,7 +362,6 @@ export default function PDFImporter({
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
               markdown: chunk.ocrMarkdown,
@@ -618,10 +376,11 @@ export default function PDFImporter({
               maxTokens: maxOutputTokens,
               openRouterKey: keys.openRouterKey,
               deepseekKey: keys.deepseekKey,
+              mistralKey: keys.mistralKey,
             }),
           },
           SUMMARIZE_TIMEOUT_MS,
-          MAX_RETRIES
+          MAX_RETRIES,
         );
 
         if (!summarizeResponse.ok) {
@@ -630,8 +389,8 @@ export default function PDFImporter({
             prev.map((cs) =>
               cs.chunkIndex === chunkIndex
                 ? { ...cs, status: "failed", error: errorMsg }
-                : cs
-            )
+                : cs,
+            ),
           );
           addNotification(`Retry failed: ${errorMsg}`, "failure");
           return;
@@ -651,12 +410,12 @@ export default function PDFImporter({
                     error: "JSON parse error",
                     rawSummarizeOutput: resultText,
                   }
-                : cs
-            )
+                : cs,
+            ),
           );
           addNotification(
             "Retry failed: JSON parse error. You can try manual fix.",
-            "warning"
+            "warning",
           );
           return;
         }
@@ -676,8 +435,8 @@ export default function PDFImporter({
                     customTables: result.customTables || [],
                   },
                 }
-              : cs
-          )
+              : cs,
+          ),
         );
         addNotification(`Chunk ${chunkIndex + 1} retry successful!`, "success");
       } catch (err: any) {
@@ -689,8 +448,8 @@ export default function PDFImporter({
                   status: "failed",
                   error: err.message || "Unknown error",
                 }
-              : cs
-          )
+              : cs,
+          ),
         );
         addNotification(`Retry failed: ${err.message}`, "failure");
       }
@@ -703,7 +462,7 @@ export default function PDFImporter({
       maxOutputTokens,
       keys,
       addNotification,
-    ]
+    ],
   );
 
   // Open repair modal for a failed chunk
@@ -719,7 +478,7 @@ export default function PDFImporter({
       setRepairError(chunk.error || "JSON parse error");
       setRepairModalOpen(true);
     },
-    [chunkStatuses, addNotification]
+    [chunkStatuses, addNotification],
   );
 
   // Handle repair save - apply manually fixed JSON
@@ -745,8 +504,8 @@ export default function PDFImporter({
                     customTables: result.customTables || [],
                   },
                 }
-              : cs
-          )
+              : cs,
+          ),
         );
 
         // Close modal
@@ -757,16 +516,16 @@ export default function PDFImporter({
 
         addNotification(
           `Chunk ${repairChunkIndex + 1} recovered from fixed JSON!`,
-          "success"
+          "success",
         );
       } catch (err) {
         addNotification(
           `Invalid JSON: ${err instanceof Error ? err.message : "Parse error"}`,
-          "warning"
+          "warning",
         );
       }
     },
-    [repairChunkIndex, addNotification]
+    [repairChunkIndex, addNotification],
   );
 
   // Collect all chunk results (for completing import after fixing)
@@ -794,10 +553,10 @@ export default function PDFImporter({
   const completeWithCurrentResults = useCallback(() => {
     const results = collectChunkResults();
     const completedCount = chunkStatuses.filter(
-      (cs) => cs.status === "complete"
+      (cs) => cs.status === "complete",
     ).length;
     const failedCount = chunkStatuses.filter(
-      (cs) => cs.status === "failed"
+      (cs) => cs.status === "failed",
     ).length;
 
     const importData = {
@@ -819,7 +578,7 @@ export default function PDFImporter({
       results.customTables.length;
     addNotification(
       `Imported ${totalItems} items from ${completedCount} chunks (${failedCount} skipped)`,
-      failedCount > 0 ? "warning" : "success"
+      failedCount > 0 ? "warning" : "success",
     );
 
     // Close modal
@@ -837,7 +596,7 @@ export default function PDFImporter({
   const getModelMaxOutput = () => {
     // Look up actual model limits from AI_MODELS config
     const modelEntry = Object.values(AI_MODELS).find(
-      (m) => m.model === aiModel || m.original_model === aiModel
+      (m) => m.model === aiModel || m.original_model === aiModel,
     );
     // Use actual maxOutputTokens from config, or 100k for custom/unknown models
     // Cap at 100k for sanity
@@ -877,7 +636,7 @@ export default function PDFImporter({
         }
       }
     },
-    [addNotification]
+    [addNotification],
   );
 
   const handleDrop = useCallback(
@@ -912,7 +671,7 @@ export default function PDFImporter({
         }
       }
     },
-    [addNotification]
+    [addNotification],
   );
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
@@ -920,18 +679,10 @@ export default function PDFImporter({
   }, []);
 
   const processFiles = async () => {
-    if (selectedFiles.length === 0 || !user) {
-      addNotification("Please select at least one file and sign in", "warning");
+    if (selectedFiles.length === 0) {
+      addNotification("Please select at least one file", "warning");
       return;
     }
-
-    const token = await getAuthToken();
-    if (!token) {
-      addNotification("Please sign in to use PDF import", "warning");
-      return;
-    }
-
-    const uploadedFilePaths: string[] = [];
 
     // Aggregate results from all files
     const allLore: StoryLore[] = [];
@@ -977,7 +728,7 @@ export default function PDFImporter({
           setProgress(fileProgressStart + fileProgressRange * 0.05);
 
           const chunks = await splitPDFIntoChunks(file, (msg) =>
-            setStatusMessage(msg)
+            setStatusMessage(msg),
           );
 
           const totalChunks = chunks.length;
@@ -994,7 +745,7 @@ export default function PDFImporter({
           // Phase 1: OCR all chunks with limited concurrency (5% - 45% progress)
           setStep("ocr");
           setStatusMessage(
-            `Running OCR on ${totalChunks} chunks (${MAX_CONCURRENT_REQUESTS} at a time)...`
+            `Running OCR on ${totalChunks} chunks (${MAX_CONCURRENT_REQUESTS} at a time)...`,
           );
           setProgress(fileProgressStart + fileProgressRange * 0.1);
 
@@ -1002,8 +753,8 @@ export default function PDFImporter({
             // Update status to ocr
             setChunkStatuses((prev) =>
               prev.map((cs) =>
-                cs.chunkIndex === chunkIdx ? { ...cs, status: "ocr" } : cs
-              )
+                cs.chunkIndex === chunkIdx ? { ...cs, status: "ocr" } : cs,
+              ),
             );
 
             const ocrResponse = await fetchWithRetry(
@@ -1012,16 +763,16 @@ export default function PDFImporter({
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                   base64Data: chunk.base64,
                   fileName: `${file.name}_pages_${chunk.pageStart}-${chunk.pageEnd}.pdf`,
                   mimeType: "application/pdf",
                   includeImages: false,
+                  mistralKey: keys.mistralKey,
                 }),
               },
-              180000 // 3 minute timeout for OCR
+              180000, // 3 minute timeout for OCR
             );
 
             if (!ocrResponse.ok) {
@@ -1035,7 +786,7 @@ export default function PDFImporter({
               throw new Error(
                 `Chunk ${chunkIdx + 1} (pages ${chunk.pageStart}-${
                   chunk.pageEnd
-                }): ${errorMsg}`
+                }): ${errorMsg}`,
               );
             }
 
@@ -1047,8 +798,8 @@ export default function PDFImporter({
               prev.map((cs) =>
                 cs.chunkIndex === chunkIdx
                   ? { ...cs, ocrMarkdown: chunkResult.markdown }
-                  : cs
-              )
+                  : cs,
+              ),
             );
 
             return {
@@ -1068,10 +819,10 @@ export default function PDFImporter({
               const ocrProgress = completed / total;
               setProgress(
                 fileProgressStart +
-                  fileProgressRange * (0.1 + ocrProgress * 0.35)
+                  fileProgressRange * (0.1 + ocrProgress * 0.35),
               );
               setStatusMessage(`OCR: ${completed}/${total} chunks complete...`);
-            }
+            },
           );
 
           // Sort by page order and combine results
@@ -1087,7 +838,7 @@ export default function PDFImporter({
 
           // Update extracted markdown after all OCR is done
           setExtractedMarkdown(
-            (prev) => prev + "\n\n---\n\n" + combinedMarkdown
+            (prev) => prev + "\n\n---\n\n" + combinedMarkdown,
           );
           totalPagesProcessed += combinedTotalPages;
           totalCost += combinedCost;
@@ -1096,15 +847,9 @@ export default function PDFImporter({
           // Phase 2: Summarize all chunks with limited concurrency (45% - 95% progress)
           setStep("summarizing");
           setStatusMessage(
-            `Extracting notes from ${ocrResults.length} chunks (${MAX_CONCURRENT_REQUESTS} at a time)...`
+            `Extracting notes from ${ocrResults.length} chunks (${MAX_CONCURRENT_REQUESTS} at a time)...`,
           );
           setProgress(fileProgressStart + fileProgressRange * 0.5);
-
-          // Refresh token before summarization phase (may have expired during OCR)
-          const freshToken = await getAuthToken();
-          if (!freshToken) {
-            throw new Error("Session expired. Please sign in again.");
-          }
 
           const summarizeTasks = ocrResults.map((ocr) => async () => {
             // Update status to summarizing
@@ -1112,8 +857,8 @@ export default function PDFImporter({
               prev.map((cs) =>
                 cs.chunkIndex === ocr.chunkIndex
                   ? { ...cs, status: "summarizing" }
-                  : cs
-              )
+                  : cs,
+              ),
             );
 
             try {
@@ -1123,7 +868,6 @@ export default function PDFImporter({
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
-                    Authorization: `Bearer ${freshToken}`,
                   },
                   body: JSON.stringify({
                     markdown: ocr.markdown,
@@ -1138,25 +882,26 @@ export default function PDFImporter({
                     maxTokens: maxOutputTokens,
                     openRouterKey: keys.openRouterKey,
                     deepseekKey: keys.deepseekKey,
+                    mistralKey: keys.mistralKey,
                   }),
                 },
                 SUMMARIZE_TIMEOUT_MS,
-                MAX_RETRIES
+                MAX_RETRIES,
               );
 
               if (!summarizeResponse.ok) {
                 const errorMsg = await summarizeResponse.text();
                 console.error(
                   `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization failed:`,
-                  errorMsg
+                  errorMsg,
                 );
                 // Update status to failed
                 setChunkStatuses((prev) =>
                   prev.map((cs) =>
                     cs.chunkIndex === ocr.chunkIndex
                       ? { ...cs, status: "failed", error: errorMsg }
-                      : cs
-                  )
+                      : cs,
+                  ),
                 );
                 return {
                   chunkIndex: ocr.chunkIndex,
@@ -1180,8 +925,8 @@ export default function PDFImporter({
                           error: "JSON parse error",
                           rawSummarizeOutput: resultText,
                         }
-                      : cs
-                  )
+                      : cs,
+                  ),
                 );
                 return {
                   chunkIndex: ocr.chunkIndex,
@@ -1204,8 +949,8 @@ export default function PDFImporter({
                           customTables: result.customTables || [],
                         },
                       }
-                    : cs
-                )
+                    : cs,
+                ),
               );
 
               return {
@@ -1218,7 +963,7 @@ export default function PDFImporter({
             } catch (err: any) {
               console.error(
                 `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization error:`,
-                err.message || err
+                err.message || err,
               );
               // Update status to failed
               setChunkStatuses((prev) =>
@@ -1229,8 +974,8 @@ export default function PDFImporter({
                         status: "failed",
                         error: err.message || "Unknown error",
                       }
-                    : cs
-                )
+                    : cs,
+                ),
               );
               return {
                 chunkIndex: ocr.chunkIndex,
@@ -1247,12 +992,12 @@ export default function PDFImporter({
               const sumProgress = completed / total;
               setProgress(
                 fileProgressStart +
-                  fileProgressRange * (0.5 + sumProgress * 0.45)
+                  fileProgressRange * (0.5 + sumProgress * 0.45),
               );
               setStatusMessage(
-                `Creating notes: ${completed}/${total} chunks complete...`
+                `Creating notes: ${completed}/${total} chunks complete...`,
               );
-            }
+            },
           );
 
           // Count failures and warn user
@@ -1260,7 +1005,7 @@ export default function PDFImporter({
           const failedCount = failedResults.length;
           if (failedCount > 0) {
             console.warn(
-              `${failedCount}/${summarizeResults.length} chunks failed to summarize`
+              `${failedCount}/${summarizeResults.length} chunks failed to summarize`,
             );
             // Show chunk details panel for failed chunks
             setShowChunkDetails(true);
@@ -1286,7 +1031,7 @@ export default function PDFImporter({
             setStep("summarizing");
             setProgress(fileProgressStart + fileProgressRange * 0.4);
             setStatusMessage(
-              `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`
+              `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`,
             );
 
             const textContent = await file.text();
@@ -1295,7 +1040,7 @@ export default function PDFImporter({
             combinedCost = 0;
 
             setExtractedMarkdown(
-              (prev) => prev + "\n\n---\n\n" + combinedMarkdown
+              (prev) => prev + "\n\n---\n\n" + combinedMarkdown,
             );
 
             const summarizeResponse = await fetchWithRetry(
@@ -1304,7 +1049,6 @@ export default function PDFImporter({
                 method: "POST",
                 headers: {
                   "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
                 },
                 body: JSON.stringify({
                   markdown: combinedMarkdown,
@@ -1319,10 +1063,11 @@ export default function PDFImporter({
                   maxTokens: maxOutputTokens,
                   openRouterKey: keys.openRouterKey,
                   deepseekKey: keys.deepseekKey,
+                  mistralKey: keys.mistralKey,
                 }),
               },
               SUMMARIZE_TIMEOUT_MS,
-              MAX_RETRIES
+              MAX_RETRIES,
             );
 
             if (!summarizeResponse.ok) {
@@ -1347,74 +1092,43 @@ export default function PDFImporter({
           setStep("uploading");
           setProgress(fileProgressStart + fileProgressRange * 0.1);
           setStatusMessage(
-            `Uploading ${file.name} (${i + 1}/${totalFiles})...`
+            `Preparing ${file.name} (${i + 1}/${totalFiles})...`,
           );
 
-          let ocrPayload: {
-            signedUrl?: string;
+          const arrayBuffer = await file.arrayBuffer();
+          const base64 = btoa(
+            new Uint8Array(arrayBuffer).reduce(
+              (data, byte) => data + String.fromCharCode(byte),
+              "",
+            ),
+          );
+
+          const ocrPayload: {
             base64Data?: string;
             fileName?: string;
             mimeType?: string;
-          } = {};
-          let filePath: string | null = null;
-
-          // Try Supabase upload first
-          const formData = new FormData();
-          formData.append("file", file);
-
-          const uploadResponse = await fetch("/api/ocr/upload", {
-            method: "POST",
-            headers: { Authorization: `Bearer ${token}` },
-            body: formData,
-          });
-
-          if (uploadResponse.ok) {
-            const uploadResult = await uploadResponse.json();
-            filePath = uploadResult.filePath;
-            if (filePath) {
-              uploadedFilePaths.push(filePath);
-            }
-            ocrPayload = { signedUrl: uploadResult.signedUrl };
-          } else {
-            // Fallback to base64 encoding for smaller files
-            console.log(
-              `Supabase upload failed for ${file.name}, falling back to base64`
-            );
-            setStatusMessage(
-              `Converting ${file.name} to base64 (${i + 1}/${totalFiles})...`
-            );
-
-            const arrayBuffer = await file.arrayBuffer();
-            const base64 = btoa(
-              new Uint8Array(arrayBuffer).reduce(
-                (data, byte) => data + String.fromCharCode(byte),
-                ""
-              )
-            );
-
-            ocrPayload = {
-              base64Data: base64,
-              fileName: file.name,
-              mimeType: file.type,
-            };
-          }
+          } = {
+            base64Data: base64,
+            fileName: file.name,
+            mimeType: file.type,
+          };
           setProgress(fileProgressStart + fileProgressRange * 0.2);
 
           // OCR Processing
           setStep("ocr");
           setStatusMessage(
-            `Extracting text from ${file.name} (${i + 1}/${totalFiles})...`
+            `Extracting text from ${file.name} (${i + 1}/${totalFiles})...`,
           );
 
           const ocrResponse = await fetch("/api/ocr/process", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
               ...ocrPayload,
               includeImages: false,
+              mistralKey: keys.mistralKey,
             }),
           });
 
@@ -1437,7 +1151,7 @@ export default function PDFImporter({
           combinedCost = ocrResult.cost;
 
           setExtractedMarkdown(
-            (prev) => prev + "\n\n---\n\n" + combinedMarkdown
+            (prev) => prev + "\n\n---\n\n" + combinedMarkdown,
           );
           totalPagesProcessed += combinedTotalPages;
           totalCost += combinedCost;
@@ -1446,14 +1160,13 @@ export default function PDFImporter({
           // Step 3: AI Summarization - Extract all notes (only for non-chunked files)
           setStep("summarizing");
           setStatusMessage(
-            `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`
+            `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`,
           );
 
           const summarizeResponse = await fetch("/api/ocr/summarize", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
             },
             body: JSON.stringify({
               markdown: combinedMarkdown,
@@ -1466,6 +1179,7 @@ export default function PDFImporter({
               maxTokens: maxOutputTokens,
               openRouterKey: keys.openRouterKey,
               deepseekKey: keys.deepseekKey,
+              mistralKey: keys.mistralKey,
             }),
           });
 
@@ -1514,14 +1228,14 @@ export default function PDFImporter({
         `Imported ${totalItems} items from ${totalPagesProcessed} pages across ${totalFiles} file${
           totalFiles > 1 ? "s" : ""
         } (${totalCost} coins)`,
-        "success"
+        "success",
       );
 
       // Show reminder about Saved Imports feature
       setTimeout(() => {
         addNotification(
           "💡 Tip: Your import is saved! Re-open the PDF Importer to access 'Saved Imports' anytime.",
-          "success"
+          "success",
         );
       }, 2000);
 
@@ -1536,21 +1250,7 @@ export default function PDFImporter({
       setStatusMessage(error.message || "Import failed");
       addNotification(error.message || "PDF import failed", "failure");
     } finally {
-      // Clean up all uploaded files
-      for (const filePath of uploadedFilePaths) {
-        try {
-          await fetch("/api/ocr/upload", {
-            method: "DELETE",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({ filePath }),
-          });
-        } catch (e) {
-          console.warn("Failed to clean up uploaded file:", e);
-        }
-      }
+      // No cleanup needed - files are processed entirely client-side/BYOK now
     }
   };
 
@@ -1752,7 +1452,7 @@ export default function PDFImporter({
                           Chunk Status (
                           {
                             chunkStatuses.filter(
-                              (cs) => cs.status === "complete"
+                              (cs) => cs.status === "complete",
                             ).length
                           }
                           /{chunkStatuses.length} complete)
@@ -1761,7 +1461,7 @@ export default function PDFImporter({
                           <span className="px-2 py-0.5 bg-red-900/50 text-red-300 text-xs rounded-full">
                             {
                               chunkStatuses.filter(
-                                (cs) => cs.status === "failed"
+                                (cs) => cs.status === "failed",
                               ).length
                             }{" "}
                             failed
@@ -1783,11 +1483,11 @@ export default function PDFImporter({
                               chunk.status === "complete"
                                 ? "bg-green-900/20 border border-green-700/30"
                                 : chunk.status === "failed"
-                                ? "bg-red-900/20 border border-red-700/30"
-                                : chunk.status === "summarizing" ||
-                                  chunk.status === "ocr"
-                                ? "bg-blue-900/30 border border-blue-700/30"
-                                : "bg-gray-900/20 border border-gray-700/30"
+                                  ? "bg-red-900/20 border border-red-700/30"
+                                  : chunk.status === "summarizing" ||
+                                      chunk.status === "ocr"
+                                    ? "bg-blue-900/30 border border-blue-700/30"
+                                    : "bg-gray-900/20 border border-gray-700/30"
                             }`}
                           >
                             <div className="shrink-0">
@@ -1887,7 +1587,7 @@ export default function PDFImporter({
                         {/* Complete with current results button */}
                         {chunkStatuses.some((cs) => cs.status === "failed") &&
                           chunkStatuses.some(
-                            (cs) => cs.status === "complete"
+                            (cs) => cs.status === "complete",
                           ) && (
                             <div className="pt-2 border-t border-blue-700/30">
                               <button
@@ -1901,7 +1601,7 @@ export default function PDFImporter({
                                 Complete Import with{" "}
                                 {
                                   chunkStatuses.filter(
-                                    (cs) => cs.status === "complete"
+                                    (cs) => cs.status === "complete",
                                   ).length
                                 }{" "}
                                 Chunks
@@ -1910,12 +1610,12 @@ export default function PDFImporter({
                                 Skip{" "}
                                 {
                                   chunkStatuses.filter(
-                                    (cs) => cs.status === "failed"
+                                    (cs) => cs.status === "failed",
                                   ).length
                                 }{" "}
                                 failed chunk
                                 {chunkStatuses.filter(
-                                  (cs) => cs.status === "failed"
+                                  (cs) => cs.status === "failed",
                                 ).length !== 1
                                   ? "s"
                                   : ""}
@@ -2018,7 +1718,7 @@ export default function PDFImporter({
                         {selectedFiles.map((file, index) => {
                           const filePages = Math.max(
                             1,
-                            Math.ceil(file.size / (100 * 1024))
+                            Math.ceil(file.size / (100 * 1024)),
                           );
                           return (
                             <div
@@ -2229,7 +1929,7 @@ export default function PDFImporter({
                                 <div
                                   onClick={() =>
                                     setExpandedImport(
-                                      isExpanded ? null : imp.id
+                                      isExpanded ? null : imp.id,
                                     )
                                   }
                                   className="flex items-center gap-3 p-3 cursor-pointer hover:bg-blue-800/30 transition-colors"
@@ -2244,7 +1944,7 @@ export default function PDFImporter({
                                     </p>
                                     <p className="text-xs text-blue-300/60">
                                       {new Date(
-                                        imp.timestamp
+                                        imp.timestamp,
                                       ).toLocaleDateString()}{" "}
                                       • {totalNotes} notes •{" "}
                                       {imp.customTables.length} tables
@@ -2356,22 +2056,6 @@ export default function PDFImporter({
                                         />
                                         Use
                                       </button>
-                                      {user && (
-                                        <button
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            openShareModal(imp);
-                                          }}
-                                          className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 text-white text-xs rounded-lg transition-colors flex items-center gap-1"
-                                          title="Share to community"
-                                        >
-                                          <DynamicIcon
-                                            name="Share2"
-                                            className="w-3 h-3"
-                                          />
-                                          Share
-                                        </button>
-                                      )}
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -2394,177 +2078,6 @@ export default function PDFImporter({
                       )}
                     </div>
                   )}
-
-                  {/* Community Imports Section */}
-                  <div className="border border-purple-700/40 rounded-lg overflow-hidden">
-                    <button
-                      onClick={() =>
-                        setShowCommunityImports(!showCommunityImports)
-                      }
-                      className="w-full px-4 py-3 flex items-center justify-between bg-purple-900/20 hover:bg-purple-900/30 transition-colors"
-                    >
-                      <div className="flex items-center gap-2">
-                        <DynamicIcon
-                          name="Globe"
-                          className="w-4 h-4 text-purple-400"
-                        />
-                        <span className="text-sm font-medium text-purple-200">
-                          Community Imports
-                        </span>
-                      </div>
-                      <DynamicIcon
-                        name={
-                          showCommunityImports ? "ChevronUp" : "ChevronDown"
-                        }
-                        className="w-4 h-4 text-purple-400"
-                      />
-                    </button>
-                    {showCommunityImports && (
-                      <div className="p-3 space-y-3 bg-purple-900/10">
-                        {/* Search and Filters */}
-                        <div className="flex gap-2">
-                          <div className="flex-1">
-                            <input
-                              type="text"
-                              value={communitySearch}
-                              onChange={(e) =>
-                                setCommunitySearch(e.target.value)
-                              }
-                              placeholder="Search imports..."
-                              className="w-full px-3 py-2 bg-purple-900/30 border border-purple-700/40 rounded-lg text-white text-sm placeholder-purple-300/50"
-                              onKeyDown={(e) => {
-                                if (e.key === "Enter") fetchCommunityImports();
-                              }}
-                            />
-                          </div>
-                          <select
-                            value={communitySort}
-                            onChange={(e) =>
-                              setCommunitySort(
-                                e.target.value as "recent" | "popular"
-                              )
-                            }
-                            className="px-3 py-2 bg-purple-900/30 border border-purple-700/40 rounded-lg text-white text-sm"
-                          >
-                            <option value="popular">Popular</option>
-                            <option value="recent">Recent</option>
-                          </select>
-                          <button
-                            onClick={fetchCommunityImports}
-                            disabled={communityLoading}
-                            className="px-3 py-2 bg-purple-600/80 hover:bg-purple-600 disabled:opacity-50 text-white rounded-lg transition-colors"
-                          >
-                            <DynamicIcon
-                              name={communityLoading ? "Loader2" : "Search"}
-                              className={`w-4 h-4 ${
-                                communityLoading ? "animate-spin" : ""
-                              }`}
-                            />
-                          </button>
-                        </div>
-
-                        {/* RPG System Filter */}
-                        <div className="flex gap-2 flex-wrap">
-                          {[
-                            "",
-                            "D&D 5e",
-                            "Pathfinder",
-                            "Call of Cthulhu",
-                            "Other",
-                          ].map((sys) => (
-                            <button
-                              key={sys}
-                              onClick={() => {
-                                setCommunitySystem(sys);
-                                setTimeout(fetchCommunityImports, 100);
-                              }}
-                              className={`px-2 py-1 text-xs rounded-full transition-colors ${
-                                communitySystem === sys
-                                  ? "bg-purple-600 text-white"
-                                  : "bg-purple-900/40 text-purple-300 hover:bg-purple-800/50"
-                              }`}
-                            >
-                              {sys || "All Systems"}
-                            </button>
-                          ))}
-                        </div>
-
-                        {/* Results */}
-                        {communityLoading ? (
-                          <div className="flex items-center justify-center py-8">
-                            <DynamicIcon
-                              name="Loader2"
-                              className="w-6 h-6 text-purple-400 animate-spin"
-                            />
-                          </div>
-                        ) : communityImports.length === 0 ? (
-                          <div className="text-center py-8 text-purple-300/60 text-sm">
-                            No community imports found
-                          </div>
-                        ) : (
-                          <div className="space-y-2 max-h-80 overflow-y-auto">
-                            {communityImports.map((imp) => (
-                              <div
-                                key={imp.id}
-                                className="bg-purple-900/30 rounded-lg border border-purple-700/40 p-3"
-                              >
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-medium text-white truncate">
-                                      {imp.name}
-                                    </p>
-                                    {imp.description && (
-                                      <p className="text-xs text-purple-300/70 line-clamp-2 mt-1">
-                                        {imp.description}
-                                      </p>
-                                    )}
-                                    <div className="flex items-center gap-2 mt-2 text-xs text-purple-300/60">
-                                      {imp.system && (
-                                        <span className="px-2 py-0.5 bg-purple-800/40 rounded-full">
-                                          {imp.system}
-                                        </span>
-                                      )}
-                                      <span>
-                                        📚 {imp.lore_count} • ⚙️{" "}
-                                        {imp.mechanics_count} • 🎲{" "}
-                                        {imp.tables_count}
-                                      </span>
-                                      <span title="Downloads">
-                                        ⬇️ {imp.downloads}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center gap-2 mt-1 text-xs text-purple-300/40">
-                                      <span>
-                                        {new Date(
-                                          imp.created_at
-                                        ).toLocaleDateString()}
-                                      </span>
-                                    </div>
-                                  </div>
-                                  <button
-                                    onClick={() => useCommunityImport(imp)}
-                                    className="px-3 py-1.5 bg-purple-600/80 hover:bg-purple-600 text-white text-xs rounded-lg transition-colors flex items-center gap-1 shrink-0"
-                                  >
-                                    <DynamicIcon
-                                      name="Download"
-                                      className="w-3 h-3"
-                                    />
-                                    Use
-                                  </button>
-                                </div>
-                              </div>
-                            ))}
-                            {communityTotal > communityImports.length && (
-                              <p className="text-center text-xs text-purple-300/50 py-2">
-                                Showing {communityImports.length} of{" "}
-                                {communityTotal} imports
-                              </p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
                 </>
               )}
             </div>
@@ -2593,173 +2106,6 @@ export default function PDFImporter({
         </div>
       )}
 
-      {/* Share Modal */}
-      {showShareModal && shareData && (
-        <div
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm"
-          onClick={() => setShowShareModal(false)}
-        >
-          <div
-            className="bg-linear-to-br from-purple-950/95 via-blue-950/95 to-purple-950/95 border border-purple-500/40 rounded-xl shadow-2xl w-full max-w-lg m-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b border-purple-700/40">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-600/30 flex items-center justify-center">
-                  <DynamicIcon
-                    name="Share2"
-                    className="w-5 h-5 text-purple-300"
-                  />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-white">
-                    Share Import to Community
-                  </h2>
-                  <p className="text-sm text-purple-200/70">
-                    Help others discover this content
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="p-4 space-y-4">
-              {/* Name */}
-              <div>
-                <label className="block text-sm font-medium text-purple-200 mb-1">
-                  Import Name *
-                </label>
-                <input
-                  type="text"
-                  value={shareName}
-                  onChange={(e) => setShareName(e.target.value)}
-                  placeholder="e.g., Monster Manual Lore"
-                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white placeholder-purple-300/50"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-sm font-medium text-purple-200 mb-1">
-                  Description
-                </label>
-                <textarea
-                  value={shareDescription}
-                  onChange={(e) => setShareDescription(e.target.value)}
-                  placeholder="What content is included? Any special notes?"
-                  rows={2}
-                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white placeholder-purple-300/50 resize-none"
-                />
-              </div>
-
-              {/* Source Book */}
-              <div>
-                <label className="block text-sm font-medium text-purple-200 mb-1">
-                  Source Book
-                </label>
-                <input
-                  type="text"
-                  value={shareSourceBook}
-                  onChange={(e) => setShareSourceBook(e.target.value)}
-                  placeholder="e.g., D&D 5e Monster Manual"
-                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white placeholder-purple-300/50"
-                />
-              </div>
-
-              {/* System */}
-              <div>
-                <label className="block text-sm font-medium text-purple-200 mb-1">
-                  RPG System
-                </label>
-                <select
-                  value={shareSystem}
-                  onChange={(e) => setShareSystem(e.target.value)}
-                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white"
-                >
-                  <option value="">Select system...</option>
-                  <option value="D&D 5e">D&D 5e</option>
-                  <option value="Pathfinder">Pathfinder</option>
-                  <option value="Call of Cthulhu">Call of Cthulhu</option>
-                  <option value="Blades in the Dark">Blades in the Dark</option>
-                  <option value="Fate">Fate</option>
-                  <option value="Year Zero Engine">Year Zero Engine</option>
-                  <option value="Savage Worlds">Savage Worlds</option>
-                  <option value="System Agnostic">System Agnostic</option>
-                  <option value="Other">Other</option>
-                </select>
-              </div>
-
-              {/* Tags */}
-              <div>
-                <label className="block text-sm font-medium text-purple-200 mb-1">
-                  Tags (comma-separated)
-                </label>
-                <input
-                  type="text"
-                  value={shareTags}
-                  onChange={(e) => setShareTags(e.target.value)}
-                  placeholder="e.g., monsters, fantasy, official"
-                  className="w-full px-3 py-2 bg-purple-900/40 border border-purple-700/40 rounded-lg text-white placeholder-purple-300/50"
-                />
-              </div>
-
-              {/* Content Summary */}
-              <div className="bg-purple-900/30 rounded-lg p-3 text-sm">
-                <p className="text-purple-200 font-medium mb-2">
-                  Content to share:
-                </p>
-                <div className="flex gap-4 text-purple-300/70">
-                  <span>📚 {shareData.lore.length} Lore</span>
-                  <span>⚙️ {shareData.mechanicNotes.length} Mechanics</span>
-                  <span>🎲 {shareData.customTables.length} Tables</span>
-                </div>
-              </div>
-
-              {/* Public toggle */}
-              <label className="flex items-center gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={sharePublic}
-                  onChange={(e) => setSharePublic(e.target.checked)}
-                  className="w-4 h-4 rounded border-purple-700/40 bg-purple-900/40 text-purple-600 focus:ring-purple-500"
-                />
-                <span className="text-sm text-purple-200">
-                  Make publicly visible (others can browse and use)
-                </span>
-              </label>
-            </div>
-
-            <div className="flex justify-end gap-3 p-4 border-t border-purple-700/40">
-              <button
-                onClick={() => setShowShareModal(false)}
-                className="px-4 py-2 bg-purple-900/40 hover:bg-purple-800/50 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={shareImportToCommunity}
-                disabled={!shareName.trim() || shareUploading}
-                className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
-              >
-                {shareUploading ? (
-                  <>
-                    <DynamicIcon
-                      name="Loader2"
-                      className="w-4 h-4 animate-spin"
-                    />
-                    Sharing...
-                  </>
-                ) : (
-                  <>
-                    <DynamicIcon name="Share2" className="w-4 h-4" />
-                    Share
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* JSON Repair Modal - for manually fixing broken chunk output */}
       {repairModalOpen && repairChunkIndex !== null && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -2781,13 +2127,13 @@ export default function PDFImporter({
                     Chunk {repairChunkIndex + 1}: Pages{" "}
                     {
                       chunkStatuses.find(
-                        (cs) => cs.chunkIndex === repairChunkIndex
+                        (cs) => cs.chunkIndex === repairChunkIndex,
                       )?.pageStart
                     }
                     -
                     {
                       chunkStatuses.find(
-                        (cs) => cs.chunkIndex === repairChunkIndex
+                        (cs) => cs.chunkIndex === repairChunkIndex,
                       )?.pageEnd
                     }
                   </p>
@@ -2829,7 +2175,7 @@ export default function PDFImporter({
                       // Try to format JSON nicely
                       let jsonContent = repairContent.trim();
                       const jsonBlockMatch = jsonContent.match(
-                        /```(?:json)?\s*([\s\S]*?)\s*```/
+                        /```(?:json)?\s*([\s\S]*?)\s*```/,
                       );
                       if (jsonBlockMatch) {
                         jsonContent = jsonBlockMatch[1].trim();
@@ -2843,7 +2189,7 @@ export default function PDFImporter({
                       if (startIndex !== -1 && endIndex !== -1) {
                         jsonContent = jsonContent.slice(
                           startIndex,
-                          endIndex + 1
+                          endIndex + 1,
                         );
                       }
 
@@ -2852,7 +2198,7 @@ export default function PDFImporter({
                     } catch {
                       addNotification(
                         "Cannot format - JSON is not valid. Try fixing the errors first.",
-                        "warning"
+                        "warning",
                       );
                     }
                   }}
@@ -2887,7 +2233,7 @@ export default function PDFImporter({
                         `Invalid JSON: ${
                           e instanceof Error ? e.message : "Parse error"
                         }`,
-                        "warning"
+                        "warning",
                       );
                     }
                   }}

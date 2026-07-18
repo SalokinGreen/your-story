@@ -1,4 +1,4 @@
-import { StoryData } from "./structs";
+import { Adventure, StoryData } from "./structs";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -80,7 +80,7 @@ export async function saveLocalStory(
     serverUpdatedAt?: string;
     markAsSynced?: boolean;
     isLocalEdit?: boolean;
-  }
+  },
 ): Promise<void> {
   const db = await openDB();
   return new Promise(async (resolve, reject) => {
@@ -136,8 +136,43 @@ export async function saveLocalStory(
   });
 }
 
+/**
+ * Creates a new local story from an adventure's story template and returns
+ * the new story's local ID. This is the entry point for "playing" an
+ * adventure - the app is fully local now, so every new story starts local.
+ */
+export async function startAdventureLocally(
+  adventure: Partial<Adventure>,
+  playerName: string = "Player",
+): Promise<string> {
+  const localId = `local_${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 9)}`;
+
+  const defaultUserNotes =
+    typeof window !== "undefined"
+      ? localStorage.getItem("defaultUserNotes") || ""
+      : "";
+
+  const newStoryData = {
+    ...adventure.storyTemplate,
+    story_name: `${adventure.title || "Adventure"} - ${new Date().toLocaleDateString()}`,
+    player_name: playerName,
+    starting_choices: adventure.startingChoices,
+    player_notes:
+      defaultUserNotes || adventure.storyTemplate?.player_notes || "",
+    level: 1,
+    upgradesSpent: 0,
+    characterSheetTemplate: adventure.characterSheetTemplate,
+  } as unknown as StoryData;
+
+  await saveLocalStory(localId, newStoryData);
+
+  return localId;
+}
+
 export async function getLocalStory(
-  storyId: string
+  storyId: string,
 ): Promise<LocalStory | undefined> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
@@ -202,7 +237,7 @@ export type SyncAction = "none" | "download" | "upload" | "conflict";
 
 export function determineSyncAction(
   localStory: LocalStory | undefined,
-  serverUpdatedAt: string | undefined
+  serverUpdatedAt: string | undefined,
 ): SyncAction {
   // No local copy - download from server
   if (!localStory) return "download";
@@ -245,7 +280,7 @@ export function determineSyncAction(
 export async function updateSyncStatus(
   storyId: string,
   syncStatus: SyncStatus,
-  serverUpdatedAt?: string
+  serverUpdatedAt?: string,
 ): Promise<void> {
   const db = await openDB();
   return new Promise(async (resolve, reject) => {
@@ -287,7 +322,7 @@ export async function getStoriesNeedingSync(): Promise<LocalStory[]> {
     request.onsuccess = () => {
       const stories = request.result as LocalStory[];
       const needingSync = stories.filter(
-        (s) => s.syncStatus === "pending" || s.syncStatus === "conflict"
+        (s) => s.syncStatus === "pending" || s.syncStatus === "conflict",
       );
       resolve(needingSync);
     };

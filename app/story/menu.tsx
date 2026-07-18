@@ -26,15 +26,14 @@ import {
   NPC,
   NPCStatus,
   NPCAttitude,
+  Adventure,
 } from "../misc/structs";
 import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { useNotification } from "../misc/NotificationContext";
-import { supabase } from "../misc/supabase";
 import { compressImage } from "../misc/imageCompression";
 import ConfirmDialog from "../components/ConfirmDialog";
-import { useAuth } from "../misc/AuthContext";
-import { encryptStoryData } from "../misc/encryption";
+import { getLocalPlayerId } from "../misc/localPlayerId";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { IconPicker } from "../components/IconPicker";
 import { CustomTablesEditor } from "../components/CustomTablesEditor";
@@ -89,7 +88,7 @@ function ChatDisplaySettings({
     "displayName" | "displayAvatar" | "player_name"
   >;
   onChange: (
-    updates: Partial<Pick<BasicSettingsForm, "displayName" | "displayAvatar">>
+    updates: Partial<Pick<BasicSettingsForm, "displayName" | "displayAvatar">>,
   ) => void;
 }) {
   return (
@@ -403,7 +402,7 @@ function StatsResourcesEditor({
     number | null
   >(null);
   const [editAchievement, setEditAchievement] = useState<Partial<Achievement>>(
-    {}
+    {},
   );
 
   const updateStat = (index: number, field: keyof Stat, value: any) => {
@@ -460,7 +459,7 @@ function StatsResourcesEditor({
   const updateAchievement = (
     index: number,
     field: keyof Achievement,
-    value: any
+    value: any,
   ) => {
     const updated = [...localAchievements];
     (updated[index] as any)[field] = value;
@@ -815,7 +814,7 @@ function StatsResourcesEditor({
                   </div>
                 </div>
               </div>
-            )
+            ),
           )}
         </div>
       </div>
@@ -989,7 +988,7 @@ function StatsResourcesEditor({
                   </div>
                 </div>
               </div>
-            )
+            ),
           )}
         </div>
       </div>
@@ -1199,7 +1198,7 @@ function StatsResourcesEditor({
                   Remove
                 </button>
               </div>
-            )
+            ),
           )}
           {localAchievements.length === 0 && (
             <p className="text-sm text-blue-200/60">No achievements yet.</p>
@@ -1220,10 +1219,10 @@ function QuestEditor({
 }) {
   const [localQuests, setLocalQuests] = useState([...quests]);
   const [draggedQuestIndex, setDraggedQuestIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editingQuestIndex, setEditingQuestIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editQuest, setEditQuest] = useState<Quest | null>(null);
 
@@ -1525,7 +1524,7 @@ function QuestEditor({
                   </div>
                 </div>
               </div>
-            )
+            ),
           )}
           {localQuests.length === 0 && (
             <p className="text-sm text-blue-200/60">No quests yet.</p>
@@ -1619,7 +1618,7 @@ function InventoryEditor({
   const updateItem = (
     index: number,
     field: keyof InventoryItem,
-    value: any
+    value: any,
   ) => {
     const updated = [...localInventory];
     (updated[index] as any)[field] = value;
@@ -1743,7 +1742,7 @@ function InventoryEditor({
                           maxDurability: maxDur,
                           durability: Math.min(
                             editInventoryItem.durability || maxDur,
-                            maxDur
+                            maxDur,
                           ),
                         });
                       }}
@@ -1772,7 +1771,7 @@ function InventoryEditor({
                       {editInventoryItem.grade === "mythic"
                         ? "(∞)"
                         : `(max ${getMaxDurability(
-                            (editInventoryItem.grade as ItemGrade) || "common"
+                            (editInventoryItem.grade as ItemGrade) || "common",
                           )})`}
                     </label>
                     <input
@@ -1780,10 +1779,11 @@ function InventoryEditor({
                       value={
                         editInventoryItem.grade === "mythic"
                           ? "∞"
-                          : editInventoryItem.durability ??
+                          : (editInventoryItem.durability ??
                             getMaxDurability(
-                              (editInventoryItem.grade as ItemGrade) || "common"
-                            )
+                              (editInventoryItem.grade as ItemGrade) ||
+                                "common",
+                            ))
                       }
                       onChange={(e) =>
                         setEditInventoryItem({
@@ -1794,9 +1794,9 @@ function InventoryEditor({
                               parseInt(e.target.value) || 0,
                               getMaxDurability(
                                 (editInventoryItem.grade as ItemGrade) ||
-                                  "common"
-                              )
-                            )
+                                  "common",
+                              ),
+                            ),
                           ),
                         })
                       }
@@ -1899,10 +1899,10 @@ function InventoryEditor({
                               width: `${
                                 ((item.durability ??
                                   getMaxDurability(
-                                    (item.grade as ItemGrade) || "common"
+                                    (item.grade as ItemGrade) || "common",
                                   )) /
                                   getMaxDurability(
-                                    (item.grade as ItemGrade) || "common"
+                                    (item.grade as ItemGrade) || "common",
                                   )) *
                                 100
                               }%`,
@@ -1914,11 +1914,11 @@ function InventoryEditor({
                         <span className="text-xs text-blue-200/60">
                           {item.durability ??
                             getMaxDurability(
-                              (item.grade as ItemGrade) || "common"
+                              (item.grade as ItemGrade) || "common",
                             )}
                           /
                           {getMaxDurability(
-                            (item.grade as ItemGrade) || "common"
+                            (item.grade as ItemGrade) || "common",
                           )}
                         </span>
                       </>
@@ -1975,7 +1975,7 @@ function InventoryEditor({
                 </div>
               </div>
             </div>
-          )
+          ),
         )}
       </div>
     </div>
@@ -1998,10 +1998,10 @@ function AbilitiesEditor({
 }) {
   const [localAbilities, setLocalAbilities] = useState([...abilities]);
   const [draggedAbilityIndex, setDraggedAbilityIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editingAbilityIndex, setEditingAbilityIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editAbility, setEditAbility] = useState<Partial<Ability>>({});
   const [editCosts, setEditCosts] = useState<AbilityCost[]>([]);
@@ -2099,7 +2099,7 @@ function AbilitiesEditor({
   const updateCost = (
     costIndex: number,
     field: keyof AbilityCost,
-    value: any
+    value: any,
   ) => {
     const updated = [...editCosts];
     (updated[costIndex] as any)[field] = value;
@@ -2297,7 +2297,7 @@ function AbilitiesEditor({
                               updateCost(
                                 costIndex,
                                 "amount",
-                                parseInt(e.target.value) || 1
+                                parseInt(e.target.value) || 1,
                               )
                             }
                             className="w-16 px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-white text-sm"
@@ -2472,7 +2472,7 @@ function AbilitiesEditor({
                 </button>
               </div>
             </div>
-          )
+          ),
         )}
       </div>
     </div>
@@ -2486,7 +2486,7 @@ function PassivesEditor({
 }: {
   passives: { name: string; description: string; nodeId: string }[];
   onUpdate: (
-    passives: { name: string; description: string; nodeId: string }[]
+    passives: { name: string; description: string; nodeId: string }[],
   ) => void;
 }) {
   const [localPassives, setLocalPassives] = useState([...passives]);
@@ -2886,8 +2886,8 @@ function LoreEditor({
                     {editLore.type === "character_sheet"
                       ? "Character sheet notes appear at the very top of AI context for character details."
                       : editLore.type === "mechanics"
-                      ? "Mechanics notes are prioritized and always visible to the AI for game rules."
-                      : "Standard lore notes are shown based on triggers and visibility."}
+                        ? "Mechanics notes are prioritized and always visible to the AI for game rules."
+                        : "Standard lore notes are shown based on triggers and visibility."}
                   </p>
                 </div>
                 <LoreImageGenerator
@@ -2978,7 +2978,7 @@ function LoreEditor({
                     <datalist id="lore-folders-list">
                       {[
                         ...new Set(
-                          localLore.map((l) => l.folder).filter(Boolean)
+                          localLore.map((l) => l.folder).filter(Boolean),
                         ),
                       ].map((folder) => (
                         <option key={folder} value={folder} />
@@ -3052,7 +3052,7 @@ function LoreEditor({
                                 setEditLore({
                                   ...editLore,
                                   tags: (editLore.tags || []).filter(
-                                    (_, i) => i !== idx
+                                    (_, i) => i !== idx,
                                   ),
                                 })
                               }
@@ -3260,7 +3260,7 @@ function LoreEditor({
                                           trigger_lores: e.target.checked
                                             ? [...current, loreEntry.title]
                                             : current.filter(
-                                                (t) => t !== loreEntry.title
+                                                (t) => t !== loreEntry.title,
                                               ),
                                         });
                                       }}
@@ -3309,7 +3309,7 @@ function LoreEditor({
                                           untrigger_lores: e.target.checked
                                             ? [...current, loreEntry.title]
                                             : current.filter(
-                                                (t) => t !== loreEntry.title
+                                                (t) => t !== loreEntry.title,
                                               ),
                                         });
                                       }}
@@ -3358,7 +3358,7 @@ function LoreEditor({
                                           var_on_triggers: e.target.checked
                                             ? [...current, variable.name]
                                             : current.filter(
-                                                (n) => n !== variable.name
+                                                (n) => n !== variable.name,
                                               ),
                                         });
                                       }}
@@ -3400,7 +3400,7 @@ function LoreEditor({
                                           var_off_triggers: e.target.checked
                                             ? [...current, variable.name]
                                             : current.filter(
-                                                (n) => n !== variable.name
+                                                (n) => n !== variable.name,
                                               ),
                                         });
                                       }}
@@ -3603,7 +3603,7 @@ function LoreEditor({
                 </div>
               </div>
             </div>
-          )
+          ),
         )}
       </div>
     </div>
@@ -3808,10 +3808,10 @@ function RelationshipsEditor({
                       rel.value >= 50
                         ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
                         : rel.value >= 0
-                        ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
-                        : rel.value >= -50
-                        ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200"
-                        : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
+                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
+                          : rel.value >= -50
+                            ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200"
+                            : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
                     }`}
                   >
                     {rel.value > 0 ? "+" : ""}
@@ -3835,7 +3835,7 @@ function RelationshipsEditor({
                 </button>
               </div>
             </div>
-          )
+          ),
         )}
         {localRelationships.length === 0 && (
           <div className="p-8 text-center rounded-lg bg-blue-900/30 border-2 border-dashed border-blue-700/40">
@@ -3936,7 +3936,7 @@ function NPCEditor({
   const saveEdit = () => {
     if (editingId && editNPC.name) {
       const updated = localNPCs.map((n) =>
-        n.id === editingId ? ({ ...n, ...editNPC } as NPC) : n
+        n.id === editingId ? ({ ...n, ...editNPC } as NPC) : n,
       );
       setLocalNPCs(updated);
       onUpdate(updated);
@@ -4207,8 +4207,8 @@ function NPCEditor({
                         npc.status === "dead"
                           ? "text-gray-400 bg-gray-500/20"
                           : npc.status === "missing"
-                          ? "text-yellow-400 bg-yellow-500/20"
-                          : "text-purple-400 bg-purple-500/20"
+                            ? "text-yellow-400 bg-yellow-500/20"
+                            : "text-purple-400 bg-purple-500/20"
                       }`}
                     >
                       {
@@ -4250,7 +4250,7 @@ function NPCEditor({
                 </button>
               </div>
             </div>
-          )
+          ),
         )}
 
         {localNPCs.length === 0 && (
@@ -4646,7 +4646,7 @@ function ConditionsEditor({
                 </button>
               </div>
             </div>
-          )
+          ),
         )}
         {localConditions.length === 0 && (
           <div className="p-8 text-center rounded-lg bg-blue-900/30 border-2 border-dashed border-blue-700/40">
@@ -5172,10 +5172,10 @@ function VariablesEditor({
                 variable.type === "number"
                   ? "bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800"
                   : variable.type === "boolean"
-                  ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
-                  : variable.type === "string"
-                  ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
-                  : "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800"
+                    ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+                    : variable.type === "string"
+                      ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+                      : "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800"
               }`}
             >
               <div className="shrink-0">
@@ -5185,10 +5185,10 @@ function VariablesEditor({
                     variable.type === "number"
                       ? "text-cyan-500"
                       : variable.type === "boolean"
-                      ? "text-emerald-500"
-                      : variable.type === "string"
-                      ? "text-amber-500"
-                      : "text-violet-500"
+                        ? "text-emerald-500"
+                        : variable.type === "string"
+                          ? "text-amber-500"
+                          : "text-violet-500"
                   }`}
                 />
               </div>
@@ -5324,7 +5324,7 @@ function StoryMetaEditor({
   onUpdate: (updates: Partial<StoryData>) => void;
 }) {
   const [localAuthorNotes, setLocalAuthorNotes] = useState<string>(
-    authorNotes || ""
+    authorNotes || "",
   );
   // Store the full memory array with MemoryEntry objects
   const [localMemory, setLocalMemory] = useState<(string | MemoryEntry)[]>([
@@ -5441,7 +5441,7 @@ export default function MenuPage({
 }: MenuProps) {
   const router = useRouter();
   const { addNotification } = useNotification();
-  const { user, getEncryptionPassword } = useAuth();
+  const localPlayerId = getLocalPlayerId();
   const [saving, setSaving] = useState(false);
   const [savingAs, setSavingAs] = useState(false);
   const [showSaveCopyModal, setShowSaveCopyModal] = useState(false);
@@ -5454,10 +5454,10 @@ export default function MenuPage({
   const [playerNotes, setPlayerNotes] = useState(storyData.player_notes || "");
   const [editingChatDisplay, setEditingChatDisplay] = useState(false);
   const [chatDisplayName, setChatDisplayName] = useState(
-    storyData.displayName || ""
+    storyData.displayName || "",
   );
   const [chatDisplayAvatar, setChatDisplayAvatar] = useState(
-    storyData.displayAvatar || ""
+    storyData.displayAvatar || "",
   );
 
   useEffect(() => {
@@ -5513,16 +5513,15 @@ export default function MenuPage({
   >("basic");
 
   const [multiplayerEnabled, setMultiplayerEnabled] = useState<boolean>(
-    !!storyData.multiplayer?.enabled
+    !!storyData.multiplayer?.enabled,
   );
   const [multiplayerMode, setMultiplayerMode] = useState<
     "host" | "any" | "timer"
   >(storyData.multiplayer?.mode || "host");
-  const [multiplayerTimerMinutes, setMultiplayerTimerMinutes] = useState<number>(
-    storyData.multiplayer?.timerMinutes ?? 2
-  );
+  const [multiplayerTimerMinutes, setMultiplayerTimerMinutes] =
+    useState<number>(storyData.multiplayer?.timerMinutes ?? 2);
   const [multiplayerHostUserId, setMultiplayerHostUserId] = useState<string>(
-    storyData.multiplayer?.hostUserId || ""
+    storyData.multiplayer?.hostUserId || "",
   );
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
@@ -5579,10 +5578,6 @@ export default function MenuPage({
   };
 
   const handleSaveAs = () => {
-    if (!user) {
-      addNotification("Please sign in to save", "warning");
-      return;
-    }
     // Generate default name with timestamp
     const timestamp = new Date().toLocaleString("en-US", {
       month: "short",
@@ -5595,64 +5590,28 @@ export default function MenuPage({
   };
 
   const handleSaveCopyConfirm = async () => {
-    if (!user) {
-      addNotification("Please sign in to save", "warning");
-      return;
-    }
-
     const copyName = saveCopyName.trim() || storyData.story_name;
     setShowSaveCopyModal(false);
     setSavingAs(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        addNotification("Please sign in to save", "warning");
-        return;
-      }
-
       // Create a copy with the custom name
-      const copyData = {
+      const copyData: StoryData = {
         ...storyData,
         story_name: copyName,
       };
 
-      // Encrypt if needed
-      const password = getEncryptionPassword();
-      const email = user?.email;
-      let dataToSave = copyData;
-      if (password && email) {
-        dataToSave = (await encryptStoryData(copyData, email, password)) as any;
-      }
+      const { saveLocalStory } = await import("../misc/localStoryManager");
+      const newLocalId = `local_${Date.now()}_${Math.random()
+        .toString(36)
+        .substr(2, 9)}`;
+      await saveLocalStory(newLocalId, copyData);
 
-      // Create new story via API
-      const response = await fetch("/api/stories", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({
-          adventureId: sourceAdventureId,
-          userId: user.id,
-          storyName: copyName,
-          storyData: dataToSave,
-          isPublic: false,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to create save");
-      }
-
-      const { story } = await response.json();
       addNotification(`Saved as "${copyName}"`, "success");
 
       // Navigate to the new story if toggle is enabled
       if (jumpToNewSave) {
-        router.push(`/story?storyId=${story.id}`);
+        router.push(`/story?storyId=${newLocalId}`);
       }
     } catch (error) {
       console.error("Error saving as:", error);
@@ -5667,7 +5626,7 @@ export default function MenuPage({
       const resolvedHostUserId =
         multiplayerEnabled &&
         (multiplayerMode === "host" || multiplayerMode === "timer")
-          ? (multiplayerHostUserId || user?.id || "").trim() || undefined
+          ? (multiplayerHostUserId || localPlayerId || "").trim() || undefined
           : undefined;
       const resolvedTimerMinutes =
         multiplayerMode === "timer"
@@ -5720,7 +5679,7 @@ export default function MenuPage({
       a.href = url;
       a.download = `${storyData.story_name.replace(
         /[^a-z0-9]/gi,
-        "_"
+        "_",
       )}_${Date.now()}.json`;
       document.body.appendChild(a);
       a.click();
@@ -5740,36 +5699,10 @@ export default function MenuPage({
 
     setDeleting(true);
     try {
-      // Check if this is a local story
-      if (storyDbId.startsWith("local_")) {
-        const { deleteLocalStory } = await import("../misc/localStoryManager");
-        await deleteLocalStory(storyDbId);
-        addNotification("Story deleted", "info");
-        router.push("/library");
-        return;
-      }
-
-      // Online story - use API
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
-
-      const response = await fetch(`/api/stories/${storyDbId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to delete story");
-      }
-
+      const { deleteLocalStory } = await import("../misc/localStoryManager");
+      await deleteLocalStory(storyDbId);
       addNotification("Story deleted", "info");
-      router.push("/explorer");
+      router.push("/library");
     } catch (error: any) {
       addNotification(error.message || "Failed to delete story", "failure");
       setDeleting(false);
@@ -5787,7 +5720,7 @@ export default function MenuPage({
       confirmButtonClass: "bg-gray-600 hover:bg-gray-700",
       onConfirm: () => {
         setConfirmDialog({ ...confirmDialog, isOpen: false });
-        router.push("/explorer");
+        router.push("/library");
       },
     });
   };
@@ -5796,7 +5729,7 @@ export default function MenuPage({
     const totalParts = storyData.scene.parts.length;
     const achievementCount = storyData.achievements.length;
     const achievedCount = storyData.achievements.filter(
-      (a) => a.dateAchieved
+      (a) => a.dateAchieved,
     ).length;
 
     return {
@@ -5813,7 +5746,7 @@ export default function MenuPage({
   const stats = calculateStoryProgress();
   const totalEarnedPoints = (storyData.earnedPointsFromChapters || []).reduce(
     (a: number, b: number) => a + b,
-    0
+    0,
   );
   const availablePoints = storyData.points;
 
@@ -5893,7 +5826,7 @@ export default function MenuPage({
 
         <button
           onClick={handleSaveAs}
-          disabled={savingAs || !user}
+          disabled={savingAs}
           className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-700 hover:bg-emerald-600 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white font-medium rounded-lg transition-colors text-sm"
           title="Create a copy of this story as a save point"
         >
@@ -6051,11 +5984,7 @@ export default function MenuPage({
                   type="text"
                   value={chatDisplayName}
                   onChange={(e) => setChatDisplayName(e.target.value)}
-                  placeholder={
-                    user?.user_metadata?.display_name ||
-                    storyData.player_name ||
-                    "Your name"
-                  }
+                  placeholder={storyData.player_name || "Your name"}
                   className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-1 focus:ring-purple-500"
                 />
               </div>
@@ -6145,16 +6074,16 @@ export default function MenuPage({
                     let freshTemplate: Partial<StoryData> | null = null;
                     if (sourceAdventureId) {
                       try {
-                        const adventureRes = await fetch(
-                          `/api/adventures/${sourceAdventureId}`
-                        );
-                        if (adventureRes.ok) {
-                          const { adventure } = await adventureRes.json();
-                          freshTemplate = adventure.storyTemplate;
-                        }
+                        const { getLocalAdventure } =
+                          await import("@/app/misc/localAdventureManager");
+                        const localAdv =
+                          await getLocalAdventure(sourceAdventureId);
+                        freshTemplate =
+                          (localAdv?.adventureData as Partial<Adventure>)
+                            ?.storyTemplate || null;
                       } catch (e) {
                         console.warn(
-                          "Could not fetch fresh adventure data, using current story values"
+                          "Could not fetch fresh adventure data, using current story values",
                         );
                       }
                     }
@@ -6212,7 +6141,7 @@ export default function MenuPage({
                             ...q,
                             fulfilled: false,
                             active: false,
-                          })
+                          }),
                         ) || [],
                       lore: (freshTemplate?.lore || storyData.lore).map(
                         (l) => ({
@@ -6221,43 +6150,13 @@ export default function MenuPage({
                             l.on_triggers && l.on_triggers.length > 0
                               ? false
                               : true,
-                        })
+                        }),
                       ),
                       newGamePlusMode: false,
                     };
-                    if (storyDbId.startsWith("local_")) {
-                      const { saveLocalStory } = await import(
-                        "@/app/misc/localStoryManager"
-                      );
-                      await saveLocalStory(storyDbId, resetStoryData);
-                    } else {
-                      const {
-                        data: { session },
-                      } = await supabase.auth.getSession();
-                      if (!session) {
-                        addNotification("Please sign in", "warning");
-                        return;
-                      }
-                      const password = getEncryptionPassword();
-                      const email = user?.email;
-                      if (!password || !email) {
-                        addNotification("Please sign in again", "warning");
-                        return;
-                      }
-                      const encryptedData = await encryptStoryData(
-                        resetStoryData,
-                        email,
-                        password
-                      );
-                      await fetch(`/api/stories/${storyDbId}`, {
-                        method: "PATCH",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: `Bearer ${session.access_token}`,
-                        },
-                        body: JSON.stringify({ storyData: encryptedData }),
-                      });
-                    }
+                    const { saveLocalStory } =
+                      await import("@/app/misc/localStoryManager");
+                    await saveLocalStory(storyDbId, resetStoryData);
                     addNotification("Story restarted!", "success");
                     window.location.reload();
                   } catch (error) {
@@ -6286,32 +6185,15 @@ export default function MenuPage({
                   if (!storyDbId) return;
                   setDeleting(true);
                   try {
-                    if (storyDbId.startsWith("local_")) {
-                      const { deleteLocalStory } = await import(
-                        "../misc/localStoryManager"
-                      );
-                      await deleteLocalStory(storyDbId);
-                      addNotification("Story deleted", "success");
-                      router.push("/library");
-                      return;
-                    }
-                    const {
-                      data: { session },
-                    } = await supabase.auth.getSession();
-                    if (!session) throw new Error("Not authenticated");
-                    const response = await fetch(`/api/stories/${storyDbId}`, {
-                      method: "DELETE",
-                      headers: {
-                        Authorization: `Bearer ${session.access_token}`,
-                      },
-                    });
-                    if (!response.ok) throw new Error("Failed to delete");
+                    const { deleteLocalStory } =
+                      await import("../misc/localStoryManager");
+                    await deleteLocalStory(storyDbId);
                     addNotification("Story deleted", "success");
-                    router.push("/explorer");
+                    router.push("/library");
                   } catch (error: any) {
                     addNotification(
                       error.message || "Failed to delete",
-                      "failure"
+                      "failure",
                     );
                     setDeleting(false);
                   }
@@ -6468,8 +6350,8 @@ export default function MenuPage({
                           Enable Multiplayer (Hot-seat)
                         </label>
                         <p className="text-xs text-blue-200/60">
-                          Collect multiple player actions (as "&gt; Name: action")
-                          before generating.
+                          Collect multiple player actions (as "&gt; Name:
+                          action") before generating.
                         </p>
                       </div>
                       <label className="relative inline-flex items-center cursor-pointer">
@@ -6479,12 +6361,8 @@ export default function MenuPage({
                           onChange={(e) =>
                             setMultiplayerEnabled(() => {
                               const checked = e.target.checked;
-                              if (
-                                checked &&
-                                !multiplayerHostUserId.trim() &&
-                                user?.id
-                              ) {
-                                setMultiplayerHostUserId(user.id);
+                              if (checked && !multiplayerHostUserId.trim()) {
+                                setMultiplayerHostUserId(localPlayerId);
                               }
                               return checked;
                             })
@@ -6504,7 +6382,7 @@ export default function MenuPage({
                       value={multiplayerMode}
                       onChange={(e) =>
                         setMultiplayerMode(
-                          e.target.value as "host" | "any" | "timer"
+                          e.target.value as "host" | "any" | "timer",
                         )
                       }
                       className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -6518,7 +6396,8 @@ export default function MenuPage({
                     </p>
                   </div>
 
-                  {(multiplayerMode === "host" || multiplayerMode === "timer") && (
+                  {(multiplayerMode === "host" ||
+                    multiplayerMode === "timer") && (
                     <div className="p-4 bg-blue-950/30 rounded-lg border border-blue-700/30 space-y-2">
                       <div className="flex items-center justify-between gap-3">
                         <div>
@@ -6534,20 +6413,10 @@ export default function MenuPage({
                         <button
                           type="button"
                           onClick={() => {
-                            if (!user?.id) return;
-                            setMultiplayerHostUserId(user.id);
+                            setMultiplayerHostUserId(localPlayerId);
                           }}
-                          disabled={!user?.id}
-                          className={`px-3 py-2 text-xs font-semibold rounded-lg transition-colors border ${
-                            user?.id
-                              ? "bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border-purple-500/30"
-                              : "bg-blue-900/20 text-blue-200/30 border-blue-800/20 cursor-not-allowed"
-                          }`}
-                          title={
-                            user?.id
-                              ? "Set the host to your user account"
-                              : "Sign in to set host"
-                          }
+                          className="px-3 py-2 text-xs font-semibold rounded-lg transition-colors border bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border-purple-500/30"
+                          title="Set the host to this device"
                         >
                           Set me as host
                         </button>
@@ -6570,7 +6439,7 @@ export default function MenuPage({
                         value={multiplayerTimerMinutes}
                         onChange={(e) =>
                           setMultiplayerTimerMinutes(
-                            parseInt(e.target.value) || 1
+                            parseInt(e.target.value) || 1,
                           )
                         }
                         className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
@@ -6797,7 +6666,7 @@ export default function MenuPage({
                                   ...storyData.agmtState!,
                                   sceneCount: Math.max(
                                     0,
-                                    storyData.agmtState!.sceneCount - 1
+                                    storyData.agmtState!.sceneCount - 1,
                                   ),
                                 },
                               });
@@ -6858,8 +6727,8 @@ export default function MenuPage({
                                   storyData.agmtState.currentStreak > 0
                                     ? "text-green-400"
                                     : storyData.agmtState.currentStreak < 0
-                                    ? "text-red-400"
-                                    : "text-gray-400"
+                                      ? "text-red-400"
+                                      : "text-gray-400"
                                 }`}
                               >
                                 {storyData.agmtState.currentStreak > 0 && "+"}
@@ -6878,9 +6747,9 @@ export default function MenuPage({
                                 style={{
                                   width: `${Math.min(
                                     Math.abs(
-                                      storyData.agmtState.currentStreak
+                                      storyData.agmtState.currentStreak,
                                     ) * 20,
-                                    100
+                                    100,
                                   )}%`,
                                 }}
                               />
@@ -6918,7 +6787,7 @@ export default function MenuPage({
                                 <span className="text-green-400">
                                   {
                                     storyData.agmtState.skillCheckHistory.filter(
-                                      (c) => c.success
+                                      (c) => c.success,
                                     ).length
                                   }{" "}
                                   wins
@@ -6926,7 +6795,7 @@ export default function MenuPage({
                                 <span className="text-red-400">
                                   {
                                     storyData.agmtState.skillCheckHistory.filter(
-                                      (c) => !c.success
+                                      (c) => !c.success,
                                     ).length
                                   }{" "}
                                   losses
@@ -7001,9 +6870,11 @@ export default function MenuPage({
                   setMultiplayerEnabled(!!storyData.multiplayer?.enabled);
                   setMultiplayerMode(storyData.multiplayer?.mode || "host");
                   setMultiplayerTimerMinutes(
-                    storyData.multiplayer?.timerMinutes ?? 2
+                    storyData.multiplayer?.timerMinutes ?? 2,
                   );
-                  setMultiplayerHostUserId(storyData.multiplayer?.hostUserId || "");
+                  setMultiplayerHostUserId(
+                    storyData.multiplayer?.hostUserId || "",
+                  );
                   setShowSettings(false);
                 }}
                 className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 text-sm sm:text-base font-semibold rounded-lg transition-colors"

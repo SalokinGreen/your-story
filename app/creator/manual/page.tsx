@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useAuth } from "@/app/misc/AuthContext";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 
 import {
@@ -43,9 +42,7 @@ import {
   LoreType,
 } from "@/app/misc/structs";
 import { useNotification } from "@/app/misc/NotificationContext";
-import { supabase } from "@/app/misc/supabase";
-import { compressImage } from "@/app/misc/imageCompression";
-import { authenticatedFetch } from "@/app/misc/getAuthToken";
+import { compressImage, fileToDataUrl } from "@/app/misc/imageCompression";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
   DEFAULT_PRESET,
@@ -77,7 +74,6 @@ import {
 import {
   saveLocalAdventure,
   getLocalAdventure,
-  deleteLocalAdventure,
 } from "@/app/misc/localAdventureManager";
 import {
   OPENROUTER_IMAGE_MODELS,
@@ -85,7 +81,6 @@ import {
   estimateImageCost,
   calculateDeepInfraImageCost,
 } from "@/app/misc/ai_prices";
-import { getAuthToken } from "@/app/misc/getAuthToken";
 import SkillTreeEditor from "@/app/components/SkillTreeEditor";
 import CharacterSheetTemplateEditor from "@/app/components/CharacterSheetTemplateEditor";
 import {
@@ -720,27 +715,16 @@ function VariableEditorCard({
 function AdventureCreatorContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user, loading: authLoading } = useAuth();
   const { keys: apiKeys } = useAPIKeys();
   const { addNotification } = useNotification();
 
   const editAdventureId = searchParams?.get("edit");
   const isCopyMode = searchParams?.get("copy") === "true";
 
-  // Redirect if not authenticated (effect only, keep hook order stable)
-  useEffect(() => {
-    // Wait for auth to finish loading before redirecting
-    if (authLoading) return;
-    if (!user) {
-      router.push("/");
-    }
-  }, [user, authLoading, router]);
-
   const [currentStep, setCurrentStep] = useState<CreatorStep>("basic");
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
-  const [isLocal, setIsLocal] = useState(false); // Track if adventure is stored locally
   const hasLoadedAdventureRef = useRef<string | null>(null); // Track loaded adventure ID to prevent re-fetching on tab focus
   const hasLoadedCopyRef = useRef(false); // Track if copy has been processed to prevent double-loading
 
@@ -776,10 +760,10 @@ function AdventureCreatorContent() {
 
   // Upgrade Settings
   const [levelingSettings, setLevelingSettings] = useState<LevelingSettings>(
-    () => cloneLevelingSettings()
+    () => cloneLevelingSettings(),
   );
   const [upgradeSettings, setUpgradeSettings] = useState<UpgradeSettings>(
-    DEFAULT_UPGRADE_SETTINGS
+    DEFAULT_UPGRADE_SETTINGS,
   );
 
   // Skill Trees
@@ -805,7 +789,7 @@ function AdventureCreatorContent() {
   const handleCustomCurveChange = (
     index: number,
     field: "level" | "cumulativeXP",
-    value: number
+    value: number,
   ) => {
     setLevelingSettings((prev) => {
       const existing = [...(prev.customCurve || [])];
@@ -847,7 +831,7 @@ function AdventureCreatorContent() {
   const handleUpgradeOverrideChange = (
     index: number,
     field: "level" | "upgrades",
-    value: number
+    value: number,
   ) => {
     setLevelingSettings((prev) => {
       const existing = [...(prev.upgradeOverrides || [])];
@@ -870,7 +854,7 @@ function AdventureCreatorContent() {
 
   const handleStartingUpgradeChange = (
     difficulty: AdventureDifficulty,
-    value: number
+    value: number,
   ) => {
     setLevelingSettings((prev) => ({
       ...prev,
@@ -889,7 +873,7 @@ function AdventureCreatorContent() {
     "easy" | "medium" | "hard" | "expert"
   >("medium");
   const [visibility, setVisibility] = useState<"public" | "hidden" | "private">(
-    "private"
+    "private",
   );
   const [nsfw, setNsfw] = useState(false);
   const [showAdvancedBasic, setShowAdvancedBasic] = useState(false);
@@ -962,14 +946,14 @@ function AdventureCreatorContent() {
 
   // Helper function to apply item changes with command support
   function applyItemChanges<
-    T extends { name?: string; title?: string; id?: string; text?: string }
+    T extends { name?: string; title?: string; id?: string; text?: string },
   >(
     existingItems: T[],
     newItems: Array<
       Partial<T> & { _command?: "add" | "replace" | "delete" | "merge" }
     >,
     itemType: string,
-    identifierKey: "name" | "title" | "id" | "text" = "name"
+    identifierKey: "name" | "title" | "id" | "text" = "name",
   ): T[] {
     let updated = [...existingItems];
 
@@ -980,13 +964,13 @@ function AdventureCreatorContent() {
       // Skip if no identifier provided
       if (!itemIdentifier) {
         console.warn(
-          `[AI] Skipping ${itemType} - no ${identifierKey} provided`
+          `[AI] Skipping ${itemType} - no ${identifierKey} provided`,
         );
         return;
       }
 
       const index = updated.findIndex(
-        (item) => item[identifierKey] === itemIdentifier
+        (item) => item[identifierKey] === itemIdentifier,
       );
 
       switch (command) {
@@ -996,7 +980,7 @@ function AdventureCreatorContent() {
             console.log(`[AI] Deleted ${itemType}: ${itemIdentifier}`);
           } else {
             console.warn(
-              `[AI] Cannot delete ${itemType} "${itemIdentifier}" - not found`
+              `[AI] Cannot delete ${itemType} "${itemIdentifier}" - not found`,
             );
           }
           break;
@@ -1012,7 +996,7 @@ function AdventureCreatorContent() {
             const { _command, ...cleanItem } = newItem;
             updated.push(cleanItem as T);
             console.log(
-              `[AI] Added ${itemType} (replace on non-existent): ${itemIdentifier}`
+              `[AI] Added ${itemType} (replace on non-existent): ${itemIdentifier}`,
             );
           }
           break;
@@ -1048,7 +1032,7 @@ function AdventureCreatorContent() {
       title?: string;
       shortDescription?: string;
       description?: string;
-    }
+    },
   ) => {
     console.log("[AI] Received data:", JSON.stringify(data, null, 2));
 
@@ -1219,8 +1203,8 @@ function AdventureCreatorContent() {
     if (deletions.length > 0) {
       const confirmed = window.confirm(
         `The AI will delete the following items:\n\n${deletions.join(
-          "\n"
-        )}\n\nContinue?`
+          "\n",
+        )}\n\nContinue?`,
       );
       if (!confirmed) {
         addNotification("Changes cancelled", "info");
@@ -1248,13 +1232,13 @@ function AdventureCreatorContent() {
 
     if (data.resources) {
       setResources(
-        applyItemChanges(resources, data.resources as any, "resource", "name")
+        applyItemChanges(resources, data.resources as any, "resource", "name"),
       );
     }
 
     if (data.inventory) {
       setInventory(
-        applyItemChanges(inventory, data.inventory as any, "item", "name")
+        applyItemChanges(inventory, data.inventory as any, "item", "name"),
       );
     }
 
@@ -1268,8 +1252,8 @@ function AdventureCreatorContent() {
           achievements,
           data.achievements as any,
           "achievement",
-          "title"
-        )
+          "title",
+        ),
       );
     }
 
@@ -1283,8 +1267,8 @@ function AdventureCreatorContent() {
           relationships,
           data.relationships as any,
           "relationship",
-          "name"
-        )
+          "name",
+        ),
       );
     }
 
@@ -1294,13 +1278,13 @@ function AdventureCreatorContent() {
 
     if (data.presets) {
       setPresets(
-        applyItemChanges(presets, data.presets as any, "preset", "id")
+        applyItemChanges(presets, data.presets as any, "preset", "id"),
       );
     }
 
     if (data.abilities) {
       setAbilities(
-        applyItemChanges(abilities, data.abilities as any, "ability", "name")
+        applyItemChanges(abilities, data.abilities as any, "ability", "name"),
       );
     }
 
@@ -1309,7 +1293,7 @@ function AdventureCreatorContent() {
     if (data.nodeEffects?.passives !== undefined) {
       // Check if this is a command-based array or a direct replacement
       const hasCommands = data.nodeEffects.passives.some(
-        (p: any) => p._command
+        (p: any) => p._command,
       );
       if (hasCommands) {
         setPassives(
@@ -1317,14 +1301,14 @@ function AdventureCreatorContent() {
             passives,
             data.nodeEffects.passives as any,
             "passive",
-            "name"
-          )
+            "name",
+          ),
         );
       } else {
         // Direct replacement (from tool executor)
         setPassives(data.nodeEffects.passives);
         console.log(
-          `[AI] Set passives directly: ${data.nodeEffects.passives.length} items`
+          `[AI] Set passives directly: ${data.nodeEffects.passives.length} items`,
         );
       }
     }
@@ -1352,7 +1336,7 @@ function AdventureCreatorContent() {
             prev.statShop,
             us.statShop as any,
             "stat shop item",
-            "name"
+            "name",
           );
         }
 
@@ -1361,7 +1345,7 @@ function AdventureCreatorContent() {
             prev.resourceShop,
             us.resourceShop as any,
             "resource shop item",
-            "name"
+            "name",
           );
         }
 
@@ -1370,7 +1354,7 @@ function AdventureCreatorContent() {
             prev.itemShop,
             us.itemShop as any,
             "item shop item",
-            "name"
+            "name",
           );
         }
 
@@ -1379,7 +1363,7 @@ function AdventureCreatorContent() {
             prev.abilityShop,
             us.abilityShop as any,
             "ability shop item",
-            "name"
+            "name",
           );
         }
 
@@ -1405,7 +1389,7 @@ function AdventureCreatorContent() {
             (point: { level: number; cumulativeXP?: number; xp?: number }) => ({
               level: point.level,
               cumulativeXP: point.cumulativeXP ?? point.xp ?? 0,
-            })
+            }),
           );
         }
         if (ls.upgradeOverrides !== undefined)
@@ -1454,7 +1438,7 @@ function AdventureCreatorContent() {
           customTables,
           data.customTables as any,
           "custom table",
-          "id"
+          "id",
         ).map((table: any) => {
           // Auto-generate ID for new tables without one
           if (!table.id) {
@@ -1463,7 +1447,7 @@ function AdventureCreatorContent() {
               .substring(2, 9)}`;
           }
           return table;
-        })
+        }),
       );
     }
 
@@ -1474,7 +1458,7 @@ function AdventureCreatorContent() {
           variables,
           data.variables as any,
           "variable",
-          "name"
+          "name",
         ).map((v: any) => {
           // Auto-generate ID for new variables without one
           if (!v.id) {
@@ -1483,7 +1467,7 @@ function AdventureCreatorContent() {
             }`;
           }
           return v;
-        })
+        }),
       );
     }
 
@@ -1494,7 +1478,7 @@ function AdventureCreatorContent() {
           skillTrees,
           data.skillTrees as any,
           "skill tree",
-          "id"
+          "id",
         ).map((tree: any) => {
           // Auto-generate ID for new trees without one
           if (!tree.id) {
@@ -1529,7 +1513,7 @@ function AdventureCreatorContent() {
             });
           }
           return tree;
-        })
+        }),
       );
     }
 
@@ -1540,8 +1524,8 @@ function AdventureCreatorContent() {
           startingChoices,
           (data as any).startingChoices as any,
           "starting choice",
-          "text"
-        ) as StartingChoice[]
+          "text",
+        ) as StartingChoice[],
       );
     }
 
@@ -1557,12 +1541,11 @@ function AdventureCreatorContent() {
   // Load adventure data if editing
   useEffect(() => {
     if (!editAdventureId) return;
-    if (!user) return; // Wait for auth to be ready
 
     // Skip re-fetching if we've already loaded this adventure (prevents reload on tab focus)
     if (hasLoadedAdventureRef.current === editAdventureId) {
       console.log(
-        "Adventure already loaded, skipping re-fetch (tab focus protection)"
+        "Adventure already loaded, skipping re-fetch (tab focus protection)",
       );
       return;
     }
@@ -1570,47 +1553,11 @@ function AdventureCreatorContent() {
     const loadAdventure = async () => {
       setLoading(true);
       try {
-        // First, try loading from database
-        const response = await authenticatedFetch(
-          `/api/adventures/${editAdventureId}`
-        );
-
-        let adventure: Adventure | null = null;
-        let isFromLocal = false;
-
-        if (response.ok) {
-          const data = await response.json();
-          adventure = data.adventure;
-
-          // Verify user is the author
-          if (adventure!.authorId !== user?.id) {
-            addNotification("You can only edit your own adventures", "failure");
-            router.push("/explorer");
-            return;
-          }
-        } else if (response.status === 404) {
-          // Not in database, try loading from IndexedDB
-          try {
-            const localAdv = await getLocalAdventure(editAdventureId);
-            if (localAdv) {
-              adventure = localAdv.adventureData as Adventure;
-              isFromLocal = true;
-              setIsLocal(true);
-            } else {
-              throw new Error(
-                "Adventure not found in database or local storage"
-              );
-            }
-          } catch (localErr) {
-            throw new Error("Adventure not found");
-          }
-        } else {
-          throw new Error("Failed to load adventure");
+        const localAdv = await getLocalAdventure(editAdventureId);
+        if (!localAdv) {
+          throw new Error("Adventure not found");
         }
-
-        if (!adventure) {
-          throw new Error("Adventure data is empty");
-        }
+        const adventure = localAdv.adventureData as Adventure;
 
         // Load basic info
         setTitle(adventure.title || "");
@@ -1633,7 +1580,7 @@ function AdventureCreatorContent() {
         setMaxChapters(template.max_chapters || 8);
         setAuthorNotes(template.author_notes || "");
         setSelectedPreset(
-          template.selected_preset || adventure.selectedPreset || "custom"
+          template.selected_preset || adventure.selectedPreset || "custom",
         );
         setPresets(template.presets || adventure.presets || [DEFAULT_PRESET]);
 
@@ -1679,79 +1626,8 @@ function AdventureCreatorContent() {
           });
         }
 
-        // Check for local draft and compare timestamps for conflict resolution
-        try {
-          const draftKey = `your-story:creator-draft:${editAdventureId}`;
-          const raw =
-            typeof window !== "undefined"
-              ? window.localStorage.getItem(draftKey)
-              : null;
-          if (raw && !isFromLocal) {
-            const saved = JSON.parse(raw) as any;
-            const localUpdatedAt = saved.updatedAt || 0;
-            const onlineUpdatedAt = adventure!.updatedAt
-              ? new Date(adventure!.updatedAt).getTime()
-              : 0;
-
-            // If local draft exists and is different from online, show conflict modal
-            // Only show if local draft has a meaningful timestamp (not 0)
-            if (localUpdatedAt > 0 && onlineUpdatedAt > 0) {
-              // Check if there are actual differences by comparing key fields
-              const hasChanges =
-                saved.title !== adventure!.title ||
-                saved.premise !== adventure!.storyTemplate?.premise ||
-                saved.intro !== adventure!.storyTemplate?.intro ||
-                JSON.stringify(saved.stats || []) !==
-                  JSON.stringify(adventure!.storyTemplate?.stats || []) ||
-                JSON.stringify(saved.inventory || []) !==
-                  JSON.stringify(adventure!.storyTemplate?.inventory || []) ||
-                JSON.stringify(saved.lore || []) !==
-                  JSON.stringify(adventure!.storyTemplate?.lore || []);
-
-              if (hasChanges) {
-                // Show conflict resolution modal
-                setConflictData({
-                  localDraft: saved,
-                  onlineAdventure: adventure!,
-                  localUpdatedAt,
-                  onlineUpdatedAt,
-                });
-                setShowConflictModal(true);
-                // Don't apply anything yet - wait for user choice
-                addNotification(
-                  "Conflict detected between local and online versions",
-                  "warning"
-                );
-              } else {
-                // No meaningful changes, just clear the draft
-                window.localStorage.removeItem(draftKey);
-                addNotification("Adventure loaded for editing", "success");
-              }
-            } else {
-              // No valid timestamps to compare, apply local draft (legacy behavior)
-              applyLocalDraft(saved);
-              addNotification(
-                "Adventure loaded with local changes from this device",
-                "success"
-              );
-            }
-          } else {
-            addNotification(
-              isFromLocal
-                ? "Local adventure loaded for editing"
-                : "Adventure loaded for editing",
-              "success"
-            );
-          }
-        } catch (err) {
-          console.error("Failed to check draft conflict", err);
-          addNotification(
-            isFromLocal
-              ? "Local adventure loaded for editing"
-              : "Adventure loaded for editing",
-            "success"
-          );
-        }
+        // Local drafts always take the adventure as loaded (no online conflict resolution needed)
+        addNotification("Local adventure loaded for editing", "success");
 
         // Mark this adventure as loaded to prevent re-fetching on tab focus
         hasLoadedAdventureRef.current = editAdventureId;
@@ -1766,7 +1642,7 @@ function AdventureCreatorContent() {
     };
 
     loadAdventure();
-  }, [editAdventureId, user, router, addNotification]);
+  }, [editAdventureId, router, addNotification]);
 
   // Helper function to apply local draft to state
   const applyLocalDraft = (saved: any) => {
@@ -1854,8 +1730,6 @@ function AdventureCreatorContent() {
   // Load copied adventure from sessionStorage
   useEffect(() => {
     if (!isCopyMode) return;
-    if (authLoading) return; // Wait for auth to finish loading
-    if (!user) return;
     if (editAdventureId) return; // Don't load copy if we're editing
     if (hasLoadedCopyRef.current) return; // Already processed this copy
 
@@ -1866,11 +1740,11 @@ function AdventureCreatorContent() {
       setLoading(true);
       try {
         const copiedData = sessionStorage.getItem(
-          "your-story:copied-adventure"
+          "your-story:copied-adventure",
         );
         if (!copiedData) {
           addNotification("No adventure data found to copy", "failure");
-          router.push("/explorer");
+          router.push("/library");
           return;
         }
 
@@ -1906,7 +1780,7 @@ function AdventureCreatorContent() {
           setMaxChapters(template.max_chapters || 8);
           setAuthorNotes(template.author_notes || "");
           setSelectedPreset(
-            template.selected_preset || adventure.selectedPreset || "custom"
+            template.selected_preset || adventure.selectedPreset || "custom",
           );
           setPresets(template.presets || adventure.presets || [DEFAULT_PRESET]);
 
@@ -1939,7 +1813,7 @@ function AdventureCreatorContent() {
 
         addNotification(
           "Adventure copied! Make your changes and save.",
-          "success"
+          "success",
         );
 
         // Remove the copy param from URL without triggering navigation
@@ -1947,7 +1821,7 @@ function AdventureCreatorContent() {
       } catch (error) {
         console.error("Error loading copied adventure:", error);
         addNotification("Failed to load copied adventure", "failure");
-        router.push("/explorer");
+        router.push("/library");
       } finally {
         setLoading(false);
         setInitialLoadComplete(true);
@@ -1955,12 +1829,12 @@ function AdventureCreatorContent() {
     };
 
     loadCopiedAdventure();
-  }, [isCopyMode, authLoading, user, editAdventureId, router, addNotification]);
+  }, [isCopyMode, editAdventureId, router, addNotification]);
 
   // Character Sheet Template (for custom characters)
   const [characterSheetTemplate, setCharacterSheetTemplate] =
     useState<CharacterSheetTemplate>(() =>
-      createCharacterSheetTemplate(DEFAULT_CHARACTER_SHEET_TEMPLATE)
+      createCharacterSheetTemplate(DEFAULT_CHARACTER_SHEET_TEMPLATE),
     );
 
   // Character Sheet (for presets - pre-written)
@@ -2036,10 +1910,10 @@ function AdventureCreatorContent() {
   });
   const [newAbilityCosts, setNewAbilityCosts] = useState<AbilityCost[]>([]);
   const [draggedAbilityIndex, setDraggedAbilityIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editingAbilityIndex, setEditingAbilityIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editAbility, setEditAbility] = useState<Partial<Ability>>({});
   const [editAbilityCosts, setEditAbilityCosts] = useState<AbilityCost[]>([]);
@@ -2051,7 +1925,7 @@ function AdventureCreatorContent() {
   const [newPassive, setNewPassive] = useState({ name: "", description: "" });
 
   const [editingPassiveIndex, setEditingPassiveIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editPassive, setEditPassive] = useState({ name: "", description: "" });
 
@@ -2104,7 +1978,7 @@ function AdventureCreatorContent() {
       value: 0,
       description: "",
       symbol: "Meh",
-    }
+    },
   );
   const [draggedRelationshipIndex, setDraggedRelationshipIndex] = useState<
     number | null
@@ -2159,7 +2033,7 @@ function AdventureCreatorContent() {
     number | null
   >(null);
   const [editAchievement, setEditAchievement] = useState<Partial<Achievement>>(
-    {}
+    {},
   );
 
   // Quests
@@ -2173,10 +2047,10 @@ function AdventureCreatorContent() {
     fulfilled: false,
   });
   const [draggedQuestIndex, setDraggedQuestIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editingQuestIndex, setEditingQuestIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editQuest, setEditQuest] = useState<Partial<Quest>>({});
 
@@ -2231,7 +2105,7 @@ function AdventureCreatorContent() {
     entries: [],
   });
   const [editingTableIndex, setEditingTableIndex] = useState<number | null>(
-    null
+    null,
   );
   const [editTable, setEditTable] = useState<Partial<CustomTable>>({});
 
@@ -2361,7 +2235,7 @@ function AdventureCreatorContent() {
 
       addNotification(
         "Restored unsaved adventure draft from this device",
-        "success"
+        "success",
       );
     } catch (err) {
       console.error("Failed to restore creator draft", err);
@@ -2442,7 +2316,7 @@ function AdventureCreatorContent() {
             (quotaError.name === "QuotaExceededError" || quotaError.code === 22)
           ) {
             console.warn(
-              "localStorage quota exceeded, cleaning up old drafts..."
+              "localStorage quota exceeded, cleaning up old drafts...",
             );
 
             // Find and remove old creator drafts (keep current one)
@@ -2463,7 +2337,7 @@ function AdventureCreatorContent() {
             for (const key of keysToRemove) {
               try {
                 const data = JSON.parse(
-                  window.localStorage.getItem(key) || "{}"
+                  window.localStorage.getItem(key) || "{}",
                 );
                 draftsWithTime.push({ key, time: data.updatedAt || 0 });
               } catch {
@@ -2491,7 +2365,7 @@ function AdventureCreatorContent() {
             // If still failing, the payload itself might be too large
             // Try saving a minimal version without large fields
             console.warn(
-              "Draft too large even after cleanup, saving minimal version"
+              "Draft too large even after cleanup, saving minimal version",
             );
             const minimalPayload = {
               ...payload,
@@ -2505,12 +2379,12 @@ function AdventureCreatorContent() {
             try {
               window.localStorage.setItem(
                 draftKey,
-                JSON.stringify(minimalPayload)
+                JSON.stringify(minimalPayload),
               );
               console.log("Saved minimal draft version");
             } catch {
               console.error(
-                "Failed to save even minimal draft - localStorage may be completely full"
+                "Failed to save even minimal draft - localStorage may be completely full",
               );
             }
           } else {
@@ -2575,7 +2449,7 @@ function AdventureCreatorContent() {
   };
 
   const handleThumbnailUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -2588,28 +2462,9 @@ function AdventureCreatorContent() {
     setUploadingThumbnail(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
       const compressed = await compressImage(file, 400, 300, 0.8);
-
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-thumbnail.${fileExt}`;
-      const filePath = `${session.user.id}/adventure-thumbnails/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("adventure-images")
-        .upload(filePath, compressed, { cacheControl: "3600", upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from("adventure-images")
-        .getPublicUrl(filePath);
-
-      setThumbnailUrl(data.publicUrl);
+      const dataUrl = await fileToDataUrl(compressed);
+      setThumbnailUrl(dataUrl);
       addNotification("Thumbnail uploaded!", "success");
     } catch (error: any) {
       console.error("Error uploading thumbnail:", error);
@@ -2631,28 +2486,9 @@ function AdventureCreatorContent() {
     setUploadingBanner(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
-
       const compressed = await compressImage(file, 1200, 400, 0.85);
-
-      const fileExt = file.name.split(".").pop();
-      const fileName = `${Date.now()}-banner.${fileExt}`;
-      const filePath = `${session.user.id}/adventure-banners/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("adventure-images")
-        .upload(filePath, compressed, { cacheControl: "3600", upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from("adventure-images")
-        .getPublicUrl(filePath);
-
-      setBannerUrl(data.publicUrl);
+      const dataUrl = await fileToDataUrl(compressed);
+      setBannerUrl(dataUrl);
       addNotification("Banner uploaded!", "success");
     } catch (error: any) {
       console.error("Error uploading banner:", error);
@@ -2676,17 +2512,18 @@ ${description || ""}`;
 
   // Generate and upload AI image
   const generateAIImage = async (type: "thumbnail" | "banner") => {
-    const token = await getAuthToken();
-    if (!token) {
-      addNotification("Please sign in to generate images", "warning");
-      return;
-    }
-
-    // Validate API key for OpenRouter provider
+    // Validate API key for the selected provider
     if (imageProvider === "openrouter" && !apiKeys.openRouterKey) {
       addNotification(
         "OpenRouter API key required. Please add your API key in Settings.",
-        "warning"
+        "warning",
+      );
+      return;
+    }
+    if (imageProvider === "deepinfra" && !apiKeys.deepinfraKey) {
+      addNotification(
+        "DeepInfra API key required. Please add your API key in Settings.",
+        "warning",
       );
       return;
     }
@@ -2710,7 +2547,6 @@ ${description || ""}`;
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           prompt,
@@ -2719,7 +2555,8 @@ ${description || ""}`;
           provider: imageProvider,
           openRouterKey:
             imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
-          // DeepInfra uses server-side key (Coins mode)
+          deepInfraKey:
+            imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
         }),
       });
 
@@ -2728,43 +2565,13 @@ ${description || ""}`;
         throw new Error(error.error || "Image generation failed");
       }
 
-      const { imageUrl, meta } = await response.json();
+      const { imageUrl } = await response.json();
 
-      // Fetch the image and upload to Supabase storage
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw new Error("Not authenticated");
+      setUrl(imageUrl);
 
-      const imageResponse = await fetch(imageUrl);
-      const imageBlob = await imageResponse.blob();
-
-      const fileName = `${Date.now()}-ai-${type}.webp`;
-      const filePath = `${session.user.id}/adventure-${type}s/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from("adventure-images")
-        .upload(filePath, imageBlob, { cacheControl: "3600", upsert: false });
-
-      if (uploadError) throw uploadError;
-
-      const { data } = supabase.storage
-        .from("adventure-images")
-        .getPublicUrl(filePath);
-
-      setUrl(data.publicUrl);
-
-      // Show appropriate success message
-      const costMessage = meta.isByok
-        ? "(BYOK - no coins)"
-        : meta.cost > 0
-        ? `Cost: ${meta.cost} coins`
-        : "(FREE)";
       addNotification(
-        `${
-          type === "thumbnail" ? "Thumbnail" : "Banner"
-        } generated! ${costMessage}`,
-        "success"
+        `${type === "thumbnail" ? "Thumbnail" : "Banner"} generated!`,
+        "success",
       );
     } catch (error: any) {
       console.error("Error generating image:", error);
@@ -3118,7 +2925,7 @@ ${description || ""}`;
 
   const updateNewAbilityCost = (
     index: number,
-    updates: Partial<AbilityCost>
+    updates: Partial<AbilityCost>,
   ) => {
     const updated = [...newAbilityCosts];
     updated[index] = { ...updated[index], ...updates };
@@ -3138,7 +2945,7 @@ ${description || ""}`;
 
   const updateEditAbilityCost = (
     index: number,
-    updates: Partial<AbilityCost>
+    updates: Partial<AbilityCost>,
   ) => {
     const updated = [...editAbilityCosts];
     updated[index] = { ...updated[index], ...updates };
@@ -3504,117 +3311,6 @@ ${description || ""}`;
     setAchievements(achievements.filter((_, i) => i !== index));
   };
 
-  const handleSaveLocally = async () => {
-    // Validation
-    if (!title.trim()) {
-      addNotification("Please enter a title", "warning");
-      setCurrentStep("basic");
-      return;
-    }
-    if (!premise.trim() || !intro.trim()) {
-      addNotification("Please fill in the story setup", "warning");
-      setCurrentStep("premise");
-      return;
-    }
-
-    // Build the story data
-    const storyData: Partial<StoryData> = {
-      story_name: title,
-      premise,
-      intro: intro,
-      memory: [],
-      max_chapters: maxChapters,
-      currentChapter: 0,
-      chapters: [],
-      scene: { parts: [] },
-      stats,
-      resources,
-      inventory,
-      abilities,
-      achievements,
-      lore,
-      relationships,
-      conditions: conditions.length > 0 ? conditions : undefined,
-      quests,
-      npcs: npcs.length > 0 ? npcs : undefined,
-      customTables,
-      variables,
-      earnedPointsFromQuests: [],
-      earnedPointsFromChapters: [],
-      author_notes: authorNotes,
-      selected_preset: selectedPreset,
-      presets: presets,
-      upgradeSettings: upgradeSettings,
-      levelingSettings,
-      agmtState: agmtEnabled ? agmtState : undefined,
-      skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
-      nodeEffects:
-        passives.length > 0
-          ? {
-              statBonuses: [],
-              resourceBonuses: [],
-              passives: passives,
-            }
-          : undefined,
-    };
-
-    // Save complete adventure using localAdventureManager
-    try {
-      const adventureTemplate: Partial<Adventure> = {
-        title,
-        shortDescription,
-        description,
-        thumbnailUrl: thumbnailUrl || "",
-        bannerUrl: bannerUrl || "",
-        tags,
-        difficulty,
-        nsfw,
-        estimatedDuration: "1-2 hours",
-        storyTemplate: storyData,
-        presets: presets,
-        characterSheetTemplate:
-          characterSheetTemplate.template.trim() ||
-          characterSheetTemplate.fields.length > 0
-            ? characterSheetTemplate
-            : undefined,
-        startingChoices:
-          startingChoices.length > 0 ? startingChoices : undefined,
-      };
-
-      // Use existing ID if editing a local adventure, otherwise generate new ID
-      const localId =
-        isLocal && editAdventureId
-          ? editAdventureId
-          : `local:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-      // Save to IndexedDB using localAdventureManager
-      await saveLocalAdventure(localId, adventureTemplate);
-
-      addNotification(
-        "Adventure saved locally! You can find it in your library.",
-        "success"
-      );
-
-      // If this is a new adventure, update the URL to edit mode and set isLocal
-      if (!editAdventureId) {
-        setIsLocal(true);
-        // Update URL without navigation to switch to edit mode
-        window.history.replaceState(
-          null,
-          "",
-          `/creator/manual?edit=${localId}`
-        );
-        // Clear the new adventure draft since we now have a saved local adventure
-        if (draftKey && typeof window !== "undefined") {
-          window.localStorage.removeItem(draftKey);
-        }
-      }
-    } catch (error: any) {
-      console.error("Error saving locally:", error);
-      addNotification(`Failed to save locally: ${error.message}`, "failure");
-    }
-  };
-
   const handleDiscardChanges = () => {
     if (!editAdventureId) {
       // For new adventures, clear the draft and reset to empty
@@ -3670,158 +3366,6 @@ ${description || ""}`;
       if (typeof window !== "undefined") {
         window.location.reload();
       }
-    }
-  };
-
-  const handleSaveToDatabase = async () => {
-    // Validation
-    if (!title.trim()) {
-      addNotification("Please enter a title", "warning");
-      setCurrentStep("basic");
-      return;
-    }
-    if (!premise.trim() || !intro.trim()) {
-      addNotification("Please fill in the story setup", "warning");
-      setCurrentStep("premise");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      // Build the story data
-      const storyData: Partial<StoryData> = {
-        story_name: title,
-        premise,
-        intro: intro,
-        memory: [],
-        max_chapters: maxChapters,
-        currentChapter: 0,
-        chapters: [],
-        scene: { parts: [] },
-        stats,
-        resources,
-        inventory,
-        abilities,
-        achievements,
-        lore,
-        relationships,
-        conditions: conditions.length > 0 ? conditions : undefined,
-        quests,
-        npcs: npcs.length > 0 ? npcs : undefined,
-        customTables,
-        variables,
-        earnedPointsFromQuests: [],
-        earnedPointsFromChapters: [],
-        author_notes: authorNotes,
-        selected_preset: selectedPreset,
-        presets: presets,
-        upgradeSettings: upgradeSettings,
-        levelingSettings,
-        agmtState: agmtEnabled ? agmtState : undefined,
-        skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
-        nodeEffects:
-          passives.length > 0
-            ? {
-                statBonuses: [],
-                resourceBonuses: [],
-                passives: passives,
-              }
-            : undefined,
-      };
-
-      // Get auth token
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
-
-      const payload = {
-        title,
-        shortDescription,
-        description,
-        thumbnailUrl: thumbnailUrl || undefined,
-        bannerUrl: bannerUrl || undefined,
-        authorId: user!.id,
-        tags,
-        difficulty: difficulty.toLowerCase(),
-        visibility: visibility.toLowerCase(),
-        nsfw,
-        estimatedDuration: "1-2 hours",
-        isPublished: true,
-        isFeatured: false,
-        storyTemplate: storyData,
-        selectedPreset: selectedPreset,
-        presets: presets,
-        characterSheetTemplate:
-          characterSheetTemplate.template.trim() ||
-          characterSheetTemplate.fields.length > 0
-            ? characterSheetTemplate
-            : undefined,
-        startingChoices:
-          startingChoices.length > 0 ? startingChoices : undefined,
-      };
-
-      // Check payload size
-      const payloadSize = JSON.stringify(payload).length;
-      console.log(
-        `Adventure payload size: ${(payloadSize / 1024).toFixed(2)} KB`
-      );
-
-      if (payloadSize > 4 * 1024 * 1024) {
-        addNotification(
-          "Adventure data is very large (>4MB). Consider reducing lore entries.",
-          "warning"
-        );
-      }
-
-      const response = await fetch("/api/adventures", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(
-          error.error || "Failed to upload adventure to database"
-        );
-      }
-
-      const { adventure } = await response.json();
-
-      // Success! Remove from IndexedDB and clear local state
-      if (editAdventureId) {
-        await deleteLocalAdventure(editAdventureId);
-      }
-      setIsLocal(false);
-
-      // Clear draft from localStorage
-      if (draftKey && typeof window !== "undefined") {
-        window.localStorage.removeItem(draftKey);
-      }
-
-      addNotification("Adventure saved to database successfully!", "success");
-
-      // Update URL to the database version (stay on page for quicksaves)
-      window.history.replaceState(
-        null,
-        "",
-        `/creator/manual?edit=${adventure.id}`
-      );
-    } catch (error) {
-      console.error("Error uploading adventure:", error);
-      addNotification(
-        error instanceof Error ? error.message : "Failed to upload adventure",
-        "failure"
-      );
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -3881,85 +3425,20 @@ ${description || ""}`;
           : undefined,
     };
 
-    // If editing a local adventure, save to IndexedDB instead of database
-    if (isLocal) {
-      try {
-        const adventureData: Partial<Adventure> = {
-          title,
-          shortDescription,
-          description,
-          thumbnailUrl: thumbnailUrl || undefined,
-          bannerUrl: bannerUrl || undefined,
-          authorId: user!.id,
-          tags,
-          difficulty: difficulty.toLowerCase() as any,
-          visibility: visibility.toLowerCase() as any,
-          nsfw,
-          estimatedDuration: "1-2 hours",
-          isPublished: false, // Local adventures are unpublished drafts
-          isFeatured: false,
-          storyTemplate: storyData,
-          selectedPreset: selectedPreset,
-          presets: presets,
-          characterSheetTemplate:
-            characterSheetTemplate.template.trim() ||
-            characterSheetTemplate.fields.length > 0
-              ? characterSheetTemplate
-              : undefined,
-          startingChoices:
-            startingChoices.length > 0 ? startingChoices : undefined,
-        };
-
-        await saveLocalAdventure(editAdventureId!, adventureData);
-
-        // Clear draft from localStorage since we just saved
-        if (draftKey && typeof window !== "undefined") {
-          window.localStorage.removeItem(draftKey);
-        }
-
-        addNotification("Adventure saved locally", "success");
-        setSaving(false);
-        return;
-      } catch (error) {
-        console.error("Error saving locally:", error);
-        addNotification(
-          error instanceof Error ? error.message : "Failed to save locally",
-          "failure"
-        );
-        setSaving(false);
-        return;
-      }
-    }
-
-    //Save to database
+    // Save to IndexedDB (local-only storage)
     try {
-      // Get auth token
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error("Not authenticated");
-      }
-
-      const isEditing = !!editAdventureId;
-      const url = isEditing
-        ? `/api/adventures/${editAdventureId}`
-        : "/api/adventures";
-      const method = isEditing ? "PATCH" : "POST";
-
-      const payload = {
+      const adventureData: Partial<Adventure> = {
         title,
         shortDescription,
         description,
         thumbnailUrl: thumbnailUrl || undefined,
         bannerUrl: bannerUrl || undefined,
-        authorId: user!.id,
         tags,
-        difficulty: difficulty.toLowerCase(),
-        visibility: visibility.toLowerCase(),
+        difficulty: difficulty.toLowerCase() as any,
+        visibility: visibility.toLowerCase() as any,
         nsfw,
         estimatedDuration: "1-2 hours",
-        isPublished: true,
+        isPublished: false,
         isFeatured: false,
         storyTemplate: storyData,
         selectedPreset: selectedPreset,
@@ -3973,64 +3452,34 @@ ${description || ""}`;
           startingChoices.length > 0 ? startingChoices : undefined,
       };
 
-      // Check payload size
-      const payloadSize = JSON.stringify(payload).length;
-      console.log(
-        `Adventure payload size: ${(payloadSize / 1024).toFixed(2)} KB`
-      );
+      const localId =
+        editAdventureId ||
+        `local:${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      if (payloadSize > 4 * 1024 * 1024) {
-        addNotification(
-          "Adventure data is very large (>4MB). Consider reducing lore entries.",
-          "warning"
-        );
+      await saveLocalAdventure(localId, adventureData);
+
+      // Clear draft from localStorage since we just saved
+      if (draftKey && typeof window !== "undefined") {
+        window.localStorage.removeItem(draftKey);
       }
 
-      const response = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify(payload),
-      });
+      addNotification("Adventure saved locally", "success");
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(
-          error.error ||
-            `Failed to ${isEditing ? "update" : "create"} adventure`
-        );
-      }
-
-      const { adventure } = await response.json();
-      addNotification(
-        `Adventure ${isEditing ? "updated" : "created"} successfully!`,
-        "success"
-      );
-
-      // Clear local draft after successful save
-      try {
-        if (draftKey && typeof window !== "undefined") {
-          window.localStorage.removeItem(draftKey);
-        }
-      } catch (err) {
-        console.error("Failed to clear creator draft", err);
-      }
-
-      // If this was a new adventure, update URL to edit mode (stay on page for quicksaves)
-      if (!isEditing) {
+      if (!editAdventureId) {
         window.history.replaceState(
           null,
           "",
-          `/creator/manual?edit=${adventure.id}`
+          `/creator/manual?edit=${localId}`,
         );
       }
 
       setSaving(false);
-    } catch (error: any) {
-      console.error("Error saving adventure:", error);
-      addNotification(`Failed to save: ${error.message}`, "failure");
+    } catch (error) {
+      console.error("Error saving locally:", error);
+      addNotification(
+        error instanceof Error ? error.message : "Failed to save locally",
+        "failure",
+      );
       setSaving(false);
     }
   };
@@ -4328,7 +3777,7 @@ ${description || ""}`;
                         onClick={() => {
                           if (!thumbnailPrompt) {
                             setThumbnailPrompt(
-                              getDefaultImagePrompt("thumbnail")
+                              getDefaultImagePrompt("thumbnail"),
                             );
                           }
                           setShowAIImageModal("thumbnail");
@@ -4618,7 +4067,7 @@ ${description || ""}`;
                         ) {
                           addNotification(
                             "Please fill in all fields",
-                            "warning"
+                            "warning",
                           );
                           return;
                         }
@@ -4637,21 +4086,21 @@ ${description || ""}`;
                                     intro,
                                     stats: JSON.parse(JSON.stringify(stats)),
                                     resources: JSON.parse(
-                                      JSON.stringify(resources)
+                                      JSON.stringify(resources),
                                     ),
                                     inventory: JSON.parse(
-                                      JSON.stringify(inventory)
+                                      JSON.stringify(inventory),
                                     ),
                                     relationships: JSON.parse(
-                                      JSON.stringify(relationships)
+                                      JSON.stringify(relationships),
                                     ),
                                     conditions: JSON.parse(
-                                      JSON.stringify(conditions)
+                                      JSON.stringify(conditions),
                                     ),
                                     authorNotes,
                                   }
-                                : p
-                            )
+                                : p,
+                            ),
                           );
                           addNotification("Preset updated!", "success");
                         } else {
@@ -4667,7 +4116,7 @@ ${description || ""}`;
                             inventory,
                             relationships,
                             conditions,
-                            authorNotes
+                            authorNotes,
                           );
                           setPresets([...presets, newPreset]);
                           addNotification("Preset created!", "success");
@@ -4748,11 +4197,11 @@ ${description || ""}`;
                             setInventory,
                             setRelationships,
                             setConditions,
-                            setAuthorNotes
+                            setAuthorNotes,
                           );
                           addNotification(
                             `${preset.name} preset applied!`,
-                            "success"
+                            "success",
                           );
                         } else {
                           // Restore saved custom values when switching back to custom
@@ -4767,12 +4216,12 @@ ${description || ""}`;
                             setAuthorNotes(savedCustomValues.authorNotes);
                             addNotification(
                               "Custom settings restored!",
-                              "success"
+                              "success",
                             );
                           } else {
                             addNotification(
                               "Custom preset selected - build from scratch!",
-                              "success"
+                              "success",
                             );
                           }
                         }
@@ -4869,7 +4318,7 @@ ${description || ""}`;
                                   isOpen: false,
                                 });
                                 setPresets(
-                                  presets.filter((p) => p.id !== preset.id)
+                                  presets.filter((p) => p.id !== preset.id),
                                 );
                                 if (selectedPreset === preset.id) {
                                   setSelectedPreset("custom");
@@ -4911,7 +4360,7 @@ ${description || ""}`;
                   <button
                     onClick={() => {
                       const preset = presets.find(
-                        (p) => p.id === selectedPreset
+                        (p) => p.id === selectedPreset,
                       );
                       if (preset) {
                         setConfirmDialog({
@@ -4936,11 +4385,11 @@ ${description || ""}`;
                               setInventory,
                               setRelationships,
                               setConditions,
-                              setAuthorNotes
+                              setAuthorNotes,
                             );
                             addNotification(
                               `Reset to ${preset.name} preset!`,
-                              "success"
+                              "success",
                             );
                           },
                         });
@@ -5026,7 +4475,7 @@ ${description || ""}`;
                         ...prev,
                         statUpgradeCost: Math.max(
                           1,
-                          parseInt(e.target.value) || 1
+                          parseInt(e.target.value) || 1,
                         ),
                       }))
                     }
@@ -5051,7 +4500,7 @@ ${description || ""}`;
                         ...prev,
                         statUpgradeAmount: Math.max(
                           1,
-                          parseInt(e.target.value) || 1
+                          parseInt(e.target.value) || 1,
                         ),
                       }))
                     }
@@ -5076,7 +4525,7 @@ ${description || ""}`;
                         ...prev,
                         resourceUpgradeCost: Math.max(
                           1,
-                          parseInt(e.target.value) || 1
+                          parseInt(e.target.value) || 1,
                         ),
                       }))
                     }
@@ -5101,7 +4550,7 @@ ${description || ""}`;
                         ...prev,
                         resourceUpgradeAmount: Math.max(
                           1,
-                          parseInt(e.target.value) || 1
+                          parseInt(e.target.value) || 1,
                         ),
                       }))
                     }
@@ -5806,7 +5255,7 @@ ${description || ""}`;
                               if (!editStartingChoice.text?.trim()) {
                                 addNotification(
                                   "Choice text is required",
-                                  "warning"
+                                  "warning",
                                 );
                                 return;
                               }
@@ -5845,7 +5294,7 @@ ${description || ""}`;
                               setEditStartingChoice({});
                               addNotification(
                                 "Starting choice updated!",
-                                "success"
+                                "success",
                               );
                             }}
                             disabled={!editStartingChoice.text?.trim()}
@@ -5966,11 +5415,11 @@ ${description || ""}`;
                           <button
                             onClick={() => {
                               setStartingChoices(
-                                startingChoices.filter((_, i) => i !== index)
+                                startingChoices.filter((_, i) => i !== index),
                               );
                               addNotification(
                                 "Starting choice removed",
-                                "success"
+                                "success",
                               );
                             }}
                             className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
@@ -5981,7 +5430,7 @@ ${description || ""}`;
                         </div>
                       </div>
                     </div>
-                  )
+                  ),
                 )
               )}
             </div>
@@ -6019,7 +5468,7 @@ ${description || ""}`;
                   setLore((prev) => [...prev, ...newLoreEntries]);
                   addNotification(
                     `Added ${newLoreEntries.length} notes from PDF`,
-                    "success"
+                    "success",
                   );
                 }
                 // Merge custom tables
@@ -6027,7 +5476,7 @@ ${description || ""}`;
                   setCustomTables((prev) => [...prev, ...data.customTables]);
                   addNotification(
                     `Added ${data.customTables.length} custom tables from PDF`,
-                    "success"
+                    "success",
                   );
                 }
               }}
@@ -6220,7 +5669,7 @@ ${description || ""}`;
                         {[...new Set(lore.flatMap((l) => l.tags || []))].map(
                           (tag) => (
                             <option key={tag} value={tag} />
-                          )
+                          ),
                         )}
                       </datalist>
                       <button
@@ -6251,7 +5700,7 @@ ${description || ""}`;
                               setNewLore({
                                 ...newLore,
                                 tags: (newLore.tags || []).filter(
-                                  (t) => t !== tag
+                                  (t) => t !== tag,
                                 ),
                               })
                             }
@@ -6487,7 +5936,7 @@ ${description || ""}`;
                                         trigger_lores: e.target.checked
                                           ? [...current, loreEntry.title]
                                           : current.filter(
-                                              (t) => t !== loreEntry.title
+                                              (t) => t !== loreEntry.title,
                                             ),
                                       });
                                     }}
@@ -6533,7 +5982,7 @@ ${description || ""}`;
                                         untrigger_lores: e.target.checked
                                           ? [...current, loreEntry.title]
                                           : current.filter(
-                                              (t) => t !== loreEntry.title
+                                              (t) => t !== loreEntry.title,
                                             ),
                                       });
                                     }}
@@ -6595,7 +6044,7 @@ ${description || ""}`;
                                         setNewLore({
                                           ...newLore,
                                           keys: (newLore.keys || []).filter(
-                                            (k) => k !== key
+                                            (k) => k !== key,
                                           ),
                                         });
                                         setPendingTagDelete(null);
@@ -6606,7 +6055,7 @@ ${description || ""}`;
                                     onBlur={() =>
                                       setTimeout(
                                         () => setPendingTagDelete(null),
-                                        200
+                                        200,
                                       )
                                     }
                                     className={`ml-1 transition-colors ${
@@ -6662,7 +6111,7 @@ ${description || ""}`;
                                           var_on_triggers: e.target.checked
                                             ? [...current, variable.name]
                                             : current.filter(
-                                                (n) => n !== variable.name
+                                                (n) => n !== variable.name,
                                               ),
                                         });
                                       }}
@@ -6704,7 +6153,7 @@ ${description || ""}`;
                                           var_off_triggers: e.target.checked
                                             ? [...current, variable.name]
                                             : current.filter(
-                                                (n) => n !== variable.name
+                                                (n) => n !== variable.name,
                                               ),
                                         });
                                       }}
@@ -6781,7 +6230,7 @@ ${description || ""}`;
                           <option value="">All Folders</option>
                           {[
                             ...new Set(
-                              lore.map((l) => l.folder).filter(Boolean)
+                              lore.map((l) => l.folder).filter(Boolean),
                             ),
                           ]
                             .sort()
@@ -6816,7 +6265,7 @@ ${description || ""}`;
                                 onClick={() => {
                                   if (isActive) {
                                     setLoreFilterTags(
-                                      loreFilterTags.filter((t) => t !== tag)
+                                      loreFilterTags.filter((t) => t !== tag),
                                     );
                                   } else {
                                     setLoreFilterTags([...loreFilterTags, tag]);
@@ -6874,17 +6323,17 @@ ${description || ""}`;
                         // Tag filter (must have all selected tags)
                         (loreFilterTags.length === 0 ||
                           loreFilterTags.every((tag) =>
-                            (item.entry.tags || []).includes(tag)
-                          ))
+                            (item.entry.tags || []).includes(tag),
+                          )),
                     )
                     .sort((a, b) => a.entry.title.localeCompare(b.entry.title));
 
                   const totalPages = Math.ceil(
-                    filteredLore.length / loreItemsPerPage
+                    filteredLore.length / loreItemsPerPage,
                   );
                   const displayedLore = filteredLore.slice(
                     (lorePage - 1) * loreItemsPerPage,
-                    lorePage * loreItemsPerPage
+                    lorePage * loreItemsPerPage,
                   );
 
                   if (filteredLore.length === 0 && lore.length > 0) {
@@ -7082,7 +6531,7 @@ ${description || ""}`;
                                       ...new Set(
                                         lore
                                           .map((l) => l.folder)
-                                          .filter(Boolean)
+                                          .filter(Boolean),
                                       ),
                                     ].map((folder) => (
                                       <option key={folder} value={folder} />
@@ -7132,7 +6581,7 @@ ${description || ""}`;
                                     >
                                       {[
                                         ...new Set(
-                                          lore.flatMap((l) => l.tags || [])
+                                          lore.flatMap((l) => l.tags || []),
                                         ),
                                       ].map((tag) => (
                                         <option key={tag} value={tag} />
@@ -7262,7 +6711,7 @@ ${description || ""}`;
                                                   on_triggers: (
                                                     editLore.on_triggers || []
                                                   ).filter(
-                                                    (t) => t !== trigger
+                                                    (t) => t !== trigger,
                                                   ),
                                                 });
                                                 setPendingTagDelete(null);
@@ -7273,7 +6722,7 @@ ${description || ""}`;
                                             onBlur={() =>
                                               setTimeout(
                                                 () => setPendingTagDelete(null),
-                                                200
+                                                200,
                                               )
                                             }
                                             className={`ml-1 transition-colors ${
@@ -7294,7 +6743,7 @@ ${description || ""}`;
                                           </button>
                                         </span>
                                       );
-                                    }
+                                    },
                                   )}
                                 </div>
                               </div>
@@ -7356,7 +6805,7 @@ ${description || ""}`;
                                                   off_triggers: (
                                                     editLore.off_triggers || []
                                                   ).filter(
-                                                    (t) => t !== trigger
+                                                    (t) => t !== trigger,
                                                   ),
                                                 });
                                                 setPendingTagDelete(null);
@@ -7367,7 +6816,7 @@ ${description || ""}`;
                                             onBlur={() =>
                                               setTimeout(
                                                 () => setPendingTagDelete(null),
-                                                200
+                                                200,
                                               )
                                             }
                                             className={`ml-1 transition-colors ${
@@ -7388,7 +6837,7 @@ ${description || ""}`;
                                           </button>
                                         </span>
                                       );
-                                    }
+                                    },
                                   )}
                                 </div>
                               </div>
@@ -7398,7 +6847,7 @@ ${description || ""}`;
                                 <button
                                   onClick={() =>
                                     setEditLoreAdvancedExpanded(
-                                      !editLoreAdvancedExpanded
+                                      !editLoreAdvancedExpanded,
                                     )
                                   }
                                   className="w-full px-4 py-3 flex items-center justify-between bg-blue-900/20 hover:bg-blue-800/30 rounded-lg transition-colors"
@@ -7469,7 +6918,7 @@ ${description || ""}`;
                                                           : current.filter(
                                                               (t) =>
                                                                 t !==
-                                                                loreEntry.title
+                                                                loreEntry.title,
                                                             ),
                                                       });
                                                     }}
@@ -7526,7 +6975,7 @@ ${description || ""}`;
                                                           : current.filter(
                                                               (t) =>
                                                                 t !==
-                                                                loreEntry.title
+                                                                loreEntry.title,
                                                             ),
                                                       });
                                                     }}
@@ -7600,13 +7049,13 @@ ${description || ""}`;
                                                         keys: (
                                                           editLore.keys || []
                                                         ).filter(
-                                                          (k) => k !== key
+                                                          (k) => k !== key,
                                                         ),
                                                       });
                                                       setPendingTagDelete(null);
                                                     } else {
                                                       setPendingTagDelete(
-                                                        deleteKey
+                                                        deleteKey,
                                                       );
                                                     }
                                                   }}
@@ -7614,9 +7063,9 @@ ${description || ""}`;
                                                     setTimeout(
                                                       () =>
                                                         setPendingTagDelete(
-                                                          null
+                                                          null,
                                                         ),
-                                                      200
+                                                      200,
                                                     )
                                                   }
                                                   className={`ml-1 transition-colors ${
@@ -7644,7 +7093,7 @@ ${description || ""}`;
 
                                     {/* Variable Triggers (Boolean) */}
                                     {variables.filter(
-                                      (v) => v.type === "boolean"
+                                      (v) => v.type === "boolean",
                                     ).length > 0 && (
                                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div>
@@ -7659,7 +7108,7 @@ ${description || ""}`;
                                           <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                                             {variables
                                               .filter(
-                                                (v) => v.type === "boolean"
+                                                (v) => v.type === "boolean",
                                               )
                                               .map((variable) => (
                                                 <label
@@ -7687,7 +7136,7 @@ ${description || ""}`;
                                                           : current.filter(
                                                               (n) =>
                                                                 n !==
-                                                                variable.name
+                                                                variable.name,
                                                             ),
                                                       });
                                                     }}
@@ -7712,7 +7161,7 @@ ${description || ""}`;
                                           <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
                                             {variables
                                               .filter(
-                                                (v) => v.type === "boolean"
+                                                (v) => v.type === "boolean",
                                               )
                                               .map((variable) => (
                                                 <label
@@ -7740,7 +7189,7 @@ ${description || ""}`;
                                                           : current.filter(
                                                               (n) =>
                                                                 n !==
-                                                                variable.name
+                                                                variable.name,
                                                             ),
                                                       });
                                                     }}
@@ -8197,7 +7646,7 @@ ${description || ""}`;
                                 points: clampNumber(
                                   parseInt(e.target.value),
                                   1,
-                                  1000
+                                  1000,
                                 ),
                               })
                             }
@@ -8368,7 +7817,7 @@ ${description || ""}`;
                         </div>
                       </div>
                     </div>
-                  )
+                  ),
                 )
               )}
             </div>
@@ -8508,7 +7957,7 @@ ${description || ""}`;
                   ) {
                     addNotification(
                       "Please fill in all required fields",
-                      "warning"
+                      "warning",
                     );
                     return;
                   }
@@ -8622,7 +8071,7 @@ ${description || ""}`;
                                 points: clampNumber(
                                   parseInt(e.target.value),
                                   1,
-                                  1000
+                                  1000,
                                 ),
                               })
                             }
@@ -8674,7 +8123,7 @@ ${description || ""}`;
                             ) {
                               addNotification(
                                 "Please fill in all required fields",
-                                "warning"
+                                "warning",
                               );
                               return;
                             }
@@ -8724,7 +8173,7 @@ ${description || ""}`;
                           const updated = [...quests];
                           const [dragged] = updated.splice(
                             draggedQuestIndex,
-                            1
+                            1,
                           );
                           updated.splice(index, 0, dragged);
                           setQuests(updated);
@@ -8830,7 +8279,7 @@ ${description || ""}`;
                                     isOpen: false,
                                   });
                                   setQuests(
-                                    quests.filter((_, i) => i !== index)
+                                    quests.filter((_, i) => i !== index),
                                   );
                                   addNotification("Quest removed", "success");
                                 },
@@ -8843,7 +8292,7 @@ ${description || ""}`;
                         </div>
                       </div>
                     </div>
-                  )
+                  ),
                 )
               )}
             </div>
@@ -9271,7 +8720,7 @@ ${description || ""}`;
                             if (!editNPC.name?.trim()) {
                               addNotification(
                                 "NPC name is required",
-                                "warning"
+                                "warning",
                               );
                               return;
                             }
@@ -9291,7 +8740,7 @@ ${description || ""}`;
                                     symbol: editNPC.symbol ?? n.symbol,
                                     notes: editNPC.notes,
                                   }
-                                : n
+                                : n,
                             );
                             setNPCs(updated);
                             setEditingNPCIndex(null);
@@ -9340,12 +8789,12 @@ ${description || ""}`;
                               npc.attitude === "hostile"
                                 ? "text-red-400 bg-red-500/20"
                                 : npc.attitude === "unfriendly"
-                                ? "text-orange-400 bg-orange-500/20"
-                                : npc.attitude === "neutral"
-                                ? "text-gray-400 bg-gray-500/20"
-                                : npc.attitude === "friendly"
-                                ? "text-green-400 bg-green-500/20"
-                                : "text-blue-400 bg-blue-500/20"
+                                  ? "text-orange-400 bg-orange-500/20"
+                                  : npc.attitude === "neutral"
+                                    ? "text-gray-400 bg-gray-500/20"
+                                    : npc.attitude === "friendly"
+                                      ? "text-green-400 bg-green-500/20"
+                                      : "text-blue-400 bg-blue-500/20"
                             }`}
                           >
                             {npc.attitude}
@@ -9356,8 +8805,8 @@ ${description || ""}`;
                                 npc.status === "dead"
                                   ? "text-gray-400 bg-gray-500/20"
                                   : npc.status === "missing"
-                                  ? "text-yellow-400 bg-yellow-500/20"
-                                  : "text-purple-400 bg-purple-500/20"
+                                    ? "text-yellow-400 bg-yellow-500/20"
+                                    : "text-purple-400 bg-purple-500/20"
                               }`}
                             >
                               {npc.status}
@@ -9413,7 +8862,7 @@ ${description || ""}`;
                         </button>
                       </div>
                     </div>
-                  )
+                  ),
                 )
               )}
             </div>
@@ -9610,7 +9059,7 @@ ${description || ""}`;
                       <div className="text-center">
                         <span
                           className={`text-3xl font-bold ${getChaosColor(
-                            agmtState.chaosFactor
+                            agmtState.chaosFactor,
                           )}`}
                         >
                           {agmtState.chaosFactor}
@@ -9622,7 +9071,7 @@ ${description || ""}`;
                       <div className="text-right flex-1 ml-4">
                         <p
                           className={`text-sm font-semibold ${getChaosColor(
-                            agmtState.chaosFactor
+                            agmtState.chaosFactor,
                           )}`}
                         >
                           {getChaosLabel(agmtState.chaosFactor)}
@@ -9858,163 +9307,17 @@ ${description || ""}`;
               onSelect={(index) => setCurrentStep(steps[index].id)}
               completedIndices={Array.from(
                 { length: currentStepIndex },
-                (_, i) => i
+                (_, i) => i,
               )}
             />
 
             <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 sm:gap-3">
-              {/* Local/Online Toggle */}
-              <div className="flex items-center gap-2">
-                <span
-                  className={`text-xs font-medium ${
-                    isLocal ? "text-blue-300" : "text-blue-300/50"
-                  }`}
-                >
-                  Local
-                </span>
-                <button
-                  onClick={async () => {
-                    if (isLocal) {
-                      // Switching from Local to Online - nothing special needed
-                      setIsLocal(false);
-                    } else {
-                      // Switching from Online to Local
-                      // If adventure exists in database, confirm and delete it
-                      if (
-                        editAdventureId &&
-                        !editAdventureId.startsWith("local:")
-                      ) {
-                        const confirmed = window.confirm(
-                          "Switching to Local will remove this adventure from the online database. It will only exist on your device. Continue?"
-                        );
-                        if (!confirmed) return;
-
-                        try {
-                          // Delete from database
-                          const response = await authenticatedFetch(
-                            `/api/adventures/${editAdventureId}`,
-                            {
-                              method: "DELETE",
-                            }
-                          );
-
-                          if (!response.ok) {
-                            throw new Error("Failed to remove from database");
-                          }
-
-                          // Save locally with a new local ID
-                          const localId = `local:${Date.now()}_${Math.random()
-                            .toString(36)
-                            .substr(2, 9)}`;
-                          const adventureTemplate: Partial<Adventure> = {
-                            title,
-                            shortDescription,
-                            description,
-                            thumbnailUrl: thumbnailUrl || "",
-                            bannerUrl: bannerUrl || "",
-                            tags,
-                            difficulty,
-                            nsfw,
-                            estimatedDuration: "1-2 hours",
-                            storyTemplate: {
-                              story_name: title,
-                              premise,
-                              intro,
-                              memory: [],
-                              max_chapters: maxChapters,
-                              currentChapter: 0,
-                              chapters: [],
-                              scene: { parts: [] },
-                              stats,
-                              resources,
-                              inventory,
-                              abilities,
-                              achievements,
-                              lore,
-                              relationships,
-                              quests,
-                              npcs: npcs.length > 0 ? npcs : undefined,
-                              customTables,
-                              variables,
-                              earnedPointsFromQuests: [],
-                              earnedPointsFromChapters: [],
-                              author_notes: authorNotes,
-                              selected_preset: selectedPreset,
-                              presets: presets,
-                              upgradeSettings: upgradeSettings,
-                              levelingSettings,
-                              agmtState: agmtEnabled ? agmtState : undefined,
-                              skillTrees:
-                                skillTrees.length > 0 ? skillTrees : undefined,
-                            },
-                            presets: presets,
-                            characterSheetTemplate:
-                              characterSheetTemplate.template.trim() ||
-                              characterSheetTemplate.fields.length > 0
-                                ? characterSheetTemplate
-                                : undefined,
-                            startingChoices:
-                              startingChoices.length > 0
-                                ? startingChoices
-                                : undefined,
-                          };
-
-                          await saveLocalAdventure(localId, adventureTemplate);
-
-                          // Update URL to the new local ID
-                          window.history.replaceState(
-                            null,
-                            "",
-                            `/creator/manual?edit=${localId}`
-                          );
-
-                          addNotification(
-                            "Adventure moved to local storage",
-                            "success"
-                          );
-                        } catch (error: any) {
-                          console.error("Error switching to local:", error);
-                          addNotification(
-                            `Failed to switch to local: ${error.message}`,
-                            "failure"
-                          );
-                          return;
-                        }
-                      }
-                      setIsLocal(true);
-                    }
-                  }}
-                  disabled={saving}
-                  className={`relative w-12 h-6 rounded-full transition-colors ${
-                    isLocal ? "bg-blue-600" : "bg-green-600"
-                  }`}
-                  title={
-                    isLocal
-                      ? "Currently saving locally"
-                      : "Currently saving online"
-                  }
-                >
-                  <div
-                    className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-transform ${
-                      isLocal ? "left-1" : "left-7"
-                    }`}
-                  />
-                </button>
-                <span
-                  className={`text-xs font-medium ${
-                    !isLocal ? "text-green-300" : "text-green-300/50"
-                  }`}
-                >
-                  Online
-                </span>
-              </div>
-
               {/* Save Button */}
               <button
                 onClick={handleSave}
                 disabled={saving}
                 className="flex items-center justify-center gap-2 px-4 py-2 w-full sm:w-auto bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
-                title={isLocal ? "Save to your device" : "Save to the database"}
+                title="Save to your device"
               >
                 {saving ? (
                   <>
@@ -10067,46 +9370,10 @@ ${description || ""}`;
           {currentStep === "preview" ? (
             <div className="flex gap-2">
               <button
-                onClick={handleSaveLocally}
-                disabled={saving}
-                className="flex-1 sm:flex-none px-3 py-3 sm:py-2.5 bg-blue-800/40 hover:bg-blue-700/50 active:bg-blue-600/50 text-blue-200 text-sm font-medium rounded-lg transition-all whitespace-nowrap border border-blue-700/30 touch-manipulation flex items-center justify-center gap-2"
-                title="Save to your device without publishing"
-              >
-                <DynamicIcon name="Save" className="w-4 h-4" />
-                <span className="hidden sm:inline">Save Locally</span>
-                <span className="sm:hidden">Local</span>
-              </button>
-              {isLocal && (
-                <button
-                  onClick={handleSaveToDatabase}
-                  disabled={saving}
-                  className="flex-1 sm:flex-none px-3 py-3 sm:py-2.5 bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap touch-manipulation flex items-center justify-center gap-2"
-                  title="Upload local adventure to database"
-                >
-                  {saving ? (
-                    <>
-                      <DynamicIcon
-                        name="Loader2"
-                        className="w-4 h-4 animate-spin"
-                      />
-                      Uploading...
-                    </>
-                  ) : (
-                    <>
-                      <DynamicIcon name="Upload" className="w-4 h-4" />
-                      <span className="hidden sm:inline">Save to Database</span>
-                      <span className="sm:hidden">Upload</span>
-                    </>
-                  )}
-                </button>
-              )}
-              <button
                 onClick={handleSave}
                 disabled={saving}
                 className="flex-1 sm:flex-none px-3 py-3 sm:py-2.5 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap touch-manipulation flex items-center justify-center gap-2"
-                title={
-                  isLocal ? "Save changes locally" : "Publish to the community"
-                }
+                title="Save to your device"
               >
                 {saving ? (
                   <>
@@ -10114,15 +9381,12 @@ ${description || ""}`;
                       name="Loader2"
                       className="w-4 h-4 animate-spin"
                     />
-                    {isLocal ? "Saving..." : "Publishing..."}
+                    Saving...
                   </>
                 ) : (
                   <>
-                    <DynamicIcon
-                      name={isLocal ? "Save" : "Rocket"}
-                      className="w-4 h-4"
-                    />
-                    {isLocal ? "Save" : "Publish"}
+                    <DynamicIcon name="Save" className="w-4 h-4" />
+                    <span>Save</span>
                   </>
                 )}
               </button>
@@ -10132,7 +9396,7 @@ ${description || ""}`;
               onClick={() => {
                 const nextIndex = Math.min(
                   steps.length - 1,
-                  currentStepIndex + 1
+                  currentStepIndex + 1,
                 );
                 setCurrentStep(steps[nextIndex].id);
               }}
@@ -10213,30 +9477,30 @@ ${description || ""}`;
                                 setInventory,
                                 setRelationships,
                                 setConditions,
-                                setAuthorNotes
+                                setAuthorNotes,
                               );
                               addNotification(
                                 `Switched to ${preset.name}`,
-                                "success"
+                                "success",
                               );
                             } else {
                               // Restore saved custom values when switching back to custom
                               if (savedCustomValues) {
                                 setCharacterSheet(
-                                  savedCustomValues.characterSheet
+                                  savedCustomValues.characterSheet,
                                 );
                                 setIntro(savedCustomValues.intro);
                                 setStats(savedCustomValues.stats);
                                 setResources(savedCustomValues.resources);
                                 setInventory(savedCustomValues.inventory);
                                 setRelationships(
-                                  savedCustomValues.relationships
+                                  savedCustomValues.relationships,
                                 );
                                 setConditions(savedCustomValues.conditions);
                                 setAuthorNotes(savedCustomValues.authorNotes);
                                 addNotification(
                                   "Custom settings restored!",
-                                  "success"
+                                  "success",
                                 );
                               }
                             }
@@ -10490,7 +9754,7 @@ ${description || ""}`;
                 value={imageModel}
                 onChange={(e) =>
                   setImageModel(
-                    e.target.value as ImageModelKey | DeepInfraImageModelKey
+                    e.target.value as ImageModelKey | DeepInfraImageModelKey,
                   )
                 }
                 className="w-full px-4 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
@@ -10502,7 +9766,7 @@ ${description || ""}`;
                           {key}{" "}
                           {model.cost > 0 ? `(~${model.cost} coins)` : "(FREE)"}
                         </option>
-                      )
+                      ),
                     )
                   : Object.entries(OPENROUTER_IMAGE_MODELS).map(([key]) => (
                       <option key={key} value={key}>
@@ -10569,8 +9833,8 @@ ${description || ""}`;
                         } coins`
                       : "FREE"
                     : imageProvider === "openrouter"
-                    ? "BYOK (no coins)"
-                    : `~${estimateImageCost(imageModel)} coins`}
+                      ? "BYOK (no coins)"
+                      : `~${estimateImageCost(imageModel)} coins`}
                 </span>
               </div>
             </div>
