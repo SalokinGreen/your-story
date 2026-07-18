@@ -31,14 +31,21 @@ export interface ReasoningTier {
 }
 
 /**
- * The tier ladder. All four entries are Mistral/DeepInfra models on purpose:
- * OpenRouter/DeepSeek/Google models require a user-supplied BYOK key
- * (APIKeysContext.tsx hasKey()), so they can't be a default/guaranteed tier.
- * Mistral and DeepInfra use a server-side key billed via coins and work for
- * every user out of the box. All four also have supportsToolCalling: true
- * in AI_MODELS — required since GM adjudication calls dice/state tools
- * mid-turn (DeepSeek R1 variants were considered for tier 3 and rejected:
- * supportsToolCalling is false on those entries).
+ * The tier ladder. Every provider is BYOK now (app/misc/APIKeysContext.tsx —
+ * there's no server-side key for any provider), so tiers are free to mix
+ * providers per-tier rather than being constrained to a single "guaranteed
+ * available" one. This ladder deliberately spans two providers as an
+ * example of that: Mistral for the cheap/default tiers, OpenRouter for the
+ * heavier ones. Swap any `modelKey` to any AI_MODELS entry to reconfigure —
+ * whichever providers end up in use, the corresponding key (mistralKey,
+ * openRouterKey, deepseekKey, googleKey, deepinfraKey) must be configured
+ * in Settings for that tier to actually dispatch; a missing key fails over
+ * to the next-lower tier (see fallbackTier below) rather than crashing.
+ *
+ * All entries have supportsToolCalling: true in AI_MODELS — required since
+ * GM adjudication calls dice/state tools mid-turn (DeepSeek R1 variants
+ * were considered for tier 3 and rejected: supportsToolCalling is false on
+ * those entries).
  */
 export const REASONING_TIERS: ReasoningTier[] = [
   {
@@ -52,12 +59,12 @@ export const REASONING_TIERS: ReasoningTier[] = [
     note: "default GM narration / skill checks",
   },
   {
-    modelKey: "Mistral Medium 3.1",
+    modelKey: "GLM 4.6",
     reasoningEffort: "high",
     note: "rules adjudication, combat",
   },
   {
-    modelKey: "DeepInfra Kimi-K2-Thinking",
+    modelKey: "Open Router Gemini 3 Flash",
     reasoningEffort: "xhigh",
     note: "boss fights, campaign-shaping calls",
   },

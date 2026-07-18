@@ -1,13 +1,24 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useAPIKeys } from "@/app/misc/APIKeysContext";
+import { useAPIKeys, APIKeys } from "@/app/misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 import { REASONING_TIERS, NARRATION_MODEL_KEY } from "@/app/misc/reasoningTiers";
 import { getUserSettings, updateUserSettings, AIConfig } from "@/app/misc/user_settings";
 import { logger, LogEntry } from "@/app/misc/logger";
 import SamplingSettingsTab from "./SamplingSettingsTab";
+
+// Maps an AI_MODELS provider string to the APIKeys field that must be
+// configured for that provider - used to flag tiers with a missing key.
+const PROVIDER_KEY_FIELD: Record<string, keyof APIKeys | undefined> = {
+  openrouter: "openRouterKey",
+  deepseek: "deepseekKey",
+  google: "googleKey",
+  mistral: "mistralKey",
+  deepinfra: "deepinfraKey",
+  novelai: "novelaiKey",
+};
 
 export default function AIConfigTab() {
   const { hasKey } = useAPIKeys();
@@ -290,6 +301,8 @@ export default function AIConfigTab() {
         <div className="space-y-2">
           {REASONING_TIERS.map((tier, index) => {
             const config = AI_MODELS[tier.modelKey];
+            const keyField = PROVIDER_KEY_FIELD[config.provider];
+            const keyConfigured = keyField ? hasKey(keyField) : true;
             return (
               <div
                 key={index}
@@ -303,6 +316,15 @@ export default function AIConfigTab() {
                     <span className="text-sm font-medium text-gray-900 dark:text-white">
                       {config.name}
                     </span>
+                    <span className="text-[10px] uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                      {config.provider}
+                    </span>
+                    {!keyConfigured && (
+                      <span className="text-[10px] bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                        <DynamicIcon name="AlertTriangle" className="w-2.5 h-2.5" />
+                        no key
+                      </span>
+                    )}
                   </div>
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                     {tier.note}
@@ -316,6 +338,11 @@ export default function AIConfigTab() {
             );
           })}
         </div>
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Tiers with &ldquo;no key&rdquo; will automatically fall back to the
+          next-lower tier until one has a configured key. Add provider keys
+          in the API Keys tab.
+        </p>
       </div>
 
       {/* Recent Reasoning Tier Calls */}

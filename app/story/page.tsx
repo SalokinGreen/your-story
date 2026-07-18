@@ -1488,7 +1488,8 @@ function StoryPageContent() {
 
   const { addNotification } = useNotification();
   const { keys: apiKeys } = useAPIKeys();
-  const { openRouterKey, deepseekKey, googleKey } = apiKeys;
+  const { openRouterKey, deepseekKey, googleKey, mistralKey, deepinfraKey } =
+    apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY,
   );
@@ -2552,6 +2553,8 @@ function StoryPageContent() {
           openRouterKey,
           deepseekKey,
           googleKey,
+          mistralKey,
+          deepinfraKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
@@ -2872,6 +2875,8 @@ function StoryPageContent() {
         openRouterKey,
         deepseekKey,
         googleKey,
+        mistralKey,
+        deepinfraKey,
       });
 
       logger.ai_response("Action analysis complete", {
@@ -4814,6 +4819,8 @@ function StoryPageContent() {
           openRouterKey,
           deepseekKey,
           googleKey,
+          mistralKey,
+          deepinfraKey,
         });
 
         // Update the part with choices
@@ -4884,6 +4891,8 @@ function StoryPageContent() {
             openRouterKey,
             deepseekKey,
             googleKey,
+            mistralKey,
+            deepinfraKey,
             storyId: storyDbId || undefined,
             abortSignal: generationAbortRef.current.signal,
             enableEmbeddings: embeddingsEnabled,
@@ -5417,6 +5426,8 @@ function StoryPageContent() {
           openRouterKey,
           deepseekKey,
           googleKey,
+          mistralKey,
+          deepinfraKey,
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
@@ -5710,6 +5721,8 @@ function StoryPageContent() {
         openRouterKey,
         deepseekKey,
         googleKey,
+        mistralKey,
+        deepinfraKey,
       });
 
       // Update the last part with new choices

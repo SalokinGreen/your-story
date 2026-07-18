@@ -137,10 +137,12 @@ export interface GenerationOptions {
   novelaiEnabled?: boolean;
   novelaiKey?: string;
   novelaiTemperature?: number;
-  // BYOK API keys (required for non-NovelAI models)
+  // BYOK API keys (required for non-NovelAI models; all providers are BYOK)
   openRouterKey?: string;
   deepseekKey?: string;
   googleKey?: string;
+  mistralKey?: string;
+  deepinfraKey?: string;
   // Embedding-based context retrieval
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
@@ -601,6 +603,8 @@ export async function generateStoryTurn(
                 openRouterKey: options.openRouterKey,
                 deepseekKey: options.deepseekKey,
                 googleKey: options.googleKey,
+                mistralKey: options.mistralKey,
+                deepinfraKey: options.deepinfraKey,
               }
             );
             startingTier = Math.max(
@@ -742,6 +746,8 @@ export async function generateStoryTurn(
               openRouterKey: options.openRouterKey,
               deepseekKey: options.deepseekKey,
               googleKey: options.googleKey,
+              mistralKey: options.mistralKey,
+              deepinfraKey: options.deepinfraKey,
             });
 
           let gmResponse = await fetch("/api/generate-stream", {
@@ -1423,6 +1429,8 @@ export async function generateStoryTurn(
           openRouterKey: options.openRouterKey,
           deepseekKey: options.deepseekKey,
           googleKey: options.googleKey,
+          mistralKey: options.mistralKey,
+          deepinfraKey: options.deepinfraKey,
           // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
           // Also stop on [STOP] marker for player agency stopping points
           stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
@@ -1832,6 +1840,8 @@ export async function generateStoryTurn(
                 openRouterKey: options.openRouterKey,
                 deepseekKey: options.deepseekKey,
                 googleKey: options.googleKey,
+                mistralKey: options.mistralKey,
+                deepinfraKey: options.deepinfraKey,
               }),
               signal: toolAbortController.signal,
               cache: "no-store",
@@ -1972,6 +1982,8 @@ export async function generateStoryTurn(
           openRouterKey: options.openRouterKey,
           deepseekKey: options.deepseekKey,
           googleKey: options.googleKey,
+          mistralKey: options.mistralKey,
+          deepinfraKey: options.deepinfraKey,
         }),
         signal: options.abortSignal,
       });
@@ -2179,6 +2191,8 @@ export async function generateSimple(
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
+    mistralKey?: string;
+    deepinfraKey?: string;
   }
 ): Promise<{
   content: string;
@@ -2205,6 +2219,8 @@ export async function generateSimple(
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,
+      mistralKey: options.mistralKey,
+      deepinfraKey: options.deepinfraKey,
     }),
   });
 
@@ -2235,6 +2251,8 @@ export async function* generateSimpleStream(
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
+    mistralKey?: string;
+    deepinfraKey?: string;
   }
 ): AsyncGenerator<StreamEvent> {
   const token = await getAuthToken();
@@ -2257,6 +2275,8 @@ export async function* generateSimpleStream(
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,
+      mistralKey: options.mistralKey,
+      deepinfraKey: options.deepinfraKey,
     }),
   });
 
@@ -2285,7 +2305,13 @@ export async function analyzeAction(
   storyData: StoryData,
   userAction: string,
   model: string,
-  apiKeys?: { openRouterKey?: string; deepseekKey?: string; googleKey?: string }
+  apiKeys?: {
+    openRouterKey?: string;
+    deepseekKey?: string;
+    googleKey?: string;
+    mistralKey?: string;
+    deepinfraKey?: string;
+  }
 ): Promise<ActionAnalysisResult> {
   const token = await getAuthToken();
   if (!token) {
@@ -2316,6 +2342,8 @@ export async function analyzeAction(
       openRouterKey: apiKeys?.openRouterKey,
       deepseekKey: apiKeys?.deepseekKey,
       googleKey: apiKeys?.googleKey,
+      mistralKey: apiKeys?.mistralKey,
+      deepinfraKey: apiKeys?.deepinfraKey,
     }),
   });
 
@@ -2645,6 +2673,8 @@ export async function generateChoicesOnly(
     openRouterKey?: string;
     deepseekKey?: string;
     googleKey?: string;
+    mistralKey?: string;
+    deepinfraKey?: string;
   }
 ): Promise<Choice[]> {
   const token = await getAuthToken();
@@ -2682,6 +2712,8 @@ export async function generateChoicesOnly(
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,
+      mistralKey: options.mistralKey,
+      deepinfraKey: options.deepinfraKey,
     }),
   });
 
