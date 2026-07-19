@@ -209,6 +209,9 @@ export interface StoryLore {
   // Author/creator-only organization fields (not visible during gameplay)
   tags?: string[]; // Tags for filtering/categorization in creator UI
   folder?: string; // Folder name for grouping in creator UI
+  // Links this entry to a note in the cross-story global Notes Library, so
+  // it can be pushed/pulled instead of living as a disconnected one-time copy.
+  libraryNoteId?: string;
 }
 
 // Memory entry with embedding tracking
