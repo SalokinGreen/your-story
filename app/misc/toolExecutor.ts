@@ -17,7 +17,20 @@ import {
   MAX_PENDING_RANDOM_EVENTS,
   PendingRandomEvent,
 } from "@/app/misc/structs";
-import { executeCommandWithResponse } from "@/app/misc/commandResponses";
+import {
+  applyCompleteQuest,
+  applyFailQuest,
+  applyUpdateQuest,
+  applyDeleteQuest,
+  applyTriggerAchievement,
+  applyDeleteNote,
+  applyRemoveAbility,
+  applyModifyAbility,
+  applyUpgradeAbility,
+  applyResetAbilityCooldown,
+  applyReduceCooldown,
+  applyAdjustResource,
+} from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
 import { logger } from "@/app/misc/logger";
 import {
@@ -173,6 +186,37 @@ const STATE_CHANGE_TOOLS = new Set([
   "fail_quest",
   "create_quest",
 ]);
+
+/**
+ * Direct typed dispatch table for tools that used to be converted into a
+ * pipe-delimited `/command: args` string and then re-parsed by a regex in
+ * commandResponses.ts's executeCommandWithResponse. Each entry here takes
+ * the already-parsed tool `args` object directly - no string round trip.
+ *
+ * `reset_ability_cooldown` and `refresh_ability` share a single
+ * implementation since their behavior is identical.
+ */
+const TOOL_DISPATCH: Record<
+  string,
+  (
+    args: Record<string, unknown>,
+    storyData: StoryData
+  ) => Omit<CommandResponse, "toolCallId"> | null
+> = {
+  complete_quest: applyCompleteQuest,
+  fail_quest: applyFailQuest,
+  update_quest: applyUpdateQuest,
+  delete_quest: applyDeleteQuest,
+  trigger_achievement: applyTriggerAchievement,
+  delete_note: applyDeleteNote,
+  remove_ability: applyRemoveAbility,
+  modify_ability: applyModifyAbility,
+  upgrade_ability: applyUpgradeAbility,
+  reset_ability_cooldown: applyResetAbilityCooldown,
+  refresh_ability: applyResetAbilityCooldown,
+  reduce_cooldown: applyReduceCooldown,
+  adjust_resource: applyAdjustResource,
+};
 
 /**
  * Parse dice notation (e.g., "2d6+3", "-1d8+2", "3d6-5") and return the rolled value
@@ -1372,134 +1416,6 @@ export function executeTools(
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
-        continue;
-      }
-
-      // Special handling for update_quest with both shortDescription and description
-      // Need to execute two commands
-      if (
-        toolCall.function.name === "update_quest" &&
-        args.shortDescription &&
-        args.description
-      ) {
-        logger.action("Special handling: update_quest with both descriptions", {
-          toolCallId: toolId,
-          questTitle: args.title,
-        });
-
-        // First: update description
-        const descCommand = `/update_quest_description: ${args.title} | ${args.description}`;
-        logger.action(`Executing command: ${descCommand}`, {
-          toolCallId: toolId,
-        });
-        const descResponse = executeCommandWithResponse(descCommand, storyData);
-
-        if (!descResponse || !descResponse.success) {
-          const errorMsg =
-            descResponse?.message || `Failed to update quest description`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-            command: descCommand,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Second: update short description
-        const shortCommand = `/update_quest_short_description: ${args.title} | ${args.shortDescription}`;
-        logger.action(`Executing command: ${shortCommand}`, {
-          toolCallId: toolId,
-        });
-        const shortResponse = executeCommandWithResponse(
-          shortCommand,
-          storyData
-        );
-
-        if (!shortResponse || !shortResponse.success) {
-          // Description was updated but short description failed - return partial success
-          const partialMsg = `${
-            descResponse.message
-          } (short description update failed: ${
-            shortResponse?.message || "unknown error"
-          })`;
-          logger.warn(`Tool call partial success: ${partialMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: true,
-            message: partialMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Both succeeded - combine messages
-        const successMsg = `${descResponse.message} and updated short description`;
-        logger.action(`Tool call succeeded: ${successMsg}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: successMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Handle adjust_resource - use delta directly
-      if (toolCall.function.name === "adjust_resource") {
-        const delta = args.delta ?? 0;
-        const command = `/adjust_resource: ${args.name} | ${delta}`;
-        logger.action(`Executing command: ${command}`, {
-          toolCallId: toolId,
-        });
-        const response = executeCommandWithResponse(command, storyData);
-
-        if (!response || !response.success) {
-          const errorMsg = response?.message || `Failed to adjust resource`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-            command,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        logger.action(`Tool call succeeded: ${response.message}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: response.message,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-
-        if (STATE_CHANGE_TOOLS.has(toolName)) {
-          stateChanges.push(response.message);
-        }
         continue;
       }
 
@@ -3057,62 +2973,67 @@ export function executeTools(
         continue;
       }
 
-      // Convert tool call to XML command format and execute
-      const command = convertToolToCommand(
-        toolCall.function.name,
-        args,
-        storyData
-      );
-      if (command === null) {
-        const errorMsg = `Tool cannot be converted to command (tool ${
-          toolCall.function.name
-        } args=${serializeArgs(args)})`;
-        logger.error(`Tool call failed: ${errorMsg}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: false,
-          message: errorMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
+      // Direct typed dispatch - no string command round trip. Handles
+      // complete_quest, fail_quest, update_quest, delete_quest,
+      // trigger_achievement, delete_note, remove_ability, modify_ability,
+      // upgrade_ability, reset_ability_cooldown, refresh_ability,
+      // reduce_cooldown, and adjust_resource.
+      const dispatchFn = TOOL_DISPATCH[toolCall.function.name];
+      if (dispatchFn) {
+        const response = dispatchFn(args, storyData);
+        if (response) {
+          const fullResponse: CommandResponse = {
+            ...response,
+            toolCallId: toolCall.id,
+          };
+          logger.action(
+            `Tool call ${fullResponse.success ? "succeeded" : "failed"}: ${
+              fullResponse.message
+            }`,
+            {
+              toolCallId: toolId,
+              toolName,
+              success: fullResponse.success,
+            }
+          );
+          responses.push(fullResponse);
+        } else {
+          const errorMsg = `Tool dispatch returned null (tool ${
+            toolCall.function.name
+          } args=${serializeArgs(args)})`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+        }
         continue;
       }
 
-      logger.action(`Converted to command: ${command}`, { toolCallId: toolId });
-      const response = executeCommandWithResponse(command, storyData);
-      if (response) {
-        response.toolCallId = toolCall.id; // Link response to tool call
-        logger.action(
-          `Tool call ${response.success ? "succeeded" : "failed"}: ${
-            response.message
-          }`,
-          {
-            toolCallId: toolId,
-            toolName,
-            success: response.success,
-          }
-        );
-        responses.push(response);
-      } else {
-        const errorMsg = `Command execution returned null (tool ${
-          toolCall.function.name
-        } args=${serializeArgs(args)} command=${command})`;
-        logger.error(`Tool call failed: ${errorMsg}`, {
-          toolCallId: toolId,
-          toolName,
-          command,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: false,
-          message: errorMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-      }
+      // Every tool name present in TOOL_MAP is handled either by one of the
+      // inline special-case blocks above or by TOOL_DISPATCH, both of which
+      // `continue` before reaching this point. If we get here, a tool was
+      // added to the schema without wiring up an executor for it.
+      const errorMsg = `Tool has no executor wired up (tool ${
+        toolCall.function.name
+      } args=${serializeArgs(args)})`;
+      logger.error(`Tool call failed: ${errorMsg}`, {
+        toolCallId: toolId,
+        toolName,
+      });
+      responses.push({
+        command: toolCall.function.name,
+        success: false,
+        message: errorMsg,
+        timestamp: Date.now(),
+        toolCallId: toolCall.id,
+      });
     } catch (error: any) {
       const errorMsg = `Execution error: ${error.message} (tool ${
         toolCall.function.name
@@ -3179,144 +3100,6 @@ export function executeTools(
   }
 
   return { responses, stateChanges };
-}
-
-/**
- * Convert tool call to XML command format for existing commandResponses.ts
- * This allows us to reuse all existing validation and fuzzy matching logic
- * Returns null for tools that need special handling (e.g., add_memory)
- *
- * Tier Conversion: Some tools accept tier strings (e.g., "moderate", "hard") instead of numbers.
- * These are converted to actual numbers based on RPG system and adventure difficulty.
- */
-function convertToolToCommand(
-  toolName: string,
-  args: Record<string, any>,
-  storyData: StoryData
-): string | null {
-  switch (toolName) {
-    // Quest Management - handled directly in executeTools (description may contain | characters)
-    case "create_quest":
-      return null;
-
-    case "complete_quest":
-      return `/complete_quest: ${args.title}`;
-
-    case "fail_quest":
-      return `/fail_quest: ${args.title}`;
-
-    case "update_quest":
-      if (args.shortDescription && args.description) {
-        // Update both - do description first
-        return `/update_quest_description: ${args.title} | ${args.description}`;
-      } else if (args.shortDescription) {
-        return `/update_quest_short_description: ${args.title} | ${args.shortDescription}`;
-      } else if (args.description) {
-        return `/update_quest_description: ${args.title} | ${args.description}`;
-      }
-      // No updates provided - this shouldn't happen but return null to fail gracefully
-      return null;
-
-    case "delete_quest":
-      return `/delete_quest: ${args.title}`;
-
-    // Achievement
-    case "trigger_achievement":
-      return `/trigger_achievement: ${args.title}`;
-
-    // Note Management - handled directly in executeTools (content may contain | characters)
-    case "create_note":
-      return null;
-
-    case "delete_note":
-      return `/note_delete: ${args.title}`;
-
-    case "list_inactive_notes":
-      return null; // Handled directly in executeTools
-
-    case "edit_note":
-      // Handled directly in executeTools (content may contain | characters like markdown tables)
-      return null;
-
-    case "edit_lore_replace":
-      // Handled directly in executeTools
-      return null;
-
-    case "edit_lore_append":
-      // Handled directly in executeTools
-      return null;
-
-    case "edit_lore_prepend":
-      // Handled directly in executeTools
-      return null;
-
-    case "toggle_lore":
-      // Handled directly in executeTools
-      return null;
-
-    case "edit_lore_insert":
-      // Handled directly in executeTools
-      return null;
-
-    case "merge_lore":
-      // Handled directly in executeTools
-      return null;
-
-    case "duplicate_lore":
-      // Handled directly in executeTools
-      return null;
-
-    case "search_notes":
-      // Handled directly in executeTools
-      return null;
-
-    // Ability Management - handled directly in executeTools (description may contain | characters)
-    case "add_ability":
-      return null;
-
-    case "remove_ability":
-      return `/remove_ability: ${args.name}`;
-
-    case "modify_ability": {
-      // Handle different modification types
-      if (args.costs !== undefined) {
-        const costsStr =
-          args.costs
-            ?.map(
-              (c: { type: string; name: string; amount: number }) =>
-                `${c.type}:${c.name}:${c.amount}`
-            )
-            .join(",") || "none";
-        return `/modify_ability: ${args.name} | costs | ${costsStr}`;
-      } else if (args.description !== undefined) {
-        return `/modify_ability: ${args.name} | description | ${args.description}`;
-      } else if (args.stat !== undefined) {
-        return `/modify_ability: ${args.name} | stat | ${args.stat || "none"}`;
-      } else if (args.maxCooldown !== undefined) {
-        return `/modify_ability: ${args.name} | maxCooldown | ${args.maxCooldown}`;
-      }
-      return null; // No valid modifications specified
-    }
-
-    case "upgrade_ability":
-      return `/upgrade_ability: ${args.name}`;
-
-    case "reset_ability_cooldown":
-      return `/refresh_ability: ${args.name}`;
-
-    case "reduce_cooldown":
-      return `/reduce_cooldown: ${args.name} | ${args.amount}`;
-
-    case "refresh_ability":
-      return `/refresh_ability: ${args.name}`;
-
-    // Memory - handled directly in executeTools, not via command
-    case "add_memory":
-      return null; // Signal to handle directly
-
-    default:
-      throw new Error(`Unhandled tool: ${toolName}`);
-  }
 }
 
 /**
