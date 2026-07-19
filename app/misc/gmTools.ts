@@ -1693,11 +1693,16 @@ const updateNPCTool: ToolSchema = {
 
 Use when:
 - NPC's status changes (dies, goes missing, leaves)
-- Relationship with player changes significantly
+- Relationship with player changes
 - New information is revealed about them
 - Their role in the story evolves
 
-Only provide fields you want to change.`,
+Only provide fields you want to change.
+
+Attitude moves at most 2 steps per call along hostile -> unfriendly ->
+neutral -> friendly -> allied (e.g. hostile to friendly in one call is
+rejected and capped to neutral) - a single dramatic moment can shift
+things a lot, but fully flipping a relationship takes more than one call.`,
     parameters: {
       type: "object",
       properties: {

@@ -194,7 +194,7 @@ adversarial testing.
 
 ## High — architecture gaps that enable sycophancy or silent drift
 
-### H1. NPC relationship tools are dead schemas; the live path is ungated
+### H1. NPC relationship tools are dead schemas; the live path is ungated — ✅ FIXED
 
 `add_relationship`/`modify_relationship`/`delete_relationship`/
 `edit_relationship` are fully defined (`toolSchemas.ts:912-1016`) but
@@ -207,6 +207,21 @@ purely cosmetic (a toast notification), also ungated. This is a direct,
 concrete instance of the sycophancy failure mode the source paper
 describes in §3.4 — nothing stops an agreeable GM from marking every NPC
 "friendly" regardless of what the player actually did.
+
+**Fix:** the four dead relationship tool schemas were deleted rather than
+revived — reviving them would have created a second, competing
+disposition-tracking system on the legacy top-level `StoryData.relationships`
+array, alongside the live `npcs[]`/`update_npc` path, the same "two
+mechanisms for one concept" problem C4 already fixed once for chaos
+factor. Instead, `update_npc`'s `attitude` field (`gmExecutor.ts`,
+`executeUpdateNPC`) now caps how far attitude can move in a single call to
+2 steps of the 5-step hostile→unfriendly→neutral→friendly→allied scale,
+clamping and reporting when a requested jump exceeds that (e.g. hostile→
+allied in one call is capped to neutral) - a big shift is still possible
+in one dramatic beat, but fully flipping a relationship now takes more
+than a single agreeable turn. `npc_reaction` was left alone (it's a
+cosmetic toast notification, not authoritative state). Covered by new
+tests in `tests/gmTools.updateNpc.test.ts`.
 
 ### H2. Random events are unenforced advisory text
 
@@ -324,13 +339,14 @@ and partially is, deterministic.
 
 ## Revised priority order (supersedes §5 of `ai-gm-integration-plan.md`)
 
-_Items 1-4 (all of C1-C5) are done — see the ✅ FIXED notes above. What
-remains is H1-H8 and the Medium items, in the order below._
+_Items 1-4 (all of C1-C5) and H1 are done — see the ✅ FIXED notes above.
+What remains is H2-H8 and the Medium items, in the order below._
 
 1. ~~**C1**~~ done.
 2. ~~**C2, C3**~~ done.
 3. ~~**C4**~~ done.
 4. ~~**C5**~~ done.
+5. ~~**H1**~~ done (H2 in that same original line item is still open).
 
 Original text, preserved for the remaining items:
 

@@ -908,112 +908,19 @@ const searchNotesTool: ToolSchema = {
   },
 };
 
-// Relationship Management Tools
-const addRelationshipTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "add_relationship",
-    description:
-      "Create a new character relationship with initial value and description",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Character name (must be unique)",
-        },
-        value: {
-          type: "number",
-          description:
-            "Initial relationship value (-100 to 100, where negative is hostile and positive is friendly)",
-          minimum: -100,
-          maximum: 100,
-        },
-        description: {
-          type: "string",
-          description: "Current relationship status and context",
-        },
-      },
-      required: ["name", "value", "description"],
-    },
-  },
-};
-
-const modifyRelationshipTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "modify_relationship",
-    description:
-      "Change an existing relationship using narrative magnitude. The actual change is calculated based on difficulty and current relationship - enemies improve slowly, friends damage easily.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Character name (fuzzy matching supported)",
-        },
-        magnitude: {
-          type: "string",
-          enum: [
-            "greatly_damage",
-            "damage",
-            "slightly_damage",
-            "slightly_improve",
-            "improve",
-            "greatly_improve",
-          ],
-          description:
-            "How much to change the relationship. Negative relationships are harder to improve, positive relationships are easier to damage.",
-        },
-        description: {
-          type: "string",
-          description: "New relationship description (optional)",
-        },
-      },
-      required: ["name", "magnitude"],
-    },
-  },
-};
-
-const deleteRelationshipTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "delete_relationship",
-    description: "Remove a character relationship entirely",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Character name (fuzzy matching supported)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const editRelationshipTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "edit_relationship",
-    description: "Update a relationship's description without changing value",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Character name (fuzzy matching supported)",
-        },
-        description: {
-          type: "string",
-          description: "New relationship description",
-        },
-      },
-      required: ["name", "description"],
-    },
-  },
-};
+// Note: this file used to also define add_relationship/modify_relationship/
+// delete_relationship/edit_relationship tools operating on the legacy
+// top-level `StoryData.relationships` array. They were never added to
+// TOOL_SCHEMAS below, so the model could never call them - fully dead
+// code. They've been removed rather than revived: `npcs[]`/update_npc is
+// the live, model-facing NPC-disposition tracker (see game-mechanics.md),
+// and reviving a second tool surface for the same concept on a different
+// array would just recreate the exact "two competing mechanisms" problem
+// documented for the old agmtState.threads/characters vs.
+// StoryData.threads/npcs split. The legacy `relationships` array itself
+// is untouched - it's still populated by old presets/saves and rendered
+// in the UI, just no longer exposed to the GM as a second tool-callable
+// system alongside update_npc.
 
 // NPC Management Tool - creates lore entry for NPCs
 const addNpcTool: ToolSchema = {

@@ -4101,6 +4101,18 @@ function executeAddNPC(
   };
 }
 
+// Ordered attitude scale (worst to best) and the max number of steps
+// update_npc is allowed to move an NPC's attitude in a single call - see
+// the clamping note inside executeUpdateNPC.
+const NPC_ATTITUDE_SCALE: NPCAttitude[] = [
+  "hostile",
+  "unfriendly",
+  "neutral",
+  "friendly",
+  "allied",
+];
+const MAX_ATTITUDE_STEP_PER_CALL = 2;
+
 /**
  * Execute update_npc tool - Modify an existing NPC's details
  */
@@ -4171,8 +4183,38 @@ function executeUpdateNPC(
     npc.relationship = params.relationship;
   }
   if (params.attitude && params.attitude !== npc.attitude) {
-    changes.push(`attitude: ${npc.attitude} → ${params.attitude}`);
-    npc.attitude = params.attitude as NPCAttitude;
+    // Cap how far attitude can swing in a single call. Nothing else gates
+    // NPC disposition - the tool description itself invites "changes
+    // significantly" - so without this, a single agreeable turn could
+    // jump an NPC straight from hostile to allied on narrative say-so
+    // alone. Capping the per-call delta to 2 steps (of the 5-step scale)
+    // still allows a big, dramatic shift in one beat, but requires more
+    // than one earned interaction to fully flip a relationship, the same
+    // "clamp and report" discipline already used for combat HP and dice
+    // bounds elsewhere in this file.
+    const requestedIndex = NPC_ATTITUDE_SCALE.indexOf(
+      params.attitude as NPCAttitude
+    );
+    const currentIndex = NPC_ATTITUDE_SCALE.indexOf(npc.attitude);
+    const maxIndex = Math.min(
+      NPC_ATTITUDE_SCALE.length - 1,
+      currentIndex + MAX_ATTITUDE_STEP_PER_CALL
+    );
+    const minIndex = Math.max(0, currentIndex - MAX_ATTITUDE_STEP_PER_CALL);
+    const clampedIndex = Math.max(
+      minIndex,
+      Math.min(maxIndex, requestedIndex)
+    );
+    const clampedAttitude = NPC_ATTITUDE_SCALE[clampedIndex];
+
+    if (clampedAttitude !== params.attitude) {
+      changes.push(
+        `attitude: ${npc.attitude} → ${clampedAttitude} (requested ${params.attitude}, capped to ${MAX_ATTITUDE_STEP_PER_CALL} steps per update)`
+      );
+    } else {
+      changes.push(`attitude: ${npc.attitude} → ${clampedAttitude}`);
+    }
+    npc.attitude = clampedAttitude;
   }
   if (params.faction !== undefined) {
     if (params.faction !== npc.faction) {
