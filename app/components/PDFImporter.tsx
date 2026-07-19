@@ -157,6 +157,27 @@ async function fetchWithRetry(
   throw lastError || new Error("Request failed after retries");
 }
 
+/**
+ * Extract an error message from a failed fetch Response. Reads the body as
+ * text exactly once (a Response body stream can only be consumed once -
+ * calling `.json()` and then falling back to `.text()` on parse failure
+ * throws "body stream already read", since `.json()` already consumed the
+ * stream even though `JSON.parse` failed).
+ */
+async function extractErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const text = await response.text();
+  if (!text) return fallback;
+  try {
+    const parsed = JSON.parse(text);
+    return parsed.error || fallback;
+  } catch {
+    return text || fallback;
+  }
+}
+
 function isTextImportFile(file: File): boolean {
   const name = file.name.toLowerCase();
   return (
@@ -962,13 +983,10 @@ export default function PDFImporter({
             }
 
             if (!ocrResponse.ok) {
-              let errorMsg = "OCR processing failed";
-              try {
-                const error = await ocrResponse.json();
-                errorMsg = error.error || errorMsg;
-              } catch {
-                errorMsg = (await ocrResponse.text()) || errorMsg;
-              }
+              const errorMsg = await extractErrorMessage(
+                ocrResponse,
+                "OCR processing failed",
+              );
               throw new Error(
                 `Chunk ${chunkIdx + 1} (pages ${range.pageStart}-${
                   range.pageEnd
@@ -1252,13 +1270,10 @@ export default function PDFImporter({
             );
 
             if (!summarizeResponse.ok) {
-              let errorMsg = "Note extraction failed";
-              try {
-                const error = await summarizeResponse.json();
-                errorMsg = error.error || errorMsg;
-              } catch {
-                errorMsg = (await summarizeResponse.text()) || errorMsg;
-              }
+              const errorMsg = await extractErrorMessage(
+                summarizeResponse,
+                "Note extraction failed",
+              );
               throw new Error(`${file.name}: ${errorMsg}`);
             }
 
@@ -1309,13 +1324,10 @@ export default function PDFImporter({
           });
 
           if (!ocrResponse.ok) {
-            let errorMsg = "OCR processing failed";
-            try {
-              const error = await ocrResponse.json();
-              errorMsg = error.error || errorMsg;
-            } catch {
-              errorMsg = (await ocrResponse.text()) || errorMsg;
-            }
+            const errorMsg = await extractErrorMessage(
+              ocrResponse,
+              "OCR processing failed",
+            );
             throw new Error(`${file.name}: ${errorMsg}`);
           }
 
@@ -1357,13 +1369,10 @@ export default function PDFImporter({
           });
 
           if (!summarizeResponse.ok) {
-            let errorMsg = "Note extraction failed";
-            try {
-              const error = await summarizeResponse.json();
-              errorMsg = error.error || errorMsg;
-            } catch {
-              errorMsg = (await summarizeResponse.text()) || errorMsg;
-            }
+            const errorMsg = await extractErrorMessage(
+              summarizeResponse,
+              "Note extraction failed",
+            );
             throw new Error(`${file.name}: ${errorMsg}`);
           }
 
