@@ -13,7 +13,7 @@ import { ChapterNav } from "../components/ChapterNav";
 import { ObjectivesStrip } from "../components/ObjectivesStrip";
 import type { SyncStatus } from "../misc/localStoryManager";
 import type { GMToolResult } from "../misc/gmExecutor";
-import { stripThinkingTags } from "../misc/ai";
+import { stripThinkingTags, cleanTextForSpeech } from "../misc/ai";
 
 interface StoryProps {
   storyData: StoryData;
@@ -1076,7 +1076,7 @@ export default function Story({
 
             {/* Right side: TTS - available as soon as story text is ready */}
             <TTSControls
-              text={storyText}
+              text={cleanTextForSpeech(storyText)}
               disabled={loading || loadingStage === "story"}
             />
           </div>
