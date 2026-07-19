@@ -43,6 +43,7 @@ import {
   generateEventMeaning,
 } from "@/app/misc/mythic";
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
+import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
 import {
   parsePointsValue,
@@ -425,8 +426,38 @@ export function executeTools(
         });
         if (!storyData.memory) storyData.memory = [];
         const entry = args.entry;
+
+        // Exact-name-matching against tracked entities (same approach
+        // compaction.ts's dropped-entity check already uses) - a
+        // lightweight version of Generative Agents' recency/importance/
+        // entity-relevance memory scoring, not NLP-style extraction.
+        const entityIds: string[] = [];
+        for (const npc of storyData.npcs || []) {
+          if (npc.name && countNameMentions(entry, npc.name) > 0) {
+            entityIds.push(npc.name);
+          }
+        }
+        for (const thread of storyData.threads || []) {
+          if (thread.title && countNameMentions(entry, thread.title) > 0) {
+            entityIds.push(thread.title);
+          }
+        }
+
+        const rawImportance = args.importance;
+        const importance =
+          typeof rawImportance === "number" && !isNaN(rawImportance)
+            ? Math.max(0, Math.min(10, rawImportance))
+            : undefined;
+
         // Add as MemoryEntry with embedded: false so it gets embedded on next sync
-        storyData.memory.push({ content: entry, embedded: false });
+        storyData.memory.push({
+          content: entry,
+          embedded: false,
+          timestamp: Date.now(),
+          sceneIndex: storyData.scene.parts.length,
+          entityIds: entityIds.length > 0 ? entityIds : undefined,
+          importance,
+        });
         const successMsg = `Added memory: "${entry.substring(0, 50)}${
           entry.length > 50 ? "..." : ""
         }"`;
