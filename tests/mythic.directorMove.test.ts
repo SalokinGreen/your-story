@@ -166,6 +166,47 @@ describe("selectDirectorMove", () => {
     expect(selectDirectorMove(storyData, "Interrupted")).toBeNull();
   });
 
+  it("selects spotlight_couch_player for whoever has gone longest unheard", () => {
+    const storyData = createTestStory({
+      multiplayer: {
+        enabled: true,
+        couchPlayers: [
+          { id: "p1", name: "Alex", color: "#22c55e" },
+          { id: "p2", name: "Sam", color: "#3b82f6" },
+        ],
+        couchPlayerFocus: { p1: 0, p2: 4 },
+      },
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("spotlight_couch_player");
+    expect(move?.targetCouchPlayerId).toBe("p2");
+  });
+
+  it("does not select spotlight_couch_player below the neglect threshold", () => {
+    const storyData = createTestStory({
+      multiplayer: {
+        enabled: true,
+        couchPlayers: [
+          { id: "p1", name: "Alex", color: "#22c55e" },
+          { id: "p2", name: "Sam", color: "#3b82f6" },
+        ],
+        couchPlayerFocus: { p1: 0, p2: 1 },
+      },
+    });
+    expect(selectDirectorMove(storyData, "Normal")).toBeNull();
+  });
+
+  it("is a no-op for single-player stories even with focus data present", () => {
+    const storyData = createTestStory({
+      multiplayer: {
+        enabled: false,
+        couchPlayers: [{ id: "p1", name: "Alex", color: "#22c55e" }],
+        couchPlayerFocus: { p1: 10 },
+      },
+    });
+    expect(selectDirectorMove(storyData, "Normal")).toBeNull();
+  });
+
   it("ignores inactive timers and threads", () => {
     const storyData = createTestStory({
       timers: [

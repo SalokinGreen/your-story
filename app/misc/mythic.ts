@@ -9,7 +9,7 @@
  * - Scene setup (altered/interrupted/normal)
  */
 
-import type { StoryData, PendingDirectorMove } from "./structs";
+import type { StoryData, PendingDirectorMove, CouchPlayer } from "./structs";
 
 export type FateAnswer = "Exceptional Yes" | "Yes" | "No" | "Exceptional No";
 export type SceneType = "Normal" | "Altered" | "Interrupted";
@@ -293,6 +293,11 @@ export function adjustTension(
   return Math.max(0, Math.min(10, currentTension + delta));
 }
 
+// Minimum consecutive turns a couch player must have gone unheard before
+// selectDirectorMove will spotlight them - low enough to matter in a short
+// session, high enough not to nag every turn in a fast-moving scene.
+const SPOTLIGHT_NEGLECT_THRESHOLD = 3;
+
 /**
  * Deterministic GM-move selection policy (PbtA-style bounded move menu).
  *
@@ -305,13 +310,12 @@ export function adjustTension(
  * acknowledge_director_move - see ai_staged.ts/toolExecutor.ts.
  *
  * Priority order: a timer about to trigger outranks a chaotic scene check,
- * which outranks high sustained tension with no other trigger. Returns null
+ * which outranks high sustained tension, which outranks a neglected couch
+ * player (spotlight_couch_player - only relevant once there's more than one
+ * couchPlayer; a no-op for the single-player majority case). Returns null
  * when nothing warrants a move, or when one is already pending and
  * unacknowledged (a simple anti-pileup throttle - address what's already
  * on the table before adding more).
- *
- * spotlight_couch_player is deliberately not selected here yet - it needs
- * per-player focus tracking that doesn't exist until that's built.
  */
 export function selectDirectorMove(
   storyData: StoryData,
@@ -362,6 +366,33 @@ export function selectDirectorMove(
       context: `Tension running high (${tension}/10)`,
       createdAt: Date.now(),
     };
+  }
+
+  // Couch co-op spotlight tracking: bias toward whichever player has gone
+  // the longest without speaking (ScenePart.speakerIds / couchPlayerFocus,
+  // updated client-side in page.tsx's handleCustomInput). No-op for
+  // single-player stories - the overwhelming majority.
+  const couchPlayers = storyData.multiplayer?.couchPlayers || [];
+  if (couchPlayers.length > 1) {
+    const focus = storyData.multiplayer?.couchPlayerFocus || {};
+    let neglectedPlayer: CouchPlayer | null = null;
+    let maxTurnsSinceSpoken = -1;
+    for (const player of couchPlayers) {
+      const turnsSinceSpoken = focus[player.id] ?? 0;
+      if (turnsSinceSpoken > maxTurnsSinceSpoken) {
+        maxTurnsSinceSpoken = turnsSinceSpoken;
+        neglectedPlayer = player;
+      }
+    }
+    if (neglectedPlayer && maxTurnsSinceSpoken >= SPOTLIGHT_NEGLECT_THRESHOLD) {
+      return {
+        id: crypto.randomUUID(),
+        move: "spotlight_couch_player",
+        targetCouchPlayerId: neglectedPlayer.id,
+        context: `${neglectedPlayer.name} hasn't had the spotlight in ${maxTurnsSinceSpoken} turns`,
+        createdAt: Date.now(),
+      };
+    }
   }
 
   return null;

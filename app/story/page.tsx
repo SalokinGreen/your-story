@@ -1058,7 +1058,11 @@ function StoryPageContent() {
     setStoryData(updatedStory);
   }
 
-  async function handleCustomInput(customText: string, playerComment?: string) {
+  async function handleCustomInput(
+    customText: string,
+    playerComment?: string,
+    speakerIds?: string[],
+  ) {
     if (!storyData) return;
     logger.action("User custom input", { customText });
 
@@ -1072,8 +1076,29 @@ function StoryPageContent() {
       user: true,
       role: "user",
       playerComment: playerComment?.trim() ? playerComment.trim() : undefined,
+      speakerIds: speakerIds && speakerIds.length > 0 ? speakerIds : undefined,
       choices: [],
     });
+
+    // Director-layer spotlight tracking: reset the speaking player(s)'
+    // turns-since-spoken counter to 0, tick everyone else's up. No-op for
+    // single-player stories (couchPlayers.length <= 1).
+    if (
+      speakerIds &&
+      speakerIds.length > 0 &&
+      (storyData.multiplayer?.couchPlayers?.length ?? 0) > 1
+    ) {
+      const focus = { ...(storyData.multiplayer!.couchPlayerFocus || {}) };
+      for (const player of storyData.multiplayer!.couchPlayers!) {
+        focus[player.id] = speakerIds.includes(player.id)
+          ? 0
+          : (focus[player.id] || 0) + 1;
+      }
+      storyData.multiplayer = {
+        ...storyData.multiplayer!,
+        couchPlayerFocus: focus,
+      };
+    }
 
     //ProcessLoretriggersafteruserinput
     processLoreTriggers(storyData, addNotification);

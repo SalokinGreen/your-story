@@ -312,6 +312,9 @@ export interface ScenePart {
   role: "system" | "user" | "assistant";
   // Optional player-visible comment that is NOT sent to AI (kept separate from content)
   playerComment?: string;
+  // Couch co-op: which CouchPlayer id(s) spoke this turn (see PlayerBubbles),
+  // for the director layer's spotlight tracking (couchPlayerFocus below).
+  speakerIds?: string[];
   reasoning?: string; // NEW: AI reasoning/thinking
   reasoning_details?: ReasoningDetail[]; // NEW: Structured reasoning tokens (OpenRouter)
   choices?: Choice[];
@@ -740,6 +743,11 @@ export interface StoryData {
     // Couch co-op: persistent named/colored player bubbles for same-device
     // pass-and-play speech-to-text turns (see PlayerBubbles component).
     couchPlayers?: CouchPlayer[];
+    // Director-layer spotlight tracking: CouchPlayer id -> turns since they
+    // last spoke (see ScenePart.speakerIds, and selectDirectorMove's
+    // spotlight_couch_player selection in mythic.ts). Only meaningful when
+    // couchPlayers.length > 1 - a no-op for single-player stories.
+    couchPlayerFocus?: Record<string, number>;
   };
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;
