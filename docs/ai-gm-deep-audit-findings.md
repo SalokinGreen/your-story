@@ -419,7 +419,7 @@ with a typed dispatch table keyed on tool name that calls the same
 mutation logic `commandResponses.ts` already contains, without the
 serialize/re-parse round-trip. Not marked ✅ FIXED for that reason.
 
-### H6. No deterministic content-safety layer exists at play-time
+### H6. No deterministic content-safety layer exists at play-time — flagged, not solved (needs a product decision)
 
 Searching the entire runtime generation path (`ai_staged.ts`,
 `gmTools.ts`, `reasoningTiers.ts`, `generation.ts`) turns up zero
@@ -432,6 +432,46 @@ moderation-endpoint call, no regex blocklist, and no equivalent of the
 paper's Lines/Veils/X-card as enforced code anywhere in play — content
 safety during actual sessions is 100% trust-the-model, and for a
 meaningful stretch of the pipeline, not even prompted.
+
+**Deliberately not fixed unilaterally in this pass.** This item is
+different in kind from H1-H5: those were all "does the code deliver the
+guarantee its name/comment implies" bugs with an objectively correct
+answer once traced. This one has no code-level "correct" answer without
+first settling a product question this repo's own docs never address:
+*what content should this app allow at play-time, for whom, and who
+decides?* Concretely, before any engineering fix is worth writing, the
+product owner needs to decide things an engineer can't decide unilaterally:
+
+- Is the `nsfw` catalog flag meant to gate content generation per-story
+  (i.e., should the play-time prompt behave differently for adventures
+  marked `nsfw: true` vs. `false`), or is it purely a search/discovery
+  filter as it is today?
+- Should there be a hard, non-model-mediated floor (e.g., a moderation
+  API call, a keyword blocklist) applied to *all* stories regardless of
+  the `nsfw` flag, an opt-in raise of the ceiling for `nsfw: true`
+  stories, or no deterministic layer at all (accepting the current
+  trust-the-model posture as an intentional design choice, e.g. because
+  this is a single/adult-user creative-writing tool rather than a
+  moderated public platform)?
+- If a deterministic layer is wanted, where should it run (client-side
+  before render, server-side in the thin AI proxy, at the provider level
+  via each backend's own moderation endpoint) and what should happen on
+  a violation (block the turn, redact, warn-and-continue, flag for human
+  review)?
+- Who is the intended audience/liability model for this app? That answer
+  changes the entire calculus (a private single-user tool has very
+  different content-safety needs than a multi-user platform with public
+  story sharing, which this app already has via the Explorer/library
+  visibility system).
+
+Building any specific mechanism now — a blocklist, a moderation call, an
+NSFW-gated prompt branch — without those answers risks exactly the kind
+of "invent a mechanic wholesale" over-engineering this audit's own
+methodology warns against, and could silently change what the product is
+for. **Recommendation: raise this with the product owner as a standalone
+discussion before any engineering work here**, using the four questions
+above as a starting point. Not marked ✅ FIXED; no code changed for this
+item.
 
 ### H7. Reasoning-tier self-escalation is optional outside combat
 
@@ -502,6 +542,10 @@ notes above. What remains is H5-H8 and the Medium items, in the order below._
    `commandResponses.ts` remains open and is intentionally deferred as its
    own scheduled refactor per the original finding's own recommendation —
    see the H5 note above.
+8. **H6** — flagged, not fixed: this item needs a product decision (what
+   should content safety mean for this app, and who is it for) before any
+   engineering work is worth doing; see the H6 note above for the specific
+   questions to raise.
 
 Original text, preserved for the remaining items:
 
