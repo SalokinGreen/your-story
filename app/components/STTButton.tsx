@@ -4,6 +4,7 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import { authenticatedFetch } from "../misc/getAuthToken";
 import { useNotification } from "../misc/NotificationContext";
+import { useAPIKeys } from "../misc/APIKeysContext";
 
 interface STTButtonProps {
   onTranscript: (text: string) => void;
@@ -26,6 +27,7 @@ export default function STTButton({
   const [state, setState] = useState<RecordingState>("idle");
   const [isSupported, setIsSupported] = useState(true);
   const { addNotification } = useNotification();
+  const { keys } = useAPIKeys();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -127,6 +129,7 @@ export default function STTButton({
 
       const formData = new FormData();
       formData.append("audio", audioBlob, "recording.webm");
+      formData.append("mistralKey", keys.mistralKey);
 
       const response = await authenticatedFetch("/api/stt/transcribe", {
         method: "POST",
