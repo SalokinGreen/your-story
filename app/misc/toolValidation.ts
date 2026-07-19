@@ -8,8 +8,10 @@
  *
  * Deliberately permissive where being strict would just create false
  * positives: unknown/extra properties are ignored (models occasionally add
- * harmless extra fields), and declared-but-unrecognized JSON Schema `type`
- * values are not enforced.
+ * harmless extra fields), declared-but-unrecognized JSON Schema `type`
+ * values are not enforced, and unambiguous scalar mismatches (e.g. "15" for
+ * a number field) are silently coerced instead of rejected - see
+ * `validateToolArgs` for details.
  */
 
 // Minimal structural type - matches the shape used in toolSchemas.ts/gmTools.ts
@@ -57,6 +59,34 @@ function typeMatches(value: unknown, type: string): boolean {
       // Unrecognized declared type (e.g. "null") - don't block on it.
       return true;
   }
+}
+
+/**
+ * Attempt to coerce `value` into the declared `type` when the mismatch is
+ * unambiguous (e.g. the model sent "15" for a number field, or "true" for a
+ * boolean field). Returns `{ value }` with the coerced value on success, or
+ * `undefined` if no safe coercion applies. This purely reduces avoidable
+ * error/retry round-trips for near-misses; it never widens what's accepted
+ * for genuinely ambiguous or malformed input (e.g. "five", "1d6", objects).
+ */
+function tryCoerce(value: unknown, type: string): { value: unknown } | undefined {
+  if (type === "number" || type === "integer") {
+    if (typeof value !== "string") return undefined;
+    const trimmed = value.trim();
+    if (trimmed === "" || !/^-?\d+(\.\d+)?$/.test(trimmed)) return undefined;
+    const parsed = Number(trimmed);
+    if (Number.isNaN(parsed)) return undefined;
+    if (type === "integer" && !Number.isInteger(parsed)) return undefined;
+    return { value: parsed };
+  }
+  if (type === "boolean") {
+    if (typeof value !== "string") return undefined;
+    const lower = value.trim().toLowerCase();
+    if (lower === "true") return { value: true };
+    if (lower === "false") return { value: false };
+    return undefined;
+  }
+  return undefined;
 }
 
 function schemaAccepts(value: unknown, schema: ToolParamSchema): boolean {
@@ -112,6 +142,13 @@ function validateAgainstSchema(
 /**
  * Validate `args` against a tool's declared parameter schema. Returns an
  * empty array when valid.
+ *
+ * Side effect: for scalar top-level properties, unambiguous type mismatches
+ * (e.g. a numeric string like "5" for a `number` field, or "true" for a
+ * `boolean` field) are silently coerced in place on `args` rather than
+ * flagged as errors. This avoids an extra error/retry round-trip for the
+ * kind of near-miss the model occasionally makes, without loosening
+ * validation for genuinely wrong or ambiguous values.
  */
 export function validateToolArgs(
   schema: ToolFunctionSchema,
@@ -132,6 +169,15 @@ export function validateToolArgs(
     const propSchema = properties[key];
     if (!propSchema) continue; // unknown/extra param - ignore rather than block
     if (required.includes(key) && errors.some((e) => e.param === key)) continue; // already flagged missing
+
+    if (propSchema.type && !propSchema.oneOf && !typeMatches(value, propSchema.type)) {
+      const coerced = tryCoerce(value, propSchema.type);
+      if (coerced) {
+        args[key] = coerced.value;
+        continue;
+      }
+    }
+
     validateAgainstSchema(value, propSchema, key, errors);
   }
 

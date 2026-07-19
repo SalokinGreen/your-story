@@ -52,7 +52,7 @@ const createQuestTool: ToolSchema = {
             },
           ],
           description:
-            "Point reward tier: trivial (5-25), minor (15-60), moderate (30-100), major (60-200), legendary (100-500). Or exact number for legacy.",
+            'Point reward: prefer a plain unquoted tier string - "trivial" (5-25), "minor" (15-60), "moderate" (30-100), "major" (60-200), or "legendary" (100-500). Only pass a bare number (no quotes) if you need an exact custom value instead of a tier.',
         },
       },
       required: ["title", "shortDescription", "description"],
@@ -649,8 +649,18 @@ const setFieldTool: ToolSchema = {
   type: "function",
   function: {
     name: "set_field",
-    description:
-      "Set a character sheet field to a specific value. Works with all field types: number (set value), resource (set current and/or max), text (set string), boolean (set true/false), select (set option). Cannot modify derived fields (they are calculated automatically).",
+    description: `Set a character sheet field to a specific value. Cannot modify derived fields (they are calculated automatically).
+
+Choose the value's JSON type based on the target field's type - do NOT wrap it in quotes if it doesn't belong there:
+- number field: bare number, e.g. value: 15 (NOT "15")
+- boolean field: bare true/false, e.g. value: true (NOT "true")
+- text/select field: string, e.g. value: "Aria" or value: "adept"
+- resource field (has current/max, e.g. Health, Mana): object { current, max }, e.g. value: { "current": 20, "max": 30 }. Omit "max" to only change current.
+
+Examples:
+- Set Strength to 15: { field: "Strength", value: 15 }
+- Set IsAlive to true: { field: "IsAlive", value: true }
+- Set Health to 20 of unchanged max: { field: "Health", value: { "current": 20 } }`,
     parameters: {
       type: "object",
       properties: {
@@ -670,11 +680,12 @@ const setFieldTool: ToolSchema = {
                 current: { type: "number" },
                 max: { type: "number" },
               },
-              description: "For resource fields: { current, max }",
+              description:
+                "For resource fields ONLY (fields with current/max, e.g. Health, Mana): { current, max }. Do not use this form for number/text/boolean fields.",
             },
           ],
           description:
-            "The value to set. Type depends on field: number for number fields, boolean for boolean fields, string for text/select fields, { current, max } for resource fields.",
+            "The value to set, matching the field's own type - a bare number for number fields, bare true/false for boolean fields, a string for text/select fields, or { current, max } only for resource fields. Never pass a number or boolean as a quoted string.",
         },
       },
       required: ["field", "value"],
@@ -686,8 +697,13 @@ const addListItemTool: ToolSchema = {
   type: "function",
   function: {
     name: "add_list_item",
-    description:
-      "Add an item to a list field in the character sheet. Supports both simple strings and structured objects with name, emoji, description, and quantity.",
+    description: `Add an item to a list field in the character sheet.
+
+Use a plain string (item: "Rope") for a simple text-only list item. Use the object form ONLY when you want to attach an emoji, description, or quantity beyond 1 - do not wrap the object in quotes or stringify it.
+
+Examples:
+- Simple: { field: "Inventory", item: "Rope" }
+- Structured: { field: "Inventory", item: { "name": "Health Potion", "emoji": "🧪", "quantity": 3 } }`,
     parameters: {
       type: "object",
       properties: {
@@ -704,7 +720,7 @@ const addListItemTool: ToolSchema = {
             {
               type: "object",
               description:
-                "Structured item object with name and optional emoji/description/quantity",
+                "Structured item object with name and optional emoji/description/quantity. Use this JSON object form directly - never as a JSON-encoded string.",
               properties: {
                 name: {
                   type: "string",
@@ -728,7 +744,7 @@ const addListItemTool: ToolSchema = {
             },
           ],
           description:
-            "Item to add - either a string or object with { name, emoji?, description?, quantity? }",
+            "Item to add: a plain string for a simple entry, or an object { name, emoji?, description?, quantity? } for a structured entry. Pick exactly one form - don't quote the object form.",
         },
       },
       required: ["field", "item"],
@@ -1667,7 +1683,7 @@ const startChallengeTool: ToolSchema = {
             },
           ],
           description:
-            "Challenge tier: quick (best of 3), standard (best of 5), extended (best of 7), epic (best of 9). Or exact odd number 3-9.",
+            'Challenge length: prefer a plain unquoted tier string - "quick" (best of 3), "standard" (best of 5), "extended" (best of 7), or "epic" (best of 9). Only pass a bare odd number 3-9 (no quotes) if you need an exact custom length instead of a tier.',
         },
         points: {
           oneOf: [
@@ -1678,7 +1694,7 @@ const startChallengeTool: ToolSchema = {
             },
           ],
           description:
-            "Points tier awarded on victory: trivial, minor, moderate (default), major, legendary. Or exact number.",
+            'Points tier awarded on victory: prefer a plain unquoted tier string - "trivial", "minor", "moderate" (default), "major", or "legendary". Only pass a bare number (no quotes) if you need an exact custom value instead of a tier.',
         },
         initialSuccesses: {
           type: "number",
