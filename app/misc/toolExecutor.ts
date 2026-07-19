@@ -3287,13 +3287,6 @@ function convertToolToCommand(
     case "delete_quest":
       return `/delete_quest: ${args.title}`;
 
-    // Character Field Management - handled directly in executeTools
-    case "modify_field":
-    case "set_field":
-    case "add_list_item":
-    case "remove_list_item":
-      return null;
-
     // Achievement
     case "trigger_achievement":
       return `/trigger_achievement: ${args.title}`;
