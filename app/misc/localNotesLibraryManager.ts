@@ -5,7 +5,7 @@
  * from PDFs). Stored in IndexedDB, independent of any single story/adventure.
  */
 
-import { LoreType } from "./structs";
+import { LoreType, StoryLore } from "./structs";
 
 const DB_NAME = "YourStoryNotesLibraryDB";
 const STORE_NAME = "notes_library";
@@ -153,6 +153,49 @@ export async function updateLibraryNote(
   };
 
   return saveLibraryNote(updated);
+}
+
+/**
+ * Convert a library note into a per-story lore entry, tagged with
+ * libraryNoteId so it stays linked back to the library (push/pull) instead
+ * of becoming a disconnected one-time copy.
+ */
+export function libraryNoteToStoryLore(note: LibraryNote): StoryLore {
+  return {
+    title: note.title,
+    content: note.content,
+    relatedCharacters: note.relatedCharacters,
+    relatedLocations: note.relatedLocations,
+    secrtet: note.type === "secret",
+    keys: note.keys,
+    type: note.type,
+    alwaysOn: note.type === "mechanics" || note.type === "character_sheet",
+    on: true,
+    tags: note.tags,
+    libraryNoteId: note.id,
+  };
+}
+
+/**
+ * Build the library-note fields from a story lore entry, for saving a
+ * story-authored note into the global library (either as a new note or as
+ * an update to the note it's already linked to).
+ */
+export function storyLoreToLibraryNoteFields(
+  lore: StoryLore
+): Omit<LibraryNote, "id" | "createdAt" | "updatedAt"> {
+  return {
+    title: lore.title,
+    content: lore.content,
+    type: lore.type || "lore",
+    tags: lore.tags || [],
+    folderId: undefined,
+    pinned: lore.pinned || false,
+    source: "manual",
+    relatedCharacters: lore.relatedCharacters || [],
+    relatedLocations: lore.relatedLocations || [],
+    keys: lore.keys || [],
+  };
 }
 
 /**

@@ -36,7 +36,11 @@ import NotesLibraryTab from "./NotesLibraryTab";
 import {
   listLibraryNotes,
   unassignFolderFromNotes,
+  libraryNoteToStoryLore,
+  LibraryNote,
 } from "@/app/misc/localNotesLibraryManager";
+import LibraryPickerModal from "@/app/components/LibraryPickerModal";
+import type { StoryLore } from "@/app/misc/structs";
 
 type LibraryView = "stories" | "adventures" | "notes";
 type StorySortBy = "updated" | "created" | "name" | "chapter";
@@ -222,22 +226,37 @@ export default function LibraryPage() {
     });
   };
 
-  const handlePlayAdventure = async (adventure: LocalAdventure) => {
-    try {
-      const localId = await startAdventureLocally(adventure.adventureData);
-      router.push(`/story?storyId=${localId}`);
-    } catch (error: any) {
-      console.error("Error starting adventure:", error);
-      addNotification(`Failed to start: ${error.message}`, "failure");
-    }
+  const [pendingPlay, setPendingPlay] = useState<
+    { kind: "adventure"; adventure: LocalAdventure } | { kind: "freeform" } | null
+  >(null);
+
+  const handlePlayAdventure = (adventure: LocalAdventure) => {
+    setPendingPlay({ kind: "adventure", adventure });
   };
 
-  const handleStartFreeformStory = async () => {
+  const handleStartFreeformStory = () => {
+    setPendingPlay({ kind: "freeform" });
+  };
+
+  const beginPendingPlay = async (initialLore: StoryLore[]) => {
+    if (!pendingPlay) return;
+    const context = pendingPlay;
+    setPendingPlay(null);
     try {
-      const localId = await startFreeformStoryLocally();
+      const localId =
+        context.kind === "adventure"
+          ? await startAdventureLocally(
+              context.adventure.adventureData,
+              "Player",
+              initialLore.length ? initialLore : undefined,
+            )
+          : await startFreeformStoryLocally(
+              "Player",
+              initialLore.length ? initialLore : undefined,
+            );
       router.push(`/story?storyId=${localId}`);
     } catch (error: any) {
-      console.error("Error starting freeform story:", error);
+      console.error("Error starting story:", error);
       addNotification(`Failed to start: ${error.message}`, "failure");
     }
   };
@@ -1390,6 +1409,18 @@ export default function LibraryPage() {
         confirmButtonClass={confirmDialog.confirmButtonClass}
         onConfirm={confirmDialog.onConfirm}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
+      />
+
+      <LibraryPickerModal
+        isOpen={pendingPlay !== null}
+        onClose={() => setPendingPlay(null)}
+        title="Bring a Character or Notes"
+        description="Attach an existing character sheet or world notes before you start, or skip and go in blank."
+        confirmLabel="Attach & Start"
+        onSkip={() => beginPendingPlay([])}
+        onImport={(notes: LibraryNote[]) =>
+          beginPendingPlay(notes.map(libraryNoteToStoryLore))
+        }
       />
     </div>
   );

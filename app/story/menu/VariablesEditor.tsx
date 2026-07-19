@@ -1,0 +1,684 @@
+"use client";
+
+import {
+  StoryData,
+  Stat,
+  Resource,
+  InventoryItem,
+  Achievement,
+  StoryLore,
+  Quest,
+  Relationship,
+  Condition,
+  ConditionTier,
+  AGMTState,
+  CustomTable,
+  Variable,
+  NumberVariable,
+  BooleanVariable,
+  StringVariable,
+  ListVariable,
+  Ability,
+  AbilityCost,
+  AbilityGrade,
+  MemoryEntry,
+  getMemoryContent,
+  NPC,
+  NPCStatus,
+  NPCAttitude,
+  Adventure,
+} from "../../misc/structs";
+import { useState, useEffect } from "react";
+import { useNotification } from "../../misc/NotificationContext";
+import { DynamicIcon } from "../../components/DynamicIcon";
+
+export default function VariablesEditor({
+  variables,
+  onUpdate,
+}: {
+  variables: Variable[];
+  onUpdate: (variables: Variable[]) => void;
+}) {
+  const { addNotification } = useNotification();
+  const [localVariables, setLocalVariables] = useState<Variable[]>([
+    ...variables,
+  ]);
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editVariable, setEditVariable] = useState<Partial<Variable>>({});
+  const [newItemInput, setNewItemInput] = useState<string>("");
+
+  const addVariable = (type: "number" | "boolean" | "string" | "list") => {
+    const id = crypto.randomUUID();
+    let newVar: Variable;
+
+    switch (type) {
+      case "number":
+        newVar = {
+          id,
+          name: "New Number",
+          description: "",
+          type: "number",
+          value: 0,
+        };
+        break;
+      case "boolean":
+        newVar = {
+          id,
+          name: "New Flag",
+          description: "",
+          type: "boolean",
+          value: false,
+        };
+        break;
+      case "string":
+        newVar = {
+          id,
+          name: "New Text",
+          description: "",
+          type: "string",
+          value: "",
+        };
+        break;
+      case "list":
+        newVar = {
+          id,
+          name: "New List",
+          description: "",
+          type: "list",
+          items: [],
+        };
+        break;
+    }
+
+    const updated = [...localVariables, newVar];
+    setLocalVariables(updated);
+    onUpdate(updated);
+  };
+
+  const removeVariable = (index: number) => {
+    const updated = localVariables.filter((_, i) => i !== index);
+    setLocalVariables(updated);
+    onUpdate(updated);
+  };
+
+  const startEdit = (index: number) => {
+    setEditingIndex(index);
+    setEditVariable({ ...localVariables[index] });
+    setNewItemInput("");
+  };
+
+  const cancelEdit = () => {
+    setEditingIndex(null);
+    setEditVariable({});
+    setNewItemInput("");
+  };
+
+  const saveEdit = () => {
+    if (editingIndex !== null && editVariable.name) {
+      const updated = [...localVariables];
+      updated[editingIndex] = editVariable as Variable;
+      setLocalVariables(updated);
+      onUpdate(updated);
+      setEditingIndex(null);
+      setEditVariable({});
+      setNewItemInput("");
+      addNotification("Variable updated!", "success");
+    }
+  };
+
+  const addListItem = () => {
+    if (editVariable.type === "list" && newItemInput.trim()) {
+      const listVar = editVariable as Partial<ListVariable>;
+      const currentItems = listVar.items || [];
+      if (listVar.maxSize && currentItems.length >= listVar.maxSize) {
+        addNotification(`Maximum ${listVar.maxSize} items allowed`, "warning");
+        return;
+      }
+      setEditVariable({
+        ...editVariable,
+        items: [...currentItems, newItemInput.trim()],
+      });
+      setNewItemInput("");
+    }
+  };
+
+  const removeListItem = (itemIndex: number) => {
+    if (editVariable.type === "list") {
+      const listVar = editVariable as Partial<ListVariable>;
+      setEditVariable({
+        ...editVariable,
+        items: (listVar.items || []).filter((_, i) => i !== itemIndex),
+      });
+    }
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case "number":
+        return "Hash";
+      case "boolean":
+        return "ToggleLeft";
+      case "string":
+        return "Type";
+      case "list":
+        return "List";
+      default:
+        return "Variable";
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case "number":
+        return "cyan";
+      case "boolean":
+        return "emerald";
+      case "string":
+        return "amber";
+      case "list":
+        return "violet";
+      default:
+        return "blue";
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h4 className="text-lg font-bold text-white flex items-center gap-2">
+          <DynamicIcon name="Variable" className="w-6 h-6" /> Variables (
+          {localVariables.length})
+        </h4>
+        <div className="flex gap-2">
+          <button
+            onClick={() => addVariable("number")}
+            className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-lg flex items-center gap-1"
+          >
+            <DynamicIcon name="Hash" className="w-4 h-4" />
+            Number
+          </button>
+          <button
+            onClick={() => addVariable("boolean")}
+            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg flex items-center gap-1"
+          >
+            <DynamicIcon name="ToggleLeft" className="w-4 h-4" />
+            Boolean
+          </button>
+          <button
+            onClick={() => addVariable("string")}
+            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-lg flex items-center gap-1"
+          >
+            <DynamicIcon name="Type" className="w-4 h-4" />
+            String
+          </button>
+          <button
+            onClick={() => addVariable("list")}
+            className="px-3 py-1 bg-violet-600 hover:bg-violet-700 text-white text-sm rounded-lg flex items-center gap-1"
+          >
+            <DynamicIcon name="List" className="w-4 h-4" />
+            List
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {localVariables.map((variable, index) => {
+          const color = getTypeColor(variable.type);
+          const isEditing = editingIndex === index;
+
+          if (isEditing) {
+            return (
+              <div
+                key={variable.id}
+                className={`p-4 bg-${color}-100 dark:bg-${color}-900/40 border-2 border-${color}-400 rounded-lg`}
+                style={{
+                  backgroundColor: `rgb(var(--${color}-900) / 0.4)`,
+                  borderColor: `rgb(var(--${color}-400))`,
+                }}
+              >
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <DynamicIcon
+                      name={getTypeIcon(variable.type)}
+                      className="w-5 h-5 text-blue-200"
+                    />
+                    <span className="text-xs uppercase tracking-wider text-blue-200/70 font-semibold">
+                      {variable.type} Variable
+                    </span>
+                  </div>
+
+                  <input
+                    type="text"
+                    value={editVariable.name || ""}
+                    onChange={(e) =>
+                      setEditVariable({
+                        ...editVariable,
+                        name: e.target.value,
+                      })
+                    }
+                    placeholder="Variable name"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white font-semibold"
+                  />
+
+                  <textarea
+                    value={editVariable.description || ""}
+                    onChange={(e) =>
+                      setEditVariable({
+                        ...editVariable,
+                        description: e.target.value,
+                      })
+                    }
+                    placeholder="Description (optional)"
+                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                    rows={2}
+                  />
+
+                  {/* Type-specific fields */}
+                  {editVariable.type === "number" && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                          Current Value
+                        </label>
+                        <input
+                          type="number"
+                          value={
+                            (editVariable as Partial<NumberVariable>).value ?? 0
+                          }
+                          onChange={(e) =>
+                            setEditVariable({
+                              ...editVariable,
+                              value: parseFloat(e.target.value) || 0,
+                            })
+                          }
+                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
+                            Min Value (optional)
+                          </label>
+                          <input
+                            type="number"
+                            value={
+                              (editVariable as Partial<NumberVariable>)
+                                .minValue ?? ""
+                            }
+                            onChange={(e) =>
+                              setEditVariable({
+                                ...editVariable,
+                                minValue:
+                                  e.target.value === ""
+                                    ? undefined
+                                    : parseFloat(e.target.value),
+                              })
+                            }
+                            placeholder="No minimum"
+                            className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
+                            Max Value (optional)
+                          </label>
+                          <input
+                            type="number"
+                            value={
+                              (editVariable as Partial<NumberVariable>)
+                                .maxValue ?? ""
+                            }
+                            onChange={(e) =>
+                              setEditVariable({
+                                ...editVariable,
+                                maxValue:
+                                  e.target.value === ""
+                                    ? undefined
+                                    : parseFloat(e.target.value),
+                              })
+                            }
+                            placeholder="No maximum"
+                            className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {editVariable.type === "boolean" && (
+                    <div>
+                      <label className="block text-sm font-semibold text-blue-200 mb-2">
+                        Current Value
+                      </label>
+                      <button
+                        onClick={() =>
+                          setEditVariable({
+                            ...editVariable,
+                            value: !(editVariable as Partial<BooleanVariable>)
+                              .value,
+                          })
+                        }
+                        className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                          (editVariable as Partial<BooleanVariable>).value
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            : "bg-red-600 hover:bg-red-700 text-white"
+                        }`}
+                      >
+                        {(editVariable as Partial<BooleanVariable>).value
+                          ? "TRUE"
+                          : "FALSE"}
+                      </button>
+                    </div>
+                  )}
+
+                  {editVariable.type === "string" && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                          Current Value
+                        </label>
+                        <input
+                          type="text"
+                          value={
+                            (editVariable as Partial<StringVariable>).value ??
+                            ""
+                          }
+                          onChange={(e) =>
+                            setEditVariable({
+                              ...editVariable,
+                              value: e.target.value,
+                            })
+                          }
+                          placeholder="Enter text value..."
+                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                          Predefined Options (optional)
+                        </label>
+                        <p className="text-xs text-blue-300/50 mb-2">
+                          If set, the AI will prefer these values. One per line.
+                        </p>
+                        <textarea
+                          value={
+                            (
+                              editVariable as Partial<StringVariable>
+                            ).options?.join("\n") ?? ""
+                          }
+                          onChange={(e) =>
+                            setEditVariable({
+                              ...editVariable,
+                              options: e.target.value
+                                ? e.target.value
+                                    .split("\n")
+                                    .filter((o) => o.trim())
+                                : undefined,
+                            })
+                          }
+                          placeholder="Monday&#10;Tuesday&#10;Wednesday&#10;..."
+                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {editVariable.type === "list" && (
+                    <div className="space-y-3">
+                      <div>
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                          Max Size (optional)
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={
+                            (editVariable as Partial<ListVariable>).maxSize ??
+                            ""
+                          }
+                          onChange={(e) =>
+                            setEditVariable({
+                              ...editVariable,
+                              maxSize:
+                                e.target.value === ""
+                                  ? undefined
+                                  : parseInt(e.target.value),
+                            })
+                          }
+                          placeholder="No limit"
+                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-blue-200 mb-1">
+                          Items (
+                          {(editVariable as Partial<ListVariable>).items
+                            ?.length || 0}
+                          {(editVariable as Partial<ListVariable>).maxSize
+                            ? ` / ${
+                                (editVariable as Partial<ListVariable>).maxSize
+                              }`
+                            : ""}
+                          )
+                        </label>
+                        <div className="flex gap-2 mb-2">
+                          <input
+                            type="text"
+                            value={newItemInput}
+                            onChange={(e) => setNewItemInput(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                addListItem();
+                              }
+                            }}
+                            placeholder="Add item..."
+                            className="flex-1 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                          />
+                          <button
+                            onClick={addListItem}
+                            disabled={!newItemInput.trim()}
+                            className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-600 text-white rounded"
+                          >
+                            <DynamicIcon name="Plus" className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {((editVariable as Partial<ListVariable>).items || [])
+                          .length > 0 && (
+                          <div className="flex flex-wrap gap-2">
+                            {(
+                              (editVariable as Partial<ListVariable>).items ||
+                              []
+                            ).map((item, itemIndex) => (
+                              <span
+                                key={itemIndex}
+                                className="px-2 py-1 bg-violet-500/30 text-violet-200 rounded flex items-center gap-1"
+                              >
+                                {item}
+                                <button
+                                  onClick={() => removeListItem(itemIndex)}
+                                  className="hover:text-red-400"
+                                >
+                                  <DynamicIcon name="X" className="w-3 h-3" />
+                                </button>
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex gap-2 pt-2">
+                    <button
+                      onClick={saveEdit}
+                      disabled={!editVariable.name}
+                      className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded"
+                    >
+                      <DynamicIcon
+                        name="Save"
+                        className="inline-block w-4 h-4 mr-1"
+                      />
+                      Save
+                    </button>
+                    <button
+                      onClick={cancelEdit}
+                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          // Display mode
+          return (
+            <div
+              key={variable.id}
+              className={`flex items-start gap-3 p-4 rounded-lg border ${
+                variable.type === "number"
+                  ? "bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800"
+                  : variable.type === "boolean"
+                    ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+                    : variable.type === "string"
+                      ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
+                      : "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800"
+              }`}
+            >
+              <div className="shrink-0">
+                <DynamicIcon
+                  name={getTypeIcon(variable.type)}
+                  className={`w-8 h-8 ${
+                    variable.type === "number"
+                      ? "text-cyan-500"
+                      : variable.type === "boolean"
+                        ? "text-emerald-500"
+                        : variable.type === "string"
+                          ? "text-amber-500"
+                          : "text-violet-500"
+                  }`}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-white flex items-center gap-2 flex-wrap mb-1">
+                  <span>{variable.name}</span>
+                  {variable.type === "number" && (
+                    <span className="text-sm px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
+                      {(variable as NumberVariable).value}
+                    </span>
+                  )}
+                  {variable.type === "boolean" && (
+                    <span
+                      className={`text-sm px-2 py-0.5 rounded-full ${
+                        (variable as BooleanVariable).value
+                          ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200"
+                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
+                      }`}
+                    >
+                      {(variable as BooleanVariable).value ? "TRUE" : "FALSE"}
+                    </span>
+                  )}
+                  {variable.type === "string" && (
+                    <span className="text-sm px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                      &quot;{(variable as StringVariable).value || "(empty)"}
+                      &quot;
+                    </span>
+                  )}
+                  {variable.type === "list" && (
+                    <span className="text-sm px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200">
+                      {(variable as ListVariable).items.length} items
+                      {(variable as ListVariable).maxSize &&
+                        ` / ${(variable as ListVariable).maxSize} max`}
+                    </span>
+                  )}
+                </div>
+                {variable.description && (
+                  <p className="text-sm text-blue-200/60 mb-2">
+                    {variable.description}
+                  </p>
+                )}
+                {/* Show number range if defined */}
+                {variable.type === "number" &&
+                  ((variable as NumberVariable).minValue !== undefined ||
+                    (variable as NumberVariable).maxValue !== undefined) && (
+                    <p className="text-xs text-blue-200/40">
+                      Range: {(variable as NumberVariable).minValue ?? "-∞"} to{" "}
+                      {(variable as NumberVariable).maxValue ?? "∞"}
+                    </p>
+                  )}
+                {/* Show string options if defined */}
+                {variable.type === "string" &&
+                  (variable as StringVariable).options &&
+                  (variable as StringVariable).options!.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(variable as StringVariable).options!.map((opt, i) => (
+                        <span
+                          key={i}
+                          className={`px-2 py-0.5 text-xs rounded ${
+                            opt === (variable as StringVariable).value
+                              ? "bg-amber-500/40 text-amber-200 font-semibold"
+                              : "bg-amber-500/20 text-amber-300"
+                          }`}
+                        >
+                          {opt}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                {/* Show list items preview */}
+                {variable.type === "list" &&
+                  (variable as ListVariable).items.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(variable as ListVariable).items
+                        .slice(0, 5)
+                        .map((item, i) => (
+                          <span
+                            key={i}
+                            className="px-2 py-0.5 text-xs rounded bg-violet-500/20 text-violet-300"
+                          >
+                            {item}
+                          </span>
+                        ))}
+                      {(variable as ListVariable).items.length > 5 && (
+                        <span className="px-2 py-0.5 text-xs rounded bg-violet-500/10 text-violet-400">
+                          +{(variable as ListVariable).items.length - 5} more
+                        </span>
+                      )}
+                    </div>
+                  )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button
+                  onClick={() => startEdit(index)}
+                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+                >
+                  <DynamicIcon name="Edit" className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => removeVariable(index)}
+                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+                >
+                  <DynamicIcon name="Trash2" className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+
+        {localVariables.length === 0 && (
+          <div className="p-8 text-center rounded-lg bg-blue-900/30 border-2 border-dashed border-blue-700/40">
+            <p className="text-sm text-blue-300/50">
+              No variables yet. Add variables to track custom values in your
+              story - numbers, flags, or lists of items.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Story Meta Editor

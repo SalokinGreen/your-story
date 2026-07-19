@@ -1,4 +1,4 @@
-import { Adventure, StoryData } from "./structs";
+import { Adventure, StoryData, StoryLore } from "./structs";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -144,6 +144,7 @@ export async function saveLocalStory(
 export async function startAdventureLocally(
   adventure: Partial<Adventure>,
   playerName: string = "Player",
+  initialLore?: StoryLore[],
 ): Promise<string> {
   const localId = `local_${Date.now()}_${Math.random()
     .toString(36)
@@ -164,6 +165,7 @@ export async function startAdventureLocally(
     level: 1,
     upgradesSpent: 0,
     characterSheetTemplate: adventure.characterSheetTemplate,
+    lore: [...(adventure.storyTemplate?.lore || []), ...(initialLore || [])],
   } as unknown as StoryData;
 
   await saveLocalStory(localId, newStoryData);
@@ -181,6 +183,7 @@ export async function startAdventureLocally(
  */
 export async function startFreeformStoryLocally(
   playerName: string = "Player",
+  initialLore?: StoryLore[],
 ): Promise<string> {
   const localId = `local_${Date.now()}_${Math.random()
     .toString(36)
@@ -190,6 +193,10 @@ export async function startFreeformStoryLocally(
     typeof window !== "undefined"
       ? localStorage.getItem("defaultUserNotes") || ""
       : "";
+
+  const hasCharacterSheet = (initialLore || []).some(
+    (l) => l.type === "character_sheet",
+  );
 
   const newStoryData = {
     story_name: "New Story",
@@ -205,10 +212,13 @@ export async function startFreeformStoryLocally(
     scene: {
       parts: [
         {
-          content:
-            "Welcome! There's no adventure set up yet - so let's build one together.\n\n" +
-            "Tell me what kind of story you're in the mood for (genre, tone, a character concept, anything at all), " +
-            "or just say \"surprise me\" and I'll take it from there.",
+          content: hasCharacterSheet
+            ? "Welcome back! I can see the character and notes you brought with you.\n\n" +
+              "Tell me what kind of story you're in the mood for (genre, tone, setting), " +
+              "or just say \"surprise me\" and I'll take it from there."
+            : "Welcome! There's no adventure set up yet - so let's build one together.\n\n" +
+              "Tell me what kind of story you're in the mood for (genre, tone, a character concept, anything at all), " +
+              "or just say \"surprise me\" and I'll take it from there.",
           imageUrl: "",
           user: false,
           role: "assistant",
@@ -221,7 +231,7 @@ export async function startFreeformStoryLocally(
     inventory: [],
     abilities: [],
     achievements: [],
-    lore: [],
+    lore: initialLore || [],
     momentum: 3,
     maxMomentum: 5,
     points: 0,

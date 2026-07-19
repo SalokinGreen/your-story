@@ -7,6 +7,14 @@ import { useState, useMemo } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
 import LoreImageGenerator from "../components/LoreImageGenerator";
 import { preprocessMarkdown } from "../misc/markdownUtils";
+import { useNotification } from "../misc/NotificationContext";
+import {
+  createLibraryNote,
+  updateLibraryNote,
+  getLibraryNote,
+  libraryNoteToStoryLore,
+  storyLoreToLibraryNoteFields,
+} from "../misc/localNotesLibraryManager";
 
 interface LorePageProps extends StoryData {
   onUpdateLore?: (updatedLore: StoryLore[]) => void;
@@ -105,9 +113,11 @@ const TYPE_CONFIG: Record<
 
 export default function LorePage(props: LorePageProps) {
   const { onUpdateLore, ...storyData } = props;
+  const { addNotification } = useNotification();
   const [selectedLore, setSelectedLore] = useState<StoryLore | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showImageGen, setShowImageGen] = useState(false);
+  const [syncingLibrary, setSyncingLibrary] = useState(false);
   const [selectedType, setSelectedType] = useState<
     LoreType | "all" | "secrets"
   >("all");
@@ -161,6 +171,72 @@ export default function LorePage(props: LorePageProps) {
     onUpdateLore(updatedLore);
     if (selectedLore?.title === loreItem.title) {
       setSelectedLore({ ...loreItem, pinned: !loreItem.pinned });
+    }
+  };
+
+  // Save a note discovered/written during play into the cross-story Notes
+  // Library, or sync an already-linked note with the global library.
+  const handleSaveToLibrary = async () => {
+    if (!selectedLore || !onUpdateLore || syncingLibrary) return;
+    setSyncingLibrary(true);
+    try {
+      const note = await createLibraryNote(
+        storyLoreToLibraryNoteFields(selectedLore)
+      );
+      const updatedLore = storyData.lore.map((l) =>
+        l.title === selectedLore.title
+          ? { ...l, libraryNoteId: note.id }
+          : l
+      );
+      onUpdateLore(updatedLore);
+      setSelectedLore({ ...selectedLore, libraryNoteId: note.id });
+      addNotification(`Saved "${selectedLore.title}" to your notes library`, "success");
+    } catch (e: any) {
+      console.error("Error saving note to library:", e);
+      addNotification(`Failed to save to library: ${e.message}`, "failure");
+    } finally {
+      setSyncingLibrary(false);
+    }
+  };
+
+  const handlePushToLibrary = async () => {
+    if (!selectedLore?.libraryNoteId || syncingLibrary) return;
+    setSyncingLibrary(true);
+    try {
+      await updateLibraryNote(
+        selectedLore.libraryNoteId,
+        storyLoreToLibraryNoteFields(selectedLore)
+      );
+      addNotification(`Pushed "${selectedLore.title}" to your library`, "success");
+    } catch (e: any) {
+      console.error("Error pushing note to library:", e);
+      addNotification(`Failed to push to library: ${e.message}`, "failure");
+    } finally {
+      setSyncingLibrary(false);
+    }
+  };
+
+  const handlePullFromLibrary = async () => {
+    if (!selectedLore?.libraryNoteId || !onUpdateLore || syncingLibrary) return;
+    setSyncingLibrary(true);
+    try {
+      const note = await getLibraryNote(selectedLore.libraryNoteId);
+      if (!note) {
+        addNotification("That library note no longer exists", "failure");
+        return;
+      }
+      const refreshed = { ...libraryNoteToStoryLore(note), pinned: selectedLore.pinned };
+      const updatedLore = storyData.lore.map((l) =>
+        l.title === selectedLore.title ? refreshed : l
+      );
+      onUpdateLore(updatedLore);
+      setSelectedLore(refreshed);
+      addNotification(`Pulled latest "${note.title}" from your library`, "success");
+    } catch (e: any) {
+      console.error("Error pulling note from library:", e);
+      addNotification(`Failed to pull from library: ${e.message}`, "failure");
+    } finally {
+      setSyncingLibrary(false);
     }
   };
 
@@ -609,6 +685,48 @@ export default function LorePage(props: LorePageProps) {
                       {selectedLore.title}
                     </h2>
                   </div>
+
+                  {/* Library sync buttons */}
+                  {onUpdateLore && !isEditing && (
+                    selectedLore.libraryNoteId ? (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={handlePushToLibrary}
+                          disabled={syncingLibrary}
+                          className="p-2 hover:bg-blue-800/50 rounded-lg transition-colors group disabled:opacity-50"
+                          title="Push this version to your notes library"
+                        >
+                          <DynamicIcon
+                            name="UploadCloud"
+                            className="w-5 h-5 text-indigo-300/70 group-hover:text-indigo-200"
+                          />
+                        </button>
+                        <button
+                          onClick={handlePullFromLibrary}
+                          disabled={syncingLibrary}
+                          className="p-2 hover:bg-blue-800/50 rounded-lg transition-colors group disabled:opacity-50"
+                          title="Pull the latest version from your notes library"
+                        >
+                          <DynamicIcon
+                            name="DownloadCloud"
+                            className="w-5 h-5 text-indigo-300/70 group-hover:text-indigo-200"
+                          />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={handleSaveToLibrary}
+                        disabled={syncingLibrary}
+                        className="p-2 hover:bg-blue-800/50 rounded-lg transition-colors group shrink-0 disabled:opacity-50"
+                        title="Save to your notes library for reuse in other stories"
+                      >
+                        <DynamicIcon
+                          name="Bookmark"
+                          className="w-5 h-5 text-purple-300/70 group-hover:text-purple-200"
+                        />
+                      </button>
+                    )
+                  )}
 
                   {/* Edit Button */}
                   {onUpdateLore && !isEditing && (
