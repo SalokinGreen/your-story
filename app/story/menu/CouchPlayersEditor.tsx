@@ -1,0 +1,127 @@
+"use client";
+
+import { useState } from "react";
+import { CouchPlayer } from "../../misc/structs";
+import { DynamicIcon } from "../../components/DynamicIcon";
+
+const PALETTE = [
+  "#22c55e", // green
+  "#ec4899", // pink
+  "#3b82f6", // blue
+  "#f59e0b", // amber
+  "#a855f7", // purple
+  "#ef4444", // red
+  "#14b8a6", // teal
+  "#eab308", // yellow
+];
+
+function nextColor(existing: CouchPlayer[]): string {
+  const used = new Set(existing.map((p) => p.color));
+  const free = PALETTE.find((c) => !used.has(c));
+  return free || PALETTE[existing.length % PALETTE.length];
+}
+
+export default function CouchPlayersEditor({
+  players,
+  onUpdate,
+}: {
+  players: CouchPlayer[];
+  onUpdate: (players: CouchPlayer[]) => void;
+}) {
+  const [newName, setNewName] = useState("");
+
+  const addPlayer = () => {
+    const name = newName.trim();
+    if (!name) return;
+    const player: CouchPlayer = {
+      id: `player_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      name,
+      color: nextColor(players),
+    };
+    onUpdate([...players, player]);
+    setNewName("");
+  };
+
+  const removePlayer = (id: string) => {
+    onUpdate(players.filter((p) => p.id !== id));
+  };
+
+  const updatePlayer = (id: string, updates: Partial<CouchPlayer>) => {
+    onUpdate(players.map((p) => (p.id === id ? { ...p, ...updates } : p)));
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-semibold text-blue-200 mb-1">
+          Couch Co-op Players
+        </label>
+        <p className="text-xs text-blue-200/60">
+          Add a colored, named bubble for everyone at the table. Tap a
+          bubble to speak your turn with voice input.
+        </p>
+      </div>
+
+      {players.length > 0 && (
+        <div className="space-y-2">
+          {players.map((p) => (
+            <div
+              key={p.id}
+              className="flex items-center gap-2 p-2.5 bg-blue-950/40 rounded-lg border border-blue-700/30"
+            >
+              <input
+                type="color"
+                value={p.color}
+                onChange={(e) =>
+                  updatePlayer(p.id, { color: e.target.value })
+                }
+                className="w-9 h-9 shrink-0 rounded-lg cursor-pointer bg-transparent border border-blue-700/40"
+                title="Bubble color"
+              />
+              <input
+                type="text"
+                value={p.name}
+                onChange={(e) => updatePlayer(p.id, { name: e.target.value })}
+                placeholder="Player name"
+                className="flex-1 min-w-0 px-3 py-2 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <button
+                type="button"
+                onClick={() => removePlayer(p.id)}
+                className="p-2 text-red-400/70 hover:text-red-300 hover:bg-red-900/30 rounded-lg transition-colors shrink-0"
+                title="Remove player"
+              >
+                <DynamicIcon name="Trash2" className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center gap-2">
+        <input
+          type="text"
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              addPlayer();
+            }
+          }}
+          placeholder="New player name"
+          className="flex-1 min-w-0 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+        />
+        <button
+          type="button"
+          onClick={addPlayer}
+          disabled={!newName.trim()}
+          className="px-4 py-3 text-sm font-semibold rounded-lg transition-colors bg-purple-600/30 hover:bg-purple-600/50 disabled:opacity-40 disabled:cursor-not-allowed text-purple-200 border border-purple-500/30 flex items-center gap-1.5 shrink-0"
+        >
+          <DynamicIcon name="Plus" className="w-4 h-4" />
+          Add
+        </button>
+      </div>
+    </div>
+  );
+}
