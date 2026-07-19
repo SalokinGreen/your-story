@@ -12,14 +12,15 @@
 > `diceFormula.ts` — file:line references throughout are exact.
 >
 > **Status update:** all five Critical items (C1-C5) below have been fixed
-> and verified with tests (see each item's own note). The High and Medium
-> items are still open. C4's fix surfaced an additional, worse finding
-> than originally reported: the "live" chaos mechanic wasn't just narrower
-> than Mythic's real rule, it was *entirely inert* in production, because
-> nothing anywhere ever populated `skillCheckHistory` - the gate the old
-> `calculateChaosAdjustment` required before it would ever return a
-> nonzero delta. Chaos factor could not change automatically at all before
-> this fix; see C4 below for the corrected mechanic.
+> and verified with tests (see each item's own note), along with H1, H2, and
+> H3. The remaining High and Medium items are still open. C4's fix surfaced
+> an additional, worse finding than originally reported: the "live" chaos
+> mechanic wasn't just narrower than Mythic's real rule, it was *entirely
+> inert* in production, because nothing anywhere ever populated
+> `skillCheckHistory` - the gate the old `calculateChaosAdjustment` required
+> before it would ever return a nonzero delta. Chaos factor could not change
+> automatically at all before this fix; see C4 below for the corrected
+> mechanic.
 
 ## Why this round found more
 
@@ -274,17 +275,44 @@ changes" (`ai_staged.ts:1219-1220`, `:1288-1289`). The claim was based on
 `buildStoryPrompt`/`buildToolPrompt`'s file-order labels ("Stage 1"/"Stage
 2a"), not actual runtime call order. See the note added to that document.
 
-### H3. Memory-compaction summaries are trusted LLM output with no validation
+### H3. Memory-compaction summaries are trusted LLM output with no validation — ✅ FIXED
 
-`compaction.ts:128-172` summarizes aged-out scene parts via an LLM call
-(`/api/generate`), and `applyCompaction` (`:78-85`) writes the result
-straight to `storyData.scene.summary` — no cross-check against canonical
-`StoryData` (inventory, NPCs, lore, flags). A hallucinated detail in the
-summary silently becomes permanent "memory" for every future turn, with no
-mechanism anywhere to detect or correct the drift. (Failure during
-compaction itself is at least non-fatal and doesn't drop mid-turn
-information — `generation.ts:736-771` — so this is specifically about
-trusting the *content* of a successful summarization, not about crashes.)
+`compaction.ts` now runs a new deterministic `validateCompactionSummary`
+against canonical `StoryData` before a summary is accepted, instead of
+writing the raw LLM output straight to `storyData.scene.summary` with no
+check at all. It checks two narrow, high-precision, name-matching signals
+(deliberately *not* general prose/consistency grading, which the rest of
+this audit already flags as unreliable and false-positive-prone — see
+`ai-gm-integration-plan.md`'s Phase 2 for that separate, broader effort):
+
+1. **Dropped entities** — an NPC/item/lore-title name that appeared ≥2 times
+   in the material being folded into the summary (`plan.textToSummarize`)
+   but is mentioned zero times in the new summary. A single incidental
+   mention disappearing is not flagged (too noisy for a lossy summary by
+   design); a heavily-referenced entity vanishing entirely usually means the
+   compaction step erased a live thread.
+2. **Status contradictions** — an NPC tracked as `dead`/`departed` described
+   in the new summary with one of a small, curated set of active-presence
+   phrases ("arrives", "hands you", "attacks you", "joins you", etc.) within
+   a short window after their name. This catches the concrete hallucination
+   case the audit called out (a dead NPC narrated back into the story via
+   the summary) without trying to parse arbitrary prose for meaning.
+
+When `ensureStoryCompacted` gets warnings back, it retries once — feeding
+the specific warning text back to the model in a revision prompt, the same
+correctable-feedback pattern `toolValidation.ts` already uses for malformed
+tool args — and only keeps the revision if it strictly reduces the warning
+count (a revision that trades one problem for a different one isn't an
+improvement). Whatever warnings remain after that (zero, in the common
+case) are persisted onto a new `scene.summaryWarnings?: string[]` field
+(`structs.ts`) rather than disappearing — this stays non-fatal, matching the
+rest of this module's existing "record and move on" posture for compaction,
+but for the first time there's an actual mechanism to detect and surface
+drift instead of none at all. Covered by new tests in
+`tests/compaction.validation.test.ts` (dropped-entity detection, status-
+contradiction detection including the "only retrospective mention, no
+false-positive" case, and the full `ensureStoryCompacted` retry/accept/
+reject flow with a mocked `fetch`).
 
 ### H4. The "real" semantic memory path is dead code; the live fallback fails silently
 
@@ -379,14 +407,16 @@ and partially is, deterministic.
 
 ## Revised priority order (supersedes §5 of `ai-gm-integration-plan.md`)
 
-_Items 1-4 (all of C1-C5) and H1 are done — see the ✅ FIXED notes above.
-What remains is H2-H8 and the Medium items, in the order below._
+_Items 1-4 (all of C1-C5), H1, H2, and H3 are done — see the ✅ FIXED notes
+above. What remains is H4-H8 and the Medium items, in the order below._
 
 1. ~~**C1**~~ done.
 2. ~~**C2, C3**~~ done.
 3. ~~**C4**~~ done.
 4. ~~**C5**~~ done.
-5. ~~**H1**~~ done (H2 in that same original line item is still open).
+5. ~~**H1, H2**~~ done.
+6. ~~**H3**~~ done (H4, the other half of the original "fix the memory
+   trust chain" line item, is still open).
 
 Original text, preserved for the remaining items:
 
