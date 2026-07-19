@@ -158,6 +158,23 @@ function isTextImportFile(file: File): boolean {
 }
 
 /**
+ * Convert bytes to base64 without building one giant string one character at a
+ * time (the naive `reduce` + `String.fromCharCode` pattern allocates a new
+ * string per byte and can spike memory enough to crash memory-constrained
+ * browsers, notably iOS Safari, on real-world multi-MB PDFs).
+ */
+function bytesToBase64(bytes: Uint8Array): string {
+  const CHUNK_SIZE = 0x8000;
+  const parts: string[] = [];
+  for (let i = 0; i < bytes.length; i += CHUNK_SIZE) {
+    parts.push(
+      String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + CHUNK_SIZE))),
+    );
+  }
+  return btoa(parts.join(""));
+}
+
+/**
  * Split a large PDF into smaller chunks using pdf-lib
  * Returns an array of base64-encoded PDF chunks
  */
@@ -207,12 +224,7 @@ async function splitPDFIntoChunks(
 
     // Convert to base64
     const chunkBytes = await chunkDoc.save();
-    const base64 = btoa(
-      new Uint8Array(chunkBytes).reduce(
-        (data, byte) => data + String.fromCharCode(byte),
-        "",
-      ),
-    );
+    const base64 = bytesToBase64(chunkBytes);
 
     chunks.push({
       base64,
@@ -1163,12 +1175,7 @@ export default function PDFImporter({
           );
 
           const arrayBuffer = await file.arrayBuffer();
-          const base64 = btoa(
-            new Uint8Array(arrayBuffer).reduce(
-              (data, byte) => data + String.fromCharCode(byte),
-              "",
-            ),
-          );
+          const base64 = bytesToBase64(new Uint8Array(arrayBuffer));
 
           const ocrPayload: {
             base64Data?: string;
