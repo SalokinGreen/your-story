@@ -920,12 +920,13 @@ export async function executeGMTools(
             ) {
               const query =
                 (params as { query?: string } | undefined)?.query || "";
-              const semanticMatches = await semanticSearchFallback(
+              const semanticOutcome = await semanticSearchFallback(
                 "lore",
                 query,
                 semanticContext
               );
-              if (semanticMatches.length > 0) {
+              if (semanticOutcome.status === "ok" && semanticOutcome.matches.length > 0) {
+                const semanticMatches = semanticOutcome.matches;
                 message += `\n\nNo exact matches, but found ${
                   semanticMatches.length
                 } semantically related note${
@@ -933,6 +934,11 @@ export async function executeGMTools(
                 }:\n${semanticMatches
                   .map((m) => `• "${m.key}": ${m.content.slice(0, 200)}`)
                   .join("\n")}`;
+              } else if (semanticOutcome.status === "error") {
+                // A real degradation, not "genuinely nothing relevant" -
+                // tell the GM rather than letting it read a plain "no
+                // matches" as proof nothing relevant exists (H4).
+                message += `\n\n[Semantic search unavailable right now (${semanticOutcome.message}) - only exact matches were checked]`;
               }
             }
 
@@ -2270,12 +2276,13 @@ async function executeSearchMemory(
 
   if (matches.length === 0) {
     // Literal match found nothing - try semantic search before giving up.
-    const semanticMatches = await semanticSearchFallback(
+    const semanticOutcome = await semanticSearchFallback(
       "memory",
       patterns.join(" "),
       semanticContext
     );
-    if (semanticMatches.length > 0) {
+    if (semanticOutcome.status === "ok" && semanticOutcome.matches.length > 0) {
+      const semanticMatches = semanticOutcome.matches;
       contextForStory += `\n[No exact matches, but found ${
         semanticMatches.length
       } semantically related ${
@@ -2296,7 +2303,13 @@ async function executeSearchMemory(
         contextForStory,
       };
     }
-    contextForStory += `\n[No matching memories found (searched ${memoryEntries.length} entries)]`;
+    if (semanticOutcome.status === "error") {
+      // A real degradation, not "genuinely nothing relevant" - tell the GM
+      // rather than letting it treat this like a confirmed empty search (H4).
+      contextForStory += `\n[No exact matches. Semantic search is unavailable right now (${semanticOutcome.message}) - only exact matches were checked]`;
+    } else {
+      contextForStory += `\n[No matching memories found (searched ${memoryEntries.length} entries)]`;
+    }
   } else {
     contextForStory += `\n[Found ${matches.length} matching ${
       matches.length === 1 ? "memory" : "memories"

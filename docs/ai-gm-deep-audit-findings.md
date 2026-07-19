@@ -12,8 +12,8 @@
 > `diceFormula.ts` — file:line references throughout are exact.
 >
 > **Status update:** all five Critical items (C1-C5) below have been fixed
-> and verified with tests (see each item's own note), along with H1, H2, and
-> H3. The remaining High and Medium items are still open. C4's fix surfaced
+> and verified with tests (see each item's own note), along with H1, H2, H3,
+> and H4. The remaining High and Medium items are still open. C4's fix surfaced
 > an additional, worse finding than originally reported: the "live" chaos
 > mechanic wasn't just narrower than Mythic's real rule, it was *entirely
 > inert* in production, because nothing anywhere ever populated
@@ -314,7 +314,7 @@ contradiction detection including the "only retrospective mention, no
 false-positive" case, and the full `ensureStoryCompacted` retry/accept/
 reject flow with a mocked `fetch`).
 
-### H4. The "real" semantic memory path is dead code; the live fallback fails silently
+### H4. The "real" semantic memory path is dead code; the live fallback fails silently — ✅ FIXED
 
 `getRelevantContextForGeneration` (`embeddings.ts:518-559`) is imported
 into `generation.ts:64` but **never called** — dead import. The only live
@@ -325,6 +325,43 @@ disabled, missing token, thrown error — it returns `[]`
 (`:38-40, :55-59`), indistinguishable from "genuinely nothing relevant was
 found." Nothing surfaces "memory retrieval is degraded" to the model, the
 orchestrator, or the UI.
+
+**Fix**: this was two separate problems, fixed separately, per the
+"check for competing mechanisms before reviving dead code" rule established
+earlier in this audit. `getRelevantContextForGeneration` and the live
+`semanticSearchFallback` path are/were two competing memory-retrieval
+mechanisms for the same concept — an automatic RAG pre-injection path that
+was superseded by an on-demand agentic one (the codebase's own comments in
+`generation.ts` STAGE 0/4 already document this supersession). Reviving the
+dead function would have recreated exactly the "two systems for the same
+thing" trap this audit flagged elsewhere (`agmtState.threads/characters` vs.
+`StoryData.threads/npcs`; dead relationship tools vs. `update_npc`) — so it
+was deleted from `embeddings.ts` instead, along with the dead import in
+`generation.ts`. (`buildSearchQuery` in `embeddings.ts`, the dead function's
+only other caller-adjacent helper, is now orphaned too but was left alone —
+it's a harmless pure string utility, not a second mechanism, and reviewing
+it is out of this item's scope.)
+
+Second, `semanticSearchFallback()`'s return type changed from
+`Promise<SemanticMatch[]>` to a discriminated union,
+`SemanticSearchOutcome`: `{status: "ok", matches}` |
+`{status: "not_configured", matches: []}` |
+`{status: "error", matches: [], message}`. Previously "embeddings disabled
+for this story," "genuinely found nothing," and "the embeddings API call
+itself threw" all collapsed into the same `[]`, which is exactly the
+"looks wired up but isn't" pattern this audit keeps finding — a degraded
+search silently looks identical to a confident "nothing exists." Both call
+sites (`gmExecutor.ts`'s `search_notes` literal-match fallback and
+`executeSearchMemory`'s fallback) now branch on `.status` and only surface
+a `[Semantic search unavailable (...)...]` note to the GM when
+`status === "error"`; `"not_configured"` and `"ok"` with zero matches still
+produce the existing, correct "no matches found" message, so normal/expected
+cases are unchanged. Covered by rewritten tests in
+`tests/semanticSearchFallback.test.ts` (asserts the new shape for
+not-configured/empty-query/ok-with-matches/ok-with-zero-matches/error cases)
+and new tests in `tests/gmTools.searchMemoryFallback.test.ts` (confirms the
+GM-facing message text distinguishes "search errored" from "search wasn't
+attempted" from "search ran and found nothing").
 
 ### H5. Tool calls still bottom out in a regex/pipe-delimited string engine — executed twice
 
@@ -407,16 +444,18 @@ and partially is, deterministic.
 
 ## Revised priority order (supersedes §5 of `ai-gm-integration-plan.md`)
 
-_Items 1-4 (all of C1-C5), H1, H2, and H3 are done — see the ✅ FIXED notes
-above. What remains is H4-H8 and the Medium items, in the order below._
+_Items 1-4 (all of C1-C5), H1, H2, H3, and H4 are done — see the ✅ FIXED
+notes above. What remains is H5-H8 and the Medium items, in the order below._
 
 1. ~~**C1**~~ done.
 2. ~~**C2, C3**~~ done.
 3. ~~**C4**~~ done.
 4. ~~**C5**~~ done.
 5. ~~**H1, H2**~~ done.
-6. ~~**H3**~~ done (H4, the other half of the original "fix the memory
-   trust chain" line item, is still open).
+6. ~~**H3, H4**~~ done (fixes the memory trust chain: H3 validates
+   compaction summaries against canonical state before trusting them; H4
+   deletes the dead automatic-RAG path and makes semantic-search
+   degradation explicit instead of indistinguishable from "no matches").
 
 Original text, preserved for the remaining items:
 

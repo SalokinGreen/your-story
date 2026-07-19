@@ -61,7 +61,6 @@ import {
   findAbilityMatch,
 } from "@/app/misc/fuzzyMatch";
 import {
-  getRelevantContextForGeneration,
   syncNewMemories,
 } from "@/app/misc/embeddings";
 import {
