@@ -1141,7 +1141,9 @@ export default function Story({
         loading={loading}
         momentumMode={momentumMode}
         onMomentumModeChange={onMomentumModeChange}
-        actionMode={actionMode}
+        // When there are no preset choices (e.g. a fresh Freeform Story),
+        // open straight into the freeform text box instead of an empty list.
+        actionMode={choices?.choices?.length ? actionMode : true}
         onActionModeChange={setActionMode}
       />
     </div>

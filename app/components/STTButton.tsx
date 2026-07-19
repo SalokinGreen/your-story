@@ -24,6 +24,7 @@ export default function STTButton({
   silenceTimeout = 3000,
 }: STTButtonProps) {
   const [state, setState] = useState<RecordingState>("idle");
+  const [isSupported, setIsSupported] = useState(true);
   const { addNotification } = useNotification();
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -66,6 +67,20 @@ export default function STTButton({
   useEffect(() => {
     return cleanup;
   }, [cleanup]);
+
+  // Detect whether voice input is actually usable in this context (secure
+  // context + browser support). navigator.mediaDevices is undefined on
+  // insecure (non-HTTPS, non-localhost) origins and in some unsupported
+  // browsers/webviews, which would otherwise throw when clicked.
+  useEffect(() => {
+    const supported =
+      typeof window !== "undefined" &&
+      window.isSecureContext &&
+      typeof navigator !== "undefined" &&
+      !!navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === "function";
+    setIsSupported(supported);
+  }, []);
 
   // Check for silence and auto-stop
   const startSilenceDetection = useCallback(() => {
@@ -252,7 +267,7 @@ export default function STTButton({
   }, []);
 
   const handleClick = () => {
-    if (disabled) return;
+    if (disabled || !isSupported) return;
 
     if (state === "idle") {
       startRecording();
@@ -263,7 +278,7 @@ export default function STTButton({
   };
 
   const getButtonStyle = () => {
-    if (disabled) {
+    if (disabled || !isSupported) {
       return "bg-blue-950/50 text-blue-500 cursor-not-allowed";
     }
     switch (state) {
@@ -288,6 +303,9 @@ export default function STTButton({
   };
 
   const getTitle = () => {
+    if (!isSupported) {
+      return "Voice input requires a secure connection (HTTPS) and a supported browser";
+    }
     switch (state) {
       case "recording":
         return "Click to stop recording";
@@ -303,7 +321,7 @@ export default function STTButton({
       <button
         type="button"
         onClick={handleClick}
-        disabled={disabled || state === "processing"}
+        disabled={disabled || !isSupported || state === "processing"}
         title={getTitle()}
         className={`h-full px-4 rounded-lg transition-all flex items-center justify-center touch-manipulation ${getButtonStyle()}`}
       >

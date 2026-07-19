@@ -845,7 +845,41 @@ export function DiceVisualizer({
                 ) : (
                   // Single die systems: 1d20, 1d100, percentile (support multi-roll advantage/disadvantage stacking)
                   <>
-                    {rolls.length > 1 ? (
+                    {isGenericMode && currentDice.length > 1 ? (
+                      // Generic formula mode with multiple dice (e.g. 2d6, 3d8): dice
+                      // combine via sum, they are not alternate rolls to choose between.
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="flex gap-3 items-center flex-wrap justify-center">
+                          {currentDice.map((die, index) => (
+                            <div
+                              key={index}
+                              className={`relative ${
+                                animationPhase === "rolling"
+                                  ? "animate-spin"
+                                  : ""
+                              }`}
+                            >
+                              <DynamicIcon
+                                name="Dices"
+                                className={`w-14 h-14 ${diceColor} drop-shadow-lg`}
+                              />
+                              {animationPhase !== "rolling" && (
+                                <div className="absolute inset-0 flex items-center justify-center">
+                                  <span className="text-xl font-bold text-white drop-shadow-md">
+                                    {die}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                        {resolvedFormula && animationPhase !== "rolling" && (
+                          <div className="text-xs text-gray-300 font-semibold">
+                            {resolvedFormula}
+                          </div>
+                        )}
+                      </div>
+                    ) : rolls.length > 1 ? (
                       <div className="flex flex-wrap gap-4 items-center justify-center">
                         {rolls.map((roll, idx) => {
                           const isUsed =
@@ -1098,7 +1132,7 @@ export function DiceVisualizer({
         {showResult && (
           <div className="space-y-3 animate-slideUp">
             {/* Roll breakdown for single-die multi-roll advantage/disadvantage */}
-            {!isYZE && rolls.length > 1 && (
+            {!isYZE && !isGenericMode && rolls.length > 1 && (
               <div className="text-center text-xs text-gray-300">
                 {hasAdvantage && (
                   <span className="font-semibold">Advantage Rolls: </span>

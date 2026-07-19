@@ -20,6 +20,7 @@ import {
 // Import client components
 import LandingAuthSection from "./components/LandingAuthSection";
 import QuickStartGenres from "./components/QuickStartGenres";
+import FreeformStoryStart from "./components/FreeformStoryStart";
 import InfoTabs from "./components/InfoTabs";
 
 // Enable ISR with 5 minute revalidation for the entire page
@@ -126,6 +127,9 @@ export default async function Home() {
 
         {/* Quick Start Genres - Client component */}
         <QuickStartGenres />
+
+        {/* Freeform Story - skip setup, talk to the GM directly - Client component */}
+        <FreeformStoryStart />
 
         {/* How It Works - Static server-rendered */}
         <div className="mb-8">

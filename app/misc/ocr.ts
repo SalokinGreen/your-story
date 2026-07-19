@@ -4,8 +4,9 @@
  * Uses Mistral's OCR API to extract text from PDFs and images,
  * then AI-processes the content into structured RPG notes.
  *
- * Pricing: ~$1 per 1000 pages + AI summarization costs
- * User cost: 1 coin per 10 pages (includes OCR + summarization)
+ * BYOK only: the caller provides their own Mistral/OpenRouter/DeepSeek API
+ * key and pays the provider directly. Pricing: ~$1 per 1000 pages for OCR,
+ * plus the selected model's own AI summarization cost.
  */
 
 import {
@@ -132,17 +133,6 @@ export interface PDFSummarizeOptions {
 // ============================================================================
 
 export const OCR_COST_PER_PAGE = 0.001; // $0.001 per page ($1/1000 pages)
-export const OCR_COINS_PER_10_PAGES = 1; // 1 coin per 10 pages (includes AI summarization)
-
-/**
- * Calculate coin cost for OCR processing
- * @param pageCount Number of pages to process
- * @returns Number of coins required
- */
-export function calculateOCRCost(pageCount: number): number {
-  // 1 coin per 10 pages, minimum 1 coin
-  return Math.max(1, Math.ceil(pageCount / 10));
-}
 
 /**
  * Estimate OCR cost in USD (for display purposes)

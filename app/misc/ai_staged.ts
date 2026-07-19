@@ -2604,8 +2604,22 @@ export function buildGMStagePrompt({
     })
     .join("\n- ");
 
-  const systemPrompt = `You ARE the Game Master. Run this like a real tabletop session.
+  // 🆕 Fresh story setup: no character_sheet note exists yet, meaning this
+  // story hasn't been set up (e.g. a "Freeform Story" started with no
+  // premise/adventure). Nudge the GM to interview the player briefly before
+  // establishing the world, instead of narrating a full opening blind.
+  const freshStorySetupBlock =
+    characterSheetLore.length === 0
+      ? `\n## 🆕 FRESH STORY - SETUP NEEDED
+This is a brand-new story with no established setting or character yet - the player skipped adventure creation to talk to you directly.
+- If the player's message doesn't give you enough to go on (genre, tone, character concept), ask up to 1-3 concise, friendly questions before creating anything. Do NOT narrate a full opening scene yet - just respond conversationally (use OOC round-brackets or plain text).
+- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (name, starting stats/resources/abilities fitting the genre and tone) and a \`mechanics\` note (dice system + core resolution rules), then narrate the opening scene.
+- Keep the interview short - one or two exchanges at most before diving in.
+`
+      : "";
 
+  const systemPrompt = `You ARE the Game Master. Run this like a real tabletop session.
+${freshStorySetupBlock}
 ## VISIBILITY RULES
 **The player ONLY sees text inside <output>...</output> tags. Everything else is hidden.**
 - ALWAYS start with <thinking> for your private reasoning

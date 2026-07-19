@@ -171,6 +171,75 @@ export async function startAdventureLocally(
   return localId;
 }
 
+/**
+ * Creates a new local story with no premise, lore, stats, or character
+ * schema - just a single GM greeting. This is the "Freeform Story" entry
+ * point: instead of going through the Creator wizard, the player talks
+ * directly to the GM, who interviews them briefly and sets up the world and
+ * character on the fly via tool calls (see the "FRESH STORY" block in
+ * buildGMStagePrompt).
+ */
+export async function startFreeformStoryLocally(
+  playerName: string = "Player",
+): Promise<string> {
+  const localId = `local_${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 9)}`;
+
+  const defaultUserNotes =
+    typeof window !== "undefined"
+      ? localStorage.getItem("defaultUserNotes") || ""
+      : "";
+
+  const newStoryData = {
+    story_name: "New Story",
+    premise: "",
+    player_name: playerName,
+    player_summary: "",
+    player_notes: defaultUserNotes,
+    intro: "",
+    memory: [],
+    max_chapters: 0,
+    currentChapter: 0,
+    chapters: [],
+    scene: {
+      parts: [
+        {
+          content:
+            "Welcome! There's no adventure set up yet - so let's build one together.\n\n" +
+            "Tell me what kind of story you're in the mood for (genre, tone, a character concept, anything at all), " +
+            "or just say \"surprise me\" and I'll take it from there.",
+          imageUrl: "",
+          user: false,
+          role: "assistant",
+          choices: [],
+        },
+      ],
+    },
+    stats: [],
+    resources: [],
+    inventory: [],
+    abilities: [],
+    achievements: [],
+    lore: [],
+    momentum: 3,
+    maxMomentum: 5,
+    points: 0,
+    level: 1,
+    upgradesSpent: 0,
+    earnedPointsFromChapters: [],
+    quests: [],
+    earnedPointsFromQuests: [],
+    relationships: [],
+    npcs: [],
+    conditions: [],
+  } as unknown as StoryData;
+
+  await saveLocalStory(localId, newStoryData);
+
+  return localId;
+}
+
 export async function getLocalStory(
   storyId: string,
 ): Promise<LocalStory | undefined> {

@@ -6,7 +6,7 @@ import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import {
   validateOCRFile,
-  calculateOCRCost,
+  estimateOCRCostUSD,
   MAX_PDF_SIZE_MB,
   OCRProcessResult,
 } from "@/app/misc/ocr";
@@ -632,7 +632,7 @@ export default function PDFImporter({
         setSelectedFiles((prev) => [...prev, ...validFiles]);
         if (totalPages > 0) {
           setPageCount((prev) => prev + totalPages);
-          setEstimatedCost((prev) => prev + calculateOCRCost(totalPages));
+          setEstimatedCost((prev) => prev + estimateOCRCostUSD(totalPages));
         }
       }
     },
@@ -667,7 +667,7 @@ export default function PDFImporter({
         setSelectedFiles((prev) => [...prev, ...validFiles]);
         if (totalPages > 0) {
           setPageCount((prev) => prev + totalPages);
-          setEstimatedCost((prev) => prev + calculateOCRCost(totalPages));
+          setEstimatedCost((prev) => prev + estimateOCRCostUSD(totalPages));
         }
       }
     },
@@ -689,7 +689,6 @@ export default function PDFImporter({
     const allMechanicNotes: StoryLore[] = [];
     const allCustomTables: CustomTable[] = [];
     let totalPagesProcessed = 0;
-    let totalCost = 0;
 
     try {
       const totalFiles = selectedFiles.length;
@@ -714,7 +713,6 @@ export default function PDFImporter({
 
         let combinedMarkdown = "";
         let combinedTotalPages = 0;
-        let combinedCost = 0;
 
         // For chunked processing, we summarize each chunk and merge results
         const chunkLore: StoryLore[] = [];
@@ -790,8 +788,7 @@ export default function PDFImporter({
               );
             }
 
-            const chunkResult: OCRProcessResult & { cost: number } =
-              await ocrResponse.json();
+            const chunkResult: OCRProcessResult = await ocrResponse.json();
 
             // Update status with OCR markdown
             setChunkStatuses((prev) =>
@@ -808,7 +805,6 @@ export default function PDFImporter({
               pageStart: chunk.pageStart,
               pageEnd: chunk.pageEnd,
               totalPages: chunkResult.totalPages,
-              cost: chunkResult.cost,
             };
           });
 
@@ -833,7 +829,6 @@ export default function PDFImporter({
               (combinedMarkdown ? "\n\n---\n\n" : "") +
               `<!-- Pages ${ocr.pageStart}-${ocr.pageEnd} -->\n${ocr.markdown}`;
             combinedTotalPages += ocr.totalPages;
-            combinedCost += ocr.cost;
           }
 
           // Update extracted markdown after all OCR is done
@@ -841,7 +836,6 @@ export default function PDFImporter({
             (prev) => prev + "\n\n---\n\n" + combinedMarkdown,
           );
           totalPagesProcessed += combinedTotalPages;
-          totalCost += combinedCost;
           setProgress(fileProgressStart + fileProgressRange * 0.45);
 
           // Phase 2: Summarize all chunks with limited concurrency (45% - 95% progress)
@@ -1037,7 +1031,6 @@ export default function PDFImporter({
             const textContent = await file.text();
             combinedMarkdown = textContent;
             combinedTotalPages = 0;
-            combinedCost = 0;
 
             setExtractedMarkdown(
               (prev) => prev + "\n\n---\n\n" + combinedMarkdown,
@@ -1143,18 +1136,15 @@ export default function PDFImporter({
             throw new Error(`${file.name}: ${errorMsg}`);
           }
 
-          const ocrResult: OCRProcessResult & { cost: number } =
-            await ocrResponse.json();
+          const ocrResult: OCRProcessResult = await ocrResponse.json();
 
           combinedMarkdown = ocrResult.markdown;
           combinedTotalPages = ocrResult.totalPages;
-          combinedCost = ocrResult.cost;
 
           setExtractedMarkdown(
             (prev) => prev + "\n\n---\n\n" + combinedMarkdown,
           );
           totalPagesProcessed += combinedTotalPages;
-          totalCost += combinedCost;
           setProgress(fileProgressStart + fileProgressRange * 0.4);
 
           // Step 3: AI Summarization - Extract all notes (only for non-chunked files)
@@ -1227,7 +1217,7 @@ export default function PDFImporter({
       addNotification(
         `Imported ${totalItems} items from ${totalPagesProcessed} pages across ${totalFiles} file${
           totalFiles > 1 ? "s" : ""
-        } (${totalCost} coins)`,
+        } (~$${estimateOCRCostUSD(totalPagesProcessed).toFixed(3)} in OCR costs, paid to your own API key)`,
         "success",
       );
 
@@ -1259,7 +1249,7 @@ export default function PDFImporter({
     const filePages = Math.max(1, Math.ceil(file.size / (100 * 1024)));
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
     setPageCount((prev) => prev - filePages);
-    setEstimatedCost((prev) => prev - calculateOCRCost(filePages));
+    setEstimatedCost((prev) => prev - estimateOCRCostUSD(filePages));
   };
 
   const resetState = () => {
@@ -1764,15 +1754,16 @@ export default function PDFImporter({
                   {selectedFiles.length > 0 && (
                     <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg p-3 flex items-center gap-3">
                       <DynamicIcon
-                        name="Coins"
+                        name="DollarSign"
                         className="w-5 h-5 text-amber-400"
                       />
                       <div className="flex-1">
                         <p className="text-sm font-medium text-amber-200">
-                          Estimated cost: {estimatedCost} coins
+                          Estimated OCR cost: ~${estimatedCost.toFixed(3)}
                         </p>
                         <p className="text-xs text-amber-300/60">
-                          1 coin per 10 pages (includes OCR + AI summarization)
+                          BYOK: paid directly to your Mistral API key. AI
+                          summarization costs extra via your selected model.
                         </p>
                       </div>
                     </div>

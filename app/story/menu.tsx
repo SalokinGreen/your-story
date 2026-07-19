@@ -54,6 +54,12 @@ import {
   getAbilityBonus,
 } from "../misc/abilitySystem";
 import { getRPGSystem, type RPGSystemType } from "../misc/rpgSystems";
+import {
+  LibraryNote,
+  listLibraryNotes,
+  createLibraryNote,
+} from "../misc/localNotesLibraryManager";
+import PDFImporter from "../components/PDFImporter";
 
 // Basic Settings Component
 interface BasicSettingsForm {
@@ -2704,6 +2710,15 @@ function LoreEditor({
   const [editLoreTag, setEditLoreTag] = useState("");
   const { addNotification } = useNotification();
 
+  // Import from Notes Library
+  const [showLibraryPicker, setShowLibraryPicker] = useState(false);
+  const [libraryNotes, setLibraryNotes] = useState<LibraryNote[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [selectedLibraryIds, setSelectedLibraryIds] = useState<Set<string>>(
+    new Set(),
+  );
+
   // Drag-and-drop handlers for lore
   const handleLoreDragStart = (index: number) => {
     setDraggedLoreIndex(index);
@@ -2815,19 +2830,136 @@ function LoreEditor({
     onUpdate(updated);
   };
 
+  // Open the "Import from Library" picker and load saved notes
+  const openLibraryPicker = async () => {
+    setShowLibraryPicker(true);
+    setLibraryLoading(true);
+    setSelectedLibraryIds(new Set());
+    try {
+      const notes = await listLibraryNotes();
+      setLibraryNotes(notes);
+    } catch (e) {
+      console.error("Error loading notes library:", e);
+      addNotification("Failed to load notes library", "failure");
+    } finally {
+      setLibraryLoading(false);
+    }
+  };
+
+  const toggleLibrarySelection = (id: string) => {
+    const next = new Set(selectedLibraryIds);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelectedLibraryIds(next);
+  };
+
+  // Append selected library notes into this story's lore
+  const importSelectedLibraryNotes = () => {
+    const toImport = libraryNotes.filter((n) => selectedLibraryIds.has(n.id));
+    if (toImport.length === 0) return;
+
+    const newLore: StoryLore[] = toImport.map((note) => ({
+      title: note.title,
+      content: note.content,
+      relatedCharacters: note.relatedCharacters,
+      relatedLocations: note.relatedLocations,
+      secrtet: note.type === "secret",
+      keys: note.keys,
+      type: note.type,
+      alwaysOn: note.type === "mechanics" || note.type === "character_sheet",
+      on: true,
+      tags: note.tags,
+    }));
+
+    const updated = [...localLore, ...newLore];
+    setLocalLore(updated);
+    onUpdate(updated);
+    addNotification(
+      `Imported ${newLore.length} note${newLore.length === 1 ? "" : "s"} from library`,
+      "success",
+    );
+    setShowLibraryPicker(false);
+  };
+
+  const filteredLibraryNotes = libraryNotes.filter(
+    (n) =>
+      !librarySearch ||
+      n.title.toLowerCase().includes(librarySearch.toLowerCase()) ||
+      n.tags.some((t) => t.toLowerCase().includes(librarySearch.toLowerCase())),
+  );
+
+  // Handle a PDF/OCR import: add to this story's live lore AND save to the
+  // persistent notes library for reuse in other stories.
+  const handlePDFImportComplete = async (data: {
+    lore: StoryLore[];
+    mechanicNotes: StoryLore[];
+    customTables: CustomTable[];
+    summary: string;
+  }) => {
+    const allNotes = [...data.lore, ...data.mechanicNotes];
+    if (allNotes.length === 0) return;
+
+    const updated = [...localLore, ...allNotes];
+    setLocalLore(updated);
+    onUpdate(updated);
+
+    let savedCount = 0;
+    for (const note of allNotes) {
+      try {
+        await createLibraryNote({
+          title: note.title,
+          content: note.content,
+          type: note.type || "lore",
+          tags: note.tags || [],
+          folderId: undefined,
+          pinned: false,
+          source: "ocr",
+          relatedCharacters: note.relatedCharacters || [],
+          relatedLocations: note.relatedLocations || [],
+          keys: note.keys || [],
+        });
+        savedCount++;
+      } catch (e) {
+        console.error("Error saving OCR note to library:", e);
+      }
+    }
+
+    addNotification(
+      `Added ${allNotes.length} note${allNotes.length === 1 ? "" : "s"} to this story, saved ${savedCount} to your notes library`,
+      "success",
+    );
+  };
+
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-2">
         <h4 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
           <DynamicIcon name="Book" className="w-6 h-6" /> Lore Entries (
           {localLore.length})
         </h4>
-        <button
-          onClick={addLore}
-          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
-        >
-          + Add Lore
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={openLibraryPicker}
+            className="px-3 py-1 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 text-white text-sm rounded-lg flex items-center gap-1.5"
+          >
+            <DynamicIcon name="Library" className="w-4 h-4" />
+            Import from Library
+          </button>
+          <PDFImporter
+            onImportComplete={handlePDFImportComplete}
+            buttonText="Import from PDF"
+            compact
+          />
+          <button
+            onClick={addLore}
+            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
+          >
+            + Add Lore
+          </button>
+        </div>
       </div>
       <div className="space-y-3">
         {localLore.map((loreItem, index) =>
@@ -3606,6 +3738,95 @@ function LoreEditor({
           ),
         )}
       </div>
+
+      {/* Import from Library Modal */}
+      {showLibraryPicker && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-lg w-full max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <DynamicIcon name="Library" className="w-5 h-5" />
+                Import from Library
+              </h2>
+              <button
+                onClick={() => setShowLibraryPicker(false)}
+                className="p-1.5 hover:bg-blue-800/50 rounded-lg"
+              >
+                <DynamicIcon name="X" className="w-5 h-5" />
+              </button>
+            </div>
+            <input
+              type="text"
+              value={librarySearch}
+              onChange={(e) => setLibrarySearch(e.target.value)}
+              placeholder="Search your notes library..."
+              className="w-full px-3 py-2 mb-3 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50"
+            />
+            <div className="flex-1 overflow-y-auto space-y-2 min-h-[120px]">
+              {libraryLoading ? (
+                <div className="text-center py-8 text-blue-300/60">
+                  Loading...
+                </div>
+              ) : filteredLibraryNotes.length === 0 ? (
+                <div className="text-center py-8 text-blue-300/60">
+                  {libraryNotes.length === 0
+                    ? "Your notes library is empty. Save notes from the Library page first."
+                    : "No notes match your search."}
+                </div>
+              ) : (
+                filteredLibraryNotes.map((note) => (
+                  <label
+                    key={note.id}
+                    className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                      selectedLibraryIds.has(note.id)
+                        ? "bg-purple-900/30 border-purple-500"
+                        : "bg-blue-900/30 border-blue-800/30 hover:bg-blue-900/50"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedLibraryIds.has(note.id)}
+                      onChange={() => toggleLibrarySelection(note.id)}
+                      className="mt-1 rounded"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="font-semibold text-white truncate">
+                        {note.title}
+                      </div>
+                      <div className="text-xs text-blue-300/60 line-clamp-2">
+                        {note.content}
+                      </div>
+                    </div>
+                    {note.source === "ocr" && (
+                      <DynamicIcon
+                        name="ScanText"
+                        className="w-4 h-4 text-blue-400/60 shrink-0"
+                        aria-label="From OCR"
+                      />
+                    )}
+                  </label>
+                ))
+              )}
+            </div>
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setShowLibraryPicker(false)}
+                className="flex-1 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={importSelectedLibraryNotes}
+                disabled={selectedLibraryIds.size === 0}
+                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                Add {selectedLibraryIds.size > 0 ? selectedLibraryIds.size : ""}{" "}
+                Note{selectedLibraryIds.size === 1 ? "" : "s"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

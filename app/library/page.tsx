@@ -18,6 +18,7 @@ import {
   saveLocalStory,
   getLocalStory,
   startAdventureLocally,
+  startFreeformStoryLocally,
 } from "@/app/misc/localStoryManager";
 import {
   listLocalAdventures,
@@ -31,8 +32,13 @@ import {
   deleteLocalFolder,
   LocalFolder,
 } from "@/app/misc/localFolderManager";
+import NotesLibraryTab from "./NotesLibraryTab";
+import {
+  listLibraryNotes,
+  unassignFolderFromNotes,
+} from "@/app/misc/localNotesLibraryManager";
 
-type LibraryView = "stories" | "adventures";
+type LibraryView = "stories" | "adventures" | "notes";
 type StorySortBy = "updated" | "created" | "name" | "chapter";
 type AdventureSortBy = "updated" | "created" | "title" | "rating" | "plays";
 
@@ -59,6 +65,7 @@ export default function LibraryPage() {
   const [view, setView] = useState<LibraryView>("stories");
   const [localStories, setLocalStories] = useState<LocalStory[]>([]);
   const [localAdventures, setLocalAdventures] = useState<LocalAdventure[]>([]);
+  const [notesCount, setNotesCount] = useState(0);
   const [folders, setFolders] = useState<LocalFolder[]>([]);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -122,16 +129,21 @@ export default function LibraryPage() {
     setLoading(true);
 
     try {
-      const [localStoriesList, localAdvs] = await Promise.all([
+      const [localStoriesList, localAdvs, notesList] = await Promise.all([
         listLocalStories(),
         listLocalAdventures().catch((error) => {
           console.error("Error loading local adventures:", error);
+          return [];
+        }),
+        listLibraryNotes().catch((error) => {
+          console.error("Error loading notes library:", error);
           return [];
         }),
       ]);
 
       setLocalStories(localStoriesList);
       setLocalAdventures(localAdvs);
+      setNotesCount(notesList.length);
       setFolders(listLocalFolders());
     } catch (error: any) {
       console.error("Error loading local data:", error);
@@ -220,6 +232,16 @@ export default function LibraryPage() {
     }
   };
 
+  const handleStartFreeformStory = async () => {
+    try {
+      const localId = await startFreeformStoryLocally();
+      router.push(`/story?storyId=${localId}`);
+    } catch (error: any) {
+      console.error("Error starting freeform story:", error);
+      addNotification(`Failed to start: ${error.message}`, "failure");
+    }
+  };
+
   const handleCreateFolder = async () => {
     if (!newFolderName.trim()) {
       addNotification("Please enter a folder name", "warning");
@@ -283,6 +305,8 @@ export default function LibraryPage() {
               s.folder_id === folderId ? { ...s, folder_id: null } : s,
             ),
           );
+          // Notes share the same folder list; uncategorize any in this folder
+          await unassignFolderFromNotes(folderId);
           addNotification("Folder deleted successfully", "success");
         } catch (error: any) {
           console.error("Error deleting folder:", error);
@@ -565,19 +589,31 @@ export default function LibraryPage() {
             <h1 className="text-lg font-bold">Library</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() =>
-                view === "stories"
-                  ? setView("adventures")
-                  : router.push("/creator")
-              }
-              className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl transition-colors text-sm font-medium"
-            >
-              <DynamicIcon name="Plus" className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                {view === "stories" ? "New Story" : "New Adventure"}
-              </span>
-            </button>
+            {view === "stories" && (
+              <button
+                onClick={handleStartFreeformStory}
+                title="Skip adventure setup - talk to the GM and build the world as you play"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-xl transition-colors text-sm font-medium"
+              >
+                <DynamicIcon name="MessageCircle" className="w-4 h-4" />
+                <span className="hidden sm:inline">Freeform Story</span>
+              </button>
+            )}
+            {view !== "notes" && (
+              <button
+                onClick={() =>
+                  view === "stories"
+                    ? setView("adventures")
+                    : router.push("/creator")
+                }
+                className="flex items-center gap-2 px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 rounded-xl transition-colors text-sm font-medium"
+              >
+                <DynamicIcon name="Plus" className="w-4 h-4" />
+                <span className="hidden sm:inline">
+                  {view === "stories" ? "New Story" : "New Adventure"}
+                </span>
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -610,10 +646,30 @@ export default function LibraryPage() {
             />
             Adventures ({localAdventures.length})
           </button>
+          <button
+            onClick={() => setView("notes")}
+            className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+              view === "notes"
+                ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-lg shadow-purple-500/25"
+                : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50 hover:text-white"
+            }`}
+          >
+            <DynamicIcon
+              name="NotebookText"
+              className="w-4 h-4 inline-block mr-2"
+            />
+            Notes ({notesCount})
+          </button>
         </div>
 
         {/* Content */}
-        {loading ? (
+        {view === "notes" ? (
+          <NotesLibraryTab
+            onCountChange={setNotesCount}
+            folders={folders}
+            setFolders={setFolders}
+          />
+        ) : loading ? (
           view === "stories" ? (
             <LibrarySkeleton />
           ) : (
