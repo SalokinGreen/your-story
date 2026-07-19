@@ -27,6 +27,17 @@ const MAX_CHUNK_SIZE_MB = 4;
 const PAGES_PER_CHUNK = 15;
 // Maximum concurrent requests - increased for faster processing
 const MAX_CONCURRENT_REQUESTS = 10;
+// Maximum concurrent OCR uploads while a chunk is being split. Each chunk
+// carries its own multi-MB base64 PDF payload, so this must stay much lower
+// than MAX_CONCURRENT_REQUESTS (used for the lightweight text-only
+// summarize phase) to avoid holding many multi-MB buffers in memory at
+// once - the main cause of tab crashes on memory-constrained mobile
+// browsers (iOS Safari, Android Chrome).
+const MAX_CONCURRENT_OCR_REQUESTS = 2;
+// Devices reporting <= this much RAM (via navigator.deviceMemory, in GB)
+// are treated as memory-constrained and get smaller chunks / lower
+// concurrency to avoid crashing while splitting large PDFs.
+const LOW_MEMORY_DEVICE_THRESHOLD_GB = 4;
 // Timeout for summarize requests (4 minutes - server allows 5)
 const SUMMARIZE_TIMEOUT_MS = 240000;
 // Retry attempts for failed requests
@@ -175,13 +186,51 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
- * Split a large PDF into smaller chunks using pdf-lib
- * Returns an array of base64-encoded PDF chunks
+ * Best-effort detection of memory-constrained devices (mobile phones/
+ * tablets) via the non-standard `navigator.deviceMemory` API. Falls back to
+ * `false` (treat as a regular desktop) when the API isn't available, since
+ * most desktop browsers don't expose it.
  */
-async function splitPDFIntoChunks(
+function isLowMemoryDevice(): boolean {
+  if (typeof navigator === "undefined") return false;
+  const deviceMemory = (navigator as Navigator & { deviceMemory?: number })
+    .deviceMemory;
+  if (typeof deviceMemory === "number") {
+    return deviceMemory <= LOW_MEMORY_DEVICE_THRESHOLD_GB;
+  }
+  return false;
+}
+
+interface PDFChunkRange {
+  pageStart: number; // 1-indexed, inclusive, for display
+  pageEnd: number; // 1-indexed, inclusive, for display
+  startIndex: number; // 0-indexed, inclusive
+  endIndex: number; // 0-indexed, inclusive
+}
+
+interface PDFChunkPlan {
+  pdfDoc: PDFDocument;
+  ranges: PDFChunkRange[];
+}
+
+/**
+ * Load a large PDF and compute how it should be split into smaller chunks,
+ * without actually materializing the base64-encoded chunk bytes yet.
+ *
+ * Building every chunk's base64 payload upfront (as this used to do) means
+ * the browser holds the original ArrayBuffer, the parsed pdf-lib document,
+ * *and* every chunk's ~33%-larger-than-binary base64 string in memory at
+ * once - multiple times the file's size - before a single byte is
+ * uploaded. That's enough to crash memory-constrained mobile browsers
+ * (iOS Safari, Android Chrome) on real-world multi-MB PDFs. Callers should
+ * build each chunk's base64 on demand (see `buildPDFChunkBase64`) right
+ * before uploading it, and let it be released again once the upload
+ * request has been sent.
+ */
+async function planPDFChunks(
   file: File,
   onProgress?: (message: string) => void,
-): Promise<{ base64: string; pageStart: number; pageEnd: number }[]> {
+): Promise<PDFChunkPlan> {
   onProgress?.("Loading PDF for splitting...");
 
   const arrayBuffer = await file.arrayBuffer();
@@ -190,50 +239,62 @@ async function splitPDFIntoChunks(
   });
   const totalPages = pdfDoc.getPageCount();
 
-  const chunks: { base64: string; pageStart: number; pageEnd: number }[] = [];
+  // On memory-constrained devices, use smaller chunks so fewer pages (and
+  // less base64 data) need to be held in memory at any one time.
+  const lowMemory = isLowMemoryDevice();
+  const maxChunkSizeMB = lowMemory ? MAX_CHUNK_SIZE_MB / 2 : MAX_CHUNK_SIZE_MB;
+  const maxPagesPerChunk = lowMemory
+    ? Math.max(1, Math.floor(PAGES_PER_CHUNK / 2))
+    : PAGES_PER_CHUNK;
 
   // Calculate how many pages per chunk based on file size
   const avgPageSize = file.size / totalPages;
-  const targetChunkSize = MAX_CHUNK_SIZE_MB * 1024 * 1024;
+  const targetChunkSize = maxChunkSizeMB * 1024 * 1024;
   const pagesPerChunk = Math.max(
-    5,
-    Math.min(PAGES_PER_CHUNK, Math.floor(targetChunkSize / avgPageSize)),
+    1,
+    Math.min(maxPagesPerChunk, Math.floor(targetChunkSize / avgPageSize)),
   );
 
   const totalChunks = Math.ceil(totalPages / pagesPerChunk);
+  const ranges: PDFChunkRange[] = [];
 
   for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
-    const startPage = chunkIndex * pagesPerChunk;
-    const endPage = Math.min(startPage + pagesPerChunk - 1, totalPages - 1);
-
-    onProgress?.(
-      `Splitting chunk ${chunkIndex + 1}/${totalChunks} (pages ${
-        startPage + 1
-      }-${endPage + 1})...`,
-    );
-
-    // Create a new PDF with just the pages for this chunk
-    const chunkDoc = await PDFDocument.create();
-    const pageIndicesToCopy = Array.from(
-      { length: endPage - startPage + 1 },
-      (_, i) => startPage + i,
-    );
-
-    const copiedPages = await chunkDoc.copyPages(pdfDoc, pageIndicesToCopy);
-    copiedPages.forEach((page) => chunkDoc.addPage(page));
-
-    // Convert to base64
-    const chunkBytes = await chunkDoc.save();
-    const base64 = bytesToBase64(chunkBytes);
-
-    chunks.push({
-      base64,
-      pageStart: startPage + 1, // 1-indexed for display
-      pageEnd: endPage + 1,
+    const startIndex = chunkIndex * pagesPerChunk;
+    const endIndex = Math.min(startIndex + pagesPerChunk - 1, totalPages - 1);
+    ranges.push({
+      startIndex,
+      endIndex,
+      pageStart: startIndex + 1, // 1-indexed for display
+      pageEnd: endIndex + 1,
     });
   }
 
-  return chunks;
+  onProgress?.(`Planned ${totalChunks} chunk(s) from ${totalPages} pages...`);
+
+  return { pdfDoc, ranges };
+}
+
+/**
+ * Build the base64-encoded PDF bytes for a single chunk. Intended to be
+ * called lazily, immediately before uploading that chunk, so at most a
+ * handful of chunk payloads exist in memory simultaneously rather than
+ * every chunk in the document at once.
+ */
+async function buildPDFChunkBase64(
+  pdfDoc: PDFDocument,
+  range: PDFChunkRange,
+): Promise<string> {
+  const chunkDoc = await PDFDocument.create();
+  const pageIndicesToCopy = Array.from(
+    { length: range.endIndex - range.startIndex + 1 },
+    (_, i) => range.startIndex + i,
+  );
+
+  const copiedPages = await chunkDoc.copyPages(pdfDoc, pageIndicesToCopy);
+  copiedPages.forEach((page) => chunkDoc.addPage(page));
+
+  const chunkBytes = await chunkDoc.save();
+  return bytesToBase64(chunkBytes);
 }
 
 // SavedPDFImport interface moved to localPDFImportManager.ts as LocalPDFImport
@@ -806,22 +867,39 @@ export default function PDFImporter({
         const chunkTables: CustomTable[] = [];
 
         if (needsChunking) {
-          // Large PDF: Split into chunks, then OCR all, then summarize all
+          // Large PDF: Plan chunk page-ranges, then OCR all (building each
+          // chunk's base64 payload lazily, right before it's uploaded),
+          // then summarize all.
           setStep("uploading");
           setStatusMessage(`Splitting ${file.name} into chunks...`);
           setProgress(fileProgressStart + fileProgressRange * 0.05);
 
-          const chunks = await splitPDFIntoChunks(file, (msg) =>
-            setStatusMessage(msg),
-          );
+          let chunkPlan: PDFChunkPlan;
+          try {
+            chunkPlan = await planPDFChunks(file, (msg) =>
+              setStatusMessage(msg),
+            );
+          } catch (err: unknown) {
+            const message =
+              err instanceof Error
+                ? err.message
+                : "the file may be too large or corrupted for this device's memory";
+            throw new Error(`Failed to read ${file.name}: ${message}`);
+          }
 
-          const totalChunks = chunks.length;
+          const { pdfDoc, ranges } = chunkPlan;
+          const totalChunks = ranges.length;
+          // Fewer concurrent OCR uploads on memory-constrained devices,
+          // since each chunk carries its own multi-MB base64 payload.
+          const ocrConcurrency = isLowMemoryDevice()
+            ? 1
+            : MAX_CONCURRENT_OCR_REQUESTS;
 
           // Initialize chunk statuses for tracking
-          const initialStatuses: ChunkStatus[] = chunks.map((chunk, idx) => ({
+          const initialStatuses: ChunkStatus[] = ranges.map((range, idx) => ({
             chunkIndex: idx,
-            pageStart: chunk.pageStart,
-            pageEnd: chunk.pageEnd,
+            pageStart: range.pageStart,
+            pageEnd: range.pageEnd,
             status: "pending",
           }));
           setChunkStatuses(initialStatuses);
@@ -829,11 +907,11 @@ export default function PDFImporter({
           // Phase 1: OCR all chunks with limited concurrency (5% - 45% progress)
           setStep("ocr");
           setStatusMessage(
-            `Running OCR on ${totalChunks} chunks (${MAX_CONCURRENT_REQUESTS} at a time)...`,
+            `Running OCR on ${totalChunks} chunks (${ocrConcurrency} at a time)...`,
           );
           setProgress(fileProgressStart + fileProgressRange * 0.1);
 
-          const ocrTasks = chunks.map((chunk, chunkIdx) => async () => {
+          const ocrTasks = ranges.map((range, chunkIdx) => async () => {
             // Update status to ocr
             setChunkStatuses((prev) =>
               prev.map((cs) =>
@@ -841,23 +919,47 @@ export default function PDFImporter({
               ),
             );
 
-            const ocrResponse = await fetchWithRetry(
-              "/api/ocr/process",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
+            // Build this chunk's base64 payload just-in-time so at most
+            // `ocrConcurrency` chunk buffers exist in memory at once,
+            // instead of every chunk in the document simultaneously.
+            let base64: string;
+            try {
+              base64 = await buildPDFChunkBase64(pdfDoc, range);
+            } catch (err: unknown) {
+              const message = err instanceof Error ? err.message : "out of memory";
+              throw new Error(
+                `Chunk ${chunkIdx + 1} (pages ${range.pageStart}-${
+                  range.pageEnd
+                }): failed to prepare chunk for upload - ${message}`,
+              );
+            }
+
+            let ocrResponse: Response;
+            try {
+              ocrResponse = await fetchWithRetry(
+                "/api/ocr/process",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    base64Data: base64,
+                    fileName: `${file.name}_pages_${range.pageStart}-${range.pageEnd}.pdf`,
+                    mimeType: "application/pdf",
+                    includeImages: false,
+                    mistralKey: keys.mistralKey,
+                  }),
                 },
-                body: JSON.stringify({
-                  base64Data: chunk.base64,
-                  fileName: `${file.name}_pages_${chunk.pageStart}-${chunk.pageEnd}.pdf`,
-                  mimeType: "application/pdf",
-                  includeImages: false,
-                  mistralKey: keys.mistralKey,
-                }),
-              },
-              180000, // 3 minute timeout for OCR
-            );
+                180000, // 3 minute timeout for OCR
+              );
+            } finally {
+              // Allow the (potentially multi-MB) base64 string to be
+              // garbage-collected as soon as the request body has been
+              // handed off, rather than staying referenced for the rest
+              // of this closure's lifetime.
+              base64 = "";
+            }
 
             if (!ocrResponse.ok) {
               let errorMsg = "OCR processing failed";
@@ -868,8 +970,8 @@ export default function PDFImporter({
                 errorMsg = (await ocrResponse.text()) || errorMsg;
               }
               throw new Error(
-                `Chunk ${chunkIdx + 1} (pages ${chunk.pageStart}-${
-                  chunk.pageEnd
+                `Chunk ${chunkIdx + 1} (pages ${range.pageStart}-${
+                  range.pageEnd
                 }): ${errorMsg}`,
               );
             }
@@ -888,15 +990,15 @@ export default function PDFImporter({
             return {
               chunkIndex: chunkIdx,
               markdown: chunkResult.markdown,
-              pageStart: chunk.pageStart,
-              pageEnd: chunk.pageEnd,
+              pageStart: range.pageStart,
+              pageEnd: range.pageEnd,
               totalPages: chunkResult.totalPages,
             };
           });
 
           const ocrResults = await runWithConcurrency(
             ocrTasks,
-            MAX_CONCURRENT_REQUESTS,
+            ocrConcurrency,
             (completed, total) => {
               const ocrProgress = completed / total;
               setProgress(
