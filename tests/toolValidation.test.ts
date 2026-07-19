@@ -129,6 +129,59 @@ describe("validateToolArgs", () => {
     expect(totalTicksErrors).toHaveLength(1);
     expect(totalTicksErrors[0].message).toContain("missing required parameter");
   });
+
+  it("coerces an unambiguous numeric string for a number field instead of erroring", () => {
+    const args: Record<string, unknown> = { name: "Bomb timer", totalTicks: "5" };
+    const errors = validateToolArgs(timerSchema, args);
+    expect(errors).toEqual([]);
+    expect(args.totalTicks).toBe(5);
+  });
+
+  it("coerces an unambiguous boolean string for a boolean field instead of erroring", () => {
+    const boolSchema: ToolFunctionSchema = {
+      function: {
+        name: "toggle_thing",
+        parameters: {
+          type: "object",
+          properties: { active: { type: "boolean" } },
+          required: ["active"],
+        },
+      },
+    };
+    const args: Record<string, unknown> = { active: "true" };
+    const errors = validateToolArgs(boolSchema, args);
+    expect(errors).toEqual([]);
+    expect(args.active).toBe(true);
+  });
+
+  it("does not coerce ambiguous/non-numeric strings for a number field", () => {
+    const errors = validateToolArgs(timerSchema, {
+      name: "Bomb timer",
+      totalTicks: "five",
+    });
+    expect(errors.some((e) => e.param === "totalTicks")).toBe(true);
+  });
+
+  it("does not coerce dice-formula-like strings for a number field", () => {
+    const errors = validateToolArgs(timerSchema, {
+      name: "Bomb timer",
+      totalTicks: "1d6",
+    });
+    expect(errors.some((e) => e.param === "totalTicks")).toBe(true);
+  });
+
+  it("does not apply scalar coercion to oneOf fields", () => {
+    // points is `oneOf: [number, enum string]` - "42" is a numeric string
+    // but should still be validated against the oneOf branches, not
+    // silently coerced to the number 42 at the top level.
+    const errors = validateToolArgs(questSchema, {
+      title: "t",
+      shortDescription: "s",
+      description: "d",
+      points: "42",
+    });
+    expect(errors.some((e) => e.param === "points")).toBe(true);
+  });
 });
 
 describe("formatValidationErrors", () => {
