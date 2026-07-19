@@ -29,13 +29,12 @@ import {
   Adventure,
 } from "../misc/structs";
 import { useRouter } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { getLocalPlayerId } from "../misc/localPlayerId";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { CustomTablesEditor } from "../components/CustomTablesEditor";
-import { DraggableScroll } from "../components/DraggableScroll";
 import ChatDisplaySettings from "./menu/ChatDisplaySettings";
 import BasicSettings, { BasicSettingsForm } from "./menu/BasicSettings";
 import StatsResourcesEditor from "./menu/StatsResourcesEditor";
@@ -59,6 +58,26 @@ interface MenuProps extends StoryData {
   onViewContext?: () => void;
   onOpenAIAssistant?: () => void;
 }
+
+type MenuTab =
+  | "basic"
+  | "multiplayer"
+  | "stats"
+  | "inventory"
+  | "abilities"
+  | "passives"
+  | "quests"
+  | "lore"
+  | "npcs"
+  | "relationships"
+  | "conditions"
+  | "variables"
+  | "tables"
+  | "threads"
+  | "mythic"
+  | "story"
+  | "tts"
+  | "ai";
 
 export default function MenuPage({
   storyDbId,
@@ -100,6 +119,38 @@ export default function MenuPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyData.displayName, storyData.displayAvatar]);
 
+  // Track scroll position in the Story Editor content pane to highlight the
+  // matching sidebar item as the user scrolls through the categories
+  useEffect(() => {
+    if (!showSettings) return;
+    const container = contentScrollRef.current;
+    if (!container) return;
+
+    container.scrollTop = 0;
+    setActiveTab("basic");
+
+    const handleScroll = () => {
+      const containerTop = container.getBoundingClientRect().top;
+      // The active section is the last one whose top has scrolled up to
+      // (or past) the top of the content pane, walking top to bottom.
+      let currentId: MenuTab | null = null;
+      for (const tab of sections) {
+        const el = sectionRefs.current[tab.id];
+        if (!el) continue;
+        if (el.getBoundingClientRect().top - containerTop <= 24) {
+          currentId = tab.id;
+        } else {
+          break;
+        }
+      }
+      setActiveTab(currentId ?? sections[0].id);
+    };
+
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showSettings]);
+
   // Settings form state
   const [settingsForm, setSettingsForm] = useState<BasicSettingsForm>({
     story_name: storyData.story_name,
@@ -122,26 +173,50 @@ export default function MenuPage({
   const [editingAchievements, setEditingAchievements] = useState(false);
   const [editingLore, setEditingLore] = useState(false);
 
-  const [activeTab, setActiveTab] = useState<
-    | "basic"
-    | "multiplayer"
-    | "stats"
-    | "inventory"
-    | "abilities"
-    | "passives"
-    | "quests"
-    | "lore"
-    | "npcs"
-    | "relationships"
-    | "conditions"
-    | "variables"
-    | "tables"
-    | "threads"
-    | "mythic"
-    | "story"
-    | "tts"
-    | "ai"
-  >("basic");
+  const [activeTab, setActiveTab] = useState<MenuTab>("basic");
+
+  // Story Editor sections, in the order they're stacked in the scrolling content pane
+  const sections: { id: MenuTab; label: string; icon: string }[] = [
+    { id: "basic", label: "Basic", icon: "FileText" },
+    { id: "multiplayer", label: "Multiplayer", icon: "Users" },
+    { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
+    { id: "inventory", label: "Inventory", icon: "Backpack" },
+    { id: "abilities", label: "Abilities", icon: "Wand2" },
+    { id: "passives", label: "Passives", icon: "Sparkles" },
+    { id: "quests", label: "Quests", icon: "Scroll" },
+    { id: "lore", label: "Notes", icon: "Book" },
+    { id: "npcs", label: "NPCs", icon: "Users" },
+    { id: "tables", label: "Tables", icon: "Dices" },
+    { id: "variables", label: "Variables", icon: "Variable" },
+    { id: "relationships", label: "Relationships", icon: "Heart" },
+    { id: "conditions", label: "Conditions", icon: "HeartPulse" },
+    { id: "mythic", label: "mythic", icon: "Sparkles" },
+    { id: "story", label: "Story", icon: "BookOpen" },
+  ];
+
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+
+  const scrollToSection = (id: MenuTab) => {
+    setActiveTab(id);
+    sectionRefs.current[id]?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
+  const SectionHeading = ({
+    tab,
+  }: {
+    tab: { id: MenuTab; label: string; icon: string };
+  }) => (
+    <div className="flex items-center gap-2 mb-4 sm:mb-5">
+      <DynamicIcon name={tab.icon} className="w-5 h-5 text-purple-400" />
+      <h4 className="text-base sm:text-lg font-bold text-white">
+        {tab.label}
+      </h4>
+    </div>
+  );
 
   const [multiplayerEnabled, setMultiplayerEnabled] = useState<boolean>(
     !!storyData.multiplayer?.enabled,
@@ -918,62 +993,64 @@ export default function MenuPage({
               </button>
             </div>
 
-            {/* Tabs - Made sticky with background to prevent content overlap */}
-            <DraggableScroll
-              className="sticky top-0 z-10 bg-[#0a1628] px-2 sm:px-6 py-2 sm:py-4 border-b border-blue-800/30 scrollbar-thin"
-              innerClassName="gap-1.5 sm:gap-3"
-            >
-              {[
-                { id: "basic", label: "Basic", icon: "FileText" },
-                { id: "multiplayer", label: "Multiplayer", icon: "Users" },
-                { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
-                { id: "inventory", label: "Inventory", icon: "Backpack" },
-                { id: "abilities", label: "Abilities", icon: "Wand2" },
-                { id: "passives", label: "Passives", icon: "Sparkles" },
-                { id: "quests", label: "Quests", icon: "Scroll" },
-                { id: "lore", label: "Notes", icon: "Book" },
-                { id: "npcs", label: "NPCs", icon: "Users" },
-                { id: "variables", label: "Variables", icon: "Variable" },
-                { id: "tables", label: "Tables", icon: "Dices" },
-                { id: "conditions", label: "Conditions", icon: "HeartPulse" },
-                { id: "mythic", label: "mythic", icon: "Sparkles" },
-                { id: "story", label: "Story", icon: "BookOpen" },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`shrink-0 h-10 sm:h-14 px-3 sm:px-6 text-xs sm:text-base font-semibold rounded-lg sm:rounded-xl transition-colors whitespace-nowrap flex items-center gap-1.5 sm:gap-3 overflow-visible ${
-                    activeTab === tab.id
-                      ? "bg-purple-600 text-white shadow-md"
-                      : "bg-blue-900/30 text-blue-200 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon
-                    name={tab.icon}
-                    className="w-4 h-4 sm:w-5 sm:h-5 shrink-0"
-                  />
-                  <span className="leading-none hidden sm:inline">
-                    {tab.label}
-                  </span>
-                </button>
-              ))}
-            </DraggableScroll>
+            {/* Sidebar nav + continuous scrolling content */}
+            <div className="flex-1 flex overflow-hidden min-h-0">
+              {/* Sidebar Navigation */}
+              <nav className="w-14 sm:w-56 shrink-0 border-r border-blue-800/30 overflow-y-auto scrollbar-thin bg-[#0a1628]">
+                <div className="py-2 sm:py-4 px-1.5 sm:px-3 space-y-1">
+                  {sections.map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => scrollToSection(tab.id)}
+                      className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm font-semibold transition-colors ${
+                        activeTab === tab.id
+                          ? "bg-purple-600 text-white shadow-md"
+                          : "text-blue-200 hover:bg-blue-800/40"
+                      }`}
+                    >
+                      <DynamicIcon
+                        name={tab.icon}
+                        className="w-4 h-4 sm:w-5 sm:h-5 shrink-0"
+                      />
+                      <span className="hidden sm:inline truncate">
+                        {tab.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </nav>
 
-            {/* Content Area */}
-            {/* Ensure consistent inner spacing and prevent layout shift */}
-            <div className="flex-1 overflow-y-auto px-3 sm:px-6 pb-3 sm:pb-6 pt-4 sm:pt-8 min-h-0">
-              {/* Uniform top spacer (pt-8) keeps all tab bodies from touching tabs; Inventory previously appeared correct */}
-              {activeTab === "basic" && (
-                <div className="mt-4">
+              {/* Content Area - all categories stacked, scroll down to move through them */}
+              <div
+                ref={contentScrollRef}
+                className="flex-1 overflow-y-auto px-3 sm:px-6 pb-6 min-h-0"
+                style={{ scrollSnapType: "y proximity" }}
+              >
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["basic"] = el;
+                  }}
+                  data-section-id="basic"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[0]} />
                   <BasicSettings
                     form={settingsForm}
                     onChange={setSettingsForm}
                   />
                 </div>
-              )}
 
-              {activeTab === "multiplayer" && (
-                <div className="mt-4 space-y-5">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["multiplayer"] = el;
+                  }}
+                  data-section-id="multiplayer"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[1]} />
+                  <div className="space-y-5">
                   <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1077,11 +1154,18 @@ export default function MenuPage({
                       />
                     </div>
                   )}
+                  </div>
                 </div>
-              )}
 
-              {activeTab === "stats" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["stats"] = el;
+                  }}
+                  data-section-id="stats"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[2]} />
                   <StatsResourcesEditor
                     stats={storyData.stats}
                     resources={storyData.resources}
@@ -1089,19 +1173,31 @@ export default function MenuPage({
                     onUpdate={(updates) => onUpdateStoryData(updates)}
                   />
                 </div>
-              )}
 
-              {activeTab === "inventory" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["inventory"] = el;
+                  }}
+                  data-section-id="inventory"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[3]} />
                   <InventoryEditor
                     inventory={storyData.inventory}
                     onUpdate={(inventory) => onUpdateStoryData({ inventory })}
                   />
                 </div>
-              )}
 
-              {activeTab === "abilities" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["abilities"] = el;
+                  }}
+                  data-section-id="abilities"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[4]} />
                   <AbilitiesEditor
                     abilities={storyData.abilities || []}
                     resources={storyData.resources}
@@ -1110,10 +1206,16 @@ export default function MenuPage({
                     onUpdate={(abilities) => onUpdateStoryData({ abilities })}
                   />
                 </div>
-              )}
 
-              {activeTab === "passives" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["passives"] = el;
+                  }}
+                  data-section-id="passives"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[5]} />
                   <PassivesEditor
                     passives={storyData.nodeEffects?.passives || []}
                     onUpdate={(passives) =>
@@ -1128,38 +1230,62 @@ export default function MenuPage({
                     }
                   />
                 </div>
-              )}
 
-              {activeTab === "quests" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["quests"] = el;
+                  }}
+                  data-section-id="quests"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[6]} />
                   <QuestEditor
                     quests={storyData.quests || []}
                     onUpdate={(quests) => onUpdateStoryData({ quests })}
                   />
                 </div>
-              )}
 
-              {activeTab === "lore" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["lore"] = el;
+                  }}
+                  data-section-id="lore"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[7]} />
                   <LoreEditor
                     lore={storyData.lore}
                     variables={storyData.variables || []}
                     onUpdate={(lore) => onUpdateStoryData({ lore })}
                   />
                 </div>
-              )}
 
-              {activeTab === "npcs" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["npcs"] = el;
+                  }}
+                  data-section-id="npcs"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[8]} />
                   <NPCEditor
                     npcs={storyData.npcs || []}
                     onUpdate={(npcs) => onUpdateStoryData({ npcs })}
                   />
                 </div>
-              )}
 
-              {activeTab === "tables" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["tables"] = el;
+                  }}
+                  data-section-id="tables"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[9]} />
                   <CustomTablesEditor
                     tables={storyData.customTables || []}
                     setTables={(tables) =>
@@ -1167,19 +1293,31 @@ export default function MenuPage({
                     }
                   />
                 </div>
-              )}
 
-              {activeTab === "variables" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["variables"] = el;
+                  }}
+                  data-section-id="variables"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[10]} />
                   <VariablesEditor
                     variables={storyData.variables || []}
                     onUpdate={(variables) => onUpdateStoryData({ variables })}
                   />
                 </div>
-              )}
 
-              {activeTab === "relationships" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["relationships"] = el;
+                  }}
+                  data-section-id="relationships"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[11]} />
                   <RelationshipsEditor
                     relationships={storyData.relationships}
                     onUpdate={(relationships) =>
@@ -1187,25 +1325,33 @@ export default function MenuPage({
                     }
                   />
                 </div>
-              )}
 
-              {activeTab === "conditions" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["conditions"] = el;
+                  }}
+                  data-section-id="conditions"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[12]} />
                   <ConditionsEditor
                     conditions={storyData.conditions || []}
                     stats={storyData.stats || []}
                     onUpdate={(conditions) => onUpdateStoryData({ conditions })}
                   />
                 </div>
-              )}
 
-              {activeTab === "mythic" && (
-                <div className="mt-4 space-y-6">
-                  <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                    <DynamicIcon name="Sparkles" className="w-6 h-6" />
-                    Advanced RPG Tools Settings
-                  </h4>
-
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["mythic"] = el;
+                  }}
+                  data-section-id="mythic"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={sections[13]} />
+                  <div className="space-y-6">
                   {/* Enable/Disable Advanced RPG Tools */}
                   <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
                     <div className="flex items-center justify-between">
@@ -1466,11 +1612,18 @@ export default function MenuPage({
                       )}
                     </>
                   )}
+                  </div>
                 </div>
-              )}
 
-              {activeTab === "story" && (
-                <div className="mt-4">
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["story"] = el;
+                  }}
+                  data-section-id="story"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-4"
+                >
+                  <SectionHeading tab={sections[14]} />
                   <StoryMetaEditor
                     memory={storyData.memory}
                     premise={storyData.premise}
@@ -1478,7 +1631,7 @@ export default function MenuPage({
                     onUpdate={(updates) => onUpdateStoryData(updates)}
                   />
                 </div>
-              )}
+              </div>
             </div>
 
             {/* Action Buttons */}
