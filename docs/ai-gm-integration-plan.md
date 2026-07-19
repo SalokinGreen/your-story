@@ -58,56 +58,57 @@ The headline gap is unambiguous: **build the Director layer; harden
 Layer 5 from "ask the model to behave" to "verify the model behaved."**
 Layers 1/2/4 need extension, not replacement.
 
-## 2. A concrete, previously-undiagnosed bug the paper explains
+## 2. A claimed bug that turned out not to be real — corrected
 
-`app/misc/ai_staged.ts` runs turns in stages: `buildStoryPrompt` (**Stage 1:
-story narration only**, line 1325) executes *before*
-`buildToolPrompt` (**Stage 2a: tool calls**, line 1657), which is what
-actually rolls dice and queries the oracle. This is exactly the ordering
-the paper identifies as the root cause of GM auto-success and retroactive
-narration: the model commits to prose describing what happened before the
-deterministic layer has decided what happened.
-
-This isn't a new problem for this codebase — `mythic_notes.md`'s
-"Current Technical Limitation" section (written for the legacy
-non-staged pipeline) already diagnosed the same shape of bug and even
-proposed the fix ("Pre-generation Tool Phase," recommended but never
-implemented). It resurfaced in the staged pipeline's stage ordering.
-**This is the single highest-leverage fix in this plan** — it's a stage
-reorder, not new architecture, and it's a prerequisite for the Director
-layer being able to inject pacing decisions *before* the prose that's
-supposed to reflect them.
+> **Correction (post-C4/H2 fixes):** this section originally claimed
+> `buildStoryPrompt` ("Stage 1") runs before `buildToolPrompt`/tool
+> resolution ("Stage 2a") within a turn, based on those functions' file-order
+> labels in `ai_staged.ts`. That's wrong. `generation.ts`'s actual runtime
+> order is "STAGE 0.5: GM Stage" (tool calls, dice, oracle - via
+> `buildGMStagePrompt`) *first*, then story narration
+> (`generation.ts:612-628`), and the narrator/DM system prompts say so
+> explicitly: "The GM has already resolved dice rolls, table results, and
+> state changes" (`ai_staged.ts:1219-1220`, `:1288-1289`). `buildToolPrompt`
+> itself (the function this claim was based on) turned out to be dead code
+> - never called anywhere - superseded by `buildGMStagePrompt`. Phase 0
+> below is retracted; there was no ordering bug to fix.
+>
+> Fixing H2 found a real, related bug in the same neighborhood instead:
+> `buildGMStagePrompt`'s tool whitelist (`stateToolNames`,
+> `ai_staged.ts:2815-2848`) was missing `increment_scene` entirely - the
+> schema and executor both existed, but the model could never call it. See
+> `ai-gm-deep-audit-findings.md`'s H2 section for the fix. The general
+> lesson holds, just from a different bug: a schema/executor existing is
+> not evidence a tool is reachable - check the whitelist actually sent to
+> the model.
 
 ## 3. Phased plan
 
-### Phase 0 — Fix stage ordering (days, not weeks)
+### Phase 0 — ~~Fix stage ordering~~ RETRACTED (see §2 correction)
 
-- Reorder the staged pipeline so uncertain-outcome tool calls (`fate_question`,
-  `formula_roll`, `start_challenge`, `roll_table`) resolve **before**
-  `buildStoryPrompt` narrates the scene, at least for the current player
-  action's resolution. Narration stages should receive tool results as
-  already-known facts, the way `buildInfoMessage`/`buildStoryInfoMessage`
-  already inject canonical state.
-- This is additive to the existing two-call-per-turn cost the codebase
-  already pays for staged generation (narration + tools + choices are
-  already three calls) — reordering doesn't add a fourth.
-- Add a regression test asserting no `formula_roll`/`fate_question` tool
-  call appears in a turn's tool log *after* narration referencing its
-  result — this is the objective, automatable version of the paper's
-  Stage-1 gating benchmark ("zero uncommitted-state-in-prose leakage").
+There was no ordering bug: the GM stage (tool calls, dice, oracle) already
+runs before narration every turn. What *is* worth keeping from this phase's
+original intent - a regression test asserting no `formula_roll`/
+`fate_question` tool call appears in a turn's tool log *after* narration
+references its result - has a real equivalent already added:
+`tests/aiStaged.gmStageToolWhitelist.test.ts` asserts against
+`buildGMStagePrompt`'s actual returned tool list, which is the more useful
+check (a tool being reachable at all is a stronger prerequisite than
+ordering was ever going to be).
 
 ### Phase 1 — Director/Pacing layer
 
 This is genuinely new code, but it should be built almost entirely out of
 primitives already sitting in this codebase, unused:
 
-- **Wire up the existing scene-check mechanic.** `checkScene()` /
-  `setupScene()` (`mythic.ts:218,536`) already implement Mythic's
-  Normal/Altered/Interrupted scene-check math against chaos factor. Expose
-  it as a `check_scene` tool (there currently isn't one — grep confirms no
-  schema calls it) and have the orchestrator call it once per scene
-  *before* the narration stage, in the same reordered flow as Phase 0.
-  This alone gives you Mythic's core surprise mechanic for free.
+- ~~**Wire up the existing scene-check mechanic.**~~ **Done** (C4 in
+  `ai-gm-deep-audit-findings.md`). `checkScene()`/`adjustChaosFactor()`
+  (`mythic.ts`) also had a die-size bug independent of being unwired (d100
+  against a 1-9 scale instead of d10) — fixed alongside the wiring.
+  Implemented via `increment_scene` (already model-callable at scene
+  transitions) rather than a new standalone `check_scene` tool, and its
+  Interrupted-triggered random events now persist as
+  `StoryData.pendingRandomEvents` (H2) instead of a one-off hint.
 - **Clocks, not just chaos.** `StoryData.timers` (`manage_timer` tool)
   already gives you a countdown primitive — reuse it rather than adding a
   parallel "clocks" concept. Add a thin `Front`-style wrapper: a clock
@@ -193,9 +194,10 @@ Mirror the paper's split between objective and subjective checks, built on
 top of the existing `tests/` Vitest suite rather than a new framework:
 
 - **Regression harness**: scripted multi-turn campaigns (extend existing
-  dice/tool/compaction tests) asserting zero Phase 0-style ordering
-  violations and a stable (non-growing) contradiction count as turn count
-  increases.
+  dice/tool/compaction tests) asserting a stable (non-growing) contradiction
+  count as turn count increases, and that every tool the codebase defines an
+  executor for is actually reachable in `buildGMStagePrompt`'s tool list
+  (the H2 whitelist-gap fix's more general lesson).
 - **Adversarial persuasion suite**: player inputs that argue for an
   unearned success ("the guard already told me it's fine," authoritative
   or pseudo-logical phrasing) — assert the GM still calls
@@ -227,16 +229,15 @@ top of the existing `tests/` Vitest suite rather than a new framework:
 
 ## 5. Suggested order of work
 
-1. Phase 0 (stage-ordering fix + regression test) — small, unblocks
-   everything else, and is a bug fix independent of this plan's merits.
-2. Phase 1's `check_scene` wiring — reuses dead code, cheap, immediately
-   gives Mythic's real surprise mechanic.
-3. Phase 2's consistency checker — highest defect-prevention value per
+_Phase 0 is retracted (§2) and Phase 1's scene-check wiring is done (C4,
+H2) — see `ai-gm-deep-audit-findings.md` for what's landed so far._
+
+1. Phase 2's consistency checker — highest defect-prevention value per
    unit effort, and it's the direct fix for the one architectural gap
    this repo's own code comments admit to (`gmTools.ts:1095`).
-4. Phase 1's remaining director pieces (clocks/fronts wrapper, move menu,
+2. Phase 1's remaining director pieces (clocks/fronts wrapper, move menu,
    tension estimate).
-5. Phase 3 (memory structure) and Phase 4 (eval harness) — do these
+3. Phase 3 (memory structure) and Phase 4 (eval harness) — do these
    together since the harness needs the structured memory to measure
    contradiction rates meaningfully.
 

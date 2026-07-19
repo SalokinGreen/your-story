@@ -754,6 +754,12 @@ export interface StoryData {
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
   agmtState?: AGMTState; // Advanced RPG Tools state (chaos factor, threads, characters)
+  // Random events the oracle has triggered but the GM hasn't yet confirmed
+  // incorporating into the narrative. Unlike a one-off context hint (easy to
+  // silently drop), these persist and keep reappearing in the GM's context
+  // every turn until explicitly cleared via resolve_random_event - see
+  // gmExecutor.ts (fate_question) and toolExecutor.ts (increment_scene).
+  pendingRandomEvents?: PendingRandomEvent[];
   customTables?: CustomTable[]; // Creator-defined random tables
   variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
@@ -785,6 +791,24 @@ export interface AGMTState {
   currentStreak: number; // Positive = success streak, negative = failure streak
   lastChaosAdjustment: number; // Scene number of last chaos adjustment
   threads?: never[]; // DEPRECATED: Use StoryThread[] at storyData.threads instead
+}
+
+// Cap on how many unresolved random events accumulate on StoryData - if the
+// GM never resolves them, drop the oldest rather than growing the prompt
+// context forever.
+export const MAX_PENDING_RANDOM_EVENTS = 5;
+
+// A random event the oracle triggered (Mythic-style Event Focus + Meaning),
+// tracked as durable state until the GM explicitly resolves it, rather than
+// a single advisory line in the prompt that can be silently missed.
+export interface PendingRandomEvent {
+  id: string;
+  source: "fate_question" | "scene_check"; // Which oracle mechanism triggered it
+  focus?: string; // Event Focus category (e.g. "NPC action", "Move toward a thread")
+  action: string; // Meaning table Action roll (e.g. "Betray")
+  subject: string; // Meaning table Subject roll (e.g. "A rival")
+  context?: string; // The fate question asked, or scene-check context
+  createdAt: number;
 }
 
 export interface SkillCheckResult {

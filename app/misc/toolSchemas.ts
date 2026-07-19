@@ -1084,6 +1084,31 @@ const abandonThreadTool: ToolSchema = {
   },
 };
 
+const resolveRandomEventTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "resolve_random_event",
+    description:
+      "Confirm a pending oracle-triggered random event has been incorporated into the narrative. Random events (from fate_question or a scene check) persist and keep reappearing in context every turn until resolved this way - call it once you've woven the event into the story, or it will keep showing up as unfinished.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description:
+            "The pending event's id, given in the event's context message",
+        },
+        how_incorporated: {
+          type: "string",
+          description:
+            "Brief note on how the event was worked into the narrative (optional, for the log)",
+        },
+      },
+      required: ["id"],
+    },
+  },
+};
+
 // Memory Management Tool
 const addMemoryTool: ToolSchema = {
   type: "function",
@@ -1546,6 +1571,9 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   updateThreadTool,
   resolveThreadTool,
   abandonThreadTool,
+
+  // Random event acknowledgement (1 tool)
+  resolveRandomEventTool,
 
   // Memory (1 tool)
   addMemoryTool,

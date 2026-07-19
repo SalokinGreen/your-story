@@ -14,6 +14,8 @@ import {
   REST_CONFIG,
   StoryThread,
   StoryLore,
+  MAX_PENDING_RANDOM_EVENTS,
+  PendingRandomEvent,
 } from "@/app/misc/structs";
 import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
@@ -1769,7 +1771,30 @@ export function executeTools(
           eventFocus = generateEventFocus().focus;
           const meaning = generateEventMeaning();
           eventMeaning = { action: meaning.action, subject: meaning.subject };
-          message += `\n⚡ SCENE INTERRUPTED! The expected scene doesn't happen - replace it with a random event: [${eventFocus}] "${eventMeaning.action} ${eventMeaning.subject}". This must be incorporated into the next narration, not skipped.`;
+
+          // Persist as tracked state rather than a one-line hint that
+          // vanishes whether or not this turn's narration used it - see
+          // the matching fate_question path in gmExecutor.ts.
+          storyData.pendingRandomEvents = storyData.pendingRandomEvents || [];
+          const pendingEvent: PendingRandomEvent = {
+            id: `event_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+            source: "scene_check",
+            focus: eventFocus,
+            action: eventMeaning.action,
+            subject: eventMeaning.subject,
+            context: `Scene ${storyData.agmtState.sceneCount} interrupted (roll ${sceneRoll} vs chaos ${oldChaos})`,
+            createdAt: Date.now(),
+          };
+          storyData.pendingRandomEvents.push(pendingEvent);
+          if (
+            storyData.pendingRandomEvents.length > MAX_PENDING_RANDOM_EVENTS
+          ) {
+            storyData.pendingRandomEvents = storyData.pendingRandomEvents.slice(
+              -MAX_PENDING_RANDOM_EVENTS
+            );
+          }
+
+          message += `\n⚡ SCENE INTERRUPTED! The expected scene doesn't happen - replace it with a random event: [${eventFocus}] "${eventMeaning.action} ${eventMeaning.subject}". Incorporate this into the next narration, then call resolve_random_event(id: "${pendingEvent.id}"). It will keep reappearing every turn until resolved.`;
         } else if (sceneType === "Altered") {
           message += `\n🔀 Scene Altered: the expected scene happens, but with an unexpected twist - don't play it exactly as planned.`;
         }
@@ -1788,6 +1813,63 @@ export function executeTools(
           command: `/increment_scene: ${oldCount} → ${oldCount + 1}`,
           success: true,
           message,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Resolve a pending random event (from fate_question or a scene
+      // check) - the explicit acknowledgement that closes the loop this
+      // tool exists for: an event persists and keeps reappearing in
+      // context every turn until the GM confirms it was addressed here,
+      // rather than a one-line hint that's just as easy to miss as to use.
+      if (toolCall.function.name === "resolve_random_event") {
+        const id = args.id?.trim();
+        const howIncorporated = args.how_incorporated?.trim();
+
+        if (!id) {
+          responses.push({
+            command: "/resolve_random_event",
+            success: false,
+            message: "✗ Event id is required",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const events = storyData.pendingRandomEvents || [];
+        const eventIndex = events.findIndex((e) => e.id === id);
+
+        if (eventIndex === -1) {
+          responses.push({
+            command: `/resolve_random_event: ${id}`,
+            success: false,
+            message: `✗ No pending random event with id "${id}" (it may already be resolved)`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const [resolved] = events.splice(eventIndex, 1);
+        storyData.pendingRandomEvents = events;
+
+        logger.action("Random event resolved via tool", {
+          toolCallId: toolId,
+          id,
+          focus: resolved.focus,
+          howIncorporated,
+        });
+        responses.push({
+          command: `/resolve_random_event: ${id}`,
+          success: true,
+          message: `✓ Random event resolved: [${resolved.focus}] "${
+            resolved.action
+          } ${resolved.subject}"${
+            howIncorporated ? ` - ${howIncorporated}` : ""
+          }`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });

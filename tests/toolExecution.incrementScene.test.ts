@@ -111,6 +111,9 @@ describe("increment_scene", () => {
     expect(storyData.agmtState!.chaosFactor).toBe(6);
     expect(responses[0].message).toContain("INTERRUPTED");
     expect(responses[0].message).toContain("increased");
+    expect(storyData.pendingRandomEvents).toHaveLength(1);
+    expect(storyData.pendingRandomEvents![0].source).toBe("scene_check");
+    expect(responses[0].message).toContain("resolve_random_event");
   });
 
   it("clamps chaos at the 1-9 boundary", () => {

@@ -21,6 +21,8 @@ import {
   NPCStatus,
   NPCAttitude,
   getMemoryContent,
+  MAX_PENDING_RANDOM_EVENTS,
+  PendingRandomEvent,
 } from "./structs";
 import {
   StartChallengeParams,
@@ -67,7 +69,14 @@ import {
   semanticSearchFallback,
   SemanticSearchContext,
 } from "./semanticSearchFallback";
-import { askFate, generateElement, MYTHIC_TABLE_NAMES, ElementCategory } from "./mythic";
+import {
+  askFate,
+  generateElement,
+  generateEventFocus,
+  generateEventMeaning,
+  MYTHIC_TABLE_NAMES,
+  ElementCategory,
+} from "./mythic";
 import { getTableByName, rollOnCustomTable } from "./tableRoller";
 import {
   getTierState,
@@ -1952,7 +1961,31 @@ function executeFateQuestion(
   contextForStory += `\n[Roll: ${fateResult.roll} → ${fateResult.answer}]`;
 
   if (fateResult.randomEvent) {
-    contextForStory += `\n[⚡ RANDOM EVENT TRIGGERED! Consider adding an unexpected twist.]`;
+    // A one-line "consider adding a twist" hint is easy to silently drop -
+    // generate real Focus + Meaning content (same as scene-check
+    // Interrupted events) and persist it as tracked state so it keeps
+    // reappearing in context every turn until resolve_random_event is
+    // called, instead of vanishing the moment this turn's narration
+    // moves on without addressing it.
+    const focusResult = generateEventFocus();
+    const meaningResult = generateEventMeaning();
+    storyData.pendingRandomEvents = storyData.pendingRandomEvents || [];
+    const pendingEvent: PendingRandomEvent = {
+      id: `event_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      source: "fate_question",
+      focus: focusResult.focus,
+      action: meaningResult.action,
+      subject: meaningResult.subject,
+      context: params.question,
+      createdAt: Date.now(),
+    };
+    storyData.pendingRandomEvents.push(pendingEvent);
+    if (storyData.pendingRandomEvents.length > MAX_PENDING_RANDOM_EVENTS) {
+      storyData.pendingRandomEvents = storyData.pendingRandomEvents.slice(
+        -MAX_PENDING_RANDOM_EVENTS
+      );
+    }
+    contextForStory += `\n[⚡ RANDOM EVENT TRIGGERED: [${pendingEvent.focus}] "${pendingEvent.action} ${pendingEvent.subject}" - incorporate this into the narrative, then call resolve_random_event(id: "${pendingEvent.id}"). It will keep reappearing every turn until resolved.]`;
   }
 
   if (params.reason) {

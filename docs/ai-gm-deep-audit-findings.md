@@ -223,7 +223,7 @@ than a single agreeable turn. `npc_reaction` was left alone (it's a
 cosmetic toast notification, not authoritative state). Covered by new
 tests in `tests/gmTools.updateNpc.test.ts`.
 
-### H2. Random events are unenforced advisory text
+### H2. Random events are unenforced advisory text — ✅ FIXED
 
 When the fate oracle triggers a random event (d100 doubles,
 `mythic.ts:174-211`), the only downstream effect is a bracketed hint
@@ -233,6 +233,46 @@ adding an unexpected twist.]` (`gmExecutor.ts:1952-1954`,
 actually incorporated the event, its Focus roll, or its Meaning
 action/subject pair — it can be buried in a throwaway sentence or ignored
 outright with no flag, retry, or record.
+
+**Fix:** both random-event sources (fate_question doubles, and the
+scene-check "Interrupted" result added for C4) now generate real Focus +
+Meaning content and persist it to `StoryData.pendingRandomEvents`
+(capped at 5, oldest dropped) instead of a one-line hint. `buildInfoMessage`
+(`ai_staged.ts`) surfaces unresolved events in every turn's context, not
+just the triggering turn, and a new `resolve_random_event` tool is the
+only way to clear one — so an event that gets buried in one turn's prose
+keeps reappearing until the GM explicitly confirms it was addressed,
+rather than silently vanishing whether or not it was used.
+
+**A more serious bug this surfaced:** while wiring `resolve_random_event`
+into `buildGMStagePrompt`'s tool whitelist, the same whitelist turned out
+to already be missing `increment_scene` entirely — the schema
+(`mythicTools.ts`) and executor (`toolExecutor.ts`) both existed, but
+`buildGMStagePrompt`'s `stateToolNames` list (the actual filter deciding
+which of `TOOL_SCHEMAS` reach the model in the live GM stage,
+`ai_staged.ts:2815-2848`) never included it, so **the model could never
+call it at all**. This means the C4 fix (scene-check-driven chaos
+adjustment) was correct in isolation but likely unreachable in production
+until this fix — the general lesson from this whole audit round
+(schema/executor existing is not evidence a tool is reachable) applied to
+my own previous fix, not just to pre-existing code. Both `increment_scene`
+and `resolve_random_event` are now in that whitelist, confirmed with a new
+test that calls `buildGMStagePrompt` and asserts on its returned tool
+list (`tests/aiStaged.gmStageToolWhitelist.test.ts`) — the only test in
+the suite that actually checks a tool reaches the model, as opposed to
+just executing correctly once called. Covered by new tests in
+`tests/gmTools.pendingRandomEvents.test.ts` and an addition to
+`tests/toolExecution.incrementScene.test.ts`.
+
+**Also corrected:** `ai-gm-integration-plan.md`'s original "Phase 0"
+claim — that narration runs before oracle/tool resolution within a turn —
+turns out to be wrong. `generation.ts`'s real turn order runs "STAGE 0.5:
+GM Stage" (tool calls, dice, oracle) before story narration
+(`generation.ts:612-628`), and the narrator/DM system prompts explicitly
+state "The GM has already resolved dice rolls, table results, and state
+changes" (`ai_staged.ts:1219-1220`, `:1288-1289`). The claim was based on
+`buildStoryPrompt`/`buildToolPrompt`'s file-order labels ("Stage 1"/"Stage
+2a"), not actual runtime call order. See the note added to that document.
 
 ### H3. Memory-compaction summaries are trusted LLM output with no validation
 
