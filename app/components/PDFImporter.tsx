@@ -43,6 +43,23 @@ const SUMMARIZE_TIMEOUT_MS = 240000;
 // Retry attempts for failed requests
 const MAX_RETRIES = 2;
 
+// Vercel enforces a hard 4.5MB request/response body limit on serverless
+// functions that cannot be raised via configuration - exceeding it fails
+// with "FUNCTION_PAYLOAD_TOO_LARGE" before the request handler even runs.
+const VERCEL_BODY_LIMIT_BYTES = 4.5 * 1024 * 1024;
+// Stay comfortably under that hard limit to leave room for JSON field
+// overhead (fileName, mimeType, API key, etc.) and for page-size
+// estimation error: a chunk planned from the document's *average* page
+// size can still land over budget if it happens to contain a few
+// image-heavy pages (e.g. a cover or table of contents).
+const SAFE_BASE64_PAYLOAD_BYTES = VERCEL_BODY_LIMIT_BYTES - 128 * 1024;
+// Below this raw file size, base64-encoding the whole PDF still fits
+// under SAFE_BASE64_PAYLOAD_BYTES in one request; larger files must go
+// through the chunked path instead, since the single-shot upload path
+// sends the whole file as one payload with no further splitting.
+const SAFE_SINGLE_UPLOAD_SIZE_MB =
+  SAFE_BASE64_PAYLOAD_BYTES / (4 / 3) / (1024 * 1024);
+
 // Providers the OCR summarize endpoint can call directly with a BYOK key.
 // NovelAI is excluded - its API doesn't support the structured JSON
 // extraction this endpoint relies on.
@@ -316,6 +333,94 @@ async function buildPDFChunkBase64(
 
   const chunkBytes = await chunkDoc.save();
   return bytesToBase64(chunkBytes);
+}
+
+/**
+ * OCR a PDF page range via /api/ocr/process, splitting it in half and
+ * recursing if the actual base64 payload turns out to exceed Vercel's
+ * hard body-size limit. Chunk ranges are planned from the document's
+ * *average* page size (see `planPDFChunks`), so a range can still land
+ * over budget in practice if it happens to contain a few image-heavy
+ * pages - splitting on the actual measured size, rather than trusting the
+ * estimate, is what keeps this from failing outright.
+ */
+async function ocrPDFRange(
+  pdfDoc: PDFDocument,
+  range: PDFChunkRange,
+  fileNameBase: string,
+  mistralKey: string,
+): Promise<{ markdown: string; totalPages: number }> {
+  let base64: string;
+  try {
+    base64 = await buildPDFChunkBase64(pdfDoc, range);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "out of memory";
+    throw new Error(
+      `pages ${range.pageStart}-${range.pageEnd}: failed to prepare chunk for upload - ${message}`,
+    );
+  }
+
+  const pageCount = range.endIndex - range.startIndex + 1;
+  if (base64.length > SAFE_BASE64_PAYLOAD_BYTES && pageCount > 1) {
+    base64 = "";
+    const half = Math.floor(pageCount / 2);
+    const firstRange: PDFChunkRange = {
+      startIndex: range.startIndex,
+      endIndex: range.startIndex + half - 1,
+      pageStart: range.pageStart,
+      pageEnd: range.pageStart + half - 1,
+    };
+    const secondRange: PDFChunkRange = {
+      startIndex: range.startIndex + half,
+      endIndex: range.endIndex,
+      pageStart: range.pageStart + half,
+      pageEnd: range.pageEnd,
+    };
+    const [first, second] = await Promise.all([
+      ocrPDFRange(pdfDoc, firstRange, fileNameBase, mistralKey),
+      ocrPDFRange(pdfDoc, secondRange, fileNameBase, mistralKey),
+    ]);
+    return {
+      markdown: `${first.markdown}\n\n---\n\n${second.markdown}`,
+      totalPages: first.totalPages + second.totalPages,
+    };
+  }
+
+  let response: Response;
+  try {
+    response = await fetchWithRetry(
+      "/api/ocr/process",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          base64Data: base64,
+          fileName: `${fileNameBase}_pages_${range.pageStart}-${range.pageEnd}.pdf`,
+          mimeType: "application/pdf",
+          includeImages: false,
+          mistralKey,
+        }),
+      },
+      180000, // 3 minute timeout for OCR
+    );
+  } finally {
+    // Allow the (potentially multi-MB) base64 string to be garbage
+    // collected as soon as the request body has been handed off.
+    base64 = "";
+  }
+
+  if (!response.ok) {
+    const errorMsg = await extractErrorMessage(
+      response,
+      "OCR processing failed",
+    );
+    throw new Error(`pages ${range.pageStart}-${range.pageEnd}: ${errorMsg}`);
+  }
+
+  const result: OCRProcessResult = await response.json();
+  return { markdown: result.markdown, totalPages: result.totalPages };
 }
 
 // SavedPDFImport interface moved to localPDFImportManager.ts as LocalPDFImport
@@ -876,8 +981,12 @@ export default function PDFImporter({
           file.type === "application/pdf" ||
           file.name.toLowerCase().endsWith(".pdf");
 
-        // For large PDFs, we'll split into chunks
-        const needsChunking = isPDF && fileSizeMB > MAX_CHUNK_SIZE_MB;
+        // For large PDFs, we'll split into chunks. The threshold is based
+        // on the *safe base64 upload size*, not MAX_CHUNK_SIZE_MB, since a
+        // single-shot upload (below) sends the whole file as one base64
+        // payload with no further splitting - it must fit under Vercel's
+        // body-size limit on its own.
+        const needsChunking = isPDF && fileSizeMB > SAFE_SINGLE_UPLOAD_SIZE_MB;
 
         let combinedMarkdown = "";
         let combinedTotalPages = 0;
@@ -943,58 +1052,21 @@ export default function PDFImporter({
             // Build this chunk's base64 payload just-in-time so at most
             // `ocrConcurrency` chunk buffers exist in memory at once,
             // instead of every chunk in the document simultaneously.
-            let base64: string;
+            // ocrPDFRange transparently splits further if the actual
+            // payload exceeds Vercel's body-size limit.
+            let chunkResult: { markdown: string; totalPages: number };
             try {
-              base64 = await buildPDFChunkBase64(pdfDoc, range);
+              chunkResult = await ocrPDFRange(
+                pdfDoc,
+                range,
+                file.name,
+                keys.mistralKey,
+              );
             } catch (err: unknown) {
-              const message = err instanceof Error ? err.message : "out of memory";
-              throw new Error(
-                `Chunk ${chunkIdx + 1} (pages ${range.pageStart}-${
-                  range.pageEnd
-                }): failed to prepare chunk for upload - ${message}`,
-              );
+              const message =
+                err instanceof Error ? err.message : "OCR processing failed";
+              throw new Error(`Chunk ${chunkIdx + 1} (${message})`);
             }
-
-            let ocrResponse: Response;
-            try {
-              ocrResponse = await fetchWithRetry(
-                "/api/ocr/process",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    base64Data: base64,
-                    fileName: `${file.name}_pages_${range.pageStart}-${range.pageEnd}.pdf`,
-                    mimeType: "application/pdf",
-                    includeImages: false,
-                    mistralKey: keys.mistralKey,
-                  }),
-                },
-                180000, // 3 minute timeout for OCR
-              );
-            } finally {
-              // Allow the (potentially multi-MB) base64 string to be
-              // garbage-collected as soon as the request body has been
-              // handed off, rather than staying referenced for the rest
-              // of this closure's lifetime.
-              base64 = "";
-            }
-
-            if (!ocrResponse.ok) {
-              const errorMsg = await extractErrorMessage(
-                ocrResponse,
-                "OCR processing failed",
-              );
-              throw new Error(
-                `Chunk ${chunkIdx + 1} (pages ${range.pageStart}-${
-                  range.pageEnd
-                }): ${errorMsg}`,
-              );
-            }
-
-            const chunkResult: OCRProcessResult = await ocrResponse.json();
 
             // Update status with OCR markdown
             setChunkStatuses((prev) =>
