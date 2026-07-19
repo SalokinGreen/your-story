@@ -16,6 +16,7 @@ import {
   StoryLore,
   MAX_PENDING_RANDOM_EVENTS,
   PendingRandomEvent,
+  MAX_PENDING_DIRECTOR_MOVES,
 } from "@/app/misc/structs";
 import {
   applyCompleteQuest,
@@ -36,6 +37,8 @@ import { logger } from "@/app/misc/logger";
 import {
   checkScene,
   adjustChaosFactor,
+  adjustTension,
+  selectDirectorMove,
   generateEventFocus,
   generateEventMeaning,
 } from "@/app/misc/mythic";
@@ -1454,6 +1457,35 @@ export function executeTools(
         storyData.agmtState.chaosFactor = newChaos;
         storyData.agmtState.lastChaosAdjustment = storyData.agmtState.sceneCount;
 
+        // Director-layer tension estimate: same hook point as chaos,
+        // nudged by the same scene check plus combat/timer pressure - see
+        // adjustTension (mythic.ts).
+        const oldTension = storyData.agmtState.tension ?? 5;
+        storyData.agmtState.tension = adjustTension(oldTension, {
+          sceneType,
+          combatActive: storyData.combatState?.active,
+          timerNearZero: (storyData.timers || []).some(
+            (t) => t.status === "active" && t.currentTicks <= 1
+          ),
+        });
+
+        // Director move selection: a deterministic policy, not the model's
+        // own choice (see selectDirectorMove's doc comment). Persisted the
+        // same way pendingRandomEvents is, so it keeps reappearing until
+        // acknowledge_director_move is called.
+        const directorMove = selectDirectorMove(storyData, sceneType);
+        if (directorMove) {
+          storyData.pendingDirectorMoves = storyData.pendingDirectorMoves || [];
+          storyData.pendingDirectorMoves.push(directorMove);
+          if (
+            storyData.pendingDirectorMoves.length > MAX_PENDING_DIRECTOR_MOVES
+          ) {
+            storyData.pendingDirectorMoves = storyData.pendingDirectorMoves.slice(
+              -MAX_PENDING_DIRECTOR_MOVES
+            );
+          }
+        }
+
         // Build response message
         let message = `✓ Scene count: ${oldCount} → ${oldCount + 1}`;
         message += `\n🎲 Scene Check: rolled ${sceneRoll} vs chaos ${oldChaos} → ${sceneType}`;
@@ -1497,6 +1529,13 @@ export function executeTools(
           message += `\n⚡ SCENE INTERRUPTED! The expected scene doesn't happen - replace it with a random event: [${eventFocus}] "${eventMeaning.action} ${eventMeaning.subject}". Incorporate this into the next narration, then call resolve_random_event(id: "${pendingEvent.id}"). It will keep reappearing every turn until resolved.`;
         } else if (sceneType === "Altered") {
           message += `\n🔀 Scene Altered: the expected scene happens, but with an unexpected twist - don't play it exactly as planned.`;
+        }
+
+        if (directorMove) {
+          const label = directorMove.move.replace(/_/g, " ");
+          message += `\n🎬 Director move: ${label}${
+            directorMove.context ? ` (${directorMove.context})` : ""
+          } - render this as prose without naming it, then call acknowledge_director_move(id: "${directorMove.id}"). It will keep reappearing every turn until resolved.`;
         }
 
         logger.action("Scene count incremented via tool", {
@@ -1570,6 +1609,61 @@ export function executeTools(
           } ${resolved.subject}"${
             howIncorporated ? ` - ${howIncorporated}` : ""
           }`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Acknowledge a pending director move - same close-the-loop shape as
+      // resolve_random_event above: the move persists and keeps
+      // reappearing in context every turn until the GM confirms it was
+      // rendered into the narration.
+      if (toolCall.function.name === "acknowledge_director_move") {
+        const id = args.id?.trim();
+        const howIncorporated = args.how_incorporated?.trim();
+
+        if (!id) {
+          responses.push({
+            command: "/acknowledge_director_move",
+            success: false,
+            message: "✗ Move id is required",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const moves = storyData.pendingDirectorMoves || [];
+        const moveIndex = moves.findIndex((m) => m.id === id);
+
+        if (moveIndex === -1) {
+          responses.push({
+            command: `/acknowledge_director_move: ${id}`,
+            success: false,
+            message: `✗ No pending director move with id "${id}" (it may already be resolved)`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const [resolved] = moves.splice(moveIndex, 1);
+        storyData.pendingDirectorMoves = moves;
+
+        logger.action("Director move acknowledged via tool", {
+          toolCallId: toolId,
+          id,
+          move: resolved.move,
+          howIncorporated,
+        });
+        responses.push({
+          command: `/acknowledge_director_move: ${id}`,
+          success: true,
+          message: `✓ Director move acknowledged: ${resolved.move.replace(
+            /_/g,
+            " "
+          )}${howIncorporated ? ` - ${howIncorporated}` : ""}`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
