@@ -99,6 +99,47 @@ export function extractThinkingTags(content: string): string[] {
 }
 
 /**
+ * Clean story content for text-to-speech playback.
+ * Removes hidden GM notes (||...||), Markdown formatting/syntax, and any
+ * leftover structured tags so TTS only reads the visible narrative prose
+ * instead of the raw AI output.
+ */
+export function cleanTextForSpeech(content: string): string {
+  if (!content) return "";
+
+  let text = stripThinkingTags(content);
+
+  // Remove hidden messages (||hidden text||) - never spoken aloud
+  text = text.replace(/\|\|[\s\S]*?\|\|/g, "");
+
+  // Strip Markdown headings, blockquotes, horizontal rules
+  text = text.replace(/^\s{0,3}#{1,6}\s+/gm, "");
+  text = text.replace(/^\s{0,3}>\s?/gm, "");
+  text = text.replace(/^\s*([-*_]){3,}\s*$/gm, "");
+
+  // Strip images and links, keeping link/alt text
+  text = text.replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1");
+  text = text.replace(/\[([^\]]*)\]\([^)]*\)/g, "$1");
+
+  // Strip bold/italic/strikethrough/inline code markers
+  text = text.replace(/(\*\*\*|___)(.*?)\1/g, "$2");
+  text = text.replace(/(\*\*|__)(.*?)\1/g, "$2");
+  text = text.replace(/(\*|_)(.*?)\1/g, "$2");
+  text = text.replace(/~~(.*?)~~/g, "$1");
+  text = text.replace(/`([^`]*)`/g, "$1");
+
+  // Strip list markers
+  text = text.replace(/^\s*[-*+]\s+/gm, "");
+  text = text.replace(/^\s*\d+\.\s+/gm, "");
+
+  // Collapse excess whitespace left behind by the removals above
+  text = text.replace(/\n{3,}/g, "\n\n");
+  text = text.replace(/[ \t]{2,}/g, " ");
+
+  return text.trim();
+}
+
+/**
  * Detect if AI output contains repetitive/looping content.
  * This happens when the model gets stuck repeating the same phrase.
  */
