@@ -681,6 +681,14 @@ export type Variable =
 
 export type MultiplayerMode = "host" | "any" | "timer";
 
+// A couch co-op player: a colored, named "bubble" a person at the table taps
+// to speak their turn. Distinct from the legacy typed-name hot-seat flow.
+export interface CouchPlayer {
+  id: string;
+  name: string;
+  color: string; // hex color, e.g. "#22c55e"
+}
+
 export interface StoryData {
   story_name: string;
   premise: string;
@@ -699,6 +707,10 @@ export interface StoryData {
     // Legacy fields (no longer used by UI; kept for backward compatibility)
     players?: string[]; // Legacy roster
     host?: string; // Legacy host display name
+
+    // Couch co-op: persistent named/colored player bubbles for same-device
+    // pass-and-play speech-to-text turns (see PlayerBubbles component).
+    couchPlayers?: CouchPlayer[];
   };
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;

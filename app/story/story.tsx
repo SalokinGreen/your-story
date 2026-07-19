@@ -7,6 +7,7 @@ import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
 import STTButton from "../components/STTButton";
+import PlayerBubbles from "../components/PlayerBubbles";
 import CombatDisplay from "../components/CombatDisplay";
 import { GMProgressPanel } from "../components/GMProgressPanel";
 import { ChapterNav } from "../components/ChapterNav";
@@ -1123,6 +1124,17 @@ export default function Story({
           </div>
         )}
       </div>
+
+      {/* Couch co-op player bubbles: tap to speak a turn via voice input */}
+      {storyData.multiplayer?.enabled &&
+        (storyData.multiplayer?.couchPlayers?.length ?? 0) > 0 &&
+        onCustomInput && (
+          <PlayerBubbles
+            players={storyData.multiplayer.couchPlayers!}
+            onSubmit={onCustomInput}
+            disabled={loading || !!loadingStage}
+          />
+        )}
 
       {/* Choices Modal */}
       <ChoicesModal

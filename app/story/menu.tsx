@@ -48,6 +48,7 @@ import NPCEditor from "./menu/NPCEditor";
 import ConditionsEditor from "./menu/ConditionsEditor";
 import VariablesEditor from "./menu/VariablesEditor";
 import StoryMetaEditor from "./menu/StoryMetaEditor";
+import CouchPlayersEditor from "./menu/CouchPlayersEditor";
 
 interface MenuProps extends StoryData {
   storyDbId: string | null;
@@ -356,6 +357,9 @@ export default function MenuPage({
           mode: multiplayerMode,
           timerMinutes: resolvedTimerMinutes,
           hostUserId: resolvedHostUserId,
+          players: storyData.multiplayer?.players,
+          host: storyData.multiplayer?.host,
+          couchPlayers: storyData.multiplayer?.couchPlayers,
         },
       };
       onUpdateStoryData(updates);
@@ -1154,6 +1158,25 @@ export default function MenuPage({
                       />
                     </div>
                   )}
+
+                  <div className="pt-2 border-t border-blue-800/20">
+                    <CouchPlayersEditor
+                      players={storyData.multiplayer?.couchPlayers || []}
+                      onUpdate={(couchPlayers) =>
+                        onUpdateStoryData({
+                          multiplayer: {
+                            enabled: !!storyData.multiplayer?.enabled,
+                            mode: storyData.multiplayer?.mode,
+                            timerMinutes: storyData.multiplayer?.timerMinutes,
+                            hostUserId: storyData.multiplayer?.hostUserId,
+                            players: storyData.multiplayer?.players,
+                            host: storyData.multiplayer?.host,
+                            couchPlayers,
+                          },
+                        })
+                      }
+                    />
+                  </div>
                   </div>
                 </div>
 
@@ -1666,10 +1689,7 @@ export default function MenuPage({
                 Cancel
               </button>
               <button
-                onClick={async () => {
-                  await handleSaveSettings();
-                  await onSaveProgress();
-                }}
+                onClick={handleSaveSettings}
                 className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-colors flex items-center justify-center gap-1"
               >
                 <DynamicIcon name="Save" className="w-4 h-4" />
