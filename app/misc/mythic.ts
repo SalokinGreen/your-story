@@ -5151,22 +5151,6 @@ const MEANING_TABLE_ELEMENTS_CHARACTERS = [
   "Young",
 ];
 
-// # Random Event Focus Table from page 38.
-const RANDOM_EVENT_FOCUS_TABLE = [
-  { range: [1, 5], focus: "Remote Event" },
-  { range: [6, 10], focus: "Ambiguous Event" },
-  { range: [11, 20], focus: "New NPC" },
-  { range: [21, 40], focus: "NPC Action" },
-  { range: [41, 45], focus: "NPC Negative" },
-  { range: [46, 50], focus: "NPC Positive" },
-  { range: [51, 55], focus: "Move Toward A Thread" },
-  { range: [56, 65], focus: "Move Away From A Thread" },
-  { range: [66, 70], focus: "Close A Thread" },
-  { range: [71, 80], focus: "PC Negative" },
-  { range: [81, 85], focus: "PC Positive" },
-  { range: [86, 100], focus: "Current Context" },
-];
-
 // # Meaning Tables (Actions & Descriptors) from pages 48-49.
 const MEANING_TABLE_ACTION_1 = [
   "Abandon",

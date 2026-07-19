@@ -13,9 +13,9 @@
 >
 > **Status update:** all five Critical items (C1-C5) below have been fixed
 > and verified with tests (see each item's own note), along with H1, H2, H3,
-> H4, H7, and H8 (partially - see H8's note for the scoping decision). H5 was
-> partially corrected; H6 was flagged for a product decision rather than
-> fixed. The Medium items are still open. C4's
+> H4, H7, H8 (partially - see H8's note for the scoping decision), and M1.
+> H5 was partially corrected; H6 was flagged for a product
+> decision rather than fixed. M2 is still open. C4's
 > fix surfaced
 > an additional, worse finding than originally reported: the "live" chaos
 > mechanic wasn't just narrower than Mythic's real rule, it was *entirely
@@ -608,13 +608,25 @@ behavior for `opposed_formula`'s `player_stat_name`.
 
 ## Medium — cleanup and drift, lower urgency
 
-- **M1 — Drifted duplicate event table.** `mythic.ts:5134-5147` defines a
-  second `RANDOM_EVENT_FOCUS_TABLE` with *different* percentage bands than
-  the live `EVENT_FOCUS` table actually used by `generateEventFocus`
-  (`mythic.ts:252-264`) — e.g. "Remote event" spans 1-7 in the dead copy
-  vs. 1-5 in the live one. Harmless today since it's unreferenced, but a
-  future edit to "the" event table has a coin-flip chance of touching the
-  wrong one.
+- **M1 — Drifted duplicate event table. — ✅ FIXED** `mythic.ts:5134-5147`
+  defined a second `RANDOM_EVENT_FOCUS_TABLE` with *different* percentage
+  bands than the live `EVENT_FOCUS` table actually used by
+  `generateEventFocus` (`mythic.ts:252-264`) — e.g. "Remote event" spanned
+  1-7 in the dead copy vs. 1-5 in the live one. It was harmless today only
+  because it was unreferenced (confirmed via a full-repo grep for
+  `RANDOM_EVENT_FOCUS_TABLE` — zero other hits), but a future edit to "the"
+  event table had a coin-flip chance of touching the wrong one. Fixed by
+  deleting the dead duplicate outright, following the same
+  "delete confirmed-dead code, don't leave it as a decoy" precedent used
+  for H4 (`getRelevantContextForGeneration`) and H5
+  (`processSceneParts`) — reviving or reconciling it would have kept two
+  competing tables around for no reason, since nothing consumes the
+  second one. Covered by 4 new tests in `tests/mythic.eventFocus.test.ts`
+  that pin `generateEventFocus`'s actual boundaries (roll 1 and roll 7
+  both land on "Remote event", roll 8 moves into "NPC action", roll 100
+  lands on "NPC positive") via `vi.spyOn(Math, "random")`, so a future
+  edit that reintroduces a second, diverging table would fail this test
+  rather than silently drift again.
 - **M2 — No general invariant that a stated success/failure must be
   preceded by a roll.** This is the broader version of the original
   plan's Stage-0 ordering finding: it's not only that narration can run
@@ -628,12 +640,11 @@ behavior for `opposed_formula`'s `player_stat_name`.
 
 ## Revised priority order (supersedes §5 of `ai-gm-integration-plan.md`)
 
-_Items 1-4 (all of C1-C5), H1, H2, H3, H4, H7, and H8 are done — see the ✅
+_Items 1-4 (all of C1-C5), H1, H2, H3, H4, H7, H8, and M1 are done — see the ✅
 FIXED notes above (H8 is scoped/partial — see its note for the residual
 `characterData`/`character_sheet`-only gap). H5 was partially corrected
 (dead code deleted; core issue deferred) and H6 was flagged for a product
-decision rather than fixed. What remains is the Medium items, in the
-order below._
+decision rather than fixed. What remains is M2, below._
 
 1. ~~**C1**~~ done.
 2. ~~**C2, C3**~~ done.
@@ -663,6 +674,12 @@ order below._
     `characterData`/`character_sheet`-lore-only adventures is explicitly
     documented as unclosed rather than papered over — see the H8 note
     above.
+11. ~~**M1**~~ done: deleted the dead, drifted-duplicate
+    `RANDOM_EVENT_FOCUS_TABLE` in `mythic.ts`; `generateEventFocus`'s
+    boundaries are now pinned by tests so a future edit can't silently
+    reintroduce a second copy — see the M1 note above.
+12. **M2** — open: no invariant that success/failure must be preceded by
+    a roll; sits downstream of H8, see the M2 note above.
 
 Original text, preserved for the remaining items:
 
