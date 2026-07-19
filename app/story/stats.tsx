@@ -53,7 +53,7 @@ export default function StatsPage(storyData: StoryData) {
 
   return (
     <div className="w-full">
-      <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 overflow-visible">
+      <div className="bg-blue-950/50 backdrop-blur-sm rounded-2xl border border-blue-800/30 shadow-lg shadow-purple-950/20 overflow-visible">
         {/* Player Info Section - Always Visible */}
         <div className="p-4 border-b border-blue-800/30">
           <div className="flex flex-col gap-3">
@@ -99,7 +99,7 @@ export default function StatsPage(storyData: StoryData) {
               onClick={() => handleTabChange(tab.id)}
               className={`px-2 py-1.5 font-medium rounded-lg transition-colors whitespace-nowrap flex items-center gap-1.5 text-xs ${
                 activeTab === tab.id
-                  ? "bg-blue-600 text-white"
+                  ? "bg-linear-to-b from-purple-600 to-purple-700 shadow-[0_2px_8px_rgba(147,51,234,0.3)] text-white"
                   : "text-blue-200/60 hover:bg-blue-900/50 hover:text-white"
               }`}
             >
@@ -166,7 +166,7 @@ export default function StatsPage(storyData: StoryData) {
                   return (
                     <div
                       key={index}
-                      className="flex flex-row items-center gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30"
+                      className="flex flex-row items-center gap-3 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30 transition-all duration-150 hover:border-blue-400/50 hover:bg-blue-500/15"
                     >
                       <div className="shrink-0">
                         <DynamicIcon
@@ -215,7 +215,7 @@ export default function StatsPage(storyData: StoryData) {
                           {stat.description}
                         </p>
                         {/* Stat bar visualization - fills from left */}
-                        <div className="w-full bg-gray-200 dark:bg-gray-900 rounded-full h-2 overflow-hidden">
+                        <div className="w-full bg-blue-900/50 rounded-full h-2 overflow-hidden">
                           <div
                             className="h-full bg-linear-to-r from-blue-400 to-blue-500 rounded-full transition-all duration-300"
                             style={{ width: `${Math.max(fillPercent, 0)}%` }}
@@ -332,7 +332,7 @@ export default function StatsPage(storyData: StoryData) {
                       {passives.map((passive, index) => (
                         <div
                           key={index}
-                          className="flex flex-row items-start gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30"
+                          className="flex flex-row items-start gap-3 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 transition-all duration-150 hover:border-emerald-400/50 hover:bg-emerald-500/15"
                         >
                           <div className="shrink-0">
                             <DynamicIcon

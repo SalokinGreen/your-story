@@ -6383,10 +6383,16 @@ function StoryPageContent() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20">
+    <div className="relative min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20">
+      {/* Ambient glow orbs - purely decorative, sits behind all content */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-700/20 blur-[100px]" />
+        <div className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-blue-700/15 blur-[110px]" />
+        <div className="absolute bottom-0 left-1/4 w-80 h-80 rounded-full bg-indigo-600/10 blur-[100px]" />
+      </div>
       <main className="flex gap-2 sm:gap-4 w-full px-0 sm:px-2 sm:max-w-4xl mx-auto flex-col">
         {/* Compact Story Header */}
-        <div className="bg-blue-950/50 rounded-none sm:rounded-xl border-x-0 sm:border border-blue-800/30 px-4 py-3">
+        <div className="bg-blue-950/50 backdrop-blur-sm rounded-none sm:rounded-2xl border-x-0 sm:border border-blue-800/30 px-4 py-3 sm:shadow-lg sm:shadow-purple-950/20">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <button
@@ -6462,7 +6468,8 @@ function StoryPageContent() {
           ]}
         />
 
-        {/*Rendercurrentpage*/}
+        {/* Render current page */}
+        <div key={currentState} className="animate-fade-in">
         {currentState === StoryState.STORY && (
           <Story
             storyData={storyData}
@@ -6542,6 +6549,7 @@ function StoryPageContent() {
         {currentState === StoryState.CONTEXT && (
           <ContextViewer storyData={storyData} />
         )}
+        </div>
       </main>
 
       {/* AI Story Editor - Rendered at page level to persist across tabs */}

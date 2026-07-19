@@ -352,7 +352,7 @@ export default function LorePage(props: LorePageProps) {
   return (
     <div className="w-full space-y-4">
       {/* Header Section */}
-      <div className="bg-linear-to-br from-blue-950/80 to-indigo-950/50 rounded-xl border border-blue-700/30 p-4 shadow-lg">
+      <div className="bg-linear-to-br from-blue-950/80 to-indigo-950/50 rounded-2xl border border-blue-700/30 p-4 shadow-lg">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -492,7 +492,7 @@ export default function LorePage(props: LorePageProps) {
       {/* Main Content - Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* Lore List */}
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 p-3 lg:col-span-1 xl:col-span-2">
+        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-2xl border border-blue-800/30 p-3 lg:col-span-1 xl:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-blue-100 flex items-center gap-2">
               <DynamicIcon
@@ -557,6 +557,10 @@ export default function LorePage(props: LorePageProps) {
                       : "border-blue-800/20 hover:border-blue-600/40 hover:bg-blue-500/5"
                   } ${isInactive ? "opacity-50" : ""} ${
                     isPinned ? "ring-1 ring-yellow-500/30" : ""
+                  } card-interactive ${
+                    isSecret
+                      ? "hover:shadow-[0_4px_16px_rgba(245,158,11,0.15)]"
+                      : "hover:shadow-[0_4px_16px_rgba(147,51,234,0.12)]"
                   }`}
                 >
                   <div
@@ -648,7 +652,7 @@ export default function LorePage(props: LorePageProps) {
         </div>
 
         {/* Lore Detail */}
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 lg:col-span-2 xl:col-span-4 flex flex-col">
+        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-2xl border border-blue-800/30 lg:col-span-2 xl:col-span-4 flex flex-col">
           {!selectedLore ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="text-center">
@@ -748,11 +752,11 @@ export default function LorePage(props: LorePageProps) {
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Image */}
                 {selectedLore.thumbnailUrl && (
-                  <div className="relative overflow-hidden rounded-xl border border-blue-700/30 shadow-lg">
+                  <div className="relative overflow-hidden rounded-xl border border-blue-700/30 shadow-lg group">
                     <img
                       src={selectedLore.thumbnailUrl}
                       alt={selectedLore.title}
-                      className="w-full h-48 sm:h-56 xl:h-64 object-cover"
+                      className="w-full h-48 sm:h-56 xl:h-64 object-cover transition-transform duration-300 group-hover:scale-105"
                     />
                     <div className="absolute inset-0 bg-linear-to-t from-blue-950/80 via-transparent to-transparent" />
                   </div>

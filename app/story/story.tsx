@@ -157,7 +157,7 @@ function ChatMessage({
             </div>
           )
         ) : (
-          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center border-2 border-purple-500/30">
+          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center border-2 border-purple-500/30 shadow-[0_0_8px_rgba(147,51,234,0.5)]">
             <DynamicIcon name="Sparkles" className="w-3 h-3 text-white" />
           </div>
         )}
@@ -298,7 +298,7 @@ function ChatMessage({
         {/* Content - hide the empty box when only streaming thinking */}
         {(content || isLoading || !isStreaming) && (
           <div
-            className={`rounded-lg p-2 sm:p-3 ${
+            className={`rounded-xl p-2 sm:p-3 ${
               isUser
                 ? isComment
                   ? "bg-blue-900/15 border border-blue-700/20"
@@ -795,7 +795,7 @@ export default function Story({
     <div className="w-full px-0 sm:px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-none sm:rounded-xl border-0 sm:border sm:border-gray-500/30 overflow-hidden relative flex flex-col max-h-[calc(100vh-100px)] sm:max-h-[calc(100vh-180px)]"
+        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-blue-800/30 sm:shadow-2xl sm:shadow-purple-950/30 overflow-hidden relative flex flex-col max-h-[calc(100vh-100px)] sm:max-h-[calc(100vh-180px)]"
         style={{
           backgroundColor: fontSettings.themeColors?.background,
         }}
@@ -808,7 +808,7 @@ export default function Story({
         )}
 
         {/* Header with story name, chapter nav, and scroll indicator */}
-        <div className="flex items-center justify-between px-3 py-1 sm:px-4 sm:py-2 bg-blue-900/30 border-b border-blue-800/30">
+        <div className="flex items-center justify-between px-3 py-1 sm:px-4 sm:py-2 bg-linear-to-r from-blue-900/40 via-blue-900/30 to-purple-900/20 border-b border-blue-800/30">
           <div className="flex items-center gap-2 min-w-0">
             <DynamicIcon name="BookOpen" className="w-4 h-4 text-blue-300 shrink-0" />
             <span className="text-sm font-medium text-blue-200 truncate max-w-[200px]">
@@ -1026,7 +1026,7 @@ export default function Story({
 
         {/* Action Buttons Bar */}
         {!editMode && (
-          <div className="flex items-center justify-between px-4 py-2 bg-blue-900/30 border-t border-blue-800/30">
+          <div className="flex items-center justify-between px-4 py-2 bg-linear-to-r from-blue-900/30 via-blue-900/20 to-purple-900/20 border-t border-blue-800/30">
             {/* Left side: Retry, Undo & Edit */}
             <div className="flex items-center gap-1.5 sm:gap-1">
               {canUndo && onUndo && (
@@ -1099,7 +1099,7 @@ export default function Story({
               {loading || loadingStage ? (
                 <button
                   onClick={onStop}
-                  className="flex-1 py-3.5 sm:py-2.5 text-base font-medium rounded-lg bg-blue-500/10 hover:bg-blue-500/20 border border-blue-400/30 text-blue-300 transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation cursor-pointer"
+                  className="flex-1 py-3.5 sm:py-2.5 text-base font-medium rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-400/30 text-blue-300 transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation cursor-pointer"
                   title="Cancel generation"
                 >
                   <div className="w-4 h-4 border-2 border-blue-400/60 border-t-blue-300 rounded-full animate-spin" />
@@ -1113,7 +1113,7 @@ export default function Story({
               ) : (
                 <button
                   onClick={() => setShowChoicesModal(true)}
-                  className="flex-1 py-3.5 sm:py-2.5 text-base font-semibold rounded-lg transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation bg-blue-600 hover:bg-blue-500 text-white"
+                  className="flex-1 py-3.5 sm:py-2.5 text-base font-semibold rounded-xl transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] text-white shadow-lg shadow-purple-950/40"
                 >
                   <DynamicIcon name="Compass" className="w-4 h-4" />
                   Continue
