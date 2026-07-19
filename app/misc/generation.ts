@@ -39,6 +39,7 @@ import {
 } from "@/app/misc/ai_staged";
 import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
+import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   outputToScenePart,
   stripThinkingTags,
@@ -80,6 +81,8 @@ import {
   classificationLabelToTier,
   decayTierTowardBaseline,
   computeSceneKey,
+  isSceneGatedForRoll,
+  hasSatisfiedRollGate,
   fallbackTier,
   describeTier,
   getTierState,
@@ -1369,6 +1372,47 @@ export async function generateStoryTurn(
               );
             }
 
+            // M2 roll-invariant gate (see isSceneGatedForRoll/
+            // hasSatisfiedRollGate, reasoningTiers.ts): when this scene is
+            // gated (combat active, a challenge active, or the GM itself
+            // declared high/deadly stakes on a roll earlier this scene),
+            // require at least one roll/oracle tool call somewhere in this
+            // turn's accumulated results before letting the round end on
+            // prose alone.
+            const sceneIsGated = isSceneGatedForRoll(storyData);
+            const rollToolCalledThisTurn = hasSatisfiedRollGate(
+              gmResults.map((r) => r.toolName)
+            );
+
+            if (
+              sceneIsGated &&
+              !rollToolCalledThisTurn &&
+              !isRepetitive &&
+              noToolCallPrompts < MAX_NO_TOOL_PROMPTS
+            ) {
+              noToolCallPrompts++;
+              logger.action(
+                "M2 gate: gated scene ended with no roll/oracle tool call - forcing another round",
+                {
+                  noToolCallPrompts,
+                  combatActive: storyData.combatState?.active,
+                  challengeActive: storyData.activeChallenge?.active,
+                  highStakesSceneKey:
+                    storyData.reasoningTierState?.highStakesSceneKey,
+                },
+              );
+              conversationHistory.push({
+                role: "user",
+                content:
+                  "This scene requires a roll before the turn can end - combat or a challenge is active, or you declared high/deadly stakes earlier this scene. Resolve the pending action with formula_roll, opposed_formula, formula_challenge_check, fate_question, or npc_roll, then continue.",
+              });
+              continue gmRoundLoop;
+            }
+
+            // Gate cap hit, or not gated at all - fail open (complete
+            // anyway) rather than get the turn stuck, matching this
+            // codebase's established "warn, don't hard-block" posture for
+            // every other advisory check.
             isComplete = true;
             break;
           }
@@ -2062,6 +2106,19 @@ export async function generateStoryTurn(
         ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
       }));
 
+    // Layer-5 consistency check (see consistencyCheck.ts): narration has
+    // already streamed to the client by this point, so this is recorded
+    // for display/debugging and eval-harness metrics, never a live gate.
+    const consistencyWarnings = checkNarrationConsistency(
+      storyContent,
+      storyData
+    );
+    if (consistencyWarnings.length > 0) {
+      logger.action("Consistency check flagged narration", {
+        warnings: consistencyWarnings,
+      });
+    }
+
     const scenePart: ScenePart = {
       content: storyContent,
       raw: rawStoryContent || undefined,
@@ -2082,6 +2139,8 @@ export async function generateStoryTurn(
           : undefined,
       gmStoryContext: gmStoryContext || undefined,
       gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
+      consistencyWarnings:
+        consistencyWarnings.length > 0 ? consistencyWarnings : undefined,
     };
 
     const result: GenerationResult = {

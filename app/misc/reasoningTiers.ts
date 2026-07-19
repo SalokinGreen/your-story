@@ -307,6 +307,40 @@ export function computeSceneKey(state: StoryData): string {
   return `freeform:${turnBucket}`;
 }
 
+// Tools whose successful call satisfies the M2 roll-invariant gate below -
+// deliberately narrow (this codebase's audit history repeatedly rules out
+// NLP-style grading of freeform narration as the alternative).
+const ROLL_OR_ORACLE_TOOL_NAMES = new Set([
+  "formula_roll",
+  "opposed_formula",
+  "formula_challenge_check",
+  "npc_roll",
+  "fate_question",
+]);
+
+/**
+ * M2 roll-invariant gate: is this scene "contested enough" that ending the
+ * GM's turn on prose alone (zero roll/oracle tool calls) would let a stated
+ * success/failure bypass the oracle layer entirely? Scope is deliberately
+ * narrow and structural — combat active, a challenge active, or the GM
+ * itself declared high/deadly stakes on a roll earlier this scene (see
+ * applyStakesEscalation, gmExecutor.ts) — not a judgment call about the
+ * content of any particular turn's narration.
+ */
+export function isSceneGatedForRoll(state: StoryData): boolean {
+  return (
+    !!state.combatState?.active ||
+    !!state.activeChallenge?.active ||
+    (!!state.reasoningTierState?.highStakesSceneKey &&
+      state.reasoningTierState.highStakesSceneKey === computeSceneKey(state))
+  );
+}
+
+/** True if at least one of the tool names called this turn satisfies the gate. */
+export function hasSatisfiedRollGate(calledToolNames: string[]): boolean {
+  return calledToolNames.some((name) => ROLL_OR_ORACLE_TOOL_NAMES.has(name));
+}
+
 export function getTierState(state: StoryData): ReasoningTierState {
   return (
     state.reasoningTierState ?? {
@@ -384,6 +418,9 @@ export function applyTierEscalation(
         ? tierState.tier3CallsInScene + 1
         : tierState.tier3CallsInScene,
     lastSceneKey: tierState.lastSceneKey,
+    // Preserved as-is here; only applyStakesEscalation (gmExecutor.ts) sets
+    // this, when the request came from a high/deadly-stakes roll specifically.
+    highStakesSceneKey: tierState.highStakesSceneKey,
   };
 
   return { ...decision, previousTier: tierState.currentTier };

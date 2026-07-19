@@ -18,6 +18,7 @@ import { NextRequest } from "next/server";
 import { getModelConfig, AIModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 import { CustomModel } from "@/app/misc/user_settings";
+import { extractFallbackToolCalls } from "@/app/misc/toolCallFallback";
 import {
   SamplingSettings,
   filterSettingsForProvider,
@@ -901,6 +902,26 @@ export async function POST(req: NextRequest) {
                 // Skip malformed JSON in final buffer
               }
             }
+          }
+        }
+
+        // Defensive fallback for a known DeepSeek reliability issue: a tool
+        // call sometimes arrives as text in content instead of populating
+        // the streamed tool_calls deltas (see toolCallFallback.ts). Only
+        // attempt recovery when tools were actually offered - otherwise
+        // this is just ordinary prose.
+        if (toolCalls.length === 0 && tools && tools.length > 0) {
+          const recovered = extractFallbackToolCalls(fullContent);
+          if (recovered) {
+            logger.action(
+              "Recovered tool call(s) from content fallback (tool_calls field was empty)",
+              {
+                provider: modelConfig.provider,
+                recoveredCount: recovered.length,
+                names: recovered.map((c) => c.function.name),
+              },
+            );
+            toolCalls = recovered;
           }
         }
 

@@ -1014,6 +1014,22 @@ ${pendingEvents
   .join("\n")}`
     : "";
 
+  // Pending director moves (the deterministic pacing layer's chosen GM
+  // move) - same persist-until-acknowledged shape as pendingEventsSection
+  // above. Render the move as prose ("make your move, but never speak its
+  // name") - never narrate "the director wants me to..." or name the move.
+  const pendingMoves = storyData.pendingDirectorMoves || [];
+  const pendingDirectorMovesSection = pendingMoves.length
+    ? `## 🎬 Pending Director Moves (must be addressed)
+${pendingMoves
+  .map((m) => {
+    const label = m.move.replace(/_/g, " ");
+    const context = m.context ? ` (${m.context})` : "";
+    return `- [${m.id}] ${label}${context} - render this as prose without naming it, then call acknowledge_director_move(id: "${m.id}")`;
+  })
+  .join("\n")}`
+    : "";
+
   // Build variables section if any exist - clean, simple format
   const variablesSection =
     storyData.variables && storyData.variables.length > 0
@@ -1105,6 +1121,7 @@ ${
     threadsSection,
     agmtSection,
     pendingEventsSection,
+    pendingDirectorMovesSection,
     storyData.author_notes
       ? `## Author Notes\n${cleanString(storyData.author_notes)}`
       : "",
@@ -2644,6 +2661,35 @@ export function buildGMStagePrompt({
   // Format timers state for context
   const timersSection = formatTimersState(storyData.timers);
 
+  // Pending random events and director moves - must be surfaced here (the
+  // live GM stage, which is what actually calls resolve_random_event/
+  // acknowledge_director_move), not just in buildInfoMessage's story-stage
+  // context. Same persist-until-acknowledged shape/lifecycle in both places.
+  const gmStagePendingEvents = storyData.pendingRandomEvents || [];
+  const gmStagePendingEventsSection = gmStagePendingEvents.length
+    ? `## ⚡ Unresolved Random Events (must be addressed)
+${gmStagePendingEvents
+  .map(
+    (e) =>
+      `- [${e.id}] [${e.focus || "Event"}] "${e.action} ${
+        e.subject
+      }" - work this into the story, then call resolve_random_event(id: "${e.id}")`,
+  )
+  .join("\n")}`
+    : "";
+
+  const gmStagePendingMoves = storyData.pendingDirectorMoves || [];
+  const gmStagePendingDirectorMovesSection = gmStagePendingMoves.length
+    ? `## 🎬 Pending Director Moves (must be addressed)
+${gmStagePendingMoves
+  .map((m) => {
+    const label = m.move.replace(/_/g, " ");
+    const context = m.context ? ` (${m.context})` : "";
+    return `- [${m.id}] ${label}${context} - render this as prose without naming it, then call acknowledge_director_move(id: "${m.id}")`;
+  })
+  .join("\n")}`
+    : "";
+
   // Build NPC list (tracked characters with relationship info)
   const npcList = (storyData.npcs || [])
     .filter((n) => n.status !== "departed") // Don't show departed NPCs
@@ -2851,6 +2897,8 @@ Keep every turn tight: one action, one consequence, then stop and hand control b
     "increment_scene",
     // Random event acknowledgement
     "resolve_random_event",
+    // Director move acknowledgement
+    "acknowledge_director_move",
   ];
 
   const gmTools = GM_TOOL_SCHEMAS.filter((t: any) =>
@@ -2892,6 +2940,14 @@ Keep every turn tight: one action, one consequence, then stop and hand control b
   // Add timers
   if (timersSection) {
     stateMessage += timersSection + "\n";
+  }
+
+  // Add pending random events / director moves - must be addressed
+  if (gmStagePendingEventsSection) {
+    stateMessage += gmStagePendingEventsSection + "\n\n";
+  }
+  if (gmStagePendingDirectorMovesSection) {
+    stateMessage += gmStagePendingDirectorMovesSection + "\n\n";
   }
 
   const messages: ChatMessage[] = [

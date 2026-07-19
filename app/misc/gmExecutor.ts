@@ -81,6 +81,7 @@ import { getTableByName, rollOnCustomTable } from "./tableRoller";
 import {
   applyTierEscalation,
   stakesFloor,
+  computeSceneKey,
 } from "./reasoningTiers";
 import {
   getRPGSystem,
@@ -1573,6 +1574,13 @@ function applyStakesEscalation(
     floor,
     `${stakes}-stakes roll`
   );
+  // M2 roll-invariant gate signal (generation.ts): remember that high/deadly
+  // stakes were declared THIS scene, independent of currentTier (which
+  // decays every turn regardless of scene boundary and so can't answer
+  // "was this scene ever declared high-stakes" on its own).
+  if (storyData.reasoningTierState) {
+    storyData.reasoningTierState.highStakesSceneKey = computeSceneKey(storyData);
+  }
   if (decision.grantedTier > decision.previousTier) {
     return `\n[Reasoning tier escalated to ${decision.grantedTier} - ${stakes}-stakes roll]`;
   }
@@ -3830,6 +3838,19 @@ function executeAdvanceTimer(
     timer.triggeredAt = Date.now();
   }
 
+  // Front/clock wrapper: surface (informational only) when a thread is
+  // linked to this timer and it's triggered or about to. This never
+  // mutates thread status itself - that still goes through
+  // update_thread/resolve_thread, so there's only one path that can change
+  // a thread's status.
+  const linkedThread = (storyData.threads || []).find(
+    (t) => t.linkedTimerId === timer.id && t.status === "active"
+  );
+  const linkedThreadNote =
+    linkedThread && (triggered || timer.currentTicks <= 1)
+      ? ` This is the clock for thread "${linkedThread.title}" - consider whether it should escalate or resolve (update_thread/resolve_thread).`
+      : "";
+
   return {
     toolName: "advance_timer",
     toolCallId,
@@ -3845,8 +3866,8 @@ function executeAdvanceTimer(
     contextForStory: triggered
       ? `[⏰ TIMER TRIGGERED: "${timer.name}" has reached 0!${
           timer.description ? ` - ${timer.description}` : ""
-        }]`
-      : `[Timer: "${timer.name}" ${previousTicks} → ${timer.currentTicks} ticks remaining]`,
+        }${linkedThreadNote}]`
+      : `[Timer: "${timer.name}" ${previousTicks} → ${timer.currentTicks} ticks remaining${linkedThreadNote}]`,
   };
 }
 

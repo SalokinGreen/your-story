@@ -56,11 +56,15 @@ function buildTrackedEntities(storyData: StoryData): TrackedEntity[] {
   return entities;
 }
 
-function escapeRegExp(value: string): string {
+// Exported for reuse by consistencyCheck.ts, which needs the identical
+// name-matching/active-presence-phrase pattern for narration (not just
+// compaction summaries) - keeping one definition rather than a second,
+// possibly-drifting copy.
+export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
-function countNameMentions(text: string, name: string): number {
+export function countNameMentions(text: string, name: string): number {
   if (!name.trim()) return 0;
   const pattern = new RegExp(`\\b${escapeRegExp(name)}\\b`, "gi");
   return (text.match(pattern) || []).length;
@@ -72,7 +76,7 @@ function countNameMentions(text: string, name: string): number {
 // a summary would only use if it were narrating them as alive/present, not
 // recapping past history. Kept short and specific to minimize false
 // positives on ordinary retrospective mentions ("...Marcus, now dead...").
-const ACTIVE_PRESENCE_PHRASES = [
+export const ACTIVE_PRESENCE_PHRASES = [
   "arrives",
   "joins you",
   "joins the party",
@@ -89,7 +93,7 @@ const ACTIVE_PRESENCE_PHRASES = [
 // How far past a name mention to look for an active-presence phrase before
 // treating it as unrelated. Generous enough to cover "Marcus arrives" and
 // "Marcus, grinning, arrives" without spanning into unrelated sentences.
-const CONTRADICTION_WINDOW_CHARS = 60;
+export const CONTRADICTION_WINDOW_CHARS = 60;
 
 // At least this many mentions in the *source* material is required before a
 // dropped-entity warning fires - a single incidental mention disappearing

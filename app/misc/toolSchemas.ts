@@ -893,6 +893,31 @@ const resolveRandomEventTool: ToolSchema = {
   },
 };
 
+const acknowledgeDirectorMoveTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "acknowledge_director_move",
+    description:
+      "Confirm a pending director move has been incorporated into the narrative. The engine - not you - decides when to announce future badness, tick a clock, or put someone in a spot; you only render the chosen move as prose ('make your move, but never speak its name' - never say 'the director wants me to...'). The move persists and keeps reappearing in context every turn until resolved this way.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description:
+            "The pending move's id, given in the move's context message",
+        },
+        how_incorporated: {
+          type: "string",
+          description:
+            "Brief note on how the move was worked into the narrative (optional, for the log)",
+        },
+      },
+      required: ["id"],
+    },
+  },
+};
+
 // Memory Management Tool
 const addMemoryTool: ToolSchema = {
   type: "function",
@@ -907,6 +932,13 @@ const addMemoryTool: ToolSchema = {
           type: "string",
           description:
             "Factual note only. GOOD: 'Mayor's daughter kidnapped by bandits'. BAD: 'The crow watches from the statue' (this is story text, not memory).",
+        },
+        importance: {
+          type: "number",
+          minimum: 0,
+          maximum: 10,
+          description:
+            "Optional: how significant this memory is to the story (0-10). Higher values should be reserved for facts that will clearly matter later (a debt, a deadline, a betrayal). Omit if unsure - most memories are mid-importance.",
         },
       },
       required: ["entry"],
@@ -1358,6 +1390,9 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
 
   // Random event acknowledgement (1 tool)
   resolveRandomEventTool,
+
+  // Director move acknowledgement (1 tool)
+  acknowledgeDirectorMoveTool,
 
   // Memory (1 tool)
   addMemoryTool,

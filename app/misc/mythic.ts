@@ -9,6 +9,8 @@
  * - Scene setup (altered/interrupted/normal)
  */
 
+import type { StoryData, PendingDirectorMove } from "./structs";
+
 export type FateAnswer = "Exceptional Yes" | "Yes" | "No" | "Exceptional No";
 export type SceneType = "Normal" | "Altered" | "Interrupted";
 export type Likelihood =
@@ -258,6 +260,111 @@ export function adjustChaosFactor(
 ): number {
   const newChaos = currentChaos + adjustment;
   return Math.max(1, Math.min(9, newChaos));
+}
+
+/**
+ * Director-layer tension/hope-fear estimate (0-10, default 5).
+ *
+ * Same clamped-scalar shape as chaos factor, updated at the same
+ * increment_scene hook point, but tracking a different thing: how much
+ * pressure is currently on the PCs, for the director's move-selection
+ * policy to read (see selectDirectorMove below). Escalating signals (an
+ * "Interrupted" scene check, active combat, a countdown timer about to
+ * hit zero) push it up; a calm "Normal" scene with none of those pushes it
+ * back down. An "Altered" scene with no other pressure is neutral.
+ */
+export interface TensionSignals {
+  sceneType: SceneType;
+  combatActive?: boolean;
+  timerNearZero?: boolean; // Any active CountdownTimer at currentTicks <= 1
+}
+
+export function adjustTension(
+  currentTension: number,
+  signals: TensionSignals
+): number {
+  const escalating =
+    signals.sceneType === "Interrupted" ||
+    !!signals.combatActive ||
+    !!signals.timerNearZero;
+  const calming = signals.sceneType === "Normal" && !escalating;
+
+  const delta = escalating ? 1 : calming ? -1 : 0;
+  return Math.max(0, Math.min(10, currentTension + delta));
+}
+
+/**
+ * Deterministic GM-move selection policy (PbtA-style bounded move menu).
+ *
+ * This is the director layer's equivalent of the oracle: the engine decides
+ * WHICH move fires and WHEN, from live state - never the model's own
+ * judgment (the same anti-pattern H7 already closed for reasoning-tier
+ * self-escalation applies here: a model that could pick its own move would
+ * reliably pick the gentlest one). The model only renders the chosen move
+ * as prose ("make your move, but never speak its name") after calling
+ * acknowledge_director_move - see ai_staged.ts/toolExecutor.ts.
+ *
+ * Priority order: a timer about to trigger outranks a chaotic scene check,
+ * which outranks high sustained tension with no other trigger. Returns null
+ * when nothing warrants a move, or when one is already pending and
+ * unacknowledged (a simple anti-pileup throttle - address what's already
+ * on the table before adding more).
+ *
+ * spotlight_couch_player is deliberately not selected here yet - it needs
+ * per-player focus tracking that doesn't exist until that's built.
+ */
+export function selectDirectorMove(
+  storyData: StoryData,
+  sceneType: SceneType
+): PendingDirectorMove | null {
+  if ((storyData.pendingDirectorMoves?.length || 0) > 0) {
+    return null;
+  }
+
+  const tension = storyData.agmtState?.tension ?? 5;
+  const activeThreads = (storyData.threads || []).filter(
+    (t) => t.status === "active"
+  );
+  const activeTimers = (storyData.timers || []).filter(
+    (t) => t.status === "active"
+  );
+
+  const nearZeroTimer = activeTimers.find((t) => t.currentTicks <= 1);
+  if (nearZeroTimer) {
+    const linkedThread = activeThreads.find(
+      (t) => t.linkedTimerId === nearZeroTimer.id
+    );
+    return {
+      id: crypto.randomUUID(),
+      move: "tick_a_clock",
+      targetTimerId: nearZeroTimer.id,
+      targetThreadId: linkedThread?.id,
+      context: `Timer "${nearZeroTimer.name}" is about to trigger`,
+      createdAt: Date.now(),
+    };
+  }
+
+  if (sceneType === "Interrupted" || sceneType === "Altered") {
+    const thread = activeThreads[0];
+    return {
+      id: crypto.randomUUID(),
+      move: "announce_future_badness",
+      targetThreadId: thread?.id,
+      context: `Scene check result: ${sceneType}`,
+      createdAt: Date.now(),
+    };
+  }
+
+  if (tension >= 8) {
+    return {
+      id: crypto.randomUUID(),
+      move: "put_someone_in_a_spot",
+      context: `Tension running high (${tension}/10)`,
+      createdAt: Date.now(),
+    };
+  }
+
+  return null;
 }
 
 /**
