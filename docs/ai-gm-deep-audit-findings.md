@@ -14,8 +14,8 @@
 > **Status update:** all five Critical items (C1-C5) below have been fixed
 > and verified with tests (see each item's own note), along with H1, H2, H3,
 > H4, H7, H8 (partially - see H8's note for the scoping decision), and M1.
-> H5 was partially corrected; H6 was flagged for a product
-> decision rather than fixed. M2 is still open. C4's
+> H5 was partially corrected; H6 and M2 were flagged for a product
+> decision rather than fixed. C4's
 > fix surfaced
 > an additional, worse finding than originally reported: the "live" chaos
 > mechanic wasn't just narrower than Mythic's real rule, it was *entirely
@@ -628,13 +628,49 @@ behavior for `opposed_formula`'s `player_stat_name`.
   edit that reintroduces a second, diverging table would fail this test
   rather than silently drift again.
 - **M2 — No general invariant that a stated success/failure must be
-  preceded by a roll.** This is the broader version of the original
-  plan's Stage-0 ordering finding: it's not only that narration can run
-  before tool resolution in a given turn, it's that **nothing anywhere
-  audits whether a roll happened at all** for a contested action. `H8`
-  and `skip_tools` (which only skips *state-mutation* tools, not GM-stage
-  dice tools, so it isn't itself a bypass) both sit downstream of this
-  same missing invariant.
+  preceded by a roll. — FLAGGED, not fixed (product decision needed).**
+  This is the broader version of the original plan's Stage-0 ordering
+  finding: it's not only that narration can run before tool resolution in
+  a given turn, it's that **nothing anywhere audits whether a roll
+  happened at all** for a contested action. `H8` and `skip_tools` (which
+  only skips *state-mutation* tools, not GM-stage dice tools, so it isn't
+  itself a bypass) both sit downstream of this same missing invariant.
+
+  Verified the current architecture still has this gap even after the
+  GM-stage-first redesign (GM stage now runs *before* the story stage,
+  per `generation.ts`'s "Stage 0.5: Running GM stage" comment, which
+  closes the literal "narration runs before any tool resolution" ordering
+  bug from the original plan): the GM stage's per-round loop
+  (`generation.ts` ~1330-1367, "No tool calls - GM is done!") explicitly
+  allows a round to complete with **zero tool calls**, and whatever
+  freeform prose the model wrote that round is pushed straight into
+  `gmAccumulatedStory`/`allGMContextParts` and fed to the story stage as
+  fact. Nothing stops the GM model from narrating "the attack lands" or
+  "you pick the lock" in that prose without ever calling `formula_roll`.
+  The only existing guardrail is a soft prompt instruction in
+  `buildGMStagePrompt` (`ai_staged.ts` ~2727-2729): *"Skill checks: Use
+  `formula_roll` for risky actions with meaningful stakes... Routine
+  actions: No roll needed - just narrate success."* — advisory text, not
+  an enforced rule.
+
+  **Why this wasn't fixed unilaterally:** closing it for real requires
+  answering "which actions are 'contested' enough to require a roll?" -
+  and the only way to answer that from the GM's own freeform prose is an
+  NLP-style classifier scanning for success/failure language, which is
+  exactly the unreliable heuristic this audit repeatedly rules out
+  elsewhere (see H1's explicit precedent: capping magnitude instead of
+  grading narrative text, and declining to gate ordinary narrative beats
+  behind rolls "just because the paper says LLMs are sycophantic"). The
+  alternative - a hard rule forcing the GM stage to call *some* roll tool
+  before every `end_gm_thinking` - would contradict the app's own
+  documented design of letting routine, low-stakes actions resolve
+  through pure narration with zero mechanical overhead, which is a
+  deliberate pacing choice, not a bug. Deciding where the line sits
+  between "routine, no roll needed" and "contested, roll required" is a
+  product/design call (which action categories, which RPG systems, how
+  strict) rather than a pure engineering fix, so - following the same
+  approach as H6 - this is flagged for that conversation instead of
+  solved unilaterally. No code changes were made for M2.
 
 ---
 
@@ -643,8 +679,9 @@ behavior for `opposed_formula`'s `player_stat_name`.
 _Items 1-4 (all of C1-C5), H1, H2, H3, H4, H7, H8, and M1 are done — see the ✅
 FIXED notes above (H8 is scoped/partial — see its note for the residual
 `characterData`/`character_sheet`-only gap). H5 was partially corrected
-(dead code deleted; core issue deferred) and H6 was flagged for a product
-decision rather than fixed. What remains is M2, below._
+(dead code deleted; core issue deferred) and H6 and M2 were flagged for a
+product decision rather than fixed. All items in the original punch list
+have now been addressed in some form._
 
 1. ~~**C1**~~ done.
 2. ~~**C2, C3**~~ done.
@@ -678,8 +715,11 @@ decision rather than fixed. What remains is M2, below._
     `RANDOM_EVENT_FOCUS_TABLE` in `mythic.ts`; `generateEventFocus`'s
     boundaries are now pinned by tests so a future edit can't silently
     reintroduce a second copy — see the M1 note above.
-12. **M2** — open: no invariant that success/failure must be preceded by
-    a roll; sits downstream of H8, see the M2 note above.
+12. **M2** — flagged, not fixed: verified the GM stage can still complete
+    a round with zero tool calls and feed raw prose straight to the story
+    stage as fact (`generation.ts` ~1330-1367); closing this needs a
+    product decision on which actions require a mandatory roll, not an
+    NLP heuristic grading the GM's own prose - see the M2 note above.
 
 Original text, preserved for the remaining items:
 
