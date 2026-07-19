@@ -45,7 +45,7 @@ const createQuestTool: ToolSchema = {
         },
         points: {
           oneOf: [
-            { type: "number", minimum: 1 },
+            { type: "number", minimum: 1, maximum: 500 },
             {
               type: "string",
               enum: ["trivial", "minor", "moderate", "major", "legendary"],
@@ -1386,7 +1386,7 @@ const gameOverTool: ToolSchema = {
   function: {
     name: "game_over",
     description:
-      "End the game due to character death or permanent incapacitation. Use when a tier 6 condition narratively prevents the character from continuing, or when the story reaches a definitive fatal end. This is a major decision - only use when there is no reasonable way to continue.",
+      "End the game due to character death or permanent incapacitation. Requires either an existing tier 6 (permanent) condition on the character, or the player's combatant being downed (HP 0 or inactive) in active combat - this call is rejected otherwise. Use upgrade_condition to raise a condition to tier 6, or resolve combat down to 0 HP, before calling this. This is a major decision - only use when there is no reasonable way to continue.",
     parameters: {
       type: "object",
       properties: {

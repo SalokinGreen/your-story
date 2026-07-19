@@ -367,6 +367,8 @@ export interface GMUpdateCombatantStatResult {
   change: number;
   reason?: string;
   diceRolled?: number[]; // If value was a dice formula
+  clampedToZero?: boolean; // HP-like stat would have gone negative, clamped to 0
+  defeated?: boolean; // HP-like stat hit 0, combatant auto-flagged isActive=false
 }
 
 export interface GMToggleCombatantConditionResult {
@@ -3005,6 +3007,26 @@ function executeUpdateCombatantStat(
     newValue = oldValue + change;
   }
 
+  // HP (and equivalent health stats) is the one stat the tool's own
+  // description promises "cannot go below 0" - that floor was previously
+  // asserted only in English. Enforce it in code, and auto-flag the
+  // combatant defeated the way remove_combatant already does, rather than
+  // leaving a walking 0-or-negative-HP combatant that nothing ever marks
+  // inactive.
+  const isHealthStat = ["hp", "health", "hitpoints", "hit points"].includes(
+    params.stat.trim().toLowerCase()
+  );
+  let clamped = false;
+  if (isHealthStat && newValue < 0) {
+    newValue = 0;
+    clamped = true;
+  }
+  let justDefeated = false;
+  if (isHealthStat && newValue <= 0 && combatant.isActive) {
+    combatant.isActive = false;
+    justDefeated = true;
+  }
+
   // Apply the change
   combatant.stats[params.stat] = newValue;
 
@@ -3014,8 +3036,13 @@ function executeUpdateCombatantStat(
     ? `${combatant.name} ${params.stat}: ${oldValue} → ${newValue} (${changeStr}) - ${params.reason}`
     : `${combatant.name} ${params.stat}: ${oldValue} → ${newValue} (${changeStr})`;
   logCombat(storyData.combatState, logEntry);
+  if (justDefeated) {
+    logCombat(storyData.combatState, `${combatant.name} is defeated (0 HP)`);
+    updateTurnOrder(storyData.combatState);
+  }
 
   const diceInfo = diceRolled ? ` [rolled: ${diceRolled.join(", ")}]` : "";
+  const defeatedInfo = justDefeated ? ` - ${combatant.name} is defeated!` : "";
 
   return {
     toolName: "update_combatant_stat",
@@ -3030,12 +3057,14 @@ function executeUpdateCombatantStat(
       change,
       reason: params.reason,
       diceRolled,
+      clampedToZero: clamped || undefined,
+      defeated: justDefeated || undefined,
     } as GMUpdateCombatantStatResult,
     contextForStory: `[${combatant.name} ${
       params.stat
     }: ${oldValue} → ${newValue} (${changeStr})${
       params.reason ? ` - ${params.reason}` : ""
-    }${diceInfo}]`,
+    }${diceInfo}${defeatedInfo}]`,
   };
 }
 
@@ -3209,6 +3238,45 @@ function executeNPCRoll(
       } as GMNPCRollResult,
       contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
     };
+  }
+
+  // Turn-order invariant: npc_roll represents a combatant's action for
+  // their turn, so it's only valid for whoever's turn it currently is -
+  // otherwise nothing stops the same combatant acting repeatedly in a
+  // round, or an off-turn combatant acting at all. (update_combatant_stat
+  // and toggle_combatant_condition are deliberately NOT gated this way -
+  // they apply the *consequences* of an action, typically to a different
+  // combatant than whoever's turn it is, e.g. the current combatant's
+  // attack damaging a target.)
+  const { turnOrder, currentTurnIndex } = storyData.combatState;
+  if (
+    turnOrder.length > 0 &&
+    currentTurnIndex >= 0 &&
+    currentTurnIndex < turnOrder.length
+  ) {
+    const currentTurnId = turnOrder[currentTurnIndex];
+    if (combatant.id !== currentTurnId) {
+      const currentTurnCombatant = storyData.combatState.combatants.find(
+        (c) => c.id === currentTurnId
+      );
+      return {
+        toolName: "npc_roll",
+        toolCallId,
+        success: false,
+        result: {
+          type: "npc_roll",
+          combatant: combatant.name,
+          formula: params.formula,
+          rolls: [],
+          total: 0,
+          reason: params.reason,
+          showToPlayer: params.show_to_player ?? false,
+        } as GMNPCRollResult,
+        contextForStory: `[Combat Error: It is not ${combatant.name}'s turn (current turn: ${
+          currentTurnCombatant?.name ?? "unknown"
+        }). Call advance_turn to move through the round instead of acting out of turn.]`,
+      };
+    }
   }
 
   // Roll the formula

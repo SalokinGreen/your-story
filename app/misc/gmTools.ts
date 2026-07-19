@@ -1425,6 +1425,11 @@ Set show_to_player: true for dramatic rolls.
 The roll result is returned and logged to combat log.
 Use update_combatant_stat to apply damage after calculating.
 
+Only valid for the combatant whose turn it currently is - call advance_turn
+first if it's someone else's turn. (This doesn't restrict which combatant
+update_combatant_stat targets - damage/effects still apply to whichever
+combatant the action affects, e.g. the player being hit on the goblin's turn.)
+
 Example flow:
 1. npc_roll: "1d20+5" for goblin attack vs player AC 15
 2. If hit: npc_roll: "1d6+2" for goblin damage

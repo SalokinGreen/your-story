@@ -157,6 +157,13 @@ function rollD100(): number {
 }
 
 /**
+ * Roll a d10 (1-10)
+ */
+function rollD10(): number {
+  return Math.floor(Math.random() * 10) + 1;
+}
+
+/**
  * Check if a roll is a random event (doubles on d100)
  */
 function isRandomEvent(roll: number): boolean {
@@ -212,6 +219,13 @@ export function askFate(
 
 /**
  * Determine scene setup
+ *
+ * This is a d10 roll against the chaos factor (1-9), per the AGMT rulebook
+ * (also documented independently in docs/mythic_notes.md's "Scene Check"
+ * notes) - NOT a d100 roll. A d100 comparison against a 1-9 scale would
+ * make Altered/Interrupted results fire on only ~1-9% of scenes even at
+ * maximum chaos, instead of the intended roughly-even odds at high chaos.
+ *
  * @param chaosFactor - Current chaos level (1-9, default 5)
  * @returns Scene type and roll
  */
@@ -219,7 +233,7 @@ export function checkScene(chaosFactor: number = 5): {
   sceneType: SceneType;
   roll: number;
 } {
-  const roll = rollD100();
+  const roll = rollD10();
 
   // Scene altered on roll <= chaos factor
   // Scene interrupted on roll <= chaos factor / 2
@@ -534,6 +548,13 @@ export function createAGMTState(): AGMTState {
 
 /**
  * Complete scene setup and random event check
+ *
+ * An Interrupted scene check IS the random-event trigger (the expected
+ * scene doesn't happen - a random event replaces it) - it isn't a
+ * separate doubles condition on the scene-check roll. (Doubles-based
+ * random event detection is a distinct mechanic that belongs to d100
+ * rolls, e.g. askFate's own roll via isRandomEvent - it doesn't apply to
+ * this d10 scene-check roll.)
  */
 export function setupScene(state: AGMTState): {
   sceneType: SceneType;
@@ -543,7 +564,7 @@ export function setupScene(state: AGMTState): {
   eventMeaning?: { action: string; subject: string };
 } {
   const { sceneType, roll: sceneRoll } = checkScene(state.chaosFactor);
-  const randomEvent = isRandomEvent(sceneRoll);
+  const randomEvent = sceneType === "Interrupted";
 
   let eventFocus: string | undefined;
   let eventMeaning: { action: string; subject: string } | undefined;

@@ -10,6 +10,16 @@
 > `reasoningTiers.ts`, `generation.ts`, `mythic.ts`, `mythicChaos.ts`,
 > `compaction.ts`, `embeddings.ts`, `semanticSearchFallback.ts`, and
 > `diceFormula.ts` — file:line references throughout are exact.
+>
+> **Status update:** all five Critical items (C1-C5) below have been fixed
+> and verified with tests (see each item's own note). The High and Medium
+> items are still open. C4's fix surfaced an additional, worse finding
+> than originally reported: the "live" chaos mechanic wasn't just narrower
+> than Mythic's real rule, it was *entirely inert* in production, because
+> nothing anywhere ever populated `skillCheckHistory` - the gate the old
+> `calculateChaosAdjustment` required before it would ever return a
+> nonzero delta. Chaos factor could not change automatically at all before
+> this fix; see C4 below for the corrected mechanic.
 
 ## Why this round found more
 
@@ -25,7 +35,12 @@ the executor, not the schema.
 
 ## Critical — fix first (small, mechanical, high blast radius)
 
-### C1. Numeric bounds in tool schemas are decoration, not enforcement
+### C1. Numeric bounds in tool schemas are decoration, not enforcement — ✅ FIXED
+
+`toolValidation.ts` now enforces `minimum`/`maximum`/`minItems`/`maxItems`
+(including inside `oneOf` branches); `create_quest`'s `points` schema got
+an explicit `maximum: 500` to match its documented tier ceiling. Covered
+by new tests in `tests/toolValidation.test.ts`.
 
 `toolValidation.ts` validates `type`/`enum`/`oneOf`/array `items` — it
 **never reads `minimum`/`maximum`**, even though dozens of schemas declare
@@ -50,7 +65,12 @@ array-`minItems`/`maxItems`) enforcement to `validateToolArgs` in
 whatever's declared-but-unchecked elsewhere in the 106 schemas — audit
 once, benefit everywhere.
 
-### C2. `game_over` has no deterministic gate at all
+### C2. `game_over` has no deterministic gate at all — ✅ FIXED
+
+`toolExecutor.ts` now rejects `game_over` unless either an existing tier 6
+(permanent) `Condition` matches the named `condition` argument, or the
+player's own combatant is downed (HP ≤ 0 or inactive) in active combat.
+Covered by new tests in `tests/toolExecution.test.ts`.
 
 `toolExecutor.ts:2294-2335` — the only check on this tool is
 `reason.length >= 10`. There is no requirement that HP hit zero, a
@@ -67,7 +87,17 @@ the tracked player combatant, or a failed roll logged in the current
 scene — and reject/re-prompt otherwise, the same way a malformed tool
 call is already rejected.
 
-### C3. Combat has no invariants
+### C3. Combat has no invariants — ✅ FIXED
+
+`update_combatant_stat` now clamps HP-like stats (`hp`/`health`/
+`hitpoints`) at a floor of 0 and auto-flags the combatant `isActive: false`
+the moment they hit 0, for delta, dice, and absolute (`=N`) forms alike.
+`npc_roll` now rejects a call for any combatant other than whoever's turn
+it currently is (when turn order is populated), while deliberately leaving
+`update_combatant_stat`/`toggle_combatant_condition` ungated by turn order
+since those apply the *consequences* of an action to whichever combatant
+they target, not the actor's own turn. Covered by new tests in
+`tests/gmTools.combatInvariants.test.ts`.
 
 - `executeUpdateCombatantStat` (`gmExecutor.ts:2926-3009`) computes
   `newValue = oldValue + change` (or an absolute `"=N"` form,
@@ -89,7 +119,24 @@ turn-ownership check to the combat-mutation tools when `combatState.active`
 is true, rejecting/queuing out-of-turn calls the way an out-of-schema
 argument is already rejected.
 
-### C4. Chaos factor: two incompatible implementations, and the correct one is dead
+### C4. Chaos factor: two incompatible implementations, and the correct one is dead — ✅ FIXED
+
+`checkScene` was also rolling a d100 against the 1-9 chaos scale (a die-
+size bug independent of it being unwired - it made Altered/Interrupted
+fire on only ~1-9% of scenes even at max chaos instead of Mythic's real
+roughly-even odds); fixed to roll a d10, matching the rule documented in
+`docs/mythic_notes.md`. `increment_scene` now calls `checkScene` every
+scene transition, surfaces the result (and, on "Interrupted," a generated
+random event the GM is told it must incorporate) to the model, and moves
+chaos via `adjustChaosFactor` (+1 on Altered/Interrupted, -1 on Normal) -
+the same external, roll-driven signal in both directions, never a model
+self-report. The old `calculateChaosAdjustment`/`applyChaosAdjustment`/
+`getChaosAdjustmentReason`/`addSkillCheckResult` functions were deleted
+from `mythicChaos.ts` (confirmed unused elsewhere, including in tests);
+`skillCheckHistory`/`currentStreak` remain on `AGMTState` as manually-
+editable, informational-only fields since the story's Chaos/Oracle tab UI
+still displays them. Covered by new tests in `tests/mythic.checkScene.test.ts`
+and `tests/toolExecution.incrementScene.test.ts`.
 
 This is worth calling out on its own because it directly affects the
 integration plan's Phase 1 recommendation to "wire up `checkScene`."
@@ -124,7 +171,13 @@ deliberately fold the streak signal into `checkScene`'s inputs as one
 factor among several. Either way, stop having both exist with only one
 reachable.
 
-### C5. Dice formulas have no bounds
+### C5. Dice formulas have no bounds — ✅ FIXED
+
+`parseFormula` now rejects dice counts/sides outside `1..100`/`1..1000`,
+and rejects an exploding die with fewer than 2 sides (which would explode
+forever, since a 1-sided die always rolls its own max). `rollDiceGroup`
+also caps total explosions per die at 100 as defense in depth, independent
+of the parse-time check. Covered by new tests in `tests/diceFormula.test.ts`.
 
 `diceFormula.ts`'s `DICE_PATTERN` accepts unbounded `\d+` for both dice
 count and sides, and none of the tool schemas exposing `formula`
@@ -270,6 +323,16 @@ and partially is, deterministic.
 ---
 
 ## Revised priority order (supersedes §5 of `ai-gm-integration-plan.md`)
+
+_Items 1-4 (all of C1-C5) are done — see the ✅ FIXED notes above. What
+remains is H1-H8 and the Medium items, in the order below._
+
+1. ~~**C1**~~ done.
+2. ~~**C2, C3**~~ done.
+3. ~~**C4**~~ done.
+4. ~~**C5**~~ done.
+
+Original text, preserved for the remaining items:
 
 1. **C1** — add `minimum`/`maximum` enforcement to `toolValidation.ts`.
    One function; closes several holes (C1's own list, and pre-empts H1

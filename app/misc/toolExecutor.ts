@@ -19,9 +19,11 @@ import { executeCommandWithResponse } from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
 import { logger } from "@/app/misc/logger";
 import {
-  applyChaosAdjustment,
-  getChaosAdjustmentReason,
-} from "@/app/misc/mythicChaos";
+  checkScene,
+  adjustChaosFactor,
+  generateEventFocus,
+  generateEventMeaning,
+} from "@/app/misc/mythic";
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
 import {
@@ -1733,22 +1735,43 @@ export function executeTools(
         // Increment scene
         storyData.agmtState.sceneCount++;
 
-        // Auto-adjust chaos based on performance
-        const adjustedState = applyChaosAdjustment(storyData.agmtState);
-        const newChaos = adjustedState.chaosFactor;
-
-        storyData.agmtState = adjustedState;
+        // Scene check (Mythic-style): roll against the current chaos
+        // factor to see whether the new scene proceeds as expected
+        // (Normal), is subverted (Altered), or is replaced entirely by a
+        // random event (Interrupted). Chaos then moves toward whichever
+        // direction that outcome implies - up when control was lost,
+        // down when the scene resolved as expected - the same external,
+        // roll-driven signal in both directions, not a model self-report
+        // of "did things go well" (which would just reopen the leniency
+        // problem this mechanic exists to prevent).
+        const { sceneType, roll: sceneRoll } = checkScene(oldChaos);
+        const newChaos = adjustChaosFactor(
+          oldChaos,
+          sceneType === "Normal" ? -1 : 1
+        );
+        storyData.agmtState.chaosFactor = newChaos;
+        storyData.agmtState.lastChaosAdjustment = storyData.agmtState.sceneCount;
 
         // Build response message
         let message = `✓ Scene count: ${oldCount} → ${oldCount + 1}`;
+        message += `\n🎲 Scene Check: rolled ${sceneRoll} vs chaos ${oldChaos} → ${sceneType}`;
 
         if (newChaos !== oldChaos) {
-          const reason = getChaosAdjustmentReason(
-            oldChaos,
-            newChaos,
-            adjustedState
-          );
-          message += `\n${reason}`;
+          message +=
+            newChaos > oldChaos
+              ? `\n⚠️ Chaos increased to ${newChaos} (scene ${sceneType.toLowerCase()} - control was lost)`
+              : `\n📉 Chaos decreased to ${newChaos} (scene resolved as expected)`;
+        }
+
+        let eventFocus: string | undefined;
+        let eventMeaning: { action: string; subject: string } | undefined;
+        if (sceneType === "Interrupted") {
+          eventFocus = generateEventFocus().focus;
+          const meaning = generateEventMeaning();
+          eventMeaning = { action: meaning.action, subject: meaning.subject };
+          message += `\n⚡ SCENE INTERRUPTED! The expected scene doesn't happen - replace it with a random event: [${eventFocus}] "${eventMeaning.action} ${eventMeaning.subject}". This must be incorporated into the next narration, not skipped.`;
+        } else if (sceneType === "Altered") {
+          message += `\n🔀 Scene Altered: the expected scene happens, but with an unexpected twist - don't play it exactly as planned.`;
         }
 
         logger.action("Scene count incremented via tool", {
@@ -1757,6 +1780,8 @@ export function executeTools(
           newCount: oldCount + 1,
           oldChaos,
           newChaos,
+          sceneType,
+          sceneRoll,
           chaosAdjusted: newChaos !== oldChaos,
         });
         responses.push({
@@ -2300,6 +2325,48 @@ export function executeTools(
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
             toolName,
+          });
+          responses.push({
+            command: `/game_over`,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Deterministic gate: game_over is a fatal, irreversible outcome and
+        // must be earned through state the engine already tracks - a tier 6
+        // (permanent) condition, or the player's own combatant being downed
+        // in active combat - not narrative say-so alone. This mirrors the
+        // tool's own schema description ("Use when a tier 6 condition
+        // narratively prevents the character from continuing").
+        const matchingTier6Condition = conditionName
+          ? storyData.conditions?.find(
+              (c) =>
+                c.name.toLowerCase() === conditionName.toLowerCase() &&
+                (c.tier === 6 || c.permanent)
+            )
+          : undefined;
+
+        const playerCombatant = storyData.combatState?.active
+          ? storyData.combatState.combatants.find((c) => c.type === "player")
+          : undefined;
+        const playerIsDowned =
+          !!playerCombatant &&
+          (!playerCombatant.isActive ||
+            (typeof playerCombatant.stats?.HP === "number" &&
+              playerCombatant.stats.HP <= 0));
+
+        if (!matchingTier6Condition && !playerIsDowned) {
+          const errorMsg = conditionName
+            ? `Cannot end the game: no active tier 6 (permanent) condition named "${conditionName}" was found. Use upgrade_condition to raise a condition to tier 6 first, or reduce the player's HP to 0 in active combat, before calling game_over.`
+            : "Cannot end the game: no tier 6 (permanent) condition or downed player combatant was found. Pass the exact name of an existing tier 6 condition, or reduce the player's HP to 0 in active combat, before calling game_over.";
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+            conditionName,
           });
           responses.push({
             command: `/game_over`,
