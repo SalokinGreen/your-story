@@ -547,78 +547,6 @@ const resetAbilityCooldownTool: ToolSchema = {
   },
 };
 
-// Passive Effect Tools
-const addPassiveTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "add_passive",
-    description:
-      "Grant the player a new passive effect. Passives are story/RP traits that influence narrative and AI behavior - they are NOT direct mechanical bonuses. Examples: 'Wolf Slayer' (wolves are easier to fight), 'Noble Blood' (nobles treat you with respect), 'Shadow Walker' (stealth situations favor you).",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description:
-            "Passive name (e.g., 'Wolf Slayer', 'Noble Blood', 'Shadow Walker', 'Fire Touched')",
-        },
-        description: {
-          type: "string",
-          description:
-            "Narrative description of what this trait means for the character and how it influences situations (e.g., 'Wolves sense your predatory nature and are easier to intimidate or defeat')",
-        },
-      },
-      required: ["name", "description"],
-    },
-  },
-};
-
-const removePassiveTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "remove_passive",
-    description:
-      "Remove a passive effect from the player (lost through curse, story events, transformation reversal, etc.)",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Passive name (fuzzy matching supported)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const modifyPassiveTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "modify_passive",
-    description:
-      "Modify an existing passive's name or description. Use when a trait evolves through story events (e.g., 'Wolf Slayer' becomes 'Beast Master' after taming a wolf).",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Current passive name (fuzzy matching supported)",
-        },
-        newName: {
-          type: "string",
-          description: "New name for the passive (optional)",
-        },
-        newDescription: {
-          type: "string",
-          description: "New description for the passive (optional)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
 // Character Field Management Tools (CharacterSchema system)
 const modifyFieldTool: ToolSchema = {
   type: "function",
@@ -1132,26 +1060,6 @@ const searchNotesTool: ToolSchema = {
         },
       },
       required: ["query"],
-    },
-  },
-};
-
-// Momentum Tool
-const modifyMomentumTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "modify_momentum",
-    description:
-      "Change momentum value. Momentum represents forward story progress and player agency.",
-    parameters: {
-      type: "object",
-      properties: {
-        amount: {
-          type: "number",
-          description: "Momentum change (can be negative)",
-        },
-      },
-      required: ["amount"],
     },
   },
 };
@@ -1862,11 +1770,6 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   upgradeAbilityTool,
   resetAbilityCooldownTool,
 
-  // Passive Effect Management (3 tools)
-  addPassiveTool,
-  removePassiveTool,
-  modifyPassiveTool,
-
   // Character Field Management (4 tools - CharacterSchema system)
   modifyFieldTool,
   setFieldTool,
@@ -1889,9 +1792,6 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   mergeLoreTool,
   duplicateLoreTool,
   searchNotesTool,
-
-  // Momentum (1 tool)
-  modifyMomentumTool,
 
   // NPC Management (1 tool - creates lore for NPCs)
   addNpcTool,

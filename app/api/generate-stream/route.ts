@@ -156,8 +156,6 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
   // Items
   "add_item",
   "remove_item",
-  // Core state
-  "modify_momentum",
   // Terminal - required
   "end_gm_thinking",
 ]);

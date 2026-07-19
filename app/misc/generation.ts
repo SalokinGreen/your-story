@@ -2364,10 +2364,9 @@ export async function analyzeAction(
         // Import parseDCValue for tier conversion
         const { parseDCValue } = await import("./rpgSystems");
         const difficulty = storyData.difficulty || "medium";
-        const systemId = storyData.rpgSystem || "3d6";
-        analysis.skill_dc = parseDCValue(lowerDc, systemId, difficulty);
+        analysis.skill_dc = parseDCValue(lowerDc, "3d6", difficulty);
         validationWarnings.push(
-          `Converted DC tier "${lowerDc}" → ${analysis.skill_dc} (${systemId}, ${difficulty} difficulty)`,
+          `Converted DC tier "${lowerDc}" → ${analysis.skill_dc} (${difficulty} difficulty)`,
         );
       } else {
         // Try parsing as number

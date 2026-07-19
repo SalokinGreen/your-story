@@ -36,21 +36,17 @@ import {
   ABILITY_GRADE_ORDER,
   initializeAbility,
   formatAbilityCost,
-  getAbilityBonus,
 } from "../../misc/abilitySystem";
-import { getRPGSystem, type RPGSystemType } from "../../misc/rpgSystems";
 
 export default function AbilitiesEditor({
   abilities,
   resources,
   variables,
-  rpgSystem,
   onUpdate,
 }: {
   abilities: Ability[];
   resources: Resource[];
   variables: Variable[];
-  rpgSystem: string;
   onUpdate: (abilities: Ability[]) => void;
 }) {
   const [localAbilities, setLocalAbilities] = useState([...abilities]);
@@ -62,8 +58,6 @@ export default function AbilitiesEditor({
   );
   const [editAbility, setEditAbility] = useState<Partial<Ability>>({});
   const [editCosts, setEditCosts] = useState<AbilityCost[]>([]);
-
-  const system = getRPGSystem((rpgSystem || "3d6") as RPGSystemType);
 
   // Drag-and-drop handlers
   const handleDragStart = (index: number) => {
@@ -436,17 +430,6 @@ export default function AbilitiesEditor({
                   {ability.stat && (
                     <span className="text-xs px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-300">
                       {ability.stat}
-                    </span>
-                  )}
-                  {getAbilityBonus(ability, system.id) > 0 && (
-                    <span
-                      className="text-xs font-bold"
-                      style={{
-                        color:
-                          ABILITY_GRADE_CONFIG[ability.grade || "novice"].color,
-                      }}
-                    >
-                      +{getAbilityBonus(ability, system.id)}
                     </span>
                   )}
                 </div>

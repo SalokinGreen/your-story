@@ -276,10 +276,9 @@ const FEW_SHOT_TOOL_CALLS = [
     id: "ex2",
     type: "function" as const,
     function: {
-      name: "modify_momentum",
+      name: "trigger_achievement",
       arguments: JSON.stringify({
-        amount: 1,
-        reason: "Quick thinking and improvisation in a tense situation",
+        title: "Silver Tongue",
       }),
     },
   },
@@ -295,8 +294,7 @@ const FEW_SHOT_TOOL_RESPONSES = [
   {
     toolCallId: "ex2",
     success: true,
-    message:
-      "Momentum increased by 1 → 2 (Quick thinking and improvisation in a tense situation)",
+    message: "Achievement unlocked: Silver Tongue",
   },
 ];
 
@@ -1094,11 +1092,6 @@ ${
       : "",
     storyData.player_notes
       ? `## Player Notes\n${cleanString(storyData.player_notes)}`
-      : "",
-    storyData.momentum !== undefined
-      ? `**Momentum:** ${storyData.momentum}/${
-          storyData.maxMomentum || 3
-        } (spend for advantage/guaranteed success)`
       : "",
     storyData.points !== undefined && storyData.points > 0
       ? `**Points:** ${storyData.points}`

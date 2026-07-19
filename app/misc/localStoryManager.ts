@@ -232,8 +232,6 @@ export async function startFreeformStoryLocally(
     abilities: [],
     achievements: [],
     lore: initialLore || [],
-    momentum: 3,
-    maxMomentum: 5,
     points: 0,
     level: 1,
     upgradesSpent: 0,

@@ -18,30 +18,15 @@ import {
   Adventure,
 } from "../misc/structs";
 import {
-  getRPGSystem,
-  rollDice,
-  checkSuccess,
-  calculateResourceRequirements,
-  getConditionPenalty,
-  parseDCValue,
-} from "../misc/rpgSystems";
-import {
   askFate,
   generateElement,
+  generateEventFocus,
+  generateEventMeaning,
   type Likelihood,
   type ElementCategory,
 } from "../misc/mythic";
-import {
-  applyDurabilityLoss,
-  getItemBonus,
-  getMaxDurability,
-  getDurabilityDisplay,
-  GRADE_CONFIG,
-  ItemGrade,
-} from "../misc/itemSystem";
 import { NARRATION_MODEL_KEY } from "../misc/reasoningTiers";
 import Story from "./story";
-import StatsPage from "./stats";
 import LorePage from "./lore";
 import QuestsPage from "./quests";
 import AchievementsPage from "./achievements";
@@ -116,11 +101,9 @@ import {
   findItemMatch,
   findResourceMatch,
   findStatMatch,
-  findAchievementMatch,
   findQuestMatch,
   findRelationshipMatch,
   findLoreMatch,
-  findAbilityMatch,
 } from "../misc/fuzzyMatch";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn, analyzeAction } from "../misc/generation";
@@ -129,14 +112,7 @@ import {
   GMNPCReactionResult,
   GMFormulaRollResult,
 } from "../misc/gmExecutor";
-import {
-  canAffordAbility,
-  deductAbilityCost,
-  startCooldown,
-  getAbilityBonus,
-  tickCooldowns,
-  ABILITY_GRADE_CONFIG,
-} from "../misc/abilitySystem";
+import { tickCooldowns } from "../misc/abilitySystem";
 import CharacterCreationForm from "./create-character/form";
 import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
@@ -450,23 +426,6 @@ export function processCommands(
           "warning",
         );
       }
-      continue;
-    }
-
-    // /modify_momentum: amount
-    const momentumMatch = trimmed.match(/^\/modify_momentum:\s*([+-]?\d+)$/i);
-    if (momentumMatch) {
-      const amount = parseInt(momentumMatch[1], 10);
-      const oldValue = storyData.momentum;
-      storyData.momentum = Math.max(
-        0,
-        Math.min(storyData.maxMomentum, storyData.momentum + amount),
-      );
-      logger.action("Momentum modified via command", {
-        amount,
-        oldValue,
-        newValue: storyData.momentum,
-      });
       continue;
     }
 
@@ -1517,9 +1476,6 @@ function StoryPageContent() {
     | { type: "thinking"; content: string; isStreaming?: boolean }
     | { type: "tool"; result: import("@/app/misc/gmExecutor").GMToolResult };
   const [liveGMEntries, setLiveGMEntries] = useState<GMEntry[]>([]);
-  const [momentumMode, setMomentumMode] = useState<
-    "none" | "advantage" | "guarantee"
-  >("none");
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
   const [started, setStarted] = useState(false);
@@ -1643,17 +1599,6 @@ function StoryPageContent() {
     resolvedFormula?: string; // Formula with variables resolved (e.g., "1d20+5")
     // Reverse DC mode (Call of Cthulhu style - roll under DC to succeed)
     reverseDC?: boolean;
-    // Legacy RPG system type (backward compatibility)
-    rpgSystem?:
-      | "3d6"
-      | "1d20"
-      | "1d100"
-      | "percentile"
-      | "pbta"
-      | "fate"
-      | "yze"
-      | "explosive"
-      | "narrative"; // RPG system type
     baseDice?: number[]; // YZE: base dice rolls
     stressDice?: number[]; // YZE: stress dice rolls
     successes?: number; // YZE: count of 6s
@@ -1672,12 +1617,6 @@ function StoryPageContent() {
   const [pendingNPCReactions, setPendingNPCReactions] = useState<NPCReaction[]>(
     [],
   );
-
-  // YZE: Stress dice selection state
-  const [yzeStressDiceChoice, setYzeStressDiceChoice] = useState<number>(0);
-  const [yzeAwaitingStressChoice, setYzeAwaitingStressChoice] =
-    useState<boolean>(false);
-  const [yzePendingChoice, setYzePendingChoice] = useState<Choice | null>(null);
 
   // Command responses for AI feedback loop
   const [pendingCommandResponses, setPendingCommandResponses] = useState<
@@ -2939,13 +2878,10 @@ function StoryPageContent() {
   ) {
     if (!storyData) return;
 
-    // If we're resuming from YZE stress dice selection, use the pending choice
     let choice: Choice | undefined;
     if (actionChoice) {
       // Direct action from freeform mode
       choice = actionChoice;
-    } else if (yzePendingChoice && yzeAwaitingStressChoice) {
-      choice = yzePendingChoice;
     } else {
       choice = choices.choices.find((c) => input[c.text]);
     }
@@ -2955,1711 +2891,165 @@ function StoryPageContent() {
 
     logger.action("User selected choice", { choice: choice.text, index: key });
 
-    // Get RPG system configuration
-    const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
-
-    // Convert tier-based DC to numeric DC if needed
-    // This handles AI-generated choices that use tier names (e.g., "hard") instead of numbers
-    if (choice.skill_dc_tier && !choice.skill_dc) {
-      const difficulty = storyData.difficulty || "medium";
-      choice.skill_dc = parseDCValue(
-        choice.skill_dc_tier,
-        rpgSystem.id as any,
-        difficulty,
-      );
-      logger.action("Converted tier to DC", {
-        tier: choice.skill_dc_tier,
-        system: rpgSystem.id,
-        difficulty,
-        dc: choice.skill_dc,
-      });
-    }
-
-    // Safety check: ensure skill_dc is numeric (handles legacy string values)
-    if (choice.skill_dc !== undefined && typeof choice.skill_dc !== "number") {
-      const tierNames = [
-        "trivial",
-        "easy",
-        "average",
-        "hard",
-        "very_hard",
-        "impossible",
-      ];
-      const dcString = String(choice.skill_dc).toLowerCase();
-      if (tierNames.includes(dcString)) {
-        const difficulty = storyData.difficulty || "medium";
-        choice.skill_dc = parseDCValue(
-          dcString as any,
-          rpgSystem.id as any,
-          difficulty,
-        );
-        logger.action("Converted string DC to numeric", {
-          original: dcString,
-          converted: choice.skill_dc,
-        });
-      } else {
-        // Try parsing as number
-        const parsed = parseInt(String(choice.skill_dc), 10);
-        choice.skill_dc = isNaN(parsed) ? 0 : parsed;
-      }
-    }
-
-    // YZE: If this choice has a skill check, show stress dice selection UI first
-    if (
-      rpgSystem.id === "yze" &&
-      choice.skill_used &&
-      !yzeAwaitingStressChoice &&
-      true
-    ) {
-      setYzePendingChoice(choice);
-      setYzeAwaitingStressChoice(true);
-      setYzeStressDiceChoice(0); // Default to 0 stress dice
-      return; // Wait for player to choose stress dice
-    }
-
     setLoading(true);
     setLoadingStage("story");
     // Set pending user choice for immediate display in chat
     setPendingUserChoice(choice.text);
 
-    //Handlemomentumspending
-    if (momentumMode === "advantage" && storyData.momentum >= 1) {
-      storyData.momentum--;
-      logger.action("Momentum spent", {
-        mode: "advantage",
-        cost: 1,
-        remaining: storyData.momentum,
+    // Check if this choice has intro_override (for starting choices)
+    // If so, skip AI generation and use the preset intro directly
+    if (choice.intro_override) {
+      logger.action("Using intro_override instead of AI generation", {
+        choice: choice.text,
       });
-      addNotification(
-        `Spent 1 Momentum for Advantage! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
-        "info",
-      );
-    } else if (momentumMode === "guarantee" && storyData.momentum >= 3) {
-      storyData.momentum -= 3;
-      logger.action("Momentum spent", {
-        mode: "guarantee",
-        cost: 3,
-        remaining: storyData.momentum,
-      });
-      addNotification(
-        `Spent 3 Momentum for Guaranteed Success! (${storyData.momentum}/${storyData.maxMomentum} remaining)`,
-        "success",
-      );
+
+      const overridePart: ScenePart = {
+        content: choice.intro_override,
+        imageUrl: "",
+        user: false,
+        role: "assistant",
+        choices: [], // Will need to generate choices next
+      };
+      storyData.scene.parts.push(overridePart);
+
+      setStoryText(choice.intro_override);
+      setStoryData({ ...storyData });
+      setLoading(false);
+      setLoadingStage("choices");
+
+      try {
+        const { choicesModel } = getModelsFromPreset();
+        const { generateChoicesOnly } = await import("../misc/generation");
+        const newChoices = await generateChoicesOnly(storyData, {
+          choicesModel,
+          openRouterKey,
+          deepseekKey,
+          googleKey,
+          mistralKey,
+          deepinfraKey,
+        });
+
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            choices: newChoices,
+          };
+        }
+
+        setChoices({ choices: newChoices });
+        setStoryData({ ...storyData });
+        setLoadingStage(null);
+
+        saveProgress(storyData);
+        addNotification("Story continues...", "success");
+      } catch (error) {
+        console.error("Error generating choices:", error);
+        const fallbackChoices = [{ text: "Continue" }];
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            choices: fallbackChoices,
+          };
+        }
+        setChoices({ choices: fallbackChoices });
+        setStoryData({ ...storyData });
+        setLoadingStage(null);
+        saveProgress(storyData);
+      }
+      return;
     }
 
-    // Get RPG system configuration (already fetched above, remove duplicate)
+    // Build the player-facing text: the choice itself, plus lightweight
+    // flavor annotations (oracle question, table roll, context dice).
+    // No mechanical resolution happens client-side anymore - the GM decides
+    // whether/how to roll via its own formula_roll tool once it reads this.
+    const flavorLines: string[] = [];
 
-    // For YZE and Explosive: Need stat value before rolling, so defer the initial roll
-    let dice_roll = 0;
-    let diceResult: { rolls: number[]; total: number; explosions?: number } = {
-      rolls: [],
-      total: 0,
-    };
-    let explosionCount = 0; // Track explosions for explosive system
-
-    if (rpgSystem.id !== "yze" && rpgSystem.id !== "explosive") {
-      // Roll dice according to system (non-YZE, non-Explosive systems roll once globally)
-      diceResult = rollDice(rpgSystem);
-      dice_roll = diceResult.total;
-      logger.action("Initial dice roll", {
-        system: rpgSystem.id,
-        rolls: diceResult.rolls,
-        total: dice_roll,
-      });
-    }
-
-    //Track all dice rolls for visualization
-    const allDiceRolls: number[] = [dice_roll];
-    const allDiceDetails: number[][] = [diceResult.rolls]; // Track individual dice per roll
-    let insufficientResourceDisadvantage = false; // Track if disadvantage from low resources
-
-    // Track advantage/disadvantage sources for stacking
-    let advantageCount = 0;
-    let disadvantageCount = 0;
-    const advantageSources: string[] = [];
-    const disadvantageSources: string[] = [];
-
-    //BuilddetailedRPG-stylechoicetextwithbrackets
-    let choiceDetails: string[] = [];
-
-    // Process Advanced RPG Tools checks first (less important, shown at top)
-    const agmtDetails: string[] = [];
     if (choice.agmt_check) {
       try {
-        // Parse format: "question (likelihood)" or just "question"
-        const match = choice.agmt_check.match(
-          /^(.+?)(?:\s*\(\s*([^)]+)\s*\))?$/,
-        );
-        if (match) {
-          const question = match[1].trim();
-          let likelihood = (match[2]?.trim() || "50/50") as Likelihood;
+        const LIKELIHOODS: Likelihood[] = [
+          "Impossible",
+          "No Way",
+          "Very Unlikely",
+          "Unlikely",
+          "50/50",
+          "Somewhat Likely",
+          "Likely",
+          "Very Likely",
+          "Near Sure Thing",
+          "A Sure Thing",
+          "Has To Be",
+        ];
+        const match = choice.agmt_check.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
+        const question = (match ? match[1] : choice.agmt_check).trim();
+        const rawLikelihood = (match ? match[2] : "50/50").trim();
+        const likelihood: Likelihood =
+          LIKELIHOODS.find(
+            (l) => l.toLowerCase() === rawLikelihood.toLowerCase(),
+          ) || "50/50";
+        const chaosFactor = storyData.agmtState?.chaosFactor ?? 5;
+        const fateResult = askFate(likelihood, chaosFactor);
 
-          // Validate and normalize likelihood
-          const validLikelihoods: Likelihood[] = [
-            "Impossible",
-            "No Way",
-            "Very Unlikely",
-            "Unlikely",
-            "50/50",
-            "Somewhat Likely",
-            "Likely",
-            "Very Likely",
-            "Near Sure Thing",
-            "A Sure Thing",
-            "Has To Be",
-          ];
-          if (!validLikelihoods.includes(likelihood)) {
-            console.warn(
-              `Invalid AGMT likelihood "${likelihood}", defaulting to 50/50`,
-            );
-            likelihood = "50/50";
-          }
+        flavorLines.push(`[AGMT Question: ${question}]`);
+        const answerLine = fateResult.randomEvent
+          ? `[AGMT Answer: ${fateResult.answer} - RANDOM EVENT TRIGGERED!]`
+          : `[AGMT Answer: ${fateResult.answer}]`;
+        flavorLines.push(answerLine);
 
-          const chaosFactor = storyData.agmtState?.chaosFactor || 5;
-
-          const result = askFate(likelihood, chaosFactor);
-
-          let agmtLine = `[AGMT Question: ${question}]`;
-          let answerLine = `[AGMT Answer: ${result.answer}`;
-          if (result.randomEvent) {
-            answerLine += " - RANDOM EVENT TRIGGERED!";
-          }
-          answerLine += `]`;
-
-          agmtDetails.push(agmtLine);
-          agmtDetails.push(answerLine);
-
-          // Add context flag if skill check exists or agmt_context_only is set
-          if (choice.skill_used || choice.agmt_context_only) {
-            agmtDetails.push(
-              `[Note: AGMT is context only - skill check determines success/failure]`,
-            );
-          }
-
-          logger.action("AGMT fate check from choice", {
-            question,
-            likelihood,
-            answer: result.answer,
-            roll: result.roll,
-            randomEvent: result.randomEvent,
-            contextOnly: !!(choice.skill_used || choice.agmt_context_only),
-          });
+        if (fateResult.randomEvent) {
+          const focus = generateEventFocus();
+          const meaning = generateEventMeaning();
+          flavorLines.push(
+            `[Random Event: ${focus.focus} - ${meaning.action} ${meaning.subject}]`,
+          );
         }
       } catch (error) {
         console.error("Error processing agmt_check:", error);
       }
     }
 
-    // Process unified table field (checks both custom tables and agmt tables)
-    // Also handle legacy agmt_table and custom_table fields for backward compatibility
-    const tableToRoll =
-      choice.table || choice.agmt_table || choice.custom_table;
-    if (tableToRoll) {
+    // Table roll: unified `table` field, with legacy fallbacks
+    const tableForChoice = choice.table || choice.agmt_table || choice.custom_table;
+    if (tableForChoice) {
       try {
-        // First, check if it's a custom table
-        const customTable = storyData.customTables?.find(
-          (t) => t.name.toLowerCase() === tableToRoll.toLowerCase(),
-        );
-
-        if (customTable) {
-          // Roll on custom table
-          const totalWeight = customTable.entries.reduce(
-            (sum, e) => sum + e.weight,
-            0,
+        if (storyData.customTables) {
+          const { getTableByName, rollOnCustomTable } =
+            await import("../misc/tableRoller");
+          const customTable = getTableByName(
+            storyData.customTables,
+            tableForChoice,
           );
-          const roll = Math.random() * totalWeight;
-          let cumulative = 0;
-          let result: { text: string; weight: number } | undefined;
-          for (const entry of customTable.entries) {
-            cumulative += entry.weight;
-            if (roll <= cumulative) {
-              result = entry;
-              break;
+          if (customTable) {
+            const result = rollOnCustomTable(customTable);
+            if (result) {
+              flavorLines.push(`[${customTable.name}: ${result.text}]`);
+            } else {
+              addNotification(`Table "${customTable.name}" is empty`, "warning");
+            }
+          } else {
+            const result = generateElement(tableForChoice as ElementCategory);
+            if (result) {
+              flavorLines.push(`[${tableForChoice} Table: ${result.element}]`);
             }
           }
-          if (result) {
-            agmtDetails.push(`[${customTable.name}: ${result.text}]`);
-            logger.action("Custom table roll from choice", {
-              table: customTable.name,
-              result: result.text,
-              weight: result.weight,
-            });
-          }
         } else {
-          // Try as agmt element table
-          const result = generateElement(tableToRoll as ElementCategory);
-          const tableName = tableToRoll
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (l) => l.toUpperCase());
-          agmtDetails.push(`[${tableName} Table: ${result.element}]`);
-
-          logger.action("AGMT table roll from choice", {
-            table: tableToRoll,
-            result: result.element,
-          });
+          const result = generateElement(tableForChoice as ElementCategory);
+          if (result) {
+            flavorLines.push(`[${tableForChoice} Table: ${result.element}]`);
+          }
         }
       } catch (error) {
         console.error("Error processing table roll:", error);
       }
     }
 
-    //Trackstatechangesfordisplay
-    let itemQuantityBefore = 0;
-    let itemQuantityAfter = 0;
-    let itemBroken = false;
-    let itemDurabilityBefore = 0;
-    let itemDurabilityAfter = 0;
-    let itemMaxDurability = 0;
-    let itemGradeBonus = 0;
-    let itemGradeLabel = ""; // Track grade label before item might be removed
-    let itemType = "normal"; // Track item type before removal
-    let insufficientResource = false;
-    let skillCheckResult = "";
-
-    // Ability tracking
-    let abilityUsed: Ability | null = null;
-    let abilityGradeBonus = 0;
-    let abilityGradeLabel = "";
-    let abilityCooldownStarted = false;
-    let abilityCostsDeducted: Array<{
-      type: string;
-      name: string;
-      amount: number;
-    }> = [];
-
-    // YZE: Panic data for user message
-    // Explosive: Explosion data for user message
-    let yzeData: {
-      baseDice?: number[];
-      stressDice?: number[];
-      successes?: number;
-      panicTriggered?: boolean;
-      panicEffect?: string;
-      stressLevel?: number;
-      stressRelief?: boolean;
-      explosions?: number; // For explosive system
-      dieSize?: number; // For explosive system
-    } = {};
-
-    // Track roll outcome for AI context
-    let rollTotal = 0; // Final total (roll + modifier)
-    let rollDC = 0; // DC used for check
-
-    //Processitemusage
-    if (choice.item_used) {
-      // Try fuzzy matching first
-      const matchResult = findItemMatch(choice.item_used, storyData.inventory);
-      // Get the actual typed item from inventory (fuzzy match returns generic type)
-      const item: InventoryItem | undefined = matchResult
-        ? storyData.inventory.find((i) => i.name === matchResult.name)
-        : undefined;
-      const item_exists = item !== undefined;
-
-      // Log fuzzy match result
-      if (matchResult && !matchResult.isExact) {
-        logger.info("Fuzzy matched item", {
-          aiProvided: choice.item_used,
-          matched: matchResult.name,
-          score: matchResult.score,
-        });
-        addNotification(
-          `Matched "${choice.item_used}" → "${matchResult.name}" (${Math.round(
-            matchResult.score * 100,
-          )}% match)`,
-          "info",
-        );
-        // Update choice to use the exact matched name
-        choice.item_used = matchResult.name;
-      }
-
-      if (item_exists && item) {
-        itemQuantityBefore = item.quantity;
-        itemType = item.type || "normal";
-
-        // Track grade label before item might be removed
-        itemGradeLabel =
-          item.grade && GRADE_CONFIG[item.grade]
-            ? ` [${GRADE_CONFIG[item.grade].label}]`
-            : "";
-
-        // Track durability info for display
-        const durabilityInfo = getDurabilityDisplay(item);
-        itemDurabilityBefore = durabilityInfo.current;
-        itemMaxDurability = durabilityInfo.max;
-        itemDurabilityAfter = itemDurabilityBefore; // Will be updated after skill check
-
-        // Get item grade bonus for this RPG system
-        itemGradeBonus = getItemBonus(item, rpgSystem.id);
-
-        //Handle advantage based on item type
-        if (itemType === "misc") {
-          //Misc items don't give advantage, but prevent disadvantage
-          addNotification(
-            `Used item: ${choice.item_used}${itemGradeLabel} (No disadvantage)`,
-            "info",
-          );
-        } else {
-          //Normal, consumable, and story items give advantage
-          advantageCount++;
-          advantageSources.push(choice.item_used);
-          const bonusText = itemGradeBonus > 0 ? ` +${itemGradeBonus}` : "";
-          addNotification(
-            `Used item: ${choice.item_used}${itemGradeLabel} (Advantage${bonusText}!)`,
-            "info",
-          );
-        }
-
-        // Handle item consumption based on type
-        // Consumable: Always consumed when used (durability doesn't apply)
-        if (itemType === "consumable") {
-          const itemIndex = storyData.inventory.findIndex(
-            (i) => i.name === choice.item_used,
-          );
-          if (itemIndex !== -1) {
-            if (storyData.inventory[itemIndex].quantity > 1) {
-              storyData.inventory[itemIndex].quantity--;
-              itemQuantityAfter = storyData.inventory[itemIndex].quantity;
-            } else {
-              storyData.inventory.splice(itemIndex, 1);
-              itemQuantityAfter = 0;
-              itemBroken = true;
-            }
-          }
-        } else {
-          //Normal,story,misc: Durability is reduced on use (handled after skill check)
-          itemQuantityAfter = itemQuantityBefore;
-        }
-      } else {
-        //Item missing - disadvantage
-        disadvantageCount++;
-        disadvantageSources.push(`missing ${choice.item_used}`);
-        addNotification(
-          `Missing item: ${choice.item_used} (Disadvantage!)`,
-          "warning",
-        );
-      }
-    }
-
-    // Process ability usage
-    if (choice.ability_used) {
-      // Initialize abilities array if needed
-      if (!storyData.abilities) {
-        storyData.abilities = [];
-      }
-
-      // Try fuzzy matching first
-      const matchResult = findAbilityMatch(
-        choice.ability_used,
-        storyData.abilities,
-      );
-      // Get the actual typed ability from array
-      const ability: Ability | undefined = matchResult
-        ? storyData.abilities.find((a) => a.name === matchResult.name)
-        : undefined;
-
-      // Log fuzzy match result
-      if (matchResult && !matchResult.isExact) {
-        logger.info("Fuzzy matched ability", {
-          aiProvided: choice.ability_used,
-          matched: matchResult.name,
-          score: matchResult.score,
-        });
-        addNotification(
-          `Matched "${choice.ability_used}" → "${
-            matchResult.name
-          }" (${Math.round(matchResult.score * 100)}% match)`,
-          "info",
-        );
-        // Update choice to use the exact matched name
-        choice.ability_used = matchResult.name;
-      }
-
-      if (ability) {
-        // Check if ability is on cooldown (currentCooldown tracks remaining turns)
-        if ((ability.currentCooldown ?? 0) > 0) {
-          addNotification(
-            `${ability.name} is on cooldown (${ability.currentCooldown} turns remaining)`,
-            "warning",
-          );
-          // Clear ability_used since it can't be activated
-          choice.ability_used = undefined;
-        } else {
-          // Check if player can afford the ability costs
-          const affordability = canAffordAbility(ability, storyData);
-
-          if (!affordability.canAfford) {
-            // Cannot afford - cancel ability use
-            const missingStr = affordability.missingCosts.join("; ");
-            addNotification(
-              `Cannot use ${ability.name}: ${missingStr}`,
-              "warning",
-            );
-            // Clear ability_used since it can't be activated
-            choice.ability_used = undefined;
-          } else {
-            // Can afford - ability will be used
-            abilityUsed = ability;
-            abilityGradeLabel =
-              ability.grade && ABILITY_GRADE_CONFIG[ability.grade]
-                ? ` [${ABILITY_GRADE_CONFIG[ability.grade].label}]`
-                : "";
-            abilityGradeBonus = getAbilityBonus(ability, rpgSystem.id);
-
-            // Apply ability advantage
-            advantageCount++;
-            advantageSources.push(ability.name);
-            const bonusText =
-              abilityGradeBonus > 0 ? ` +${abilityGradeBonus}` : "";
-            addNotification(
-              `Using ability: ${ability.name}${abilityGradeLabel} (Advantage${bonusText}!)`,
-              "success",
-            );
-
-            // Deduct costs immediately
-            const costChanges = deductAbilityCost(ability, storyData);
-            if (costChanges.length > 0) {
-              // Store cost info for logging/display
-              abilityCostsDeducted = ability.cost.map((c) => ({
-                type: c.type,
-                name: c.name,
-                amount: c.amount,
-              }));
-
-              // Log cost deductions
-              for (const cost of abilityCostsDeducted) {
-                logger.action("Ability cost deducted", {
-                  ability: ability.name,
-                  costType: cost.type,
-                  costName: cost.name,
-                  amount: cost.amount,
-                });
-              }
-            }
-
-            // Start cooldown if ability has one
-            if (ability.cooldown && ability.cooldown > 0) {
-              startCooldown(ability);
-              abilityCooldownStarted = true;
-              addNotification(
-                `${ability.name} is now on cooldown (${ability.cooldown} turns)`,
-                "info",
-              );
-            }
-          }
-        }
-      } else {
-        // Ability not found - no penalty, just clear it
-        addNotification(`Ability not found: ${choice.ability_used}`, "warning");
-        choice.ability_used = undefined;
-      }
-    }
-
-    // Track momentum advantage (for all cases: with item, missing item, no item)
-    if (
-      momentumMode === "advantage" &&
-      rpgSystem.id !== "yze" &&
-      rpgSystem.id !== "explosive"
-    ) {
-      advantageCount++;
-      advantageSources.push("momentum advantage");
-    }
-
-    //Processresourceusage(resourceisautomaticallyatriskonskillcheckfailure)
-    let matchedResource: Resource | null = null;
-    if (choice.resource_used) {
-      // Try fuzzy matching first
-      const matchResult = findResourceMatch(
-        choice.resource_used,
-        storyData.resources,
-      );
-      matchedResource = matchResult ? (matchResult.item as Resource) : null;
-
-      // Log fuzzy match result
-      if (matchResult && !matchResult.isExact) {
-        logger.info("Fuzzy matched resource", {
-          aiProvided: choice.resource_used,
-          matched: matchResult.name,
-          score: matchResult.score,
-        });
-        addNotification(
-          `Matched "${choice.resource_used}" ? "${
-            matchResult.name
-          }" (${Math.round(matchResult.score * 100)}% match)`,
-          "info",
-        );
-        // Update choice to use the exact matched name
-        choice.resource_used = matchResult.name;
-      }
-
-      if (matchedResource) {
-        // Ensure resource.value is a valid number (prevent NaN)
-        if (
-          typeof matchedResource.value !== "number" ||
-          isNaN(matchedResource.value)
-        ) {
-          matchedResource.value = 0;
-        }
-
-        const dc = choice.skill_dc || 0;
-        const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
-        const requiredAmount = resourceReqs.required;
-
-        //Check if player has enough resource
-        if (matchedResource.value < requiredAmount) {
-          insufficientResource = true;
-          insufficientResourceDisadvantage = true; // Set disadvantage flag
-          disadvantageCount++;
-          disadvantageSources.push(`insufficient ${matchedResource.name}`);
-          logger.action("Insufficient resource", {
-            resource: choice.resource_used,
-            required: requiredAmount,
-            available: matchedResource.value,
-            disadvantage: true,
-          });
-          addNotification(
-            `Insufficient ${matchedResource.name}! Need ${requiredAmount}, have ${matchedResource.value}. Disadvantage on roll!`,
-            "warning",
-          );
-        }
-      } else {
-        logger.warn("Resource not found", { resource: choice.resource_used });
-        addNotification(
-          `Resource not found: ${choice.resource_used}`,
-          "warning",
-        );
-      }
-    }
-
-    // Apply stacking advantage/disadvantage system.
-    // - Fate: each net advantage adds +1 to modifier; each net disadvantage adds -1 (no extra rolls).
-    // - PbtA: roll extra d6s and keep best/worst 2 (like Dungeon World)
-    // - 3d6: roll extra d6s and keep best/worst 3
-    // - Other non-YZE/non-Explosive systems: roll extra sets equal to |netAdvantage| and pick best/worst.
-    let pbtaPenalty = 0; // Negative for advantage (adds), positive for disadvantage (subtracts)
-    if (rpgSystem.id === "fate") {
-      // Fate: modifier shift (fiction-first approach)
-      const netAdvantage = advantageCount - disadvantageCount;
-      if (netAdvantage !== 0) {
-        // Convert net advantage into modifier shift.
-        pbtaPenalty = -netAdvantage; // penalty negative => increases modifier
-        const isAdvantage = netAdvantage > 0;
-        const sourcesList = isAdvantage
-          ? advantageSources.join(", ")
-          : disadvantageSources.join(", ");
-        const stackText =
-          Math.abs(netAdvantage) > 1
-            ? ` (x${Math.abs(netAdvantage)} stacked)`
-            : "";
-        addNotification(
-          `${isAdvantage ? "🎲 Advantage" : "⚠️ Disadvantage"}${stackText}: ${
-            isAdvantage ? "+" : "-"
-          }${Math.abs(netAdvantage)} modifier from ${sourcesList}`,
-          isAdvantage ? "success" : "warning",
-        );
-        logger.action("Fate modifier shift from advantage/disadvantage", {
-          netAdvantage,
-          pbtaPenalty,
-          sources: sourcesList,
-        });
-      }
-    } else if (rpgSystem.id === "pbta") {
-      // PbtA: DC determines advantage/disadvantage (not items/abilities)
-      // DC values: trivial=-2, easy=-1, average=0, hard=1, very_hard=2, impossible=3
-      // Negative = advantage dice, Positive = disadvantage dice
-      const dc = choice.skill_dc || 0;
-      if (dc !== 0) {
-        const isAdvantage = dc < 0;
-        const extraDiceCount = Math.abs(dc); // number of additional dice beyond base 2
-        // Roll extra individual dice
-        const pool: number[] = [...diceResult.rolls]; // base 2 dice from initial roll
-        for (let i = 0; i < extraDiceCount; i++) {
-          const die = Math.floor(Math.random() * 6) + 1;
-          pool.push(die);
-        }
-        // Determine selected dice indices - keep best/worst 2
-        const sortedIndices = pool
-          .map((v, idx) => ({ v, idx }))
-          .sort((a, b) => (isAdvantage ? b.v - a.v : a.v - b.v))
-          .slice(0, 2) // keep best or worst 2
-          .map((o) => o.idx);
-        // Compute final total from selected dice
-        const selectedDice = sortedIndices.map((i) => pool[i]);
-        dice_roll = selectedDice.reduce((a, b) => a + b, 0);
-        // Overwrite diceResult.rolls with the chosen 2 for downstream success calc
-        diceResult.rolls = selectedDice;
-        // Store full pool (for visualization). Replace first entry in allDiceDetails.
-        allDiceDetails[0] = pool;
-        allDiceRolls[0] = dice_roll; // update displayed base roll value
-
-        // Determine difficulty label
-        const difficultyLabel =
-          dc <= -2
-            ? "trivial"
-            : dc === -1
-              ? "easy"
-              : dc === 1
-                ? "hard"
-                : dc === 2
-                  ? "very hard"
-                  : "impossible";
-
-        logger.action("PbtA DC-based advantage/disadvantage", {
-          dc,
-          isAdvantage,
-          extraDiceCount,
-          pool,
-          selectedDice,
-          finalTotal: dice_roll,
-          difficulty: difficultyLabel,
-        });
-        const stackText =
-          extraDiceCount > 1
-            ? ` (${extraDiceCount + 2}d6 keep ${
-                isAdvantage ? "best" : "worst"
-              } 2)`
-            : ` (3d6 keep ${isAdvantage ? "best" : "worst"} 2)`;
-        addNotification(
-          `${
-            isAdvantage ? "🎲 Advantage" : "⚠️ Disadvantage"
-          }${stackText}: ${difficultyLabel} difficulty - kept ${selectedDice.join(
-            ",",
-          )} from [${pool.join(",")}]`,
-          isAdvantage ? "success" : "warning",
-        );
-      }
-    } else if (rpgSystem.id !== "yze" && rpgSystem.id !== "explosive") {
-      const netAdvantage = advantageCount - disadvantageCount;
-      if (netAdvantage !== 0) {
-        const isAdvantage = netAdvantage > 0;
-        const sourcesList = isAdvantage
-          ? advantageSources.join(", ")
-          : disadvantageSources.join(", ");
-        // 3d6 special handling: add extra dice to a single pool and keep best/worst 3
-        if (rpgSystem.id === "3d6") {
-          const extraDiceCount = Math.abs(netAdvantage); // number of additional dice beyond base 3
-          // Roll extra individual dice
-          const pool: number[] = [...diceResult.rolls]; // base 3 dice from initial roll
-          for (let i = 0; i < extraDiceCount; i++) {
-            const die = Math.floor(Math.random() * 6) + 1;
-            pool.push(die);
-          }
-          // Determine selected dice indices
-          const sortedIndices = pool
-            .map((v, idx) => ({ v, idx }))
-            .sort((a, b) => (isAdvantage ? b.v - a.v : a.v - b.v))
-            .slice(0, 3) // keep best or worst 3
-            .map((o) => o.idx);
-          // Compute final total from selected dice
-          const selectedDice = sortedIndices.map((i) => pool[i]);
-          dice_roll = selectedDice.reduce((a, b) => a + b, 0);
-          // Overwrite diceResult.rolls with the chosen 3 for downstream success calc
-          diceResult.rolls = selectedDice;
-          // Store full pool (for visualization). Replace first entry in allDiceDetails.
-          allDiceDetails[0] = pool;
-          allDiceRolls[0] = dice_roll; // update displayed base roll value
-          logger.action("3d6 pooled advantage/disadvantage", {
-            netAdvantage,
-            isAdvantage,
-            pool,
-            selectedDice,
-            finalTotal: dice_roll,
-            sources: sourcesList,
-          });
-          const stackText =
-            extraDiceCount > 1 ? ` (+${extraDiceCount} dice)` : " (+1 die)";
-          addNotification(
-            `${
-              isAdvantage ? "🎲 Advantage" : "⚠️ Disadvantage"
-            }${stackText}: kept ${selectedDice.join(",")} from [${pool.join(
-              ",",
-            )}]`,
-            isAdvantage ? "success" : "warning",
-          );
-        } else {
-          // Existing multi-roll set logic for other systems
-          const rollsToMake = Math.abs(netAdvantage);
-          logger.action(
-            `${isAdvantage ? "Advantage" : "Disadvantage"} stacking`,
-            {
-              advantageCount,
-              disadvantageCount,
-              netAdvantage,
-              advantageSources,
-              disadvantageSources,
-              rollsToMake,
-            },
-          );
-          for (let i = 0; i < rollsToMake; i++) {
-            const extraResult = rollDice(rpgSystem);
-            const extraRoll = extraResult.total;
-            allDiceRolls.push(extraRoll);
-            allDiceDetails.push(extraResult.rolls);
-            if (isAdvantage) {
-              if (rpgSystem.rollUnder) {
-                if (extraRoll < dice_roll) dice_roll = extraRoll;
-              } else {
-                if (extraRoll > dice_roll) dice_roll = extraRoll;
-              }
-            } else {
-              if (rpgSystem.rollUnder) {
-                if (extraRoll > dice_roll) dice_roll = extraRoll;
-              } else {
-                if (extraRoll < dice_roll) dice_roll = extraRoll;
-              }
-            }
-          }
-          const stackText =
-            Math.abs(netAdvantage) > 1
-              ? ` (x${Math.abs(netAdvantage)} stacked)`
-              : "";
-          addNotification(
-            `${
-              isAdvantage ? "? Advantage" : "?? Disadvantage"
-            }${stackText} from: ${sourcesList}`,
-            isAdvantage ? "success" : "warning",
-          );
-        }
-      }
-    }
-
-    //Handleskillcheck
-    if (choice.skill_used) {
-      // Try fuzzy matching first
-      const matchResult = findStatMatch(choice.skill_used, storyData.stats);
-      // If skill not found, treat as if player has 1 stat point in it
-      // Apply stat_bonus if provided (situational modifier to effective stat value)
-      const baseStatValue = matchResult?.item.value ?? 1;
-      const statValue = baseStatValue + (choice.stat_bonus || 0);
-
-      // Notify if stat bonus is applied
-      if (choice.stat_bonus && choice.stat_bonus !== 0) {
-        const bonusSign = choice.stat_bonus > 0 ? "+" : "";
-        addNotification(
-          `Situational modifier: ${bonusSign}${choice.stat_bonus} to ${
-            matchResult?.name || choice.skill_used
-          } (${baseStatValue} → ${statValue})`,
-          choice.stat_bonus > 0 ? "success" : "warning",
-        );
-      }
-
-      // Check for applicable conditions and apply penalties
-      let conditionPenaltyModifier = 0;
-      let conditionAutoFail = false;
-      let conditionGameOver = false;
-      let appliedCondition: {
-        name: string;
-        tier: number;
-        penaltyType: string;
-      } | null = null;
-
-      if (storyData.conditions && storyData.conditions.length > 0) {
-        // Find the most severe applicable condition
-        // Priority: affectsAll conditions, then conditions that affect this specific skill
-        const skillNameLower = (
-          matchResult?.name || choice.skill_used
-        ).toLowerCase();
-
-        const applicableConditions = storyData.conditions.filter((c) => {
-          if (c.affectsAll) return true;
-          return c.affects.some((a) => a.toLowerCase() === skillNameLower);
-        });
-
-        if (applicableConditions.length > 0) {
-          // Find highest tier condition
-          const highestTierCondition = applicableConditions.reduce((max, c) =>
-            c.tier > max.tier ? c : max,
-          );
-
-          const penalty = getConditionPenalty(
-            storyData.rpgSystem,
-            highestTierCondition.tier,
-          );
-
-          appliedCondition = {
-            name: highestTierCondition.name,
-            tier: highestTierCondition.tier,
-            penaltyType: penalty.type,
-          };
-
-          const tierLabel = ["I", "II", "III", "IV", "V", "VI"][
-            highestTierCondition.tier - 1
-          ];
-
-          switch (penalty.type) {
-            case "modifier":
-              // penalty.value is negative (e.g., -4), but checkSuccess expects positive penalty to subtract
-              // So we negate it to store as positive (e.g., 4)
-              conditionPenaltyModifier = -penalty.value;
-              disadvantageCount++;
-              disadvantageSources.push(
-                `${highestTierCondition.name} (Tier ${tierLabel})`,
-              );
-              addNotification(
-                `Condition penalty: ${highestTierCondition.name} (Tier ${tierLabel}) → ${penalty.value} to roll`,
-                "warning",
-              );
-              break;
-            case "auto-fail":
-            case "auto-miss":
-            case "taken-out":
-              conditionAutoFail = true;
-              addNotification(
-                `Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Auto-fail!`,
-                "failure",
-              );
-              break;
-            case "game-over":
-              conditionGameOver = true;
-              addNotification(
-                `PERMANENT CONDITION: ${highestTierCondition.name} (Tier ${tierLabel}) ? The story may end here.`,
-                "failure",
-              );
-              break;
-            case "die-size-down":
-              // For explosive system: reduce die size
-              // This is handled specially in the explosive dice section
-              disadvantageCount += penalty.value; // Each step down counts as disadvantage
-              disadvantageSources.push(
-                `${highestTierCondition.name} (Tier ${tierLabel})`,
-              );
-              addNotification(
-                `Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Die size reduced by ${penalty.value}`,
-                "warning",
-              );
-              break;
-            case "d4-only":
-              // For explosive system: force d4
-              disadvantageCount += 4; // Severe penalty
-              disadvantageSources.push(
-                `${highestTierCondition.name} (Tier ${tierLabel})`,
-              );
-              addNotification(
-                `Severe Condition: ${highestTierCondition.name} (Tier ${tierLabel}) ? Forced to use d4!`,
-                "failure",
-              );
-              break;
-            case "none":
-              // No mechanical effect (narrative system)
-              break;
-          }
-
-          logger.action("Condition penalty applied", {
-            condition: highestTierCondition.name,
-            tier: highestTierCondition.tier,
-            penaltyType: penalty.type,
-            penaltyValue: penalty.value,
-            skill: choice.skill_used,
-          });
-        }
-      }
-
-      // Handle auto-fail from conditions
-      if (conditionAutoFail) {
-        skillCheckResult = "failure";
-
-        // Show dice visualizer with auto-fail
-        setDiceRoll({
-          show: true,
-          rolls: [0],
-          finalRoll: 0,
-          skillName: choice.skill_used,
-          skillBonus: statValue,
-          dc: choice.skill_dc || 0,
-          isSuccess: false,
-          isCritical: false,
-          hasAdvantage: false,
-          hasDisadvantage: true,
-          advantageCount: 0,
-          disadvantageCount: 1,
-          netAdvantage: -1,
-          advantageSources: "",
-          disadvantageSources: appliedCondition?.name || "Condition",
-          diceRolls: [[0]],
-          rpgSystem: storyData.rpgSystem || "3d6",
-          reverseDC: storyData.reverseDC,
-          conditionAutoFail: true,
-          conditionName: appliedCondition?.name,
-        });
-
-        // Skip normal dice rolling and success calculation
-        // Continue to choice details generation
-      } else if (conditionGameOver) {
-        // Game over condition - still roll but mark as game over potential
-        skillCheckResult = "failure";
-
-        // Don't trigger game_over immediately - let the AI decide based on the narrative
-        // The tool stage will handle game_over if appropriate
-      }
-
-      // Skip dice rolling if condition auto-fail
-      if (!conditionAutoFail) {
-        // For YZE: Roll dice NOW using stat value
-        // For Explosive: Roll dice NOW using stat value to determine die size
-        if (rpgSystem.id === "yze") {
-          const baseDiceCount = Math.floor(statValue / 20); // 0-5 base dice from stat
-          const stressDiceCount = yzeStressDiceChoice; // Use player's choice
-          const totalDiceCount = baseDiceCount + stressDiceCount;
-
-          // Roll all dice (base + stress)
-          const rolls: number[] = [];
-          for (let i = 0; i < totalDiceCount; i++) {
-            rolls.push(Math.floor(Math.random() * 6) + 1);
-          }
-
-          // Add stress to character
-          if (stressDiceCount > 0) {
-            const currentStress = storyData.stress || 0;
-            storyData.stress = Math.min(10, currentStress + stressDiceCount);
-            addNotification(
-              `Added ${stressDiceCount} stress dice (+${stressDiceCount} stress ? ${storyData.stress}/10)`,
-              "warning",
-            );
-          }
-
-          logger.action("YZE dice roll", {
-            system: "yze",
-            baseDice: baseDiceCount,
-            stressDice: stressDiceCount,
-            rolls,
-            stat: statValue,
-          });
-
-          // Ensure dice visualizer gets the actual dice rolled for YZE
-          if (Array.isArray(allDiceDetails) && allDiceDetails.length > 0) {
-            allDiceDetails[0] = rolls;
-          }
-
-          diceResult = { rolls, total: 0 }; // Total doesn't matter for YZE
-          dice_roll = 0; // Not used for YZE
-
-          // Reset YZE state
-          setYzeAwaitingStressChoice(false);
-          setYzePendingChoice(null);
-        } else if (rpgSystem.id === "explosive") {
-          // Explosive dice: Determine die size from stat
-          const dieSize = rpgSystem.statToDieSize
-            ? rpgSystem.statToDieSize(statValue)
-            : 20;
-          yzeData.dieSize = dieSize;
-
-          // Check if we have item advantage
-          const hasItemForAdvantage =
-            choice.item_used &&
-            storyData.inventory.find((i) => i.name === choice.item_used);
-          const itemType = hasItemForAdvantage
-            ? hasItemForAdvantage.type || "normal"
-            : null;
-          const hasAdvantage =
-            hasItemForAdvantage && itemType && itemType !== "misc";
-          const hasDisadvantage = choice.item_used && !hasItemForAdvantage;
-
-          // Roll initial die with explosions
-          diceResult = rollDice(rpgSystem, dieSize);
-          dice_roll = diceResult.total;
-          explosionCount = diceResult.explosions || 0;
-
-          logger.action("Explosive dice roll", {
-            system: "explosive",
-            dieSize,
-            rolls: diceResult.rolls,
-            total: dice_roll,
-            explosions: explosionCount,
-            stat: statValue,
-          });
-
-          // Handle advantage (roll second die, take higher)
-          if (hasAdvantage) {
-            const secondResult = rollDice(rpgSystem, dieSize);
-            const second_roll = secondResult.total;
-            allDiceRolls.push(dice_roll, second_roll);
-            allDiceDetails.push(diceResult.rolls, secondResult.rolls);
-
-            logger.action("Explosive advantage roll from item", {
-              item: choice.item_used,
-              firstRoll: dice_roll,
-              firstExplosions: explosionCount,
-              secondRoll: second_roll,
-              secondExplosions: secondResult.explosions || 0,
-            });
-
-            if (second_roll > dice_roll) {
-              dice_roll = second_roll;
-              explosionCount = secondResult.explosions || 0;
-              diceResult = secondResult;
-            }
-          } else if (hasDisadvantage) {
-            // Disadvantage: roll second die, take lower
-            const secondResult = rollDice(rpgSystem, dieSize);
-            const second_roll = secondResult.total;
-            allDiceRolls.push(dice_roll, second_roll);
-            allDiceDetails.push(diceResult.rolls, secondResult.rolls);
-
-            logger.action("Explosive disadvantage roll from missing item", {
-              item: choice.item_used,
-              firstRoll: dice_roll,
-              secondRoll: second_roll,
-            });
-
-            if (second_roll < dice_roll) {
-              dice_roll = second_roll;
-              explosionCount = secondResult.explosions || 0;
-              diceResult = secondResult;
-            }
-          } else {
-            // No advantage/disadvantage
-            allDiceRolls.push(dice_roll);
-            allDiceDetails.push(diceResult.rolls);
-          }
-
-          // Handle momentum advantage for explosive
-          if (momentumMode === "advantage") {
-            const reroll1Result = rollDice(rpgSystem, dieSize);
-            const reroll2Result = rollDice(rpgSystem, dieSize);
-            const reroll1 = reroll1Result.total;
-            const reroll2 = reroll2Result.total;
-            allDiceRolls.push(reroll1, reroll2);
-            allDiceDetails.push(reroll1Result.rolls, reroll2Result.rolls);
-
-            const oldRoll = dice_roll;
-            const bestRoll = Math.max(dice_roll, reroll1, reroll2);
-            if (bestRoll === reroll1) {
-              dice_roll = reroll1;
-              explosionCount = reroll1Result.explosions || 0;
-              diceResult = reroll1Result;
-            } else if (bestRoll === reroll2) {
-              dice_roll = reroll2;
-              explosionCount = reroll2Result.explosions || 0;
-              diceResult = reroll2Result;
-            }
-
-            logger.action("Explosive momentum advantage", {
-              oldRoll,
-              reroll1,
-              reroll2,
-              finalRoll: dice_roll,
-              finalExplosions: explosionCount,
-            });
-
-            addNotification(
-              `Advantage Used! Rolls: ${oldRoll}, ${reroll1}, ${reroll2} → Best: ${dice_roll}`,
-              "success",
-            );
-          }
-
-          yzeData.explosions = explosionCount;
-        }
-
-        // Log fuzzy match result
-        if (matchResult && !matchResult.isExact) {
-          logger.info("Fuzzy matched skill", {
-            aiProvided: choice.skill_used,
-            matched: matchResult.name,
-            score: matchResult.score,
-          });
-          addNotification(
-            `Matched "${choice.skill_used}" ? "${
-              matchResult.name
-            }" (${Math.round(matchResult.score * 100)}% match)`,
-            "info",
-          );
-          // Update choice to use the exact matched name
-          choice.skill_used = matchResult.name;
-        } else if (!matchResult) {
-          // No match found - log warning
-          logger.warn("Skill not found or no fuzzy match", {
-            skill: choice.skill_used,
-          });
-          addNotification(`Skill not found: ${choice.skill_used}`, "warning");
-        }
-
-        const dc = choice.skill_dc || 0;
-
-        //Calculate resource requirements based on RPG system
-        const resourceReqs = calculateResourceRequirements(rpgSystem, dc);
-
-        //Handleguaranteedsuccess
-        if (momentumMode === "guarantee") {
-          skillCheckResult = "success";
-          logger.action("Skill check (Guaranteed)", {
-            skill: choice.skill_used,
-            dc,
-          });
-          addNotification(
-            `Guaranteed Success! (${choice.skill_used}: Auto-success with 2 Momentum)`,
-            "success",
-          );
-        } else {
-          let dc_passed: boolean;
-          let isCritical: boolean;
-          let total: number;
-
-          // For YZE: calculate success count and panic FIRST
-          if (rpgSystem.id === "yze" && allDiceDetails.length > 0) {
-            const lastRoll = allDiceDetails[allDiceDetails.length - 1];
-            const currentStress = storyData.stress || 0;
-            const stressDiceCount = yzeStressDiceChoice; // Use player's chosen stress dice
-
-            // Split dice into base and stress dice
-            const baseDiceCount = lastRoll.length - stressDiceCount;
-            yzeData.baseDice = lastRoll.slice(0, baseDiceCount);
-            yzeData.stressDice =
-              stressDiceCount > 0 ? lastRoll.slice(baseDiceCount) : [];
-
-            // Calculate success using checkSuccess (pass rolls array)
-            const successResult = checkSuccess(
-              rpgSystem,
-              dice_roll,
-              statValue,
-              dc,
-              conditionPenaltyModifier - itemGradeBonus - abilityGradeBonus, // Apply condition penalty (positive) and grade bonuses (negative to add)
-              lastRoll,
-              storyData.reverseDC, // Call of Cthulhu style - roll under DC
-            );
-
-            yzeData.successes = successResult.successes;
-            yzeData.stressRelief = successResult.stressRelief;
-            yzeData.stressLevel = currentStress;
-
-            // For YZE: use success count to determine if check passed
-            dc_passed = successResult.success;
-            isCritical = successResult.critical;
-            total = successResult.successes || 0;
-
-            // Store for AI context
-            rollTotal = total;
-            rollDC = dc;
-
-            // Check for panic (1s on stress dice)
-            if (stressDiceCount > 0 && yzeData.stressDice) {
-              const hasOnes = yzeData.stressDice.some((die) => die === 1);
-              if (hasOnes) {
-                yzeData.panicTriggered = true;
-                // Roll panic: d6 + stress
-                const panicRoll =
-                  Math.floor(Math.random() * 6) + 1 + currentStress;
-                // Find panic effect from table
-                if (rpgSystem.panicTable) {
-                  const panicEntry = rpgSystem.panicTable.find(
-                    (entry) => panicRoll >= entry.min && panicRoll <= entry.max,
-                  );
-                  if (panicEntry) {
-                    yzeData.panicEffect = `${panicEntry.effect}: ${panicEntry.description}`;
-                  }
-                }
-              }
-            }
-          } else {
-            // All other systems: use checkSuccess function
-            const successResult = checkSuccess(
-              rpgSystem,
-              dice_roll,
-              statValue,
-              dc,
-              (rpgSystem.id === "pbta" || rpgSystem.id === "fate"
-                ? pbtaPenalty
-                : 0) +
-                conditionPenaltyModifier -
-                itemGradeBonus -
-                abilityGradeBonus, // Condition penalty is positive (subtracts), grade bonuses are negative (adds)
-              undefined, // rolls array (only needed for YZE)
-              storyData.reverseDC, // Call of Cthulhu style - roll under DC
-            );
-
-            dc_passed = successResult.success;
-            isCritical = successResult.critical;
-            total = successResult.total;
-
-            // Store for AI context
-            rollTotal = total;
-            rollDC = dc;
-
-            // Store partial success for PbtA
-            if (successResult.partial) {
-              // PbtA partial success counts as "success" for progression but with complications
-              dc_passed = true;
-              skillCheckResult = "partial";
-            }
-
-            // Store Fate-specific outcomes (tie, style)
-            if (rpgSystem.id === "fate") {
-              if (successResult.tie) {
-                skillCheckResult = "tie";
-                dc_passed = true; // Ties count as partial success
-              } else if (successResult.style) {
-                skillCheckResult = "style";
-              }
-            }
-          }
-
-          logger.action("Skill check result", {
-            skill: choice.skill_used,
-            dc,
-            roll: dice_roll,
-            stat: statValue,
-            total,
-            passed: dc_passed,
-          });
-
-          // Track skill check for AGMT chaos adjustment
-          if (storyData.agmtState && choice.skill_used) {
-            const { addSkillCheckResult } =
-              await import("@/app/misc/mythicChaos");
-            const skillResult = {
-              sceneNumber: storyData.agmtState.sceneCount,
-              success: dc_passed,
-              skill: choice.skill_used,
-              difficulty: dc,
-              margin: total - dc,
-              timestamp: Date.now(),
-            };
-            storyData.agmtState = addSkillCheckResult(
-              storyData.agmtState,
-              skillResult,
-            );
-          }
-
-          // Show dice visualizer
-          const usedItem = choice.item_used
-            ? storyData.inventory.find((i) => i.name === choice.item_used)
-            : null;
-          const hasItemAdvantage =
-            !!usedItem && (usedItem.type || "normal") !== "misc";
-          const hasItemDisadvantage = !!(choice.item_used && !usedItem);
-          const hasAbilityAdvantage = !!abilityUsed;
-
-          // For display: use modifier instead of raw stat for systems with statToModifier
-          const baseDisplayBonus = rpgSystem.statToModifier
-            ? rpgSystem.statToModifier(statValue)
-            : statValue;
-          // Include grade bonuses from items and abilities in display
-          const displayBonus =
-            rpgSystem.id === "pbta"
-              ? baseDisplayBonus -
-                pbtaPenalty +
-                itemGradeBonus +
-                abilityGradeBonus
-              : baseDisplayBonus + itemGradeBonus + abilityGradeBonus; // pbtaPenalty negative increases modifier
-
-          // Calculate net advantage/disadvantage for display
-          const netAdvantage = advantageCount - disadvantageCount;
-
-          setDiceRoll({
-            show: true,
-            rolls: allDiceRolls,
-            finalRoll: dice_roll,
-            skillName: choice.skill_used,
-            skillBonus: displayBonus,
-            dc,
-            isSuccess: dc_passed,
-            isCritical: isCritical,
-            hasAdvantage: hasItemAdvantage || hasAbilityAdvantage,
-            hasDisadvantage: hasItemDisadvantage,
-            advantageCount,
-            disadvantageCount,
-            netAdvantage,
-            advantageSources: advantageSources.join(", "),
-            disadvantageSources: disadvantageSources.join(", "),
-            diceRolls: allDiceDetails, // Individual dice for each roll
-            rpgSystem: storyData.rpgSystem || "3d6", // Pass system type
-            reverseDC: storyData.reverseDC, // Call of Cthulhu style - roll under DC
-            conditionPenalty:
-              conditionPenaltyModifier !== 0 ? -conditionPenaltyModifier : 0, // Convert to negative for display
-            conditionName: appliedCondition?.name,
-            ...yzeData, // Spread YZE-specific data
-          });
-
-          // Process result - dice visualizer shows all check details
-          if (dc_passed) {
-            // Only set to "success" if not already set to partial/tie/style
-            if (
-              skillCheckResult !== "partial" &&
-              skillCheckResult !== "tie" &&
-              skillCheckResult !== "style"
-            ) {
-              skillCheckResult = "success";
-            }
-
-            // YZE stress relief on strong success
-            if (rpgSystem.id === "yze" && yzeData.stressRelief) {
-              if (storyData.stress && storyData.stress > 0) {
-                storyData.stress--;
-              }
-            }
-
-            // Earn momentum on success (not when using guarantee or reroll)
-            if (momentumMode === "none") {
-              if (isCritical) {
-                // Critical success: Earn 2 momentum
-                if (storyData.momentum < storyData.maxMomentum) {
-                  const earned = Math.min(
-                    2,
-                    storyData.maxMomentum - storyData.momentum,
-                  );
-                  storyData.momentum += earned;
-                  logger.action("Momentum earned (Critical Success)", {
-                    earned,
-                    newTotal: storyData.momentum,
-                  });
-                }
-              } else if (!rpgSystem.rollUnder && total >= dc + 20) {
-                // Strong success (beat DC by 20+): earn 1 momentum (only for roll-over systems)
-                if (storyData.momentum < storyData.maxMomentum) {
-                  storyData.momentum++;
-                  logger.action("Momentum earned (Strong Success)", {
-                    earned: 1,
-                    newTotal: storyData.momentum,
-                  });
-                }
-              }
-            }
-
-            // Apply durability loss on success (-1 durability) for non-consumable items
-            if (choice.item_used) {
-              const item = storyData.inventory.find(
-                (i) => i.name === choice.item_used,
-              );
-              const itemType = item?.type || "normal";
-
-              // Consumables don't have durability (they're already consumed)
-              // Story and misc items use durability system
-              if (item && itemType !== "consumable") {
-                const durabilityResult = applyDurabilityLoss(item, false);
-                itemDurabilityAfter = durabilityResult.newDurability;
-
-                if (durabilityResult.broken) {
-                  // Item broke from durability loss
-                  itemBroken = true;
-                  const itemIndex = storyData.inventory.findIndex(
-                    (i) => i.name === choice.item_used,
-                  );
-                  if (itemIndex !== -1) {
-                    if (storyData.inventory[itemIndex].quantity > 1) {
-                      storyData.inventory[itemIndex].quantity--;
-                      // Reset durability for remaining items
-                      const maxDur = getMaxDurability(item.grade || "common");
-                      storyData.inventory[itemIndex].durability = maxDur;
-                      itemQuantityAfter =
-                        storyData.inventory[itemIndex].quantity;
-                    } else {
-                      storyData.inventory.splice(itemIndex, 1);
-                      itemQuantityAfter = 0;
-                    }
-                  }
-                  logger.action("Item broke from durability (Success)", {
-                    item: choice.item_used,
-                    durabilityBefore: itemDurabilityBefore,
-                    durabilityAfter: 0,
-                  });
-                } else {
-                  // Update durability on the item
-                  const itemIndex = storyData.inventory.findIndex(
-                    (i) => i.name === choice.item_used,
-                  );
-                  if (itemIndex !== -1) {
-                    storyData.inventory[itemIndex].durability =
-                      durabilityResult.newDurability;
-                  }
-                  logger.action("Item durability reduced (Success)", {
-                    item: choice.item_used,
-                    durabilityBefore: itemDurabilityBefore,
-                    durabilityAfter: durabilityResult.newDurability,
-                  });
-                }
-              }
-            }
-          } else {
-            skillCheckResult = "failure";
-
-            // Handle item durability on failure (-2 durability for non-consumable items)
-            if (choice.item_used) {
-              const item = storyData.inventory.find(
-                (i) => i.name === choice.item_used,
-              );
-              const itemType = item?.type || "normal";
-
-              // Consumables don't have durability (they're already consumed)
-              // Normal, story, and misc items use durability system
-              if (item && itemType !== "consumable") {
-                const durabilityResult = applyDurabilityLoss(item, true);
-                itemDurabilityAfter = durabilityResult.newDurability;
-
-                if (durabilityResult.broken) {
-                  // Item broke from durability loss
-                  itemBroken = true;
-                  const itemIndex = storyData.inventory.findIndex(
-                    (i) => i.name === choice.item_used,
-                  );
-                  if (itemIndex !== -1) {
-                    if (storyData.inventory[itemIndex].quantity > 1) {
-                      storyData.inventory[itemIndex].quantity--;
-                      // Reset durability for remaining items
-                      const maxDur = getMaxDurability(item.grade || "common");
-                      storyData.inventory[itemIndex].durability = maxDur;
-                      itemQuantityAfter =
-                        storyData.inventory[itemIndex].quantity;
-                    } else {
-                      storyData.inventory.splice(itemIndex, 1);
-                      itemQuantityAfter = 0;
-                    }
-                  }
-                  logger.action("Item broke from durability (Failure)", {
-                    item: choice.item_used,
-                    durabilityBefore: itemDurabilityBefore,
-                    durabilityAfter: 0,
-                  });
-                } else {
-                  // Update durability on the item
-                  const itemIndex = storyData.inventory.findIndex(
-                    (i) => i.name === choice.item_used,
-                  );
-                  if (itemIndex !== -1) {
-                    storyData.inventory[itemIndex].durability =
-                      durabilityResult.newDurability;
-                  }
-                  logger.action("Item durability reduced (Failure)", {
-                    item: choice.item_used,
-                    durabilityBefore: itemDurabilityBefore,
-                    durabilityAfter: durabilityResult.newDurability,
-                  });
-                }
-              }
-            }
-          }
-        }
-      } // End of if (!conditionAutoFail)
-
-      //Buildskillcheckline
-      const insufficientText = insufficientResource ? " (no skill bonus)" : "";
-      let skillCheckLine = `[Skill check (${choice.skill_used})`;
-
-      // Add system-specific context for AI
-      if (rpgSystem.id === "pbta" && skillCheckResult === "partial") {
-        // PbtA: Partial success (7-9) - AI should add complications
-        skillCheckLine += `: partial success (7-9)`;
-      } else if (rpgSystem.id === "fate") {
-        // Fate: Include tie/style outcomes and margin
-        const margin = rollTotal - rollDC;
-        if (skillCheckResult === "tie") {
-          skillCheckLine += `: tie (margin 0)`;
-        } else if (skillCheckResult === "style") {
-          skillCheckLine += `: success with style (+${margin})`;
-        } else if (skillCheckResult === "success") {
-          skillCheckLine += `: success (margin +${margin})`;
-        } else {
-          skillCheckLine += `: ${skillCheckResult}`;
-        }
-      } else if (rpgSystem.id === "explosive") {
-        // Explosive: Include explosion count and die size
-        const dieSize = yzeData.dieSize || 20;
-        const explosions = yzeData.explosions || 0;
-        if (explosions > 0) {
-          skillCheckLine += `: ${skillCheckResult} (d${dieSize} exploded x${explosions})`;
-        } else {
-          skillCheckLine += `: ${skillCheckResult} (d${dieSize})`;
-        }
-      } else if (rpgSystem.id === "yze") {
-        // YZE: Include success count
-        const successes = yzeData.successes || 0;
-        skillCheckLine += `: ${skillCheckResult} (${successes} successes vs ${rollDC})`;
-      } else {
-        // Standard systems: capitalize first letter for readability
-        const formattedResult =
-          skillCheckResult.charAt(0).toUpperCase() + skillCheckResult.slice(1);
-        skillCheckLine += `: ${formattedResult}`;
-      }
-
-      skillCheckLine += `${insufficientText}]`;
-      choiceDetails.push(skillCheckLine);
-
-      // Auto-contribute to active challenge if action analysis flagged it
-      if (
-        storyData.activeChallenge?.active &&
-        choice.challenge_handling?.contributes_to_challenge &&
-        skillCheckResult
-      ) {
-        const challenge = storyData.activeChallenge;
-        const isSuccess =
-          skillCheckResult === "success" ||
-          skillCheckResult === "style" ||
-          skillCheckResult === "partial"; // Partial success still counts as progress
-
-        if (isSuccess) {
-          challenge.currentSuccesses++;
-        } else {
-          challenge.currentFailures++;
-        }
-
-        // Check if challenge is resolved
-        const majority = Math.ceil(challenge.rounds / 2);
-        let challengeResolved = false;
-
-        if (challenge.currentSuccesses >= majority) {
-          challenge.active = false;
-          challenge.result = "won";
-          challenge.pointsAwarded = challenge.pointsAwarded || 25;
-          storyData.points = (storyData.points || 0) + challenge.pointsAwarded;
-          challengeResolved = true;
-          addNotification(
-            `🏆 Challenge WON: ${challenge.name}! (+${challenge.pointsAwarded} XP)`,
-            "success",
-          );
-        } else if (challenge.currentFailures >= majority) {
-          challenge.active = false;
-          challenge.result = "lost";
-          challengeResolved = true;
-          addNotification(`💀 Challenge LOST: ${challenge.name}`, "failure");
-        }
-
-        // Add challenge progress to choice details
-        const scoreStr = `[${challenge.name}: ${challenge.currentSuccesses}-${
-          challenge.currentFailures
-        }${challengeResolved ? ` (${challenge.result})` : ""}]`;
-        choiceDetails.push(scoreStr);
-
-        logger.action("Challenge contribution from skill check", {
-          challenge: challenge.name,
-          result: isSuccess ? "success" : "failure",
-          score: `${challenge.currentSuccesses}-${challenge.currentFailures}`,
-          resolved: challengeResolved,
-        });
-      } else if (
-        // Signal tool stage to start a NEW challenge when action analysis detected complex event
-        !storyData.activeChallenge?.active &&
-        choice.challenge_handling?.is_complex_event &&
-        choice.challenge_handling?.challenge_name &&
-        skillCheckResult
-      ) {
-        // Determine if this first roll counts as success
-        const isSuccess =
-          skillCheckResult === "success" ||
-          skillCheckResult === "style" ||
-          skillCheckResult === "partial";
-
-        const challengeName = choice.challenge_handling.challenge_name;
-        const initialScore = isSuccess ? "1-0" : "0-1";
-
-        choiceDetails.push(
-          `[Start Challenge "${challengeName}": ${initialScore}]`,
-        );
-
-        logger.action("New challenge signaled from action analysis", {
-          challenge: challengeName,
-          firstRoll: isSuccess ? "success" : "failure",
-        });
-      }
-
-      // YZE: Add panic details if triggered
-      if (
-        rpgSystem.id === "yze" &&
-        yzeData.panicTriggered &&
-        yzeData.panicEffect
-      ) {
-        choiceDetails.push(`[PANIC! ${yzeData.panicEffect}]`);
-      }
-    }
-
-    //Builditemusageline
-    if (choice.item_used && itemQuantityBefore > 0) {
-      // Use pre-tracked grade and type (item might be removed from inventory)
-      const bonusText = itemGradeBonus > 0 ? ` +${itemGradeBonus}` : "";
-
-      if (itemBroken) {
-        // Item broke (durability hit 0)
-        choiceDetails.push(
-          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore} → broken]`,
-        );
-      } else if (itemType === "consumable") {
-        // Consumable items show quantity change
-        if (itemQuantityAfter !== itemQuantityBefore) {
-          choiceDetails.push(
-            `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore} → ${itemQuantityAfter}]`,
-          );
-        } else {
-          choiceDetails.push(
-            `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`,
-          );
-        }
-      } else if (
-        itemDurabilityBefore > 0 &&
-        itemDurabilityAfter !== itemDurabilityBefore
-      ) {
-        // Non-consumable items show durability change
-        choiceDetails.push(
-          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ${itemDurabilityBefore}/${itemMaxDurability} → ${itemDurabilityAfter}/${itemMaxDurability}]`,
-        );
-      } else if (itemMaxDurability === Infinity || itemMaxDurability === -1) {
-        // AGMT items have infinite durability
-        choiceDetails.push(
-          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; Durability ∞]`,
-        );
-      } else {
-        // No durability change (or item has no durability tracking)
-        choiceDetails.push(
-          `[Item Used: ${choice.item_used}${itemGradeLabel}${bonusText}; x${itemQuantityBefore}]`,
-        );
-      }
-    }
-
-    // Build ability usage line
-    if (choice.ability_used && abilityUsed) {
-      const bonusText = abilityGradeBonus > 0 ? ` +${abilityGradeBonus}` : "";
-      const costsText =
-        abilityCostsDeducted.length > 0
-          ? `; Cost: ${abilityCostsDeducted
-              .map((c) => `${c.amount} ${c.name}`)
-              .join(", ")}`
-          : "";
-      const cooldownText =
-        abilityCooldownStarted && abilityUsed.cooldown
-          ? `; Cooldown: ${abilityUsed.cooldown} turns`
-          : "";
-      choiceDetails.push(
-        `[Ability Used: ${abilityUsed.name}${abilityGradeLabel}${bonusText}${costsText}${cooldownText}]`,
-      );
-    }
-
-    // Add agmt details at the beginning (less important info first)
-    if (agmtDetails.length > 0) {
-      choiceDetails = [...agmtDetails, ...choiceDetails];
-    }
-
-    // Process table rolls using unified table field
-    // Support legacy custom_table field for backward compatibility
-    const tableForChoiceDetails = choice.table || choice.custom_table;
-    if (tableForChoiceDetails && storyData.customTables) {
-      try {
-        const { getTableByName, rollOnCustomTable } =
-          await import("../misc/tableRoller");
-        const table = getTableByName(
-          storyData.customTables,
-          tableForChoiceDetails,
-        );
-
-        if (table) {
-          const result = rollOnCustomTable(table);
-          if (result) {
-            choiceDetails.push(`[${table.name}: ${result.text}]`);
-            logger.action("Custom table roll from choice", {
-              table: table.name,
-              result: result.text,
-            });
-          } else {
-            addNotification(`Table "${table.name}" is empty`, "warning");
-          }
-        }
-        // If not a custom table, the agmt table was already handled earlier
-      } catch (error) {
-        console.error("Error processing table roll:", error);
-      }
-    }
-
-    // Process context rolls from action analysis
+    // Context rolls from action analysis (flavor dice unrelated to skill checks)
     if (choice.rolls && choice.rolls.length > 0) {
       for (const roll of choice.rolls) {
-        // Skip rolls without dice notation
         if (!roll.dice) continue;
         try {
-          // Parse dice notation (e.g., "1d4", "2d6", "1d20+5")
           const diceMatch = roll.dice.match(/^(\d+)?d(\d+)([+-]\d+)?$/i);
           if (diceMatch) {
             const count = parseInt(diceMatch[1] || "1");
@@ -4678,15 +3068,10 @@ function StoryPageContent() {
               count > 1 ? `(${diceResults.join("+")})` : `${diceResults[0]}`;
             const modStr =
               modifier !== 0 ? `${modifier > 0 ? "+" : ""}${modifier}` : "";
-            choiceDetails.push(
+            flavorLines.push(
               `[Context: ${roll.description} (${roll.dice}) = ${rollStr}${modStr} → ${total}]`,
             );
-            addNotification(
-              `Context Roll: ${roll.description} = ${total}`,
-              "success",
-            );
           } else {
-            // Invalid dice notation, skip
             console.warn(`Invalid dice notation: ${roll.dice}`);
           }
         } catch (error) {
@@ -4695,18 +3080,13 @@ function StoryPageContent() {
       }
     }
 
-    //Assemblechoicetext - Player action first, then skill check details
     let text = ">" + choice.text;
-    // Add STT disclaimer if voice input was used
     if (choice.stt_input) {
       text += "\n[Voice Input - may contain transcription errors]";
     }
-    if (choiceDetails.length > 0) {
-      text += "\n" + choiceDetails.join("\n");
+    if (flavorLines.length > 0) {
+      text += "\n" + flavorLines.join("\n");
     }
-    console.log("Final choice text:", text);
-    //Resetmomentummodeafteruse
-    setMomentumMode("none");
 
     storyData.scene.parts.push({
       content: text,
@@ -4719,7 +3099,6 @@ function StoryPageContent() {
 
     setChoices({ choices: [] });
 
-    //ProcessLoretriggersafteruserchoice
     processLoreTriggers(storyData, addNotification);
 
     const {
@@ -4795,90 +3174,6 @@ function StoryPageContent() {
       }
     };
 
-    // Create dice animation promise (if dice roll is showing)
-    // Animation runs in parallel with generation - don't block on it
-    const diceAnimationPromise = diceRoll?.show
-      ? new Promise<void>((resolve) => {
-          // Total phases: rolling (1800ms) + stopped (800ms) + calculating (1200ms) + result hold (5000ms) = 8800ms
-          setTimeout(() => {
-            setDiceRoll(null);
-            resolve();
-          }, 9000);
-        })
-      : Promise.resolve();
-
-    // Check if this choice has intro_override (for starting choices)
-    // If so, skip AI generation and use the preset intro directly
-    if (choice.intro_override) {
-      logger.action("Using intro_override instead of AI generation", {
-        choice: choice.text,
-      });
-
-      // Add the intro_override as the AI response
-      const overridePart: ScenePart = {
-        content: choice.intro_override,
-        imageUrl: "",
-        user: false,
-        role: "assistant",
-        choices: [], // Will need to generate choices next
-      };
-      storyData.scene.parts.push(overridePart);
-
-      setStoryText(choice.intro_override);
-      setStoryData({ ...storyData });
-      setLoading(false);
-      setLoadingStage("choices");
-
-      // Wait for dice animation if showing
-      await diceAnimationPromise;
-
-      // Generate choices for this intro_override content
-      try {
-        const { generateChoicesOnly } = await import("../misc/generation");
-        const newChoices = await generateChoicesOnly(storyData, {
-          choicesModel,
-          openRouterKey,
-          deepseekKey,
-          googleKey,
-          mistralKey,
-          deepinfraKey,
-        });
-
-        // Update the part with choices
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            choices: newChoices,
-          };
-        }
-
-        setChoices({ choices: newChoices });
-        setStoryData({ ...storyData });
-        setLoadingStage(null);
-
-        // Save progress
-        saveProgress(storyData);
-        addNotification("Story continues...", "success");
-      } catch (error) {
-        console.error("Error generating choices:", error);
-        // Fallback to a simple "Continue" choice
-        const fallbackChoices = [{ text: "Continue" }];
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            choices: fallbackChoices,
-          };
-        }
-        setChoices({ choices: fallbackChoices });
-        setStoryData({ ...storyData });
-        setLoadingStage(null);
-        saveProgress(storyData);
-      }
-      return;
-    }
-
     console.log(
       "[page.tsx] About to call generateStoryTurn. actionChoice:",
       !!actionChoice,
@@ -4889,372 +3184,324 @@ function StoryPageContent() {
     generationAbortRef.current = new AbortController();
 
     try {
-      // Run generation and dice animation in parallel
-      await Promise.all([
-        generateStoryTurn(
-          storyData,
-          "", // User choice already in storyData.scene.parts
-          {
-            storyModel,
-            toolsModel,
-            choicesModel,
-            enableTools: toolCallingEnabled,
-            maxToolLoops,
-            customMaxContext:
-              customMaxContext > 0 ? customMaxContext : undefined,
-            customStoryContext:
-              storyContextSize > 0 ? storyContextSize : undefined,
-            customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
-            skipChoices: !!actionChoice, // Skip choices generation in freeform action mode
-            novelaiEnabled: novelaiEnabled && !!novelaiKey,
-            novelaiKey,
-            novelaiTemperature,
-            openRouterKey,
-            deepseekKey,
-            googleKey,
-            mistralKey,
-            deepinfraKey,
-            storyId: storyDbId || undefined,
-            abortSignal: generationAbortRef.current.signal,
-            enableEmbeddings: embeddingsEnabled,
-            embeddingThreshold,
-            samplingSettings: getSamplingSettings(),
-            usePrefill,
-            storytellerMode,
-            enableGMStage: gmStageEnabled,
-            gmStageModel: toolsModel, // Use same model as tools stage
+      await generateStoryTurn(
+        storyData,
+        "", // User choice already in storyData.scene.parts
+        {
+          storyModel,
+          toolsModel,
+          choicesModel,
+          enableTools: toolCallingEnabled,
+          maxToolLoops,
+          customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
+          customStoryContext:
+            storyContextSize > 0 ? storyContextSize : undefined,
+          customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
+          skipChoices: !!actionChoice, // Skip choices generation in freeform action mode
+          novelaiEnabled: novelaiEnabled && !!novelaiKey,
+          novelaiKey,
+          novelaiTemperature,
+          openRouterKey,
+          deepseekKey,
+          googleKey,
+          mistralKey,
+          deepinfraKey,
+          storyId: storyDbId || undefined,
+          abortSignal: generationAbortRef.current.signal,
+          enableEmbeddings: embeddingsEnabled,
+          embeddingThreshold,
+          samplingSettings: getSamplingSettings(),
+          usePrefill,
+          storytellerMode,
+          enableGMStage: gmStageEnabled,
+          gmStageModel: toolsModel, // Use same model as tools stage
+        },
+        {
+          onGMStageStart: () => {
+            setLoadingStage("gm");
+            // Reset live GM entries for new generation
+            setLiveGMEntries([]);
+            logger.action("GM stage started - determining mechanics");
           },
-          {
-            onGMStageStart: () => {
-              setLoadingStage("gm");
-              // Reset live GM entries for new generation
-              setLiveGMEntries([]);
-              logger.action("GM stage started - determining mechanics");
-            },
-            onCompaction: (summary) => {
-              addNotification(
-                "Recap: earlier events were condensed into a summary to save space",
-                "info",
-                6000,
+          onCompaction: (summary) => {
+            addNotification(
+              "Recap: earlier events were condensed into a summary to save space",
+              "info",
+              6000,
+            );
+            logger.action("Story history compacted", {
+              summaryLength: summary.length,
+            });
+          },
+          onGMContent: (delta, fullContent) => {
+            // Stream GM thinking content - accumulate entries properly
+            setLiveGMEntries((prev) => {
+              const lastEntry = prev[prev.length - 1];
+              if (lastEntry?.type === "thinking" && lastEntry.isStreaming) {
+                return [
+                  ...prev.slice(0, -1),
+                  {
+                    type: "thinking",
+                    content: fullContent,
+                    isStreaming: true,
+                  },
+                ];
+              } else {
+                return [
+                  ...prev,
+                  {
+                    type: "thinking",
+                    content: fullContent,
+                    isStreaming: true,
+                  },
+                ];
+              }
+            });
+          },
+          onGMToolResult: (result) => {
+            setLiveGMEntries((prev) => {
+              const updated = prev.map((entry) =>
+                entry.type === "thinking" && entry.isStreaming
+                  ? { ...entry, isStreaming: false }
+                  : entry,
               );
-              logger.action("Story history compacted", {
-                summaryLength: summary.length,
+              return [...updated, { type: "tool", result }];
+            });
+          },
+          onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
+            logger.ai_response("GM stage complete", {
+              toolCount: gmResults.length,
+              tools: gmResults.map((r) => r.toolName),
+              contextLength: storyContext.length,
+              thinkingLines: thinking?.length || 0,
+              usage,
+            });
+
+            setLiveGMEntries([]);
+
+            if (gmResults.length > 0) {
+              partialPart.gmToolCalls = gmResults;
+            }
+            if (storyContext) {
+              partialPart.gmStoryContext = storyContext;
+            }
+            if (thinking && thinking.length > 0) {
+              partialPart.gmThinking = thinking;
+            }
+
+            // Find formula_roll results to show dice - this is the GM's own
+            // freeform dice tool, the only roll path left in the app.
+            const formulaResult = gmResults.find(
+              (r) =>
+                r.toolName === "formula_roll" &&
+                (r.result as GMFormulaRollResult)?.showToPlayer !== false,
+            );
+
+            if (formulaResult && formulaResult.result) {
+              const result = formulaResult.result as GMFormulaRollResult;
+              const dc = typeof result.dc === "number" ? result.dc : 0;
+              setDiceRoll({
+                show: true,
+                rolls: result.rolls || [],
+                finalRoll: result.total,
+                skillName: result.displayName || result.reason || "Roll",
+                skillBonus: 0, // Formula rolls handle bonuses internally
+                dc,
+                isSuccess: result.success ?? true,
+                isPartial: false,
+                isCritical: false,
+                hasAdvantage: false,
+                hasDisadvantage: false,
+                diceRolls: [result.rolls || []],
+                formula: result.formula,
+                resolvedFormula: result.resolvedFormula,
+                reverseDC: result.reverseDC,
               });
-            },
-            onGMContent: (delta, fullContent) => {
-              // Stream GM thinking content - accumulate entries properly
-              setLiveGMEntries((prev) => {
-                const lastEntry = prev[prev.length - 1];
-                // If last entry is streaming thinking, update it
-                if (lastEntry?.type === "thinking" && lastEntry.isStreaming) {
-                  return [
-                    ...prev.slice(0, -1),
-                    {
-                      type: "thinking",
-                      content: fullContent,
-                      isStreaming: true,
-                    },
-                  ];
-                } else {
-                  // Otherwise add new thinking entry
-                  return [
-                    ...prev,
-                    {
-                      type: "thinking",
-                      content: fullContent,
-                      isStreaming: true,
-                    },
-                  ];
-                }
-              });
-            },
-            onGMToolResult: (result) => {
-              // Add tool result and finalize any streaming thinking entry
-              setLiveGMEntries((prev) => {
-                // Mark any streaming thinking as complete
-                const updated = prev.map((entry) =>
-                  entry.type === "thinking" && entry.isStreaming
-                    ? { ...entry, isStreaming: false }
-                    : entry,
-                );
-                // Add the tool result
-                return [...updated, { type: "tool", result }];
-              });
-            },
-            onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
-              logger.ai_response("GM stage complete", {
-                toolCount: gmResults.length,
-                tools: gmResults.map((r) => r.toolName),
-                contextLength: storyContext.length,
-                thinkingLines: thinking?.length || 0,
-                usage,
-              });
 
-              // Clear live state now that we have final results
-              setLiveGMEntries([]);
-
-              // Store GM results in the partial part (keeps all results including errors)
-              if (gmResults.length > 0) {
-                partialPart.gmToolCalls = gmResults;
-              }
-              if (storyContext) {
-                partialPart.gmStoryContext = storyContext;
-              }
-              if (thinking && thinking.length > 0) {
-                partialPart.gmThinking = thinking;
-              }
-
-              // Find formula_roll results to show dice
-              // Only show dice if showToPlayer is true (default)
-              const formulaResult = gmResults.find(
-                (r) =>
-                  r.toolName === "formula_roll" &&
-                  (r.result as GMFormulaRollResult)?.showToPlayer !== false,
-              );
-
-              if (formulaResult && formulaResult.result) {
-                // Handle formula_roll results (custom formula-based dice rolls)
-                const result = formulaResult.result as GMFormulaRollResult;
-
-                // Trigger dice visualizer with formula roll data (generic mode)
-                const dc = typeof result.dc === "number" ? result.dc : 0;
-                setDiceRoll({
-                  show: true,
-                  rolls: result.rolls || [],
-                  finalRoll: result.total,
-                  skillName: result.displayName || result.reason || "Roll",
-                  skillBonus: 0, // Formula rolls handle bonuses internally
-                  dc,
-                  isSuccess: result.success ?? true,
-                  isPartial: false, // Formula rolls don't have partial success
-                  isCritical: false,
-                  hasAdvantage: false,
-                  hasDisadvantage: false,
-                  diceRolls: [result.rolls || []],
-                  // Use generic mode (formula-based) instead of rpgSystem
+              logger.action(
+                "Dice visualizer triggered from GM formula_roll",
+                {
                   formula: result.formula,
                   resolvedFormula: result.resolvedFormula,
-                  // Use per-roll reverseDC from GM result (Call of Cthulhu style)
-                  reverseDC: result.reverseDC,
-                });
-
-                logger.action(
-                  "Dice visualizer triggered from GM formula_roll",
-                  {
-                    formula: result.formula,
-                    resolvedFormula: result.resolvedFormula,
-                    total: result.total,
-                    dc: result.dc,
-                    success: result.success,
-                  },
-                );
-              }
-
-              // Extract NPC reactions from GM results and show as toast notifications
-              const npcReactionResults = gmResults.filter(
-                (r) => r.toolName === "npc_reaction",
+                  total: result.total,
+                  dc: result.dc,
+                  success: result.success,
+                },
               );
-              if (npcReactionResults.length > 0) {
-                const newReactions = npcReactionResults
-                  .map((r) => (r.result as GMNPCReactionResult)?.reaction)
-                  .filter((r): r is NPCReaction => r !== undefined);
+            }
 
-                if (newReactions.length > 0) {
-                  // Add reactions to the pending list (they'll auto-dismiss)
-                  setPendingNPCReactions((prev) => [...prev, ...newReactions]);
+            // Extract NPC reactions from GM results and show as toast notifications
+            const npcReactionResults = gmResults.filter(
+              (r) => r.toolName === "npc_reaction",
+            );
+            if (npcReactionResults.length > 0) {
+              const newReactions = npcReactionResults
+                .map((r) => (r.result as GMNPCReactionResult)?.reaction)
+                .filter((r): r is NPCReaction => r !== undefined);
 
-                  // Also store in the scene part for persistence
-                  if (!partialPart.npcReactions) {
-                    partialPart.npcReactions = [];
-                  }
-                  partialPart.npcReactions.push(...newReactions);
+              if (newReactions.length > 0) {
+                setPendingNPCReactions((prev) => [...prev, ...newReactions]);
 
-                  logger.action("NPC reactions triggered", {
-                    count: newReactions.length,
-                    npcs: newReactions.map((r) => r.npcName),
-                  });
+                if (!partialPart.npcReactions) {
+                  partialPart.npcReactions = [];
                 }
+                partialPart.npcReactions.push(...newReactions);
+
+                logger.action("NPC reactions triggered", {
+                  count: newReactions.length,
+                  npcs: newReactions.map((r) => r.npcName),
+                });
               }
+            }
 
-              setLoadingStage("story");
-            },
-            onStoryContent: (chunk: string, fullContent: string) => {
-              // Update partial part as content streams
-              partialPart.content = fullContent;
+            setLoadingStage("story");
+          },
+          onStoryContent: (chunk: string, fullContent: string) => {
+            partialPart.content = fullContent;
 
-              // Only add to scene once (when we first get content)
-              if (
-                storyData.scene.parts[storyData.scene.parts.length - 1] !==
-                partialPart
-              ) {
-                storyData.scene.parts = [...storyData.scene.parts, partialPart];
-              }
+            if (
+              storyData.scene.parts[storyData.scene.parts.length - 1] !==
+              partialPart
+            ) {
+              storyData.scene.parts = [...storyData.scene.parts, partialPart];
+            }
 
-              setStoryText(fullContent);
-              // Don't call setStoryData here - it causes infinite loops during rapid streaming
-              // storyText is sufficient for display, full update happens in onStoryComplete
-              setLoading(false); // Let player read while tools/choices generate
-              setPendingUserChoice(""); // Clear pending choice - response is here
-            },
-            onStoryComplete: (content: string, usage: any) => {
-              // Update the partial part with the cleaned content (strips [GM State Update] etc)
-              partialPart.content = content;
-              setStoryText(content);
-              setStoryData({ ...storyData }); // Full update only at completion
+            setStoryText(fullContent);
+            setLoading(false); // Let player read while tools/choices generate
+            setPendingUserChoice(""); // Clear pending choice - response is here
+          },
+          onStoryComplete: (content: string, usage: any) => {
+            partialPart.content = content;
+            setStoryText(content);
+            setStoryData({ ...storyData }); // Full update only at completion
 
-              // Tools and choices run in parallel after story - no separate loading stage
-              logger.ai_response("Story narration complete", {
-                length: content.length,
-                usage,
-              });
-            },
-            onToolsStart: () => {
-              // Keep showing tools stage while either is running
-            },
-            onToolsComplete: (
-              toolCalls,
-              toolResponses,
-              stateChanges,
+            logger.ai_response("Story narration complete", {
+              length: content.length,
               usage,
-            ) => {
-              // Update the last part with tool data including stateChanges
-              const lastPartIndex = storyData.scene.parts.length - 1;
-              if (lastPartIndex >= 0) {
-                storyData.scene.parts[lastPartIndex] = {
-                  ...storyData.scene.parts[lastPartIndex],
-                  toolCalls,
-                  toolResponses,
-                  stateChanges:
-                    stateChanges.length > 0 ? stateChanges : undefined,
-                };
-              }
+            });
+          },
+          onToolsStart: () => {
+            // Keep showing tools stage while either is running
+          },
+          onToolsComplete: (
+            toolCalls,
+            toolResponses,
+            stateChanges,
+            usage,
+          ) => {
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                toolCalls,
+                toolResponses,
+                stateChanges:
+                  stateChanges.length > 0 ? stateChanges : undefined,
+              };
+            }
 
-              // Store tool responses for AI feedback in next turn
-              setPendingCommandResponses(toolResponses);
+            setPendingCommandResponses(toolResponses);
+            processQuestNotifications(toolResponses, addNotification);
 
-              // Notify player of quest changes
-              processQuestNotifications(toolResponses, addNotification);
+            setStoryData({ ...storyData });
+            toolsComplete = true;
+            checkBothComplete();
 
-              setStoryData({ ...storyData });
-              toolsComplete = true;
-              checkBothComplete();
+            logger.ai_response("Tools complete", {
+              toolCallsCount: toolCalls.length,
+              responsesCount: toolResponses.length,
+              stateChangesCount: stateChanges.length,
+              usage,
+            });
+          },
+          onChoicesStart: () => {
+            // Keep showing tools stage while either is running
+          },
+          onChoicesComplete: (newChoices, usage) => {
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                choices: newChoices,
+              };
+            }
 
-              logger.ai_response("Tools complete", {
-                toolCallsCount: toolCalls.length,
-                responsesCount: toolResponses.length,
-                stateChangesCount: stateChanges.length,
-                usage,
-              });
-            },
-            onChoicesStart: () => {
-              // Keep showing tools stage while either is running
-            },
-            onChoicesComplete: (newChoices, usage) => {
-              // Update the last part with choices
-              const lastPartIndex = storyData.scene.parts.length - 1;
-              if (lastPartIndex >= 0) {
-                storyData.scene.parts[lastPartIndex] = {
-                  ...storyData.scene.parts[lastPartIndex],
-                  choices: newChoices,
-                };
-              }
+            setChoices({ choices: newChoices });
+            setStoryData({ ...storyData });
+            choicesComplete = true;
+            checkBothComplete();
 
-              setChoices({ choices: newChoices });
-              setStoryData({ ...storyData });
-              choicesComplete = true;
-              checkBothComplete();
+            logger.ai_response("Choices complete", {
+              choicesCount: newChoices.length,
+              usage,
+            });
+          },
+          onComplete: (result) => {
+            if (result.meta.balance !== undefined) {
+              setTokenBalance(result.meta.balance);
+            }
 
-              logger.ai_response("Choices complete", {
-                choicesCount: newChoices.length,
-                usage,
-              });
-            },
-            onComplete: (result) => {
-              // Update token balance
-              if (result.meta.balance !== undefined) {
-                setTokenBalance(result.meta.balance);
-              }
+            if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
+              const currentChapter = storyData.chapters.length;
+              addNotification(
+                `Chapter ${currentChapter} Complete!`,
+                "success",
+              );
+            }
 
-              // Check for chapter completion
-              if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
-                const currentChapter = storyData.chapters.length;
+            // Tick ability cooldowns at end of turn
+            if (storyData.abilities && storyData.abilities.length > 0) {
+              const offCooldown = tickCooldowns(storyData.abilities);
+              if (offCooldown.length > 0) {
                 addNotification(
-                  `Chapter ${currentChapter} Complete!`,
+                  `Abilities ready: ${offCooldown.join(", ")}`,
                   "success",
                 );
               }
+            }
 
-              // Tick ability cooldowns at end of turn
-              if (storyData.abilities && storyData.abilities.length > 0) {
-                const offCooldown = tickCooldowns(storyData.abilities);
-                if (offCooldown.length > 0) {
-                  addNotification(
-                    `Abilities ready: ${offCooldown.join(", ")}`,
-                    "success",
-                  );
-                }
-              }
+            const lastIdx = storyData.scene.parts.length - 1;
+            if (lastIdx >= 0 && result.scenePart?.gmConversation) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                gmConversation: result.scenePart.gmConversation,
+              };
+            }
 
-              // Copy gmConversation from result.scenePart to the last scene part
-              // This preserves the full GM conversation history for future context
-              const lastIdx = storyData.scene.parts.length - 1;
-              if (lastIdx >= 0 && result.scenePart?.gmConversation) {
-                storyData.scene.parts[lastIdx] = {
-                  ...storyData.scene.parts[lastIdx],
-                  gmConversation: result.scenePart.gmConversation,
-                };
-                console.log(
-                  "[onComplete] Saved gmConversation:",
-                  result.scenePart.gmConversation.length,
-                  "messages",
-                );
-              }
+            setCanRetry(true);
+            setCanUndo(true);
+            setLoadingStage(null);
 
-              setCanRetry(true);
-              setCanUndo(true);
-              setLoadingStage(null);
+            setPendingCommandResponses([]);
 
-              // Clear command responses after successful generation
-              setPendingCommandResponses([]);
+            setStoryData({ ...storyData });
 
-              setStoryData({ ...storyData });
+            saveProgress(storyData, true);
 
-              // Save progress
-              const lastPartForSave =
-                storyData.scene.parts[storyData.scene.parts.length - 1];
-              console.log(
-                "Saving story - last part choices:",
-                lastPartForSave.choices?.length || 0,
-                "choices",
-              );
-              saveProgress(storyData, true);
-
-              logger.ai_response("Generation complete (choice)", {
-                totalTokenCost: result.meta.totalTokenCost,
-              });
-            },
-            onError: (error) => {
-              addNotification(`Error: ${error.message}`, "failure");
-              setLoading(false);
-              setLoadingStage(null);
-              setCanRetry(true);
-              setChoices({
-                choices:
-                  storyData.scene.parts[storyData.scene.parts.length - 1]
-                    ?.choices || [],
-              });
-
-              logger.error("Generation error (choice)", {
-                message: error.message,
-              });
-            },
+            logger.ai_response("Generation complete (choice)", {
+              totalTokenCost: result.meta.totalTokenCost,
+            });
           },
-          pendingCommandResponses.length > 0
-            ? pendingCommandResponses
-            : undefined,
-        ),
-        diceAnimationPromise, // Wait for dice animation to complete too
-      ]);
+          onError: (error) => {
+            addNotification(`Error: ${error.message}`, "failure");
+            setLoading(false);
+            setLoadingStage(null);
+            setCanRetry(true);
+            setChoices({
+              choices:
+                storyData.scene.parts[storyData.scene.parts.length - 1]
+                  ?.choices || [],
+            });
+
+            logger.error("Generation error (choice)", {
+              message: error.message,
+            });
+          },
+        },
+        pendingCommandResponses.length > 0
+          ? pendingCommandResponses
+          : undefined,
+      );
     } catch (error: any) {
       addNotification(`Error: ${error.message}`, "failure");
       setLoading(false);
@@ -6016,14 +4263,10 @@ function StoryPageContent() {
                           customTables:
                             freshTemplate?.customTables ||
                             storyData.customTables,
-                          maxMomentum:
-                            freshTemplate?.maxMomentum ?? storyData.maxMomentum,
                           restState: freshTemplate?.restState || {
                             quickRestsUsed: 0,
                             shortRestsUsed: 0,
                           },
-                          nodeEffects:
-                            freshTemplate?.nodeEffects || storyData.nodeEffects,
                           unlockedNodes:
                             freshTemplate?.unlockedNodes ||
                             storyData.unlockedNodes,
@@ -6032,8 +4275,6 @@ function StoryPageContent() {
                           memory: [],
                           currentChapter: 0,
                           chapters: [],
-                          momentum:
-                            freshTemplate?.momentum ?? storyData.momentum,
                           points: 0,
                           earnedPointsFromChapters: [],
                           earnedPointsFromQuests: [],
@@ -6110,7 +4351,6 @@ function StoryPageContent() {
                         const ngPlusCount =
                           (storyData.newGamePlusCount || 0) + 1;
                         const bonusPoints = ngPlusCount * 50; //50pointsperNG+run
-                        const bonusMomentum = Math.min(ngPlusCount, 3); //Upto+3maxmomentum
 
                         // Try to fetch fresh adventure data for story-specific fields (lore, quests)
                         let freshTemplate: Partial<StoryData> | null = null;
@@ -6137,8 +4377,6 @@ function StoryPageContent() {
                           memory: [],
                           currentChapter: 0,
                           chapters: [],
-                          momentum: storyData.momentum,
-                          maxMomentum: storyData.maxMomentum + bonusMomentum,
                           points: bonusPoints, //Startwithbonuspoints
                           earnedPointsFromChapters: [],
                           earnedPointsFromQuests: [],
@@ -6164,7 +4402,6 @@ function StoryPageContent() {
                           // Keep skill tree progress!
                           skillTrees: storyData.skillTrees,
                           unlockedNodes: storyData.unlockedNodes,
-                          nodeEffects: storyData.nodeEffects,
                           // Reset quests from fresh adventure or current story
                           quests:
                             (freshTemplate?.quests || storyData.quests)?.map(
@@ -6194,7 +4431,7 @@ function StoryPageContent() {
                         await saveLocalStory(storyDbId, ngPlusStoryData);
 
                         addNotification(
-                          `New Game Plus ${ngPlusCount} activated! +${bonusPoints} points, +${bonusMomentum} max momentum`,
+                          `New Game Plus ${ngPlusCount} activated! +${bonusPoints} points`,
                           "success",
                         );
                         router.push(`/story?storyId=${storyDbId}`);
@@ -6478,8 +4715,6 @@ function StoryPageContent() {
             input={input}
             loading={loading}
             loadingStage={loadingStage}
-            momentumMode={momentumMode}
-            onMomentumModeChange={setMomentumMode}
             handleChoice={handleChoice}
             handleSelect={handleSelect}
             onCustomInput={handleCustomInput}
@@ -6504,7 +4739,6 @@ function StoryPageContent() {
             liveGMEntries={liveGMEntries}
           />
         )}
-        {currentState === StoryState.STATS && <StatsPage {...storyData} />}
         {currentState === StoryState.CHARACTER_CREATION && (
           <CharacterCreationForm
             storyData={storyData}
@@ -6628,108 +4862,6 @@ function StoryPageContent() {
         />
       )}
 
-      {/* YZE: Stress Dice Selection UI */}
-      {yzeAwaitingStressChoice && yzePendingChoice && storyData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-          <div className="bg-linear-to-br from-gray-900 via-red-950 to-gray-900 border-4 border-red-600 rounded-2xl p-8 max-w-md w-full mx-4 shadow-2xl">
-            <div className="flex items-center justify-center gap-3 mb-6">
-              <DynamicIcon name="Skull" className="w-10 h-10 text-red-400" />
-              <h2 className="text-3xl font-black text-red-100 uppercase tracking-wide">
-                Add Stress Dice?
-              </h2>
-            </div>
-
-            <div className="bg-gray-950/50 rounded-lg p-4 mb-6 border border-red-900">
-              <p className="text-white text-center mb-4">
-                <span className="font-bold text-red-300">Skill:</span>{" "}
-                {yzePendingChoice.skill_used}
-              </p>
-              <p className="text-gray-300 text-sm text-center mb-2">
-                Base Dice:{" "}
-                <span className="font-bold text-blue-400">
-                  {Math.floor(
-                    (storyData.stats.find(
-                      (s) => s.name === yzePendingChoice.skill_used,
-                    )?.value || 0) / 20,
-                  )}
-                </span>
-              </p>
-              <p className="text-gray-300 text-sm text-center mb-4">
-                Current Stress:{" "}
-                <span
-                  className={`font-bold ${
-                    (storyData.stress || 0) >= 8
-                      ? "text-red-400 animate-pulse"
-                      : "text-yellow-400"
-                  }`}
-                >
-                  {storyData.stress || 0}/10
-                </span>
-              </p>
-              <p className="text-gray-400 text-xs text-center border-t border-gray-700 pt-3">
-                ?? Stress dice increase your chances (count 6s) but add stress
-                and risk PANIC on 1s!
-              </p>
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-white font-bold mb-3 text-center">
-                Stress Dice:{" "}
-                <span className="text-red-400 text-2xl">
-                  {yzeStressDiceChoice}
-                </span>
-              </label>
-              <input
-                type="range"
-                min="0"
-                max={Math.min(5, 10 - (storyData.stress || 0))}
-                value={yzeStressDiceChoice}
-                onChange={(e) =>
-                  setYzeStressDiceChoice(parseInt(e.target.value))
-                }
-                className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-600"
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1">
-                <span>0 (Safe)</span>
-                <span>{Math.min(5, 10 - (storyData.stress || 0))} (Max)</span>
-              </div>
-            </div>
-
-            {yzeStressDiceChoice > 0 && (
-              <div className="bg-red-950/30 border border-red-800 rounded-lg p-3 mb-6">
-                <p className="text-red-200 text-sm text-center">
-                  +{yzeStressDiceChoice} stress ?{" "}
-                  <span className="font-bold">
-                    {(storyData.stress || 0) + yzeStressDiceChoice}/10
-                  </span>
-                </p>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() => {
-                  setYzeAwaitingStressChoice(false);
-                  setYzePendingChoice(null);
-                  setYzeStressDiceChoice(0);
-                }}
-                className="flex-1 bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-6 rounded-xl transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  handleChoice(); // Resume with chosen stress dice
-                }}
-                className="flex-1 bg-linear-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white font-bold py-3 px-6 rounded-xl transition-all shadow-lg"
-              >
-                Roll!
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/*DiceVisualizer*/}
       {diceRoll && diceRoll.show && (
         <DiceVisualizer
@@ -6746,7 +4878,6 @@ function StoryPageContent() {
           formula={diceRoll.formula}
           resolvedFormula={diceRoll.resolvedFormula}
           reverseDC={diceRoll.reverseDC}
-          rpgSystem={diceRoll.rpgSystem}
           baseDice={diceRoll.baseDice}
           stressDice={diceRoll.stressDice}
           successes={diceRoll.successes}

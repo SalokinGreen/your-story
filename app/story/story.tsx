@@ -23,8 +23,6 @@ interface StoryProps {
   input: Record<string, boolean>;
   loading: boolean;
   loadingStage?: "gm" | "story" | "choices" | null;
-  momentumMode: "none" | "advantage" | "guarantee";
-  onMomentumModeChange: (mode: "none" | "advantage" | "guarantee") => void;
   handleChoice: (playerComment?: string) => void;
   handleSelect: (index: number) => void;
   onCustomInput?: (text: string, playerComment?: string) => void;
@@ -337,8 +335,6 @@ export default function Story({
   input,
   loading,
   loadingStage,
-  momentumMode,
-  onMomentumModeChange,
   handleChoice,
   handleSelect,
   onCustomInput,
@@ -1151,8 +1147,6 @@ export default function Story({
         onCommentSubmit={onCommentSubmit}
         onRerollChoices={onRerollChoices}
         loading={loading}
-        momentumMode={momentumMode}
-        onMomentumModeChange={onMomentumModeChange}
         // When there are no preset choices (e.g. a fresh Freeform Story),
         // open straight into the freeform text box instead of an empty list.
         actionMode={choices?.choices?.length ? actionMode : true}

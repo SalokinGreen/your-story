@@ -79,7 +79,6 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
 
   // Game settings
   const settings: string[] = [];
-  if (data.rpgSystem) settings.push(`- **RPG System:** ${data.rpgSystem}`);
   if (data.difficulty) settings.push(`- **Difficulty:** ${data.difficulty}`);
   if (data.max_chapters)
     settings.push(`- **Max Chapters:** ${data.max_chapters}`);
