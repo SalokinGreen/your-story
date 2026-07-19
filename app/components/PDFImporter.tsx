@@ -38,6 +38,12 @@ const MAX_CONCURRENT_OCR_REQUESTS = 2;
 // are treated as memory-constrained and get smaller chunks / lower
 // concurrency to avoid crashing while splitting large PDFs.
 const LOW_MEMORY_DEVICE_THRESHOLD_GB = 4;
+// Above this raw file size, pdf-lib has to hold a proportionally large
+// parsed document in memory for the *entire* OCR phase (it's needed for
+// `copyPages` on every chunk, not just the first one) regardless of how
+// small each individual chunk ends up being. Treat large source files as
+// memory-constrained on their own, independent of device detection.
+const VERY_LARGE_FILE_SIZE_MB = 25;
 // Timeout for summarize requests (4 minutes - server allows 5)
 const SUMMARIZE_TIMEOUT_MS = 240000;
 // Retry attempts for failed requests
@@ -225,9 +231,12 @@ function bytesToBase64(bytes: Uint8Array): string {
 
 /**
  * Best-effort detection of memory-constrained devices (mobile phones/
- * tablets) via the non-standard `navigator.deviceMemory` API. Falls back to
- * `false` (treat as a regular desktop) when the API isn't available, since
- * most desktop browsers don't expose it.
+ * tablets) via the non-standard `navigator.deviceMemory` API. Safari
+ * (iOS/iPadOS, including desktop-mode iPad) has never implemented that API
+ * - the exact devices most prone to crashing on large in-memory PDF
+ * parsing - so falling back to "not low memory" there silently disables
+ * every mitigation below. Fall back to a mobile/tablet user-agent and
+ * touch-capability heuristic instead of assuming desktop-class headroom.
  */
 function isLowMemoryDevice(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -236,7 +245,28 @@ function isLowMemoryDevice(): boolean {
   if (typeof deviceMemory === "number") {
     return deviceMemory <= LOW_MEMORY_DEVICE_THRESHOLD_GB;
   }
+  const ua = navigator.userAgent || "";
+  if (/iPhone|iPad|iPod|Android|Mobile/i.test(ua)) return true;
+  // iPadOS 13+ reports its UA as a regular Mac, but exposes multi-touch
+  // (real desktop Macs don't), so this is the standard way to detect it.
+  if (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1) {
+    return true;
+  }
   return false;
+}
+
+/**
+ * Whether a given file should be processed with the conservative
+ * (smaller chunk / lower concurrency) memory settings - either because
+ * the device looks memory-constrained, or because the file itself is
+ * large enough that pdf-lib's persistent in-memory document (held for the
+ * whole OCR phase) is a meaningful memory floor on any device.
+ */
+function needsConservativeMemoryMode(fileSizeBytes: number): boolean {
+  return (
+    isLowMemoryDevice() ||
+    fileSizeBytes / (1024 * 1024) > VERY_LARGE_FILE_SIZE_MB
+  );
 }
 
 interface PDFChunkRange {
@@ -277,9 +307,10 @@ async function planPDFChunks(
   });
   const totalPages = pdfDoc.getPageCount();
 
-  // On memory-constrained devices, use smaller chunks so fewer pages (and
-  // less base64 data) need to be held in memory at any one time.
-  const lowMemory = isLowMemoryDevice();
+  // On memory-constrained devices (or for very large source files), use
+  // smaller chunks so fewer pages (and less base64 data) need to be held
+  // in memory at any one time.
+  const lowMemory = needsConservativeMemoryMode(file.size);
   const maxChunkSizeMB = lowMemory ? MAX_CHUNK_SIZE_MB / 2 : MAX_CHUNK_SIZE_MB;
   const maxPagesPerChunk = lowMemory
     ? Math.max(1, Math.floor(PAGES_PER_CHUNK / 2))
@@ -483,7 +514,6 @@ export default function PDFImporter({
   const [statusMessage, setStatusMessage] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [estimatedCost, setEstimatedCost] = useState(0);
-  const [extractedMarkdown, setExtractedMarkdown] = useState("");
   const [pageCount, setPageCount] = useState(0);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
@@ -1019,9 +1049,10 @@ export default function PDFImporter({
 
           const { pdfDoc, ranges } = chunkPlan;
           const totalChunks = ranges.length;
-          // Fewer concurrent OCR uploads on memory-constrained devices,
-          // since each chunk carries its own multi-MB base64 payload.
-          const ocrConcurrency = isLowMemoryDevice()
+          // Fewer concurrent OCR uploads on memory-constrained devices (or
+          // for very large source files), since each chunk carries its
+          // own multi-MB base64 payload.
+          const ocrConcurrency = needsConservativeMemoryMode(file.size)
             ? 1
             : MAX_CONCURRENT_OCR_REQUESTS;
 
@@ -1109,10 +1140,6 @@ export default function PDFImporter({
             combinedTotalPages += ocr.totalPages;
           }
 
-          // Update extracted markdown after all OCR is done
-          setExtractedMarkdown(
-            (prev) => prev + "\n\n---\n\n" + combinedMarkdown,
-          );
           totalPagesProcessed += combinedTotalPages;
           setProgress(fileProgressStart + fileProgressRange * 0.45);
 
@@ -1310,10 +1337,6 @@ export default function PDFImporter({
             combinedMarkdown = textContent;
             combinedTotalPages = 0;
 
-            setExtractedMarkdown(
-              (prev) => prev + "\n\n---\n\n" + combinedMarkdown,
-            );
-
             const summarizeResponse = await fetchWithRetry(
               "/api/ocr/summarize",
               {
@@ -1408,9 +1431,6 @@ export default function PDFImporter({
           combinedMarkdown = ocrResult.markdown;
           combinedTotalPages = ocrResult.totalPages;
 
-          setExtractedMarkdown(
-            (prev) => prev + "\n\n---\n\n" + combinedMarkdown,
-          );
           totalPagesProcessed += combinedTotalPages;
           setProgress(fileProgressStart + fileProgressRange * 0.4);
 
@@ -1522,7 +1542,6 @@ export default function PDFImporter({
     setStatusMessage("");
     setSelectedFiles([]);
     setEstimatedCost(0);
-    setExtractedMarkdown("");
     setPageCount(0);
     setCurrentFileIndex(0);
     setChunkStatuses([]);
