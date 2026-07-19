@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNotification } from "../misc/NotificationContext";
-import { getAuthToken } from "../misc/getAuthToken";
+import { useAPIKeys } from "../misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
 
 interface TTSControlsProps {
@@ -36,6 +36,7 @@ export default function TTSControls({
   disabled = false,
 }: TTSControlsProps) {
   const { addNotification } = useNotification();
+  const { keys: apiKeys } = useAPIKeys();
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -95,21 +96,22 @@ export default function TTSControls({
       isGeneratingRef.current = true;
       setIsLoading(true);
 
-      const token = await getAuthToken();
-      if (!token) {
-        throw new Error("Authentication required. Please sign in to use TTS.");
+      if (!apiKeys.deepinfraKey) {
+        throw new Error(
+          "DeepInfra API key is required. Please add your own key in Settings."
+        );
       }
 
       const response = await fetch("/api/tts/generate", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           text,
           voiceId: selectedVoice,
           model: selectedModel,
+          deepinfraKey: apiKeys.deepinfraKey,
         }),
       });
 
@@ -191,7 +193,14 @@ export default function TTSControls({
       setIsLoading(false);
       isGeneratingRef.current = false;
     }
-  }, [disabled, text, isPaused, audioUrl, addNotification]);
+  }, [
+    disabled,
+    text,
+    isPaused,
+    audioUrl,
+    addNotification,
+    apiKeys.deepinfraKey,
+  ]);
 
   // Handle text changes - clear audio and mark pending auto-generate
   useEffect(() => {
