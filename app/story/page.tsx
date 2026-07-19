@@ -47,6 +47,7 @@ import QuestsPage from "./quests";
 import AchievementsPage from "./achievements";
 import NPCsPage from "./npcs";
 import MenuPage from "./menu";
+import { StoryTabBar } from "./StoryTabBar";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
@@ -6423,40 +6424,43 @@ function StoryPageContent() {
                   <span className="text-sm">{tokenBalance}</span>
                 </div>
               )}
+              {/* Menu / Settings entry (moved out of the tab row) */}
+              <button
+                type="button"
+                onClick={() => setCurrentState(StoryState.MENU)}
+                aria-label="Menu"
+                aria-current={
+                  currentState === StoryState.MENU ? "page" : undefined
+                }
+                title="Menu"
+                className={`focus-ring rounded-lg p-1.5 transition-colors ${
+                  currentState === StoryState.MENU
+                    ? "bg-purple-600/20 text-purple-300 ring-1 ring-purple-400/40 shadow-[0_0_10px_rgba(147,51,234,0.4)]"
+                    : "text-blue-300 hover:bg-blue-900/50 hover:text-white"
+                }`}
+              >
+                <DynamicIcon name="Settings" className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="relative z-30 bg-blue-950/50 rounded-none sm:rounded-xl border-x-0 sm:border border-blue-800/30 p-2">
-          <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-1">
-            {[
-              { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
-              { state: StoryState.LORE, icon: "Scroll", label: "Notes" },
-              { state: StoryState.NPCS, icon: "Users", label: "NPCs" },
-              { state: StoryState.QUESTS, icon: "Target", label: "Quests" },
-              {
-                state: StoryState.ACHIEVEMENTS,
-                icon: "Trophy",
-                label: "Achievements",
-              },
-              { state: StoryState.MENU, icon: "Settings", label: "Menu" },
-            ].map(({ state, icon, label }) => (
-              <button
-                key={state}
-                onClick={() => setCurrentState(state)}
-                className={`px-4 py-3 sm:px-3 sm:py-2 text-sm font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
-                  currentState === state
-                    ? "bg-blue-600 text-white"
-                    : "text-blue-200/70 hover:bg-blue-900/50 hover:text-white active:bg-blue-800/50"
-                }`}
-              >
-                <DynamicIcon name={icon} className="w-5 h-5 sm:w-4 sm:h-4" />
-                <span className="hidden sm:inline">{label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <StoryTabBar
+          currentState={currentState}
+          onSelect={(state) => setCurrentState(state as StoryState)}
+          tabs={[
+            { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
+            { state: StoryState.LORE, icon: "Scroll", label: "Notes" },
+            { state: StoryState.NPCS, icon: "Users", label: "NPCs" },
+            { state: StoryState.QUESTS, icon: "Target", label: "Quests" },
+            {
+              state: StoryState.ACHIEVEMENTS,
+              icon: "Trophy",
+              label: "Achievements",
+            },
+          ]}
+        />
 
         {/*Rendercurrentpage*/}
         {currentState === StoryState.STORY && (
