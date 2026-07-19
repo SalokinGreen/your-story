@@ -1523,6 +1523,47 @@ function flattenRolls(rolls: RollResult["rolls"]): number[] {
  * calls `set_reasoning_tier` itself. Returns an extra `contextForStory`
  * line when escalation actually happens, or "" otherwise.
  */
+// H8: roll-input integrity check. Model-typed flat modifiers on formula_roll
+// / opposed_formula are entirely self-asserted with no cross-check against
+// the character sheet. A full cross-check isn't possible for every adventure
+// because character data can live in three different shapes: structured
+// storyData.stats/resources (numeric, always reliable when present),
+// storyData.characterData (freeform strings typed into a template form - no
+// type guarantee, could be "16" or "Very Strong"), or a "character_sheet"
+// type lore note (pure prose, no structure at all). Parsing the latter two
+// would mean guessing numbers out of natural language, which is exactly the
+// unreliable-heuristic failure mode this audit warns against elsewhere.
+// So this only fires when the model voluntarily names a stat/resource via
+// the new optional stat_name/player_stat_name param AND that name matches a
+// structured storyData.stats/resources entry. It never blocks or rewrites
+// the roll (stacking from items/abilities/conditions legitimately shifts the
+// modifier away from the base stat) - it only appends a non-blocking
+// integrity note to contextForStory so the story/GM stage can notice and
+// react if a claim is clearly out of bounds. SLACK is sized generously from
+// documented stacking rules: item grade tops out at +5 (agmt) and ability
+// grade tops out at +5 (legendary), so +10 comfortably covers legitimate
+// double-stacking without flagging normal play.
+const STAT_INTEGRITY_SLACK = 10;
+
+function checkStatIntegrity(
+  storyData: StoryData,
+  statName: string | undefined,
+  claimedModifier: number
+): string {
+  if (!statName) return "";
+  const statMatch = findStatMatch(statName, storyData.stats || []);
+  const resourceMatch = statMatch
+    ? null
+    : findResourceMatch(statName, storyData.resources || []);
+  const matched = statMatch?.item ?? resourceMatch?.item;
+  if (!matched) return "";
+  const ceiling = matched.value + STAT_INTEGRITY_SLACK;
+  if (claimedModifier > ceiling) {
+    return `\n[⚠ Roll integrity check: claimed modifier +${claimedModifier} attributed to "${statName}" exceeds the character sheet value (${matched.value}, even allowing for item/ability stacking) - verify this roll]`;
+  }
+  return "";
+}
+
 function applyStakesEscalation(
   storyData: StoryData,
   stakes: "low" | "medium" | "high" | "deadly" | undefined
@@ -1624,6 +1665,12 @@ function executeFormulaRoll(
     contextForStory += `\n[Stakes: ${params.stakes}]`;
     contextForStory += applyStakesEscalation(storyData, params.stakes);
   }
+
+  contextForStory += checkStatIntegrity(
+    storyData,
+    params.stat_name,
+    rollResult.modifiers
+  );
 
   if (params.consequences) {
     const outcome = success
@@ -1766,6 +1813,12 @@ function executeOpposedFormula(
     contextForStory += `\n[Stakes: ${params.stakes}]`;
     contextForStory += applyStakesEscalation(storyData, params.stakes);
   }
+
+  contextForStory += checkStatIntegrity(
+    storyData,
+    params.player_stat_name,
+    playerResult.modifiers
+  );
 
   if (params.consequences) {
     const outcome =
