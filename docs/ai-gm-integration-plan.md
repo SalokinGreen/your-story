@@ -10,6 +10,14 @@
 > in. It supersedes the "missing features" backlog in `mythic_notes.md`
 > where the two disagree (that doc predates the staged pipeline and the
 > current `StoryData.threads`/`StoryData.npcs` model).
+>
+> **See also:** `ai-gm-deep-audit-findings.md` — a follow-up pass that
+> traced actual runtime code (not just schema/tool names) and found
+> several places where an apparent guarantee isn't actually enforced
+> (unbounded numeric tool args, an ungated `game_over`, two competing
+> chaos-factor implementations where the correct one is dead code, and
+> more). That doc's priority order supersedes §5 below for anything it
+> also covers.
 
 ## TL;DR
 
