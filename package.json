@@ -15,6 +15,7 @@
     "@vercel/analytics": "^1.5.0",
     "@vercel/speed-insights": "^1.2.0",
     "compressorjs": "^1.2.1",
+    "framer-motion": "^12.42.2",
     "js-tiktoken": "^1.0.21",
     "json5": "^2.2.3",
     "lucide-react": "^0.554.0",

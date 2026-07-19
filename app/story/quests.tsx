@@ -82,7 +82,7 @@ export default function QuestsPage(storyData: StoryData) {
                   return (
                     <div
                       key={quest.id || `quest-${quest.title}-${Math.random()}`}
-                      className="flex flex-col gap-3 p-4 rounded-lg border-2 border-blue-500/50 bg-blue-900/30 transition-all"
+                      className="flex flex-col gap-3 p-4 rounded-xl border-2 border-blue-500/50 bg-blue-900/30 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(59,130,246,0.15)]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -154,7 +154,7 @@ export default function QuestsPage(storyData: StoryData) {
                         quest.id ||
                         `quest-completed-${quest.title}-${Math.random()}`
                       }
-                      className="flex flex-col gap-3 p-4 rounded-lg border-2 border-green-500/50 bg-green-900/20 transition-all"
+                      className="flex flex-col gap-3 p-4 rounded-xl border-2 border-green-500/50 bg-green-900/20 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(34,197,94,0.15)]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -230,7 +230,7 @@ export default function QuestsPage(storyData: StoryData) {
                         quest.id ||
                         `quest-inactive-${quest.title}-${Math.random()}`
                       }
-                      className="flex flex-col gap-3 p-4 rounded-lg border-2 border-blue-800/30 bg-blue-900/20 opacity-70 transition-all"
+                      className="flex flex-col gap-3 p-4 rounded-xl border-2 border-blue-800/30 bg-blue-900/20 opacity-70 transition-all card-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.08)]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -315,7 +315,7 @@ export default function QuestsPage(storyData: StoryData) {
                 {activeThreads.map((thread) => (
                   <div
                     key={thread.id}
-                    className="flex flex-col gap-3 p-4 rounded-lg border-2 border-purple-500/50 bg-purple-900/30 transition-all"
+                    className="flex flex-col gap-3 p-4 rounded-xl border-2 border-purple-500/50 bg-purple-900/30 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(168,85,247,0.15)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -378,7 +378,7 @@ export default function QuestsPage(storyData: StoryData) {
                 {resolvedThreads.map((thread) => (
                   <div
                     key={thread.id}
-                    className="flex flex-col gap-3 p-4 rounded-lg border-2 border-green-500/40 bg-green-900/20 opacity-80 transition-all"
+                    className="flex flex-col gap-3 p-4 rounded-xl border-2 border-green-500/40 bg-green-900/20 opacity-80 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(34,197,94,0.12)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -445,7 +445,7 @@ export default function QuestsPage(storyData: StoryData) {
                 {abandonedThreads.map((thread) => (
                   <div
                     key={thread.id}
-                    className="flex flex-col gap-3 p-4 rounded-lg border-2 border-red-800/30 bg-red-900/10 opacity-60 transition-all"
+                    className="flex flex-col gap-3 p-4 rounded-xl border-2 border-red-800/30 bg-red-900/10 opacity-60 transition-all card-interactive hover:shadow-[0_4px_12px_rgba(239,68,68,0.08)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">

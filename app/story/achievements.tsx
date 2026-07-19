@@ -138,9 +138,9 @@ export default function AchievementsPage(storyData: StoryData) {
               {unlockedAchievements.map((achievement, index) => (
                 <div
                   key={`unlocked-${index}`}
-                  className="flex flex-row items-start gap-3 p-4 rounded-xl border-2 bg-linear-to-r from-amber-500/10 to-yellow-500/10 border-amber-500/40"
+                  className="card-interactive flex flex-row items-start gap-3 p-4 rounded-xl border-2 bg-linear-to-r from-amber-500/10 to-yellow-500/10 border-amber-500/40 hover:border-amber-400/60 hover:shadow-[0_4px_20px_rgba(245,158,11,0.2)]"
                 >
-                  <div className="shrink-0 w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center">
+                  <div className="shrink-0 w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center shadow-[0_0_12px_rgba(245,158,11,0.25)]">
                     <DynamicIcon
                       name={achievement.symbol || "Trophy"}
                       className="w-6 h-6 text-amber-400"
@@ -182,7 +182,7 @@ export default function AchievementsPage(storyData: StoryData) {
               {visibleLockedAchievements.map((achievement, index) => (
                 <div
                   key={`locked-${index}`}
-                  className="flex flex-row items-start gap-3 p-4 rounded-xl border bg-blue-900/20 border-blue-800/40 opacity-70"
+                  className="card-interactive flex flex-row items-start gap-3 p-4 rounded-xl border bg-blue-900/20 border-blue-800/40 opacity-70 hover:opacity-90 hover:border-blue-600/40"
                 >
                   <div className="shrink-0 w-12 h-12 rounded-xl bg-blue-900/40 border border-blue-700/50 flex items-center justify-center">
                     <DynamicIcon
