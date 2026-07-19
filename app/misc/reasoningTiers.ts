@@ -208,6 +208,28 @@ export function hardRuleFloor(state: StoryData): number {
 }
 
 /**
+ * Deterministic tier floor from a roll's own declared `stakes` (H7 fix).
+ *
+ * `formula_roll`/`opposed_formula` already accept a structured, model-set
+ * `stakes: "low" | "medium" | "high" | "deadly"` enum, but until this fix
+ * it was pure narration text — never read by the tier router, so a model
+ * could mark its own roll "deadly" and the system would still let it (or
+ * any later round) run at the cheapest tier, because self-escalation via
+ * `set_reasoning_tier` outside combat was always optional. This makes
+ * escalation for self-declared high-stakes rolls non-optional, using the
+ * same severity mapping `hardRuleFloor` already uses for combat (regular
+ * combat and "high" stakes both floor at the rules-adjudication tier;
+ * boss fights and "deadly" stakes both floor at the top tier) — no new
+ * mechanic invented, just extending the existing floor concept to a
+ * second structured signal the model was already providing.
+ */
+export function stakesFloor(stakes?: "low" | "medium" | "high" | "deadly" | string): number {
+  if (stakes === "deadly") return TOP_TIER;
+  if (stakes === "high") return TOP_TIER - 1;
+  return 0;
+}
+
+/**
  * Deterministic per-turn default from game-state alone — no LLM call.
  * Always returns a tier (freeform talk defaults to 0); ambiguity is
  * handled separately by isClassificationAmbiguous/buildClassifierPrompt.
@@ -333,6 +355,38 @@ export function resolveTierEscalation(
     return { grantedTier: Math.max(currentTier, TOP_TIER - 1), capped: true };
   }
   return { grantedTier: requested, capped: false };
+}
+
+/**
+ * Runs a tier-escalation request through the same decay/cap policy as
+ * `set_reasoning_tier` and persists the result onto `storyData.reasoningTierState`
+ * (mutating `modified`, same convention as every other GM tool executor).
+ * Shared by the model's own self-escalation tool AND by deterministic,
+ * non-optional floors (e.g. `stakesFloor` for high/deadly-stakes rolls) so
+ * both paths update state identically and respect the same scene cap.
+ */
+export function applyTierEscalation(
+  storyData: StoryData,
+  requestedTier: number,
+  reason: string,
+): EscalationDecision & { previousTier: number } {
+  const tierState = getTierState(storyData);
+  const decision = resolveTierEscalation(
+    { tier: requestedTier, reason },
+    tierState.currentTier,
+    tierState,
+  );
+
+  storyData.reasoningTierState = {
+    currentTier: decision.grantedTier,
+    tier3CallsInScene:
+      decision.grantedTier === TOP_TIER
+        ? tierState.tier3CallsInScene + 1
+        : tierState.tier3CallsInScene,
+    lastSceneKey: tierState.lastSceneKey,
+  };
+
+  return { ...decision, previousTier: tierState.currentTier };
 }
 
 // ============================================================

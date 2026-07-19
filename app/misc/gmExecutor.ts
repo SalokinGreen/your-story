@@ -79,9 +79,8 @@ import {
 } from "./mythic";
 import { getTableByName, rollOnCustomTable } from "./tableRoller";
 import {
-  getTierState,
-  resolveTierEscalation,
-  TOP_TIER,
+  applyTierEscalation,
+  stakesFloor,
 } from "./reasoningTiers";
 import {
   getRPGSystem,
@@ -1515,6 +1514,33 @@ function flattenRolls(rolls: RollResult["rolls"]): number[] {
 }
 
 /**
+ * H7 fix: a self-declared "high"/"deadly" `stakes` value on a roll is a
+ * non-optional escalation floor, not decoration. Mirrors the combat floor
+ * in `hardRuleFloor` (regular combat -> rules-adjudication tier, boss
+ * fight -> top tier) but keyed on the roll's own stakes instead of combat
+ * state, so a genuinely high-stakes non-combat check can no longer be
+ * quietly adjudicated at the cheapest tier just because the model never
+ * calls `set_reasoning_tier` itself. Returns an extra `contextForStory`
+ * line when escalation actually happens, or "" otherwise.
+ */
+function applyStakesEscalation(
+  storyData: StoryData,
+  stakes: "low" | "medium" | "high" | "deadly" | undefined
+): string {
+  const floor = stakesFloor(stakes);
+  if (floor <= 0) return "";
+  const decision = applyTierEscalation(
+    storyData,
+    floor,
+    `${stakes}-stakes roll`
+  );
+  if (decision.grantedTier > decision.previousTier) {
+    return `\n[Reasoning tier escalated to ${decision.grantedTier} - ${stakes}-stakes roll]`;
+  }
+  return "";
+}
+
+/**
  * Execute a formula roll with optional DC check
  * GM must provide formulas with actual numeric values (no variable substitution)
  */
@@ -1524,7 +1550,6 @@ function executeFormulaRoll(
   storyData: StoryData
 ): GMToolResult {
   // No variable resolver - GM must provide actual numbers
-  void storyData; // Suppress unused parameter warning
 
   // Roll the formula
   let rollResult: RollResult;
@@ -1597,6 +1622,7 @@ function executeFormulaRoll(
 
   if (params.stakes) {
     contextForStory += `\n[Stakes: ${params.stakes}]`;
+    contextForStory += applyStakesEscalation(storyData, params.stakes);
   }
 
   if (params.consequences) {
@@ -1643,7 +1669,6 @@ function executeOpposedFormula(
   storyData: StoryData
 ): GMToolResult {
   // No variable resolver - GM must provide actual numbers
-  void storyData; // Suppress unused parameter warning
 
   // Roll player's formula
   let playerResult: RollResult;
@@ -1739,6 +1764,7 @@ function executeOpposedFormula(
 
   if (params.stakes) {
     contextForStory += `\n[Stakes: ${params.stakes}]`;
+    contextForStory += applyStakesEscalation(storyData, params.stakes);
   }
 
   if (params.consequences) {
@@ -2422,27 +2448,13 @@ function executeSetReasoningTier(
   const requestedTier = typeof params?.tier === "number" ? params.tier : 0;
   const reason = params?.reason || "(no reason given)";
 
-  const tierState = getTierState(storyData);
-  const decision = resolveTierEscalation(
-    { tier: requestedTier, reason },
-    tierState.currentTier,
-    tierState
-  );
+  const decision = applyTierEscalation(storyData, requestedTier, reason);
   const grantedTier = decision.grantedTier;
-
-  storyData.reasoningTierState = {
-    currentTier: grantedTier,
-    tier3CallsInScene:
-      grantedTier === TOP_TIER
-        ? tierState.tier3CallsInScene + 1
-        : tierState.tier3CallsInScene,
-    lastSceneKey: tierState.lastSceneKey,
-  };
 
   let contextForStory: string;
   if (decision.capped) {
     contextForStory = `[Reasoning tier escalation to ${requestedTier} capped at ${grantedTier} - scene top-tier limit reached]`;
-  } else if (grantedTier > tierState.currentTier) {
+  } else if (grantedTier > decision.previousTier) {
     contextForStory = `[Reasoning tier escalated to ${grantedTier}: ${reason}]`;
   } else {
     contextForStory = `[Reasoning tier escalation request ignored - already at tier ${grantedTier}]`;

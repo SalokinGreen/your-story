@@ -13,7 +13,9 @@
 >
 > **Status update:** all five Critical items (C1-C5) below have been fixed
 > and verified with tests (see each item's own note), along with H1, H2, H3,
-> and H4. The remaining High and Medium items are still open. C4's fix surfaced
+> H4, and H7. H5 was partially corrected; H6 was flagged for a product
+> decision rather than fixed. H8 and the Medium items are still open. C4's
+> fix surfaced
 > an additional, worse finding than originally reported: the "live" chaos
 > mechanic wasn't just narrower than Mythic's real rule, it was *entirely
 > inert* in production, because nothing anywhere ever populated
@@ -473,7 +475,7 @@ discussion before any engineering work here**, using the four questions
 above as a starting point. Not marked ✅ FIXED; no code changed for this
 item.
 
-### H7. Reasoning-tier self-escalation is optional outside combat
+### H7. Reasoning-tier self-escalation is optional outside combat — ✅ FIXED
 
 `set_reasoning_tier`'s description tells the model to use it "only when
 the current task genuinely exceeds your ability"
@@ -485,6 +487,37 @@ call — exactly where a lenient model is most likely to want to avoid
 rigorous adjudication — nothing forces escalation. A model that would
 rather not roll a hard check can just narrate at the default tier and
 never ask for more scrutiny.
+
+**Fix**: `formula_roll` and `opposed_formula` already accept a
+structured, model-set `stakes: "low" | "medium" | "high" | "deadly"`
+parameter (`gmTools.ts:58,77`) — but until this fix it was pure narration
+text (`\n[Stakes: ${params.stakes}]` in `contextForStory`), never read by
+the tier router. That's the same signal a model would need to decide
+whether to self-escalate in the first place, just sitting unused. New
+`stakesFloor()` (`reasoningTiers.ts`) makes escalation for self-declared
+high-stakes rolls non-optional instead of inventing a new mechanic: it
+reuses `hardRuleFloor`'s existing combat-severity mapping (regular combat
+and "high" stakes both floor at the rules-adjudication tier; boss fights
+and "deadly" stakes both floor at the top tier). `applyTierEscalation()`
+(also `reasoningTiers.ts`) factors the decay/cap-respecting state-update
+logic that `set_reasoning_tier`'s executor already had into a shared
+helper, so both the model's voluntary self-escalation and this new
+mandatory stakes-based floor go through the identical policy (including
+the `MAX_TIER3_CALLS_PER_SCENE` cap — a string of "deadly" rolls in one
+scene still can't bypass it). `executeFormulaRoll` and
+`executeOpposedFormula` (`gmExecutor.ts`) now call this after every roll
+that declares `stakes`, and both narrate the escalation back to the GM
+via `contextForStory` when it actually raises the tier (so the model sees
+its declared stakes had a real mechanical consequence, not just flavor
+text). `low`/`medium`/undefined stakes remain a no-op, matching the
+existing classifier's behavior for everything that isn't explicitly
+flagged high-severity. Covered by 10 new tests in
+`tests/reasoningTiers.stakesFloor.test.ts`: `stakesFloor`'s mapping,
+`applyTierEscalation`'s no-downgrade and scene-cap behavior directly, and
+the `formula_roll`/`opposed_formula` wiring via `executeGMTools` (no
+escalation for low stakes, forced escalation for high/deadly with no
+`set_reasoning_tier` call from the model, and idempotence when already at
+or above the floor a given stakes value would grant).
 
 ### H8. Roll inputs are entirely model-asserted
 
@@ -524,8 +557,10 @@ and partially is, deterministic.
 
 ## Revised priority order (supersedes §5 of `ai-gm-integration-plan.md`)
 
-_Items 1-4 (all of C1-C5), H1, H2, H3, and H4 are done — see the ✅ FIXED
-notes above. What remains is H5-H8 and the Medium items, in the order below._
+_Items 1-4 (all of C1-C5), H1, H2, H3, H4, and H7 are done — see the ✅
+FIXED notes above. H5 was partially corrected (dead code deleted; core
+issue deferred) and H6 was flagged for a product decision rather than
+fixed. What remains is H8 and the Medium items, in the order below._
 
 1. ~~**C1**~~ done.
 2. ~~**C2, C3**~~ done.
@@ -546,6 +581,9 @@ notes above. What remains is H5-H8 and the Medium items, in the order below._
    should content safety mean for this app, and who is it for) before any
    engineering work is worth doing; see the H6 note above for the specific
    questions to raise.
+9. ~~**H7**~~ done (self-declared high/deadly roll stakes are now a
+   non-optional reasoning-tier floor instead of decorative text; see the
+   H7 note above).
 
 Original text, preserved for the remaining items:
 
