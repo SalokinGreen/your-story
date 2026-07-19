@@ -35,7 +35,7 @@ export interface CompactionPlan {
 // canonical by construction.
 interface TrackedEntity {
   name: string;
-  kind: "npc" | "item" | "lore";
+  kind: "npc" | "lore";
   deceasedOrGone: boolean; // NPC status dead/departed - contradiction risk
 }
 
@@ -48,10 +48,6 @@ function buildTrackedEntities(storyData: StoryData): TrackedEntity[] {
       kind: "npc",
       deceasedOrGone: npc.status === "dead" || npc.status === "departed",
     });
-  }
-  for (const item of storyData.inventory || []) {
-    if (!item.name) continue;
-    entities.push({ name: item.name, kind: "item", deceasedOrGone: false });
   }
   for (const lore of storyData.lore || []) {
     if (!lore.title) continue;

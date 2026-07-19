@@ -108,9 +108,6 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "add_combatant",
   "update_combatant_stat",
   "npc_roll",
-  // Items
-  "add_item",
-  "remove_item",
   // Terminal - required
   "end_gm_thinking",
 ]);

@@ -88,13 +88,15 @@ export default function PrivacyPolicy() {
                 />
                 <div>
                   <h3 className="font-medium text-white">
-                    Your stories are encrypted
+                    Your stories are access-controlled
                   </h3>
                   <p className="text-sm text-blue-200/60">
-                    Your story content is encrypted using keys derived from your
-                    login credentials. We literally cannot read your stories -
-                    only you can decrypt them. Not even our team has access to
-                    your narrative content.
+                    Your stories are protected by authentication and
+                    row-level security policies restricting access to your
+                    own account. Story content is not end-to-end encrypted -
+                    our servers process it as plaintext to generate your
+                    story with the AI provider, the same way any AI writing
+                    tool must.
                   </p>
                 </div>
               </div>
@@ -161,8 +163,8 @@ export default function PrivacyPolicy() {
                 <li className="flex items-start gap-2">
                   <span className="text-blue-400 shrink-0">•</span>
                   <span className="flex-1 min-w-0">
-                    Your full story history stays on our servers (encrypted),
-                    not with AI providers
+                    Your full story history stays on our servers, not with AI
+                    providers
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
@@ -171,8 +173,8 @@ export default function PrivacyPolicy() {
                     <strong className="text-white">
                       We do not train AI on your stories
                     </strong>{" "}
-                    - we couldn&apos;t even if we wanted to, since they&apos;re
-                    encrypted
+                    - your content is only sent to the AI provider to
+                    generate your story, per their API terms
                   </span>
                 </li>
               </ul>
@@ -338,7 +340,8 @@ export default function PrivacyPolicy() {
                   className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
                 />
                 <span className="flex-1 min-w-0">
-                  Stories are encrypted - we can&apos;t read them, only you can
+                  Stories are access-controlled to your account, not shared
+                  with other users
                 </span>
               </li>
               <li className="flex items-start gap-2">
@@ -347,8 +350,7 @@ export default function PrivacyPolicy() {
                   className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
                 />
                 <span className="flex-1 min-w-0">
-                  We don&apos;t train AI on your stories (and couldn&apos;t -
-                  they&apos;re encrypted)
+                  We don&apos;t train AI on your stories
                 </span>
               </li>
               <li className="flex items-start gap-2">
