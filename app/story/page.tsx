@@ -92,11 +92,7 @@ import { processLoreTriggers } from "../misc/lore";
 import { fillTemplate } from "../misc/characterSheetTemplate";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { DiceVisualizer } from "../components/DiceVisualizer";
-import {
-  generateCommandResponses,
-  formatResponsesForAI,
-  executeCommandWithResponse,
-} from "../misc/commandResponses";
+import { formatResponsesForAI } from "../misc/commandResponses";
 import {
   findItemMatch,
   findResourceMatch,
@@ -1660,128 +1656,6 @@ function StoryPageContent() {
       return next;
     });
   };
-
-  // Helper to process multiple scene parts from API
-  function processSceneParts(
-    parts: any[],
-    storyData: StoryData,
-    addNotification: (
-      message: string,
-      type: "success" | "failure" | "info" | "warning",
-    ) => void,
-  ) {
-    if (!parts || parts.length === 0) return null;
-
-    let lastPartWithContent = null;
-
-    for (const part of parts) {
-      // Handle tool calls (new system)
-      if (part.toolCalls && part.toolResponses) {
-        // Execute commands from tool responses to mutate game state
-        // Use executeCommandWithResponse for proper command handling
-        const commands = part.toolResponses
-          .map((r: CommandResponse) => r.command)
-          .filter(
-            (cmd: string | undefined): cmd is string =>
-              cmd !== undefined && cmd !== null,
-          );
-
-        if (commands.length > 0) {
-          for (const command of commands) {
-            try {
-              executeCommandWithResponse(command, storyData);
-            } catch (error) {
-              console.error("Error executing command:", command, error);
-            }
-          }
-        }
-
-        // Handle add_memory tool calls
-        try {
-          const memoryToolCalls = (part.toolCalls || []).filter(
-            (tc: any) => tc?.function?.name === "add_memory",
-          );
-          if (memoryToolCalls.length > 0) {
-            const existingMemoryLower = storyData.memory.map((m) =>
-              getMemoryContent(m).toLowerCase().trim(),
-            );
-            for (const tc of memoryToolCalls) {
-              let args: any = tc.function?.arguments;
-              if (typeof args === "string") {
-                try {
-                  args = JSON.parse(args);
-                } catch (e) {
-                  continue;
-                }
-              }
-              const entry: string | undefined = args?.entry?.trim();
-              if (
-                entry &&
-                !existingMemoryLower.includes(entry.toLowerCase().trim())
-              ) {
-                // Add as MemoryEntry with embedded: false
-                storyData.memory.push({ content: entry, embedded: false });
-                existingMemoryLower.push(entry.toLowerCase().trim());
-                addNotification(
-                  `Memory added: ${entry.substring(0, 80)}${
-                    entry.length > 80 ? "..." : ""
-                  }`,
-                  "success",
-                );
-              }
-            }
-          }
-        } catch (e) {
-          console.error("Failed processing add_memory tool calls", e);
-        }
-
-        // Store tool responses for AI feedback in next turn
-        setPendingCommandResponses(part.toolResponses);
-      }
-      // Handle legacy XML commands
-      else if (part.commands && part.commands.length > 0) {
-        processCommands(part.commands, storyData, addNotification);
-
-        const responses = generateCommandResponses(part.commands, storyData);
-        setPendingCommandResponses(responses);
-      }
-
-      // Handle memory entries (legacy system)
-      if (part.memoryEntries && part.memoryEntries.length > 0) {
-        const existingMemoryLower = storyData.memory.map((m) =>
-          getMemoryContent(m).toLowerCase().trim(),
-        );
-        const newMemories = part.memoryEntries.filter(
-          (entry: string) =>
-            !existingMemoryLower.includes(entry.toLowerCase().trim()),
-        );
-        if (newMemories.length > 0) {
-          logger.action("New memory entries added", {
-            count: newMemories.length,
-            entries: newMemories,
-          });
-          // Add as MemoryEntry with embedded: false
-          storyData.memory.push(
-            ...newMemories.map((content: string) => ({
-              content,
-              embedded: false,
-            })),
-          );
-        }
-      }
-
-      // Push part to scene
-      storyData.scene.parts.push(part);
-
-      // Track the last part with actual content for UI display
-      if (part.content && part.content.trim().length > 0) {
-        lastPartWithContent = part;
-      }
-    }
-
-    processLoreTriggers(storyData, addNotification);
-    return lastPartWithContent || parts[parts.length - 1];
-  }
 
   // Navigation handlers - only navigate through AI story parts with content
   function handleNavigateLeft() {

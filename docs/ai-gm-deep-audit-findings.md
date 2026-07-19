@@ -20,7 +20,12 @@
 > `skillCheckHistory` - the gate the old `calculateChaosAdjustment` required
 > before it would ever return a nonzero delta. Chaos factor could not change
 > automatically at all before this fix; see C4 below for the corrected
-> mechanic.
+> mechanic. H5 similarly turned out to be over-stated once verified: its
+> "executed twice, server- and client-side" claim traced back to a
+> function (`processSceneParts` in `page.tsx`) with zero callers anywhere
+> in the codebase — deleted as dead code; the underlying single-execution
+> serialize/regex fragility it also identified is real and still open,
+> deliberately deferred as its own larger refactor.
 
 ## Why this round found more
 
@@ -363,7 +368,7 @@ and new tests in `tests/gmTools.searchMemoryFallback.test.ts` (confirms the
 GM-facing message text distinguishes "search errored" from "search wasn't
 attempted" from "search ran and found nothing").
 
-### H5. Tool calls still bottom out in a regex/pipe-delimited string engine — executed twice
+### H5. Tool calls still bottom out in a regex/pipe-delimited string engine — partially corrected, core issue deferred
 
 `commandResponses.ts` isn't legacy-and-replaced; it's still the actual
 execution backend for a large share of "clean" tool calls.
@@ -371,13 +376,48 @@ execution backend for a large share of "clean" tool calls.
 re-serializes already-validated tool arguments back into strings like
 `` `/modify_ability: ${name} | costs | ${costsStr}` ``, which are then
 regex-parsed by `executeCommandWithResponse` in `commandResponses.ts`.
-Separately, `app/story/page.tsx:1690-1696` re-parses and re-executes the
-*same command strings* client-side to mirror state. So the schema-
+~~Separately, `app/story/page.tsx:1690-1696` re-parses and re-executes the
+same command strings client-side to mirror state.~~ So the schema-
 validated tool layer is a thin wrapper around a fragile
-string-serialize-then-regex-parse engine underneath, and that engine runs
-**twice** — once server-side, once client-side — for one logical state
-mutation. This is a correctness/drift risk (the two parses can only stay
-in sync by convention) as much as it is technical debt.
+string-serialize-then-regex-parse engine underneath ~~, and that engine
+runs twice — once server-side, once client-side — for one logical state
+mutation~~.
+
+**Correction (this session)**: the "runs twice" half of this finding does
+not hold up under the same "read the actual executor, don't trust what
+looks wired up" rule this audit established for everything else.
+`app/story/page.tsx`'s `processSceneParts` — the function the original
+finding pointed at for the client-side re-execution — takes no callers
+anywhere in the codebase (confirmed via full-repo grep and independently
+flagged by ESLint's own `no-unused-vars` warning at the time of this
+audit). The actual live client-side generation flow
+(`generateStoryTurn()` in `generation.ts`, invoked from several other call
+sites in `page.tsx` that call `setPendingCommandResponses` directly) never
+goes through `processSceneParts`; it's dead code left behind by an earlier
+refactor, not a second execution path. This is the same "wired up but
+isn't" pattern as C4/H2/H4, just running in the opposite direction here —
+less duplication exists in production than the original finding claimed,
+not more. Per this audit's own precedent for confirmed-dead code (H4),
+`processSceneParts` and its two now-unused imports
+(`executeCommandWithResponse`, `generateCommandResponses`) were deleted
+from `page.tsx` rather than left as a misleading decoy. No test was added
+specifically for a deletion of unreachable code; `npx tsc --noEmit` and
+`npx eslint app/story/page.tsx` (down to 31 problems from a 36-problem
+baseline, zero new) confirm nothing else referenced it, and the full
+`vitest` suite is unaffected.
+
+**What's still open**: the core defect — schema-validated tool arguments
+getting flattened back into pipe-delimited strings and regex-parsed by
+`commandResponses.ts`, once, server-... actually client-side during
+generation (per this repo's frontend-centric architecture) — is real and
+unaddressed. Per the original task handoff's own instruction ("this is a
+bigger, deliberate refactor... schedule it, don't rush it alongside the
+smaller fixes"), no attempt was made to replace or bypass
+`commandResponses.ts` in this pass. Recommend treating it as its own
+scheduled effort: replace `convertToolToCommand` + string-command dispatch
+with a typed dispatch table keyed on tool name that calls the same
+mutation logic `commandResponses.ts` already contains, without the
+serialize/re-parse round-trip. Not marked ✅ FIXED for that reason.
 
 ### H6. No deterministic content-safety layer exists at play-time
 
@@ -456,6 +496,12 @@ notes above. What remains is H5-H8 and the Medium items, in the order below._
    compaction summaries against canonical state before trusting them; H4
    deletes the dead automatic-RAG path and makes semantic-search
    degradation explicit instead of indistinguishable from "no matches").
+7. **H5** — partially corrected: the "dual execution" half of the finding
+   was itself dead code (`processSceneParts` in `page.tsx`, now deleted);
+   the underlying single-execution serialize/regex-parse fragility in
+   `commandResponses.ts` remains open and is intentionally deferred as its
+   own scheduled refactor per the original finding's own recommendation —
+   see the H5 note above.
 
 Original text, preserved for the remaining items:
 
