@@ -31,6 +31,15 @@ const isTTSEnabled = (): boolean => {
   return localStorage.getItem("ttsEnabled") !== "false";
 };
 
+// A tiny (near-silent) WAV data URI used to "unlock" an <audio> element.
+// Browsers such as Safari/iOS only allow `play()` to succeed when it is
+// invoked synchronously inside a user-gesture handler; once an element has
+// successfully played (even a fraction of a second of silence) as a direct
+// result of a gesture, that same element remains allowed to play new
+// sources later on without requiring another gesture.
+const SILENT_AUDIO_DATA_URI =
+  "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
+
 export default function TTSControls({
   text,
   disabled = false,
@@ -56,6 +65,32 @@ export default function TTSControls({
     }
   }, []);
 
+  // Clean up the persistent audio element when this component unmounts.
+  useEffect(() => {
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.removeAttribute("src");
+        audioRef.current = null;
+      }
+    };
+  }, []);
+
+  // Lazily get (or create) a single, persistent <audio> element that we
+  // reuse for the lifetime of this component instead of constructing a new
+  // Audio() for every playback. Reusing the same element matters because
+  // once it has successfully played as a direct result of a user gesture,
+  // browsers keep allowing that same element to play subsequent sources
+  // (e.g. once the network request for a fresh generation finishes) even
+  // though that later `play()` call is no longer synchronously tied to the
+  // click.
+  const getAudioElement = useCallback((): HTMLAudioElement => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio();
+    }
+    return audioRef.current;
+  }, []);
+
   const handlePlay = useCallback(async () => {
     if (disabled || !text.trim() || isGeneratingRef.current) return;
 
@@ -71,9 +106,9 @@ export default function TTSControls({
     }
 
     if (savedAudioBlobRef.current && audioUrl) {
-      const audio = new Audio(audioUrl);
-      audioRef.current = audio;
+      const audio = getAudioElement();
       audio.volume = volume;
+      audio.src = audioUrl;
 
       audio.onended = () => {
         setIsPlaying(false);
@@ -90,6 +125,19 @@ export default function TTSControls({
       setIsPlaying(true);
       setIsPaused(false);
       return;
+    }
+
+    // Prime the persistent <audio> element synchronously, still within the
+    // click's user-gesture call stack, before doing any async work (network
+    // fetch). This "unlocks" the element for browsers (notably Safari/iOS)
+    // that require play() to be invoked directly from a gesture handler.
+    const audio = getAudioElement();
+    audio.volume = volume;
+    if (audio.paused) {
+      audio.src = SILENT_AUDIO_DATA_URI;
+      audio.play().catch(() => {
+        // Ignore - this is just a best-effort unlock attempt.
+      });
     }
 
     try {
@@ -161,9 +209,13 @@ export default function TTSControls({
       const url = URL.createObjectURL(audioBlob);
       setAudioUrl(url);
 
-      const audio = new Audio(url);
-      audioRef.current = audio;
+      // Reuse the same (already-primed) <audio> element rather than
+      // constructing a new one, so the earlier gesture-tied play() call
+      // keeps this playback allowed even though we're now past the network
+      // request.
+      const audio = getAudioElement();
       audio.volume = volume;
+      audio.src = url;
 
       audio.onended = () => {
         setIsPlaying(false);
@@ -200,6 +252,7 @@ export default function TTSControls({
     audioUrl,
     addNotification,
     apiKeys.deepinfraKey,
+    getAudioElement,
   ]);
 
   // Handle text changes - clear audio and mark pending auto-generate
@@ -207,10 +260,14 @@ export default function TTSControls({
     if (text !== lastTextRef.current) {
       lastTextRef.current = text;
 
-      // Stop and clear existing audio
+      // Stop and reset the existing (persistent) audio element. We
+      // intentionally keep the same <audio> element around instead of
+      // discarding it, since a previously "unlocked" element (one that has
+      // already played as a direct result of a user gesture) can keep
+      // playing new sources later without needing another gesture.
       if (audioRef.current) {
         audioRef.current.pause();
-        audioRef.current = null;
+        audioRef.current.removeAttribute("src");
       }
       if (audioUrl) {
         URL.revokeObjectURL(audioUrl);
