@@ -9,7 +9,10 @@ import {
   findResourceMatch,
   findItemMatch,
 } from "../misc/fuzzyMatch";
-import { getRPGSystem } from "../misc/rpgSystems";
+
+// Default DC hint shown in the manual action builder - the GM interprets
+// this narratively via its own dice tools, it isn't enforced client-side.
+const DEFAULT_BUILDER_DC = 12;
 
 interface ChoicesModalProps {
   isOpen: boolean;
@@ -27,8 +30,6 @@ interface ChoicesModalProps {
   onCommentSubmit?: (comment: string) => void;
   onRerollChoices?: () => void;
   loading: boolean;
-  momentumMode: "none" | "advantage" | "guarantee";
-  onMomentumModeChange: (mode: "none" | "advantage" | "guarantee") => void;
   actionMode?: boolean;
   onActionModeChange?: (enabled: boolean) => void;
 }
@@ -52,8 +53,6 @@ export default function ChoicesModal({
   onCommentSubmit,
   onRerollChoices,
   loading,
-  momentumMode,
-  onMomentumModeChange,
   actionMode = false,
   onActionModeChange,
 }: ChoicesModalProps) {
@@ -96,8 +95,6 @@ export default function ChoicesModal({
   const [builderResource, setBuilderResource] = useState("");
   const [builderPlain, setBuilderPlain] = useState(true);
 
-  const rpgSystem = getRPGSystem(storyData.rpgSystem || "3d6");
-
   // Ref for auto-focusing textarea in action mode
   const actionTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -120,7 +117,7 @@ export default function ChoicesModal({
       setAnalyzingAction(false);
       setShowActionBuilder(false);
       setBuilderSkill("");
-      setBuilderDc(rpgSystem.dc.medium);
+      setBuilderDc(DEFAULT_BUILDER_DC);
       setBuilderItem("");
       setBuilderResource("");
       setBuilderPlain(true);
@@ -128,7 +125,7 @@ export default function ChoicesModal({
       setMultiplayerName("");
       setMultiplayerTimerStart(null);
     }
-  }, [isOpen, rpgSystem.dc.medium]);
+  }, [isOpen]);
 
   // Initialize multiplayer name when opening
   useEffect(() => {
@@ -205,10 +202,6 @@ export default function ChoicesModal({
       };
     }
   }, [isOpen]);
-
-  const hasSkillCheck = selectedChoice?.skill_used !== undefined;
-  const canUseAdvantage = storyData.momentum >= 1 && hasSkillCheck;
-  const canUseGuarantee = storyData.momentum >= 3 && hasSkillCheck;
 
   const handleActionAnalyze = async (
     overrideText?: string,
@@ -1036,84 +1029,8 @@ export default function ChoicesModal({
           )}
         </div>
 
-        {/* Footer with Momentum & Confirm */}
+        {/* Footer with Confirm */}
         <div className="p-3 border-t border-blue-800/30 bg-blue-900/30 space-y-2">
-          {/* Momentum Controls - show for both modes */}
-          {/* In choice mode: only show if selected choice has skill check */}
-          {/* In action mode: always show (will apply if AI detects skill check) */}
-          {(actionMode || (selectedChoice && hasSkillCheck)) && (
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <DynamicIcon name="Zap" className="w-4 h-4 text-yellow-400" />
-                <span className="text-xs text-blue-200/60">
-                  {storyData.momentum}/{storyData.maxMomentum}
-                </span>
-                <div className="flex gap-0.5 ml-1">
-                  {Array.from({ length: storyData.maxMomentum }).map((_, i) => (
-                    <div
-                      key={i}
-                      className={`w-2 h-2 rounded-full ${
-                        i < storyData.momentum ? "bg-yellow-400" : "bg-blue-800"
-                      }`}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                {(actionMode ? storyData.momentum >= 1 : canUseAdvantage) && (
-                  <button
-                    onClick={() =>
-                      onMomentumModeChange(
-                        momentumMode === "advantage" ? "none" : "advantage",
-                      )
-                    }
-                    title={
-                      actionMode
-                        ? "Advantage if action requires a skill check"
-                        : undefined
-                    }
-                    className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
-                      momentumMode === "advantage"
-                        ? "bg-yellow-500 text-white"
-                        : "bg-blue-900/50 text-blue-200/70 hover:bg-yellow-500/30 active:bg-yellow-500/50"
-                    }`}
-                  >
-                    <DynamicIcon
-                      name="Dices"
-                      className="w-4 h-4 sm:w-3 sm:h-3"
-                    />
-                    Advantage (1)
-                  </button>
-                )}
-                {(actionMode ? storyData.momentum >= 3 : canUseGuarantee) && (
-                  <button
-                    onClick={() =>
-                      onMomentumModeChange(
-                        momentumMode === "guarantee" ? "none" : "guarantee",
-                      )
-                    }
-                    title={
-                      actionMode
-                        ? "Guarantee success if action requires a skill check"
-                        : undefined
-                    }
-                    className={`px-3 py-2 sm:px-2 sm:py-1 text-xs font-medium rounded-lg transition-all flex items-center gap-1.5 touch-manipulation ${
-                      momentumMode === "guarantee"
-                        ? "bg-green-500 text-white"
-                        : "bg-blue-900/50 text-blue-200/70 hover:bg-green-500/30 active:bg-green-500/50"
-                    }`}
-                  >
-                    <DynamicIcon
-                      name="Check"
-                      className="w-4 h-4 sm:w-3 sm:h-3"
-                    />
-                    Guarantee (3)
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-
           {/* Confirm Button - only for choice mode */}
           {!actionMode && (
             <button
@@ -1135,16 +1052,6 @@ export default function ChoicesModal({
                     className="w-4 h-4 animate-spin"
                   />
                   Generating...
-                </>
-              ) : momentumMode === "advantage" ? (
-                <>
-                  <DynamicIcon name="Dices" className="w-4 h-4" />
-                  Continue with Advantage
-                </>
-              ) : momentumMode === "guarantee" ? (
-                <>
-                  <DynamicIcon name="Check" className="w-4 h-4" />
-                  Continue Guaranteed
                 </>
               ) : (
                 <>

@@ -1,5 +1,24 @@
 # Advanced RPG Tools - Implementation Notes
 
+> **Status (July 2026):** This is a historical implementation log, kept for
+> context on the oracle/table system's design. Several items below are now
+> out of date:
+> - The choice-level `agmt_check`/`agmt_table` fields still exist and are
+>   used for oracle flavor on freeform actions, but they no longer feed a
+>   client-side skill-check engine - the GM resolves any actual roll itself
+>   via the `formula_roll` tool (see `docs/game-mechanics.md`).
+> - `StoryData.agmtState.threads`/`.characters` (mentioned throughout this
+>   doc) are deprecated. Story threads now live in the top-level
+>   `StoryData.threads: StoryThread[]`, managed by the GM via
+>   `create_thread`/`update_thread`/`resolve_thread`/`abandon_thread`. NPCs
+>   are tracked separately via `StoryData.npcs` and `add_npc`/`update_npc`.
+> - `chaosFactor`/`sceneCount`/`skillCheckHistory`/`currentStreak` are live
+>   and editable in the story's Chaos/Oracle tab.
+> - The `fate_question` and `roll_table` GM tools described as "Phase 1"
+>   below are implemented and live.
+> - Momentum, the RPG-system picker, and the point-buy upgrade system
+>   referenced in older parts of this app are gone entirely.
+
 ## Currently Implemented (Complete)
 
 ### Core Fate Mechanics

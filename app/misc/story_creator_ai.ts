@@ -54,7 +54,6 @@ export function buildStoryCreatorMessages({
     upgradeSettings: storyData.upgradeSettings,
     levelingSettings: storyData.levelingSettings,
     skillTrees: storyData.skillTrees,
-    rpgSystem: storyData.rpgSystem,
     points: storyData.points,
     conditions: storyData.conditions,
     characterSheet: storyData.characterSheet,
@@ -170,8 +169,6 @@ export function applyCreatorChangesToStoryData(
   if (changes.intro !== undefined) updates.intro = changes.intro;
   if (changes.author_notes !== undefined)
     updates.author_notes = changes.author_notes;
-  if (changes.rpgSystem !== undefined)
-    updates.rpgSystem = changes.rpgSystem as StoryData["rpgSystem"];
   if (changes.points !== undefined) updates.points = changes.points;
   if (changes.characterSheet !== undefined)
     updates.characterSheet = changes.characterSheet;
@@ -490,7 +487,6 @@ export function summarizeChanges(changes: CreatorOutputData): string[] {
   if (changes.premise) summaries.push("Updated premise");
   if (changes.intro) summaries.push("Updated intro");
   if (changes.author_notes) summaries.push("Updated author notes");
-  if (changes.rpgSystem) summaries.push(`RPG system: ${changes.rpgSystem}`);
   if (changes.points !== undefined) summaries.push(`Points: ${changes.points}`);
   if (changes.characterSheet) summaries.push("Updated character sheet");
 
@@ -666,7 +662,7 @@ You help players by using tools to make precise changes to their story's data. Y
 - update_preset_character_sheet - Update a preset's pre-filled character sheet
 
 ### Game Configuration
-- update_settings (rpgSystem, difficulty, etc.)
+- update_settings (difficulty, etc.)
 - update_leveling_settings, update_upgrade_settings
 
 ### Player Progression

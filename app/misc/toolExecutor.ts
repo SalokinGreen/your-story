@@ -25,11 +25,8 @@ import {
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
 import {
-  parseDCValue,
   parsePointsValue,
-  parseStatChangeValue,
   parseChallengeRoundsValue,
-  RPGSystemType,
 } from "@/app/misc/rpgSystems";
 import { initializeAbility } from "@/app/misc/abilitySystem";
 
@@ -188,10 +185,6 @@ const STATE_CHANGE_TOOLS = new Set([
   "reset_ability_cooldown",
   "reduce_cooldown",
   "refresh_ability",
-  // Passives - tool names and command names
-  "add_passive",
-  "remove_passive",
-  "modify_passive",
   // Conditions
   "add_condition",
   "upgrade_condition",
@@ -201,8 +194,6 @@ const STATE_CHANGE_TOOLS = new Set([
   "add_npc",
   // Achievements - tool names and command names
   "trigger_achievement",
-  // Momentum - tool names and command names
-  "modify_momentum",
   // Game state
   "game_over",
   // Scene Challenges
@@ -3270,11 +3261,6 @@ function convertToolToCommand(
   args: Record<string, any>,
   storyData: StoryData
 ): string | null {
-  // Extract system and difficulty for tier conversion
-  const rpgSystem: RPGSystemType =
-    (storyData.rpgSystem as RPGSystemType) || "3d6";
-  const difficulty: AdventureDifficulty = storyData.difficulty || "medium";
-
   switch (toolName) {
     // Quest Management - handled directly in executeTools (description may contain | characters)
     case "create_quest":
@@ -3300,13 +3286,6 @@ function convertToolToCommand(
 
     case "delete_quest":
       return `/delete_quest: ${args.title}`;
-
-    // Character Field Management - handled directly in executeTools
-    case "modify_field":
-    case "set_field":
-    case "add_list_item":
-    case "remove_list_item":
-      return null;
 
     // Achievement
     case "trigger_achievement":
@@ -3358,10 +3337,6 @@ function convertToolToCommand(
       // Handled directly in executeTools
       return null;
 
-    // Momentum
-    case "modify_momentum":
-      return `/modify_momentum: ${args.amount >= 0 ? "+" : ""}${args.amount}`;
-
     // Ability Management - handled directly in executeTools (description may contain | characters)
     case "add_ability":
       return null;
@@ -3401,20 +3376,6 @@ function convertToolToCommand(
 
     case "refresh_ability":
       return `/refresh_ability: ${args.name}`;
-
-    // Passive Effect Management
-    case "add_passive":
-      return `/add_passive: ${args.name} | ${args.description}`;
-
-    case "remove_passive":
-      return `/remove_passive: ${args.name}`;
-
-    case "modify_passive": {
-      const parts = [args.name];
-      if (args.newName) parts.push(`name:${args.newName}`);
-      if (args.newDescription) parts.push(`desc:${args.newDescription}`);
-      return `/modify_passive: ${parts.join(" | ")}`;
-    }
 
     // Memory - handled directly in executeTools, not via command
     case "add_memory":
@@ -3533,13 +3494,9 @@ function executeRestTool(
     }
   }
 
-  // 2. Stress Reduction (YZE system)
+  // 2. Stress Reduction
   const stressReduction = config.stressReduction[restType];
-  if (
-    stressReduction > 0 &&
-    storyData.rpgSystem === "yze" &&
-    (storyData.stress ?? 0) > 0
-  ) {
+  if (stressReduction > 0 && (storyData.stress ?? 0) > 0) {
     const oldStress = storyData.stress ?? 0;
     storyData.stress = Math.max(0, oldStress - stressReduction);
     const actualReduction = oldStress - (storyData.stress ?? 0);

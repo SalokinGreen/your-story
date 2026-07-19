@@ -37,15 +37,14 @@ import { DynamicIcon } from "../components/DynamicIcon";
 import { CustomTablesEditor } from "../components/CustomTablesEditor";
 import ChatDisplaySettings from "./menu/ChatDisplaySettings";
 import BasicSettings, { BasicSettingsForm } from "./menu/BasicSettings";
-import StatsResourcesEditor from "./menu/StatsResourcesEditor";
 import QuestEditor from "./menu/QuestEditor";
 import InventoryEditor from "./menu/InventoryEditor";
 import AbilitiesEditor from "./menu/AbilitiesEditor";
-import PassivesEditor from "./menu/PassivesEditor";
 import LoreEditor from "./menu/LoreEditor";
 import RelationshipsEditor from "./menu/RelationshipsEditor";
 import NPCEditor from "./menu/NPCEditor";
 import ConditionsEditor from "./menu/ConditionsEditor";
+import ThreadsEditor from "./menu/ThreadsEditor";
 import VariablesEditor from "./menu/VariablesEditor";
 import StoryMetaEditor from "./menu/StoryMetaEditor";
 import CouchPlayersEditor from "./menu/CouchPlayersEditor";
@@ -63,10 +62,8 @@ interface MenuProps extends StoryData {
 type MenuTab =
   | "basic"
   | "multiplayer"
-  | "stats"
   | "inventory"
   | "abilities"
-  | "passives"
   | "quests"
   | "lore"
   | "npcs"
@@ -76,9 +73,7 @@ type MenuTab =
   | "tables"
   | "threads"
   | "mythic"
-  | "story"
-  | "tts"
-  | "ai";
+  | "story";
 
 export default function MenuPage({
   storyDbId,
@@ -144,7 +139,7 @@ export default function MenuPage({
           break;
         }
       }
-      setActiveTab(currentId ?? sections[0].id);
+      setActiveTab(currentId ?? getSection("basic").id);
     };
 
     container.addEventListener("scroll", handleScroll, { passive: true });
@@ -159,12 +154,8 @@ export default function MenuPage({
     player_summary: storyData.player_summary,
     premise: storyData.premise,
     max_chapters: storyData.max_chapters,
-    points: storyData.points,
-    momentum: storyData.momentum,
-    maxMomentum: storyData.maxMomentum,
     displayName: storyData.displayName || "",
     displayAvatar: storyData.displayAvatar || "",
-    rpgSystem: storyData.rpgSystem || "3d6",
   });
 
   // Advanced editing states
@@ -180,10 +171,8 @@ export default function MenuPage({
   const sections: { id: MenuTab; label: string; icon: string }[] = [
     { id: "basic", label: "Basic", icon: "FileText" },
     { id: "multiplayer", label: "Multiplayer", icon: "Users" },
-    { id: "stats", label: "Stats & Resources", icon: "BarChart2" },
     { id: "inventory", label: "Inventory", icon: "Backpack" },
     { id: "abilities", label: "Abilities", icon: "Wand2" },
-    { id: "passives", label: "Passives", icon: "Sparkles" },
     { id: "quests", label: "Quests", icon: "Scroll" },
     { id: "lore", label: "Notes", icon: "Book" },
     { id: "npcs", label: "NPCs", icon: "Users" },
@@ -191,9 +180,13 @@ export default function MenuPage({
     { id: "variables", label: "Variables", icon: "Variable" },
     { id: "relationships", label: "Relationships", icon: "Heart" },
     { id: "conditions", label: "Conditions", icon: "HeartPulse" },
-    { id: "mythic", label: "mythic", icon: "Sparkles" },
+    { id: "threads", label: "Threads", icon: "GitBranch" },
+    { id: "mythic", label: "Chaos/Oracle", icon: "Sparkles" },
     { id: "story", label: "Story", icon: "BookOpen" },
   ];
+
+  const getSection = (id: MenuTab) =>
+    sections.find((s) => s.id === id) ?? sections[0];
 
   const contentScrollRef = useRef<HTMLDivElement>(null);
   const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
@@ -346,12 +339,8 @@ export default function MenuPage({
         player_summary: settingsForm.player_summary,
         premise: settingsForm.premise,
         max_chapters: settingsForm.max_chapters,
-        points: settingsForm.points,
-        momentum: settingsForm.momentum,
-        maxMomentum: settingsForm.maxMomentum,
         displayName: settingsForm.displayName || undefined,
         displayAvatar: settingsForm.displayAvatar || undefined,
-        rpgSystem: settingsForm.rpgSystem,
         multiplayer: {
           enabled: multiplayerEnabled,
           mode: multiplayerMode,
@@ -454,11 +443,6 @@ export default function MenuPage({
   };
 
   const stats = calculateStoryProgress();
-  const totalEarnedPoints = (storyData.earnedPointsFromChapters || []).reduce(
-    (a: number, b: number) => a + b,
-    0,
-  );
-  const availablePoints = storyData.points;
 
   return (
     <div className="w-full space-y-4">
@@ -483,7 +467,7 @@ export default function MenuPage({
         </div>
 
         {/* Quick Stats Row */}
-        <div className="grid grid-cols-4 gap-2 text-center">
+        <div className="grid grid-cols-2 gap-2 text-center">
           <div className="bg-blue-900/30 rounded-lg py-2 px-1">
             <p className="text-lg font-bold text-blue-400">
               {stats.totalParts}
@@ -495,18 +479,6 @@ export default function MenuPage({
               {stats.achievedCount}/{stats.achievementCount}
             </p>
             <p className="text-[10px] text-purple-300/50">Achieved</p>
-          </div>
-          <div className="bg-yellow-900/30 rounded-lg py-2 px-1">
-            <p className="text-lg font-bold text-yellow-400">
-              {availablePoints}
-            </p>
-            <p className="text-[10px] text-yellow-300/50">Points</p>
-          </div>
-          <div className="bg-cyan-900/30 rounded-lg py-2 px-1">
-            <p className="text-lg font-bold text-cyan-400">
-              {storyData.momentum}/{storyData.maxMomentum}
-            </p>
-            <p className="text-[10px] text-cyan-300/50">Momentum</p>
           </div>
         </div>
       </div>
@@ -820,14 +792,10 @@ export default function MenuPage({
                         freshTemplate?.agmtState || storyData.agmtState,
                       customTables:
                         freshTemplate?.customTables || storyData.customTables,
-                      maxMomentum:
-                        freshTemplate?.maxMomentum ?? storyData.maxMomentum,
                       restState: freshTemplate?.restState || {
                         quickRestsUsed: 0,
                         shortRestsUsed: 0,
                       },
-                      nodeEffects:
-                        freshTemplate?.nodeEffects || storyData.nodeEffects,
                       unlockedNodes:
                         freshTemplate?.unlockedNodes || storyData.unlockedNodes,
                       // Always reset these
@@ -835,7 +803,6 @@ export default function MenuPage({
                       memory: [],
                       currentChapter: 0,
                       chapters: [],
-                      momentum: freshTemplate?.momentum ?? storyData.momentum,
                       points: 0,
                       earnedPointsFromChapters: [],
                       earnedPointsFromQuests: [],
@@ -1038,7 +1005,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[0]} />
+                  <SectionHeading tab={getSection("basic")} />
                   <BasicSettings
                     form={settingsForm}
                     onChange={setSettingsForm}
@@ -1053,7 +1020,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[1]} />
+                  <SectionHeading tab={getSection("multiplayer")} />
                   <div className="space-y-5">
                   <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
                     <div className="flex items-center justify-between">
@@ -1182,30 +1149,13 @@ export default function MenuPage({
 
                 <div
                   ref={(el) => {
-                    sectionRefs.current["stats"] = el;
-                  }}
-                  data-section-id="stats"
-                  style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
-                >
-                  <SectionHeading tab={sections[2]} />
-                  <StatsResourcesEditor
-                    stats={storyData.stats}
-                    resources={storyData.resources}
-                    achievements={storyData.achievements}
-                    onUpdate={(updates) => onUpdateStoryData(updates)}
-                  />
-                </div>
-
-                <div
-                  ref={(el) => {
                     sectionRefs.current["inventory"] = el;
                   }}
                   data-section-id="inventory"
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[3]} />
+                  <SectionHeading tab={getSection("inventory")} />
                   <InventoryEditor
                     inventory={storyData.inventory}
                     onUpdate={(inventory) => onUpdateStoryData({ inventory })}
@@ -1220,37 +1170,12 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[4]} />
+                  <SectionHeading tab={getSection("abilities")} />
                   <AbilitiesEditor
                     abilities={storyData.abilities || []}
                     resources={storyData.resources}
                     variables={storyData.variables || []}
-                    rpgSystem={storyData.rpgSystem || "3d6"}
                     onUpdate={(abilities) => onUpdateStoryData({ abilities })}
-                  />
-                </div>
-
-                <div
-                  ref={(el) => {
-                    sectionRefs.current["passives"] = el;
-                  }}
-                  data-section-id="passives"
-                  style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
-                >
-                  <SectionHeading tab={sections[5]} />
-                  <PassivesEditor
-                    passives={storyData.nodeEffects?.passives || []}
-                    onUpdate={(passives) =>
-                      onUpdateStoryData({
-                        nodeEffects: {
-                          statBonuses: storyData.nodeEffects?.statBonuses || [],
-                          resourceBonuses:
-                            storyData.nodeEffects?.resourceBonuses || [],
-                          passives,
-                        },
-                      })
-                    }
                   />
                 </div>
 
@@ -1262,7 +1187,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[6]} />
+                  <SectionHeading tab={getSection("quests")} />
                   <QuestEditor
                     quests={storyData.quests || []}
                     onUpdate={(quests) => onUpdateStoryData({ quests })}
@@ -1277,7 +1202,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[7]} />
+                  <SectionHeading tab={getSection("lore")} />
                   <LoreEditor
                     lore={storyData.lore}
                     variables={storyData.variables || []}
@@ -1293,7 +1218,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[8]} />
+                  <SectionHeading tab={getSection("npcs")} />
                   <NPCEditor
                     npcs={storyData.npcs || []}
                     onUpdate={(npcs) => onUpdateStoryData({ npcs })}
@@ -1308,7 +1233,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[9]} />
+                  <SectionHeading tab={getSection("tables")} />
                   <CustomTablesEditor
                     tables={storyData.customTables || []}
                     setTables={(tables) =>
@@ -1325,7 +1250,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[10]} />
+                  <SectionHeading tab={getSection("variables")} />
                   <VariablesEditor
                     variables={storyData.variables || []}
                     onUpdate={(variables) => onUpdateStoryData({ variables })}
@@ -1340,7 +1265,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[11]} />
+                  <SectionHeading tab={getSection("relationships")} />
                   <RelationshipsEditor
                     relationships={storyData.relationships}
                     onUpdate={(relationships) =>
@@ -1357,11 +1282,26 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[12]} />
+                  <SectionHeading tab={getSection("conditions")} />
                   <ConditionsEditor
                     conditions={storyData.conditions || []}
                     stats={storyData.stats || []}
                     onUpdate={(conditions) => onUpdateStoryData({ conditions })}
+                  />
+                </div>
+
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["threads"] = el;
+                  }}
+                  data-section-id="threads"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={getSection("threads")} />
+                  <ThreadsEditor
+                    threads={storyData.threads || []}
+                    onUpdate={(threads) => onUpdateStoryData({ threads })}
                   />
                 </div>
 
@@ -1373,7 +1313,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={sections[13]} />
+                  <SectionHeading tab={getSection("mythic")} />
                   <div className="space-y-6">
                   {/* Enable/Disable Advanced RPG Tools */}
                   <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
@@ -1646,7 +1586,7 @@ export default function MenuPage({
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-4"
                 >
-                  <SectionHeading tab={sections[14]} />
+                  <SectionHeading tab={getSection("story")} />
                   <StoryMetaEditor
                     memory={storyData.memory}
                     premise={storyData.premise}
@@ -1667,12 +1607,8 @@ export default function MenuPage({
                     player_summary: storyData.player_summary,
                     premise: storyData.premise,
                     max_chapters: storyData.max_chapters,
-                    points: storyData.points,
-                    momentum: storyData.momentum,
-                    maxMomentum: storyData.maxMomentum,
                     displayName: storyData.displayName || "",
                     displayAvatar: storyData.displayAvatar || "",
-                    rpgSystem: storyData.rpgSystem || "3d6",
                   });
                   setMultiplayerEnabled(!!storyData.multiplayer?.enabled);
                   setMultiplayerMode(storyData.multiplayer?.mode || "host");

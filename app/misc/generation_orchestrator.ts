@@ -797,9 +797,8 @@ export async function generateAdventureSequential(
     }
   }
 
-  // Apply RPG system and NSFW settings
+  // Apply NSFW setting
   if (finalResult.storyTemplate) {
-    finalResult.storyTemplate.rpgSystem = config.rpgSystem;
     finalResult.storyTemplate.nsfw = config.nsfw;
   }
 

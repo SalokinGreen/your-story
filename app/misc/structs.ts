@@ -725,8 +725,6 @@ export interface StoryData {
   abilities: Ability[]; // Skills, spells, special moves
   achievements: Achievement[];
   lore: StoryLore[];
-  momentum: number;
-  maxMomentum: number;
   points: number; // XP (experience points) - legacy name kept for backward compatibility
   level: number; // Current level derived from XP (calculated, but stored for convenience)
   upgradesSpent: number; // Number of level-up upgrades the player has spent
@@ -751,16 +749,6 @@ export interface StoryData {
   newGamePlusCount?: number; // Number of NG+ runs completed
   newGamePlusMode?: boolean; // Whether current run is NG+
   nsfw?: boolean; // Whether the story contains NSFW content
-  rpgSystem?:
-    | "3d6"
-    | "1d20"
-    | "1d100"
-    | "percentile"
-    | "pbta"
-    | "fate"
-    | "yze"
-    | "explosive"
-    | "narrative"; // RPG dice system
   reverseDC?: boolean; // If true, success = roll ≤ DC (Call of Cthulhu style)
   difficulty?: AdventureDifficulty; // Adventure difficulty (affects DC/points scaling)
   stress?: number; // YZE: Current stress level (0-10)

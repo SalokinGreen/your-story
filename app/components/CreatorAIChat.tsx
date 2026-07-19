@@ -1977,31 +1977,6 @@ function ChangeSummary({
       icon: "Coins",
     });
   }
-  if (data.momentum !== undefined) {
-    changes.push({
-      type: "Update",
-      label: "Starting Momentum",
-      value: `${data.momentum}`,
-      icon: "Zap",
-    });
-  }
-  if (data.maxMomentum !== undefined) {
-    changes.push({
-      type: "Update",
-      label: "Max Momentum",
-      value: `${data.maxMomentum}`,
-      icon: "Battery",
-    });
-  }
-  if (data.rpgSystem) {
-    changes.push({
-      type: "Update",
-      label: "RPG System",
-      value: data.rpgSystem,
-      icon: "Dices",
-    });
-  }
-
   return (
     <div className="space-y-2">
       {changes.map((change, i) => (

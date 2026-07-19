@@ -2996,31 +2996,6 @@ function ChangeSummary({
       icon: "Coins",
     });
   }
-  if (data.momentum !== undefined) {
-    changes.push({
-      type: "Update",
-      label: "Momentum",
-      value: `${data.momentum}`,
-      icon: "Zap",
-    });
-  }
-  if (data.maxMomentum !== undefined) {
-    changes.push({
-      type: "Update",
-      label: "Max Momentum",
-      value: `${data.maxMomentum}`,
-      icon: "Battery",
-    });
-  }
-  if (data.rpgSystem) {
-    changes.push({
-      type: "Update",
-      label: "RPG System",
-      value: data.rpgSystem,
-      icon: "Dices",
-    });
-  }
-
   if (changes.length === 0) {
     return (
       <p className="text-xs text-gray-500 dark:text-gray-400 italic">

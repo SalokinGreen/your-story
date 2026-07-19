@@ -276,10 +276,9 @@ const FEW_SHOT_TOOL_CALLS = [
     id: "ex2",
     type: "function" as const,
     function: {
-      name: "modify_momentum",
+      name: "trigger_achievement",
       arguments: JSON.stringify({
-        amount: 1,
-        reason: "Quick thinking and improvisation in a tense situation",
+        title: "Silver Tongue",
       }),
     },
   },
@@ -295,8 +294,7 @@ const FEW_SHOT_TOOL_RESPONSES = [
   {
     toolCallId: "ex2",
     success: true,
-    message:
-      "Momentum increased by 1 → 2 (Quick thinking and improvisation in a tense situation)",
+    message: "Achievement unlocked: Silver Tongue",
   },
 ];
 
@@ -1095,11 +1093,6 @@ ${
     storyData.player_notes
       ? `## Player Notes\n${cleanString(storyData.player_notes)}`
       : "",
-    storyData.momentum !== undefined
-      ? `**Momentum:** ${storyData.momentum}/${
-          storyData.maxMomentum || 3
-        } (spend for advantage/guaranteed success)`
-      : "",
     storyData.points !== undefined && storyData.points > 0
       ? `**Points:** ${storyData.points}`
       : "",
@@ -1817,7 +1810,7 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 
 2. **Combat Stats Revealed?** Did we learn how tough/dangerous something is? → \`create_note\` with stats
 
-3. **Resource Delta:** Did the player lose or gain resources? → \`update_resource\` / \`modify_field\`
+3. **Resource Delta:** Did the player lose or gain resources? → reflect it in the character sheet note (\`edit_note\`)
 
 4. **Quick Facts:** Codes, deadlines, debts, clues? → \`add_memory\` (keep it SHORT)
 
@@ -1914,12 +1907,9 @@ Use these sparingly - only for content that must be referenced constantly.
 
 ## CHARACTER LIST FIELDS
 
-Use \`add_list_item\` for list fields (Equipment, Abilities, Languages, etc.):
-
-**Object with Emoji (preferred):**
-\`add_list_item({ field: "Equipment", item: { name: "Iron Sword", emoji: "⚔️", description: "A sturdy blade" } })\`
-
-Use \`remove_list_item\` with just the item name (fuzzy matching supported).
+For freeform lists on the character sheet (Equipment, Languages, etc. that
+aren't tracked by the dedicated Inventory/Abilities tools), edit the
+character sheet note directly with \`edit_note\` to add or remove the entry.
 
 Think through the narrative sentence-by-sentence, then execute the required Tool Calls.`;
 
