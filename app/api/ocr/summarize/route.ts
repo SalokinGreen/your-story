@@ -28,10 +28,14 @@ export const maxDuration = 300;
  *   maxTables?: number,         // Max tables to extract
  *   customInstructions?: string,// Additional AI instructions
  *   model?: string,             // AI model to use
+ *   provider?: string,          // "openrouter" | "deepseek" | "mistral" | "google" | "deepinfra"
+ *                               // Inferred from model name if omitted.
  *   maxTokens?: number,         // Max output tokens
  *   openRouterKey?: string,     // BYOK for OpenRouter
  *   deepseekKey?: string,       // BYOK for DeepSeek
- *   mistralKey?: string         // BYOK for Mistral
+ *   mistralKey?: string,        // BYOK for Mistral
+ *   googleKey?: string,         // BYOK for Google AI Studio
+ *   deepinfraKey?: string       // BYOK for DeepInfra
  * }
  *
  * Response: {
@@ -43,6 +47,56 @@ export const maxDuration = 300;
  * }
  */
 
+type AIProvider = "openrouter" | "deepseek" | "mistral" | "google" | "deepinfra";
+
+function inferProvider(model: string): AIProvider {
+  if (
+    model.startsWith("mistral-") ||
+    model.startsWith("ministral-") ||
+    model.startsWith("codestral-") ||
+    model.startsWith("devstral-")
+  ) {
+    return "mistral";
+  }
+  if (model === "deepseek-v4-flash") return "deepseek";
+  return "openrouter";
+}
+
+function callProviderAI(
+  provider: AIProvider,
+  systemPrompt: string,
+  userPrompt: string,
+  model: string,
+  maxTokens: number,
+  apiKey: string,
+): Promise<{ success: boolean; content?: string; error?: string }> {
+  switch (provider) {
+    case "mistral":
+      return callMistralAI(systemPrompt, userPrompt, model, maxTokens, apiKey);
+    case "deepseek":
+      return callDeepSeekAI(systemPrompt, userPrompt, model, maxTokens, apiKey);
+    case "google":
+      return callGoogleAI(systemPrompt, userPrompt, model, maxTokens, apiKey);
+    case "deepinfra":
+      return callDeepInfraAI(
+        systemPrompt,
+        userPrompt,
+        model,
+        maxTokens,
+        apiKey,
+      );
+    case "openrouter":
+    default:
+      return callOpenRouterAI(
+        systemPrompt,
+        userPrompt,
+        model,
+        maxTokens,
+        apiKey,
+      );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -51,15 +105,37 @@ export async function POST(request: NextRequest) {
       focus = ["all"],
       customInstructions = "",
       model = "ministral-14b-2512",
+      provider,
       maxTokens = 16000, // Increased for comprehensive extraction
       openRouterKey,
       deepseekKey,
       mistralKey,
+      googleKey,
+      deepinfraKey,
     } = body;
 
     if (!markdown || markdown.trim().length === 0) {
       return NextResponse.json(
         { error: "No markdown content provided" },
+        { status: 400 },
+      );
+    }
+
+    const effectiveProvider: AIProvider = provider || inferProvider(model);
+    const providerKeys: Record<AIProvider, string | undefined> = {
+      openrouter: openRouterKey,
+      deepseek: deepseekKey,
+      mistral: mistralKey,
+      google: googleKey,
+      deepinfra: deepinfraKey,
+    };
+    const apiKey = providerKeys[effectiveProvider];
+
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          error: `No ${effectiveProvider} API key provided. Please add your own key in Settings.`,
+        },
         { status: 400 },
       );
     }
@@ -75,47 +151,14 @@ export async function POST(request: NextRequest) {
     const userPrompt = buildUserPrompt(markdown, contentType, extractedTables);
 
     // Call AI to process the content
-    let aiResponse;
-
-    // Determine which API to use
-    const isMistralModel =
-      model.startsWith("mistral-") ||
-      model.startsWith("ministral-") ||
-      model.startsWith("codestral-") ||
-      model.startsWith("devstral-");
-
-    if (isMistralModel && mistralKey) {
-      aiResponse = await callMistralAI(
-        systemPrompt,
-        userPrompt,
-        model,
-        maxTokens,
-        mistralKey,
-      );
-    } else if (model === "deepseek-v4-flash" && deepseekKey) {
-      aiResponse = await callDeepSeekAI(
-        systemPrompt,
-        userPrompt,
-        maxTokens,
-        deepseekKey,
-      );
-    } else if (openRouterKey) {
-      aiResponse = await callOpenRouterAI(
-        systemPrompt,
-        userPrompt,
-        model,
-        maxTokens,
-        openRouterKey,
-      );
-    } else {
-      return NextResponse.json(
-        {
-          error:
-            "No valid AI configuration. Please provide your own API key in Settings.",
-        },
-        { status: 400 },
-      );
-    }
+    const aiResponse = await callProviderAI(
+      effectiveProvider,
+      systemPrompt,
+      userPrompt,
+      model,
+      maxTokens,
+      apiKey,
+    );
 
     if (!aiResponse.success) {
       return NextResponse.json(
@@ -138,33 +181,16 @@ export async function POST(request: NextRequest) {
         console.log(`Continuation attempt ${attempt + 1}/2`);
 
         const continuationPrompt = buildContinuationPrompt(content, "core");
-        let continuationResponse;
 
         // Use the same provider for continuation
-        if (isMistralModel && mistralKey) {
-          continuationResponse = await callMistralAI(
-            "You are a JSON completion assistant. Output ONLY the minimal characters needed to close the JSON.",
-            continuationPrompt,
-            model,
-            2000, // Small limit for just closing JSON
-            mistralKey,
-          );
-        } else if (model === "deepseek-v4-flash" && deepseekKey) {
-          continuationResponse = await callDeepSeekAI(
-            "You are a JSON completion assistant. Output ONLY the minimal characters needed to close the JSON.",
-            continuationPrompt,
-            2000,
-            deepseekKey,
-          );
-        } else if (openRouterKey) {
-          continuationResponse = await callOpenRouterAI(
-            "You are a JSON completion assistant. Output ONLY the minimal characters needed to close the JSON.",
-            continuationPrompt,
-            model,
-            2000,
-            openRouterKey,
-          );
-        }
+        const continuationResponse = await callProviderAI(
+          effectiveProvider,
+          "You are a JSON completion assistant. Output ONLY the minimal characters needed to close the JSON.",
+          continuationPrompt,
+          model,
+          2000, // Small limit for just closing JSON
+          apiKey,
+        );
 
         if (continuationResponse?.success && continuationResponse.content) {
           const cleanedContinuation = cleanContinuationContent(
@@ -375,6 +401,7 @@ async function callMistralAI(
 async function callDeepSeekAI(
   systemPrompt: string,
   userPrompt: string,
+  model: string,
   maxTokens: number,
   apiKey: string,
 ): Promise<{ success: boolean; content?: string; error?: string }> {
@@ -386,7 +413,7 @@ async function callDeepSeekAI(
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "deepseek-v4-flash",
+        model: model || "deepseek-v4-flash",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },
@@ -449,6 +476,94 @@ async function callOpenRouterAI(
       return {
         success: false,
         error: `OpenRouter API error: ${response.statusText}`,
+      };
+    }
+
+    const data = await response.json();
+    return { success: true, content: data.choices[0]?.message?.content || "" };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+async function callGoogleAI(
+  systemPrompt: string,
+  userPrompt: string,
+  model: string,
+  maxTokens: number,
+  apiKey: string,
+): Promise<{ success: boolean; content?: string; error?: string }> {
+  try {
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: maxTokens,
+          temperature: 0.3,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Google AI error:", error);
+      return {
+        success: false,
+        error: `Google AI error: ${response.statusText}`,
+      };
+    }
+
+    const data = await response.json();
+    return { success: true, content: data.choices[0]?.message?.content || "" };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+async function callDeepInfraAI(
+  systemPrompt: string,
+  userPrompt: string,
+  model: string,
+  maxTokens: number,
+  apiKey: string,
+): Promise<{ success: boolean; content?: string; error?: string }> {
+  try {
+    const response = await fetch(
+      "https://api.deepinfra.com/v1/openai/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          max_tokens: maxTokens,
+          temperature: 0.3,
+        }),
+      },
+    );
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("DeepInfra AI error:", error);
+      return {
+        success: false,
+        error: `DeepInfra API error: ${response.statusText}`,
       };
     }
 

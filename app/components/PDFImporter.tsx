@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useNotification } from "@/app/misc/NotificationContext";
-import { useAPIKeys } from "@/app/misc/APIKeysContext";
+import { useAPIKeys, APIKeys } from "@/app/misc/APIKeysContext";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import {
   validateOCRFile,
@@ -31,6 +31,50 @@ const MAX_CONCURRENT_REQUESTS = 10;
 const SUMMARIZE_TIMEOUT_MS = 240000;
 // Retry attempts for failed requests
 const MAX_RETRIES = 2;
+
+// Providers the OCR summarize endpoint can call directly with a BYOK key.
+// NovelAI is excluded - its API doesn't support the structured JSON
+// extraction this endpoint relies on.
+type BYOKProvider = "openrouter" | "deepseek" | "mistral" | "google" | "deepinfra";
+
+const PROVIDER_KEY_FIELD: Record<BYOKProvider, keyof APIKeys> = {
+  openrouter: "openRouterKey",
+  deepseek: "deepseekKey",
+  mistral: "mistralKey",
+  google: "googleKey",
+  deepinfra: "deepinfraKey",
+};
+
+const PROVIDER_LABELS: Record<BYOKProvider, string> = {
+  openrouter: "OpenRouter",
+  deepseek: "DeepSeek",
+  mistral: "Mistral",
+  google: "Google AI Studio",
+  deepinfra: "DeepInfra",
+};
+
+// All built-in models grouped by provider, for the dropdown below.
+const MODELS_BY_PROVIDER: Record<
+  BYOKProvider,
+  { model: string; name: string }[]
+> = (() => {
+  const groups: Record<BYOKProvider, { model: string; name: string }[]> = {
+    openrouter: [],
+    deepseek: [],
+    mistral: [],
+    google: [],
+    deepinfra: [],
+  };
+  for (const cfg of Object.values(AI_MODELS)) {
+    if (cfg.provider in groups) {
+      groups[cfg.provider as BYOKProvider].push({
+        model: cfg.model,
+        name: cfg.name,
+      });
+    }
+  }
+  return groups;
+})();
 
 /**
  * Helper to run promises with limited concurrency
@@ -249,7 +293,9 @@ export default function PDFImporter({
 
   // Advanced options
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [customOpenRouterModel, setCustomOpenRouterModel] = useState("");
+  const [customModelProvider, setCustomModelProvider] =
+    useState<BYOKProvider>("openrouter");
+  const [customModelId, setCustomModelId] = useState("");
   const [customInstructions, setCustomInstructions] = useState("");
   const [maxOutputTokens, setMaxOutputTokens] = useState(16000);
 
@@ -267,6 +313,22 @@ export default function PDFImporter({
   const [repairChunkIndex, setRepairChunkIndex] = useState<number | null>(null);
   const [repairContent, setRepairContent] = useState("");
   const [repairError, setRepairError] = useState("");
+
+  // Resolve the currently selected model + provider, whether it's one of the
+  // built-in models or a user-entered custom model ID for any provider.
+  const getSelectedModel = useCallback((): {
+    model: string;
+    provider: BYOKProvider;
+  } => {
+    if (aiModel === "custom-model") {
+      return { model: customModelId.trim(), provider: customModelProvider };
+    }
+    const cfg = Object.values(AI_MODELS).find((m) => m.model === aiModel);
+    return {
+      model: aiModel,
+      provider: (cfg?.provider as BYOKProvider) || "openrouter",
+    };
+  }, [aiModel, customModelId, customModelProvider]);
 
   // Load saved imports from IndexedDB on mount
   useEffect(() => {
@@ -369,14 +431,14 @@ export default function PDFImporter({
               customInstructions:
                 customInstructions +
                 `\n\nNote: This is pages ${chunk.pageStart}-${chunk.pageEnd} of a larger document.`,
-              model:
-                aiModel === "custom-openrouter"
-                  ? customOpenRouterModel
-                  : aiModel,
+              model: getSelectedModel().model,
+              provider: getSelectedModel().provider,
               maxTokens: maxOutputTokens,
               openRouterKey: keys.openRouterKey,
               deepseekKey: keys.deepseekKey,
               mistralKey: keys.mistralKey,
+              googleKey: keys.googleKey,
+              deepinfraKey: keys.deepinfraKey,
             }),
           },
           SUMMARIZE_TIMEOUT_MS,
@@ -457,8 +519,7 @@ export default function PDFImporter({
     [
       chunkStatuses,
       customInstructions,
-      aiModel,
-      customOpenRouterModel,
+      getSelectedModel,
       maxOutputTokens,
       keys,
       addNotification,
@@ -684,6 +745,19 @@ export default function PDFImporter({
       return;
     }
 
+    const selectedModel = getSelectedModel();
+    if (!selectedModel.model) {
+      addNotification("Please enter a custom model ID", "warning");
+      return;
+    }
+    if (!keys[PROVIDER_KEY_FIELD[selectedModel.provider]]) {
+      addNotification(
+        `Please add your ${PROVIDER_LABELS[selectedModel.provider]} API key in Settings`,
+        "warning",
+      );
+      return;
+    }
+
     // Aggregate results from all files
     const allLore: StoryLore[] = [];
     const allMechanicNotes: StoryLore[] = [];
@@ -869,14 +943,14 @@ export default function PDFImporter({
                     customInstructions:
                       customInstructions +
                       `\n\nNote: This is pages ${ocr.pageStart}-${ocr.pageEnd} of a larger document.`,
-                    model:
-                      aiModel === "custom-openrouter"
-                        ? customOpenRouterModel
-                        : aiModel,
+                    model: getSelectedModel().model,
+                    provider: getSelectedModel().provider,
                     maxTokens: maxOutputTokens,
                     openRouterKey: keys.openRouterKey,
                     deepseekKey: keys.deepseekKey,
                     mistralKey: keys.mistralKey,
+                    googleKey: keys.googleKey,
+                    deepinfraKey: keys.deepinfraKey,
                   }),
                 },
                 SUMMARIZE_TIMEOUT_MS,
@@ -1049,14 +1123,14 @@ export default function PDFImporter({
                   customInstructions:
                     (customInstructions || "") +
                     `\n\nNote: This content was imported from a text file (${file.name}).`,
-                  model:
-                    aiModel === "custom-openrouter"
-                      ? customOpenRouterModel
-                      : aiModel,
+                  model: getSelectedModel().model,
+                  provider: getSelectedModel().provider,
                   maxTokens: maxOutputTokens,
                   openRouterKey: keys.openRouterKey,
                   deepseekKey: keys.deepseekKey,
                   mistralKey: keys.mistralKey,
+                  googleKey: keys.googleKey,
+                  deepinfraKey: keys.deepinfraKey,
                 }),
               },
               SUMMARIZE_TIMEOUT_MS,
@@ -1162,14 +1236,14 @@ export default function PDFImporter({
               markdown: combinedMarkdown,
               focus: ["all"],
               customInstructions,
-              model:
-                aiModel === "custom-openrouter"
-                  ? customOpenRouterModel
-                  : aiModel,
+              model: getSelectedModel().model,
+              provider: getSelectedModel().provider,
               maxTokens: maxOutputTokens,
               openRouterKey: keys.openRouterKey,
               deepseekKey: keys.deepseekKey,
               mistralKey: keys.mistralKey,
+              googleKey: keys.googleKey,
+              deepinfraKey: keys.deepinfraKey,
             }),
           });
 
@@ -1774,49 +1848,78 @@ export default function PDFImporter({
                     <label className="block text-sm font-semibold text-blue-200 mb-1">
                       AI Model for Summarization
                     </label>
+                    <p className="text-xs text-blue-300/50 mb-1.5">
+                      BYOK only - add a provider key in Settings to unlock its
+                      models.
+                    </p>
                     <select
                       value={aiModel}
                       onChange={(e) => setAIModel(e.target.value)}
                       className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white"
                     >
-                      <option value={AI_MODELS["Ministral 14B"].model}>
-                        {AI_MODELS["Ministral 14B"].name} (Coins)
-                      </option>
-                      <option value={AI_MODELS["Mistral Small 3.2"].model}>
-                        {AI_MODELS["Mistral Small 3.2"].name} (Coins)
-                      </option>
-                      <option value={AI_MODELS["Mistral Medium 3.1"].model}>
-                        {AI_MODELS["Mistral Medium 3.1"].name} (Coins)
-                      </option>
-                      {keys.deepseekKey && (
-                        <option value={AI_MODELS["DeepSeek V4 Flash"].model}>
-                          {AI_MODELS["DeepSeek V4 Flash"].name} (BYOK)
+                      {(Object.keys(PROVIDER_LABELS) as BYOKProvider[]).map(
+                        (provider) => {
+                          if (!keys[PROVIDER_KEY_FIELD[provider]]) return null;
+                          const models = MODELS_BY_PROVIDER[provider];
+                          if (models.length === 0) return null;
+                          return (
+                            <optgroup
+                              key={provider}
+                              label={PROVIDER_LABELS[provider]}
+                            >
+                              {models.map((m) => (
+                                <option key={m.model} value={m.model}>
+                                  {m.name}
+                                </option>
+                              ))}
+                            </optgroup>
+                          );
+                        },
+                      )}
+                      <optgroup label="Custom">
+                        <option value="custom-model">
+                          Custom Model (any provider)
                         </option>
-                      )}
-                      {keys.openRouterKey && (
-                        <>
-                          <option value="anthropic/claude-3.5-sonnet">
-                            Claude 3.5 Sonnet (BYOK)
-                          </option>
-                          <option value={AI_MODELS["Gemini 2.5 Flash"].model}>
-                            {AI_MODELS["Gemini 2.5 Flash"].name} (BYOK)
-                          </option>
-                          <option value="custom-openrouter">
-                            Custom OpenRouter Model (BYOK)
-                          </option>
-                        </>
-                      )}
+                      </optgroup>
                     </select>
-                    {aiModel === "custom-openrouter" && (
-                      <input
-                        type="text"
-                        value={customOpenRouterModel}
-                        onChange={(e) =>
-                          setCustomOpenRouterModel(e.target.value)
-                        }
-                        placeholder="e.g., anthropic/claude-3-opus"
-                        className="w-full mt-2 px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white placeholder-blue-300/50"
-                      />
+                    {!Object.values(PROVIDER_KEY_FIELD).some(
+                      (field) => keys[field],
+                    ) && (
+                      <p className="text-xs text-amber-400/80 mt-1">
+                        No API keys configured yet - add one in Settings to
+                        pick a model.
+                      </p>
+                    )}
+                    {aiModel === "custom-model" && (
+                      <div className="mt-2 space-y-2">
+                        <select
+                          value={customModelProvider}
+                          onChange={(e) =>
+                            setCustomModelProvider(
+                              e.target.value as BYOKProvider,
+                            )
+                          }
+                          className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white"
+                        >
+                          {(
+                            Object.keys(PROVIDER_LABELS) as BYOKProvider[]
+                          ).map((provider) => (
+                            <option key={provider} value={provider}>
+                              {PROVIDER_LABELS[provider]}
+                              {!keys[PROVIDER_KEY_FIELD[provider]]
+                                ? " (no key set)"
+                                : ""}
+                            </option>
+                          ))}
+                        </select>
+                        <input
+                          type="text"
+                          value={customModelId}
+                          onChange={(e) => setCustomModelId(e.target.value)}
+                          placeholder="Model ID, e.g. anthropic/claude-opus-4.1"
+                          className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white placeholder-blue-300/50"
+                        />
+                      </div>
                     )}
                   </div>
 
@@ -2086,7 +2189,11 @@ export default function PDFImporter({
               </button>
               <button
                 onClick={processFiles}
-                disabled={selectedFiles.length === 0 || step !== "idle"}
+                disabled={
+                  selectedFiles.length === 0 ||
+                  step !== "idle" ||
+                  (aiModel === "custom-model" && !customModelId.trim())
+                }
                 className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
               >
                 <DynamicIcon name="Sparkles" className="w-4 h-4" />
