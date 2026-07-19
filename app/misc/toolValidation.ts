@@ -3,8 +3,11 @@
  * JSON-schema-like objects that are sent to the LLM (toolSchemas.ts /
  * gmTools.ts) - a single source of truth instead of hand-written per-tool
  * checks. Previously tool execution only checked that required keys were
- * *present*; this also checks declared types/enums so the model gets a
- * specific, correctable error instead of a generic crash deep in an executor.
+ * *present*; this also checks declared types/enums/minimum/maximum/
+ * minItems/maxItems so the model gets a specific, correctable error instead
+ * of a generic crash deep in an executor - and so a declared bound (e.g.
+ * `required_successes: 2..10`) is an actual guarantee, not just a hint the
+ * model happens to see in its own schema description.
  *
  * Deliberately permissive where being strict would just create false
  * positives: unknown/extra properties are ignored (models occasionally add
@@ -22,6 +25,10 @@ export interface ToolParamSchema {
   enum?: unknown[];
   oneOf?: ToolParamSchema[];
   items?: ToolParamSchema;
+  minimum?: number;
+  maximum?: number;
+  minItems?: number;
+  maxItems?: number;
   [key: string]: unknown;
 }
 
@@ -132,10 +139,46 @@ function validateAgainstSchema(
     return;
   }
 
-  if (schema.type === "array" && schema.items && Array.isArray(value)) {
-    value.forEach((item, i) =>
-      validateAgainstSchema(item, schema.items as ToolParamSchema, `${path}[${i}]`, errors)
-    );
+  if (
+    (schema.type === "number" || schema.type === "integer") &&
+    typeof value === "number"
+  ) {
+    if (schema.minimum !== undefined && value < schema.minimum) {
+      errors.push({
+        param: path,
+        message: `"${path}" must be >= ${schema.minimum}, got ${value}`,
+      });
+      return;
+    }
+    if (schema.maximum !== undefined && value > schema.maximum) {
+      errors.push({
+        param: path,
+        message: `"${path}" must be <= ${schema.maximum}, got ${value}`,
+      });
+      return;
+    }
+  }
+
+  if (schema.type === "array" && Array.isArray(value)) {
+    if (schema.minItems !== undefined && value.length < schema.minItems) {
+      errors.push({
+        param: path,
+        message: `"${path}" must have at least ${schema.minItems} item(s), got ${value.length}`,
+      });
+      return;
+    }
+    if (schema.maxItems !== undefined && value.length > schema.maxItems) {
+      errors.push({
+        param: path,
+        message: `"${path}" must have at most ${schema.maxItems} item(s), got ${value.length}`,
+      });
+      return;
+    }
+    if (schema.items) {
+      value.forEach((item, i) =>
+        validateAgainstSchema(item, schema.items as ToolParamSchema, `${path}[${i}]`, errors)
+      );
+    }
   }
 }
 

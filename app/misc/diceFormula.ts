@@ -79,6 +79,18 @@ export type VariableResolver = (name: string) => number | undefined;
 // Matches dice notation: 2d6, 1d20kh1, 4d6kl3, 1d6!
 const DICE_PATTERN = /^(\d+)d(\d+)(kh\d+|kl\d+)?(!)?$/i;
 
+// Sane upper bounds on dice notation. Without these, a model-supplied
+// formula like "999999999d6" (or an exploding "1d1!", which always
+// "explodes" since a 1-sided die can only ever roll its max) would spin
+// rollDiceGroup's loop indefinitely - a real perf/DoS edge case reachable
+// from ordinary tool-call input, not just adversarial testing.
+export const MAX_DICE_COUNT = 100;
+export const MAX_DICE_SIDES = 1000;
+// Defense in depth for exploding dice: even with sides >= 2 validated at
+// parse time, cap total explosions per die so a pathological RNG sequence
+// (or a future change to the exploding-dice rule) can't hang the roller.
+const MAX_EXPLOSIONS_PER_DIE = 100;
+
 // Matches variable: {{variable_name}}
 const VARIABLE_PATTERN = /^\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}$/;
 
@@ -133,6 +145,22 @@ export function parseFormula(formula: string): ParsedFormula {
       const sides = parseInt(diceMatch[2], 10);
       const keepMod = diceMatch[3];
       const exploding = !!diceMatch[4];
+
+      if (count < 1 || count > MAX_DICE_COUNT) {
+        throw new Error(
+          `Invalid dice count in "${match}": must be between 1 and ${MAX_DICE_COUNT}`
+        );
+      }
+      if (sides < 1 || sides > MAX_DICE_SIDES) {
+        throw new Error(
+          `Invalid dice sides in "${match}": must be between 1 and ${MAX_DICE_SIDES}`
+        );
+      }
+      if (exploding && sides < 2) {
+        throw new Error(
+          `Invalid exploding dice in "${match}": a die with fewer than 2 sides always "explodes" and would roll forever`
+        );
+      }
 
       const dice: DiceRoll = { count, sides, exploding };
 
@@ -237,7 +265,7 @@ function rollDiceGroup(dice: DiceRoll): DiceGroupResult {
 
     // Handle exploding dice
     if (dice.exploding) {
-      while (roll === dice.sides) {
+      while (roll === dice.sides && explosions < MAX_EXPLOSIONS_PER_DIE) {
         roll = rollDie(dice.sides);
         allRolls.push(roll);
         explosions++;

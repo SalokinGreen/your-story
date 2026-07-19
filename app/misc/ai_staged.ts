@@ -997,6 +997,23 @@ export function buildInfoMessage(
 - Scene Count: ${storyData.agmtState.sceneCount}`
     : "";
 
+  // Pending random events (from fate_question/scene checks) - shown every
+  // turn, not just the one that triggered them, until resolve_random_event
+  // is called. This is what keeps an oracle-triggered event from being a
+  // one-shot hint that's easy to silently drop.
+  const pendingEvents = storyData.pendingRandomEvents || [];
+  const pendingEventsSection = pendingEvents.length
+    ? `## ⚡ Unresolved Random Events (must be addressed)
+${pendingEvents
+  .map(
+    (e) =>
+      `- [${e.id}] [${e.focus || "Event"}] "${e.action} ${
+        e.subject
+      }" - work this into the story, then call resolve_random_event(id: "${e.id}")`,
+  )
+  .join("\n")}`
+    : "";
+
   // Build variables section if any exist - clean, simple format
   const variablesSection =
     storyData.variables && storyData.variables.length > 0
@@ -1087,6 +1104,7 @@ ${
     variablesSection,
     threadsSection,
     agmtSection,
+    pendingEventsSection,
     storyData.author_notes
       ? `## Author Notes\n${cleanString(storyData.author_notes)}`
       : "",
@@ -2827,6 +2845,12 @@ Keep every turn tight: one action, one consequence, then stop and hand control b
     "update_thread",
     "resolve_thread",
     "abandon_thread",
+    // Advanced RPG Tools scene check (was missing from this whitelist
+    // entirely - the schema, executor, and prompt section all existed,
+    // but the model could never actually call it in the live GM stage)
+    "increment_scene",
+    // Random event acknowledgement
+    "resolve_random_event",
   ];
 
   const gmTools = GM_TOOL_SCHEMAS.filter((t: any) =>

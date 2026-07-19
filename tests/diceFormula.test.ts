@@ -106,6 +106,34 @@ describe("diceFormula", () => {
       const result = parseFormula("");
       expect(result.tokens).toHaveLength(0);
     });
+
+    it("rejects an absurd dice count instead of hanging", () => {
+      expect(() => parseFormula("999999999d6")).toThrow(/dice count/i);
+    });
+
+    it("accepts the maximum allowed dice count", () => {
+      expect(() => parseFormula("100d6")).not.toThrow();
+    });
+
+    it("rejects a dice count above the maximum", () => {
+      expect(() => parseFormula("101d6")).toThrow(/dice count/i);
+    });
+
+    it("rejects an absurd number of sides", () => {
+      expect(() => parseFormula("1d999999999")).toThrow(/dice sides/i);
+    });
+
+    it("accepts the maximum allowed sides", () => {
+      expect(() => parseFormula("1d1000")).not.toThrow();
+    });
+
+    it("rejects sides above the maximum", () => {
+      expect(() => parseFormula("1d1001")).toThrow(/dice sides/i);
+    });
+
+    it("rejects an exploding die with fewer than 2 sides (would explode forever)", () => {
+      expect(() => parseFormula("1d1!")).toThrow(/exploding/i);
+    });
   });
 
   describe("rollFormula", () => {
@@ -188,6 +216,17 @@ describe("diceFormula", () => {
       const result = rollFormula("1d6!");
       expect(result.total).toBe(9); // 6 + 3
       expect(result.rolls[0].explosions).toBe(1);
+
+      vi.restoreAllMocks();
+    });
+
+    it("caps exploding dice instead of looping forever when every roll is max", () => {
+      // Always roll max (2 on a d2) - without a cap this would explode forever.
+      vi.spyOn(Math, "random").mockReturnValue(0.999);
+
+      const result = rollFormula("1d2!");
+      expect(result.rolls[0].explosions).toBeLessThanOrEqual(100);
+      expect(Number.isFinite(result.total)).toBe(true);
 
       vi.restoreAllMocks();
     });

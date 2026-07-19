@@ -45,7 +45,7 @@ const createQuestTool: ToolSchema = {
         },
         points: {
           oneOf: [
-            { type: "number", minimum: 1 },
+            { type: "number", minimum: 1, maximum: 500 },
             {
               type: "string",
               enum: ["trivial", "minor", "moderate", "major", "legendary"],
@@ -908,112 +908,19 @@ const searchNotesTool: ToolSchema = {
   },
 };
 
-// Relationship Management Tools
-const addRelationshipTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "add_relationship",
-    description:
-      "Create a new character relationship with initial value and description",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Character name (must be unique)",
-        },
-        value: {
-          type: "number",
-          description:
-            "Initial relationship value (-100 to 100, where negative is hostile and positive is friendly)",
-          minimum: -100,
-          maximum: 100,
-        },
-        description: {
-          type: "string",
-          description: "Current relationship status and context",
-        },
-      },
-      required: ["name", "value", "description"],
-    },
-  },
-};
-
-const modifyRelationshipTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "modify_relationship",
-    description:
-      "Change an existing relationship using narrative magnitude. The actual change is calculated based on difficulty and current relationship - enemies improve slowly, friends damage easily.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Character name (fuzzy matching supported)",
-        },
-        magnitude: {
-          type: "string",
-          enum: [
-            "greatly_damage",
-            "damage",
-            "slightly_damage",
-            "slightly_improve",
-            "improve",
-            "greatly_improve",
-          ],
-          description:
-            "How much to change the relationship. Negative relationships are harder to improve, positive relationships are easier to damage.",
-        },
-        description: {
-          type: "string",
-          description: "New relationship description (optional)",
-        },
-      },
-      required: ["name", "magnitude"],
-    },
-  },
-};
-
-const deleteRelationshipTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "delete_relationship",
-    description: "Remove a character relationship entirely",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Character name (fuzzy matching supported)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const editRelationshipTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "edit_relationship",
-    description: "Update a relationship's description without changing value",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Character name (fuzzy matching supported)",
-        },
-        description: {
-          type: "string",
-          description: "New relationship description",
-        },
-      },
-      required: ["name", "description"],
-    },
-  },
-};
+// Note: this file used to also define add_relationship/modify_relationship/
+// delete_relationship/edit_relationship tools operating on the legacy
+// top-level `StoryData.relationships` array. They were never added to
+// TOOL_SCHEMAS below, so the model could never call them - fully dead
+// code. They've been removed rather than revived: `npcs[]`/update_npc is
+// the live, model-facing NPC-disposition tracker (see game-mechanics.md),
+// and reviving a second tool surface for the same concept on a different
+// array would just recreate the exact "two competing mechanisms" problem
+// documented for the old agmtState.threads/characters vs.
+// StoryData.threads/npcs split. The legacy `relationships` array itself
+// is untouched - it's still populated by old presets/saves and rendered
+// in the UI, just no longer exposed to the GM as a second tool-callable
+// system alongside update_npc.
 
 // NPC Management Tool - creates lore entry for NPCs
 const addNpcTool: ToolSchema = {
@@ -1173,6 +1080,31 @@ const abandonThreadTool: ToolSchema = {
         },
       },
       required: ["title"],
+    },
+  },
+};
+
+const resolveRandomEventTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "resolve_random_event",
+    description:
+      "Confirm a pending oracle-triggered random event has been incorporated into the narrative. Random events (from fate_question or a scene check) persist and keep reappearing in context every turn until resolved this way - call it once you've woven the event into the story, or it will keep showing up as unfinished.",
+    parameters: {
+      type: "object",
+      properties: {
+        id: {
+          type: "string",
+          description:
+            "The pending event's id, given in the event's context message",
+        },
+        how_incorporated: {
+          type: "string",
+          description:
+            "Brief note on how the event was worked into the narrative (optional, for the log)",
+        },
+      },
+      required: ["id"],
     },
   },
 };
@@ -1386,7 +1318,7 @@ const gameOverTool: ToolSchema = {
   function: {
     name: "game_over",
     description:
-      "End the game due to character death or permanent incapacitation. Use when a tier 6 condition narratively prevents the character from continuing, or when the story reaches a definitive fatal end. This is a major decision - only use when there is no reasonable way to continue.",
+      "End the game due to character death or permanent incapacitation. Requires either an existing tier 6 (permanent) condition on the character, or the player's combatant being downed (HP 0 or inactive) in active combat - this call is rejected otherwise. Use upgrade_condition to raise a condition to tier 6, or resolve combat down to 0 HP, before calling this. This is a major decision - only use when there is no reasonable way to continue.",
     parameters: {
       type: "object",
       properties: {
@@ -1639,6 +1571,9 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   updateThreadTool,
   resolveThreadTool,
   abandonThreadTool,
+
+  // Random event acknowledgement (1 tool)
+  resolveRandomEventTool,
 
   // Memory (1 tool)
   addMemoryTool,

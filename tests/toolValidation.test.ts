@@ -184,6 +184,86 @@ describe("validateToolArgs", () => {
   });
 });
 
+const boundedSchema: ToolFunctionSchema = {
+  function: {
+    name: "start_challenge",
+    parameters: {
+      type: "object",
+      properties: {
+        required_successes: { type: "number", minimum: 2, maximum: 10 },
+        value: {
+          oneOf: [{ type: "number", minimum: -100, maximum: 100 }],
+        },
+        tags: { type: "array", items: { type: "string" }, maxItems: 3 },
+      },
+      required: ["required_successes"],
+    },
+  },
+};
+
+describe("validateToolArgs - numeric and array bounds", () => {
+  it("rejects a number below the declared minimum", () => {
+    const errors = validateToolArgs(boundedSchema, { required_successes: -5 });
+    expect(errors.some((e) => e.param === "required_successes")).toBe(true);
+  });
+
+  it("rejects a number above the declared maximum", () => {
+    const errors = validateToolArgs(boundedSchema, { required_successes: 999 });
+    expect(errors.some((e) => e.param === "required_successes")).toBe(true);
+  });
+
+  it("accepts a number within bounds", () => {
+    const errors = validateToolArgs(boundedSchema, { required_successes: 5 });
+    expect(errors).toEqual([]);
+  });
+
+  it("accepts the boundary values themselves", () => {
+    expect(validateToolArgs(boundedSchema, { required_successes: 2 })).toEqual([]);
+    expect(validateToolArgs(boundedSchema, { required_successes: 10 })).toEqual([]);
+  });
+
+  it("enforces bounds inside a oneOf branch", () => {
+    const errors = validateToolArgs(boundedSchema, {
+      required_successes: 5,
+      value: 150,
+    });
+    expect(errors.some((e) => e.param === "value")).toBe(true);
+  });
+
+  it("enforces maxItems on arrays", () => {
+    const errors = validateToolArgs(boundedSchema, {
+      required_successes: 5,
+      tags: ["a", "b", "c", "d"],
+    });
+    expect(errors.some((e) => e.param === "tags")).toBe(true);
+  });
+
+  it("caps create_quest points at the schema maximum", () => {
+    const cappedQuestSchema: ToolFunctionSchema = {
+      function: {
+        name: "create_quest",
+        parameters: {
+          type: "object",
+          properties: {
+            points: {
+              oneOf: [
+                { type: "number", minimum: 1, maximum: 500 },
+                {
+                  type: "string",
+                  enum: ["trivial", "minor", "moderate", "major", "legendary"],
+                },
+              ],
+            },
+          },
+          required: [],
+        },
+      },
+    };
+    const errors = validateToolArgs(cappedQuestSchema, { points: 999999999 });
+    expect(errors.some((e) => e.param === "points")).toBe(true);
+  });
+});
+
 describe("formatValidationErrors", () => {
   it("joins errors into a single readable message", () => {
     const msg = formatValidationErrors("create_timer", [

@@ -21,6 +21,8 @@ import {
   NPCStatus,
   NPCAttitude,
   getMemoryContent,
+  MAX_PENDING_RANDOM_EVENTS,
+  PendingRandomEvent,
 } from "./structs";
 import {
   StartChallengeParams,
@@ -67,7 +69,14 @@ import {
   semanticSearchFallback,
   SemanticSearchContext,
 } from "./semanticSearchFallback";
-import { askFate, generateElement, MYTHIC_TABLE_NAMES, ElementCategory } from "./mythic";
+import {
+  askFate,
+  generateElement,
+  generateEventFocus,
+  generateEventMeaning,
+  MYTHIC_TABLE_NAMES,
+  ElementCategory,
+} from "./mythic";
 import { getTableByName, rollOnCustomTable } from "./tableRoller";
 import {
   getTierState,
@@ -367,6 +376,8 @@ export interface GMUpdateCombatantStatResult {
   change: number;
   reason?: string;
   diceRolled?: number[]; // If value was a dice formula
+  clampedToZero?: boolean; // HP-like stat would have gone negative, clamped to 0
+  defeated?: boolean; // HP-like stat hit 0, combatant auto-flagged isActive=false
 }
 
 export interface GMToggleCombatantConditionResult {
@@ -1950,7 +1961,31 @@ function executeFateQuestion(
   contextForStory += `\n[Roll: ${fateResult.roll} → ${fateResult.answer}]`;
 
   if (fateResult.randomEvent) {
-    contextForStory += `\n[⚡ RANDOM EVENT TRIGGERED! Consider adding an unexpected twist.]`;
+    // A one-line "consider adding a twist" hint is easy to silently drop -
+    // generate real Focus + Meaning content (same as scene-check
+    // Interrupted events) and persist it as tracked state so it keeps
+    // reappearing in context every turn until resolve_random_event is
+    // called, instead of vanishing the moment this turn's narration
+    // moves on without addressing it.
+    const focusResult = generateEventFocus();
+    const meaningResult = generateEventMeaning();
+    storyData.pendingRandomEvents = storyData.pendingRandomEvents || [];
+    const pendingEvent: PendingRandomEvent = {
+      id: `event_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      source: "fate_question",
+      focus: focusResult.focus,
+      action: meaningResult.action,
+      subject: meaningResult.subject,
+      context: params.question,
+      createdAt: Date.now(),
+    };
+    storyData.pendingRandomEvents.push(pendingEvent);
+    if (storyData.pendingRandomEvents.length > MAX_PENDING_RANDOM_EVENTS) {
+      storyData.pendingRandomEvents = storyData.pendingRandomEvents.slice(
+        -MAX_PENDING_RANDOM_EVENTS
+      );
+    }
+    contextForStory += `\n[⚡ RANDOM EVENT TRIGGERED: [${pendingEvent.focus}] "${pendingEvent.action} ${pendingEvent.subject}" - incorporate this into the narrative, then call resolve_random_event(id: "${pendingEvent.id}"). It will keep reappearing every turn until resolved.]`;
   }
 
   if (params.reason) {
@@ -3005,6 +3040,26 @@ function executeUpdateCombatantStat(
     newValue = oldValue + change;
   }
 
+  // HP (and equivalent health stats) is the one stat the tool's own
+  // description promises "cannot go below 0" - that floor was previously
+  // asserted only in English. Enforce it in code, and auto-flag the
+  // combatant defeated the way remove_combatant already does, rather than
+  // leaving a walking 0-or-negative-HP combatant that nothing ever marks
+  // inactive.
+  const isHealthStat = ["hp", "health", "hitpoints", "hit points"].includes(
+    params.stat.trim().toLowerCase()
+  );
+  let clamped = false;
+  if (isHealthStat && newValue < 0) {
+    newValue = 0;
+    clamped = true;
+  }
+  let justDefeated = false;
+  if (isHealthStat && newValue <= 0 && combatant.isActive) {
+    combatant.isActive = false;
+    justDefeated = true;
+  }
+
   // Apply the change
   combatant.stats[params.stat] = newValue;
 
@@ -3014,8 +3069,13 @@ function executeUpdateCombatantStat(
     ? `${combatant.name} ${params.stat}: ${oldValue} → ${newValue} (${changeStr}) - ${params.reason}`
     : `${combatant.name} ${params.stat}: ${oldValue} → ${newValue} (${changeStr})`;
   logCombat(storyData.combatState, logEntry);
+  if (justDefeated) {
+    logCombat(storyData.combatState, `${combatant.name} is defeated (0 HP)`);
+    updateTurnOrder(storyData.combatState);
+  }
 
   const diceInfo = diceRolled ? ` [rolled: ${diceRolled.join(", ")}]` : "";
+  const defeatedInfo = justDefeated ? ` - ${combatant.name} is defeated!` : "";
 
   return {
     toolName: "update_combatant_stat",
@@ -3030,12 +3090,14 @@ function executeUpdateCombatantStat(
       change,
       reason: params.reason,
       diceRolled,
+      clampedToZero: clamped || undefined,
+      defeated: justDefeated || undefined,
     } as GMUpdateCombatantStatResult,
     contextForStory: `[${combatant.name} ${
       params.stat
     }: ${oldValue} → ${newValue} (${changeStr})${
       params.reason ? ` - ${params.reason}` : ""
-    }${diceInfo}]`,
+    }${diceInfo}${defeatedInfo}]`,
   };
 }
 
@@ -3209,6 +3271,45 @@ function executeNPCRoll(
       } as GMNPCRollResult,
       contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
     };
+  }
+
+  // Turn-order invariant: npc_roll represents a combatant's action for
+  // their turn, so it's only valid for whoever's turn it currently is -
+  // otherwise nothing stops the same combatant acting repeatedly in a
+  // round, or an off-turn combatant acting at all. (update_combatant_stat
+  // and toggle_combatant_condition are deliberately NOT gated this way -
+  // they apply the *consequences* of an action, typically to a different
+  // combatant than whoever's turn it is, e.g. the current combatant's
+  // attack damaging a target.)
+  const { turnOrder, currentTurnIndex } = storyData.combatState;
+  if (
+    turnOrder.length > 0 &&
+    currentTurnIndex >= 0 &&
+    currentTurnIndex < turnOrder.length
+  ) {
+    const currentTurnId = turnOrder[currentTurnIndex];
+    if (combatant.id !== currentTurnId) {
+      const currentTurnCombatant = storyData.combatState.combatants.find(
+        (c) => c.id === currentTurnId
+      );
+      return {
+        toolName: "npc_roll",
+        toolCallId,
+        success: false,
+        result: {
+          type: "npc_roll",
+          combatant: combatant.name,
+          formula: params.formula,
+          rolls: [],
+          total: 0,
+          reason: params.reason,
+          showToPlayer: params.show_to_player ?? false,
+        } as GMNPCRollResult,
+        contextForStory: `[Combat Error: It is not ${combatant.name}'s turn (current turn: ${
+          currentTurnCombatant?.name ?? "unknown"
+        }). Call advance_turn to move through the round instead of acting out of turn.]`,
+      };
+    }
   }
 
   // Roll the formula
@@ -4033,6 +4134,18 @@ function executeAddNPC(
   };
 }
 
+// Ordered attitude scale (worst to best) and the max number of steps
+// update_npc is allowed to move an NPC's attitude in a single call - see
+// the clamping note inside executeUpdateNPC.
+const NPC_ATTITUDE_SCALE: NPCAttitude[] = [
+  "hostile",
+  "unfriendly",
+  "neutral",
+  "friendly",
+  "allied",
+];
+const MAX_ATTITUDE_STEP_PER_CALL = 2;
+
 /**
  * Execute update_npc tool - Modify an existing NPC's details
  */
@@ -4103,8 +4216,38 @@ function executeUpdateNPC(
     npc.relationship = params.relationship;
   }
   if (params.attitude && params.attitude !== npc.attitude) {
-    changes.push(`attitude: ${npc.attitude} → ${params.attitude}`);
-    npc.attitude = params.attitude as NPCAttitude;
+    // Cap how far attitude can swing in a single call. Nothing else gates
+    // NPC disposition - the tool description itself invites "changes
+    // significantly" - so without this, a single agreeable turn could
+    // jump an NPC straight from hostile to allied on narrative say-so
+    // alone. Capping the per-call delta to 2 steps (of the 5-step scale)
+    // still allows a big, dramatic shift in one beat, but requires more
+    // than one earned interaction to fully flip a relationship, the same
+    // "clamp and report" discipline already used for combat HP and dice
+    // bounds elsewhere in this file.
+    const requestedIndex = NPC_ATTITUDE_SCALE.indexOf(
+      params.attitude as NPCAttitude
+    );
+    const currentIndex = NPC_ATTITUDE_SCALE.indexOf(npc.attitude);
+    const maxIndex = Math.min(
+      NPC_ATTITUDE_SCALE.length - 1,
+      currentIndex + MAX_ATTITUDE_STEP_PER_CALL
+    );
+    const minIndex = Math.max(0, currentIndex - MAX_ATTITUDE_STEP_PER_CALL);
+    const clampedIndex = Math.max(
+      minIndex,
+      Math.min(maxIndex, requestedIndex)
+    );
+    const clampedAttitude = NPC_ATTITUDE_SCALE[clampedIndex];
+
+    if (clampedAttitude !== params.attitude) {
+      changes.push(
+        `attitude: ${npc.attitude} → ${clampedAttitude} (requested ${params.attitude}, capped to ${MAX_ATTITUDE_STEP_PER_CALL} steps per update)`
+      );
+    } else {
+      changes.push(`attitude: ${npc.attitude} → ${clampedAttitude}`);
+    }
+    npc.attitude = clampedAttitude;
   }
   if (params.faction !== undefined) {
     if (params.faction !== npc.faction) {
