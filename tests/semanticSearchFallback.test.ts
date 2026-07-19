@@ -13,33 +13,33 @@ describe("semanticSearchFallback", () => {
     mockedSearch.mockReset();
   });
 
-  it("returns no matches when disabled", async () => {
+  it("reports not_configured when disabled", async () => {
     const result = await semanticSearchFallback("memory", "tavern owner", {
       enabled: false,
       storyId: "s1",
       token: "t1",
     });
-    expect(result).toEqual([]);
+    expect(result).toEqual({ status: "not_configured", matches: [] });
     expect(mockedSearch).not.toHaveBeenCalled();
   });
 
-  it("returns no matches when storyId or token is missing", async () => {
+  it("reports not_configured when storyId or token is missing", async () => {
     expect(
       await semanticSearchFallback("memory", "tavern owner", { enabled: true, token: "t1" })
-    ).toEqual([]);
+    ).toEqual({ status: "not_configured", matches: [] });
     expect(
       await semanticSearchFallback("memory", "tavern owner", { enabled: true, storyId: "s1" })
-    ).toEqual([]);
+    ).toEqual({ status: "not_configured", matches: [] });
     expect(mockedSearch).not.toHaveBeenCalled();
   });
 
-  it("returns no matches for an empty query", async () => {
+  it("reports not_configured for an empty query", async () => {
     const result = await semanticSearchFallback("memory", "   ", {
       enabled: true,
       storyId: "s1",
       token: "t1",
     });
-    expect(result).toEqual([]);
+    expect(result).toEqual({ status: "not_configured", matches: [] });
     expect(mockedSearch).not.toHaveBeenCalled();
   });
 
@@ -64,9 +64,10 @@ describe("semanticSearchFallback", () => {
       token: "t1",
     });
 
-    expect(result).toHaveLength(1);
-    expect(result[0].key).toBe("mem_1");
-    expect(result[0].content).toContain("Gregor");
+    expect(result.status).toBe("ok");
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].key).toBe("mem_1");
+    expect(result.matches[0].content).toContain("Gregor");
     expect(mockedSearch).toHaveBeenCalledWith(
       "s1",
       "tavern owner",
@@ -96,8 +97,9 @@ describe("semanticSearchFallback", () => {
       token: "t1",
     });
 
-    expect(result).toHaveLength(1);
-    expect(result[0].key).toBe("Gregor Stonebeard");
+    expect(result.status).toBe("ok");
+    expect(result.matches).toHaveLength(1);
+    expect(result.matches[0].key).toBe("Gregor Stonebeard");
     expect(mockedSearch).toHaveBeenCalledWith(
       "s1",
       "tavern owner",
@@ -106,7 +108,7 @@ describe("semanticSearchFallback", () => {
     );
   });
 
-  it("swallows errors and returns no matches", async () => {
+  it("reports status: error (with a message) rather than an indistinguishable empty result", async () => {
     mockedSearch.mockRejectedValue(new Error("network down"));
 
     const result = await semanticSearchFallback("memory", "tavern owner", {
@@ -114,6 +116,17 @@ describe("semanticSearchFallback", () => {
       storyId: "s1",
       token: "t1",
     });
-    expect(result).toEqual([]);
+    expect(result).toEqual({ status: "error", matches: [], message: "network down" });
+  });
+
+  it("returns matches: [] alongside status: ok when the search legitimately finds nothing", async () => {
+    mockedSearch.mockResolvedValue({ lore: [], memories: [], totalResults: 0 });
+
+    const result = await semanticSearchFallback("memory", "tavern owner", {
+      enabled: true,
+      storyId: "s1",
+      token: "t1",
+    });
+    expect(result).toEqual({ status: "ok", matches: [] });
   });
 });

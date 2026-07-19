@@ -79,9 +79,8 @@ import {
 } from "./mythic";
 import { getTableByName, rollOnCustomTable } from "./tableRoller";
 import {
-  getTierState,
-  resolveTierEscalation,
-  TOP_TIER,
+  applyTierEscalation,
+  stakesFloor,
 } from "./reasoningTiers";
 import {
   getRPGSystem,
@@ -920,12 +919,13 @@ export async function executeGMTools(
             ) {
               const query =
                 (params as { query?: string } | undefined)?.query || "";
-              const semanticMatches = await semanticSearchFallback(
+              const semanticOutcome = await semanticSearchFallback(
                 "lore",
                 query,
                 semanticContext
               );
-              if (semanticMatches.length > 0) {
+              if (semanticOutcome.status === "ok" && semanticOutcome.matches.length > 0) {
+                const semanticMatches = semanticOutcome.matches;
                 message += `\n\nNo exact matches, but found ${
                   semanticMatches.length
                 } semantically related note${
@@ -933,6 +933,11 @@ export async function executeGMTools(
                 }:\n${semanticMatches
                   .map((m) => `• "${m.key}": ${m.content.slice(0, 200)}`)
                   .join("\n")}`;
+              } else if (semanticOutcome.status === "error") {
+                // A real degradation, not "genuinely nothing relevant" -
+                // tell the GM rather than letting it read a plain "no
+                // matches" as proof nothing relevant exists (H4).
+                message += `\n\n[Semantic search unavailable right now (${semanticOutcome.message}) - only exact matches were checked]`;
               }
             }
 
@@ -1509,6 +1514,74 @@ function flattenRolls(rolls: RollResult["rolls"]): number[] {
 }
 
 /**
+ * H7 fix: a self-declared "high"/"deadly" `stakes` value on a roll is a
+ * non-optional escalation floor, not decoration. Mirrors the combat floor
+ * in `hardRuleFloor` (regular combat -> rules-adjudication tier, boss
+ * fight -> top tier) but keyed on the roll's own stakes instead of combat
+ * state, so a genuinely high-stakes non-combat check can no longer be
+ * quietly adjudicated at the cheapest tier just because the model never
+ * calls `set_reasoning_tier` itself. Returns an extra `contextForStory`
+ * line when escalation actually happens, or "" otherwise.
+ */
+// H8: roll-input integrity check. Model-typed flat modifiers on formula_roll
+// / opposed_formula are entirely self-asserted with no cross-check against
+// the character sheet. A full cross-check isn't possible for every adventure
+// because character data can live in three different shapes: structured
+// storyData.stats/resources (numeric, always reliable when present),
+// storyData.characterData (freeform strings typed into a template form - no
+// type guarantee, could be "16" or "Very Strong"), or a "character_sheet"
+// type lore note (pure prose, no structure at all). Parsing the latter two
+// would mean guessing numbers out of natural language, which is exactly the
+// unreliable-heuristic failure mode this audit warns against elsewhere.
+// So this only fires when the model voluntarily names a stat/resource via
+// the new optional stat_name/player_stat_name param AND that name matches a
+// structured storyData.stats/resources entry. It never blocks or rewrites
+// the roll (stacking from items/abilities/conditions legitimately shifts the
+// modifier away from the base stat) - it only appends a non-blocking
+// integrity note to contextForStory so the story/GM stage can notice and
+// react if a claim is clearly out of bounds. SLACK is sized generously from
+// documented stacking rules: item grade tops out at +5 (agmt) and ability
+// grade tops out at +5 (legendary), so +10 comfortably covers legitimate
+// double-stacking without flagging normal play.
+const STAT_INTEGRITY_SLACK = 10;
+
+function checkStatIntegrity(
+  storyData: StoryData,
+  statName: string | undefined,
+  claimedModifier: number
+): string {
+  if (!statName) return "";
+  const statMatch = findStatMatch(statName, storyData.stats || []);
+  const resourceMatch = statMatch
+    ? null
+    : findResourceMatch(statName, storyData.resources || []);
+  const matched = statMatch?.item ?? resourceMatch?.item;
+  if (!matched) return "";
+  const ceiling = matched.value + STAT_INTEGRITY_SLACK;
+  if (claimedModifier > ceiling) {
+    return `\n[⚠ Roll integrity check: claimed modifier +${claimedModifier} attributed to "${statName}" exceeds the character sheet value (${matched.value}, even allowing for item/ability stacking) - verify this roll]`;
+  }
+  return "";
+}
+
+function applyStakesEscalation(
+  storyData: StoryData,
+  stakes: "low" | "medium" | "high" | "deadly" | undefined
+): string {
+  const floor = stakesFloor(stakes);
+  if (floor <= 0) return "";
+  const decision = applyTierEscalation(
+    storyData,
+    floor,
+    `${stakes}-stakes roll`
+  );
+  if (decision.grantedTier > decision.previousTier) {
+    return `\n[Reasoning tier escalated to ${decision.grantedTier} - ${stakes}-stakes roll]`;
+  }
+  return "";
+}
+
+/**
  * Execute a formula roll with optional DC check
  * GM must provide formulas with actual numeric values (no variable substitution)
  */
@@ -1518,7 +1591,6 @@ function executeFormulaRoll(
   storyData: StoryData
 ): GMToolResult {
   // No variable resolver - GM must provide actual numbers
-  void storyData; // Suppress unused parameter warning
 
   // Roll the formula
   let rollResult: RollResult;
@@ -1591,7 +1663,14 @@ function executeFormulaRoll(
 
   if (params.stakes) {
     contextForStory += `\n[Stakes: ${params.stakes}]`;
+    contextForStory += applyStakesEscalation(storyData, params.stakes);
   }
+
+  contextForStory += checkStatIntegrity(
+    storyData,
+    params.stat_name,
+    rollResult.modifiers
+  );
 
   if (params.consequences) {
     const outcome = success
@@ -1637,7 +1716,6 @@ function executeOpposedFormula(
   storyData: StoryData
 ): GMToolResult {
   // No variable resolver - GM must provide actual numbers
-  void storyData; // Suppress unused parameter warning
 
   // Roll player's formula
   let playerResult: RollResult;
@@ -1733,7 +1811,14 @@ function executeOpposedFormula(
 
   if (params.stakes) {
     contextForStory += `\n[Stakes: ${params.stakes}]`;
+    contextForStory += applyStakesEscalation(storyData, params.stakes);
   }
+
+  contextForStory += checkStatIntegrity(
+    storyData,
+    params.player_stat_name,
+    playerResult.modifiers
+  );
 
   if (params.consequences) {
     const outcome =
@@ -2270,12 +2355,13 @@ async function executeSearchMemory(
 
   if (matches.length === 0) {
     // Literal match found nothing - try semantic search before giving up.
-    const semanticMatches = await semanticSearchFallback(
+    const semanticOutcome = await semanticSearchFallback(
       "memory",
       patterns.join(" "),
       semanticContext
     );
-    if (semanticMatches.length > 0) {
+    if (semanticOutcome.status === "ok" && semanticOutcome.matches.length > 0) {
+      const semanticMatches = semanticOutcome.matches;
       contextForStory += `\n[No exact matches, but found ${
         semanticMatches.length
       } semantically related ${
@@ -2296,7 +2382,13 @@ async function executeSearchMemory(
         contextForStory,
       };
     }
-    contextForStory += `\n[No matching memories found (searched ${memoryEntries.length} entries)]`;
+    if (semanticOutcome.status === "error") {
+      // A real degradation, not "genuinely nothing relevant" - tell the GM
+      // rather than letting it treat this like a confirmed empty search (H4).
+      contextForStory += `\n[No exact matches. Semantic search is unavailable right now (${semanticOutcome.message}) - only exact matches were checked]`;
+    } else {
+      contextForStory += `\n[No matching memories found (searched ${memoryEntries.length} entries)]`;
+    }
   } else {
     contextForStory += `\n[Found ${matches.length} matching ${
       matches.length === 1 ? "memory" : "memories"
@@ -2409,27 +2501,13 @@ function executeSetReasoningTier(
   const requestedTier = typeof params?.tier === "number" ? params.tier : 0;
   const reason = params?.reason || "(no reason given)";
 
-  const tierState = getTierState(storyData);
-  const decision = resolveTierEscalation(
-    { tier: requestedTier, reason },
-    tierState.currentTier,
-    tierState
-  );
+  const decision = applyTierEscalation(storyData, requestedTier, reason);
   const grantedTier = decision.grantedTier;
-
-  storyData.reasoningTierState = {
-    currentTier: grantedTier,
-    tier3CallsInScene:
-      grantedTier === TOP_TIER
-        ? tierState.tier3CallsInScene + 1
-        : tierState.tier3CallsInScene,
-    lastSceneKey: tierState.lastSceneKey,
-  };
 
   let contextForStory: string;
   if (decision.capped) {
     contextForStory = `[Reasoning tier escalation to ${requestedTier} capped at ${grantedTier} - scene top-tier limit reached]`;
-  } else if (grantedTier > tierState.currentTier) {
+  } else if (grantedTier > decision.previousTier) {
     contextForStory = `[Reasoning tier escalated to ${grantedTier}: ${reason}]`;
   } else {
     contextForStory = `[Reasoning tier escalation request ignored - already at tier ${grantedTier}]`;

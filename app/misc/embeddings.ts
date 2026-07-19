@@ -511,49 +511,13 @@ export async function syncLoreEmbeddings(
   return { synced, cleaned, errors, embeddedTitles };
 }
 
-/**
- * Get relevant context for story generation using embeddings
- * Returns lore titles and memory contents that are semantically relevant
- */
-export async function getRelevantContextForGeneration(
-  storyId: string,
-  userChoice: string,
-  recentStoryParts: string[],
-  authToken: string,
-  options: {
-    loreLimit?: number;
-    memoryLimit?: number;
-    minSimilarity?: number;
-  } = {}
-): Promise<{
-  loreTitles: string[];
-  memories: string[];
-  error?: string;
-}> {
-  try {
-    // Build query from user choice + recent story
-    const query = buildSearchQuery(
-      userChoice,
-      recentStoryParts.map((content) => ({ role: "assistant", content }))
-    );
-
-    const results = await searchRelevantContext(storyId, query, authToken, {
-      loreLimit: options.loreLimit ?? 8,
-      memoryLimit: options.memoryLimit ?? 15,
-      minSimilarity: options.minSimilarity ?? 0.25,
-    });
-
-    return {
-      loreTitles: results.lore.map((l) => l.entry_key),
-      memories: results.memories.map((m) => m.content),
-    };
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Embedding search failed:", message);
-    return {
-      loreTitles: [],
-      memories: [],
-      error: message,
-    };
-  }
-}
+// Note: an earlier `getRelevantContextForGeneration` helper used to live
+// here for automatic RAG pre-injection of lore/memory before every
+// generation call. It was superseded by on-demand agentic retrieval
+// (search_memory/search_notes, with `semanticSearchFallback.ts` as their
+// semantic fallback when literal matching misses) and had become dead code
+// - imported in generation.ts but never called (H4 in
+// ai-gm-deep-audit-findings.md). Deleted rather than revived: reviving it
+// would have created a second, competing memory-retrieval path alongside
+// the live agentic one, the same "two mechanisms for one concept" problem
+// this audit has already flagged and fixed elsewhere (see C4/H1's notes).

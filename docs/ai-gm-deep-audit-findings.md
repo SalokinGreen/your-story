@@ -12,14 +12,23 @@
 > `diceFormula.ts` — file:line references throughout are exact.
 >
 > **Status update:** all five Critical items (C1-C5) below have been fixed
-> and verified with tests (see each item's own note). The High and Medium
-> items are still open. C4's fix surfaced an additional, worse finding
-> than originally reported: the "live" chaos mechanic wasn't just narrower
-> than Mythic's real rule, it was *entirely inert* in production, because
-> nothing anywhere ever populated `skillCheckHistory` - the gate the old
-> `calculateChaosAdjustment` required before it would ever return a
-> nonzero delta. Chaos factor could not change automatically at all before
-> this fix; see C4 below for the corrected mechanic.
+> and verified with tests (see each item's own note), along with H1, H2, H3,
+> H4, H7, H8 (partially - see H8's note for the scoping decision), and M1.
+> H5 was partially corrected; H6 and M2 were flagged for a product
+> decision rather than fixed. C4's
+> fix surfaced
+> an additional, worse finding than originally reported: the "live" chaos
+> mechanic wasn't just narrower than Mythic's real rule, it was *entirely
+> inert* in production, because nothing anywhere ever populated
+> `skillCheckHistory` - the gate the old `calculateChaosAdjustment` required
+> before it would ever return a nonzero delta. Chaos factor could not change
+> automatically at all before this fix; see C4 below for the corrected
+> mechanic. H5 similarly turned out to be over-stated once verified: its
+> "executed twice, server- and client-side" claim traced back to a
+> function (`processSceneParts` in `page.tsx`) with zero callers anywhere
+> in the codebase — deleted as dead code; the underlying single-execution
+> serialize/regex fragility it also identified is real and still open,
+> deliberately deferred as its own larger refactor.
 
 ## Why this round found more
 
@@ -274,19 +283,46 @@ changes" (`ai_staged.ts:1219-1220`, `:1288-1289`). The claim was based on
 `buildStoryPrompt`/`buildToolPrompt`'s file-order labels ("Stage 1"/"Stage
 2a"), not actual runtime call order. See the note added to that document.
 
-### H3. Memory-compaction summaries are trusted LLM output with no validation
+### H3. Memory-compaction summaries are trusted LLM output with no validation — ✅ FIXED
 
-`compaction.ts:128-172` summarizes aged-out scene parts via an LLM call
-(`/api/generate`), and `applyCompaction` (`:78-85`) writes the result
-straight to `storyData.scene.summary` — no cross-check against canonical
-`StoryData` (inventory, NPCs, lore, flags). A hallucinated detail in the
-summary silently becomes permanent "memory" for every future turn, with no
-mechanism anywhere to detect or correct the drift. (Failure during
-compaction itself is at least non-fatal and doesn't drop mid-turn
-information — `generation.ts:736-771` — so this is specifically about
-trusting the *content* of a successful summarization, not about crashes.)
+`compaction.ts` now runs a new deterministic `validateCompactionSummary`
+against canonical `StoryData` before a summary is accepted, instead of
+writing the raw LLM output straight to `storyData.scene.summary` with no
+check at all. It checks two narrow, high-precision, name-matching signals
+(deliberately *not* general prose/consistency grading, which the rest of
+this audit already flags as unreliable and false-positive-prone — see
+`ai-gm-integration-plan.md`'s Phase 2 for that separate, broader effort):
 
-### H4. The "real" semantic memory path is dead code; the live fallback fails silently
+1. **Dropped entities** — an NPC/item/lore-title name that appeared ≥2 times
+   in the material being folded into the summary (`plan.textToSummarize`)
+   but is mentioned zero times in the new summary. A single incidental
+   mention disappearing is not flagged (too noisy for a lossy summary by
+   design); a heavily-referenced entity vanishing entirely usually means the
+   compaction step erased a live thread.
+2. **Status contradictions** — an NPC tracked as `dead`/`departed` described
+   in the new summary with one of a small, curated set of active-presence
+   phrases ("arrives", "hands you", "attacks you", "joins you", etc.) within
+   a short window after their name. This catches the concrete hallucination
+   case the audit called out (a dead NPC narrated back into the story via
+   the summary) without trying to parse arbitrary prose for meaning.
+
+When `ensureStoryCompacted` gets warnings back, it retries once — feeding
+the specific warning text back to the model in a revision prompt, the same
+correctable-feedback pattern `toolValidation.ts` already uses for malformed
+tool args — and only keeps the revision if it strictly reduces the warning
+count (a revision that trades one problem for a different one isn't an
+improvement). Whatever warnings remain after that (zero, in the common
+case) are persisted onto a new `scene.summaryWarnings?: string[]` field
+(`structs.ts`) rather than disappearing — this stays non-fatal, matching the
+rest of this module's existing "record and move on" posture for compaction,
+but for the first time there's an actual mechanism to detect and surface
+drift instead of none at all. Covered by new tests in
+`tests/compaction.validation.test.ts` (dropped-entity detection, status-
+contradiction detection including the "only retrospective mention, no
+false-positive" case, and the full `ensureStoryCompacted` retry/accept/
+reject flow with a mocked `fetch`).
+
+### H4. The "real" semantic memory path is dead code; the live fallback fails silently — ✅ FIXED
 
 `getRelevantContextForGeneration` (`embeddings.ts:518-559`) is imported
 into `generation.ts:64` but **never called** — dead import. The only live
@@ -298,7 +334,44 @@ disabled, missing token, thrown error — it returns `[]`
 found." Nothing surfaces "memory retrieval is degraded" to the model, the
 orchestrator, or the UI.
 
-### H5. Tool calls still bottom out in a regex/pipe-delimited string engine — executed twice
+**Fix**: this was two separate problems, fixed separately, per the
+"check for competing mechanisms before reviving dead code" rule established
+earlier in this audit. `getRelevantContextForGeneration` and the live
+`semanticSearchFallback` path are/were two competing memory-retrieval
+mechanisms for the same concept — an automatic RAG pre-injection path that
+was superseded by an on-demand agentic one (the codebase's own comments in
+`generation.ts` STAGE 0/4 already document this supersession). Reviving the
+dead function would have recreated exactly the "two systems for the same
+thing" trap this audit flagged elsewhere (`agmtState.threads/characters` vs.
+`StoryData.threads/npcs`; dead relationship tools vs. `update_npc`) — so it
+was deleted from `embeddings.ts` instead, along with the dead import in
+`generation.ts`. (`buildSearchQuery` in `embeddings.ts`, the dead function's
+only other caller-adjacent helper, is now orphaned too but was left alone —
+it's a harmless pure string utility, not a second mechanism, and reviewing
+it is out of this item's scope.)
+
+Second, `semanticSearchFallback()`'s return type changed from
+`Promise<SemanticMatch[]>` to a discriminated union,
+`SemanticSearchOutcome`: `{status: "ok", matches}` |
+`{status: "not_configured", matches: []}` |
+`{status: "error", matches: [], message}`. Previously "embeddings disabled
+for this story," "genuinely found nothing," and "the embeddings API call
+itself threw" all collapsed into the same `[]`, which is exactly the
+"looks wired up but isn't" pattern this audit keeps finding — a degraded
+search silently looks identical to a confident "nothing exists." Both call
+sites (`gmExecutor.ts`'s `search_notes` literal-match fallback and
+`executeSearchMemory`'s fallback) now branch on `.status` and only surface
+a `[Semantic search unavailable (...)...]` note to the GM when
+`status === "error"`; `"not_configured"` and `"ok"` with zero matches still
+produce the existing, correct "no matches found" message, so normal/expected
+cases are unchanged. Covered by rewritten tests in
+`tests/semanticSearchFallback.test.ts` (asserts the new shape for
+not-configured/empty-query/ok-with-matches/ok-with-zero-matches/error cases)
+and new tests in `tests/gmTools.searchMemoryFallback.test.ts` (confirms the
+GM-facing message text distinguishes "search errored" from "search wasn't
+attempted" from "search ran and found nothing").
+
+### H5. Tool calls still bottom out in a regex/pipe-delimited string engine — partially corrected, core issue deferred
 
 `commandResponses.ts` isn't legacy-and-replaced; it's still the actual
 execution backend for a large share of "clean" tool calls.
@@ -306,15 +379,50 @@ execution backend for a large share of "clean" tool calls.
 re-serializes already-validated tool arguments back into strings like
 `` `/modify_ability: ${name} | costs | ${costsStr}` ``, which are then
 regex-parsed by `executeCommandWithResponse` in `commandResponses.ts`.
-Separately, `app/story/page.tsx:1690-1696` re-parses and re-executes the
-*same command strings* client-side to mirror state. So the schema-
+~~Separately, `app/story/page.tsx:1690-1696` re-parses and re-executes the
+same command strings client-side to mirror state.~~ So the schema-
 validated tool layer is a thin wrapper around a fragile
-string-serialize-then-regex-parse engine underneath, and that engine runs
-**twice** — once server-side, once client-side — for one logical state
-mutation. This is a correctness/drift risk (the two parses can only stay
-in sync by convention) as much as it is technical debt.
+string-serialize-then-regex-parse engine underneath ~~, and that engine
+runs twice — once server-side, once client-side — for one logical state
+mutation~~.
 
-### H6. No deterministic content-safety layer exists at play-time
+**Correction (this session)**: the "runs twice" half of this finding does
+not hold up under the same "read the actual executor, don't trust what
+looks wired up" rule this audit established for everything else.
+`app/story/page.tsx`'s `processSceneParts` — the function the original
+finding pointed at for the client-side re-execution — takes no callers
+anywhere in the codebase (confirmed via full-repo grep and independently
+flagged by ESLint's own `no-unused-vars` warning at the time of this
+audit). The actual live client-side generation flow
+(`generateStoryTurn()` in `generation.ts`, invoked from several other call
+sites in `page.tsx` that call `setPendingCommandResponses` directly) never
+goes through `processSceneParts`; it's dead code left behind by an earlier
+refactor, not a second execution path. This is the same "wired up but
+isn't" pattern as C4/H2/H4, just running in the opposite direction here —
+less duplication exists in production than the original finding claimed,
+not more. Per this audit's own precedent for confirmed-dead code (H4),
+`processSceneParts` and its two now-unused imports
+(`executeCommandWithResponse`, `generateCommandResponses`) were deleted
+from `page.tsx` rather than left as a misleading decoy. No test was added
+specifically for a deletion of unreachable code; `npx tsc --noEmit` and
+`npx eslint app/story/page.tsx` (down to 31 problems from a 36-problem
+baseline, zero new) confirm nothing else referenced it, and the full
+`vitest` suite is unaffected.
+
+**What's still open**: the core defect — schema-validated tool arguments
+getting flattened back into pipe-delimited strings and regex-parsed by
+`commandResponses.ts`, once, server-... actually client-side during
+generation (per this repo's frontend-centric architecture) — is real and
+unaddressed. Per the original task handoff's own instruction ("this is a
+bigger, deliberate refactor... schedule it, don't rush it alongside the
+smaller fixes"), no attempt was made to replace or bypass
+`commandResponses.ts` in this pass. Recommend treating it as its own
+scheduled effort: replace `convertToolToCommand` + string-command dispatch
+with a typed dispatch table keyed on tool name that calls the same
+mutation logic `commandResponses.ts` already contains, without the
+serialize/re-parse round-trip. Not marked ✅ FIXED for that reason.
+
+### H6. No deterministic content-safety layer exists at play-time — flagged, not solved (needs a product decision)
 
 Searching the entire runtime generation path (`ai_staged.ts`,
 `gmTools.ts`, `reasoningTiers.ts`, `generation.ts`) turns up zero
@@ -328,7 +436,47 @@ paper's Lines/Veils/X-card as enforced code anywhere in play — content
 safety during actual sessions is 100% trust-the-model, and for a
 meaningful stretch of the pipeline, not even prompted.
 
-### H7. Reasoning-tier self-escalation is optional outside combat
+**Deliberately not fixed unilaterally in this pass.** This item is
+different in kind from H1-H5: those were all "does the code deliver the
+guarantee its name/comment implies" bugs with an objectively correct
+answer once traced. This one has no code-level "correct" answer without
+first settling a product question this repo's own docs never address:
+*what content should this app allow at play-time, for whom, and who
+decides?* Concretely, before any engineering fix is worth writing, the
+product owner needs to decide things an engineer can't decide unilaterally:
+
+- Is the `nsfw` catalog flag meant to gate content generation per-story
+  (i.e., should the play-time prompt behave differently for adventures
+  marked `nsfw: true` vs. `false`), or is it purely a search/discovery
+  filter as it is today?
+- Should there be a hard, non-model-mediated floor (e.g., a moderation
+  API call, a keyword blocklist) applied to *all* stories regardless of
+  the `nsfw` flag, an opt-in raise of the ceiling for `nsfw: true`
+  stories, or no deterministic layer at all (accepting the current
+  trust-the-model posture as an intentional design choice, e.g. because
+  this is a single/adult-user creative-writing tool rather than a
+  moderated public platform)?
+- If a deterministic layer is wanted, where should it run (client-side
+  before render, server-side in the thin AI proxy, at the provider level
+  via each backend's own moderation endpoint) and what should happen on
+  a violation (block the turn, redact, warn-and-continue, flag for human
+  review)?
+- Who is the intended audience/liability model for this app? That answer
+  changes the entire calculus (a private single-user tool has very
+  different content-safety needs than a multi-user platform with public
+  story sharing, which this app already has via the Explorer/library
+  visibility system).
+
+Building any specific mechanism now — a blocklist, a moderation call, an
+NSFW-gated prompt branch — without those answers risks exactly the kind
+of "invent a mechanic wholesale" over-engineering this audit's own
+methodology warns against, and could silently change what the product is
+for. **Recommendation: raise this with the product owner as a standalone
+discussion before any engineering work here**, using the four questions
+above as a starting point. Not marked ✅ FIXED; no code changed for this
+item.
+
+### H7. Reasoning-tier self-escalation is optional outside combat — ✅ FIXED
 
 `set_reasoning_tier`'s description tells the model to use it "only when
 the current task genuinely exceeds your ability"
@@ -341,7 +489,38 @@ rigorous adjudication — nothing forces escalation. A model that would
 rather not roll a hard check can just narrate at the default tier and
 never ask for more scrutiny.
 
-### H8. Roll inputs are entirely model-asserted
+**Fix**: `formula_roll` and `opposed_formula` already accept a
+structured, model-set `stakes: "low" | "medium" | "high" | "deadly"`
+parameter (`gmTools.ts:58,77`) — but until this fix it was pure narration
+text (`\n[Stakes: ${params.stakes}]` in `contextForStory`), never read by
+the tier router. That's the same signal a model would need to decide
+whether to self-escalate in the first place, just sitting unused. New
+`stakesFloor()` (`reasoningTiers.ts`) makes escalation for self-declared
+high-stakes rolls non-optional instead of inventing a new mechanic: it
+reuses `hardRuleFloor`'s existing combat-severity mapping (regular combat
+and "high" stakes both floor at the rules-adjudication tier; boss fights
+and "deadly" stakes both floor at the top tier). `applyTierEscalation()`
+(also `reasoningTiers.ts`) factors the decay/cap-respecting state-update
+logic that `set_reasoning_tier`'s executor already had into a shared
+helper, so both the model's voluntary self-escalation and this new
+mandatory stakes-based floor go through the identical policy (including
+the `MAX_TIER3_CALLS_PER_SCENE` cap — a string of "deadly" rolls in one
+scene still can't bypass it). `executeFormulaRoll` and
+`executeOpposedFormula` (`gmExecutor.ts`) now call this after every roll
+that declares `stakes`, and both narrate the escalation back to the GM
+via `contextForStory` when it actually raises the tier (so the model sees
+its declared stakes had a real mechanical consequence, not just flavor
+text). `low`/`medium`/undefined stakes remain a no-op, matching the
+existing classifier's behavior for everything that isn't explicitly
+flagged high-severity. Covered by 10 new tests in
+`tests/reasoningTiers.stakesFloor.test.ts`: `stakesFloor`'s mapping,
+`applyTierEscalation`'s no-downgrade and scene-cap behavior directly, and
+the `formula_roll`/`opposed_formula` wiring via `executeGMTools` (no
+escalation for low stakes, forced escalation for high/deadly with no
+`set_reasoning_tier` call from the model, and idempotence when already at
+or above the floor a given stakes value would grant).
+
+### H8. Roll inputs are entirely model-asserted — ✅ FIXED (partial, scoped)
 
 The RNG itself (`diceFormula.ts`) is honest — but the modifiers and DCs
 fed into `formula_roll`/`opposed_formula`/`formula_challenge_check` are
@@ -355,38 +534,192 @@ oracle/entropy defenses in Layer 2 catch it. This is the least visible
 sycophancy vector in the codebase: it hides behind a mechanism that looks,
 and partially is, deterministic.
 
+**A full cross-check against "the character sheet" isn't possible**,
+because this codebase supports three different, mutually incompatible
+shapes of character data, and the app has deliberately moved *away* from a
+single structured schema over time: (1) `storyData.stats: Stat[]` /
+`storyData.resources: Resource[]` — always-numeric, structured, but
+increasingly a legacy path since these fields are explicitly deprecated
+from AI prompts; (2) `storyData.characterData: Record<string, string>` —
+freeform strings typed into a template form at character creation (a value
+could be `"16"`, `"Very Strong"`, or `"16 (+3 mod)"` with zero type
+guarantee); (3) a `"character_sheet"` type lore note — pure prose, no
+structure at all, the increasingly-preferred path per current convention.
+Cross-checking (2) or (3) would mean guessing numbers out of natural
+language text, which is exactly the unreliable prose/NLP heuristic this
+audit warns against elsewhere (see H1's decision to cap magnitude instead
+of grading narrative text). Notably, `diceFormula.ts` already has
+`createCharacterResolver`/`createSchemaBasedResolver` for exactly this kind
+of lookup, but they're dead code with zero production callers (only
+referenced from `tests/diceFormula.test.ts`) — another instance of this
+audit's "looks wired up but isn't" pattern, this time for the very
+variable-substitution mechanism that predates the "GM types literal
+numbers" convention.
+
+**The fix implemented is scoped to what's actually reliable**: `gmTools.ts`
+adds an optional `stat_name` param to `formula_roll` and
+`player_stat_name` to `opposed_formula` (`FormulaRollParams`,
+`OpposedFormulaParams`) — the model may voluntarily name which stat or
+resource its flat modifier is claimed to derive from. `gmExecutor.ts`'s new
+`checkStatIntegrity()` helper fuzzy-matches that name against
+`storyData.stats`/`storyData.resources` (reusing the already-imported but
+previously-unused `findStatMatch`/`findResourceMatch` from
+`fuzzyMatch.ts` — one more dead-but-present utility this audit keeps
+finding uses for) and, only when a match is found, compares the claimed
+modifier against `matchedValue + STAT_INTEGRITY_SLACK` (a slack constant
+of `10`, sized from the documented stacking ceilings: item grade tops out
+at `+5` (agmt) and ability grade tops out at `+5` (legendary), so `+10`
+comfortably covers legitimate double-stacking without flagging normal
+play). If the claim exceeds that ceiling, a non-blocking
+`[⚠ Roll integrity check: ...]` note is appended to `contextForStory` —
+it never rejects, clamps, or rewrites the roll, matching this audit's
+established preference for "warn and let the GM stage react" over
+punitive heuristics that risk false positives. `executeFormulaRoll` and
+`executeOpposedFormula` both wire this in right after their existing
+stakes-narration block. If no `stat_name` is given, or it doesn't match
+any structured stat/resource (e.g. a `characterData`/`character_sheet`-only
+adventure, or a narrative-only bonus with no tracked stat), the check is
+silently skipped — no false positives are generated by guessing.
+
+**Known limitation, stated explicitly rather than hidden:** this only
+covers adventures that populate `stats`/`resources`, and only when the
+model chooses to name the source (nothing forces it to). It does **not**
+close the gap for `characterData`-only or `character_sheet`-lore-only
+adventures — which, per current repo convention, is the *preferred* path
+going forward — because there is no reliable, non-guessing way to extract
+a numeric ground truth from freeform text or unstructured strings. Closing
+that residual gap would require either (a) a future decision to keep
+`stats`/`resources` populated even for schema/lore-based adventures
+specifically as a machine-readable shadow copy for this kind of check, or
+(b) a deliberately-scoped small-language-model parsing layer — both are
+larger, cross-cutting decisions beyond this audit's scope and are flagged
+here for a future session rather than solved unilaterally. `formula_challenge_check`
+was left untouched for the same reason `opposed_formula`'s opponent side
+was: it has no analogous "which stat" declaration in its existing schema,
+and bolting one on without a matching narrative convention risked more
+awkward false positives than value. Covered by 7 new tests in
+`tests/gmTools.statIntegrity.test.ts`: no-flag when the claim is
+plausible, flag when it clearly isn't, no-flag when `stat_name` is
+omitted, no-flag when the name doesn't match any tracked stat/resource,
+matching against resources (not just stats), and the same flag/no-flag
+behavior for `opposed_formula`'s `player_stat_name`.
+
 ---
 
 ## Medium — cleanup and drift, lower urgency
 
-- **M1 — Drifted duplicate event table.** `mythic.ts:5134-5147` defines a
-  second `RANDOM_EVENT_FOCUS_TABLE` with *different* percentage bands than
-  the live `EVENT_FOCUS` table actually used by `generateEventFocus`
-  (`mythic.ts:252-264`) — e.g. "Remote event" spans 1-7 in the dead copy
-  vs. 1-5 in the live one. Harmless today since it's unreferenced, but a
-  future edit to "the" event table has a coin-flip chance of touching the
-  wrong one.
+- **M1 — Drifted duplicate event table. — ✅ FIXED** `mythic.ts:5134-5147`
+  defined a second `RANDOM_EVENT_FOCUS_TABLE` with *different* percentage
+  bands than the live `EVENT_FOCUS` table actually used by
+  `generateEventFocus` (`mythic.ts:252-264`) — e.g. "Remote event" spanned
+  1-7 in the dead copy vs. 1-5 in the live one. It was harmless today only
+  because it was unreferenced (confirmed via a full-repo grep for
+  `RANDOM_EVENT_FOCUS_TABLE` — zero other hits), but a future edit to "the"
+  event table had a coin-flip chance of touching the wrong one. Fixed by
+  deleting the dead duplicate outright, following the same
+  "delete confirmed-dead code, don't leave it as a decoy" precedent used
+  for H4 (`getRelevantContextForGeneration`) and H5
+  (`processSceneParts`) — reviving or reconciling it would have kept two
+  competing tables around for no reason, since nothing consumes the
+  second one. Covered by 4 new tests in `tests/mythic.eventFocus.test.ts`
+  that pin `generateEventFocus`'s actual boundaries (roll 1 and roll 7
+  both land on "Remote event", roll 8 moves into "NPC action", roll 100
+  lands on "NPC positive") via `vi.spyOn(Math, "random")`, so a future
+  edit that reintroduces a second, diverging table would fail this test
+  rather than silently drift again.
 - **M2 — No general invariant that a stated success/failure must be
-  preceded by a roll.** This is the broader version of the original
-  plan's Stage-0 ordering finding: it's not only that narration can run
-  before tool resolution in a given turn, it's that **nothing anywhere
-  audits whether a roll happened at all** for a contested action. `H8`
-  and `skip_tools` (which only skips *state-mutation* tools, not GM-stage
-  dice tools, so it isn't itself a bypass) both sit downstream of this
-  same missing invariant.
+  preceded by a roll. — FLAGGED, not fixed (product decision needed).**
+  This is the broader version of the original plan's Stage-0 ordering
+  finding: it's not only that narration can run before tool resolution in
+  a given turn, it's that **nothing anywhere audits whether a roll
+  happened at all** for a contested action. `H8` and `skip_tools` (which
+  only skips *state-mutation* tools, not GM-stage dice tools, so it isn't
+  itself a bypass) both sit downstream of this same missing invariant.
+
+  Verified the current architecture still has this gap even after the
+  GM-stage-first redesign (GM stage now runs *before* the story stage,
+  per `generation.ts`'s "Stage 0.5: Running GM stage" comment, which
+  closes the literal "narration runs before any tool resolution" ordering
+  bug from the original plan): the GM stage's per-round loop
+  (`generation.ts` ~1330-1367, "No tool calls - GM is done!") explicitly
+  allows a round to complete with **zero tool calls**, and whatever
+  freeform prose the model wrote that round is pushed straight into
+  `gmAccumulatedStory`/`allGMContextParts` and fed to the story stage as
+  fact. Nothing stops the GM model from narrating "the attack lands" or
+  "you pick the lock" in that prose without ever calling `formula_roll`.
+  The only existing guardrail is a soft prompt instruction in
+  `buildGMStagePrompt` (`ai_staged.ts` ~2727-2729): *"Skill checks: Use
+  `formula_roll` for risky actions with meaningful stakes... Routine
+  actions: No roll needed - just narrate success."* — advisory text, not
+  an enforced rule.
+
+  **Why this wasn't fixed unilaterally:** closing it for real requires
+  answering "which actions are 'contested' enough to require a roll?" -
+  and the only way to answer that from the GM's own freeform prose is an
+  NLP-style classifier scanning for success/failure language, which is
+  exactly the unreliable heuristic this audit repeatedly rules out
+  elsewhere (see H1's explicit precedent: capping magnitude instead of
+  grading narrative text, and declining to gate ordinary narrative beats
+  behind rolls "just because the paper says LLMs are sycophantic"). The
+  alternative - a hard rule forcing the GM stage to call *some* roll tool
+  before every `end_gm_thinking` - would contradict the app's own
+  documented design of letting routine, low-stakes actions resolve
+  through pure narration with zero mechanical overhead, which is a
+  deliberate pacing choice, not a bug. Deciding where the line sits
+  between "routine, no roll needed" and "contested, roll required" is a
+  product/design call (which action categories, which RPG systems, how
+  strict) rather than a pure engineering fix, so - following the same
+  approach as H6 - this is flagged for that conversation instead of
+  solved unilaterally. No code changes were made for M2.
 
 ---
 
 ## Revised priority order (supersedes §5 of `ai-gm-integration-plan.md`)
 
-_Items 1-4 (all of C1-C5) and H1 are done — see the ✅ FIXED notes above.
-What remains is H2-H8 and the Medium items, in the order below._
+_Items 1-4 (all of C1-C5), H1, H2, H3, H4, H7, H8, and M1 are done — see the ✅
+FIXED notes above (H8 is scoped/partial — see its note for the residual
+`characterData`/`character_sheet`-only gap). H5 was partially corrected
+(dead code deleted; core issue deferred) and H6 and M2 were flagged for a
+product decision rather than fixed. All items in the original punch list
+have now been addressed in some form._
 
 1. ~~**C1**~~ done.
 2. ~~**C2, C3**~~ done.
 3. ~~**C4**~~ done.
 4. ~~**C5**~~ done.
-5. ~~**H1**~~ done (H2 in that same original line item is still open).
+5. ~~**H1, H2**~~ done.
+6. ~~**H3, H4**~~ done (fixes the memory trust chain: H3 validates
+   compaction summaries against canonical state before trusting them; H4
+   deletes the dead automatic-RAG path and makes semantic-search
+   degradation explicit instead of indistinguishable from "no matches").
+7. **H5** — partially corrected: the "dual execution" half of the finding
+   was itself dead code (`processSceneParts` in `page.tsx`, now deleted);
+   the underlying single-execution serialize/regex-parse fragility in
+   `commandResponses.ts` remains open and is intentionally deferred as its
+   own scheduled refactor per the original finding's own recommendation —
+   see the H5 note above.
+8. **H6** — flagged, not fixed: this item needs a product decision (what
+   should content safety mean for this app, and who is it for) before any
+   engineering work is worth doing; see the H6 note above for the specific
+   questions to raise.
+9. ~~**H7**~~ done (self-declared high/deadly roll stakes are now a
+   non-optional reasoning-tier floor instead of decorative text; see the
+   H7 note above).
+10. ~~**H8**~~ done, scoped: `formula_roll`/`opposed_formula` now accept an
+    optional `stat_name`/`player_stat_name` declaration and cross-check it
+    against `stats`/`resources` when populated; the residual gap for
+    `characterData`/`character_sheet`-lore-only adventures is explicitly
+    documented as unclosed rather than papered over — see the H8 note
+    above.
+11. ~~**M1**~~ done: deleted the dead, drifted-duplicate
+    `RANDOM_EVENT_FOCUS_TABLE` in `mythic.ts`; `generateEventFocus`'s
+    boundaries are now pinned by tests so a future edit can't silently
+    reintroduce a second copy — see the M1 note above.
+12. **M2** — flagged, not fixed: verified the GM stage can still complete
+    a round with zero tool calls and feed raw prose straight to the story
+    stage as fact (`generation.ts` ~1330-1367); closing this needs a
+    product decision on which actions require a mandatory roll, not an
+    NLP heuristic grading the GM's own prose - see the M2 note above.
 
 Original text, preserved for the remaining items:
 

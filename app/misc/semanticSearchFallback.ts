@@ -11,9 +11,15 @@
  * previously wired up for memory but disabled in favor of on-demand
  * agentic retrieval - see generation.ts's compaction/GM-stage comments).
  *
- * Failure here is always non-fatal: if embeddings aren't configured for
- * this story, or the search API errors, callers just fall back to "no
- * matches found" exactly as before this existed.
+ * Failure here is always non-fatal in the sense that it never throws or
+ * blocks the caller's own "no literal matches" fallback - but "not
+ * configured for this story" (expected, most stories) and "configured but
+ * the search actually failed" (a real degradation) used to collapse into
+ * the same empty-array result, indistinguishable from "genuinely nothing
+ * relevant was found" (H4). `semanticSearchFallback` now returns a tagged
+ * result so callers can tell those apart and only surface a note to the GM
+ * for the "degraded" case, not the normal "not configured"/"no matches"
+ * ones.
  */
 
 import { searchRelevantContext } from "./embeddings";
@@ -30,13 +36,24 @@ export interface SemanticMatch {
   similarity: number;
 }
 
+export type SemanticSearchOutcome =
+  // Ran successfully - `matches` may still be empty (genuinely nothing
+  // relevant), which is expected and not a degradation.
+  | { status: "ok"; matches: SemanticMatch[] }
+  // Skipped because this story has no embeddings configured, or the caller
+  // passed no query - the normal, common case, not a failure.
+  | { status: "not_configured"; matches: [] }
+  // Attempted and failed (network/API error) - a real degradation worth
+  // surfacing, distinct from "not configured" and from "ran, found nothing".
+  | { status: "error"; matches: []; message: string };
+
 export async function semanticSearchFallback(
   kind: "memory" | "lore",
   query: string,
   context: SemanticSearchContext
-): Promise<SemanticMatch[]> {
+): Promise<SemanticSearchOutcome> {
   if (!context.enabled || !context.storyId || !context.token || !query.trim()) {
-    return [];
+    return { status: "not_configured", matches: [] };
   }
 
   try {
@@ -46,15 +63,21 @@ export async function semanticSearchFallback(
       context.token,
       kind === "lore" ? { loreLimit: 5, memoryLimit: 0 } : { loreLimit: 0, memoryLimit: 5 }
     );
-    const matches = kind === "lore" ? result.lore : result.memories;
-    return matches.map((m) => ({
-      key: m.entry_key,
-      content: m.content,
-      similarity: m.similarity,
-    }));
-  } catch {
-    // Non-fatal - the caller already has a "no literal matches" result to
-    // fall back to, this is strictly a bonus on top of that.
-    return [];
+    const rawMatches = kind === "lore" ? result.lore : result.memories;
+    return {
+      status: "ok",
+      matches: rawMatches.map((m) => ({
+        key: m.entry_key,
+        content: m.content,
+        similarity: m.similarity,
+      })),
+    };
+  } catch (error: unknown) {
+    // A real degradation - the caller still has its "no literal matches"
+    // result to fall back to, but this is no longer indistinguishable from
+    // "searched semantically and found nothing".
+    const message = error instanceof Error ? error.message : "Unknown error";
+    return { status: "error", matches: [], message };
   }
 }
+

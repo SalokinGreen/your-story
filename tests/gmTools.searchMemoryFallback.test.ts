@@ -109,4 +109,37 @@ describe("search_memory semantic fallback (via executeGMTools)", () => {
     expect(result.results[0].success).toBe(false);
     expect(result.results[0].contextForStory).toContain("No matching memories found");
   });
+
+  it("surfaces a degraded-search note (H4) instead of a plain 'no matches' when the semantic search itself errors", async () => {
+    mockedSearch.mockRejectedValue(new Error("embeddings API timed out"));
+
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("search_memory", { patterns: ["tavern owner"] });
+
+    const result = await executeGMTools([toolCall], storyData, {
+      enabled: true,
+      storyId: "s1",
+      token: "t1",
+    });
+
+    expect(result.results[0].success).toBe(false);
+    // Distinct from the "genuinely nothing relevant" message above - the
+    // GM should be told search is degraded, not that it definitively found
+    // nothing relevant.
+    expect(result.results[0].contextForStory).toContain("unavailable");
+    expect(result.results[0].contextForStory).toContain("embeddings API timed out");
+    expect(result.results[0].contextForStory).not.toContain("No matching memories found");
+  });
+
+  it("does not surface a degraded-search note when semantic search was never attempted (not configured)", async () => {
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("search_memory", { patterns: ["tavern owner"] });
+
+    // No semanticContext - falls back to {} (not_configured), the normal case.
+    const result = await executeGMTools([toolCall], storyData);
+
+    expect(mockedSearch).not.toHaveBeenCalled();
+    expect(result.results[0].contextForStory).not.toContain("unavailable");
+    expect(result.results[0].contextForStory).toContain("No matching memories found");
+  });
 });

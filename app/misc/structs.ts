@@ -373,6 +373,12 @@ export interface Scene {
   // so compaction only needs to summarize newly-dropped parts, not redo it
   // from scratch every turn.
   summarizedThroughIndex?: number;
+  // Deterministic cross-check results from the most recent compaction pass
+  // (validateCompactionSummary in compaction.ts) that survived one revision
+  // attempt - e.g. an NPC tracked as dead described as actively present, or
+  // a heavily-referenced entity dropped entirely from the summary. Human-
+  // readable strings, undefined/omitted when the last summary was clean.
+  summaryWarnings?: string[];
 }
 export interface Quest {
   id: string; // Unique identifier for the quest

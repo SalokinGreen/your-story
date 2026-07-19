@@ -61,6 +61,11 @@ export interface FormulaRollParams {
     failure?: string;
   };
   show_to_player?: boolean; // Show dice animation to player (default true)
+  // Name of the stat/resource this roll's flat modifier is claimed to be
+  // derived from (e.g. "Strength", "Stamina"). Optional; when it matches a
+  // structured storyData.stats/resources entry, the executor cross-checks
+  // the claimed modifier against that value as an integrity check (H8).
+  stat_name?: string;
 }
 
 /**
@@ -81,6 +86,9 @@ export interface OpposedFormulaParams {
     tie?: string;
   };
   show_to_player?: boolean; // Show dice animation to player (default true)
+  // Name of the stat/resource the player's flat modifier is claimed to be
+  // derived from. See FormulaRollParams.stat_name (H8 integrity check).
+  player_stat_name?: string;
 }
 
 /**
@@ -679,6 +687,11 @@ Example formulas:
           description:
             "Show dice roll animation to player? Default true for player rolls. Set false for DM/enemy/hidden rolls.",
         },
+        stat_name: {
+          type: "string",
+          description:
+            "Optional: name of the stat/resource this formula's flat modifier comes from (e.g. 'Strength'). If it matches a tracked stat/resource, the modifier is cross-checked against it as an integrity check. Omit for narrative-only or character_sheet-lore-based adventures with no tracked stats/resources.",
+        },
       },
       required: ["formula", "reason"],
     },
@@ -742,6 +755,11 @@ Examples:
           type: "boolean",
           description:
             "Show dice roll animation to player? Default true for player rolls. Set false for DM/hidden rolls.",
+        },
+        player_stat_name: {
+          type: "string",
+          description:
+            "Optional: name of the stat/resource the player's flat modifier comes from. Cross-checked against tracked stats/resources as an integrity check, same as formula_roll's stat_name.",
         },
       },
       required: [
