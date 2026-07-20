@@ -369,6 +369,68 @@ export function classifyPlayerStyle(input: string): PlayerStyleType | null {
   return null;
 }
 
+// Deterministic, name-based classification of what a turn's GM tool
+// activity actually *did* - a second, independent signal alongside
+// classifyPlayerStyle's freeform-text keyword read of what the player
+// *typed*. Neither replaces the other; page.tsx blends both into the same
+// playerStyleCounts accumulator. Tool names not listed here contribute no
+// signal (formula_roll, add_memory, etc. are too generic to imply a style
+// on their own).
+const ACTION_TOOL_NAMES = new Set([
+  "start_combat",
+  "add_combatant",
+  "remove_combatant",
+  "update_combatant_stat",
+  "toggle_combatant_condition",
+  "advance_turn",
+  "end_combat",
+  "opposed_formula",
+]);
+const SOCIAL_TOOL_NAMES = new Set(["npc_reaction", "update_npc"]);
+const TACTICAL_TOOL_NAMES = new Set([
+  "start_challenge",
+  "update_challenge",
+  "resolve_challenge",
+  "cancel_challenge",
+  "formula_challenge_check",
+  "search_memory",
+  "read_notes",
+  "roll_table",
+  "manage_timer",
+  "calculate",
+]);
+
+/**
+ * Classifies a turn's GM tool-call activity into the same lightweight style
+ * buckets as classifyPlayerStyle, by counting which category each called
+ * tool falls into. Returns the bucket with the most matches, or null when
+ * there's no signal (no matching tools called) or the top two buckets are
+ * tied (an ambiguous turn shouldn't guess a style any more than ambiguous
+ * freeform text should).
+ */
+export function classifyToolActivityStyle(
+  toolNames: string[]
+): PlayerStyleType | null {
+  let action = 0;
+  let social = 0;
+  let tactical = 0;
+  for (const name of toolNames) {
+    if (ACTION_TOOL_NAMES.has(name)) action++;
+    else if (SOCIAL_TOOL_NAMES.has(name)) social++;
+    else if (TACTICAL_TOOL_NAMES.has(name)) tactical++;
+  }
+
+  const counts: [PlayerStyleType, number][] = [
+    ["action", action],
+    ["social", social],
+    ["tactical", tactical],
+  ];
+  counts.sort((a, b) => b[1] - a[1]);
+
+  if (counts[0][1] === 0 || counts[0][1] === counts[1][1]) return null;
+  return counts[0][0];
+}
+
 /** The style with the highest observed count, or null if there's no signal yet. */
 export function dominantPlayerStyle(
   counts: Record<PlayerStyleType, number> | undefined

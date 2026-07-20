@@ -10,6 +10,7 @@ import {
   adjustTension,
   selectDirectorMove,
   classifyPlayerStyle,
+  classifyToolActivityStyle,
   dominantPlayerStyle,
   storyProgress,
   targetTensionForProgress,
@@ -345,6 +346,50 @@ describe("classifyPlayerStyle", () => {
   it("returns null for input with no matching keywords", () => {
     expect(classifyPlayerStyle("The weather is nice today")).toBeNull();
     expect(classifyPlayerStyle("")).toBeNull();
+  });
+});
+
+describe("classifyToolActivityStyle", () => {
+  it("classifies action-flavored tool activity", () => {
+    expect(classifyToolActivityStyle(["start_combat", "add_combatant"])).toBe(
+      "action"
+    );
+  });
+
+  it("classifies social-flavored tool activity", () => {
+    expect(classifyToolActivityStyle(["npc_reaction", "update_npc"])).toBe(
+      "social"
+    );
+  });
+
+  it("classifies tactical-flavored tool activity", () => {
+    expect(
+      classifyToolActivityStyle(["start_challenge", "manage_timer"])
+    ).toBe("tactical");
+  });
+
+  it("returns null when no called tools match any bucket", () => {
+    expect(classifyToolActivityStyle(["formula_roll", "add_memory"])).toBeNull();
+  });
+
+  it("returns null for an empty tool list", () => {
+    expect(classifyToolActivityStyle([])).toBeNull();
+  });
+
+  it("returns null on a tie between buckets rather than guessing", () => {
+    expect(
+      classifyToolActivityStyle(["start_combat", "npc_reaction"])
+    ).toBeNull();
+  });
+
+  it("picks the bucket with strictly more matches", () => {
+    expect(
+      classifyToolActivityStyle([
+        "start_combat",
+        "add_combatant",
+        "npc_reaction",
+      ])
+    ).toBe("action");
   });
 });
 

@@ -23,6 +23,7 @@ import {
   generateEventFocus,
   generateEventMeaning,
   classifyPlayerStyle,
+  classifyToolActivityStyle,
   type Likelihood,
   type ElementCategory,
 } from "../misc/mythic";
@@ -1293,6 +1294,43 @@ function StoryPageContent() {
               usage,
             });
             setLiveGMEntries([]);
+
+            // Player modeling (PaSSAGE-inspired), second signal: classify
+            // this turn's actual GM tool-call activity (what happened),
+            // independent of the freeform-text classification already
+            // applied above (what the player typed). Blended into the same
+            // counters - two independent deterministic signals give a
+            // richer read than freeform text alone, especially for players
+            // who speak briefly but trigger a lot of tool activity.
+            if (
+              speakerIds &&
+              speakerIds.length > 0 &&
+              (storyData.multiplayer?.couchPlayers?.length ?? 0) > 1
+            ) {
+              const toolStyle = classifyToolActivityStyle(
+                gmResults.map((r) => r.toolName),
+              );
+              if (toolStyle) {
+                const styleCounts = {
+                  ...(storyData.multiplayer!.playerStyleCounts || {}),
+                };
+                for (const speakerId of speakerIds) {
+                  const current = styleCounts[speakerId] || {
+                    action: 0,
+                    social: 0,
+                    tactical: 0,
+                  };
+                  styleCounts[speakerId] = {
+                    ...current,
+                    [toolStyle]: current[toolStyle] + 1,
+                  };
+                }
+                storyData.multiplayer = {
+                  ...storyData.multiplayer!,
+                  playerStyleCounts: styleCounts,
+                };
+              }
+            }
 
             // Store GM results in the partial part (keeps all results including errors)
             if (gmResults.length > 0) {

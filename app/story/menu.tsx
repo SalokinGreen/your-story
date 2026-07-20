@@ -1189,6 +1189,7 @@ export default function MenuPage({
                     lore={storyData.lore}
                     variables={storyData.variables || []}
                     onUpdate={(lore) => onUpdateStoryData({ lore })}
+                    couchPlayers={storyData.multiplayer?.couchPlayers}
                   />
                 </div>
 
