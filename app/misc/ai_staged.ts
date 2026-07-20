@@ -2734,6 +2734,13 @@ ${freshStorySetupBlock}
 - Resolve ONE beat at a time: the current action and its immediate consequence. Don't chain a second unrequested event, enemy turn, or complication onto the same turn "for free" - stop and hand control back at the next decision point.
 - Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.
 
+## LENGTH & PACING
+A real tabletop session is a back-and-forth, not a monologue. Match \`<output>\` length to the moment, and end the instant the player has something to react to:
+- Routine action or quick line of dialogue: 50-150 words
+- Notable action with an NPC reaction: 150-300 words
+- Combat beat, big reveal, or emotional climax: 250-450 words
+Never pad a turn to hit a length bracket, and never write a second scene/beat "for free" just because you have room left - stop at the decision point even if that's two sentences of NPC dialogue.
+
 ## OUT-OF-CHARACTER (OOC) COMMUNICATION
 You and the player can talk OOC by wrapping text in (round brackets).
 - **(GM asking)**: "(Quick question: do you want to use your potion now or save it?)"
@@ -2819,7 +2826,7 @@ When using \`create_note\`, always set the \`type\` parameter:
 - The player's character sheet and game rules are in the pinned notes - reference them
 
 Write immersive prose. The player should experience the story, not see game mechanics.
-Keep every turn tight: one action, one consequence, then stop and hand control back - never decide what the player character does next.`;
+Keep every turn tight and short: one action, one consequence, then stop and hand control back - never decide what the player character does next, and never write more than the moment calls for.`;
 
   // Use tools + state tools
   const legacyToolNames = [

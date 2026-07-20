@@ -934,8 +934,12 @@ export async function generateStoryTurn(
               tools: gmBaseTools,
               model,
               reasoningEffort: effort,
+              // Honor the user's Response Length setting (options.customMaxOutput)
+              // per GM round - it used to be ignored here, which is why lowering
+              // it had no effect on normal play (the GM stage's own output IS the
+              // player-visible story, see gmFinalStoryContent below).
               maxTokens: Math.min(
-                12000,
+                options.customMaxOutput || 12000,
                 getModelConfig(model).maxOutputTokens || 4000,
               ),
               temperature: 0.4, // Slightly higher for more natural GM thinking
