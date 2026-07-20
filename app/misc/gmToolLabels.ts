@@ -39,12 +39,6 @@ const TOOL_LABELS: Record<string, string> = {
   advance_turn: "Advancing turn",
   end_combat: "Ending combat",
 
-  // Conditions
-  upgrade_condition: "Worsening a condition",
-  downgrade_condition: "Improving a condition",
-  remove_condition: "Removing a condition",
-  modify_condition: "Updating a condition",
-
   // NPCs
   add_npc: "Adding NPC",
   update_npc: "Updating NPC",
@@ -54,13 +48,12 @@ const TOOL_LABELS: Record<string, string> = {
   // Timers
   manage_timer: "Managing timer",
 
-  // Quests / threads / achievements
-  create_quest: "Creating quest",
-  update_quest: "Updating quest",
-  complete_quest: "Completing quest",
-  fail_quest: "Failing quest",
-  delete_quest: "Removing quest",
-  trigger_achievement: "Unlocking achievement",
+  // Goals / threads
+  create_goal: "Creating goal",
+  update_goal: "Updating goal",
+  complete_goal: "Completing goal",
+  fail_goal: "Failing goal",
+  delete_goal: "Removing goal",
   create_thread: "Opening story thread",
   update_thread: "Updating story thread",
   resolve_thread: "Resolving story thread",

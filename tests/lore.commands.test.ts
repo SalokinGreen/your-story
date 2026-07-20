@@ -187,11 +187,7 @@ describe("Lore Manipulation Commands", () => {
       stats: [],
       resources: [],
       inventory: [],
-      achievements: [],
       abilities: [],
-      level: 1,
-      upgradesSpent: 0,
-      conditions: [],
       lore: [
         {
           title: "The Ancient Order",
@@ -209,15 +205,10 @@ describe("Lore Manipulation Commands", () => {
       scene: {
         parts: [],
       },
-      points: 0,
-      earnedPointsFromChapters: [],
-      earnedPointsFromQuests: [],
       currentChapter: 0,
       max_chapters: 10,
       chapters: [],
-      quests: [],
-      momentum: 0,
-      maxMomentum: 5,
+      goals: [],
       relationships: [],
       npcs: [],
     } as StoryData;

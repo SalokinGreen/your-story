@@ -1,5 +1,11 @@
 # Points System Migration
 
+> **Deprecated:** The points/XP/leveling system and Upgrades shop described
+> here have been removed from the app (see `docs/game-mechanics.md`).
+> This document is kept as a historical record of the migration that added
+> these fields to the database; the fields themselves are no longer read
+> or written by current code.
+
 ## Overview
 
 This migration adds the points progression system to existing stories and adventures in the database. The points system allows players to earn upgrade points from completing chapters and unlocking achievements, which can be spent in the Upgrades shop to improve their character.

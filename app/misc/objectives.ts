@@ -3,24 +3,23 @@ import { StoryData } from "./structs";
 export interface ObjectiveSummary {
   key: string;
   title: string;
-  kind: "quest" | "thread";
-  detail?: string; // e.g. "25 pts" or thread priority
+  kind: "goal" | "thread";
+  detail?: string; // e.g. thread priority
 }
 
 /**
- * Active quests + active story threads, combined into one glanceable list
- * for a compact "Objectives" strip - the full Journal page (quests.tsx)
+ * Active goals + active story threads, combined into one glanceable list
+ * for a compact "Objectives" strip - the full Journal page (goals.tsx)
  * still has the detailed view with descriptions, completed/abandoned
  * history, etc. This is just "what's currently open".
  */
 export function getActiveObjectives(storyData: StoryData): ObjectiveSummary[] {
-  const quests: ObjectiveSummary[] = (storyData.quests || [])
-    .filter((q) => q.active && !q.fulfilled)
-    .map((q) => ({
-      key: `quest-${q.id}`,
-      title: q.title,
-      kind: "quest" as const,
-      detail: q.points ? `${q.points} pts` : undefined,
+  const goals: ObjectiveSummary[] = (storyData.goals || [])
+    .filter((g) => g.active && !g.fulfilled)
+    .map((g) => ({
+      key: `goal-${g.id}`,
+      title: g.title,
+      kind: "goal" as const,
     }));
 
   const threads: ObjectiveSummary[] = (storyData.threads || [])
@@ -32,5 +31,5 @@ export function getActiveObjectives(storyData: StoryData): ObjectiveSummary[] {
       detail: t.priority,
     }));
 
-  return [...quests, ...threads];
+  return [...goals, ...threads];
 }

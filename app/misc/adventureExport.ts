@@ -94,7 +94,6 @@ function sanitizeStoryTemplate(
 
   // Remove runtime state
   delete sanitized.memory;
-  delete sanitized.conditions;
   delete sanitized.activeChallenge;
   delete sanitized.restState;
   delete sanitized.agmtState;
@@ -142,20 +141,12 @@ function sanitizeStoryTemplate(
     }));
   }
 
-  // Reset quests
-  if (sanitized.quests) {
-    sanitized.quests = sanitized.quests.map((q) => ({
-      ...q,
-      active: q.active,
+  // Reset goals
+  if (sanitized.goals) {
+    sanitized.goals = sanitized.goals.map((g) => ({
+      ...g,
+      active: g.active,
       fulfilled: false,
-    }));
-  }
-
-  // Reset achievements
-  if (sanitized.achievements) {
-    sanitized.achievements = sanitized.achievements.map((a) => ({
-      ...a,
-      dateAchieved: null,
     }));
   }
 

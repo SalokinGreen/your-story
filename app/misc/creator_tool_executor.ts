@@ -8,9 +8,8 @@
 import {
   StoryData,
   Ability,
-  Achievement,
   StoryLore,
-  Quest,
+  Goal,
   Relationship,
   Variable,
   NumberVariable,
@@ -22,14 +21,12 @@ import {
   SkillNode,
   CustomTable,
   UpgradeSettings,
-  LevelingSettings,
   StartingChoice,
   AbilityGrade,
   NodeEffects,
   CharacterSheetTemplate,
   NPC,
 } from "@/app/misc/structs";
-import { getCumulativeXPForLevel } from "@/app/misc/leveling";
 import {
   CHARACTER_SHEET_PRESET_TEMPLATES,
   parseTemplateFields,
@@ -60,8 +57,7 @@ export interface CreatorChanges {
   abilities?: Ability[];
   nodeEffects?: NodeEffects;
   lore?: StoryLore[];
-  achievements?: Achievement[];
-  quests?: Quest[];
+  goals?: Goal[];
   relationships?: Relationship[];
   variables?: Variable[];
   presets?: Preset[];
@@ -69,7 +65,6 @@ export interface CreatorChanges {
   customTables?: CustomTable[];
   npcs?: NPC[];
   upgradeSettings?: Partial<UpgradeSettings>;
-  levelingSettings?: Partial<LevelingSettings>;
   characterSheetTemplate?: CharacterSheetTemplate;
   characterSheet?: string;
 
@@ -78,11 +73,6 @@ export interface CreatorChanges {
   premise?: string;
   intro?: string;
   author_notes?: string;
-
-  // Progression changes
-  level?: number;
-  points?: number;
-  upgradesSpent?: number;
 
   // Metadata changes
   title?: string;
@@ -315,136 +305,41 @@ export function executeCreatorTool(
       }
 
       // ============================================
-      // ACHIEVEMENTS
+      // GOALS
       // ============================================
-      case "add_achievements": {
-        const achievements = args.achievements as Achievement[];
-        const existingAchievements = [
-          ...(currentState.storyData.achievements || []),
-        ];
-        for (const ach of achievements) {
-          const existing = existingAchievements.find(
-            (a) => a.title.toLowerCase() === ach.title.toLowerCase()
+      case "add_goals": {
+        const goals = args.goals as Goal[];
+        const existingGoals = [...(currentState.storyData.goals || [])];
+        for (const goal of goals) {
+          const existing = existingGoals.find(
+            (g) =>
+              g.id === goal.id ||
+              g.title.toLowerCase() === goal.title.toLowerCase()
           );
           if (existing) {
-            changesList.push(
-              `Achievement "${ach.title}" already exists, skipped`
-            );
+            changesList.push(`Goal "${goal.title}" already exists, skipped`);
           } else {
-            existingAchievements.push({
-              title: ach.title,
-              description: ach.description,
-              ai_hint: ach.ai_hint,
-              points: ach.points,
-              hidden: ach.hidden,
-              rewardDescription: ach.rewardDescription,
-              symbol: ach.symbol,
-              dateAchieved: null,
-            });
-            changesList.push(
-              `Added achievement: ${ach.title} (${ach.points} pts)`
-            );
-          }
-        }
-        changes.achievements = existingAchievements;
-        break;
-      }
-
-      case "modify_achievements": {
-        const modifications = args.achievements as Array<{
-          title: string;
-          new_title?: string;
-          description?: string;
-          ai_hint?: string;
-          points?: number;
-          hidden?: boolean;
-          rewardDescription?: string;
-          symbol?: string;
-        }>;
-        const existingAchievements = [
-          ...(currentState.storyData.achievements || []),
-        ];
-        for (const mod of modifications) {
-          const idx = existingAchievements.findIndex(
-            (a) => a.title.toLowerCase() === mod.title.toLowerCase()
-          );
-          if (idx === -1) {
-            changesList.push(`Achievement "${mod.title}" not found, skipped`);
-            continue;
-          }
-          if (mod.new_title !== undefined)
-            existingAchievements[idx].title = mod.new_title;
-          if (mod.description !== undefined)
-            existingAchievements[idx].description = mod.description;
-          if (mod.ai_hint !== undefined)
-            existingAchievements[idx].ai_hint = mod.ai_hint;
-          if (mod.points !== undefined)
-            existingAchievements[idx].points = mod.points;
-          if (mod.hidden !== undefined)
-            existingAchievements[idx].hidden = mod.hidden;
-          if (mod.rewardDescription !== undefined)
-            existingAchievements[idx].rewardDescription = mod.rewardDescription;
-          if (mod.symbol !== undefined)
-            existingAchievements[idx].symbol = mod.symbol;
-          changesList.push(`Modified achievement: ${mod.title}`);
-        }
-        changes.achievements = existingAchievements;
-        break;
-      }
-
-      case "remove_achievements": {
-        const titles = args.titles as string[];
-        const existingAchievements = [
-          ...(currentState.storyData.achievements || []),
-        ];
-        const remaining = existingAchievements.filter(
-          (a) => !titles.some((t) => t.toLowerCase() === a.title.toLowerCase())
-        );
-        const removed = existingAchievements.length - remaining.length;
-        changesList.push(`Removed ${removed} achievement(s)`);
-        changes.achievements = remaining;
-        break;
-      }
-
-      // ============================================
-      // QUESTS
-      // ============================================
-      case "add_quests": {
-        const quests = args.quests as Quest[];
-        const existingQuests = [...(currentState.storyData.quests || [])];
-        for (const quest of quests) {
-          const existing = existingQuests.find(
-            (q) =>
-              q.id === quest.id ||
-              q.title.toLowerCase() === quest.title.toLowerCase()
-          );
-          if (existing) {
-            changesList.push(`Quest "${quest.title}" already exists, skipped`);
-          } else {
-            existingQuests.push({
+            existingGoals.push({
               id:
-                quest.id ||
-                `quest_${Date.now()}_${Math.random()
+                goal.id ||
+                `goal_${Date.now()}_${Math.random()
                   .toString(36)
                   .substr(2, 9)}`,
-              title: quest.title,
-              shortDescription: quest.shortDescription,
-              description: quest.description,
-              active: quest.active ?? false,
+              title: goal.title,
+              shortDescription: goal.shortDescription,
+              description: goal.description,
+              active: goal.active ?? false,
               fulfilled: false,
-              points: quest.points,
             });
-            changesList.push(
-              `Added quest: ${quest.title} (${quest.points} pts)`
-            );
+            changesList.push(`Added goal: ${goal.title}`);
           }
         }
-        changes.quests = existingQuests;
+        changes.goals = existingGoals;
         break;
       }
 
-      case "modify_quests": {
-        const modifications = args.quests as Array<{
+      case "modify_goals": {
+        const modifications = args.goals as Array<{
           id?: string;
           title?: string;
           new_id?: string;
@@ -452,48 +347,46 @@ export function executeCreatorTool(
           shortDescription?: string;
           description?: string;
           active?: boolean;
-          points?: number;
         }>;
-        const existingQuests = [...(currentState.storyData.quests || [])];
+        const existingGoals = [...(currentState.storyData.goals || [])];
         for (const mod of modifications) {
-          const idx = existingQuests.findIndex(
-            (q) =>
-              (mod.id && q.id === mod.id) ||
-              (mod.title && q.title.toLowerCase() === mod.title.toLowerCase())
+          const idx = existingGoals.findIndex(
+            (g) =>
+              (mod.id && g.id === mod.id) ||
+              (mod.title && g.title.toLowerCase() === mod.title.toLowerCase())
           );
           if (idx === -1) {
             changesList.push(
-              `Quest "${mod.id || mod.title}" not found, skipped`
+              `Goal "${mod.id || mod.title}" not found, skipped`
             );
             continue;
           }
-          if (mod.new_id !== undefined) existingQuests[idx].id = mod.new_id;
+          if (mod.new_id !== undefined) existingGoals[idx].id = mod.new_id;
           if (mod.new_title !== undefined)
-            existingQuests[idx].title = mod.new_title;
+            existingGoals[idx].title = mod.new_title;
           if (mod.shortDescription !== undefined)
-            existingQuests[idx].shortDescription = mod.shortDescription;
+            existingGoals[idx].shortDescription = mod.shortDescription;
           if (mod.description !== undefined)
-            existingQuests[idx].description = mod.description;
-          if (mod.active !== undefined) existingQuests[idx].active = mod.active;
-          if (mod.points !== undefined) existingQuests[idx].points = mod.points;
-          changesList.push(`Modified quest: ${existingQuests[idx].title}`);
+            existingGoals[idx].description = mod.description;
+          if (mod.active !== undefined) existingGoals[idx].active = mod.active;
+          changesList.push(`Modified goal: ${existingGoals[idx].title}`);
         }
-        changes.quests = existingQuests;
+        changes.goals = existingGoals;
         break;
       }
 
-      case "remove_quests": {
+      case "remove_goals": {
         const ids = args.ids as string[];
-        const existingQuests = [...(currentState.storyData.quests || [])];
-        const remaining = existingQuests.filter(
-          (q) =>
+        const existingGoals = [...(currentState.storyData.goals || [])];
+        const remaining = existingGoals.filter(
+          (g) =>
             !ids.some(
-              (id) => id === q.id || id.toLowerCase() === q.title.toLowerCase()
+              (id) => id === g.id || id.toLowerCase() === g.title.toLowerCase()
             )
         );
-        const removed = existingQuests.length - remaining.length;
-        changesList.push(`Removed ${removed} quest(s)`);
-        changes.quests = remaining;
+        const removed = existingGoals.length - remaining.length;
+        changesList.push(`Removed ${removed} goal(s)`);
+        changes.goals = remaining;
         break;
       }
 
@@ -752,7 +645,6 @@ export function executeCreatorTool(
               inventory: preset.inventory || [],
               abilities: preset.abilities,
               relationships: preset.relationships || [],
-              conditions: preset.conditions || [],
             });
             changesList.push(`Added preset: ${preset.name}`);
           }
@@ -1094,111 +986,6 @@ export function executeCreatorTool(
         break;
       }
 
-      case "update_leveling_settings": {
-        const settings: Partial<LevelingSettings> = {};
-        const settingLabels: Record<string, string> = {
-          xpBase: "XP Base",
-          levelCap: "Level Cap",
-          defaultUpgradesPerLevel: "Upgrades Per Level",
-          useCustomCurve: "Use Custom Curve",
-          customCurve: "Custom XP Curve",
-          upgradeOverrides: "Upgrade Overrides",
-          startingUpgrades: "Starting Upgrades",
-        };
-        for (const key of Object.keys(args)) {
-          (settings as any)[key] = args[key];
-          const label = settingLabels[key] || key;
-          const value = args[key];
-          if (typeof value === "boolean") {
-            changesList.push(`${label}: ${value ? "Enabled" : "Disabled"}`);
-          } else if (typeof value === "number") {
-            changesList.push(`${label}: ${value}`);
-          } else if (Array.isArray(value)) {
-            changesList.push(`${label}: ${value.length} entries`);
-          } else if (typeof value === "object" && value !== null) {
-            changesList.push(`${label}: configured`);
-          } else {
-            changesList.push(`${label}: ${String(value)}`);
-          }
-        }
-        if (Object.keys(settings).length > 0) {
-          changes.levelingSettings = settings;
-        }
-        break;
-      }
-
-      // ============================================
-      // PROGRESSION
-      // ============================================
-      case "set_progression": {
-        const currentPoints = (currentState.storyData.points as number) || 0;
-        const currentLevel = (currentState.storyData.level as number) || 1;
-        const currentUpgradesSpent =
-          (currentState.storyData.upgradesSpent as number) || 0;
-        const levelingSettings = currentState.storyData.levelingSettings as
-          | LevelingSettings
-          | undefined;
-
-        // Handle add_points (relative change)
-        if (args.add_points !== undefined) {
-          const addAmount = args.add_points as number;
-          const newPoints = Math.max(0, currentPoints + addAmount);
-          changes.points = newPoints;
-          if (addAmount >= 0) {
-            changesList.push(`Added ${addAmount} XP (total: ${newPoints})`);
-          } else {
-            changesList.push(
-              `Removed ${Math.abs(addAmount)} XP (total: ${newPoints})`
-            );
-          }
-        }
-
-        // Handle points (absolute set)
-        if (args.points !== undefined) {
-          const newPoints = Math.max(0, args.points as number);
-          changes.points = newPoints;
-          changesList.push(`Set XP to ${newPoints}`);
-        }
-
-        // Handle level (absolute set) - also set XP to match!
-        if (args.level !== undefined) {
-          const newLevel = Math.max(1, args.level as number);
-          changes.level = newLevel;
-
-          // Calculate the minimum XP required for this level
-          // Use getCumulativeXPForLevel which gives total XP needed to REACH that level
-          // For level 3, we need the XP threshold for level 2->3 transition
-          const requiredXP = getCumulativeXPForLevel(
-            newLevel,
-            levelingSettings
-          );
-
-          // Only update points if not already explicitly set in this call
-          if (args.points === undefined && args.add_points === undefined) {
-            changes.points = requiredXP;
-            changesList.push(
-              `Set XP to ${requiredXP} (minimum for level ${newLevel})`
-            );
-          }
-
-          if (newLevel > currentLevel) {
-            changesList.push(`Leveled up to ${newLevel}!`);
-          } else if (newLevel < currentLevel) {
-            changesList.push(`Level reduced to ${newLevel}`);
-          } else {
-            changesList.push(`Level set to ${newLevel}`);
-          }
-        }
-
-        // Handle upgradesSpent
-        if (args.upgradesSpent !== undefined) {
-          const newSpent = Math.max(0, args.upgradesSpent as number);
-          changes.upgradesSpent = newSpent;
-          changesList.push(`Upgrades spent set to ${newSpent}`);
-        }
-
-        break;
-      }
 
       // ============================================
       // STARTING CHOICES
@@ -1571,10 +1358,9 @@ export function executeCreatorTools(
             abilities: changes.abilities,
           }),
           ...(changes.lore !== undefined && { lore: changes.lore }),
-          ...(changes.achievements !== undefined && {
-            achievements: changes.achievements,
+          ...(changes.goals !== undefined && {
+            goals: changes.goals,
           }),
-          ...(changes.quests !== undefined && { quests: changes.quests }),
           ...(changes.relationships !== undefined && {
             relationships: changes.relationships,
           }),
@@ -1627,12 +1413,6 @@ export function executeCreatorTools(
           upgradeSettings: {
             ...mergedChanges.upgradeSettings,
             ...changes.upgradeSettings,
-          },
-        }),
-        ...(changes.levelingSettings && {
-          levelingSettings: {
-            ...mergedChanges.levelingSettings,
-            ...changes.levelingSettings,
           },
         }),
       };

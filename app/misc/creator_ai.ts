@@ -2,11 +2,9 @@ import {
   StoryData,
   StartingChoice,
   Ability,
-  Achievement,
   StoryLore,
-  Quest,
+  Goal,
   Relationship,
-  Condition,
   Variable,
   SkillTree,
   CustomTable,
@@ -69,14 +67,6 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     );
   }
 
-  // Points
-  const progression: string[] = [];
-  if (data.points !== undefined && data.points > 0)
-    progression.push(`- **Points:** ${data.points}`);
-  if (progression.length > 0) {
-    sections.push("## Progression\n" + progression.join("\n"));
-  }
-
   // Game settings
   const settings: string[] = [];
   if (data.difficulty) settings.push(`- **Difficulty:** ${data.difficulty}`);
@@ -89,26 +79,6 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
   }
 
   // NOTE: Abilities section removed - abilities are deprecated and should be in character_sheet lore
-
-  // Achievements
-  if (data.achievements && data.achievements.length > 0) {
-    const achievementsSection = ["## Achievements"];
-    data.achievements.forEach((ach: Achievement) => {
-      const status = ach.dateAchieved ? "✓ Unlocked" : "○ Locked";
-      const hiddenStr = ach.hidden ? " [Hidden]" : "";
-      achievementsSection.push(
-        `- **${ach.title}** (${ach.points} pts) ${status}${hiddenStr} ${
-          ach.symbol || ""
-        }`
-      );
-      if (ach.description) achievementsSection.push(`  - ${ach.description}`);
-      if (ach.ai_hint)
-        achievementsSection.push(`  - *AI Hint:* ${ach.ai_hint}`);
-      if (ach.rewardDescription)
-        achievementsSection.push(`  - Reward: ${ach.rewardDescription}`);
-    });
-    sections.push(achievementsSection.join("\n"));
-  }
 
   // Lore
   if (data.lore && data.lore.length > 0) {
@@ -140,24 +110,22 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push(loreSection.join("\n"));
   }
 
-  // Quests
-  if (data.quests && data.quests.length > 0) {
-    const questsSection = ["## Quests"];
-    data.quests.forEach((quest: Quest) => {
-      const status = quest.fulfilled
+  // Goals
+  if (data.goals && data.goals.length > 0) {
+    const goalsSection = ["## Goals"];
+    data.goals.forEach((goal: Goal) => {
+      const status = goal.fulfilled
         ? "✓ Complete"
-        : quest.active
+        : goal.active
         ? "○ Active"
         : "- Inactive";
-      questsSection.push(
-        `- **${quest.title}** (${quest.points} pts) ${status}`
-      );
-      questsSection.push(`  - ${quest.shortDescription}`);
-      if (quest.description !== quest.shortDescription) {
-        questsSection.push(`  - *Details:* ${quest.description}`);
+      goalsSection.push(`- **${goal.title}** ${status}`);
+      goalsSection.push(`  - ${goal.shortDescription}`);
+      if (goal.description !== goal.shortDescription) {
+        goalsSection.push(`  - *Details:* ${goal.description}`);
       }
     });
-    sections.push(questsSection.join("\n"));
+    sections.push(goalsSection.join("\n"));
   }
 
   // Relationships
@@ -172,22 +140,6 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
       if (rel.description) relSection.push(`  - ${rel.description}`);
     });
     sections.push(relSection.join("\n"));
-  }
-
-  // Conditions
-  if (data.conditions && data.conditions.length > 0) {
-    const condSection = ["## Active Conditions"];
-    data.conditions.forEach((cond: Condition) => {
-      const permStr = cond.permanent ? " [Permanent]" : "";
-      const affectsStr = cond.affectsAll
-        ? "All checks"
-        : cond.affects.join(", ");
-      condSection.push(`- **${cond.name}** Tier ${cond.tier}${permStr}`);
-      condSection.push(`  - ${cond.description}`);
-      condSection.push(`  - Affects: ${affectsStr}`);
-      if (cond.source) condSection.push(`  - Source: ${cond.source}`);
-    });
-    sections.push(condSection.join("\n"));
   }
 
   // Variables
@@ -291,46 +243,8 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
     sections.push(presetsSection.join("\n"));
   }
 
-  // Leveling Settings
-  if (data.levelingSettings) {
-    const ls = data.levelingSettings;
-    const levelingSection = ["## Leveling Settings"];
-    if (ls.xpBase !== undefined)
-      levelingSection.push(`- XP Base: ${ls.xpBase}`);
-    if (ls.levelCap !== undefined)
-      levelingSection.push(`- Level Cap: ${ls.levelCap}`);
-    if (ls.defaultUpgradesPerLevel !== undefined) {
-      levelingSection.push(
-        `- Default Upgrades Per Level: ${ls.defaultUpgradesPerLevel} (1 upgrade = 1 skill tree node)`
-      );
-    }
-    if (ls.useCustomCurve && ls.customCurve?.length) {
-      levelingSection.push(
-        `- Custom XP Curve: ${ls.customCurve
-          .map((c) => `Lvl ${c.level}: ${c.cumulativeXP} XP`)
-          .join(", ")}`
-      );
-    }
-    if (ls.upgradeOverrides?.length) {
-      levelingSection.push(
-        `- Upgrade Overrides: ${ls.upgradeOverrides
-          .map((o) => `Lvl ${o.level}: ${o.upgrades} upgrades`)
-          .join(", ")}`
-      );
-    }
-    if (ls.startingUpgrades) {
-      const starts = Object.entries(ls.startingUpgrades)
-        .map(([d, u]) => `${d}: ${u}`)
-        .join(", ");
-      levelingSection.push(`- Starting Upgrades by Difficulty: ${starts}`);
-    }
-    sections.push(levelingSection.join("\n"));
-  }
-
-  // Progress info (simplified - removed XP/level/upgrades)
+  // Progress info
   const progress: string[] = [];
-  if (data.points !== undefined && data.points > 0)
-    progress.push(`- **Points:** ${data.points}`);
   if (data.currentChapter !== undefined)
     progress.push(`- **Current Chapter:** ${data.currentChapter}`);
   if (progress.length > 0) {
@@ -363,13 +277,7 @@ export function formatStoryDataAsMarkdown(data: Partial<StoryData>): string {
 
   // Game Over state
   if (data.gameOver) {
-    sections.push(
-      `## Game Over\n- Reason: ${data.gameOver.reason}${
-        data.gameOver.condition
-          ? `\n- Caused by: ${data.gameOver.condition}`
-          : ""
-      }`
-    );
+    sections.push(`## Game Over\n- Reason: ${data.gameOver.reason}`);
   }
 
   // Starting choices
@@ -429,7 +337,7 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - **CRITICAL: You may only include ONE JSON block per response.** All changes must be combined into a single JSON object. The app cannot process multiple JSON blocks.
 - You can return a PARTIAL StoryData object. Only include the fields you want to change or add.
 - **CRITICAL: ONLY include fields the user EXPLICITLY requested.** Do NOT add extra fields "for convenience" or "best practice". If user asks for skill trees, ONLY output skillTrees. Do NOT also output upgradeSettings or anything else unless specifically asked.
-- Arrays (like 'lore', 'achievements', 'quests', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
+- Arrays (like 'lore', 'goals', 'presets', 'variables', 'relationships', 'customTables') in your JSON will be MERGED with the existing data by default.
 - Scalar fields (like 'story_name', 'premise', 'characterSheet', 'title', 'shortDescription', 'description') will be REPLACED.
 
 ### IMPORTANT: Item Commands
@@ -462,10 +370,10 @@ You can control how items in arrays are applied using the **_command** field:
       "_command": "delete"
     }
   ],
-  "quests": [
+  "goals": [
     {
-      "title": "Main Quest",
-      "description": "Updated quest description",
+      "title": "Main Goal",
+      "description": "Updated goal description",
       "_command": "replace"
     }
   ]
@@ -541,20 +449,20 @@ You can control how items in arrays are applied using the **_command** field:
   1. **Challenge Difficulty**: How hard is this threat overall? (Easy/Medium/Hard/Boss)
   2. **Approach DCs**: What skills work against this threat and at what difficulty?
      - Example: "Combat (hard), Persuasion (very_hard), Stealth (average)"
-  3. **Per-Failure Condition**: What condition does the threat inflict on failed checks?
-     - Name the condition and its tier: "Slash Wound (Tier II)", "Psychic Trauma (Tier III)"
+  3. **Per-Failure Consequence**: What narrative setback does the threat inflict on failed checks?
+     - Example: "Sword Wound - hinders melee checks", "Psychic Trauma - hinders willpower checks"
   4. **Challenge Loss Stakes**: If player loses an extended challenge, what happens?
-     - Example: "Defeat inflicts Broken Body (Tier IV) and capture"
-  
+     - Example: "Defeat leaves the player gravely wounded and captured"
+
   **Example Threat Lore Entry:**
   Title: "Guard Captain Marcus"
   Content: "Marcus is the ruthless captain of the city guard, known for his brutal efficiency...
-  
+
   **Threat Profile:**
   - Challenge Difficulty: Hard (best of 5)
   - Combat DC: hard, Persuasion DC: very_hard, Stealth DC: average (to avoid)
-  - Per-Failure Condition: Sword Wound (Tier II) - upgrades to Tier III, IV on repeated failures
-  - Challenge Loss: Deep Wound (Tier IV) + arrested and imprisoned"
+  - Per-Failure Consequence: Sword Wound - worsens with repeated failures
+  - Challenge Loss: Grave wound + arrested and imprisoned"
   
   This allows the AI narrator to consistently apply consequences during gameplay.
 - relationships (Array of { name, value, description, symbol })
@@ -562,19 +470,12 @@ You can control how items in arrays are applied using the **_command** field:
   - value: Relationship level from -100 (hostile enemy) to +100 (strong ally)
   - description: Current state/context of the relationship
   - symbol: Icon name as words (e.g., "heart", "skull", "shield", "handshake")
-- achievements (Array of { title, description, points, symbol, ai_hint })
-  - title: Achievement name
-  - description: Public description shown to player
-  - points: Points awarded when unlocked
-  - symbol: Icon name as words (e.g., "trophy", "crown", "star", "medal")
-  - ai_hint: (Optional) Precise trigger conditions for the AI to award this achievement
-- quests (Array of { title, shortDescription, description, points, active, fulfilled })
-  - title: Quest name
-  - shortDescription: Brief summary for quest list
-  - description: Full quest details and objectives
-  - points: Points awarded upon completion
-  - active: Whether quest is currently visible/active
-  - fulfilled: Whether quest has been completed
+- goals (Array of { title, shortDescription, description, active, fulfilled })
+  - title: Goal name
+  - shortDescription: Brief summary for goal list
+  - description: Full goal details and objectives
+  - active: Whether goal is currently visible/active
+  - fulfilled: Whether goal has been completed
 - presets (Array of { id, name, description, icon, playerName, playerSummary, abilities, authorNotes })
   - id: Unique identifier (use "preset-" + timestamp for new ones)
   - name: Preset display name
@@ -660,15 +561,6 @@ You can control how items in arrays are applied using the **_command** field:
   - agmt_context_only: Boolean - when true with skill_used, agmt provides context only (doesn't override skill check result)
   - agmt_table: Optional AGMT table to roll on (e.g., "action", "subject", "character_descriptors", "locations", "plot_twists")
   - custom_table: Optional custom table name to roll on
-- levelingSettings (Object with leveling curve and upgrade point configuration)
-  - xpBase: Number (default 100) - Base multiplier for XP requirements. Higher = slower leveling.
-  - levelCap: Number (default 100) - Maximum level players can reach.
-  - defaultUpgradesPerLevel: Number (default 1) - Upgrade points granted per level up. **Each upgrade point unlocks ONE skill tree node**, so 1 point/level is standard. For faster progression, use 2-3 points/level.
-  - useCustomCurve: Boolean - When true, use customCurve instead of quadratic formula. MUST set to true when providing customCurve.
-  - customCurve: Array of { level: number, cumulativeXP: number } - Custom XP thresholds for each level. Level is the target level (2+), cumulativeXP is total XP needed to reach that level. Example: [{ level: 2, cumulativeXP: 100 }, { level: 3, cumulativeXP: 300 }]
-  - upgradeOverrides: Array of { level, upgrades } - Override upgrade points for specific levels (e.g., milestone bonus points at level 10).
-  - startingUpgrades: Object { easy?: number, medium?: number, hard?: number, expert?: number } - Starting upgrade points per difficulty. Since 1 point = 1 skill tree node, giving 5-10 starting points lets players customize their build immediately.
-
 Notes:
 - **ICONS**: Use the 'symbol' field with descriptive WORDS like "heart", "sword", "shield", "fire", "brain", "lightning", "coin", "skull", "potion", "book", "eye", "moon" - NOT emoji characters. We fuzzy-match these words to our icon library automatically. Examples: "broken-heart" for loss, "fire" for fire magic, "shield" for defense.
 - Be creative and thematic in your additions/modifications based on the story setting.
@@ -740,23 +632,22 @@ Assistant:
 \`\`\`"
 
 **Example 3 - Mixed Operations:**
-User: "Delete the Old Quest, update Main Quest description, and add a Secret Quest."
+User: "Delete the Old Goal, update Main Goal description, and add a Secret Goal."
 Assistant:
-"I've made those changes to your quest list.
+"I've made those changes to your goal list.
 
 \`\`\`json
 {
-  "quests": [
-    { "title": "Old Quest", "_command": "delete" },
+  "goals": [
+    { "title": "Old Goal", "_command": "delete" },
     {
-      "title": "Main Quest",
+      "title": "Main Goal",
       "description": "Find the ancient artifact before the dark lord does"
     },
     {
-      "title": "Secret Quest",
+      "title": "Secret Goal",
       "shortDescription": "Hidden path",
       "description": "Discover the secret passage beneath the castle",
-      "points": 50,
       "active": false,
       "fulfilled": false,
       "_command": "add"
@@ -1289,7 +1180,7 @@ export function parseCreatorOutput(content: string): {
   // Second try: look for raw JSON (no code fence) - common with some models
   // Find JSON object that starts with { and contains typical story data keys
   const rawJsonMatch = content.match(
-    /(\{[\s\S]*(?:"lore"|"achievements"|"quests"|"relationships"|"variables"|"abilities"|"customTables"|"skillTrees"|"upgradeSettings"|"levelingSettings"|"presets")[\s\S]*\})/
+    /(\{[\s\S]*(?:"lore"|"goals"|"relationships"|"variables"|"abilities"|"customTables"|"skillTrees"|"upgradeSettings"|"presets")[\s\S]*\})/
   );
 
   if (rawJsonMatch) {
@@ -1379,10 +1270,9 @@ When the user asks you to create or modify parts of the scenario (like "create a
   **THREAT PROFILES:** When creating lore for enemies/threats, include in the content:
   - Challenge Difficulty (Easy/Medium/Hard/Boss)
   - Approach DCs (e.g., "Combat: hard, Stealth: average")
-  - Per-Failure Condition (e.g., "Claw Wound Tier II")
-  - Challenge Loss Stakes (e.g., "Devoured - Tier VI, game over")
-- add_achievements, modify_achievements, remove_achievements - Manage unlockables
-- add_quests, modify_quests, remove_quests - Manage objectives
+  - Per-Failure Consequence (e.g., "Claw Wound - narrative injury, hinders melee")
+  - Challenge Loss Stakes (e.g., "Devoured - fatal, game over")
+- add_goals, modify_goals, remove_goals - Manage objectives
 
 **Relationships & Variables:**
 - add_relationships, modify_relationships, remove_relationships - Manage NPC/faction standings
@@ -1397,7 +1287,6 @@ When the user asks you to create or modify parts of the scenario (like "create a
 - update_basic_info - Update story_name, premise, characterSheet, intro, author_notes
 - update_adventure_metadata - Update title, shortDescription, description
 - update_upgrade_settings - Configure progression shop system
-- update_leveling_settings - Configure XP curve and level caps
 
 **Character Sheet:**
 - update_character_sheet - Update the player's filled character sheet markdown

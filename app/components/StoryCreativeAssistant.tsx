@@ -2322,113 +2322,9 @@ function ToolArgsDisplay({
     );
   }
 
-  // Achievements display
-  if (toolName.includes("achievement")) {
-    // Handle both array format and single achievement at top level
-    // AI might send: { achievements: [{title: "X"}] } OR { title: "X", ai_hint: "Y" }
-    let items: Record<string, unknown>[];
-    if (args.achievements && Array.isArray(args.achievements)) {
-      items = args.achievements as Record<string, unknown>[];
-    } else if (args.titles && Array.isArray(args.titles)) {
-      // For remove_achievements which uses "titles" array
-      items = (args.titles as string[]).map((t) => ({ title: t }));
-    } else if (args.title) {
-      // Single achievement at top level
-      items = [args as Record<string, unknown>];
-    } else {
-      items = [];
-    }
-
-    const arrayItems = Array.isArray(items) ? items : [items];
-
-    // Handle case where achievements array is empty or undefined
-    if (
-      arrayItems.length === 0 ||
-      (arrayItems.length === 1 && Object.keys(arrayItems[0] || {}).length === 0)
-    ) {
-      return null;
-    }
-
-    return (
-      <div className="mt-2 space-y-2">
-        {arrayItems.slice(0, 5).map((item, idx) => {
-          // Get the title - could be 'title' or for renames check both
-          // Debug: explicitly check each field
-          const titleVal = item.title;
-          const newTitleVal = item.new_title;
-          const displayTitle = titleVal
-            ? String(titleVal)
-            : newTitleVal
-              ? String(newTitleVal)
-              : "(No Title)";
-
-          return (
-            <div
-              key={idx}
-              className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
-            >
-              <div className="flex items-center gap-2 mb-1">
-                {has(item.symbol) && (
-                  <span className="text-base">{String(item.symbol)}</span>
-                )}
-                <DynamicIcon
-                  name="Trophy"
-                  className="w-3.5 h-3.5 text-amber-500"
-                />
-                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                  {displayTitle}
-                </span>
-                {has(item.points) && (
-                  <span className="ml-auto text-xs font-mono bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300 px-2 py-0.5 rounded">
-                    {String(item.points)} pts
-                  </span>
-                )}
-                {item.hidden === true && (
-                  <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400">
-                    Hidden
-                  </span>
-                )}
-              </div>
-              {has(item.description) && (
-                <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
-                  {String(item.description)}
-                </p>
-              )}
-              {has(item.ai_hint) && (
-                <p className="text-xs text-purple-600 dark:text-purple-400 line-clamp-2 mt-1 italic">
-                  AI Hint: {String(item.ai_hint)}
-                </p>
-              )}
-              {/* Show what fields are being modified if it's a modify operation */}
-              {toolName === "modify_achievements" &&
-                !has(item.description) &&
-                !has(item.ai_hint) && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 italic">
-                    {Object.keys(item)
-                      .filter((k) => k !== "title")
-                      .map((k) =>
-                        k
-                          .replace(/_/g, " ")
-                          .replace(/\b\w/g, (l) => l.toUpperCase()),
-                      )
-                      .join(", ") || "No changes specified"}
-                  </p>
-                )}
-            </div>
-          );
-        })}
-        {arrayItems.length > 5 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
-            +{arrayItems.length - 5} more...
-          </p>
-        )}
-      </div>
-    );
-  }
-
-  // Quests display
-  if (toolName.includes("quest")) {
-    const items = (args.quests || args.modifications || [args]) as Record<
+  // Goals display
+  if (toolName.includes("goal")) {
+    const items = (args.goals || args.modifications || [args]) as Record<
       string,
       unknown
     >[];
@@ -2449,11 +2345,6 @@ function ToolArgsDisplay({
               <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
                 {String(item.title || item.name || item.new_title || "Unknown")}
               </span>
-              {has(item.points) && (
-                <span className="ml-auto text-xs font-mono bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">
-                  {String(item.points)} pts
-                </span>
-              )}
               {item.active === true && (
                 <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400">
                   Active
@@ -2594,74 +2485,37 @@ function ToolArgsDisplay({
     );
   }
 
-  // Progression (level, XP, upgrades)
-  if (toolName === "set_progression") {
-    const progressionIcons: Record<string, string> = {
-      level: "⭐",
-      points: "✨",
-      add_points: "➕",
-      upgradesSpent: "🔧",
-    };
-    const progressionLabels: Record<string, string> = {
-      level: "Level",
-      points: "XP (Total)",
-      add_points: "Add XP",
-      upgradesSpent: "Upgrades Spent",
-    };
-
-    const entries = Object.entries(args).filter(
-      ([, v]) => v !== undefined && v !== null,
-    );
-    if (entries.length === 0) return null;
-
-    return (
-      <div className="mt-2 space-y-2">
-        {entries.map(([key, value]) => {
-          const icon = progressionIcons[key] || "📊";
-          const label = progressionLabels[key] || key;
-
-          return (
-            <div
-              key={key}
-              className="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-2 border border-yellow-200 dark:border-yellow-700/50 flex items-center gap-2"
-            >
-              <span className="text-base">{icon}</span>
-              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
-                {label}
-              </span>
-              <span className="ml-auto text-sm font-mono bg-yellow-100 dark:bg-yellow-900/50 text-yellow-700 dark:text-yellow-300 px-2 py-0.5 rounded">
-                {typeof value === "number" && key === "add_points"
-                  ? (value >= 0 ? "+" : "") + String(value)
-                  : String(value)}
-              </span>
-            </div>
-          );
-        })}
-      </div>
-    );
-  }
-
-  // Leveling/Upgrade settings
-  if (toolName.includes("leveling") || toolName.includes("upgrade_settings")) {
+  // Upgrade shop settings
+  if (toolName.includes("upgrade_settings")) {
     const settingIcons: Record<string, string> = {
-      xpBase: "⚡",
-      levelCap: "🎯",
-      defaultUpgradesPerLevel: "⬆️",
-      useCustomCurve: "📈",
-      startingUpgrades: "🌟",
-      pointsToLevelUp: "💎",
-      maxLevel: "🏆",
-      upgradePointsPerLevel: "📦",
+      enabled: "🔧",
+      allowStatUpgrade: "💪",
+      allowResourceUpgrade: "❤️",
+      allowAddItem: "🎒",
+      statUpgradeCost: "💰",
+      statUpgradeAmount: "📈",
+      resourceUpgradeCost: "💰",
+      resourceUpgradeAmount: "📈",
+      addItemCost: "💰",
+      statShopEnabled: "🏪",
+      resourceShopEnabled: "🏪",
+      itemShopEnabled: "🏪",
+      abilityShopEnabled: "🏪",
     };
     const settingLabels: Record<string, string> = {
-      xpBase: "XP Base Multiplier",
-      levelCap: "Maximum Level",
-      defaultUpgradesPerLevel: "Upgrades Per Level",
-      useCustomCurve: "Custom XP Curve",
-      startingUpgrades: "Starting Upgrades",
-      pointsToLevelUp: "Points to Level Up",
-      maxLevel: "Max Level",
-      upgradePointsPerLevel: "Upgrade Points/Level",
+      enabled: "Upgrades Enabled",
+      allowStatUpgrade: "Allow Stat Upgrades",
+      allowResourceUpgrade: "Allow Resource Upgrades",
+      allowAddItem: "Allow Add Item",
+      statUpgradeCost: "Stat Upgrade Cost",
+      statUpgradeAmount: "Stat Upgrade Amount",
+      resourceUpgradeCost: "Resource Upgrade Cost",
+      resourceUpgradeAmount: "Resource Upgrade Amount",
+      addItemCost: "Add Item Cost",
+      statShopEnabled: "Stat Shop Enabled",
+      resourceShopEnabled: "Resource Shop Enabled",
+      itemShopEnabled: "Item Shop Enabled",
+      abilityShopEnabled: "Ability Shop Enabled",
     };
 
     const entries = Object.entries(args).filter(
@@ -2863,23 +2717,12 @@ function ChangeSummary({
       icon: "Scroll",
     });
   }
-  if (data.achievements?.length) {
+  if (data.goals?.length) {
     changes.push({
       type: "Add/Update",
-      label: "Achievements",
-      value: `${data.achievements.length} achievement${
-        data.achievements.length > 1 ? "s" : ""
-      }`,
-      details: data.achievements,
-      icon: "Trophy",
-    });
-  }
-  if (data.quests?.length) {
-    changes.push({
-      type: "Add/Update",
-      label: "Quests",
-      value: `${data.quests.length} quest${data.quests.length > 1 ? "s" : ""}`,
-      details: data.quests,
+      label: "Goals",
+      value: `${data.goals.length} goal${data.goals.length > 1 ? "s" : ""}`,
+      details: data.goals,
       icon: "Swords",
     });
   }
@@ -2947,25 +2790,6 @@ function ChangeSummary({
       icon: "ShoppingCart",
     });
   }
-  if (data.levelingSettings) {
-    const ls = data.levelingSettings;
-    const details = [];
-    if (ls.xpBase !== undefined) details.push(`XP Base: ${ls.xpBase}`);
-    if (ls.defaultUpgradesPerLevel !== undefined)
-      details.push(`Upgrades/Level: ${ls.defaultUpgradesPerLevel}`);
-    if (ls.levelCap !== undefined) details.push(`Level Cap: ${ls.levelCap}`);
-    if (ls.startingUpgrades) details.push(`Starting Upgrades: configured`);
-    changes.push({
-      type: "Update",
-      label: "Leveling Settings",
-      value:
-        details.length > 0
-          ? details.join(", ")
-          : "Updated leveling configuration",
-      details: data.levelingSettings,
-      icon: "TrendingUp",
-    });
-  }
   if (data.agmtState) {
     changes.push({
       type: "Update",
@@ -2975,25 +2799,6 @@ function ChangeSummary({
       }`,
       details: data.agmtState,
       icon: "Brain",
-    });
-  }
-  if (data.conditions?.length) {
-    changes.push({
-      type: "Add/Update",
-      label: "Conditions",
-      value: `${data.conditions.length} condition${
-        data.conditions.length > 1 ? "s" : ""
-      }`,
-      details: data.conditions,
-      icon: "AlertCircle",
-    });
-  }
-  if (data.points !== undefined) {
-    changes.push({
-      type: "Update",
-      label: "Points",
-      value: `${data.points} points`,
-      icon: "Coins",
     });
   }
   if (changes.length === 0) {
@@ -3734,42 +3539,6 @@ function StoryContextDisplay({ storyData }: { storyData: StoryData }) {
     });
   }
 
-  // Leveling Settings
-  if (storyData.levelingSettings) {
-    const ls = storyData.levelingSettings;
-    const parts = [];
-    if (ls.defaultUpgradesPerLevel)
-      parts.push(`${ls.defaultUpgradesPerLevel} pts/lvl`);
-    if (ls.xpBase) parts.push(`XP×${ls.xpBase}`);
-    if (ls.levelCap) parts.push(`Cap: ${ls.levelCap}`);
-    if (parts.length > 0) {
-      contextItems.push({
-        icon: "TrendingUp",
-        label: "Leveling",
-        value: parts.join(", "),
-        color: "text-cyan-500",
-      });
-    }
-  }
-
-  // Current Progress
-  if (storyData.level !== undefined || storyData.points !== undefined) {
-    const parts = [];
-    if (storyData.level !== undefined) parts.push(`Level ${storyData.level}`);
-    if (storyData.points !== undefined) parts.push(`${storyData.points} XP`);
-    if (storyData.upgradesSpent !== undefined) {
-      const available =
-        (storyData.points || 0) - (storyData.upgradesSpent || 0);
-      if (available > 0) parts.push(`${available} upgrade pts available`);
-    }
-    contextItems.push({
-      icon: "Award",
-      label: "Progress",
-      value: parts.join(", "),
-      color: "text-amber-500",
-    });
-  }
-
   // Notes
   if (storyData.lore?.length) {
     const activeLore = storyData.lore.filter((l) => l.on !== false);
@@ -3781,26 +3550,13 @@ function StoryContextDisplay({ storyData }: { storyData: StoryData }) {
     });
   }
 
-  // Achievements
-  if (storyData.achievements?.length) {
-    const unlocked = storyData.achievements.filter(
-      (a) => a.dateAchieved !== null,
-    );
-    contextItems.push({
-      icon: "Trophy",
-      label: "Achievements",
-      value: `${unlocked.length}/${storyData.achievements.length} unlocked`,
-      color: "text-yellow-400",
-    });
-  }
-
-  // Quests
-  if (storyData.quests?.length) {
-    const active = storyData.quests.filter((q) => q.active && !q.fulfilled);
+  // Goals
+  if (storyData.goals?.length) {
+    const active = storyData.goals.filter((g) => g.active && !g.fulfilled);
     contextItems.push({
       icon: "Swords",
-      label: "Quests",
-      value: `${active.length} active, ${storyData.quests.length} total`,
+      label: "Goals",
+      value: `${active.length} active, ${storyData.goals.length} total`,
       color: "text-red-400",
     });
   }
@@ -3829,23 +3585,6 @@ function StoryContextDisplay({ storyData }: { storyData: StoryData }) {
       label: "Variables",
       value: `${storyData.variables.length} tracked`,
       color: "text-indigo-500",
-    });
-  }
-
-  // Conditions
-  if (storyData.conditions?.length) {
-    const condNames = storyData.conditions
-      .map((c) => `${c.name} (Tier ${c.tier})`)
-      .slice(0, 2);
-    const more =
-      storyData.conditions.length > 2
-        ? ` +${storyData.conditions.length - 2}`
-        : "";
-    contextItems.push({
-      icon: "AlertTriangle",
-      label: "Conditions",
-      value: condNames.join(", ") + more,
-      color: "text-rose-500",
     });
   }
 

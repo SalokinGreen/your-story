@@ -14,8 +14,7 @@ import type { StoryData, CommandResponse, LoreType } from "./structs";
 import {
   findResourceMatch,
   findStatMatch,
-  findAchievementMatch,
-  findQuestMatch,
+  findGoalMatch,
   findRelationshipMatch,
   findLoreMatch,
   findAbilityMatch,
@@ -23,1409 +22,6 @@ import {
 } from "./fuzzyMatch";
 import { logger } from "./logger";
 import { ABILITY_GRADE_ORDER, initializeAbility } from "./abilitySystem";
-import { calculateLevel } from "./leveling";
-
-/**
- * Execute a single command and generate a response.
- * Returns CommandResponse with success status and human-readable message.
- */
-export function executeCommandWithResponse(
-  command: string,
-  storyData: StoryData
-): CommandResponse | null {
-  const trimmed = command.trim();
-  const timestamp = Date.now();
-
-  // === QUEST COMMANDS ===
-
-  // /create_quest: title | short description | full description | points
-  const createQuestMatch = trimmed.match(
-    /^\/create_quest:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)$/i
-  );
-  if (createQuestMatch) {
-    const title = createQuestMatch[1].trim();
-    const shortDesc = createQuestMatch[2].trim();
-    const points = parseInt(createQuestMatch[4], 10);
-
-    if (!storyData.quests) storyData.quests = [];
-
-    const existing = storyData.quests.find((q) => q.title === title);
-    if (existing) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Quest "${title}" already exists`,
-        timestamp,
-      };
-    }
-
-    const newQuest = {
-      id: `quest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      title,
-      shortDescription: shortDesc,
-      description: createQuestMatch[3].trim(),
-      active: true,
-      fulfilled: false,
-      points,
-      createdAt: new Date(),
-    };
-
-    storyData.quests.push(newQuest);
-    logger.action("Quest created via command response", { title, points });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Created quest "${title}" (${points} points)`,
-      timestamp,
-    };
-  }
-
-  // /activate_quest: quest title
-  const activateQuestMatch = trimmed.match(/^\/activate_quest:\s*(.+)$/i);
-  if (activateQuestMatch) {
-    const questTitle = activateQuestMatch[1].trim();
-    if (!storyData.quests) storyData.quests = [];
-
-    const matchResult = findQuestMatch(questTitle, storyData.quests);
-    const quest = matchResult?.item;
-
-    if (!quest) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Quest "${questTitle}" not found`,
-        timestamp,
-      };
-    }
-
-    if (quest.active) {
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Quest "${quest.title}" was already active`,
-        timestamp,
-      };
-    }
-
-    quest.active = true;
-    logger.action("Quest activated via command response", {
-      title: quest.title,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Activated quest "${quest.title}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /deactivate_quest: quest title
-  const deactivateQuestMatch = trimmed.match(/^\/deactivate_quest:\s*(.+)$/i);
-  if (deactivateQuestMatch) {
-    const questTitle = deactivateQuestMatch[1].trim();
-    if (!storyData.quests) storyData.quests = [];
-
-    const matchResult = findQuestMatch(questTitle, storyData.quests);
-    const quest = matchResult?.item;
-
-    if (!quest) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Quest "${questTitle}" not found`,
-        timestamp,
-      };
-    }
-
-    if (!quest.active) {
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Quest "${quest.title}" was already inactive`,
-        timestamp,
-      };
-    }
-
-    quest.active = false;
-    logger.action("Quest deactivated via command response", {
-      title: quest.title,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Deactivated quest "${quest.title}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // === ABILITY COMMANDS ===
-
-  // /add_ability: name | description | grade | stat | costs | maxCooldown
-  // costs format: "resource:Health:10,variable:ManaSpent:5" or empty string
-  const addAbilityMatch = trimmed.match(
-    /^\/add_ability:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(novice|apprentice|adept|expert|master|legendary)\s*(?:\|\s*(.+?))?\s*(?:\|\s*(.+?))?\s*(?:\|\s*(\d+))?$/i
-  );
-  if (addAbilityMatch) {
-    const name = addAbilityMatch[1].trim();
-    const description = addAbilityMatch[2].trim();
-    const grade = addAbilityMatch[3].toLowerCase() as
-      | "novice"
-      | "apprentice"
-      | "adept"
-      | "expert"
-      | "master"
-      | "legendary";
-    const stat = addAbilityMatch[4]?.trim() || undefined;
-    const costsStr = addAbilityMatch[5]?.trim() || "";
-    const maxCooldown = addAbilityMatch[6]
-      ? parseInt(addAbilityMatch[6], 10)
-      : 0;
-
-    // Initialize abilities array if needed
-    if (!storyData.abilities) {
-      storyData.abilities = [];
-    }
-
-    const existing = storyData.abilities.find(
-      (a) => a.name.toLowerCase() === name.toLowerCase()
-    );
-    if (existing) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Ability "${name}" already exists`,
-        timestamp,
-      };
-    }
-
-    // Parse costs string
-    const costs: Array<{
-      type: "resource" | "variable";
-      name: string;
-      amount: number;
-    }> = [];
-    if (costsStr) {
-      const costParts = costsStr.split(",");
-      for (const part of costParts) {
-        const [typeStr, costName, amountStr] = part.trim().split(":");
-        if (typeStr && costName && amountStr) {
-          const type = typeStr.toLowerCase() as "resource" | "variable";
-          if (type === "resource" || type === "variable") {
-            costs.push({
-              type,
-              name: costName.trim(),
-              amount: parseInt(amountStr, 10),
-            });
-          }
-        }
-      }
-    }
-
-    // Validate stat exists if specified
-    if (
-      stat &&
-      !storyData.stats.find((s) => s.name.toLowerCase() === stat.toLowerCase())
-    ) {
-      return {
-        command: trimmed,
-        success: "partial" as const,
-        message: `Added ability "${name}" but stat "${stat}" not found (ability will work with any skill check)`,
-        timestamp,
-      };
-    }
-
-    const ability = initializeAbility({
-      name,
-      description,
-      grade,
-      stat,
-      cost: costs,
-      cooldown: maxCooldown,
-      symbol: "✨",
-    });
-
-    storyData.abilities.push(ability);
-
-    logger.action("Ability added via command response", {
-      name,
-      grade,
-      costs,
-      maxCooldown,
-    });
-
-    const costDesc =
-      costs.length > 0
-        ? ` (costs: ${costs.map((c) => `${c.amount} ${c.name}`).join(", ")})`
-        : "";
-    const cooldownDesc =
-      maxCooldown > 0 ? `, ${maxCooldown} turn cooldown` : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Added ${grade} ability "${name}"${costDesc}${cooldownDesc}`,
-      timestamp,
-    };
-  }
-
-  // === STAT COMMANDS ===
-
-  // /add_stat: name | description | value
-  const addStatMatch = trimmed.match(
-    /^\/add_stat:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)$/i
-  );
-  if (addStatMatch) {
-    const name = addStatMatch[1].trim();
-    const description = addStatMatch[2].trim();
-    const value = parseInt(addStatMatch[3], 10);
-
-    const existing = storyData.stats.find((s) => s.name === name);
-    if (existing) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Stat "${name}" already exists`,
-        timestamp,
-      };
-    }
-
-    storyData.stats.push({
-      name,
-      value,
-      description,
-      symbol: "⭐",
-      custom_symbol_url: undefined,
-    });
-
-    logger.action("Stat added via command response", { name, value });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Added stat "${name}" (${value})`,
-      timestamp,
-    };
-  }
-
-  // /modify_stat: name | value_delta
-  const modifyStatMatch = trimmed.match(
-    /^\/modify_stat:\s*(.+?)\s*\|\s*(-?\d+)$/i
-  );
-  if (modifyStatMatch) {
-    const name = modifyStatMatch[1].trim();
-    const valueDelta = parseInt(modifyStatMatch[2], 10);
-
-    const matchResult = findStatMatch(name, storyData.stats);
-    const stat = matchResult?.item;
-
-    if (!stat) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Stat "${name}" not found`,
-        timestamp,
-      };
-    }
-
-    const oldValue = stat.value;
-    stat.value = Math.max(0, stat.value + valueDelta);
-    const actualDelta = stat.value - oldValue;
-
-    logger.action("Stat modified via command response", {
-      name: stat.name,
-      valueDelta,
-      oldValue,
-      newValue: stat.value,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${stat.name}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `${stat.name}: ${oldValue} → ${stat.value} (${
-        actualDelta > 0 ? "+" : ""
-      }${actualDelta})${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /adjust_stat: stat name | delta
-  const adjustStatMatch = trimmed.match(
-    /^\/adjust_stat:\s*(.+?)\s*\|\s*(-?\d+)$/i
-  );
-  if (adjustStatMatch) {
-    const statName = adjustStatMatch[1].trim();
-    const delta = parseInt(adjustStatMatch[2], 10);
-
-    const matchResult = findStatMatch(statName, storyData.stats);
-    const stat = matchResult?.item;
-
-    if (!stat) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Stat "${statName}" not found`,
-        timestamp,
-      };
-    }
-
-    const oldValue = stat.value;
-    stat.value += delta;
-
-    logger.action("Stat adjusted via command response", {
-      statName: stat.name,
-      delta,
-      oldValue,
-      newValue: stat.value,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${statName}" → "${stat.name}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `${stat.name}: ${oldValue} → ${stat.value} (${
-        delta > 0 ? "+" : ""
-      }${delta})${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /remove_stat: stat name
-  const removeStatMatch = trimmed.match(/^\/remove_stat:\s*(.+)$/i);
-  if (removeStatMatch) {
-    const name = removeStatMatch[1].trim();
-
-    const matchResult = findStatMatch(name, storyData.stats);
-    const stat = matchResult?.item;
-
-    if (!stat) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Stat "${name}" not found`,
-        timestamp,
-      };
-    }
-
-    storyData.stats = storyData.stats.filter((s) => s.name !== stat.name);
-
-    logger.action("Stat removed via command response", { name: stat.name });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${stat.name}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Removed stat "${stat.name}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // === RESOURCE COMMANDS ===
-
-  // /add_resource: name | description | current | max
-  const addResourceMatch = trimmed.match(
-    /^\/add_resource:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(\d+)\s*\|\s*(\d+)$/i
-  );
-  if (addResourceMatch) {
-    const name = addResourceMatch[1].trim();
-    const description = addResourceMatch[2].trim();
-    const current = parseInt(addResourceMatch[3], 10);
-    const max = parseInt(addResourceMatch[4], 10);
-
-    const existing = storyData.resources.find((r) => r.name === name);
-    if (existing) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Resource "${name}" already exists`,
-        timestamp,
-      };
-    }
-
-    storyData.resources.push({
-      name,
-      value: current,
-      maxValue: max,
-      description,
-      symbol: "??",
-    });
-
-    logger.action("Resource added via command response", {
-      name,
-      current,
-      max,
-    });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Added resource "${name}" (${current}/${max})`,
-      timestamp,
-    };
-  }
-
-  // /set_resource_max: resource name | new max
-  const setResourceMaxMatch = trimmed.match(
-    /^\/set_resource_max:\s*(.+?)\s*\|\s*(\d+)$/i
-  );
-  if (setResourceMaxMatch) {
-    const resourceName = setResourceMaxMatch[1].trim();
-    const newMax = parseInt(setResourceMaxMatch[2], 10);
-
-    const matchResult = findResourceMatch(resourceName, storyData.resources);
-    const resource = matchResult?.item;
-
-    if (!resource) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Resource "${resourceName}" not found`,
-        timestamp,
-      };
-    }
-
-    // Ensure resource.value is a valid number (prevent NaN)
-    if (typeof resource.value !== "number" || isNaN(resource.value)) {
-      resource.value = 0;
-    }
-
-    const oldMax = resource.maxValue;
-    resource.maxValue = newMax;
-
-    // Clamp current value if it exceeds new max
-    if (resource.value > newMax) {
-      resource.value = newMax;
-    }
-
-    logger.action("Resource max set via command response", {
-      resourceName: resource.name,
-      oldMax,
-      newMax,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${resourceName}" → "${resource.name}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `${resource.name} max: ${oldMax} → ${newMax}${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /modify_resource: name | current_delta | max_delta
-  const modifyResourceMatch = trimmed.match(
-    /^\/modify_resource:\s*(.+?)\s*\|\s*(-?\d+)\s*\|\s*(-?\d+)$/i
-  );
-  if (modifyResourceMatch) {
-    const name = modifyResourceMatch[1].trim();
-    const currentDelta = parseInt(modifyResourceMatch[2], 10);
-    const maxDelta = parseInt(modifyResourceMatch[3], 10);
-
-    const matchResult = findResourceMatch(name, storyData.resources);
-    const resource = matchResult?.item;
-
-    if (!resource) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Resource "${name}" not found`,
-        timestamp,
-      };
-    }
-
-    // Ensure resource.value is a valid number (prevent NaN)
-    if (typeof resource.value !== "number" || isNaN(resource.value)) {
-      resource.value = 0;
-    }
-
-    const oldValue = resource.value;
-    const oldMax = resource.maxValue;
-
-    resource.maxValue = Math.max(1, resource.maxValue + maxDelta);
-    resource.value = Math.max(
-      0,
-      Math.min(resource.maxValue, resource.value + currentDelta)
-    );
-
-    logger.action("Resource modified via command response", {
-      name: resource.name,
-      currentDelta,
-      maxDelta,
-      oldValue,
-      newValue: resource.value,
-      oldMax,
-      newMax: resource.maxValue,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${resource.name}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `${resource.name}: ${oldValue}/${oldMax} → ${resource.value}/${resource.maxValue}${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /remove_resource: resource name
-  const removeResourceMatch = trimmed.match(/^\/remove_resource:\s*(.+)$/i);
-  if (removeResourceMatch) {
-    const name = removeResourceMatch[1].trim();
-
-    const matchResult = findResourceMatch(name, storyData.resources);
-    const resource = matchResult?.item;
-
-    if (!resource) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Resource "${name}" not found`,
-        timestamp,
-      };
-    }
-
-    storyData.resources = storyData.resources.filter(
-      (r) => r.name !== resource.name
-    );
-
-    logger.action("Resource removed via command response", {
-      name: resource.name,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${resource.name}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Removed resource "${resource.name}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // === ACHIEVEMENT COMMANDS ===
-
-  // === NOTE COMMANDS ===
-
-  // /create_note: title | content | type
-  const createNoteMatch = trimmed.match(
-    /^\/create_note:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.*)$/i
-  );
-  if (createNoteMatch) {
-    const noteTitle = createNoteMatch[1].trim();
-    const noteContent = createNoteMatch[2].trim();
-    const noteType = createNoteMatch[3].trim() as LoreType;
-
-    if (!storyData.lore) storyData.lore = [];
-
-    const existingNote = storyData.lore.find((l) => l.title === noteTitle);
-    if (existingNote) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Note "${noteTitle}" already exists`,
-        timestamp,
-      };
-    }
-
-    storyData.lore.push({
-      title: noteTitle,
-      content: noteContent,
-      relatedCharacters: [],
-      relatedLocations: [],
-      secrtet: false,
-      keys: [],
-      type: noteType || "lore",
-      on: true, // Agentic notes are visible by default
-      alwaysOn: true, // No more triggers needed with read_notes
-      embedded: false, // New entry needs embedding
-    });
-
-    // Mark lore embeddings as dirty for re-sync
-    storyData.loreEmbeddingsDirty = true;
-
-    logger.action("New note created via command response", {
-      title: noteTitle,
-    });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Created note entry "${noteTitle}"`,
-      timestamp,
-    };
-  }
-
-  // /note_show: note title (also handles legacy /lore_show)
-  const noteShowMatch = trimmed.match(/^\/(note_show|lore_show):\s*(.+)$/i);
-  if (noteShowMatch) {
-    const noteTitle = noteShowMatch[2].trim();
-
-    if (!storyData.lore) storyData.lore = [];
-
-    const matchResult = findLoreMatch(noteTitle, storyData.lore);
-    const noteEntry = matchResult?.item;
-
-    if (!noteEntry) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Note "${noteTitle}" not found`,
-        timestamp,
-      };
-    }
-
-    if (noteEntry.on === true) {
-      const fuzzyNote =
-        matchResult && !matchResult.isExact
-          ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
-              matchResult.score * 100
-            )}%)`
-          : "";
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Note "${noteEntry.title}" was already visible${fuzzyNote}`,
-        timestamp,
-      };
-    }
-
-    noteEntry.on = true;
-    noteEntry.lastTriggeredIndex = storyData.scene.parts.length;
-
-    // Add to revealedLore on the last scene part (or create one if needed)
-    const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
-    if (lastPart) {
-      if (!lastPart.revealedLore) lastPart.revealedLore = [];
-      if (!lastPart.revealedLore.includes(noteEntry.title)) {
-        lastPart.revealedLore.push(noteEntry.title);
-      }
-    }
-
-    logger.action("Note revealed via command response", {
-      title: noteEntry.title,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Revealed note "${noteEntry.title}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /note_hide: note title (also handles legacy /lore_hide)
-  const noteHideMatch = trimmed.match(/^\/(note_hide|lore_hide):\s*(.+)$/i);
-  if (noteHideMatch) {
-    const noteTitle = noteHideMatch[2].trim();
-
-    if (!storyData.lore) storyData.lore = [];
-
-    const matchResult = findLoreMatch(noteTitle, storyData.lore);
-    const noteEntry = matchResult?.item;
-
-    if (!noteEntry) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Note "${noteTitle}" not found`,
-        timestamp,
-      };
-    }
-
-    if (noteEntry.on === false) {
-      const fuzzyNote =
-        matchResult && !matchResult.isExact
-          ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
-              matchResult.score * 100
-            )}%)`
-          : "";
-      return {
-        command: trimmed,
-        success: "partial",
-        message: `Note "${noteEntry.title}" was already hidden${fuzzyNote}`,
-        timestamp,
-      };
-    }
-
-    noteEntry.on = false;
-
-    logger.action("Note hidden via command response", {
-      title: noteEntry.title,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${noteTitle}" → "${noteEntry.title}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Hidden note "${noteEntry.title}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /note_update: title | newTitle | content | type
-  const noteUpdateMatch = trimmed.match(
-    /^\/note_update:\s*(.+?)\s*\|\s*(.*?)\s*\|\s*(.*?)\s*\|\s*(.*)$/i
-  );
-  if (noteUpdateMatch) {
-    const title = noteUpdateMatch[1].trim();
-    const newTitle = noteUpdateMatch[2].trim();
-    const content = noteUpdateMatch[3].trim();
-    const type = noteUpdateMatch[4].trim() as LoreType;
-
-    const existing = (storyData.lore || []).find(
-      (l) => l.title.toLowerCase() === title.toLowerCase()
-    );
-    if (!existing) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Note "${title}" not found`,
-        timestamp,
-      };
-    }
-
-    if (newTitle) existing.title = newTitle;
-    if (content) {
-      existing.content = content;
-      existing.embedded = false; // Re-sync if content changes
-      storyData.loreEmbeddingsDirty = true;
-    }
-    if (type) existing.type = type;
-
-    // Agentic notes are always on
-    existing.on = true;
-    existing.alwaysOn = true;
-    existing.on_triggers = [];
-    existing.off_triggers = [];
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Updated note "${title}"`,
-      timestamp,
-    };
-  }
-
-  // /lore_add_content: lore title | new text
-  const loreAddMatch = trimmed.match(
-    /^\/lore_add_content:\s*(.+?)\s*\|\s*(.+)$/i
-  );
-  if (loreAddMatch) {
-    const loreTitle = loreAddMatch[1].trim();
-    const newText = loreAddMatch[2].trim();
-
-    if (!storyData.lore) storyData.lore = [];
-
-    const matchResult = findLoreMatch(loreTitle, storyData.lore);
-    const loreEntry = matchResult?.item;
-
-    if (!loreEntry) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Lore "${loreTitle}" not found`,
-        timestamp,
-      };
-    }
-
-    loreEntry.content = loreEntry.content.trim() + "\n" + newText;
-    loreEntry.embedded = false; // Content changed, needs re-embedding
-
-    // Mark lore embeddings as dirty for re-sync
-    storyData.loreEmbeddingsDirty = true;
-
-    logger.action("Content added to lore via command response", {
-      title: loreEntry.title,
-      addedText: newText,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Added content to lore "${loreEntry.title}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /lore_replace_content: lore title | old text | new text
-  const loreReplaceMatch = trimmed.match(
-    /^\/lore_replace_content:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+)$/i
-  );
-  if (loreReplaceMatch) {
-    const loreTitle = loreReplaceMatch[1].trim();
-    const oldText = loreReplaceMatch[2].trim();
-    const newText = loreReplaceMatch[3].trim();
-
-    if (!storyData.lore) storyData.lore = [];
-
-    const matchResult = findLoreMatch(loreTitle, storyData.lore);
-    const loreEntry = matchResult?.item;
-
-    if (!loreEntry) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Lore "${loreTitle}" not found`,
-        timestamp,
-      };
-    }
-
-    if (!loreEntry.content.includes(oldText)) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Text not found in lore "${loreTitle}"`,
-        timestamp,
-      };
-    }
-
-    loreEntry.content = loreEntry.content.replace(oldText, newText);
-    loreEntry.embedded = false; // Content changed, needs re-embedding
-
-    // Mark lore embeddings as dirty for re-sync
-    storyData.loreEmbeddingsDirty = true;
-
-    logger.action("Lore content replaced via command response", {
-      title: loreEntry.title,
-      oldText,
-      newText,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Replaced content in lore "${loreEntry.title}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /lore_delete_content: lore title | text to delete
-  const loreDeleteMatch = trimmed.match(
-    /^\/lore_delete_content:\s*(.+?)\s*\|\s*(.+)$/i
-  );
-  if (loreDeleteMatch) {
-    const loreTitle = loreDeleteMatch[1].trim();
-    const textToDelete = loreDeleteMatch[2].trim();
-
-    if (!storyData.lore) storyData.lore = [];
-
-    const matchResult = findLoreMatch(loreTitle, storyData.lore);
-    const loreEntry = matchResult?.item;
-
-    if (!loreEntry) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Lore "${loreTitle}" not found`,
-        timestamp,
-      };
-    }
-
-    if (!loreEntry.content.includes(textToDelete)) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Text not found in lore "${loreTitle}"`,
-        timestamp,
-      };
-    }
-
-    loreEntry.content = loreEntry.content.replace(textToDelete, "").trim();
-    // Clean up multiple spaces and newlines
-    loreEntry.content = loreEntry.content.replace(/  +/g, " ");
-    loreEntry.content = loreEntry.content.replace(/\n{3,}/g, "\n\n");
-    loreEntry.embedded = false; // Content changed, needs re-embedding
-
-    // Mark lore embeddings as dirty for re-sync
-    storyData.loreEmbeddingsDirty = true;
-
-    logger.action("Content deleted from lore via command response", {
-      title: loreEntry.title,
-      deletedText: textToDelete,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${loreTitle}" → "${loreEntry.title}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Deleted content from lore "${loreEntry.title}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // === RELATIONSHIP COMMANDS ===
-
-  // /add_relationship: name | value | description
-  const addRelationshipMatch = trimmed.match(
-    /^\/add_relationship:\s*(.+?)\s*\|\s*(-?\d+)\s*\|\s*(.+)$/i
-  );
-  if (addRelationshipMatch) {
-    const name = addRelationshipMatch[1].trim();
-    const value = parseInt(addRelationshipMatch[2], 10);
-    const description = addRelationshipMatch[3].trim();
-
-    if (!storyData.relationships) storyData.relationships = [];
-
-    if (!name) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Relationship name cannot be empty`,
-        timestamp,
-      };
-    }
-
-    const existing = storyData.relationships.find(
-      (r) => r.name.toLowerCase() === name.toLowerCase()
-    );
-
-    if (existing) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Relationship "${name}" already exists`,
-        timestamp,
-      };
-    }
-
-    if (value < -100 || value > 100) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Relationship value must be between -100 and 100 (got ${value})`,
-        timestamp,
-      };
-    }
-
-    // Determine symbol based on relationship value
-    let symbol = "🤝"; // Default neutral
-    if (value >= 75) symbol = "💚"; // Strong ally
-    else if (value >= 50) symbol = "💙"; // Ally
-    else if (value >= 25) symbol = "😊"; // Friend
-    else if (value >= 0) symbol = "🤝"; // Neutral/Acquaintance
-    else if (value >= -25) symbol = "😐"; // Slight tension
-    else if (value >= -50) symbol = "😠"; // Unfriendly
-    else if (value >= -75) symbol = "💔"; // Enemy
-    else symbol = "⚔️"; // Hostile
-
-    storyData.relationships.push({
-      name,
-      value,
-      description,
-      symbol,
-    });
-
-    logger.action("Relationship added via command response", {
-      name,
-      value,
-      description,
-    });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Added relationship "${name}" (${value}) ${symbol}`,
-      timestamp,
-    };
-  }
-
-  // /modify_relationship: name | value_delta
-  const modifyRelationshipMatch = trimmed.match(
-    /^\/modify_relationship:\s*(.+?)\s*\|\s*(-?\d+)$/i
-  );
-  if (modifyRelationshipMatch) {
-    const name = modifyRelationshipMatch[1].trim();
-    const delta = parseInt(modifyRelationshipMatch[2], 10);
-
-    if (!storyData.relationships) storyData.relationships = [];
-
-    const matchResult = findRelationshipMatch(name, storyData.relationships);
-    const relationship = matchResult?.item;
-
-    if (!relationship) {
-      // Provide helpful error with available relationships
-      const availableNames = storyData.relationships
-        .map((r) => r.name)
-        .join(", ");
-      const helpText = availableNames
-        ? ` (available: ${availableNames})`
-        : " (no relationships exist yet - use add_relationship to create one)";
-      return {
-        command: trimmed,
-        success: false,
-        message: `Relationship "${name}" not found${helpText}`,
-        timestamp,
-      };
-    }
-
-    const oldValue = relationship.value;
-    relationship.value = Math.max(-100, Math.min(100, oldValue + delta));
-    const actualDelta = relationship.value - oldValue;
-
-    // Update symbol based on new value
-    if (relationship.value >= 75) relationship.symbol = "💚";
-    else if (relationship.value >= 50) relationship.symbol = "💙";
-    else if (relationship.value >= 25) relationship.symbol = "😊";
-    else if (relationship.value >= 0) relationship.symbol = "🤝";
-    else if (relationship.value >= -25) relationship.symbol = "😐";
-    else if (relationship.value >= -50) relationship.symbol = "😠";
-    else if (relationship.value >= -75) relationship.symbol = "💔";
-    else relationship.symbol = "⚔️";
-
-    logger.action("Relationship modified via command response", {
-      name: relationship.name,
-      delta,
-      oldValue,
-      newValue: relationship.value,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${relationship.name}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `${relationship.name}: ${oldValue} → ${relationship.value} (${
-        actualDelta > 0 ? "+" : ""
-      }${actualDelta}) ${relationship.symbol}${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /remove_relationship: relationship name
-  const removeRelationshipMatch = trimmed.match(
-    /^\/remove_relationship:\s*(.+)$/i
-  );
-  if (removeRelationshipMatch) {
-    const name = removeRelationshipMatch[1].trim();
-
-    if (!storyData.relationships) storyData.relationships = [];
-
-    const matchResult = findRelationshipMatch(name, storyData.relationships);
-    const relationship = matchResult?.item;
-
-    if (!relationship) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Relationship "${name}" not found`,
-        timestamp,
-      };
-    }
-
-    storyData.relationships = storyData.relationships.filter(
-      (r) => r !== relationship
-    );
-
-    logger.action("Relationship removed via command response", {
-      name: relationship.name,
-      value: relationship.value,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${relationship.name}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Removed relationship "${relationship.name}"${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // /update_relationship_description: relationship name | new description
-  const updateRelationshipDescMatch = trimmed.match(
-    /^\/update_relationship_description:\s*(.+?)\s*\|\s*(.+)$/i
-  );
-  if (updateRelationshipDescMatch) {
-    const name = updateRelationshipDescMatch[1].trim();
-    const newDescription = updateRelationshipDescMatch[2].trim();
-
-    if (!storyData.relationships) storyData.relationships = [];
-
-    const matchResult = findRelationshipMatch(name, storyData.relationships);
-    const relationship = matchResult?.item;
-
-    if (!relationship) {
-      return {
-        command: trimmed,
-        success: false,
-        message: `Relationship "${name}" not found`,
-        timestamp,
-      };
-    }
-
-    relationship.description = newDescription;
-
-    logger.action("Relationship description updated via command response", {
-      name: relationship.name,
-      newDescription,
-    });
-
-    const fuzzyNote =
-      matchResult && !matchResult.isExact
-        ? ` (matched "${name}" → "${relationship.name}", ${Math.round(
-            matchResult.score * 100
-          )}%)`
-        : "";
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Updated relationship "${relationship.name}" description${fuzzyNote}`,
-      timestamp,
-    };
-  }
-
-  // === Advanced RPG Tools COMMANDS ===
-
-  // DEPRECATED: AGMT thread commands - use StoryThread tools instead
-  // These handlers return no-op success for backwards compatibility
-  const addThreadMatch = trimmed.match(/^\/add_thread:\s*(.+)$/i);
-  if (addThreadMatch) {
-    return {
-      command: trimmed,
-      success: true,
-      message: `AGMT threads deprecated - use create_thread for StoryThreads`,
-      timestamp,
-    };
-  }
-
-  const updateThreadMatch = trimmed.match(
-    /^\/update_thread:\s*(.+?)\s*→\s*(.+)$/i
-  );
-  if (updateThreadMatch) {
-    return {
-      command: trimmed,
-      success: true,
-      message: `AGMT threads deprecated - use update_thread for StoryThreads`,
-      timestamp,
-    };
-  }
-
-  const resolveThreadMatch = trimmed.match(/^\/resolve_thread:\s*(.+)$/i);
-  if (resolveThreadMatch) {
-    return {
-      command: trimmed,
-      success: true,
-      message: `AGMT threads deprecated - use resolve_thread for StoryThreads`,
-      timestamp,
-    };
-  }
-
-  const closeThreadMatch = trimmed.match(/^\/close_thread:\s*(.+)$/i);
-  if (closeThreadMatch) {
-    return {
-      command: trimmed,
-      success: true,
-      message: `AGMT threads deprecated - use resolve_thread for StoryThreads`,
-      timestamp,
-    };
-  }
-
-  const reopenThreadMatch = trimmed.match(/^\/reopen_thread:\s*(.+)$/i);
-  if (reopenThreadMatch) {
-    return {
-      command: trimmed,
-      success: true,
-      message: `AGMT threads deprecated - StoryThreads don't support reopen`,
-      timestamp,
-    };
-  }
-
-  // /adjust_chaos: delta
-  const adjustChaosMatch = trimmed.match(/^\/adjust_chaos:\s*([+-]?\d+)$/i);
-  if (adjustChaosMatch) {
-    const delta = parseInt(adjustChaosMatch[1], 10);
-
-    if (!storyData.agmtState) {
-      return {
-        command: trimmed,
-        success: false,
-        message: "Advanced RPG Tools not enabled",
-        timestamp,
-      };
-    }
-
-    const oldValue = storyData.agmtState.chaosFactor;
-    storyData.agmtState.chaosFactor = Math.max(
-      1,
-      Math.min(9, oldValue + delta)
-    );
-
-    logger.action("Chaos factor adjusted via command response", {
-      oldValue,
-      newValue: storyData.agmtState.chaosFactor,
-      delta,
-    });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Chaos factor: ${oldValue} → ${storyData.agmtState.chaosFactor}`,
-      timestamp,
-    };
-  }
-
-  // /increment_scene: (with optional new value)
-  const incrementSceneMatch = trimmed.match(
-    /^\/increment_scene:\s*(\d+)\s*→\s*(\d+)$/i
-  );
-  if (incrementSceneMatch) {
-    const newValue = parseInt(incrementSceneMatch[2], 10);
-
-    if (!storyData.agmtState) {
-      storyData.agmtState = {
-        chaosFactor: 5,
-        threads: [],
-        sceneCount: 0,
-        skillCheckHistory: [],
-        currentStreak: 0,
-        lastChaosAdjustment: -999,
-      };
-    }
-
-    const oldValue = storyData.agmtState.sceneCount || 0;
-    storyData.agmtState.sceneCount = newValue;
-
-    logger.action("Scene count updated via command response", {
-      oldValue,
-      newValue,
-    });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Scene count: ${oldValue} → ${newValue}`,
-      timestamp,
-    };
-  }
-
-  // Simple /increment_scene command
-  const simpleIncrementSceneMatch = trimmed.match(/^\/increment_scene$/i);
-  if (simpleIncrementSceneMatch) {
-    if (!storyData.agmtState) {
-      storyData.agmtState = {
-        chaosFactor: 5,
-        threads: [],
-        sceneCount: 0,
-        skillCheckHistory: [],
-        currentStreak: 0,
-        lastChaosAdjustment: -999,
-      };
-    }
-
-    const oldValue = storyData.agmtState.sceneCount || 0;
-    storyData.agmtState.sceneCount = oldValue + 1;
-
-    logger.action("Scene count incremented via command response", {
-      oldValue,
-      newValue: storyData.agmtState.sceneCount,
-    });
-
-    return {
-      command: trimmed,
-      success: true,
-      message: `Scene count: ${oldValue} → ${storyData.agmtState.sceneCount}`,
-      timestamp,
-    };
-  }
-
-  // Command not recognized
-  return null;
-}
 
 // === DIRECT TYPED TOOL DISPATCH ===
 //
@@ -1435,67 +31,48 @@ export function executeCommandWithResponse(
 // command string. See toolExecutor.ts's TOOL_DISPATCH table for wiring.
 
 /**
- * /complete_quest: quest title
+ * /complete_goal: goal title
  */
-export function applyCompleteQuest(
+export function applyCompleteGoal(
   args: Record<string, unknown>,
   storyData: StoryData
 ): Omit<CommandResponse, "toolCallId"> | null {
   const timestamp = Date.now();
-  const questTitle = String(args.title ?? "").trim();
-  const command = `/complete_quest: ${questTitle}`;
+  const goalTitle = String(args.title ?? "").trim();
+  const command = `/complete_goal: ${goalTitle}`;
 
-  if (!storyData.quests) storyData.quests = [];
-  if (!storyData.earnedPointsFromQuests) storyData.earnedPointsFromQuests = [];
+  if (!storyData.goals) storyData.goals = [];
 
-  const matchResult = findQuestMatch(questTitle, storyData.quests);
-  const quest = matchResult?.item;
+  const matchResult = findGoalMatch(goalTitle, storyData.goals);
+  const goal = matchResult?.item;
 
-  if (!quest) {
+  if (!goal) {
     return {
       command,
       success: false,
-      message: `Quest "${questTitle}" not found`,
+      message: `Goal "${goalTitle}" not found`,
       timestamp,
     };
   }
 
-  if (quest.fulfilled) {
+  if (goal.fulfilled) {
     return {
       command,
       success: "partial",
-      message: `Quest "${quest.title}" was already completed`,
+      message: `Goal "${goal.title}" was already completed`,
       timestamp,
     };
   }
 
-  quest.fulfilled = true;
+  goal.fulfilled = true;
 
-  // Award XP if not already awarded
-  const alreadyAwarded = storyData.earnedPointsFromQuests.includes(quest.id);
-  let leveledUp = false;
-  let newLevel = storyData.level || 1;
-  if (!alreadyAwarded) {
-    storyData.earnedPointsFromQuests.push(quest.id);
-    storyData.points = (storyData.points || 0) + quest.points;
-    const oldLevel = storyData.level || 1;
-    const level = calculateLevel(
-      storyData.points || 0,
-      storyData.levelingSettings
-    );
-    storyData.level = level;
-    newLevel = level;
-    leveledUp = level > oldLevel;
-  }
-
-  logger.action("Quest completed via tool dispatch", {
-    title: quest.title,
-    xpAwarded: alreadyAwarded ? 0 : quest.points,
+  logger.action("Goal completed via tool dispatch", {
+    title: goal.title,
   });
 
   const fuzzyNote =
     matchResult && !matchResult.isExact
-      ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+      ? ` (matched "${goalTitle}" → "${goal.title}", ${Math.round(
           matchResult.score * 100
         )}%)`
       : "";
@@ -1503,61 +80,55 @@ export function applyCompleteQuest(
   return {
     command,
     success: true,
-    message: `Completed quest "${quest.title}"${
-      alreadyAwarded
-        ? ""
-        : ` (+${quest.points} XP${
-            leveledUp ? `, Level Up to ${newLevel}!` : ""
-          })`
-    }${fuzzyNote}`,
+    message: `Completed goal "${goal.title}"${fuzzyNote}`,
     timestamp,
   };
 }
 
 /**
- * /fail_quest: quest title
+ * /fail_goal: goal title
  */
-export function applyFailQuest(
+export function applyFailGoal(
   args: Record<string, unknown>,
   storyData: StoryData
 ): Omit<CommandResponse, "toolCallId"> | null {
   const timestamp = Date.now();
-  const questTitle = String(args.title ?? "").trim();
-  const command = `/fail_quest: ${questTitle}`;
+  const goalTitle = String(args.title ?? "").trim();
+  const command = `/fail_goal: ${goalTitle}`;
 
-  if (!storyData.quests) storyData.quests = [];
+  if (!storyData.goals) storyData.goals = [];
 
-  const matchResult = findQuestMatch(questTitle, storyData.quests);
-  const quest = matchResult?.item;
+  const matchResult = findGoalMatch(goalTitle, storyData.goals);
+  const goal = matchResult?.item;
 
-  if (!quest) {
+  if (!goal) {
     return {
       command,
       success: false,
-      message: `Quest "${questTitle}" not found`,
+      message: `Goal "${goalTitle}" not found`,
       timestamp,
     };
   }
 
-  if (quest.fulfilled) {
+  if (goal.fulfilled) {
     return {
       command,
       success: "partial",
-      message: `Quest "${quest.title}" was already completed (cannot fail)`,
+      message: `Goal "${goal.title}" was already completed (cannot fail)`,
       timestamp,
     };
   }
 
-  // Mark quest as inactive (failed) - no points awarded
-  quest.active = false;
+  // Mark goal as inactive (failed)
+  goal.active = false;
 
-  logger.action("Quest failed via tool dispatch", {
-    title: quest.title,
+  logger.action("Goal failed via tool dispatch", {
+    title: goal.title,
   });
 
   const fuzzyNote =
     matchResult && !matchResult.isExact
-      ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+      ? ` (matched "${goalTitle}" → "${goal.title}", ${Math.round(
           matchResult.score * 100
         )}%)`
       : "";
@@ -1565,45 +136,45 @@ export function applyFailQuest(
   return {
     command,
     success: true,
-    message: `Failed quest "${quest.title}"${fuzzyNote}`,
+    message: `Failed goal "${goal.title}"${fuzzyNote}`,
     timestamp,
   };
 }
 
 /**
- * /update_quest: quest title | description? | shortDescription?
+ * /update_goal: goal title | description? | shortDescription?
  * Updates whichever of description/shortDescription are present, in a
  * single pass (replaces the old two-command sequential special case).
  */
-export function applyUpdateQuest(
+export function applyUpdateGoal(
   args: Record<string, unknown>,
   storyData: StoryData
 ): Omit<CommandResponse, "toolCallId"> | null {
   const timestamp = Date.now();
-  const questTitle = String(args.title ?? "").trim();
-  const command = `/update_quest: ${questTitle}`;
+  const goalTitle = String(args.title ?? "").trim();
+  const command = `/update_goal: ${goalTitle}`;
 
-  if (!storyData.quests) storyData.quests = [];
+  if (!storyData.goals) storyData.goals = [];
 
-  const matchResult = findQuestMatch(questTitle, storyData.quests);
-  const quest = matchResult?.item;
+  const matchResult = findGoalMatch(goalTitle, storyData.goals);
+  const goal = matchResult?.item;
 
-  if (!quest) {
+  if (!goal) {
     return {
       command,
       success: false,
-      message: `Quest "${questTitle}" not found`,
+      message: `Goal "${goalTitle}" not found`,
       timestamp,
     };
   }
 
   const changes: string[] = [];
   if (args.description !== undefined) {
-    quest.description = String(args.description);
+    goal.description = String(args.description);
     changes.push("description");
   }
   if (args.shortDescription !== undefined) {
-    quest.shortDescription = String(args.shortDescription);
+    goal.shortDescription = String(args.shortDescription);
     changes.push("short description");
   }
 
@@ -1611,19 +182,19 @@ export function applyUpdateQuest(
     return {
       command,
       success: false,
-      message: `No updates provided for quest "${quest.title}" (need description and/or shortDescription)`,
+      message: `No updates provided for goal "${goal.title}" (need description and/or shortDescription)`,
       timestamp,
     };
   }
 
-  logger.action("Quest updated via tool dispatch", {
-    title: quest.title,
+  logger.action("Goal updated via tool dispatch", {
+    title: goal.title,
     changes,
   });
 
   const fuzzyNote =
     matchResult && !matchResult.isExact
-      ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+      ? ` (matched "${goalTitle}" → "${goal.title}", ${Math.round(
           matchResult.score * 100
         )}%)`
       : "";
@@ -1631,61 +202,55 @@ export function applyUpdateQuest(
   return {
     command,
     success: true,
-    message: `Updated quest "${quest.title}": ${changes.join(", ")} updated${fuzzyNote}`,
+    message: `Updated goal "${goal.title}": ${changes.join(", ")} updated${fuzzyNote}`,
     timestamp,
   };
 }
 
 /**
- * /delete_quest: quest title
- *
- * NOTE: previously this tool built a `/delete_quest: ...` command string
- * that had no matching regex handler anywhere in this file, so every call
- * silently failed with "Command execution returned null". This is the
- * first real implementation, modeled on applyRemoveAbility's find-and-splice
- * pattern.
+ * /delete_goal: goal title
  */
-export function applyDeleteQuest(
+export function applyDeleteGoal(
   args: Record<string, unknown>,
   storyData: StoryData
 ): Omit<CommandResponse, "toolCallId"> | null {
   const timestamp = Date.now();
-  const questTitle = String(args.title ?? "").trim();
-  const command = `/delete_quest: ${questTitle}`;
+  const goalTitle = String(args.title ?? "").trim();
+  const command = `/delete_goal: ${goalTitle}`;
 
-  if (!storyData.quests || storyData.quests.length === 0) {
+  if (!storyData.goals || storyData.goals.length === 0) {
     return {
       command,
       success: false,
-      message: `No quests exist to delete`,
+      message: `No goals exist to delete`,
       timestamp,
     };
   }
 
-  const matchResult = findQuestMatch(questTitle, storyData.quests);
-  const quest = matchResult?.item;
+  const matchResult = findGoalMatch(goalTitle, storyData.goals);
+  const goal = matchResult?.item;
 
-  if (!quest) {
+  if (!goal) {
     return {
       command,
       success: false,
-      message: `Quest "${questTitle}" not found`,
+      message: `Goal "${goalTitle}" not found`,
       timestamp,
     };
   }
 
-  const index = storyData.quests.findIndex((q) => q.id === quest.id);
+  const index = storyData.goals.findIndex((g) => g.id === goal.id);
   if (index !== -1) {
-    storyData.quests.splice(index, 1);
+    storyData.goals.splice(index, 1);
   }
 
-  logger.action("Quest deleted via tool dispatch", {
-    title: quest.title,
+  logger.action("Goal deleted via tool dispatch", {
+    title: goal.title,
   });
 
   const fuzzyNote =
     matchResult && !matchResult.isExact
-      ? ` (matched "${questTitle}" → "${quest.title}", ${Math.round(
+      ? ` (matched "${goalTitle}" → "${goal.title}", ${Math.round(
           matchResult.score * 100
         )}%)`
       : "";
@@ -1693,75 +258,7 @@ export function applyDeleteQuest(
   return {
     command,
     success: true,
-    message: `Deleted quest "${quest.title}"${fuzzyNote}`,
-    timestamp,
-  };
-}
-
-/**
- * /trigger_achievement: achievement title
- */
-export function applyTriggerAchievement(
-  args: Record<string, unknown>,
-  storyData: StoryData
-): Omit<CommandResponse, "toolCallId"> | null {
-  const timestamp = Date.now();
-  const achievementTitle = String(args.title ?? "").trim();
-  const command = `/trigger_achievement: ${achievementTitle}`;
-
-  const matchResult = findAchievementMatch(
-    achievementTitle,
-    storyData.achievements
-  );
-  const existing = matchResult?.item;
-
-  if (!existing) {
-    return {
-      command,
-      success: false,
-      message: `Achievement "${achievementTitle}" not found`,
-      timestamp,
-    };
-  }
-
-  if (existing.dateAchieved) {
-    return {
-      command,
-      success: "partial",
-      message: `Achievement "${existing.title}" was already unlocked`,
-      timestamp,
-    };
-  }
-
-  existing.dateAchieved = new Date();
-  storyData.points = (storyData.points || 0) + existing.points;
-
-  const oldLevel = storyData.level || 1;
-  const level = calculateLevel(
-    storyData.points || 0,
-    storyData.levelingSettings
-  );
-  storyData.level = level;
-  const leveledUp = level > oldLevel;
-
-  logger.action("Achievement unlocked via tool dispatch", {
-    title: existing.title,
-    xp: existing.points,
-  });
-
-  const fuzzyNote =
-    matchResult && !matchResult.isExact
-      ? ` (matched "${achievementTitle}" → "${existing.title}", ${Math.round(
-          matchResult.score * 100
-        )}%)`
-      : "";
-
-  return {
-    command,
-    success: true,
-    message: `Unlocked achievement "${existing.title}" (+${
-      existing.points
-    } XP${leveledUp ? `, Level Up to ${level}!` : ""})${fuzzyNote}`,
+    message: `Deleted goal "${goal.title}"${fuzzyNote}`,
     timestamp,
   };
 }
@@ -2239,41 +736,6 @@ export function applyAdjustResource(
     } (${actualDelta > 0 ? "+" : ""}${actualDelta})${fuzzyNote}`,
     timestamp,
   };
-}
-
-/**
- * Batch process all commands and generate responses.
- * Returns array of CommandResponse objects for AI feedback.
- */
-export function generateCommandResponses(
-  commands: string[],
-  storyData: StoryData
-): CommandResponse[] {
-  const responses: CommandResponse[] = [];
-
-  for (const command of commands) {
-    const response = executeCommandWithResponse(command, storyData);
-    if (response) {
-      responses.push(response);
-    } else {
-      // Unknown command - still generate a response for AI awareness
-      responses.push({
-        command: command.trim(),
-        success: false,
-        message: `Unknown or malformed command`,
-        timestamp: Date.now(),
-      });
-    }
-  }
-
-  logger.info("Generated command responses", {
-    totalCommands: commands.length,
-    successCount: responses.filter((r) => r.success === true).length,
-    partialCount: responses.filter((r) => r.success === "partial").length,
-    failureCount: responses.filter((r) => r.success === false).length,
-  });
-
-  return responses;
 }
 
 /**

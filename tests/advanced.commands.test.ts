@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import type { Resource, Stat, Quest } from "@/app/misc/structs";
+import type { Resource, Stat, Goal } from "@/app/misc/structs";
 
 // Mock functions
 const mockNotifications: Array<{ message: string; type: string }> = [];
@@ -26,8 +26,8 @@ function findStatMatch(name: string, stats: Stat[]) {
   return null;
 }
 
-function findQuestMatch(title: string, quests: Quest[]) {
-  const exact = quests.find((q) => q.title === title);
+function findGoalMatch(title: string, goals: Goal[]) {
+  const exact = goals.find((g) => g.title === title);
   if (exact) return { item: exact, name: exact.title, score: 1, isExact: true };
   return null;
 }
@@ -179,43 +179,43 @@ function processAdvancedCommands(
       continue;
     }
 
-    // /update_quest_description: quest title | new description
-    const updateQuestDescMatch = trimmed.match(
-      /^\/update_quest_description:\s*(.+?)\s*\|\s*(.+)$/i
+    // /update_goal_description: goal title | new description
+    const updateGoalDescMatch = trimmed.match(
+      /^\/update_goal_description:\s*(.+?)\s*\|\s*(.+)$/i
     );
-    if (updateQuestDescMatch) {
-      const questTitle = updateQuestDescMatch[1].trim();
-      const newDescription = updateQuestDescMatch[2].trim();
-      const matchResult = findQuestMatch(questTitle, storyData.quests);
-      const quest = matchResult?.item;
+    if (updateGoalDescMatch) {
+      const goalTitle = updateGoalDescMatch[1].trim();
+      const newDescription = updateGoalDescMatch[2].trim();
+      const matchResult = findGoalMatch(goalTitle, storyData.goals);
+      const goal = matchResult?.item;
 
-      if (!quest) {
-        addNotification(`⚠️ Quest "${questTitle}" not found`, "warning");
+      if (!goal) {
+        addNotification(`⚠️ Goal "${goalTitle}" not found`, "warning");
       } else {
-        quest.description = newDescription;
+        goal.description = newDescription;
         addNotification(
-          `✨ Quest "${quest.title}" description updated`,
+          `✨ Goal "${goal.title}" description updated`,
           "success"
         );
       }
       continue;
     }
 
-    // /update_quest_short_description: quest title | new short description
-    const updateQuestShortDescMatch = trimmed.match(
-      /^\/update_quest_short_description:\s*(.+?)\s*\|\s*(.+)$/i
+    // /update_goal_short_description: goal title | new short description
+    const updateGoalShortDescMatch = trimmed.match(
+      /^\/update_goal_short_description:\s*(.+?)\s*\|\s*(.+)$/i
     );
-    if (updateQuestShortDescMatch) {
-      const questTitle = updateQuestShortDescMatch[1].trim();
-      const newShortDescription = updateQuestShortDescMatch[2].trim();
-      const matchResult = findQuestMatch(questTitle, storyData.quests);
-      const quest = matchResult?.item;
+    if (updateGoalShortDescMatch) {
+      const goalTitle = updateGoalShortDescMatch[1].trim();
+      const newShortDescription = updateGoalShortDescMatch[2].trim();
+      const matchResult = findGoalMatch(goalTitle, storyData.goals);
+      const goal = matchResult?.item;
 
-      if (!quest) {
-        addNotification(`⚠️ Quest "${questTitle}" not found`, "warning");
+      if (!goal) {
+        addNotification(`⚠️ Goal "${goalTitle}" not found`, "warning");
       } else {
-        quest.shortDescription = newShortDescription;
-        addNotification(`✨ Quest "${quest.title}" summary updated`, "success");
+        goal.shortDescription = newShortDescription;
+        addNotification(`✨ Goal "${goal.title}" summary updated`, "success");
       }
       continue;
     }
@@ -258,7 +258,7 @@ describe("Advanced AI Commands", () => {
           symbol: "🧠",
         },
       ],
-      quests: [
+      goals: [
         {
           id: "q1",
           title: "Save the Village",
@@ -266,7 +266,6 @@ describe("Advanced AI Commands", () => {
           description: "The village needs saving",
           active: true,
           fulfilled: false,
-          points: 10,
         },
       ],
     };
@@ -375,29 +374,29 @@ describe("Advanced AI Commands", () => {
     });
   });
 
-  describe("Quest Management", () => {
-    it("should update quest description", () => {
+  describe("Goal Management", () => {
+    it("should update goal description", () => {
       processAdvancedCommands(
         [
-          "/update_quest_description: Save the Village | The village is under attack by dragons",
+          "/update_goal_description: Save the Village | The village is under attack by dragons",
         ],
         storyData,
         mockAddNotification,
         mockLogger
       );
-      expect(storyData.quests[0].description).toBe(
+      expect(storyData.goals[0].description).toBe(
         "The village is under attack by dragons"
       );
     });
 
-    it("should update quest short description", () => {
+    it("should update goal short description", () => {
       processAdvancedCommands(
-        ["/update_quest_short_description: Save the Village | Dragon attack!"],
+        ["/update_goal_short_description: Save the Village | Dragon attack!"],
         storyData,
         mockAddNotification,
         mockLogger
       );
-      expect(storyData.quests[0].shortDescription).toBe("Dragon attack!");
+      expect(storyData.goals[0].shortDescription).toBe("Dragon attack!");
     });
   });
 
@@ -434,7 +433,7 @@ describe("Advanced AI Commands", () => {
       const commands = [
         "/modify_stat: Strength | 10",
         "/modify_resource: Health | -20 | 0",
-        "/update_quest_description: Save the Village | New quest details",
+        "/update_goal_description: Save the Village | New goal details",
       ];
       processAdvancedCommands(
         commands,
@@ -449,7 +448,7 @@ describe("Advanced AI Commands", () => {
       expect(
         storyData.resources.find((r: Resource) => r.name === "Health")?.value
       ).toBe(60);
-      expect(storyData.quests[0].description).toBe("New quest details");
+      expect(storyData.goals[0].description).toBe("New goal details");
     });
   });
 });

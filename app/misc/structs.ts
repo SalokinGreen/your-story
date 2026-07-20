@@ -65,14 +65,6 @@ export type DCTier =
   | "very_hard"
   | "impossible";
 
-// Points/XP tier for quests, achievements, challenges
-export type PointsTier =
-  | "trivial" // Very minor accomplishment
-  | "minor" // Small task
-  | "moderate" // Standard quest
-  | "major" // Significant achievement
-  | "legendary"; // Epic accomplishment
-
 // Stat/resource change tier
 export type StatChangeTier =
   | "tiny" // +/- 1-2
@@ -138,18 +130,6 @@ export interface Ability {
   custom_symbol_url?: string;
   cooldown?: number; // Turns before can use again (0 = no cooldown)
   currentCooldown?: number; // Current cooldown counter
-}
-
-export interface Achievement {
-  title: string;
-  description: string;
-  ai_hint?: string; // Optional precise hint for AI on when to trigger this achievement
-  dateAchieved: Date | null;
-  points: number;
-  symbol: string;
-  custom_symbol_url?: string;
-  hidden?: boolean; // Hidden from player but visible to AI
-  rewardDescription?: string;
 }
 
 export interface CommandResponse {
@@ -443,15 +423,14 @@ export interface Scene {
   // docs/research-paper-ttrpg-theory-gap-analysis.md).
   lastSceneBoundaryIndex?: number;
 }
-export interface Quest {
-  id: string; // Unique identifier for the quest
+export interface Goal {
+  id: string; // Unique identifier for the goal
   title: string;
-  shortDescription: string; // Brief summary shown in quest list
-  description: string; // Full quest description with details
-  active: boolean; // Whether the quest is currently active/visible to player
-  fulfilled: boolean; // Whether the quest has been completed
-  points: number; // Points awarded upon completion
-  createdAt?: Date; // When the quest was created (for ordering)
+  shortDescription: string; // Brief summary shown in goal list
+  description: string; // Full goal description with details
+  active: boolean; // Whether the goal is currently active/visible to player
+  fulfilled: boolean; // Whether the goal has been completed
+  createdAt?: Date; // When the goal was created (for ordering)
 }
 // NPC Status - alive, dead, missing, unknown, departed
 export type NPCStatus = "alive" | "dead" | "missing" | "unknown" | "departed";
@@ -500,25 +479,9 @@ export interface Relationship {
   custom_symbol_url?: string;
 }
 
-// Conditions/Afflictions system
-export type ConditionTier = 1 | 2 | 3 | 4 | 5 | 6;
-
-export interface Condition {
-  id: string; // Unique identifier
-  name: string; // e.g., "Broken Leg", "Poisoned", "Exhausted"
-  tier: ConditionTier; // Severity level (1-6, where 6 is permanent/game-over potential)
-  description: string; // What this condition represents at current tier
-  affects: string[]; // Which stats/skills this penalizes (e.g., ["Agility", "Athletics"])
-  affectsAll?: boolean; // If true, affects ALL rolls (e.g., "Dying", "Severe Exhaustion")
-  source?: string; // How it was acquired (for narrative context)
-  permanent?: boolean; // Tier VI conditions are typically permanent
-  createdAt: number; // Timestamp when condition was acquired
-}
-
 // Game Over state for permanent character death/loss
 export interface GameOver {
   reason: string; // Narrative reason for game over
-  condition?: string; // Name of condition that caused it (if applicable)
   timestamp: number; // When the game ended
 }
 
@@ -534,7 +497,6 @@ export interface SceneChallenge {
   createdAt: number; // Timestamp when challenge started
   resolvedAt?: number; // Timestamp when challenge ended
   result?: "won" | "lost"; // Outcome if resolved
-  pointsAwarded?: number; // Points given on completion
 }
 
 // ============================================
@@ -637,7 +599,6 @@ export interface Preset {
   abilities?: Ability[]; // Starting abilities for this preset
   relationships: Relationship[]; // Legacy
   npcs?: NPC[]; // Starting NPCs for this preset
-  conditions?: Condition[]; // Starting conditions/afflictions for this preset
   variables?: Variable[]; // Starting variables for this preset
   authorNotes: string;
 }
@@ -661,8 +622,6 @@ export interface RestState {
 export interface RestConfig {
   // Cooldown reduction (turns)
   cooldownReduction: { quick: number; short: number; long: number };
-  // Condition downgrade (tiers) - only affects non-permanent conditions
-  conditionDowngrade: { quick: number; short: number; long: number };
   // Stress reduction (YZE only)
   stressReduction: { quick: number; short: number; long: number };
   // Max uses before long rest required
@@ -675,28 +634,24 @@ export interface RestConfig {
 export const REST_CONFIG: Record<AdventureDifficulty, RestConfig> = {
   easy: {
     cooldownReduction: { quick: 2, short: 999, long: 999 }, // 999 = full reset
-    conditionDowngrade: { quick: 0, short: 1, long: 2 },
     stressReduction: { quick: 2, short: 5, long: 10 },
     maxQuickRests: 4,
     maxShortRests: 3,
   },
   medium: {
     cooldownReduction: { quick: 1, short: 3, long: 999 },
-    conditionDowngrade: { quick: 0, short: 1, long: 2 },
     stressReduction: { quick: 1, short: 3, long: 10 },
     maxQuickRests: 3,
     maxShortRests: 2,
   },
   hard: {
     cooldownReduction: { quick: 1, short: 2, long: 999 },
-    conditionDowngrade: { quick: 0, short: 1, long: 1 },
     stressReduction: { quick: 1, short: 2, long: 8 },
     maxQuickRests: 2,
     maxShortRests: 2,
   },
   expert: {
     cooldownReduction: { quick: 1, short: 2, long: 999 },
-    conditionDowngrade: { quick: 0, short: 0, long: 1 },
     stressReduction: { quick: 0, short: 1, long: 5 },
     maxQuickRests: 2,
     maxShortRests: 1,
@@ -827,17 +782,10 @@ export interface StoryData {
   resources: Resource[];
   inventory: InventoryItem[];
   abilities: Ability[]; // Skills, spells, special moves
-  achievements: Achievement[];
   lore: StoryLore[];
-  points: number; // XP (experience points) - legacy name kept for backward compatibility
-  level: number; // Current level derived from XP (calculated, but stored for convenience)
-  upgradesSpent: number; // Number of level-up upgrades the player has spent
-  earnedPointsFromChapters: number[];
-  quests: Quest[]; // Quest system
-  earnedPointsFromQuests: string[]; // Array of quest IDs that have awarded points
+  goals: Goal[]; // Goal system (player-facing objectives)
   relationships: Relationship[]; // Legacy relationship tracking (deprecated)
   npcs: NPC[]; // NPC tracking system (enhanced relationships)
-  conditions: Condition[]; // Active conditions/afflictions affecting the player
   gameOver?: GameOver; // Game over state if the player has permanently died/lost
   activeChallenge?: SceneChallenge; // Current scene challenge (progress clock)
   timers?: CountdownTimer[]; // Countdown timers for deadlines/events
@@ -849,7 +797,6 @@ export interface StoryData {
   selected_preset?: string; // ID of the preset used
   presets?: Preset[]; // Adventure-specific character presets
   upgradeSettings?: UpgradeSettings; // Customizable upgrade system
-  levelingSettings?: LevelingSettings; // Customizable leveling curve
   newGamePlusCount?: number; // Number of NG+ runs completed
   newGamePlusMode?: boolean; // Whether current run is NG+
   nsfw?: boolean; // Whether the story contains NSFW content
@@ -1024,26 +971,6 @@ export interface AGMTThread {
 }
 
 // Upgrade system configuration
-
-export interface LevelCurvePoint {
-  level: number; // Target level (2+)
-  cumulativeXP: number; // Total XP required to reach this level
-}
-
-export interface LevelUpgradeOverride {
-  level: number; // Target level (2+)
-  upgrades: number; // Upgrade points awarded at this level
-}
-
-export interface LevelingSettings {
-  xpBase?: number; // Base multiplier for quadratic curve
-  levelCap?: number; // Max level attainable
-  useCustomCurve?: boolean; // When true, use customCurve thresholds instead of quadratic
-  customCurve?: LevelCurvePoint[]; // Custom XP requirements per level
-  defaultUpgradesPerLevel?: number; // Default upgrades granted on level up
-  upgradeOverrides?: LevelUpgradeOverride[]; // Per-level overrides for upgrade points
-  startingUpgrades?: Partial<Record<AdventureDifficulty, number>>; // Difficulty-based starting upgrades override
-}
 
 export interface UpgradeSettings {
   enabled: boolean; // Master toggle for upgrade system

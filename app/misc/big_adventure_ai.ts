@@ -5,7 +5,7 @@
  * - Stage 1: Core concept (title, premise, intro, author notes)
  * - Stage 2: Mechanics Notes (game rules as lore entries)
  * - Stage 2B: Character Sheet Template (fillable template with stats/resources)
- * - Stage 3: Content (lore, achievements, quests)
+ * - Stage 3: Content (lore, goals)
  * - Stage 4: Advanced (presets with filled character sheets, agmt, custom tables, starting choices)
  * - Stage 5: Icons (assigns thematic icons to all elements)
  *
@@ -49,7 +49,7 @@ export type GenerationStage =
   | "character-sheet"
   | "content-lore"
   | "content-npcs"
-  | "content-achievements"
+  | "content-goals"
   | "advanced-presets"
   | "advanced-tables"
   | "advanced-other"
@@ -114,18 +114,16 @@ export function getSubstageConfig(
 }
 
 // Iteration-specific sub-stages for content stage
-export type ContentSubStage = "lore" | "achievements" | "quests";
+export type ContentSubStage = "lore" | "goals";
 
 export interface ContentIterationConfig {
   lore: number; // 1-5 iterations
-  achievements: number;
-  quests: number;
+  goals: number;
 }
 
 export const DEFAULT_CONTENT_ITERATIONS: ContentIterationConfig = {
   lore: 1,
-  achievements: 1,
-  quests: 1,
+  goals: 1,
 };
 
 export interface BigAdventureConfig {
@@ -517,12 +515,10 @@ export type RegenerateSection =
   | "variables" // Regenerate variables
   | "mechanicsLore" // Regenerate mechanics lore entries
   | "lore" // Regenerate lore entries
-  | "achievements" // Regenerate achievements
-  | "quests" // Regenerate quests
+  | "goals" // Regenerate goals
   | "presets" // Regenerate character presets
   | "agmt" // Regenerate agmt state
   | "customTables" // Regenerate custom tables
-  | "levelingSettings" // Regenerate leveling curve settings
   | "startingChoices" // Regenerate starting choices
   | "icons"; // Regenerate icon assignments
 
@@ -572,16 +568,10 @@ export const REGENERATE_SECTIONS: Record<
     emoji: "📚",
     stage: "content",
   },
-  achievements: {
-    name: "Achievements",
-    description: "Unlockable achievements",
-    emoji: "🏆",
-    stage: "content",
-  },
-  quests: {
-    name: "Quests",
-    description: "Quest objectives",
-    emoji: "📋",
+  goals: {
+    name: "Goals",
+    description: "Player objectives",
+    emoji: "🎯",
     stage: "content",
   },
   presets: {
@@ -600,12 +590,6 @@ export const REGENERATE_SECTIONS: Record<
     name: "Custom Tables",
     description: "Random tables",
     emoji: "🎰",
-    stage: "advanced",
-  },
-  levelingSettings: {
-    name: "Leveling Curve",
-    description: "XP curve and upgrade points per level",
-    emoji: "📈",
     stage: "advanced",
   },
   startingChoices: {
@@ -765,7 +749,6 @@ export interface GenerationProgress {
 
 export interface IconAssignments {
   // NOTE: inventory and abilities fields are DEPRECATED - removed
-  achievements?: Record<string, string>;
   relationships?: Record<string, string>;
   presets?: Record<string, string>;
 }
@@ -923,16 +906,15 @@ export function getStageInfo(stage: GenerationStage): {
       number: 5,
       emoji: "👥",
     },
-    "content-achievements": {
-      name: "Goals & Milestones",
-      description: "Achievements and quests",
+    "content-goals": {
+      name: "Goals",
+      description: "Player objectives",
       detailedDescription:
-        "Defines what the player can accomplish: achievements to unlock and quests to complete.",
-      generates: ["Achievements with rewards", "Main and side quests"],
-      instructionHint:
-        "Shape quest objectives, achievement triggers, or story pacing",
+        "Defines what the player can accomplish: goals to complete over the course of the story.",
+      generates: ["Main and side goals"],
+      instructionHint: "Shape goal objectives or story pacing",
       number: 6,
-      emoji: "🏆",
+      emoji: "🎯",
     },
     "advanced-presets": {
       name: "Character Presets",
@@ -983,9 +965,8 @@ export function getStageInfo(stage: GenerationStage): {
       name: "Icon Assignment",
       description: "Assigns thematic icons to all elements",
       detailedDescription:
-        "Reviews achievements, lore entries, and relationships to assign appropriate icons from the game-icons.net library.",
+        "Reviews lore entries and relationships to assign appropriate icons from the game-icons.net library.",
       generates: [
-        "Icons for achievements",
         "Icons for relationships",
         "Icons for presets",
       ],
@@ -1602,23 +1583,19 @@ OUTPUT JSON SCHEMA:
 Remember: Output ONLY the JSON object, nothing else.`;
   }
 
-  if (stage === "content-achievements") {
+  if (stage === "content-goals") {
     return `${basePrompt}
 
-STAGE 3C: GOALS & MILESTONES
-Generate achievements and quests appropriate for this adventure's scope.
+STAGE 3C: GOALS
+Generate goals appropriate for this adventure's scope.
 
 GUIDELINES:
-- Create achievements for major story milestones, exploration, combat feats, social victories, and secret discoveries
-- Create quests for main story objectives and optional side content
+- Create goals for main story objectives and optional side content
 
 OUTPUT JSON SCHEMA:
 {
-  "achievements": [
-    { "title": "string", "description": "string (player-facing)", "ai_hint": "string (precise trigger conditions for AI)", "points": number, "symbol": "emoji", "dateAchieved": null }
-  ],
-  "quests": [
-    { "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }
+  "goals": [
+    { "id": "goal_xxx", "title": "string", "shortDescription": "string", "description": "string", "active": boolean, "fulfilled": false }
   ]
 }
 
@@ -1762,24 +1739,6 @@ Remember: Output ONLY the JSON object, nothing else.`;
     const schemaFields: string[] = [];
     let instructions = "";
 
-    // Always include leveling settings
-    instructions += `
-LEVELING CURVE & UPGRADES:
-Configure how quickly players level up and how many upgrade points they receive.
-- xpBase: Higher = slower leveling (default 100)
-- levelCap: Maximum level (default 100)  
-- defaultUpgradesPerLevel: Upgrade points per level (default 1)
-- upgradeOverrides: Bonus points at milestone levels (e.g., level 5, 10, etc.)
-- startingUpgrades: Override starting upgrade points per difficulty (easy=3, medium=2, hard=1, expert=0)
-`;
-    schemaFields.push(`"levelingSettings": {
-    "xpBase": number,
-    "levelCap": number,
-    "defaultUpgradesPerLevel": number,
-    "upgradeOverrides": [{ "level": number, "upgrades": number }],
-    "startingUpgrades": { "easy": number, "medium": number, "hard": number, "expert": number }
-  }`);
-
     if (config.includeStartingChoices) {
       instructions += `
 STARTING CHOICES (2-4):
@@ -1834,14 +1793,13 @@ AVAILABLE ICONS (${ALL_GAME_ICON_IDS.length} total):
 ${iconList}
 
 ELEMENTS THAT NEED ICONS:
-You will receive a list of achievements, relationships, and presets.
+You will receive a list of relationships and presets.
 For each element, choose the most thematically appropriate icon from the list above.
 
 NOTE: Inventory and abilities are DEPRECATED and not included.
 
 GUIDELINES:
 - Match icons to the element's theme/function (e.g., "Warrior" preset → "sword", "Mage" → "spell-book")
-- For achievements, use icons that represent the accomplishment
 - For relationships, use icons that represent the character's role or personality
 - For presets (character builds), use icons that represent the class/archetype
 - Be creative but thematic - the icon should represent what the element does
@@ -1850,7 +1808,6 @@ GUIDELINES:
 OUTPUT JSON SCHEMA:
 {
   "iconAssignments": {
-    "achievements": { "AchievementTitle": "icon-id", ... },
     "relationships": { "NPCName": "icon-id", ... },
     "presets": { "PresetName": "icon-id", ... }
   }
@@ -1970,16 +1927,6 @@ export function buildBigAdventureMessages(
     let elementsMessage = "ELEMENTS THAT NEED ICONS:\n\n";
 
     // NOTE: inventory and abilities icon assignment is DEPRECATED - removed
-
-    if (template.achievements && template.achievements.length > 0) {
-      elementsMessage += `ACHIEVEMENTS:\n`;
-      template.achievements.forEach((a) => {
-        elementsMessage += `- "${a.title}": ${
-          a.description || "No description"
-        }\n`;
-      });
-      elementsMessage += "\n";
-    }
 
     if (template.relationships && template.relationships.length > 0) {
       elementsMessage += `RELATIONSHIPS:\n`;
@@ -2517,11 +2464,10 @@ export function parseBigAdventureStageOutput(
       };
     }
 
-    if (stage === "content-achievements") {
+    if (stage === "content-goals") {
       return {
         storyTemplate: {
-          achievements: parsed.achievements,
-          quests: parsed.quests,
+          goals: parsed.goals,
         },
       };
     }
@@ -2546,9 +2492,7 @@ export function parseBigAdventureStageOutput(
 
     if (stage === "advanced-other") {
       return {
-        storyTemplate: {
-          levelingSettings: parsed.levelingSettings,
-        },
+        storyTemplate: {},
         startingChoices: parsed.startingChoices,
       };
     }
@@ -2591,14 +2535,9 @@ export function mergeBigAdventureResults(
       resources: [],
       inventory: [],
       abilities: [],
-      achievements: [],
       lore: [],
-      points: 0,
-      earnedPointsFromChapters: [],
-      quests: [],
-      earnedPointsFromQuests: [],
+      goals: [],
       relationships: [],
-      conditions: [],
     },
   };
 
@@ -2618,15 +2557,13 @@ export function mergeBigAdventureResults(
       // NOTE: abilities and inventory are DEPRECATED - not included here
       const arrayFields = [
         "lore",
-        "achievements",
-        "quests",
+        "goals",
         "presets",
         "customTables",
         "variables",
         "relationships",
         "stats",
         "resources",
-        "conditions",
       ] as const;
 
       // Create a new storyTemplate with merged arrays
@@ -2675,17 +2612,6 @@ export function mergeBigAdventureResults(
       const assignments = result.iconAssignments;
 
       // NOTE: inventory and abilities icon assignments are DEPRECATED - removed
-
-      // Apply to achievements
-      if (assignments.achievements && merged.storyTemplate.achievements) {
-        merged.storyTemplate.achievements =
-          merged.storyTemplate.achievements.map((achievement) => ({
-            ...achievement,
-            symbol:
-              assignments.achievements![achievement.title] ||
-              achievement.symbol,
-          }));
-      }
 
       // Apply to relationships
       if (assignments.relationships && merged.storyTemplate.relationships) {
@@ -2743,7 +2669,7 @@ export function getStagesToRun(config: BigAdventureConfig): GenerationStage[] {
   if (contentEnabled) {
     stages.push("content-lore");
     stages.push("content-npcs");
-    stages.push("content-achievements");
+    stages.push("content-goals");
   }
 
   // Advanced substages - only if specific features are enabled AND advanced stage is enabled
@@ -2801,7 +2727,7 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
     "character-sheet": 2500,
     "content-lore": 3500,
     "content-npcs": 3500,
-    "content-achievements": 3000,
+    "content-goals": 3000,
     "advanced-presets": 4000,
     "advanced-tables": 3000,
     "advanced-other": 3000,
@@ -2820,10 +2746,8 @@ export function estimateBigAdventureCost(config: BigAdventureConfig): {
       // Scale lore output by iteration multiplier
       const outputMultiplier = Math.min(2, contentIterations.lore);
       outputForStage = Math.round(outputForStage * outputMultiplier);
-    } else if (stage === "content-achievements") {
-      const avgMultiplier =
-        (contentIterations.achievements + contentIterations.quests) / 2;
-      const outputMultiplier = Math.min(2, avgMultiplier);
+    } else if (stage === "content-goals") {
+      const outputMultiplier = Math.min(2, contentIterations.goals);
       outputForStage = Math.round(outputForStage * outputMultiplier);
     }
 
@@ -2870,8 +2794,7 @@ export function saveAutosave(data: BigAdventureAutosave): void {
         storyTemplate: {
           ...st,
           lore: st.lore?.slice(0, 30),
-          achievements: st.achievements?.slice(0, 20),
-          quests: st.quests?.slice(0, 10),
+          goals: st.goals?.slice(0, 20),
           customTables: st.customTables?.slice(0, 10),
         },
       };
@@ -3053,8 +2976,8 @@ EXISTING CONTENT SUMMARY:`;
   if (currentResult.storyTemplate?.lore?.length) {
     context += `\n- Lore entries: ${currentResult.storyTemplate.lore.length}`;
   }
-  if (currentResult.storyTemplate?.achievements?.length) {
-    context += `\n- Achievements: ${currentResult.storyTemplate.achievements.length}`;
+  if (currentResult.storyTemplate?.goals?.length) {
+    context += `\n- Goals: ${currentResult.storyTemplate.goals.length}`;
   }
 
   // Section-specific prompts
@@ -3123,13 +3046,9 @@ TRIGGERS - CRITICAL:
 - EVERY lore entry MUST have on_triggers OR alwaysOn=true - no empty triggers!`,
       schema: `{ "lore": [{ "title": "Lord Varen Blackwood", "content": "string (2-4 detailed paragraphs)", "secret": false, "on": false, "alwaysOn": false, "on_triggers": ["Varen", "Blackwood", "Lord Blackwood", "the lord"], "off_triggers": [], "var_on_triggers": [] }] }`,
     },
-    achievements: {
-      instruction: `Generate achievements with ai_hint for precise triggering. Create as many as appropriate for this adventure's scope.`,
-      schema: `{ "achievements": [{ "title": "string", "description": "string", "ai_hint": "string", "points": number, "symbol": "emoji", "dateAchieved": null }] }`,
-    },
-    quests: {
-      instruction: `Generate quests with objectives. Create as many as appropriate for this adventure's scope.`,
-      schema: `{ "quests": [{ "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }] }`,
+    goals: {
+      instruction: `Generate goals with objectives. Create as many as appropriate for this adventure's scope.`,
+      schema: `{ "goals": [{ "id": "goal_xxx", "title": "string", "shortDescription": "string", "description": "string", "active": boolean, "fulfilled": false }] }`,
     },
     presets: {
       instruction: `Generate character presets with unique character sheets and abilities. Create as many as appropriate to give players meaningful choices.
@@ -3146,10 +3065,6 @@ Write full, standalone content - not fragments!`,
     customTables: {
       instruction: `Generate random tables (encounters, weather, events, etc). Create as many tables as needed. Each table MUST have 20-50 entries for proper variety.`,
       schema: `{ "customTables": [{ "id": "table_xxx", "name": "string", "description": "string", "entries": [{ "text": "string (20-50 entries per table!)", "weight": number (1-10) }] }] }`,
-    },
-    levelingSettings: {
-      instruction: `Configure leveling curve and upgrade points per level. xpBase controls how quickly players level (higher = slower), levelCap sets max level, defaultUpgradesPerLevel is standard upgrade points, upgradeOverrides gives bonus points at milestones, startingUpgrades overrides starting points per difficulty.`,
-      schema: `{ "levelingSettings": { "xpBase": number (default 100), "levelCap": number (default 100), "defaultUpgradesPerLevel": number (default 1), "upgradeOverrides": [{ "level": number, "upgrades": number }], "startingUpgrades": { "easy": number, "medium": number, "hard": number, "expert": number } } }`,
     },
     startingChoices: {
       instruction: "Generate 2-4 starting choices for the adventure beginning.",
@@ -3170,7 +3085,7 @@ Match icons to element themes:
 - Social: conversation, handshake, crown
 - Movement: running-shoe, wingfoot, sprint
 - Stealth: hidden, cloak, shadow`,
-      schema: `{ "iconAssignments": { "achievements": { "AchievementTitle": "icon-id" }, "relationships": { "NPCName": "icon-id" }, "presets": { "PresetName": "icon-id" } } }`,
+      schema: `{ "iconAssignments": { "relationships": { "NPCName": "icon-id" }, "presets": { "PresetName": "icon-id" } } }`,
     },
   };
 
@@ -3304,18 +3219,14 @@ export function parseRegenerateSectionOutput(
         return { storyTemplate: { lore: parsed.lore } };
       case "lore":
         return { storyTemplate: { lore: parsed.lore } };
-      case "achievements":
-        return { storyTemplate: { achievements: parsed.achievements } };
-      case "quests":
-        return { storyTemplate: { quests: parsed.quests } };
+      case "goals":
+        return { storyTemplate: { goals: parsed.goals } };
       case "presets":
         return { storyTemplate: { presets: parsed.presets } };
       case "agmt":
         return { storyTemplate: { agmtState: parsed.agmtState } };
       case "customTables":
         return { storyTemplate: { customTables: parsed.customTables } };
-      case "levelingSettings":
-        return { storyTemplate: { levelingSettings: parsed.levelingSettings } };
       case "startingChoices":
         return { startingChoices: parsed.startingChoices };
       case "icons":
@@ -3335,8 +3246,7 @@ export function parseRegenerateSectionOutput(
 export const EXTENDABLE_SECTIONS: RegenerateSection[] = [
   "mechanicsLore",
   "lore",
-  "achievements",
-  "quests",
+  "goals",
   "presets",
   "customTables",
   "variables",
@@ -3389,23 +3299,13 @@ export function buildExtendSectionMessages(
           .join(", ");
         break;
       }
-      case "achievements":
-        existingItems = (template.achievements || []) as {
+      case "goals":
+        existingItems = (template.goals || []) as {
           name?: string;
           title?: string;
         }[];
         existingItemsPreview = existingItems
-          .map((a) => a.title)
-          .filter(Boolean)
-          .join(", ");
-        break;
-      case "quests":
-        existingItems = (template.quests || []) as {
-          name?: string;
-          title?: string;
-        }[];
-        existingItemsPreview = existingItems
-          .map((q) => q.title)
+          .map((g) => g.title)
           .filter(Boolean)
           .join(", ");
         break;
@@ -3505,13 +3405,9 @@ TRIGGERS - IMPORTANT:
 Ensure new lore references and connects to existing lore entries.`,
       schema: `{ "lore": [{ "title": "Captain Sera Vex", "content": "string (2-4 detailed paragraphs)", "secret": false, "on": false, "alwaysOn": false, "on_triggers": ["Sera", "Vex", "Captain Vex", "the captain"], "off_triggers": [], "var_on_triggers": [] }] }`,
     },
-    achievements: {
-      instruction: `Generate NEW achievements with ai_hint for precise triggering. Generate as many as possible.`,
-      schema: `{ "achievements": [{ "title": "string", "description": "string", "ai_hint": "string", "points": number, "symbol": "emoji", "dateAchieved": null }] }`,
-    },
-    quests: {
-      instruction: `Generate NEW quests with objectives. Generate as many as possible.`,
-      schema: `{ "quests": [{ "id": "quest_xxx", "title": "string", "shortDescription": "string", "description": "string", "points": number, "active": boolean, "fulfilled": false }] }`,
+    goals: {
+      instruction: `Generate NEW goals with objectives. Generate as many as possible.`,
+      schema: `{ "goals": [{ "id": "goal_xxx", "title": "string", "shortDescription": "string", "description": "string", "active": boolean, "fulfilled": false }] }`,
     },
     presets: {
       instruction: `Generate NEW character presets with unique character sheets and abilities. Generate as many as the output budget allows.
@@ -3529,10 +3425,6 @@ Write full, standalone content - not fragments!`,
       instruction: `Generate NEW random tables (encounters, weather, events, etc). Generate as many tables as the output budget allows.
 Each table MUST have 20-50 entries for proper variety. Use weights 1-10 (higher = more common).`,
       schema: `{ "customTables": [{ "id": "table_xxx", "name": "string", "description": "string", "entries": [{ "text": "string (20-50 entries per table!)", "weight": number (1-10) }] }] }`,
-    },
-    levelingSettings: {
-      instruction: "",
-      schema: "",
     },
     startingChoices: {
       instruction: "",
@@ -3667,19 +3559,10 @@ export function parseExtendSectionOutput(
             lore: [...(template.lore || []), ...(parsed.lore || [])],
           },
         };
-      case "achievements":
+      case "goals":
         return {
           storyTemplate: {
-            achievements: [
-              ...(template.achievements || []),
-              ...(parsed.achievements || []),
-            ],
-          },
-        };
-      case "quests":
-        return {
-          storyTemplate: {
-            quests: [...(template.quests || []), ...(parsed.quests || [])],
+            goals: [...(template.goals || []), ...(parsed.goals || [])],
           },
         };
       case "presets":

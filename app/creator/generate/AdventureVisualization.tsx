@@ -184,80 +184,74 @@ export function RelationshipGraph({
   );
 }
 
-interface QuestFlowProps {
-  quests: Array<{
+interface GoalFlowProps {
+  goals: Array<{
     id?: string;
     title: string;
     shortDescription?: string;
     description?: string;
-    points?: number;
     active?: boolean;
     fulfilled?: boolean;
   }>;
 }
 
 /**
- * Quest Flow - Displays quests as a flow diagram
+ * Goal Flow - Displays goals as a flow diagram
  */
-export function QuestFlow({ quests }: QuestFlowProps) {
-  const [expandedQuest, setExpandedQuest] = useState<string | null>(null);
+export function GoalFlow({ goals }: GoalFlowProps) {
+  const [expandedGoal, setExpandedGoal] = useState<string | null>(null);
 
-  if (!quests || quests.length === 0) {
+  if (!goals || goals.length === 0) {
     return (
       <div className="text-center text-blue-300/50 py-8">
-        No quests to display
+        No goals to display
       </div>
     );
   }
 
-  // Group quests by status
-  const mainQuests = quests.filter((q) => q.active);
-  const sideQuests = quests.filter((q) => !q.active);
+  // Group goals by status
+  const mainGoals = goals.filter((g) => g.active);
+  const sideGoals = goals.filter((g) => !g.active);
 
   return (
     <div className="space-y-4">
-      {/* Main Quests */}
-      {mainQuests.length > 0 && (
+      {/* Main Goals */}
+      {mainGoals.length > 0 && (
         <div>
           <h4 className="text-sm font-medium text-amber-400 mb-2 flex items-center gap-2">
-            <span>⚔️</span> Main Quests
+            <span>⚔️</span> Main Goals
           </h4>
           <div className="grid gap-2">
-            {mainQuests.map((quest, i) => (
+            {mainGoals.map((goal, i) => (
               <div
-                key={quest.id || i}
+                key={goal.id || i}
                 className={`bg-amber-900/30 rounded-lg p-3 border border-amber-700/30 cursor-pointer transition-all hover:border-amber-600/50 ${
-                  expandedQuest === (quest.id || `main-${i}`)
+                  expandedGoal === (goal.id || `main-${i}`)
                     ? "border-amber-500/50"
                     : ""
                 }`}
                 onClick={() =>
-                  setExpandedQuest(
-                    expandedQuest === (quest.id || `main-${i}`)
+                  setExpandedGoal(
+                    expandedGoal === (goal.id || `main-${i}`)
                       ? null
-                      : quest.id || `main-${i}`
+                      : goal.id || `main-${i}`
                   )
                 }
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-white text-sm">
-                    {quest.title}
+                    {goal.title}
                   </span>
-                  {quest.points && (
-                    <span className="text-xs text-amber-400">
-                      +{quest.points} pts
-                    </span>
-                  )}
                 </div>
-                {quest.shortDescription && (
+                {goal.shortDescription && (
                   <p className="text-xs text-amber-300/60 mt-1">
-                    {quest.shortDescription}
+                    {goal.shortDescription}
                   </p>
                 )}
-                {expandedQuest === (quest.id || `main-${i}`) &&
-                  quest.description && (
+                {expandedGoal === (goal.id || `main-${i}`) &&
+                  goal.description && (
                     <p className="text-sm text-amber-200/70 mt-2 pt-2 border-t border-amber-700/30 animate-in slide-in-from-top-1">
-                      {quest.description}
+                      {goal.description}
                     </p>
                   )}
               </div>
@@ -266,48 +260,43 @@ export function QuestFlow({ quests }: QuestFlowProps) {
         </div>
       )}
 
-      {/* Side Quests */}
-      {sideQuests.length > 0 && (
+      {/* Side Goals */}
+      {sideGoals.length > 0 && (
         <div>
           <h4 className="text-sm font-medium text-blue-400 mb-2 flex items-center gap-2">
-            <span>📜</span> Side Quests
+            <span>📜</span> Side Goals
           </h4>
           <div className="grid gap-2">
-            {sideQuests.map((quest, i) => (
+            {sideGoals.map((goal, i) => (
               <div
-                key={quest.id || i}
+                key={goal.id || i}
                 className={`bg-blue-900/30 rounded-lg p-3 border border-blue-700/30 cursor-pointer transition-all hover:border-blue-600/50 ${
-                  expandedQuest === (quest.id || `side-${i}`)
+                  expandedGoal === (goal.id || `side-${i}`)
                     ? "border-blue-500/50"
                     : ""
                 }`}
                 onClick={() =>
-                  setExpandedQuest(
-                    expandedQuest === (quest.id || `side-${i}`)
+                  setExpandedGoal(
+                    expandedGoal === (goal.id || `side-${i}`)
                       ? null
-                      : quest.id || `side-${i}`
+                      : goal.id || `side-${i}`
                   )
                 }
               >
                 <div className="flex items-center justify-between">
                   <span className="font-medium text-white text-sm">
-                    {quest.title}
+                    {goal.title}
                   </span>
-                  {quest.points && (
-                    <span className="text-xs text-blue-400">
-                      +{quest.points} pts
-                    </span>
-                  )}
                 </div>
-                {quest.shortDescription && (
+                {goal.shortDescription && (
                   <p className="text-xs text-blue-300/60 mt-1">
-                    {quest.shortDescription}
+                    {goal.shortDescription}
                   </p>
                 )}
-                {expandedQuest === (quest.id || `side-${i}`) &&
-                  quest.description && (
+                {expandedGoal === (goal.id || `side-${i}`) &&
+                  goal.description && (
                     <p className="text-sm text-blue-200/70 mt-2 pt-2 border-t border-blue-700/30 animate-in slide-in-from-top-1">
-                      {quest.description}
+                      {goal.description}
                     </p>
                   )}
               </div>
@@ -324,30 +313,30 @@ interface AdventureVisualizationProps {
 }
 
 /**
- * Adventure Visualization Panel - Combined view of relationships and quests
+ * Adventure Visualization Panel - Combined view of relationships and goals
  */
 export function AdventureVisualization({
   result,
 }: AdventureVisualizationProps) {
-  const [activeTab, setActiveTab] = useState<"relationships" | "quests">(
+  const [activeTab, setActiveTab] = useState<"relationships" | "goals">(
     "relationships"
   );
 
   const hasRelationships =
     result.storyTemplate?.relationships &&
     result.storyTemplate.relationships.length > 0;
-  const hasQuests =
-    result.storyTemplate?.quests && result.storyTemplate.quests.length > 0;
+  const hasGoals =
+    result.storyTemplate?.goals && result.storyTemplate.goals.length > 0;
 
-  if (!hasRelationships && !hasQuests) {
+  if (!hasRelationships && !hasGoals) {
     return null;
   }
 
   // Auto-select first available tab
   const availableTabs = [
     hasRelationships && "relationships",
-    hasQuests && "quests",
-  ].filter(Boolean) as ("relationships" | "quests")[];
+    hasGoals && "goals",
+  ].filter(Boolean) as ("relationships" | "goals")[];
 
   if (!availableTabs.includes(activeTab)) {
     // Switch to first available if current tab not available
@@ -376,16 +365,16 @@ export function AdventureVisualization({
             💕 Relationships
           </button>
         )}
-        {hasQuests && (
+        {hasGoals && (
           <button
-            onClick={() => setActiveTab("quests")}
+            onClick={() => setActiveTab("goals")}
             className={`px-4 py-2 rounded-lg text-sm transition-colors ${
-              activeTab === "quests"
+              activeTab === "goals"
                 ? "bg-purple-600 text-white"
                 : "bg-blue-900/40 text-blue-300 hover:bg-blue-800/50"
             }`}
           >
-            ⚔️ Quest Flow
+            ⚔️ Goal Flow
           </button>
         )}
       </div>
@@ -398,8 +387,8 @@ export function AdventureVisualization({
             playerName={result.storyTemplate?.player_name || "Player"}
           />
         )}
-        {activeTab === "quests" && hasQuests && (
-          <QuestFlow quests={result.storyTemplate!.quests!} />
+        {activeTab === "goals" && hasGoals && (
+          <GoalFlow goals={result.storyTemplate!.goals!} />
         )}
       </div>
     </div>

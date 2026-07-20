@@ -54,7 +54,7 @@ function getMinimalFallbackJSON(stage: GenerationStage): string {
       return JSON.stringify({
         lore: [],
       });
-    case "content-achievements":
+    case "content-goals":
       return JSON.stringify({
         achievements: [],
         quests: [],

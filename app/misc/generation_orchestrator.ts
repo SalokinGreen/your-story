@@ -34,7 +34,7 @@ const PARALLELIZABLE_STAGES: GenerationStage[] = [
   "character-sheet",
   "content-lore",
   "content-npcs",
-  "content-achievements",
+  "content-goals",
   "advanced-presets",
   "advanced-tables",
   "advanced-other",

@@ -4,8 +4,8 @@ import { StoryData, StoryThread } from "../misc/structs";
 import { useState } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
 
-export default function QuestsPage(storyData: StoryData) {
-  const [expandedQuestId, setExpandedQuestId] = useState<string | null>(null);
+export default function GoalsPage(storyData: StoryData) {
+  const [expandedGoalId, setExpandedGoalId] = useState<string | null>(null);
   const [expandedThreadId, setExpandedThreadId] = useState<string | null>(null);
 
   // Get threads data
@@ -16,11 +16,11 @@ export default function QuestsPage(storyData: StoryData) {
   const abandonedThreads =
     storyData.threads?.filter((t) => t.status === "abandoned") || [];
 
-  const hasQuests = storyData.quests && storyData.quests.length > 0;
+  const hasGoals = storyData.goals && storyData.goals.length > 0;
   const hasThreads = storyData.threads && storyData.threads.length > 0;
 
-  // Empty state - no quests or threads
-  if (!hasQuests && !hasThreads) {
+  // Empty state - no goals or threads
+  if (!hasGoals && !hasThreads) {
     return (
       <div className="w-full">
         <div className="bg-blue-950/50 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-blue-800/30">
@@ -30,7 +30,7 @@ export default function QuestsPage(storyData: StoryData) {
           </h2>
           <div className="p-8 text-center rounded-lg bg-blue-900/20 border-2 border-dashed border-blue-700/40">
             <p className="text-sm sm:text-base text-blue-200/60">
-              No quests or story threads yet
+              No goals or story threads yet
             </p>
           </div>
         </div>
@@ -38,91 +38,88 @@ export default function QuestsPage(storyData: StoryData) {
     );
   }
 
-  const activeQuests = storyData.quests?.filter((q) => q.active) || [];
-  const inactiveQuests = storyData.quests?.filter((q) => !q.active) || [];
-  const completedQuests = activeQuests.filter((q) => q.fulfilled);
-  const ongoingQuests = activeQuests.filter((q) => !q.fulfilled);
+  const activeGoals = storyData.goals?.filter((g) => g.active) || [];
+  const inactiveGoals = storyData.goals?.filter((g) => !g.active) || [];
+  const completedGoals = activeGoals.filter((g) => g.fulfilled);
+  const ongoingGoals = activeGoals.filter((g) => !g.fulfilled);
 
-  const toggleQuestActive = (questId: string) => {
-    const quest = storyData.quests?.find((q) => q.id === questId);
-    if (quest) {
-      quest.active = !quest.active;
+  const toggleGoalActive = (goalId: string) => {
+    const goal = storyData.goals?.find((g) => g.id === goalId);
+    if (goal) {
+      goal.active = !goal.active;
       // Force re-render by updating state
-      setExpandedQuestId(null);
+      setExpandedGoalId(null);
     }
   };
 
-  const toggleExpanded = (questId: string) => {
-    setExpandedQuestId(expandedQuestId === questId ? null : questId);
+  const toggleExpanded = (goalId: string) => {
+    setExpandedGoalId(expandedGoalId === goalId ? null : goalId);
   };
 
   return (
     <div className="w-full">
-      {/* Quests Section */}
-      {hasQuests && (
+      {/* Goals Section */}
+      {hasGoals && (
         <div className="bg-blue-950/50 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-blue-800/30">
           <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent flex items-center gap-2">
             <DynamicIcon name="Scroll" className="w-8 h-8 text-purple-400" />{" "}
-            Quests
+            Goals
           </h2>
 
-          {/* Active Ongoing Quests */}
-          {ongoingQuests.length > 0 && (
+          {/* Active Ongoing Goals */}
+          {ongoingGoals.length > 0 && (
             <div className="mb-8">
               <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-white">
                 <DynamicIcon name="Target" className="w-6 h-6 text-blue-400" />
-                Active Quests ({ongoingQuests.length})
+                Active Goals ({ongoingGoals.length})
               </h3>
               <div className="space-y-3">
-                {ongoingQuests.map((quest) => {
-                  if (!quest.id) {
-                    console.error("Quest missing id:", quest);
-                    quest.id = `quest-${Math.random()}`; // Fallback ID
+                {ongoingGoals.map((goal) => {
+                  if (!goal.id) {
+                    console.error("Goal missing id:", goal);
+                    goal.id = `goal-${Math.random()}`; // Fallback ID
                   }
                   return (
                     <div
-                      key={quest.id || `quest-${quest.title}-${Math.random()}`}
+                      key={goal.id || `goal-${goal.title}-${Math.random()}`}
                       className="flex flex-col gap-3 p-4 rounded-xl border-2 border-blue-500/50 bg-blue-900/30 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(59,130,246,0.15)]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 mb-2">
                             <h4 className="font-bold text-base sm:text-lg text-white">
-                              {quest.title}
+                              {goal.title}
                             </h4>
-                            <span className="px-2 py-0.5 bg-blue-800/50 text-blue-200 rounded-full text-xs font-bold shrink-0">
-                              {quest.points} pts
-                            </span>
                           </div>
                           <p className="text-sm sm:text-base text-blue-100/80 mb-2">
-                            {quest.shortDescription}
+                            {goal.shortDescription}
                           </p>
-                          {expandedQuestId === quest.id &&
-                            quest.description !== quest.shortDescription && (
+                          {expandedGoalId === goal.id &&
+                            goal.description !== goal.shortDescription && (
                               <p className="text-xs sm:text-sm text-blue-200/60 italic mt-2 p-3 bg-blue-950/50 rounded border border-blue-700/40">
-                                {quest.description}
+                                {goal.description}
                               </p>
                             )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 pt-2 border-t border-blue-700/40">
-                        {quest.description !== quest.shortDescription && (
+                        {goal.description !== goal.shortDescription && (
                           <button
-                            onClick={() => toggleExpanded(quest.id)}
+                            onClick={() => toggleExpanded(goal.id)}
                             className="px-3 py-1 text-sm bg-blue-700/50 hover:bg-blue-600/50 text-blue-100 rounded-lg transition-colors"
                           >
-                            {expandedQuestId === quest.id
+                            {expandedGoalId === goal.id
                               ? "Show Less"
                               : "Show Details"}
                           </button>
                         )}
                         <button
-                          onClick={() => toggleQuestActive(quest.id)}
+                          onClick={() => toggleGoalActive(goal.id)}
                           className="px-3 py-1 text-sm bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
                         >
                           <span className="flex items-center gap-1">
                             <DynamicIcon name="EyeOff" className="w-4 h-4" />{" "}
-                            Hide Quest
+                            Hide Goal
                           </span>
                         </button>
                       </div>
@@ -133,26 +130,26 @@ export default function QuestsPage(storyData: StoryData) {
             </div>
           )}
 
-          {/* Completed Quests */}
-          {completedQuests.length > 0 && (
+          {/* Completed Goals */}
+          {completedGoals.length > 0 && (
             <div className="mb-8">
               <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-white">
                 <DynamicIcon
                   name="CheckCircle"
                   className="w-6 h-6 text-green-400"
                 />
-                Completed Quests ({completedQuests.length})
+                Completed Goals ({completedGoals.length})
               </h3>
               <div className="space-y-3">
-                {completedQuests.map((quest) => {
-                  if (!quest.id) {
-                    console.error("Quest missing id:", quest);
+                {completedGoals.map((goal) => {
+                  if (!goal.id) {
+                    console.error("Goal missing id:", goal);
                   }
                   return (
                     <div
                       key={
-                        quest.id ||
-                        `quest-completed-${quest.title}-${Math.random()}`
+                        goal.id ||
+                        `goal-completed-${goal.title}-${Math.random()}`
                       }
                       className="flex flex-col gap-3 p-4 rounded-xl border-2 border-green-500/50 bg-green-900/20 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(34,197,94,0.15)]"
                     >
@@ -164,41 +161,38 @@ export default function QuestsPage(storyData: StoryData) {
                               className="w-5 h-5 text-green-400 shrink-0"
                             />
                             <h4 className="font-bold text-base sm:text-lg text-white line-through">
-                              {quest.title}
+                              {goal.title}
                             </h4>
-                            <span className="px-2 py-0.5 bg-green-800/50 text-green-200 rounded-full text-xs font-bold shrink-0">
-                              {quest.points} pts
-                            </span>
                           </div>
                           <p className="text-sm sm:text-base text-green-100/70">
-                            {quest.shortDescription}
+                            {goal.shortDescription}
                           </p>
-                          {expandedQuestId === quest.id &&
-                            quest.description !== quest.shortDescription && (
+                          {expandedGoalId === goal.id &&
+                            goal.description !== goal.shortDescription && (
                               <p className="text-xs sm:text-sm text-green-200/60 italic mt-2 p-3 bg-green-950/50 rounded border border-green-700/40">
-                                {quest.description}
+                                {goal.description}
                               </p>
                             )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 pt-2 border-t border-green-700/40">
-                        {quest.description !== quest.shortDescription && (
+                        {goal.description !== goal.shortDescription && (
                           <button
-                            onClick={() => toggleExpanded(quest.id)}
+                            onClick={() => toggleExpanded(goal.id)}
                             className="px-3 py-1 text-sm bg-green-700/50 hover:bg-green-600/50 text-green-100 rounded-lg transition-colors"
                           >
-                            {expandedQuestId === quest.id
+                            {expandedGoalId === goal.id
                               ? "Show Less"
                               : "Show Details"}
                           </button>
                         )}
                         <button
-                          onClick={() => toggleQuestActive(quest.id)}
+                          onClick={() => toggleGoalActive(goal.id)}
                           className="px-3 py-1 text-sm bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
                         >
                           <span className="flex items-center gap-1">
                             <DynamicIcon name="EyeOff" className="w-4 h-4" />{" "}
-                            Hide Quest
+                            Hide Goal
                           </span>
                         </button>
                       </div>
@@ -209,26 +203,26 @@ export default function QuestsPage(storyData: StoryData) {
             </div>
           )}
 
-          {/* Inactive Quests */}
-          {inactiveQuests.length > 0 && (
+          {/* Inactive Goals */}
+          {inactiveGoals.length > 0 && (
             <div>
               <h3 className="text-lg sm:text-xl font-bold mb-4 flex items-center gap-2 text-white">
                 <DynamicIcon
                   name="EyeOff"
                   className="w-6 h-6 text-blue-300/60"
                 />
-                Inactive Quests ({inactiveQuests.length})
+                Inactive Goals ({inactiveGoals.length})
               </h3>
               <div className="space-y-3">
-                {inactiveQuests.map((quest) => {
-                  if (!quest.id) {
-                    console.error("Quest missing id:", quest);
+                {inactiveGoals.map((goal) => {
+                  if (!goal.id) {
+                    console.error("Goal missing id:", goal);
                   }
                   return (
                     <div
                       key={
-                        quest.id ||
-                        `quest-inactive-${quest.title}-${Math.random()}`
+                        goal.id ||
+                        `goal-inactive-${goal.title}-${Math.random()}`
                       }
                       className="flex flex-col gap-3 p-4 rounded-xl border-2 border-blue-800/30 bg-blue-900/20 opacity-70 transition-all card-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.08)]"
                     >
@@ -237,15 +231,12 @@ export default function QuestsPage(storyData: StoryData) {
                           <div className="flex items-center gap-2 mb-2">
                             <h4
                               className={`font-bold text-base sm:text-lg text-white ${
-                                quest.fulfilled ? "line-through" : ""
+                                goal.fulfilled ? "line-through" : ""
                               }`}
                             >
-                              {quest.title}
+                              {goal.title}
                             </h4>
-                            <span className="px-2 py-0.5 bg-blue-800/30 text-blue-200/60 rounded-full text-xs font-bold shrink-0">
-                              {quest.points} pts
-                            </span>
-                            {quest.fulfilled && (
+                            {goal.fulfilled && (
                               <DynamicIcon
                                 name="Check"
                                 className="w-5 h-5 text-green-400 shrink-0"
@@ -253,34 +244,34 @@ export default function QuestsPage(storyData: StoryData) {
                             )}
                           </div>
                           <p className="text-sm sm:text-base text-blue-200/60">
-                            {quest.shortDescription}
+                            {goal.shortDescription}
                           </p>
-                          {expandedQuestId === quest.id &&
-                            quest.description !== quest.shortDescription && (
+                          {expandedGoalId === goal.id &&
+                            goal.description !== goal.shortDescription && (
                               <p className="text-xs sm:text-sm text-blue-200/50 italic mt-2 p-3 bg-blue-950/50 rounded border border-blue-800/30">
-                                {quest.description}
+                                {goal.description}
                               </p>
                             )}
                         </div>
                       </div>
                       <div className="flex items-center gap-2 pt-2 border-t border-blue-800/30">
-                        {quest.description !== quest.shortDescription && (
+                        {goal.description !== goal.shortDescription && (
                           <button
-                            onClick={() => toggleExpanded(quest.id)}
+                            onClick={() => toggleExpanded(goal.id)}
                             className="px-3 py-1 text-sm bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
                           >
-                            {expandedQuestId === quest.id
+                            {expandedGoalId === goal.id
                               ? "Show Less"
                               : "Show Details"}
                           </button>
                         )}
                         <button
-                          onClick={() => toggleQuestActive(quest.id)}
+                          onClick={() => toggleGoalActive(goal.id)}
                           className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
                         >
                           <span className="flex items-center gap-1">
                             <DynamicIcon name="Eye" className="w-4 h-4" /> Show
-                            Quest
+                            Goal
                           </span>
                         </button>
                       </div>

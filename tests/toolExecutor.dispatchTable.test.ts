@@ -1,14 +1,14 @@
 /**
  * Direct typed dispatch table tests.
  *
- * toolExecutor.ts used to convert these 13 tool calls into a pipe-delimited
+ * toolExecutor.ts used to convert these tool calls into a pipe-delimited
  * `/command: args` string (via convertToolToCommand) and then re-parse that
  * string with a regex in commandResponses.ts's executeCommandWithResponse.
  * That round trip is gone now - TOOL_DISPATCH calls typed apply* functions
  * directly with the already-parsed args object.
  *
- * Two of these tools - delete_quest and delete_note - previously built
- * command strings (`/delete_quest: ...`, `/note_delete: ...`) that had NO
+ * Two of these tools - delete_goal and delete_note - previously built
+ * command strings (`/delete_goal: ...`, `/note_delete: ...`) that had NO
  * matching regex handler anywhere in commandResponses.ts, so every call
  * silently failed with "Command execution returned null". This file
  * confirms both are now real, working implementations.
@@ -20,7 +20,7 @@ import {
   applyReduceCooldown,
   applyResetAbilityCooldown,
 } from "@/app/misc/commandResponses";
-import type { Ability, Quest, Resource, StoryData } from "@/app/misc/structs";
+import type { Ability, Goal, Resource, StoryData } from "@/app/misc/structs";
 
 function createTestStory(overrides: Partial<StoryData> = {}): StoryData {
   return {
@@ -29,42 +29,32 @@ function createTestStory(overrides: Partial<StoryData> = {}): StoryData {
     player_name: "Test Player",
     player_summary: "Test summary",
     intro: "Test intro",
-    points: 0,
-    earnedPointsFromQuests: [],
-    earnedPointsFromChapters: [],
     currentChapter: 0,
     max_chapters: 10,
     scene: { parts: [] },
     chapters: [],
-    quests: [],
+    goals: [],
     stats: [],
     resources: [],
     inventory: [],
-    achievements: [],
     lore: [],
     memory: [],
-    momentum: 0,
-    maxMomentum: 10,
     relationships: [],
     rpgSystem: "3d6",
     abilities: [],
-    level: 1,
-    upgradesSpent: 0,
-    conditions: [],
     npcs: [],
     ...overrides,
   } as StoryData;
 }
 
-function quest(overrides: Partial<Quest> = {}): Quest {
+function goal(overrides: Partial<Goal> = {}): Goal {
   return {
-    id: `quest_${Math.random().toString(36).slice(2)}`,
+    id: `goal_${Math.random().toString(36).slice(2)}`,
     title: "Save the Village",
     shortDescription: "Save it",
     description: "The village is under attack.",
     active: true,
     fulfilled: false,
-    points: 50,
     ...overrides,
   };
 }
@@ -101,32 +91,30 @@ function toolCall(name: string, args: Record<string, unknown>): ToolCall {
 }
 
 describe("TOOL_DISPATCH - direct typed tool execution", () => {
-  describe("complete_quest", () => {
-    it("completes an active quest and awards XP", () => {
+  describe("complete_goal", () => {
+    it("completes an active goal", () => {
       const storyData = createTestStory({
-        quests: [quest({ title: "Save the Village", points: 50 })],
+        goals: [goal({ title: "Save the Village" })],
       });
 
       const { responses } = executeTools(
-        [toolCall("complete_quest", { title: "Save the Village" })],
+        [toolCall("complete_goal", { title: "Save the Village" })],
         storyData
       );
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(responses[0].message).toContain("Completed quest");
-      expect(responses[0].message).toContain("+50 XP");
-      expect(storyData.quests[0].fulfilled).toBe(true);
-      expect(storyData.points).toBe(50);
+      expect(responses[0].message).toContain("Completed goal");
+      expect(storyData.goals[0].fulfilled).toBe(true);
     });
 
-    it("reports partial success when the quest was already completed", () => {
+    it("reports partial success when the goal was already completed", () => {
       const storyData = createTestStory({
-        quests: [quest({ title: "Save the Village", fulfilled: true })],
+        goals: [goal({ title: "Save the Village", fulfilled: true })],
       });
 
       const { responses } = executeTools(
-        [toolCall("complete_quest", { title: "Save the Village" })],
+        [toolCall("complete_goal", { title: "Save the Village" })],
         storyData
       );
 
@@ -135,45 +123,45 @@ describe("TOOL_DISPATCH - direct typed tool execution", () => {
     });
   });
 
-  describe("delete_quest (bug fix - previously always failed)", () => {
-    it("deletes an existing quest by fuzzy title match", () => {
+  describe("delete_goal (bug fix - previously always failed)", () => {
+    it("deletes an existing goal by fuzzy title match", () => {
       const storyData = createTestStory({
-        quests: [
-          quest({ title: "Save the Village" }),
-          quest({ title: "Find the Amulet" }),
+        goals: [
+          goal({ title: "Save the Village" }),
+          goal({ title: "Find the Amulet" }),
         ],
       });
 
       const { responses } = executeTools(
-        [toolCall("delete_quest", { title: "Save the Village" })],
+        [toolCall("delete_goal", { title: "Save the Village" })],
         storyData
       );
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(responses[0].message).toContain("Deleted quest");
+      expect(responses[0].message).toContain("Deleted goal");
       // This is the regression check: previously this tool built
-      // `/delete_quest: ...` which had no regex handler, so
+      // `/delete_goal: ...` which had no regex handler, so
       // executeCommandWithResponse returned null and the message was
       // always "Command execution returned null".
       expect(responses[0].message).not.toContain("returned null");
-      expect(storyData.quests).toHaveLength(1);
-      expect(storyData.quests[0].title).toBe("Find the Amulet");
+      expect(storyData.goals).toHaveLength(1);
+      expect(storyData.goals[0].title).toBe("Find the Amulet");
     });
 
-    it("reports not-found for a nonexistent quest", () => {
+    it("reports not-found for a nonexistent goal", () => {
       const storyData = createTestStory({
-        quests: [quest({ title: "Save the Village" })],
+        goals: [goal({ title: "Save the Village" })],
       });
 
       const { responses } = executeTools(
-        [toolCall("delete_quest", { title: "Nonexistent Quest" })],
+        [toolCall("delete_goal", { title: "Nonexistent Goal" })],
         storyData
       );
 
       expect(responses[0].success).toBe(false);
       expect(responses[0].message).toContain("not found");
-      expect(storyData.quests).toHaveLength(1);
+      expect(storyData.goals).toHaveLength(1);
     });
   });
 
@@ -243,15 +231,15 @@ describe("TOOL_DISPATCH - direct typed tool execution", () => {
     });
   });
 
-  describe("update_quest", () => {
+  describe("update_goal", () => {
     it("updates both description and shortDescription in a single call", () => {
       const storyData = createTestStory({
-        quests: [quest({ title: "Save the Village" })],
+        goals: [goal({ title: "Save the Village" })],
       });
 
       const { responses } = executeTools(
         [
-          toolCall("update_quest", {
+          toolCall("update_goal", {
             title: "Save the Village",
             description: "A new, more detailed description of the threat.",
             shortDescription: "Dragon attack!",
@@ -262,10 +250,10 @@ describe("TOOL_DISPATCH - direct typed tool execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(true);
-      expect(storyData.quests[0].description).toBe(
+      expect(storyData.goals[0].description).toBe(
         "A new, more detailed description of the threat."
       );
-      expect(storyData.quests[0].shortDescription).toBe("Dragon attack!");
+      expect(storyData.goals[0].shortDescription).toBe("Dragon attack!");
     });
   });
 
@@ -358,45 +346,19 @@ describe("TOOL_DISPATCH - direct typed tool execution", () => {
     });
   });
 
-  describe("fail_quest", () => {
-    it("deactivates an active, unfulfilled quest without awarding points", () => {
+  describe("fail_goal", () => {
+    it("deactivates an active, unfulfilled goal", () => {
       const storyData = createTestStory({
-        quests: [quest({ title: "Save the Village", points: 50 })],
+        goals: [goal({ title: "Save the Village" })],
       });
 
       const { responses } = executeTools(
-        [toolCall("fail_quest", { title: "Save the Village" })],
+        [toolCall("fail_goal", { title: "Save the Village" })],
         storyData
       );
 
       expect(responses[0].success).toBe(true);
-      expect(storyData.quests[0].active).toBe(false);
-      expect(storyData.points).toBe(0);
-    });
-  });
-
-  describe("trigger_achievement", () => {
-    it("unlocks an achievement and awards points", () => {
-      const storyData = createTestStory({
-        achievements: [
-          {
-            title: "First Blood",
-            description: "Win your first fight",
-            dateAchieved: null,
-            points: 25,
-            symbol: "🏆",
-          },
-        ],
-      });
-
-      const { responses } = executeTools(
-        [toolCall("trigger_achievement", { title: "First Blood" })],
-        storyData
-      );
-
-      expect(responses[0].success).toBe(true);
-      expect(storyData.achievements[0].dateAchieved).not.toBeNull();
-      expect(storyData.points).toBe(25);
+      expect(storyData.goals[0].active).toBe(false);
     });
   });
 

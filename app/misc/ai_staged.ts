@@ -301,7 +301,7 @@ Farouk's grip tightens. "Now. We talk price. Or we talk to the Caliph's men."
 </output>
 [STOP]`,
   stateChanges: [
-    "Condition added: Compromised Position (Tier I) - Farouk has you by the wrist",
+    "New thread: Escape Farouk's Grip (side) - the merchant has you by the wrist and is threatening to call the Caliph's men",
   ],
 };
 
@@ -322,9 +322,12 @@ const FEW_SHOT_TOOL_CALLS = [
     id: "ex2",
     type: "function" as const,
     function: {
-      name: "trigger_achievement",
+      name: "create_goal",
       arguments: JSON.stringify({
         title: "Silver Tongue",
+        shortDescription: "Talk your way out of three dangerous situations.",
+        description:
+          "You've shown a knack for smooth talk under pressure. Pull off two more silver-tongued escapes to prove the skill is no fluke.",
       }),
     },
   },
@@ -340,7 +343,7 @@ const FEW_SHOT_TOOL_RESPONSES = [
   {
     toolCallId: "ex2",
     success: true,
-    message: "Achievement unlocked: Silver Tongue",
+    message: 'Created goal "Silver Tongue"',
   },
 ];
 
@@ -411,7 +414,7 @@ Your curved dagger presses against your hip. The exit is three stalls away, bloc
 </output>
 [STOP]`,
   stateChanges: [
-    "Condition added: Compromised Position (Tier I) - Farouk has you by the wrist",
+    "New thread: Escape Farouk's Grip (side) - the merchant has you by the wrist and is threatening to call the Caliph's men",
   ],
 };
 
@@ -476,7 +479,7 @@ export function buildToolsFewShotMessages(): ChatMessage[] {
     {
       role: "assistant",
       content:
-        "Analyzing the narrative for game state changes:\n1. A memory should be added about the amulet's location\n2. Nazim noticed and is ready to help - this is a significant moment worth recording\n3. Good progress on the quest\n\nCalling tools:",
+        "Analyzing the narrative for game state changes:\n1. A memory should be added about the amulet's location\n2. Nazim noticed and is ready to help - this is a significant moment worth recording\n3. This persuasive streak is worth tracking as a new goal\n\nCalling tools:",
       tool_calls: FEW_SHOT_TOOL_CALLS,
     },
     // Tool responses
@@ -807,16 +810,6 @@ export function buildInfoMessage(
   storyData: StoryData,
   embeddingContext?: EmbeddingContext, // DEPRECATED - kept for backward compat but ignored
 ): string {
-  // Build achievements section - show LOCKED achievements with ai_hint
-  const lockedAchievements = storyData.achievements.filter(
-    (a) => !a.dateAchieved,
-  );
-  const achievementsSection = lockedAchievements.length
-    ? `## Locked Achievements\n${lockedAchievements
-        .map((a) => `- ${a.title}: ${a.ai_hint || a.description}`)
-        .join("\n")}`
-    : "";
-
   // ============================================
   // AGENTIC NOTE SYSTEM - Folder-based approach
   // ============================================
@@ -1012,23 +1005,23 @@ export function buildInfoMessage(
       ? `## 🧠 Memory (${memoryCount} entries - use search_memory to find specific facts)`
       : "";
 
-  // Build quests section if any exist
-  const activeQuests =
-    storyData.quests?.filter((q) => q.active && !q.fulfilled) || [];
-  const inactiveQuests =
-    storyData.quests?.filter((q) => !q.active && !q.fulfilled) || [];
-  const questsSection =
-    activeQuests.length || inactiveQuests.length
-      ? `## Quests\n${
-          activeQuests.length
-            ? `### Active\n${activeQuests
-                .map((q) => `- ${q.title}: ${q.description}`)
+  // Build goals section if any exist
+  const activeGoals =
+    storyData.goals?.filter((g) => g.active && !g.fulfilled) || [];
+  const inactiveGoals =
+    storyData.goals?.filter((g) => !g.active && !g.fulfilled) || [];
+  const goalsSection =
+    activeGoals.length || inactiveGoals.length
+      ? `## Goals\n${
+          activeGoals.length
+            ? `### Active\n${activeGoals
+                .map((g) => `- ${g.title}: ${g.description}`)
                 .join("\n")}`
             : ""
         }${
-          inactiveQuests.length
-            ? `${activeQuests.length ? "\n" : ""}### Inactive\n${inactiveQuests
-                .map((q) => `- ${q.title}`)
+          inactiveGoals.length
+            ? `${activeGoals.length ? "\n" : ""}### Inactive\n${inactiveGoals
+                .map((g) => `- ${g.title}`)
                 .join("\n")}`
             : ""
         }`
@@ -1155,8 +1148,7 @@ ${
     // Memory - summary only, use search_memory tool
     memorySection,
     // Other game state
-    achievementsSection,
-    questsSection,
+    goalsSection,
     variablesSection,
     threadsSection,
     agmtSection,
@@ -1167,9 +1159,6 @@ ${
       : "",
     storyData.player_notes
       ? `## Player Notes\n${cleanString(storyData.player_notes)}`
-      : "",
-    storyData.points !== undefined && storyData.points > 0
-      ? `**Points:** ${storyData.points}`
       : "",
   ]
     .filter(Boolean)
@@ -1217,12 +1206,12 @@ export function buildStoryInfoMessage(storyData: StoryData): string {
         .join("\n\n")}`
     : "";
 
-  // Active quests only - for narrative continuity
-  const activeQuests =
-    storyData.quests?.filter((q) => q.active && !q.fulfilled) || [];
-  const questsSection = activeQuests.length
-    ? `## Active Quests\n${activeQuests
-        .map((q) => `- ${q.title}: ${q.description}`)
+  // Active goals only - for narrative continuity
+  const activeGoals =
+    storyData.goals?.filter((g) => g.active && !g.fulfilled) || [];
+  const goalsSection = activeGoals.length
+    ? `## Active Goals\n${activeGoals
+        .map((g) => `- ${g.title}: ${g.description}`)
         .join("\n")}`
     : "";
 
@@ -1242,7 +1231,7 @@ export function buildStoryInfoMessage(storyData: StoryData): string {
     storyData.premise ? `**Premise:** ${cleanString(storyData.premise)}` : "",
     storyInstructionsSection,
     characterSheetSection,
-    questsSection,
+    goalsSection,
     threadsSection,
     storyData.author_notes
       ? `## Author Notes\n${cleanString(storyData.author_notes)}`
@@ -1762,10 +1751,10 @@ User will not see your output. Use your message content to "Think Step-by-Step" 
 ## CRITICAL: Existing Game Data
 The info message contains the CURRENT game state - these are entries that ALREADY EXIST:
 - **"## Notes/Lore"** = Note entries that exist. Use \`edit_note\` to add info, NOT \`create_note\`
-- **"### Threads"** = Quests/storylines that exist. Use \`update_thread\` to progress, NOT \`create_thread\`
+- **"### Threads"** = Plotlines/storylines that exist. Use \`update_thread\` to progress, NOT \`create_thread\`
 - **"## Memory"** = Facts already saved. Don't duplicate them.
 - **"## NPCs"** = Characters already tracked. Don't recreate them.
-- **"## Quests"** = Quests already active. Update status as needed.
+- **"## Goals"** = Goals already active. Update status as needed.
 
 Only use CREATE tools for GENUINELY NEW content not shown in the info message.
 
@@ -1895,9 +1884,10 @@ ANALYSIS STEPS (Apply ONLY to the latest STORY TEXT)
 4. **Quick Facts:** Codes, deadlines, debts, clues? → \`add_memory\` (keep it SHORT)
 
 5. **World Building:** New location, faction, or detailed lore? → \`create_note\`
-6. **Thread Progress:** Quest started, progressed, or completed? → thread tools
+6. **Thread Progress:** Plotline started, progressed, or resolved? → thread tools
+7. **Goal Progress:** Goal started, progressed, completed, or failed? → goal tools
 
-7. **Nothing Significant?** → \`skip_tools\` (this is the most common case!)
+8. **Nothing Significant?** → \`skip_tools\` (this is the most common case!)
 
 ## ⛔ ANTI-PATTERNS (NEVER DO THESE)
 
@@ -2840,8 +2830,8 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Timers:** Manage timed events with \`manage_timer\` (action: create/advance/toggle_pause/cancel/trigger)
 
 ### Story Progression
-- **Quest progress**: \`create_quest\`, \`update_quest\`, \`complete_quest\`
-- **Significant achievements**: \`trigger_achievement\`
+- **Thread progress**: \`create_thread\`, \`update_thread\`, \`resolve_thread\`, \`abandon_thread\`
+- **Goal progress**: \`create_goal\`, \`update_goal\`, \`complete_goal\`, \`fail_goal\`
 
 ## NOTE TYPES (ALWAYS specify type when creating!)
 When using \`create_note\`, always set the \`type\` parameter:
@@ -2910,14 +2900,12 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
 
   // (TOOL_SCHEMAS imported statically at the top of this file)
   const stateToolNames = [
-    // Quest tools
-    "create_quest",
-    "complete_quest",
-    "fail_quest",
-    "update_quest",
-    "delete_quest",
-    // Achievement
-    "trigger_achievement",
+    // Goal tools
+    "create_goal",
+    "complete_goal",
+    "fail_goal",
+    "update_goal",
+    "delete_goal",
     // Note management tools
     "search_notes",
     "create_note",
@@ -2932,11 +2920,6 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "duplicate_lore",
     // Memory
     "add_memory",
-    // Condition tools (no add_condition - that happens via stakes)
-    "upgrade_condition",
-    "downgrade_condition",
-    "remove_condition",
-    "modify_condition",
     // Thread tools
     "create_thread",
     "update_thread",

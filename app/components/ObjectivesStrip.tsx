@@ -7,14 +7,14 @@ import { DynamicIcon } from "./DynamicIcon";
 
 interface ObjectivesStripProps {
   storyData: StoryData;
-  /** Optional: switch to the full Journal/quests page for details. */
+  /** Optional: switch to the full Journal/goals page for details. */
   onOpenJournal?: () => void;
 }
 
 /**
- * Glanceable "what's currently open" strip - active quests + active story
+ * Glanceable "what's currently open" strip - active goals + active story
  * threads, collapsed by default to a single count pill. The full journal
- * page (quests.tsx) still owns the detailed view (descriptions, completed/
+ * page (goals.tsx) still owns the detailed view (descriptions, completed/
  * abandoned history); this is just a lightweight always-visible summary so
  * players don't have to leave the main story view to check.
  */
@@ -49,7 +49,7 @@ export function ObjectivesStrip({ storyData, onOpenJournal }: ObjectivesStripPro
             >
               <span className="flex items-center gap-1.5 text-blue-200/80 min-w-0">
                 <DynamicIcon
-                  name={objective.kind === "quest" ? "Scroll" : "GitBranch"}
+                  name={objective.kind === "goal" ? "Scroll" : "GitBranch"}
                   className="w-3 h-3 shrink-0 text-blue-400/70"
                 />
                 <span className="truncate">{objective.title}</span>

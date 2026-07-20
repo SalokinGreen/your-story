@@ -10,7 +10,6 @@ import {
   SceneChallenge,
   Stat,
   REST_CONFIG,
-  Condition,
   InventoryItem,
   Ability,
   Combatant,
@@ -92,7 +91,6 @@ import {
   getRPGSystem,
   checkSuccess,
   rollDice,
-  getConditionPenalty,
   RPGSystemType,
   RPGSystem,
 } from "./rpgSystems";
@@ -186,7 +184,6 @@ export interface GMRestResult {
   recovery: {
     resources: { name: string; restored: number }[];
     cooldowns: { name: string; reduced: number }[];
-    conditions: { name: string; oldTier: number; newTier: number }[];
     items: { name: string; restored: number }[];
     stress?: { oldValue: number; newValue: number };
   };
@@ -540,48 +537,6 @@ export interface GMNegotiatePriceResult {
 // ============================================
 // HELPER FUNCTIONS
 // ============================================
-
-/**
- * Calculate total condition penalty for a stat from all applicable conditions
- */
-function calculateConditionPenalty(
-  conditions: Condition[],
-  statName: string,
-  systemId: RPGSystemType | undefined
-): { penalty: number; condition?: Condition } {
-  if (!conditions || conditions.length === 0) {
-    return { penalty: 0 };
-  }
-
-  // Find the highest-tier condition that affects this stat
-  let worstCondition: Condition | undefined;
-  let worstPenalty = 0;
-
-  for (const condition of conditions) {
-    // Check if condition affects this stat or all stats
-    const affectsThisStat =
-      condition.affectsAll ||
-      (condition.affects || []).some(
-        (s) => s.toLowerCase() === statName.toLowerCase()
-      );
-
-    if (!affectsThisStat) continue;
-
-    const tier = condition.tier as 1 | 2 | 3 | 4 | 5 | 6;
-    const penaltyResult = getConditionPenalty(systemId, tier);
-
-    // For now, we only handle modifier penalties in skill checks
-    if (
-      penaltyResult.type === "modifier" &&
-      penaltyResult.value > worstPenalty
-    ) {
-      worstPenalty = penaltyResult.value;
-      worstCondition = condition;
-    }
-  }
-
-  return { penalty: worstPenalty, condition: worstCondition };
-}
 
 // ============================================
 // DIFFICULTY PARSING
@@ -1370,7 +1325,6 @@ function executeTakeRest(
         recovery: {
           resources: [],
           cooldowns: [],
-          conditions: [],
           items: [],
         },
         error: `Cannot rest during active challenge "${storyData.activeChallenge.name}"`,
@@ -1404,7 +1358,7 @@ function executeTakeRest(
       result: {
         type: "take_rest",
         restType: params.type,
-        recovery: { resources: [], cooldowns: [], conditions: [], items: [] },
+        recovery: { resources: [], cooldowns: [], items: [] },
         error: `No quick rests remaining (${restConfig.maxQuickRests} max)`,
       } as GMRestResult,
       contextForStory: `[ERROR: No quick rests remaining (${restConfig.maxQuickRests} max)]`,
@@ -1421,7 +1375,7 @@ function executeTakeRest(
       result: {
         type: "take_rest",
         restType: params.type,
-        recovery: { resources: [], cooldowns: [], conditions: [], items: [] },
+        recovery: { resources: [], cooldowns: [], items: [] },
         error: `No short rests remaining (${restConfig.maxShortRests} max)`,
       } as GMRestResult,
       contextForStory: `[ERROR: No short rests remaining (${restConfig.maxShortRests} max)]`,
@@ -1432,13 +1386,11 @@ function executeTakeRest(
   const recovery: GMRestResult["recovery"] = {
     resources: [],
     cooldowns: [],
-    conditions: [],
     items: [],
   };
 
   // Get rest type specific config
   const cooldownReduction = restConfig.cooldownReduction[params.type];
-  const conditionDowngrade = restConfig.conditionDowngrade[params.type];
 
   // Restore resources (custom calculation - RestConfig doesn't have resourceRestore)
   // We'll use a simple percentage based on rest type
@@ -1481,29 +1433,6 @@ function executeTakeRest(
           name: ability.name,
           reduced: oldCooldown - ability.currentCooldown,
         });
-      }
-    }
-  }
-
-  // Improve conditions (short/long rests only)
-  if (conditionDowngrade > 0) {
-    for (const condition of storyData.conditions || []) {
-      if (!condition.permanent && condition.tier > 1) {
-        const newTier = Math.max(1, condition.tier - conditionDowngrade) as
-          | 1
-          | 2
-          | 3
-          | 4
-          | 5
-          | 6;
-        if (newTier < condition.tier) {
-          recovery.conditions.push({
-            name: condition.name,
-            oldTier: condition.tier,
-            newTier,
-          });
-          condition.tier = newTier;
-        }
       }
     }
   }
@@ -1561,11 +1490,6 @@ function executeTakeRest(
   if (recovery.cooldowns.length > 0) {
     contextForStory += `\n[Cooldowns reduced: ${recovery.cooldowns
       .map((c) => `${c.name} -${c.reduced}`)
-      .join(", ")}]`;
-  }
-  if (recovery.conditions.length > 0) {
-    contextForStory += `\n[Conditions improved: ${recovery.conditions
-      .map((c) => `${c.name} ${c.oldTier}→${c.newTier}`)
       .join(", ")}]`;
   }
   if (recovery.items.length > 0) {

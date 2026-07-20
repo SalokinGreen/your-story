@@ -21,38 +21,27 @@ export interface ToolSchema {
   };
 }
 
-// Quest Management Tools
-const createQuestTool: ToolSchema = {
+// Goal Management Tools
+const createGoalTool: ToolSchema = {
   type: "function",
   function: {
-    name: "create_quest",
+    name: "create_goal",
     description:
-      "Create a new quest for the player with title, description, and optional point reward",
+      "Create a new goal for the player with title and description",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Quest title (must be unique)",
+          description: "Goal title (must be unique)",
         },
         shortDescription: {
           type: "string",
-          description: "Brief quest summary (1-2 sentences)",
+          description: "Brief goal summary (1-2 sentences)",
         },
         description: {
           type: "string",
-          description: "Detailed quest objectives and context",
-        },
-        points: {
-          oneOf: [
-            { type: "number", minimum: 1, maximum: 500 },
-            {
-              type: "string",
-              enum: ["trivial", "minor", "moderate", "major", "legendary"],
-            },
-          ],
-          description:
-            'Point reward: prefer a plain unquoted tier string - "trivial" (5-25), "minor" (15-60), "moderate" (30-100), "major" (60-200), or "legendary" (100-500). Only pass a bare number (no quotes) if you need an exact custom value instead of a tier.',
+          description: "Detailed goal objectives and context",
         },
       },
       required: ["title", "shortDescription", "description"],
@@ -60,17 +49,17 @@ const createQuestTool: ToolSchema = {
   },
 };
 
-const completeQuestTool: ToolSchema = {
+const completeGoalTool: ToolSchema = {
   type: "function",
   function: {
-    name: "complete_quest",
-    description: "Mark a quest as completed and award points to the player",
+    name: "complete_goal",
+    description: "Mark a goal as completed",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Exact quest title (fuzzy matching supported)",
+          description: "Exact goal title (fuzzy matching supported)",
         },
       },
       required: ["title"],
@@ -78,17 +67,17 @@ const completeQuestTool: ToolSchema = {
   },
 };
 
-const failQuestTool: ToolSchema = {
+const failGoalTool: ToolSchema = {
   type: "function",
   function: {
-    name: "fail_quest",
-    description: "Mark a quest as failed (no points awarded)",
+    name: "fail_goal",
+    description: "Mark a goal as failed",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Exact quest title (fuzzy matching supported)",
+          description: "Exact goal title (fuzzy matching supported)",
         },
       },
       required: ["title"],
@@ -96,17 +85,17 @@ const failQuestTool: ToolSchema = {
   },
 };
 
-const updateQuestTool: ToolSchema = {
+const updateGoalTool: ToolSchema = {
   type: "function",
   function: {
-    name: "update_quest",
-    description: "Update quest description or details (keeps same status)",
+    name: "update_goal",
+    description: "Update goal description or details (keeps same status)",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Exact quest title (fuzzy matching supported)",
+          description: "Exact goal title (fuzzy matching supported)",
         },
         shortDescription: {
           type: "string",
@@ -122,17 +111,17 @@ const updateQuestTool: ToolSchema = {
   },
 };
 
-const deleteQuestTool: ToolSchema = {
+const deleteGoalTool: ToolSchema = {
   type: "function",
   function: {
-    name: "delete_quest",
-    description: "Remove a quest entirely from the quest log",
+    name: "delete_goal",
+    description: "Remove a goal entirely from the goal log",
     parameters: {
       type: "object",
       properties: {
         title: {
           type: "string",
-          description: "Exact quest title (fuzzy matching supported)",
+          description: "Exact goal title (fuzzy matching supported)",
         },
       },
       required: ["title"],
@@ -327,26 +316,6 @@ const resetAbilityCooldownTool: ToolSchema = {
         },
       },
       required: ["name"],
-    },
-  },
-};
-
-// Achievement Tool
-const triggerAchievementTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "trigger_achievement",
-    description:
-      "Unlock an achievement and award progression points. Only locked achievements can be triggered.",
-    parameters: {
-      type: "object",
-      properties: {
-        title: {
-          type: "string",
-          description: "Exact achievement title (fuzzy matching supported)",
-        },
-      },
-      required: ["title"],
     },
   },
 };
@@ -980,186 +949,20 @@ const skipToolsTool: ToolSchema = {
   },
 };
 
-// Condition Management Tools
-const addConditionTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "add_condition",
-    description:
-      "Inflict a condition/affliction on the character. Conditions impose penalties on skill checks based on their tier. Tier VI is permanent (often results in game over). Choose appropriate tier based on severity: I (minor inconvenience), II (noticeable hindrance), III (significant impairment), IV (severe debilitation), V (critical injury), VI (permanent disability).",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description:
-            "Condition name (e.g., 'Broken Arm', 'Poisoned', 'Exhausted', 'Blinded', 'Cursed')",
-        },
-        tier: {
-          type: "number",
-          enum: [1, 2, 3, 4, 5, 6],
-          description:
-            "Severity tier (1-6). Higher tiers impose greater penalties. Tier 6 is permanent.",
-        },
-        description: {
-          type: "string",
-          description: "Description of the condition and its narrative effects",
-        },
-        affects: {
-          type: "array",
-          items: { type: "string" },
-          description:
-            "List of stat names this condition affects (e.g., ['Strength', 'Acrobatics']). Use affectsAll for conditions affecting all checks.",
-        },
-        affectsAll: {
-          type: "boolean",
-          description:
-            "If true, this condition affects ALL skill checks regardless of stat (optional, default: false)",
-        },
-        source: {
-          type: "string",
-          description:
-            "What caused this condition (e.g., 'Dragon fire breath', 'Fell from cliff')",
-        },
-      },
-      required: ["name", "tier", "description", "affects"],
-    },
-  },
-};
-
-const upgradeConditionTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "upgrade_condition",
-    description:
-      "Worsen a condition by increasing its tier. Use when a condition becomes more severe due to neglect, failed treatment, or story events. Cannot go above tier 6.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Condition name (fuzzy matching supported)",
-        },
-        tiers: {
-          type: "number",
-          description: "Number of tiers to increase (default: 1)",
-          minimum: 1,
-        },
-        description: {
-          type: "string",
-          description:
-            "Updated description reflecting worsened state (optional)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const downgradeConditionTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "downgrade_condition",
-    description:
-      "Improve a condition by decreasing its tier. Use when healing, treatment, or recovery occurs. If tier reaches 0, the condition is removed. Tier 6 (permanent) conditions cannot be downgraded.",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Condition name (fuzzy matching supported)",
-        },
-        tiers: {
-          type: "number",
-          description: "Number of tiers to decrease (default: 1)",
-          minimum: 1,
-        },
-        description: {
-          type: "string",
-          description:
-            "Updated description reflecting improved state (optional)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const removeConditionTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "remove_condition",
-    description:
-      "Completely remove a condition (full recovery or cure). Tier 6 (permanent) conditions cannot be removed without extraordinary circumstances (e.g., divine intervention, powerful magic).",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Condition name (fuzzy matching supported)",
-        },
-        force: {
-          type: "boolean",
-          description:
-            "Force removal of permanent (tier 6) condition due to extraordinary circumstances (default: false)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
-const modifyConditionTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "modify_condition",
-    description:
-      "Update a condition's affected stats or description without changing tier",
-    parameters: {
-      type: "object",
-      properties: {
-        name: {
-          type: "string",
-          description: "Condition name (fuzzy matching supported)",
-        },
-        description: {
-          type: "string",
-          description: "New description (optional)",
-        },
-        affects: {
-          type: "array",
-          items: { type: "string" },
-          description: "New list of affected stats (optional)",
-        },
-        affectsAll: {
-          type: "boolean",
-          description: "New value for affectsAll flag (optional)",
-        },
-      },
-      required: ["name"],
-    },
-  },
-};
-
 // Game Over Tool
 const gameOverTool: ToolSchema = {
   type: "function",
   function: {
     name: "game_over",
     description:
-      "End the game due to character death or permanent incapacitation. Requires either an existing tier 6 (permanent) condition on the character, or the player's combatant being downed (HP 0 or inactive) in active combat - this call is rejected otherwise. Use upgrade_condition to raise a condition to tier 6, or resolve combat down to 0 HP, before calling this. This is a major decision - only use when there is no reasonable way to continue.",
+      "End the game due to character death or permanent incapacitation. Requires the player's combatant being downed (HP 0 or inactive) in active combat - this call is rejected otherwise. Resolve combat down to 0 HP before calling this. This is a major decision - only use when there is no reasonable way to continue.",
     parameters: {
       type: "object",
       properties: {
         reason: {
           type: "string",
           description:
-            "Narrative reason for game over (e.g., 'Succumbed to wounds', 'Permanent blindness makes adventuring impossible')",
-        },
-        condition: {
-          type: "string",
-          description:
-            "Name of the tier 6 condition causing game over (if applicable)",
+            "Narrative reason for game over (e.g., 'Succumbed to wounds', 'Fell in battle')",
         },
       },
       required: ["reason"],
@@ -1308,8 +1111,8 @@ const takeRestTool: ToolSchema = {
     name: "take_rest",
     description: `Allow the player to rest and recover. Three types available:
 - QUICK (30 min): Brief break. Reduces cooldowns slightly. Limited uses before long rest.
-- SHORT (4-8 hours): Sleep/extended rest. Resets most cooldowns, downgrades minor conditions by 1 tier. Limited uses before long rest.
-- LONG (several days): Extended downtime/time skip. All cooldowns reset, conditions improve 1-2 tiers. Resets quick/short rest counts.
+- SHORT (4-8 hours): Sleep/extended rest. Resets most cooldowns. Limited uses before long rest.
+- LONG (several days): Extended downtime/time skip. All cooldowns reset. Resets quick/short rest counts.
 
 IMPORTANT: Resource recovery is NOT automatic. You must specify which resources to restore using the 'resources' parameter. Only include resources that make sense to recover during rest (e.g., Health, Stamina, Mana). Do NOT include non-regenerating resources like Gold, Coins, Ammo, etc.
 
@@ -1361,12 +1164,12 @@ Long rests involve a time skip. Use when narratively appropriate (safe haven, en
 
 // Export all tools as array
 export const TOOL_SCHEMAS: ToolSchema[] = [
-  // Quest Management (5 tools)
-  createQuestTool,
-  completeQuestTool,
-  failQuestTool,
-  updateQuestTool,
-  deleteQuestTool,
+  // Goal Management (5 tools)
+  createGoalTool,
+  completeGoalTool,
+  failGoalTool,
+  updateGoalTool,
+  deleteGoalTool,
 
   // Ability Management (5 tools)
   addAbilityTool,
@@ -1374,9 +1177,6 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   modifyAbilityTool,
   upgradeAbilityTool,
   resetAbilityCooldownTool,
-
-  // Achievement (1 tool)
-  triggerAchievementTool,
 
   // Note Management (8 tools)
   createNoteTool,
@@ -1410,11 +1210,6 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Memory (1 tool)
   addMemoryTool,
 
-  // Conditions (5 tools) - add_condition moved to GM Stage
-  upgradeConditionTool,
-  downgradeConditionTool,
-  removeConditionTool,
-  modifyConditionTool,
   gameOverTool,
 
   // Scene Challenges (4 tools)

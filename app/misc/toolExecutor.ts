@@ -8,7 +8,6 @@
 import {
   StoryData,
   CommandResponse,
-  Condition,
   AdventureDifficulty,
   RestType,
   REST_CONFIG,
@@ -19,11 +18,10 @@ import {
   MAX_PENDING_DIRECTOR_MOVES,
 } from "@/app/misc/structs";
 import {
-  applyCompleteQuest,
-  applyFailQuest,
-  applyUpdateQuest,
-  applyDeleteQuest,
-  applyTriggerAchievement,
+  applyCompleteGoal,
+  applyFailGoal,
+  applyUpdateGoal,
+  applyDeleteGoal,
   applyDeleteNote,
   applyRemoveAbility,
   applyModifyAbility,
@@ -45,10 +43,7 @@ import {
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
 import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
-import {
-  parsePointsValue,
-  parseChallengeRoundsValue,
-} from "@/app/misc/rpgSystems";
+import { parseChallengeRoundsValue } from "@/app/misc/rpgSystems";
 import { initializeAbility } from "@/app/misc/abilitySystem";
 
 /**
@@ -167,15 +162,8 @@ export const STATE_CHANGE_TOOLS = new Set([
   "reset_ability_cooldown",
   "reduce_cooldown",
   "refresh_ability",
-  // Conditions
-  "add_condition",
-  "upgrade_condition",
-  "downgrade_condition",
-  "remove_condition",
   // NPC Management
   "add_npc",
-  // Achievements - tool names and command names
-  "trigger_achievement",
   // Game state
   "game_over",
   // Scene Challenges
@@ -190,10 +178,10 @@ export const STATE_CHANGE_TOOLS = new Set([
   "update_thread",
   "resolve_thread",
   "abandon_thread",
-  // Quests - completion includes XP gain and potential level ups
-  "complete_quest",
-  "fail_quest",
-  "create_quest",
+  // Goals
+  "complete_goal",
+  "fail_goal",
+  "create_goal",
 ]);
 
 /**
@@ -212,11 +200,10 @@ const TOOL_DISPATCH: Record<
     storyData: StoryData
   ) => Omit<CommandResponse, "toolCallId"> | null
 > = {
-  complete_quest: applyCompleteQuest,
-  fail_quest: applyFailQuest,
-  update_quest: applyUpdateQuest,
-  delete_quest: applyDeleteQuest,
-  trigger_achievement: applyTriggerAchievement,
+  complete_goal: applyCompleteGoal,
+  fail_goal: applyFailGoal,
+  update_goal: applyUpdateGoal,
+  delete_goal: applyDeleteGoal,
   delete_note: applyDeleteNote,
   remove_ability: applyRemoveAbility,
   modify_ability: applyModifyAbility,
@@ -627,50 +614,44 @@ export function executeTools(
         continue;
       }
 
-      // Special handling for create_quest (description may contain | characters)
-      if (toolCall.function.name === "create_quest") {
-        logger.action("Special handling: create_quest", {
+      // Special handling for create_goal (description may contain | characters)
+      if (toolCall.function.name === "create_goal") {
+        logger.action("Special handling: create_goal", {
           toolCallId: toolId,
           title: args.title,
         });
 
-        if (!storyData.quests) storyData.quests = [];
+        if (!storyData.goals) storyData.goals = [];
 
-        const existing = storyData.quests.find((q) => q.title === args.title);
+        const existing = storyData.goals.find((g) => g.title === args.title);
         if (existing) {
           responses.push({
             command: toolCall.function.name,
             success: false,
-            message: `Quest "${args.title}" already exists`,
+            message: `Goal "${args.title}" already exists`,
             timestamp: Date.now(),
             toolCallId: toolCall.id,
           });
           continue;
         }
 
-        // Points can be a tier string or number
-        const rawPoints = args.points ?? "moderate";
-        const points = parsePointsValue(rawPoints, difficulty);
-
-        const newQuest = {
-          id: `quest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        const newGoal = {
+          id: `goal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           title: args.title,
           shortDescription: args.shortDescription,
           description: args.description,
           active: true,
           fulfilled: false,
-          points,
           createdAt: new Date(),
         };
 
-        storyData.quests.push(newQuest);
+        storyData.goals.push(newGoal);
 
-        logger.action("Quest created via direct tool handling", {
+        logger.action("Goal created via direct tool handling", {
           title: args.title,
-          points,
         });
 
-        const stateChange = `📜 Created quest "${args.title}" (${points} points)`;
+        const stateChange = `📜 Created goal "${args.title}"`;
         stateChanges.push(stateChange);
 
         responses.push({
@@ -1718,531 +1699,9 @@ export function executeTools(
         continue;
       }
 
-      // === CONDITION MANAGEMENT TOOL HANDLERS ===
-
-      // Add condition
-      if (toolCall.function.name === "add_condition") {
-        const name = args.name?.trim();
-        const tier = args.tier as 1 | 2 | 3 | 4 | 5 | 6;
-        const description = args.description?.trim();
-        const affects = args.affects || [];
-        const affectsAll = args.affectsAll || false;
-        const source = args.source?.trim() || undefined;
-
-        if (!name || name.length < 2) {
-          const errorMsg = "Condition name must be at least 2 characters";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/add_condition: ${name || ""}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        if (!tier || tier < 1 || tier > 6) {
-          const errorMsg = "Condition tier must be between 1 and 6";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/add_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        if (!description || description.length < 5) {
-          const errorMsg =
-            "Condition description must be at least 5 characters";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/add_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Initialize conditions array if needed
-        if (!storyData.conditions) {
-          storyData.conditions = [];
-        }
-
-        // Check for duplicate condition name
-        const existing = storyData.conditions.find(
-          (c) => c.name.toLowerCase() === name.toLowerCase()
-        );
-        if (existing) {
-          const errorMsg = `Condition "${name}" already exists at tier ${existing.tier}`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/add_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const newCondition: Condition = {
-          id: crypto.randomUUID(),
-          name,
-          tier,
-          description,
-          affects: affectsAll ? [] : affects,
-          affectsAll,
-          source,
-          permanent: tier === 6,
-          createdAt: Date.now(),
-        };
-
-        storyData.conditions.push(newCondition);
-
-        const tierLabel = ["I", "II", "III", "IV", "V", "VI"][tier - 1];
-        const affectsLabel = affectsAll
-          ? "all checks"
-          : affects.length > 0
-          ? affects.join(", ")
-          : "unspecified";
-
-        logger.action("Condition added via tool", {
-          toolCallId: toolId,
-          name,
-          tier,
-          affectsAll,
-          affects,
-        });
-        responses.push({
-          command: `/add_condition: ${name} (Tier ${tierLabel})`,
-          success: true,
-          message: `✓ Inflicted ${
-            tier === 6 ? "PERMANENT " : ""
-          }condition: ${name} (Tier ${tierLabel}) - affects ${affectsLabel}`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Upgrade condition (increase tier)
-      if (toolCall.function.name === "upgrade_condition") {
-        const name = args.name?.trim();
-        const tiers = args.tiers || 1;
-        const newDescription = args.description?.trim();
-
-        if (!storyData.conditions || storyData.conditions.length === 0) {
-          const errorMsg = "No conditions to upgrade";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/upgrade_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const match = findBestMatch(
-          name,
-          storyData.conditions,
-          (c) => c.name,
-          0.6
-        );
-        if (!match) {
-          const errorMsg = `Condition not found: "${name}"`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/upgrade_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const condition = match.item;
-        const oldTier = condition.tier;
-
-        if (condition.tier >= 6) {
-          const errorMsg = `Condition "${condition.name}" is already at maximum tier (VI)`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/upgrade_condition: ${condition.name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const newTier = Math.min(6, condition.tier + tiers) as
-          | 1
-          | 2
-          | 3
-          | 4
-          | 5
-          | 6;
-        condition.tier = newTier;
-        if (newTier === 6) {
-          condition.permanent = true;
-        }
-        if (newDescription) {
-          condition.description = newDescription;
-        }
-
-        const oldTierLabel = ["I", "II", "III", "IV", "V", "VI"][oldTier - 1];
-        const newTierLabel = ["I", "II", "III", "IV", "V", "VI"][newTier - 1];
-
-        logger.action("Condition upgraded via tool", {
-          toolCallId: toolId,
-          name: condition.name,
-          oldTier,
-          newTier,
-        });
-        responses.push({
-          command: `/upgrade_condition: ${condition.name} (Tier ${oldTierLabel} → ${newTierLabel})`,
-          success: true,
-          message: `✓ ${
-            condition.name
-          } worsened: Tier ${oldTierLabel} → ${newTierLabel}${
-            newTier === 6 ? " (PERMANENT)" : ""
-          }`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Downgrade condition (decrease tier)
-      if (toolCall.function.name === "downgrade_condition") {
-        const name = args.name?.trim();
-        const tiers = args.tiers || 1;
-        const newDescription = args.description?.trim();
-
-        if (!storyData.conditions || storyData.conditions.length === 0) {
-          const errorMsg = "No conditions to downgrade";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/downgrade_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const match = findBestMatch(
-          name,
-          storyData.conditions,
-          (c) => c.name,
-          0.6
-        );
-        if (!match) {
-          const errorMsg = `Condition not found: "${name}"`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/downgrade_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const condition = match.item;
-        const oldTier = condition.tier;
-
-        if (condition.permanent || condition.tier === 6) {
-          const errorMsg = `Condition "${condition.name}" is permanent and cannot be downgraded`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/downgrade_condition: ${condition.name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const newTier = condition.tier - tiers;
-
-        if (newTier <= 0) {
-          // Remove condition entirely
-          storyData.conditions = storyData.conditions.filter(
-            (c) => c.id !== condition.id
-          );
-
-          const oldTierLabel = ["I", "II", "III", "IV", "V", "VI"][oldTier - 1];
-
-          logger.action("Condition removed via downgrade", {
-            toolCallId: toolId,
-            name: condition.name,
-            oldTier,
-          });
-          responses.push({
-            command: `/downgrade_condition: ${condition.name} (Tier ${oldTierLabel} → Removed)`,
-            success: true,
-            message: `✓ ${condition.name} fully recovered - condition removed`,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        condition.tier = newTier as 1 | 2 | 3 | 4 | 5 | 6;
-        if (newDescription) {
-          condition.description = newDescription;
-        }
-
-        const oldTierLabel = ["I", "II", "III", "IV", "V", "VI"][oldTier - 1];
-        const newTierLabel = ["I", "II", "III", "IV", "V", "VI"][newTier - 1];
-
-        logger.action("Condition downgraded via tool", {
-          toolCallId: toolId,
-          name: condition.name,
-          oldTier,
-          newTier,
-        });
-        responses.push({
-          command: `/downgrade_condition: ${condition.name} (Tier ${oldTierLabel} → ${newTierLabel})`,
-          success: true,
-          message: `✓ ${condition.name} improved: Tier ${oldTierLabel} → ${newTierLabel}`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Remove condition
-      if (toolCall.function.name === "remove_condition") {
-        const name = args.name?.trim();
-        const force = args.force || false;
-
-        if (!storyData.conditions || storyData.conditions.length === 0) {
-          const errorMsg = "No conditions to remove";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/remove_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const match = findBestMatch(
-          name,
-          storyData.conditions,
-          (c) => c.name,
-          0.6
-        );
-        if (!match) {
-          const errorMsg = `Condition not found: "${name}"`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/remove_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const condition = match.item;
-
-        if ((condition.permanent || condition.tier === 6) && !force) {
-          const errorMsg = `Condition "${condition.name}" is permanent. Use force=true for extraordinary circumstances.`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/remove_condition: ${condition.name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        storyData.conditions = storyData.conditions.filter(
-          (c) => c.id !== condition.id
-        );
-
-        const tierLabel = ["I", "II", "III", "IV", "V", "VI"][
-          condition.tier - 1
-        ];
-
-        logger.action("Condition removed via tool", {
-          toolCallId: toolId,
-          name: condition.name,
-          tier: condition.tier,
-          forced: force,
-        });
-        responses.push({
-          command: `/remove_condition: ${condition.name}`,
-          success: true,
-          message: `✓ ${
-            condition.permanent && force
-              ? "Miraculously cured permanent "
-              : "Removed "
-          }condition: ${condition.name} (was Tier ${tierLabel})`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Modify condition
-      if (toolCall.function.name === "modify_condition") {
-        const name = args.name?.trim();
-        const newDescription = args.description?.trim();
-        const newAffects = args.affects;
-        const newAffectsAll = args.affectsAll;
-
-        if (!storyData.conditions || storyData.conditions.length === 0) {
-          const errorMsg = "No conditions to modify";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/modify_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const match = findBestMatch(
-          name,
-          storyData.conditions,
-          (c) => c.name,
-          0.6
-        );
-        if (!match) {
-          const errorMsg = `Condition not found: "${name}"`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/modify_condition: ${name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const condition = match.item;
-        const changes: string[] = [];
-
-        if (newDescription) {
-          condition.description = newDescription;
-          changes.push("description");
-        }
-        if (newAffects !== undefined) {
-          condition.affects = newAffects;
-          changes.push("affected stats");
-        }
-        if (newAffectsAll !== undefined) {
-          condition.affectsAll = newAffectsAll;
-          changes.push("affectsAll");
-        }
-
-        if (changes.length === 0) {
-          const errorMsg = "No changes specified";
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: `/modify_condition: ${condition.name}`,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        logger.action("Condition modified via tool", {
-          toolCallId: toolId,
-          name: condition.name,
-          changes,
-        });
-        responses.push({
-          command: `/modify_condition: ${condition.name}`,
-          success: true,
-          message: `✓ Updated condition "${condition.name}": ${changes.join(
-            ", "
-          )}`,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
       // Game over
       if (toolCall.function.name === "game_over") {
         const reason = args.reason?.trim();
-        const conditionName = args.condition?.trim();
 
         if (!reason || reason.length < 10) {
           const errorMsg = "Game over reason must be at least 10 characters";
@@ -2261,19 +1720,10 @@ export function executeTools(
         }
 
         // Deterministic gate: game_over is a fatal, irreversible outcome and
-        // must be earned through state the engine already tracks - a tier 6
-        // (permanent) condition, or the player's own combatant being downed
-        // in active combat - not narrative say-so alone. This mirrors the
-        // tool's own schema description ("Use when a tier 6 condition
-        // narratively prevents the character from continuing").
-        const matchingTier6Condition = conditionName
-          ? storyData.conditions?.find(
-              (c) =>
-                c.name.toLowerCase() === conditionName.toLowerCase() &&
-                (c.tier === 6 || c.permanent)
-            )
-          : undefined;
-
+        // must be earned through state the engine already tracks - the
+        // player's own combatant being downed in active combat - not
+        // narrative say-so alone. This mirrors the tool's own schema
+        // description.
         const playerCombatant = storyData.combatState?.active
           ? storyData.combatState.combatants.find((c) => c.type === "player")
           : undefined;
@@ -2283,14 +1733,12 @@ export function executeTools(
             (typeof playerCombatant.stats?.HP === "number" &&
               playerCombatant.stats.HP <= 0));
 
-        if (!matchingTier6Condition && !playerIsDowned) {
-          const errorMsg = conditionName
-            ? `Cannot end the game: no active tier 6 (permanent) condition named "${conditionName}" was found. Use upgrade_condition to raise a condition to tier 6 first, or reduce the player's HP to 0 in active combat, before calling game_over.`
-            : "Cannot end the game: no tier 6 (permanent) condition or downed player combatant was found. Pass the exact name of an existing tier 6 condition, or reduce the player's HP to 0 in active combat, before calling game_over.";
+        if (!playerIsDowned) {
+          const errorMsg =
+            "Cannot end the game: no downed player combatant was found. Reduce the player's HP to 0 in active combat before calling game_over.";
           logger.error(`Tool call failed: ${errorMsg}`, {
             toolCallId: toolId,
             toolName,
-            conditionName,
           });
           responses.push({
             command: `/game_over`,
@@ -2305,21 +1753,17 @@ export function executeTools(
         // Mark story as game over
         storyData.gameOver = {
           reason,
-          condition: conditionName,
           timestamp: Date.now(),
         };
 
         logger.action("Game over triggered via tool", {
           toolCallId: toolId,
           reason,
-          condition: conditionName,
         });
         responses.push({
           command: `/game_over: ${reason}`,
           success: true,
-          message: `⚠️ GAME OVER: ${reason}${
-            conditionName ? ` (due to ${conditionName})` : ""
-          }`,
+          message: `⚠️ GAME OVER: ${reason}`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -2334,8 +1778,6 @@ export function executeTools(
         const description = args.description?.trim();
         // Rounds can be a tier string or number - convert using tier system
         let rounds = parseChallengeRoundsValue(args.rounds ?? "standard");
-        // Points can be a tier string or number - convert using tier system
-        const points = parsePointsValue(args.points ?? "moderate", difficulty);
         const initialSuccesses = Math.min(args.initialSuccesses ?? 0, 3);
         const initialFailures = Math.min(args.initialFailures ?? 0, 3);
 
@@ -2389,7 +1831,6 @@ export function executeTools(
           currentFailures: initialFailures,
           active: true,
           createdAt: Date.now(),
-          pointsAwarded: points,
         };
 
         logger.action("Challenge started via tool", {
@@ -2397,16 +1838,13 @@ export function executeTools(
           name,
           rounds,
           majority,
-          points,
           initialSuccesses,
           initialFailures,
         });
         responses.push({
           command: `/start_challenge: ${name}`,
           success: true,
-          message: `🎯 CHALLENGE STARTED: ${name} (Best of ${rounds} - first to ${majority}) [Score: ${initialSuccesses}-${initialFailures}]${
-            points > 0 ? ` (${points} points on victory)` : ""
-          }`,
+          message: `🎯 CHALLENGE STARTED: ${name} (Best of ${rounds} - first to ${majority}) [Score: ${initialSuccesses}-${initialFailures}]`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -2468,12 +1906,6 @@ export function executeTools(
           challenge.active = false;
           challenge.resolvedAt = Date.now();
           challenge.result = "won";
-
-          // Award points
-          if (challenge.pointsAwarded && challenge.pointsAwarded > 0) {
-            storyData.points =
-              (storyData.points || 0) + challenge.pointsAwarded;
-          }
         } else if (challenge.currentFailures >= majority) {
           autoResolved = true;
           autoResult = "lost";
@@ -2499,11 +1931,7 @@ export function executeTools(
 
         if (autoResolved) {
           if (autoResult === "won") {
-            message += `\n🏆 CHALLENGE WON: ${challenge.name}!${
-              challenge.pointsAwarded
-                ? ` (+${challenge.pointsAwarded} points)`
-                : ""
-            }`;
+            message += `\n🏆 CHALLENGE WON: ${challenge.name}!`;
           } else {
             message += `\n💀 CHALLENGE LOST: ${challenge.name}!`;
           }
@@ -2573,16 +2001,9 @@ export function executeTools(
 
         let message = "";
         if (result === "won") {
-          // Award points
-          if (challenge.pointsAwarded && challenge.pointsAwarded > 0) {
-            storyData.points =
-              (storyData.points || 0) + challenge.pointsAwarded;
-          }
           message = `🏆 CHALLENGE WON: ${challenge.name}!${
-            challenge.pointsAwarded
-              ? ` (+${challenge.pointsAwarded} points)`
-              : ""
-          }${reason ? ` - ${reason}` : ""}`;
+            reason ? ` - ${reason}` : ""
+          }`;
         } else {
           message = `💀 CHALLENGE LOST: ${challenge.name}!${
             reason ? ` - ${reason}` : ""
@@ -2594,7 +2015,6 @@ export function executeTools(
           name: challenge.name,
           result,
           reason,
-          pointsAwarded: result === "won" ? challenge.pointsAwarded : 0,
         });
         responses.push({
           command: `/resolve_challenge: ${result}`,
@@ -3116,8 +2536,8 @@ export function executeTools(
       }
 
       // Direct typed dispatch - no string command round trip. Handles
-      // complete_quest, fail_quest, update_quest, delete_quest,
-      // trigger_achievement, delete_note, remove_ability, modify_ability,
+      // complete_goal, fail_goal, update_goal, delete_goal,
+      // delete_note, remove_ability, modify_ability,
       // upgrade_ability, reset_ability_cooldown, refresh_ability,
       // reduce_cooldown, and adjust_resource.
       const dispatchFn = TOOL_DISPATCH[toolCall.function.name];
@@ -3402,40 +2822,7 @@ function executeRestTool(
     }
   }
 
-  // 4. Condition Downgrade (non-permanent only)
-  const conditionDowngrade = config.conditionDowngrade[restType];
-  if (conditionDowngrade > 0 && storyData.conditions?.length) {
-    const conditionsHealed: string[] = [];
-    const conditionsToRemove: number[] = [];
-
-    for (let i = 0; i < storyData.conditions.length; i++) {
-      const condition = storyData.conditions[i];
-      // Skip permanent conditions (tier 6) and explicitly permanent ones
-      if (condition.permanent || condition.tier >= 6) continue;
-
-      const newTier = condition.tier - conditionDowngrade;
-      if (newTier < 1) {
-        // Condition fully healed - mark for removal
-        conditionsToRemove.push(i);
-        conditionsHealed.push(`${condition.name} healed`);
-      } else {
-        // Downgrade tier
-        condition.tier = newTier as 1 | 2 | 3 | 4 | 5;
-        conditionsHealed.push(`${condition.name} improved`);
-      }
-    }
-
-    // Remove fully healed conditions (reverse order to preserve indices)
-    for (let i = conditionsToRemove.length - 1; i >= 0; i--) {
-      storyData.conditions.splice(conditionsToRemove[i], 1);
-    }
-
-    if (conditionsHealed.length > 0) {
-      effects.push(conditionsHealed.join(", "));
-    }
-  }
-
-  // 5. Update rest state tracking
+  // 4. Update rest state tracking
   if (restType === "long") {
     // Long rest resets quick/short rest counts
     storyData.restState.quickRestsUsed = 0;

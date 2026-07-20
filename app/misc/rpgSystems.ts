@@ -1647,60 +1647,6 @@ export function getSystemUpgradeDefaults(systemId: RPGSystemType = "3d6"): {
   };
 }
 
-/**
- * Get condition penalty for a given tier
- * Returns an object with the penalty type and value
- */
-export function getConditionPenalty(
-  systemId: RPGSystemType | undefined,
-  tier: 1 | 2 | 3 | 4 | 5 | 6
-): {
-  type:
-    | "modifier"
-    | "auto-fail"
-    | "auto-miss"
-    | "taken-out"
-    | "game-over"
-    | "die-size-down"
-    | "d4-only"
-    | "none";
-  value: number;
-} {
-  const system = getRPGSystem(systemId);
-  const tierKey = `tier${tier}` as keyof typeof system.conditionPenalties;
-  const penalty = system.conditionPenalties[tierKey];
-
-  if (penalty === null) {
-    return { type: "none", value: 0 };
-  }
-
-  if (typeof penalty === "number") {
-    return { type: "modifier", value: penalty };
-  }
-
-  // Handle special string penalties
-  switch (penalty) {
-    case "auto-fail":
-      return { type: "auto-fail", value: 0 };
-    case "auto-miss":
-      return { type: "auto-miss", value: 0 };
-    case "taken-out":
-      return { type: "taken-out", value: 0 };
-    case "game-over":
-      return { type: "game-over", value: 0 };
-    case "die-size-down":
-      return { type: "die-size-down", value: 1 };
-    case "die-size-down-2":
-      return { type: "die-size-down", value: 2 };
-    case "die-size-down-3":
-      return { type: "die-size-down", value: 3 };
-    case "d4-only":
-      return { type: "d4-only", value: 0 };
-    default:
-      return { type: "none", value: 0 };
-  }
-}
-
 // ============================================================================
 // TIER-BASED DIFFICULTY SYSTEM
 // ============================================================================
@@ -1710,7 +1656,6 @@ export function getConditionPenalty(
 import type {
   AdventureDifficulty,
   DCTier,
-  PointsTier,
   StatChangeTier,
   ChallengeTier,
 } from "./structs";
@@ -1813,21 +1758,6 @@ const DC_TIER_VALUES: Record<
 };
 
 /**
- * Points values by tier and adventure difficulty
- * These are universal across RPG systems
- */
-const POINTS_TIER_VALUES: Record<
-  PointsTier,
-  Record<AdventureDifficulty, number>
-> = {
-  trivial: { easy: 5, medium: 10, hard: 15, expert: 25 },
-  minor: { easy: 15, medium: 25, hard: 40, expert: 60 },
-  moderate: { easy: 30, medium: 50, hard: 75, expert: 100 },
-  major: { easy: 60, medium: 100, hard: 150, expert: 200 },
-  legendary: { easy: 100, medium: 200, hard: 300, expert: 500 },
-};
-
-/**
  * Stat/resource change values by tier and adventure difficulty
  * Higher difficulty = smaller changes (harder to grow)
  */
@@ -1872,22 +1802,6 @@ export function getDCFromTier(
 }
 
 /**
- * Convert a points tier to an actual number
- * @param tier - The points tier (e.g., "moderate")
- * @param difficulty - The adventure difficulty
- * @returns The numeric points value
- */
-export function getPointsFromTier(
-  tier: PointsTier,
-  difficulty: AdventureDifficulty = "medium"
-): number {
-  return (
-    POINTS_TIER_VALUES[tier]?.[difficulty] ??
-    POINTS_TIER_VALUES["moderate"][difficulty]
-  );
-}
-
-/**
  * Convert a stat change tier to an actual number
  * @param tier - The change tier (e.g., "small")
  * @param difficulty - The adventure difficulty
@@ -1921,16 +1835,6 @@ export function isDCTier(value: unknown): value is DCTier {
     ["trivial", "easy", "average", "hard", "very_hard", "impossible"].includes(
       value
     )
-  );
-}
-
-/**
- * Check if a value is a valid points tier string
- */
-export function isPointsTier(value: unknown): value is PointsTier {
-  return (
-    typeof value === "string" &&
-    ["trivial", "minor", "moderate", "major", "legendary"].includes(value)
   );
 }
 
@@ -1974,25 +1878,6 @@ export function parseDCValue(
   return isNaN(parsed)
     ? getDCFromTier("average", systemId, difficulty)
     : parsed;
-}
-
-/**
- * Parse a points value that could be either a number or a tier string
- * Returns the numeric points value
- */
-export function parsePointsValue(
-  value: number | string,
-  difficulty: AdventureDifficulty = "medium"
-): number {
-  if (typeof value === "number") {
-    return value;
-  }
-  if (isPointsTier(value)) {
-    return getPointsFromTier(value, difficulty);
-  }
-  // Try parsing as number
-  const parsed = parseInt(value, 10);
-  return isNaN(parsed) ? getPointsFromTier("moderate", difficulty) : parsed;
 }
 
 /**
@@ -2040,13 +1925,6 @@ export const DC_TIERS: DCTier[] = [
   "hard",
   "very_hard",
   "impossible",
-];
-export const POINTS_TIERS: PointsTier[] = [
-  "trivial",
-  "minor",
-  "moderate",
-  "major",
-  "legendary",
 ];
 export const STAT_CHANGE_TIERS: StatChangeTier[] = [
   "tiny",

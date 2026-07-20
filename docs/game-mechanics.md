@@ -9,8 +9,9 @@ entry the adventure (or its creator) can define.
 
 This is a deliberate shift from an earlier, more mechanical version of the
 app (momentum points, a picker of 8 fixed dice systems, automatic
-advantage/disadvantage rolls, a point-buy stat shop). Those systems are
-gone. What replaced them is described below.
+advantage/disadvantage rolls, a point-buy stat shop, an XP/leveling
+economy fed by quests and achievements, and a tiered status-condition
+system). Those systems are gone. What replaced them is described below.
 
 ## Character State: Notes, Not Stat Blocks
 
@@ -26,9 +27,6 @@ Some structured data still exists for systems that benefit from it:
 - **Abilities** (`Ability[]`) - named skills/spells/special moves with an
   optional cost and cooldown, managed via `add_ability`, `modify_ability`,
   `upgrade_ability`, `remove_ability`, `reset_ability_cooldown`.
-- **Conditions** (`Condition[]`) - status effects/afflictions with tiers,
-  managed via `add_condition`, `upgrade_condition`, `downgrade_condition`,
-  `remove_condition`.
 - **NPCs** (`NPC[]`) - tracked characters with status/attitude, managed via
   `add_npc`, `update_npc`, `remove_npc`, plus `npc_reaction` for toast
   notifications when an NPC's opinion shifts.
@@ -36,6 +34,15 @@ Some structured data still exists for systems that benefit from it:
   can open/update/resolve/abandon on its own (`create_thread`,
   `update_thread`, `resolve_thread`, `abandon_thread`). Editable manually
   in the story's Threads tab.
+- **Goals** (`Goal[]`) - player-facing objectives the GM can create, update,
+  complete, or fail (`create_goal`, `update_goal`, `complete_goal`,
+  `fail_goal`, `delete_goal`). Editable manually in the story's Goals tab.
+  Together with Story Threads, this is where the old Quests/Achievements
+  systems' functionality now lives - see "What Changed" below. Status
+  effects and afflictions that used to be tracked as structured
+  `Condition[]` entries are now just narrative detail: describe them in the
+  character sheet note, or as a `formula_roll` consequence, the same way
+  the GM narrates any other consequence.
 
 ## Dice & Checks
 
@@ -87,10 +94,10 @@ independent of the player's own character sheet.
 
 `take_rest` processes a quick (~30 min), short (4-8 hour), or long
 (multi-day) rest: it restores resources per the adventure's rest
-configuration, reduces stress, and ticks down ability cooldowns and
-condition durations. It can't be used while a challenge is active.
+configuration, reduces stress, and ticks down ability cooldowns. It can't
+be used while a challenge is active.
 
-## Notes, Memory & Quests
+## Notes, Memory & Goals
 
 - **Notes** (`read_notes`, `search_notes`, `create_note`, `edit_note`,
   `delete_note`, and the `edit_lore_*`/`merge_lore`/`duplicate_lore`
@@ -98,13 +105,10 @@ condition durations. It can't be used while a challenge is active.
   secrets, the character sheet, and the mechanics note all live here.
 - **Memory** (`add_memory`, `search_memory`): durable recall of key past
   events, searched rather than replayed in full each turn.
-- **Quests** (`create_quest`, `update_quest`, `complete_quest`,
-  `fail_quest`, `delete_quest`): tracked objectives shown in the Quests
-  tab; completing one still awards XP (`points`) toward the character's
-  level.
-- **Achievements** (`trigger_achievement`): milestone unlocks with a
-  player-facing description and an optional `ai_hint` for precise
-  triggering conditions.
+- **Goals** (`create_goal`, `update_goal`, `complete_goal`, `fail_goal`,
+  `delete_goal`): tracked objectives shown in the Goals tab, alongside
+  Story Threads in the same Journal view. Purely narrative - completing a
+  goal doesn't award any points or currency.
 - **Timers** (`manage_timer`): countdown timers for deadlines/events.
 
 ## What Changed From the Old System
@@ -131,6 +135,28 @@ the app and have been removed:
   gating (predefined choices that reference a starting item) still reads
   the legacy `inventory` field on old saves/presets for backward
   compatibility.
+- **Conditions**: the tiered (I-VI) status-effect system (`Condition[]`,
+  `add_condition`/`upgrade_condition`/`downgrade_condition`/
+  `remove_condition`/`modify_condition`) has been removed, along with the
+  Conditions tab. Status effects and injuries are now purely narrative -
+  the GM describes them in prose or via `formula_roll` consequences
+  instead of tracking a structured tier. `game_over` no longer accepts a
+  tier-6-condition path; it's gated solely on the player's combatant being
+  downed (HP 0 or inactive) in active combat. This does not affect
+  `toggle_combatant_condition`, the separate combat-only status-effect
+  toggle used by `start_combat`/`add_combatant` (e.g. "Stunned", "Prone",
+  "On Fire") - that's unchanged.
+- **Achievements**: `Achievement[]` and `trigger_achievement` have been
+  removed, along with the Achievements tab. Milestones are now just
+  narrated, or tracked as a Goal if they're something the player should
+  see progress toward.
+- **Quests & XP/Leveling**: the `Quest[]` type (with its `points` field),
+  `create_quest`/`update_quest`/`complete_quest`/`fail_quest`/
+  `delete_quest`, and the entire XP/leveling economy (`points`, `level`,
+  `upgradesSpent`, `levelingSettings`, and the per-quest/achievement/
+  challenge point rewards) have been removed. Objectives are now tracked
+  as **Goals** (see above) with no points attached, and Scene Challenges no
+  longer award points on victory - only narrative outcomes.
 
 If you have an older save that still has these fields, they're preserved
 for backward compatibility but no longer do anything - the GM doesn't read
@@ -138,4 +164,4 @@ them, and the UI no longer exposes them.
 
 ---
 
-_Last updated: July 2026_
+_Last updated: July 2026 (Goals replace Quests/Achievements/XP; Conditions removed)_

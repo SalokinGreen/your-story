@@ -35,7 +35,7 @@ The data structure for Your Story is designed to efficiently manage story elemen
 
 - **Player Profile**: Information about the player, including preferences and progress.
 - **Save States**: Serialized data representing the current state of the game for saving and loading
-- **Statistics**: Tracking player choices, achievements, player stats, and story outcomes.
+- **Statistics**: Tracking player choices, goals, player stats, and story outcomes.
 - **Feedback**: User feedback and ratings for stories and gameplay experience.
 
 ###

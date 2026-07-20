@@ -278,9 +278,6 @@ export function unlockNode(
   // Apply effects
   applyNodeEffects(storyData, tree, node);
 
-  // Increment upgradesSpent
-  storyData.upgradesSpent = (storyData.upgradesSpent || 0) + 1;
-
   return { success: true, message: `Unlocked: ${node.name}` };
 }
 
@@ -400,12 +397,6 @@ export function respecTree(
   // Remove from unlocked nodes list
   storyData.unlockedNodes = unlockedNodes.filter(
     (id) => !id.startsWith(treePrefix)
-  );
-
-  // Refund upgrade points
-  storyData.upgradesSpent = Math.max(
-    0,
-    (storyData.upgradesSpent || 0) - refunded
   );
 
   return {

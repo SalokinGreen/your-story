@@ -1876,21 +1876,12 @@ function ChangeSummary({
       icon: "Scroll",
     });
   }
-  if (data.achievements?.length) {
+  if (data.goals?.length) {
     changes.push({
       type: "Add/Update",
-      label: "Achievements",
-      value: `${data.achievements.length} achievements`,
-      details: data.achievements,
-      icon: "Trophy",
-    });
-  }
-  if (data.quests?.length) {
-    changes.push({
-      type: "Add/Update",
-      label: "Quests",
-      value: `${data.quests.length} quests`,
-      details: data.quests,
+      label: "Goals",
+      value: `${data.goals.length} goals`,
+      details: data.goals,
       icon: "Swords",
     });
   }
@@ -1948,33 +1939,6 @@ function ChangeSummary({
       value: "Upgrade shop configuration",
       details: data.upgradeSettings,
       icon: "ShoppingCart",
-    });
-  }
-  if (data.levelingSettings) {
-    const ls = data.levelingSettings;
-    const details = [];
-    if (ls.xpBase !== undefined) details.push(`XP Base: ${ls.xpBase}`);
-    if (ls.defaultUpgradesPerLevel !== undefined)
-      details.push(`Upgrades/Level: ${ls.defaultUpgradesPerLevel}`);
-    if (ls.levelCap !== undefined) details.push(`Level Cap: ${ls.levelCap}`);
-    if (ls.startingUpgrades) details.push(`Starting Upgrades: configured`);
-    changes.push({
-      type: "Update",
-      label: "Leveling Settings",
-      value:
-        details.length > 0
-          ? details.join(", ")
-          : "Updated leveling configuration",
-      details: data.levelingSettings,
-      icon: "TrendingUp",
-    });
-  }
-  if (data.points !== undefined) {
-    changes.push({
-      type: "Update",
-      label: "Starting Points",
-      value: `${data.points} points`,
-      icon: "Coins",
     });
   }
   return (
@@ -2059,8 +2023,7 @@ function getToolIcon(
     return "Backpack";
   if (toolName.includes("ability")) return "Wand2";
   if (toolName.includes("lore")) return "Scroll";
-  if (toolName.includes("achievement")) return "Trophy";
-  if (toolName.includes("quest")) return "Swords";
+  if (toolName.includes("goal")) return "Swords";
   if (toolName.includes("relationship")) return "Users";
   if (toolName.includes("variable")) return "Variable";
   if (toolName.includes("table")) return "Table";
