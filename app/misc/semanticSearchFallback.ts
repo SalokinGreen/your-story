@@ -23,6 +23,7 @@
  */
 
 import { searchRelevantContext } from "./embeddings";
+import { getMemoryContent, MemoryEntry } from "./structs";
 
 export interface SemanticSearchContext {
   storyId?: string;
@@ -47,10 +48,66 @@ export type SemanticSearchOutcome =
   // surfacing, distinct from "not configured" and from "ran, found nothing".
   | { status: "error"; matches: []; message: string };
 
+// Bounded reranking nudge on top of embedding similarity - a lightweight
+// version of Generative Agents' recency/importance/relevance memory
+// scoring, using similarity as the "relevance" axis directly rather than
+// reimplementing it. Each component is capped at +0.1 (max combined +0.3)
+// so this only breaks ties/near-ties toward more recent, more important,
+// or more query-relevant-by-entity memories - it never overrides a clearly
+// stronger semantic match.
+function computeMemoryBoost(
+  entry: MemoryEntry | undefined,
+  query: string,
+  maxSceneIndex: number
+): number {
+  if (!entry) return 0;
+  let boost = 0;
+
+  if (typeof entry.sceneIndex === "number" && maxSceneIndex > 0) {
+    const scenesAgo = maxSceneIndex - entry.sceneIndex;
+    boost += Math.max(0, 0.1 - scenesAgo * 0.01); // fades to 0 by ~10 scenes ago
+  }
+
+  if (typeof entry.importance === "number") {
+    boost += (entry.importance / 10) * 0.1;
+  }
+
+  if (entry.entityIds && entry.entityIds.length > 0) {
+    const lowerQuery = query.toLowerCase();
+    if (entry.entityIds.some((id) => lowerQuery.includes(id.toLowerCase()))) {
+      boost += 0.1;
+    }
+  }
+
+  return boost;
+}
+
+// Finds the MemoryEntry a DB-returned semantic match corresponds to, by
+// exact content match - the embeddings DB doesn't store sceneIndex/
+// entityIds/importance itself, so this is how those fields get back to a
+// match. Matches are never truncated relative to the source content (see
+// syncNewMemories, embeddings.ts), so exact string equality is reliable.
+function findSourceMemoryEntry(
+  content: string,
+  memoryEntries: (string | MemoryEntry)[]
+): MemoryEntry | undefined {
+  for (const memory of memoryEntries) {
+    if (typeof memory !== "string" && getMemoryContent(memory) === content) {
+      return memory;
+    }
+  }
+  return undefined;
+}
+
 export async function semanticSearchFallback(
   kind: "memory" | "lore",
   query: string,
-  context: SemanticSearchContext
+  context: SemanticSearchContext,
+  // Only used for kind === "memory" - enables reranking matches by
+  // recency/importance/entity-relevance on top of embedding similarity.
+  // Omit (or pass for "lore") and results are returned in similarity order
+  // exactly as before.
+  memoryEntries?: (string | MemoryEntry)[]
 ): Promise<SemanticSearchOutcome> {
   if (!context.enabled || !context.storyId || !context.token || !query.trim()) {
     return { status: "not_configured", matches: [] };
@@ -64,14 +121,29 @@ export async function semanticSearchFallback(
       kind === "lore" ? { loreLimit: 5, memoryLimit: 0 } : { loreLimit: 0, memoryLimit: 5 }
     );
     const rawMatches = kind === "lore" ? result.lore : result.memories;
-    return {
-      status: "ok",
-      matches: rawMatches.map((m) => ({
-        key: m.entry_key,
-        content: m.content,
-        similarity: m.similarity,
-      })),
-    };
+    let matches: SemanticMatch[] = rawMatches.map((m) => ({
+      key: m.entry_key,
+      content: m.content,
+      similarity: m.similarity,
+    }));
+
+    if (kind === "memory" && memoryEntries && memoryEntries.length > 0) {
+      const sceneIndices = memoryEntries
+        .map((m) => (typeof m !== "string" ? m.sceneIndex : undefined))
+        .filter((n): n is number => typeof n === "number");
+      const maxSceneIndex = sceneIndices.length > 0 ? Math.max(...sceneIndices) : 0;
+
+      matches = matches
+        .map((match) => {
+          const sourceEntry = findSourceMemoryEntry(match.content, memoryEntries);
+          const boost = computeMemoryBoost(sourceEntry, query, maxSceneIndex);
+          return { match, score: match.similarity + boost };
+        })
+        .sort((a, b) => b.score - a.score)
+        .map((scored) => scored.match);
+    }
+
+    return { status: "ok", matches };
   } catch (error: unknown) {
     // A real degradation - the caller still has its "no literal matches"
     // result to fall back to, but this is no longer indistinguishable from

@@ -18,6 +18,7 @@ import { NextRequest } from "next/server";
 import { getModelConfig, AIModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 import { CustomModel } from "@/app/misc/user_settings";
+import { extractFallbackToolCalls } from "@/app/misc/toolCallFallback";
 import {
   SamplingSettings,
   filterSettingsForProvider,
@@ -38,6 +39,10 @@ interface ChatMessage {
 interface RequestBody {
   messages: ChatMessage[];
   tools?: any[];
+  // Caller-forced tool_choice (e.g. the M2 roll-invariant gate's retry
+  // round, generation.ts). Only "required" is meaningful here - anything
+  // else falls back to the provider's normal default below.
+  toolChoice?: "required";
   model?: string;
   maxTokens?: number;
   temperature?: number;
@@ -153,9 +158,6 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "add_combatant",
   "update_combatant_stat",
   "npc_roll",
-  // Items
-  "add_item",
-  "remove_item",
   // Terminal - required
   "end_gm_thinking",
 ]);
@@ -321,6 +323,7 @@ export async function POST(req: NextRequest) {
         const {
           messages,
           tools,
+          toolChoice,
           model: rawModel,
           maxTokens = 4000,
           temperature = 0.7,
@@ -632,10 +635,14 @@ export async function POST(req: NextRequest) {
               ? filterToolsForGoogle(tools)
               : tools;
           requestBody.tools = toolsToUse;
-          // Google/Gemini needs tool_choice: "required" to actually invoke tools
-          // ("auto" often results in empty responses)
+          // Google/Gemini needs tool_choice: "required" to actually invoke
+          // tools ("auto" often results in empty responses); a caller can
+          // also force "required" for any provider (e.g. the M2 gate's
+          // retry round) - that always wins over the per-provider default.
           requestBody.tool_choice =
-            modelConfig.provider === "google" ? "required" : "auto";
+            toolChoice === "required" || modelConfig.provider === "google"
+              ? "required"
+              : "auto";
         }
 
         applyReasoningEffort(
@@ -904,6 +911,26 @@ export async function POST(req: NextRequest) {
                 // Skip malformed JSON in final buffer
               }
             }
+          }
+        }
+
+        // Defensive fallback for a known DeepSeek reliability issue: a tool
+        // call sometimes arrives as text in content instead of populating
+        // the streamed tool_calls deltas (see toolCallFallback.ts). Only
+        // attempt recovery when tools were actually offered - otherwise
+        // this is just ordinary prose.
+        if (toolCalls.length === 0 && tools && tools.length > 0) {
+          const recovered = extractFallbackToolCalls(fullContent);
+          if (recovered) {
+            logger.action(
+              "Recovered tool call(s) from content fallback (tool_calls field was empty)",
+              {
+                provider: modelConfig.provider,
+                recoveredCount: recovered.length,
+                names: recovered.map((c) => c.function.name),
+              },
+            );
+            toolCalls = recovered;
           }
         }
 

@@ -25,7 +25,11 @@ interface StoryProps {
   loadingStage?: "gm" | "story" | "choices" | null;
   handleChoice: (playerComment?: string) => void;
   handleSelect: (index: number) => void;
-  onCustomInput?: (text: string, playerComment?: string) => void;
+  onCustomInput?: (
+    text: string,
+    playerComment?: string,
+    speakerIds?: string[],
+  ) => void;
   onActionSubmit?: (
     text: string,
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
@@ -1127,7 +1131,9 @@ export default function Story({
         onCustomInput && (
           <PlayerBubbles
             players={storyData.multiplayer.couchPlayers!}
-            onSubmit={onCustomInput}
+            onSubmit={(text, speakerIds) =>
+              onCustomInput(text, undefined, speakerIds)
+            }
             disabled={loading || !!loadingStage}
           />
         )}

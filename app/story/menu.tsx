@@ -38,7 +38,6 @@ import { CustomTablesEditor } from "../components/CustomTablesEditor";
 import ChatDisplaySettings from "./menu/ChatDisplaySettings";
 import BasicSettings, { BasicSettingsForm } from "./menu/BasicSettings";
 import QuestEditor from "./menu/QuestEditor";
-import InventoryEditor from "./menu/InventoryEditor";
 import AbilitiesEditor from "./menu/AbilitiesEditor";
 import LoreEditor from "./menu/LoreEditor";
 import RelationshipsEditor from "./menu/RelationshipsEditor";
@@ -62,7 +61,6 @@ interface MenuProps extends StoryData {
 type MenuTab =
   | "basic"
   | "multiplayer"
-  | "inventory"
   | "abilities"
   | "quests"
   | "lore"
@@ -171,7 +169,6 @@ export default function MenuPage({
   const sections: { id: MenuTab; label: string; icon: string }[] = [
     { id: "basic", label: "Basic", icon: "FileText" },
     { id: "multiplayer", label: "Multiplayer", icon: "Users" },
-    { id: "inventory", label: "Inventory", icon: "Backpack" },
     { id: "abilities", label: "Abilities", icon: "Wand2" },
     { id: "quests", label: "Quests", icon: "Scroll" },
     { id: "lore", label: "Notes", icon: "Book" },
@@ -1149,21 +1146,6 @@ export default function MenuPage({
 
                 <div
                   ref={(el) => {
-                    sectionRefs.current["inventory"] = el;
-                  }}
-                  data-section-id="inventory"
-                  style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
-                >
-                  <SectionHeading tab={getSection("inventory")} />
-                  <InventoryEditor
-                    inventory={storyData.inventory}
-                    onUpdate={(inventory) => onUpdateStoryData({ inventory })}
-                  />
-                </div>
-
-                <div
-                  ref={(el) => {
                     sectionRefs.current["abilities"] = el;
                   }}
                   data-section-id="abilities"
@@ -1207,6 +1189,7 @@ export default function MenuPage({
                     lore={storyData.lore}
                     variables={storyData.variables || []}
                     onUpdate={(lore) => onUpdateStoryData({ lore })}
+                    couchPlayers={storyData.multiplayer?.couchPlayers}
                   />
                 </div>
 

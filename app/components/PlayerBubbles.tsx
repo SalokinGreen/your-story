@@ -76,7 +76,7 @@ interface RecordingSession {
 
 interface PlayerBubblesProps {
   players: CouchPlayer[];
-  onSubmit: (text: string) => void;
+  onSubmit: (text: string, speakerIds?: string[]) => void;
   disabled?: boolean;
 }
 
@@ -150,7 +150,8 @@ export default function PlayerBubbles({
     (lines: PendingLine[]) => {
       if (lines.length === 0) return;
       const text = lines.map((l) => `> ${l.name}: ${l.text}`).join("\n");
-      onSubmit(text);
+      const speakerIds = Array.from(new Set(lines.map((l) => l.playerId)));
+      onSubmit(text, speakerIds);
     },
     [onSubmit],
   );

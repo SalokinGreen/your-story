@@ -5,7 +5,7 @@ import {
   ensureStoryCompacted,
   CompactionPlan,
 } from "../app/misc/compaction";
-import { StoryData, NPC, InventoryItem, StoryLore } from "../app/misc/structs";
+import { StoryData, NPC, StoryLore } from "../app/misc/structs";
 
 function createMockStoryData(overrides: Partial<StoryData> = {}): StoryData {
   return {
@@ -39,17 +39,6 @@ function npc(overrides: Partial<NPC>): NPC {
   };
 }
 
-function item(overrides: Partial<InventoryItem>): InventoryItem {
-  return {
-    name: "Rusty Sword",
-    quantity: 1,
-    description: "An old blade",
-    type: "normal",
-    symbol: "🗡️",
-    ...overrides,
-  };
-}
-
 function lore(overrides: Partial<StoryLore>): StoryLore {
   return {
     title: "The Old War",
@@ -70,10 +59,9 @@ describe("validateCompactionSummary", () => {
   it("returns no warnings for a clean summary that preserves referenced entities", () => {
     const storyData = createMockStoryData({
       npcs: [npc({ name: "Marcus", status: "alive" })],
-      inventory: [item({ name: "Rusty Sword" })],
     });
-    const source = "Marcus greeted the party. Marcus led them to the shop. The party took the Rusty Sword.";
-    const summary = "The party met Marcus and acquired the Rusty Sword.";
+    const source = "Marcus greeted the party. Marcus led them to the shop.";
+    const summary = "The party met Marcus.";
 
     const warnings = validateCompactionSummary(plan(source), summary, storyData);
     expect(warnings).toEqual([]);
@@ -141,18 +129,16 @@ describe("validateCompactionSummary", () => {
     );
   });
 
-  it("checks items and lore titles for dropped-entity warnings too", () => {
+  it("checks lore titles for dropped-entity warnings too", () => {
     const storyData = createMockStoryData({
-      inventory: [item({ name: "Ancient Amulet" })],
       lore: [lore({ title: "The Sunken City" })],
     });
     const source =
-      "The Ancient Amulet glowed brightly. The Ancient Amulet seemed to react to The Sunken City. The Sunken City was mentioned twice more.";
+      "The Sunken City loomed ahead. The Sunken City seemed to pulse with light. The Sunken City was mentioned twice more.";
     const summary = "The party continued their journey through the swamp.";
 
     const warnings = validateCompactionSummary(plan(source), summary, storyData);
     const droppedNames = warnings.filter((w) => w.type === "dropped_entity").map((w) => w.entity);
-    expect(droppedNames).toContain("Ancient Amulet");
     expect(droppedNames).toContain("The Sunken City");
   });
 });

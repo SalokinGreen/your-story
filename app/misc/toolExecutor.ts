@@ -16,17 +16,34 @@ import {
   StoryLore,
   MAX_PENDING_RANDOM_EVENTS,
   PendingRandomEvent,
+  MAX_PENDING_DIRECTOR_MOVES,
 } from "@/app/misc/structs";
-import { executeCommandWithResponse } from "@/app/misc/commandResponses";
+import {
+  applyCompleteQuest,
+  applyFailQuest,
+  applyUpdateQuest,
+  applyDeleteQuest,
+  applyTriggerAchievement,
+  applyDeleteNote,
+  applyRemoveAbility,
+  applyModifyAbility,
+  applyUpgradeAbility,
+  applyResetAbilityCooldown,
+  applyReduceCooldown,
+  applyAdjustResource,
+} from "@/app/misc/commandResponses";
 import { TOOL_MAP } from "@/app/misc/toolSchemas";
 import { logger } from "@/app/misc/logger";
 import {
   checkScene,
   adjustChaosFactor,
+  adjustTension,
+  selectDirectorMove,
   generateEventFocus,
   generateEventMeaning,
 } from "@/app/misc/mythic";
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
+import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
 import {
   parsePointsValue,
@@ -118,50 +135,6 @@ function calculateRelationshipDelta(
   return finalChange;
 }
 
-/**
- * Calculate durability change based on magnitude and difficulty.
- * Returns percentage-based change scaled to item's max durability.
- */
-function calculateDurabilityDelta(
-  magnitude: string,
-  maxDurability: number,
-  difficulty: AdventureDifficulty = "medium"
-): number {
-  // Base percentages of max durability
-  const baseMagnitudes: Record<string, number> = {
-    // Negative (damaging)
-    destroy: -1.0, // 100%
-    heavily_damage: -0.5, // 50%
-    damage: -0.25, // 25%
-    scratch: -0.1, // 10%
-    // Positive (repairing)
-    patch: 0.1, // 10%
-    repair: 0.25, // 25%
-    fully_repair: 1.0, // 100%
-  };
-
-  // Difficulty multipliers (harder = more damage, less repair)
-  const difficultyMultipliers: Record<
-    AdventureDifficulty,
-    { gain: number; loss: number }
-  > = {
-    easy: { gain: 1.3, loss: 0.7 },
-    medium: { gain: 1.0, loss: 1.0 },
-    hard: { gain: 0.8, loss: 1.2 },
-    expert: { gain: 0.6, loss: 1.4 },
-  };
-
-  const basePercent = baseMagnitudes[magnitude] || 0;
-  const isRepairing = basePercent > 0;
-  const diffMult =
-    difficultyMultipliers[difficulty] || difficultyMultipliers.medium;
-
-  const multiplier = isRepairing ? diffMult.gain : diffMult.loss;
-  const finalChange = Math.round(basePercent * maxDurability * multiplier);
-
-  return finalChange;
-}
-
 export interface ToolCall {
   id?: string;
   type: "function";
@@ -179,8 +152,13 @@ export interface ExecuteToolsResult {
 /**
  * Tools whose successful execution should generate state change notifications
  * for the story generation stage. Includes both tool names and their command equivalents.
+ *
+ * Exported for reuse by generation.ts's leniency audit (a soft, always-on
+ * widening of the M2 roll-invariant gate) - reusing this list rather than
+ * inventing a second, possibly-drifting one for "consequential state-changing
+ * tool."
  */
-const STATE_CHANGE_TOOLS = new Set([
+export const STATE_CHANGE_TOOLS = new Set([
   // Abilities - tool names and command names
   "add_ability",
   "remove_ability",
@@ -217,6 +195,37 @@ const STATE_CHANGE_TOOLS = new Set([
   "fail_quest",
   "create_quest",
 ]);
+
+/**
+ * Direct typed dispatch table for tools that used to be converted into a
+ * pipe-delimited `/command: args` string and then re-parsed by a regex in
+ * commandResponses.ts's executeCommandWithResponse. Each entry here takes
+ * the already-parsed tool `args` object directly - no string round trip.
+ *
+ * `reset_ability_cooldown` and `refresh_ability` share a single
+ * implementation since their behavior is identical.
+ */
+const TOOL_DISPATCH: Record<
+  string,
+  (
+    args: Record<string, unknown>,
+    storyData: StoryData
+  ) => Omit<CommandResponse, "toolCallId"> | null
+> = {
+  complete_quest: applyCompleteQuest,
+  fail_quest: applyFailQuest,
+  update_quest: applyUpdateQuest,
+  delete_quest: applyDeleteQuest,
+  trigger_achievement: applyTriggerAchievement,
+  delete_note: applyDeleteNote,
+  remove_ability: applyRemoveAbility,
+  modify_ability: applyModifyAbility,
+  upgrade_ability: applyUpgradeAbility,
+  reset_ability_cooldown: applyResetAbilityCooldown,
+  refresh_ability: applyResetAbilityCooldown,
+  reduce_cooldown: applyReduceCooldown,
+  adjust_resource: applyAdjustResource,
+};
 
 /**
  * Parse dice notation (e.g., "2d6+3", "-1d8+2", "3d6-5") and return the rolled value
@@ -422,8 +431,38 @@ export function executeTools(
         });
         if (!storyData.memory) storyData.memory = [];
         const entry = args.entry;
+
+        // Exact-name-matching against tracked entities (same approach
+        // compaction.ts's dropped-entity check already uses) - a
+        // lightweight version of Generative Agents' recency/importance/
+        // entity-relevance memory scoring, not NLP-style extraction.
+        const entityIds: string[] = [];
+        for (const npc of storyData.npcs || []) {
+          if (npc.name && countNameMentions(entry, npc.name) > 0) {
+            entityIds.push(npc.name);
+          }
+        }
+        for (const thread of storyData.threads || []) {
+          if (thread.title && countNameMentions(entry, thread.title) > 0) {
+            entityIds.push(thread.title);
+          }
+        }
+
+        const rawImportance = args.importance;
+        const importance =
+          typeof rawImportance === "number" && !isNaN(rawImportance)
+            ? Math.max(0, Math.min(10, rawImportance))
+            : undefined;
+
         // Add as MemoryEntry with embedded: false so it gets embedded on next sync
-        storyData.memory.push({ content: entry, embedded: false });
+        storyData.memory.push({
+          content: entry,
+          embedded: false,
+          timestamp: Date.now(),
+          sceneIndex: storyData.scene.parts.length,
+          entityIds: entityIds.length > 0 ? entityIds : undefined,
+          importance,
+        });
         const successMsg = `Added memory: "${entry.substring(0, 50)}${
           entry.length > 50 ? "..." : ""
         }"`;
@@ -1419,306 +1458,6 @@ export function executeTools(
         continue;
       }
 
-      // Special handling for update_quest with both shortDescription and description
-      // Need to execute two commands
-      if (
-        toolCall.function.name === "update_quest" &&
-        args.shortDescription &&
-        args.description
-      ) {
-        logger.action("Special handling: update_quest with both descriptions", {
-          toolCallId: toolId,
-          questTitle: args.title,
-        });
-
-        // First: update description
-        const descCommand = `/update_quest_description: ${args.title} | ${args.description}`;
-        logger.action(`Executing command: ${descCommand}`, {
-          toolCallId: toolId,
-        });
-        const descResponse = executeCommandWithResponse(descCommand, storyData);
-
-        if (!descResponse || !descResponse.success) {
-          const errorMsg =
-            descResponse?.message || `Failed to update quest description`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-            command: descCommand,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Second: update short description
-        const shortCommand = `/update_quest_short_description: ${args.title} | ${args.shortDescription}`;
-        logger.action(`Executing command: ${shortCommand}`, {
-          toolCallId: toolId,
-        });
-        const shortResponse = executeCommandWithResponse(
-          shortCommand,
-          storyData
-        );
-
-        if (!shortResponse || !shortResponse.success) {
-          // Description was updated but short description failed - return partial success
-          const partialMsg = `${
-            descResponse.message
-          } (short description update failed: ${
-            shortResponse?.message || "unknown error"
-          })`;
-          logger.warn(`Tool call partial success: ${partialMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: true,
-            message: partialMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Both succeeded - combine messages
-        const successMsg = `${descResponse.message} and updated short description`;
-        logger.action(`Tool call succeeded: ${successMsg}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: successMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-        continue;
-      }
-
-      // Handle adjust_resource - use delta directly
-      if (toolCall.function.name === "adjust_resource") {
-        const delta = args.delta ?? 0;
-        const command = `/adjust_resource: ${args.name} | ${delta}`;
-        logger.action(`Executing command: ${command}`, {
-          toolCallId: toolId,
-        });
-        const response = executeCommandWithResponse(command, storyData);
-
-        if (!response || !response.success) {
-          const errorMsg = response?.message || `Failed to adjust resource`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-            command,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        logger.action(`Tool call succeeded: ${response.message}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: response.message,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-
-        if (STATE_CHANGE_TOOLS.has(toolName)) {
-          stateChanges.push(response.message);
-        }
-        continue;
-      }
-
-      // Special handling for damage_item - calculate durability loss from magnitude
-      if (toolCall.function.name === "damage_item") {
-        const inventory = storyData.inventory || [];
-        const existingItem = inventory.find(
-          (i) => i.name.toLowerCase() === args.name?.toLowerCase()
-        );
-
-        if (!existingItem) {
-          const errorMsg = `Item "${args.name}" not found`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        // Items without durability tracking can't be damaged this way
-        const maxDurability = existingItem.maxDurability || 100;
-        const difficulty = storyData.difficulty || "medium";
-
-        // Calculate actual damage from magnitude
-        const damage = calculateDurabilityDelta(
-          args.magnitude || "damage",
-          maxDurability,
-          difficulty as AdventureDifficulty
-        );
-
-        logger.action("Special handling: damage_item with magnitude", {
-          toolCallId: toolId,
-          itemName: args.name,
-          magnitude: args.magnitude,
-          maxDurability,
-          calculatedDamage: damage,
-          difficulty,
-        });
-
-        // Use absolute value since /damage_item expects positive amount
-        const command = `/damage_item: ${args.name} | ${Math.abs(damage)}`;
-        logger.action(`Executing command: ${command}`, {
-          toolCallId: toolId,
-        });
-        const response = executeCommandWithResponse(command, storyData);
-
-        if (!response || !response.success) {
-          const errorMsg = response?.message || `Failed to damage item`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-            command,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const magnitudeLabel = (args.magnitude || "damage").replace(/_/g, " ");
-        const successMsg = `${response.message} (${magnitudeLabel})`;
-        logger.action(`Tool call succeeded: ${successMsg}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: successMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-
-        if (STATE_CHANGE_TOOLS.has(toolName)) {
-          stateChanges.push(successMsg);
-        }
-        continue;
-      }
-
-      // Special handling for repair_item - calculate durability restoration from magnitude
-      if (toolCall.function.name === "repair_item") {
-        const inventory = storyData.inventory || [];
-        const existingItem = inventory.find(
-          (i) => i.name.toLowerCase() === args.name?.toLowerCase()
-        );
-
-        if (!existingItem) {
-          const errorMsg = `Item "${args.name}" not found`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const maxDurability = existingItem.maxDurability || 100;
-        const difficulty = storyData.difficulty || "medium";
-
-        // Calculate actual repair amount from magnitude
-        const repair = calculateDurabilityDelta(
-          args.magnitude || "repair",
-          maxDurability,
-          difficulty as AdventureDifficulty
-        );
-
-        logger.action("Special handling: repair_item with magnitude", {
-          toolCallId: toolId,
-          itemName: args.name,
-          magnitude: args.magnitude,
-          maxDurability,
-          calculatedRepair: repair,
-          difficulty,
-        });
-
-        const command = `/repair_item: ${args.name} | ${repair}`;
-        logger.action(`Executing command: ${command}`, {
-          toolCallId: toolId,
-        });
-        const response = executeCommandWithResponse(command, storyData);
-
-        if (!response || !response.success) {
-          const errorMsg = response?.message || `Failed to repair item`;
-          logger.error(`Tool call failed: ${errorMsg}`, {
-            toolCallId: toolId,
-            toolName,
-            command,
-          });
-          responses.push({
-            command: toolCall.function.name,
-            success: false,
-            message: errorMsg,
-            timestamp: Date.now(),
-            toolCallId: toolCall.id,
-          });
-          continue;
-        }
-
-        const magnitudeLabel = (args.magnitude || "repair").replace(/_/g, " ");
-        const successMsg = `${response.message} (${magnitudeLabel})`;
-        logger.action(`Tool call succeeded: ${successMsg}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: true,
-          message: successMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-
-        if (STATE_CHANGE_TOOLS.has(toolName)) {
-          stateChanges.push(successMsg);
-        }
-        continue;
-      }
-
       // === Advanced RPG Tools TOOL HANDLERS ===
 
       // Increment scene
@@ -1753,6 +1492,35 @@ export function executeTools(
         );
         storyData.agmtState.chaosFactor = newChaos;
         storyData.agmtState.lastChaosAdjustment = storyData.agmtState.sceneCount;
+
+        // Director-layer tension estimate: same hook point as chaos,
+        // nudged by the same scene check plus combat/timer pressure - see
+        // adjustTension (mythic.ts).
+        const oldTension = storyData.agmtState.tension ?? 5;
+        storyData.agmtState.tension = adjustTension(oldTension, {
+          sceneType,
+          combatActive: storyData.combatState?.active,
+          timerNearZero: (storyData.timers || []).some(
+            (t) => t.status === "active" && t.currentTicks <= 1
+          ),
+        });
+
+        // Director move selection: a deterministic policy, not the model's
+        // own choice (see selectDirectorMove's doc comment). Persisted the
+        // same way pendingRandomEvents is, so it keeps reappearing until
+        // acknowledge_director_move is called.
+        const directorMove = selectDirectorMove(storyData, sceneType);
+        if (directorMove) {
+          storyData.pendingDirectorMoves = storyData.pendingDirectorMoves || [];
+          storyData.pendingDirectorMoves.push(directorMove);
+          if (
+            storyData.pendingDirectorMoves.length > MAX_PENDING_DIRECTOR_MOVES
+          ) {
+            storyData.pendingDirectorMoves = storyData.pendingDirectorMoves.slice(
+              -MAX_PENDING_DIRECTOR_MOVES
+            );
+          }
+        }
 
         // Build response message
         let message = `✓ Scene count: ${oldCount} → ${oldCount + 1}`;
@@ -1797,6 +1565,13 @@ export function executeTools(
           message += `\n⚡ SCENE INTERRUPTED! The expected scene doesn't happen - replace it with a random event: [${eventFocus}] "${eventMeaning.action} ${eventMeaning.subject}". Incorporate this into the next narration, then call resolve_random_event(id: "${pendingEvent.id}"). It will keep reappearing every turn until resolved.`;
         } else if (sceneType === "Altered") {
           message += `\n🔀 Scene Altered: the expected scene happens, but with an unexpected twist - don't play it exactly as planned.`;
+        }
+
+        if (directorMove) {
+          const label = directorMove.move.replace(/_/g, " ");
+          message += `\n🎬 Director move: ${label}${
+            directorMove.context ? ` (${directorMove.context})` : ""
+          } - render this as prose without naming it, then call acknowledge_director_move(id: "${directorMove.id}"). It will keep reappearing every turn until resolved.`;
         }
 
         logger.action("Scene count incremented via tool", {
@@ -1870,6 +1645,61 @@ export function executeTools(
           } ${resolved.subject}"${
             howIncorporated ? ` - ${howIncorporated}` : ""
           }`,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Acknowledge a pending director move - same close-the-loop shape as
+      // resolve_random_event above: the move persists and keeps
+      // reappearing in context every turn until the GM confirms it was
+      // rendered into the narration.
+      if (toolCall.function.name === "acknowledge_director_move") {
+        const id = args.id?.trim();
+        const howIncorporated = args.how_incorporated?.trim();
+
+        if (!id) {
+          responses.push({
+            command: "/acknowledge_director_move",
+            success: false,
+            message: "✗ Move id is required",
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const moves = storyData.pendingDirectorMoves || [];
+        const moveIndex = moves.findIndex((m) => m.id === id);
+
+        if (moveIndex === -1) {
+          responses.push({
+            command: `/acknowledge_director_move: ${id}`,
+            success: false,
+            message: `✗ No pending director move with id "${id}" (it may already be resolved)`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const [resolved] = moves.splice(moveIndex, 1);
+        storyData.pendingDirectorMoves = moves;
+
+        logger.action("Director move acknowledged via tool", {
+          toolCallId: toolId,
+          id,
+          move: resolved.move,
+          howIncorporated,
+        });
+        responses.push({
+          command: `/acknowledge_director_move: ${id}`,
+          success: true,
+          message: `✓ Director move acknowledged: ${resolved.move.replace(
+            /_/g,
+            " "
+          )}${howIncorporated ? ` - ${howIncorporated}` : ""}`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
@@ -3273,62 +3103,67 @@ export function executeTools(
         continue;
       }
 
-      // Convert tool call to XML command format and execute
-      const command = convertToolToCommand(
-        toolCall.function.name,
-        args,
-        storyData
-      );
-      if (command === null) {
-        const errorMsg = `Tool cannot be converted to command (tool ${
-          toolCall.function.name
-        } args=${serializeArgs(args)})`;
-        logger.error(`Tool call failed: ${errorMsg}`, {
-          toolCallId: toolId,
-          toolName,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: false,
-          message: errorMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
+      // Direct typed dispatch - no string command round trip. Handles
+      // complete_quest, fail_quest, update_quest, delete_quest,
+      // trigger_achievement, delete_note, remove_ability, modify_ability,
+      // upgrade_ability, reset_ability_cooldown, refresh_ability,
+      // reduce_cooldown, and adjust_resource.
+      const dispatchFn = TOOL_DISPATCH[toolCall.function.name];
+      if (dispatchFn) {
+        const response = dispatchFn(args, storyData);
+        if (response) {
+          const fullResponse: CommandResponse = {
+            ...response,
+            toolCallId: toolCall.id,
+          };
+          logger.action(
+            `Tool call ${fullResponse.success ? "succeeded" : "failed"}: ${
+              fullResponse.message
+            }`,
+            {
+              toolCallId: toolId,
+              toolName,
+              success: fullResponse.success,
+            }
+          );
+          responses.push(fullResponse);
+        } else {
+          const errorMsg = `Tool dispatch returned null (tool ${
+            toolCall.function.name
+          } args=${serializeArgs(args)})`;
+          logger.error(`Tool call failed: ${errorMsg}`, {
+            toolCallId: toolId,
+            toolName,
+          });
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: errorMsg,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+        }
         continue;
       }
 
-      logger.action(`Converted to command: ${command}`, { toolCallId: toolId });
-      const response = executeCommandWithResponse(command, storyData);
-      if (response) {
-        response.toolCallId = toolCall.id; // Link response to tool call
-        logger.action(
-          `Tool call ${response.success ? "succeeded" : "failed"}: ${
-            response.message
-          }`,
-          {
-            toolCallId: toolId,
-            toolName,
-            success: response.success,
-          }
-        );
-        responses.push(response);
-      } else {
-        const errorMsg = `Command execution returned null (tool ${
-          toolCall.function.name
-        } args=${serializeArgs(args)} command=${command})`;
-        logger.error(`Tool call failed: ${errorMsg}`, {
-          toolCallId: toolId,
-          toolName,
-          command,
-        });
-        responses.push({
-          command: toolCall.function.name,
-          success: false,
-          message: errorMsg,
-          timestamp: Date.now(),
-          toolCallId: toolCall.id,
-        });
-      }
+      // Every tool name present in TOOL_MAP is handled either by one of the
+      // inline special-case blocks above or by TOOL_DISPATCH, both of which
+      // `continue` before reaching this point. If we get here, a tool was
+      // added to the schema without wiring up an executor for it.
+      const errorMsg = `Tool has no executor wired up (tool ${
+        toolCall.function.name
+      } args=${serializeArgs(args)})`;
+      logger.error(`Tool call failed: ${errorMsg}`, {
+        toolCallId: toolId,
+        toolName,
+      });
+      responses.push({
+        command: toolCall.function.name,
+        success: false,
+        message: errorMsg,
+        timestamp: Date.now(),
+        toolCallId: toolCall.id,
+      });
     } catch (error: any) {
       const errorMsg = `Execution error: ${error.message} (tool ${
         toolCall.function.name
@@ -3395,144 +3230,6 @@ export function executeTools(
   }
 
   return { responses, stateChanges };
-}
-
-/**
- * Convert tool call to XML command format for existing commandResponses.ts
- * This allows us to reuse all existing validation and fuzzy matching logic
- * Returns null for tools that need special handling (e.g., add_memory)
- *
- * Tier Conversion: Some tools accept tier strings (e.g., "moderate", "hard") instead of numbers.
- * These are converted to actual numbers based on RPG system and adventure difficulty.
- */
-function convertToolToCommand(
-  toolName: string,
-  args: Record<string, any>,
-  storyData: StoryData
-): string | null {
-  switch (toolName) {
-    // Quest Management - handled directly in executeTools (description may contain | characters)
-    case "create_quest":
-      return null;
-
-    case "complete_quest":
-      return `/complete_quest: ${args.title}`;
-
-    case "fail_quest":
-      return `/fail_quest: ${args.title}`;
-
-    case "update_quest":
-      if (args.shortDescription && args.description) {
-        // Update both - do description first
-        return `/update_quest_description: ${args.title} | ${args.description}`;
-      } else if (args.shortDescription) {
-        return `/update_quest_short_description: ${args.title} | ${args.shortDescription}`;
-      } else if (args.description) {
-        return `/update_quest_description: ${args.title} | ${args.description}`;
-      }
-      // No updates provided - this shouldn't happen but return null to fail gracefully
-      return null;
-
-    case "delete_quest":
-      return `/delete_quest: ${args.title}`;
-
-    // Achievement
-    case "trigger_achievement":
-      return `/trigger_achievement: ${args.title}`;
-
-    // Note Management - handled directly in executeTools (content may contain | characters)
-    case "create_note":
-      return null;
-
-    case "delete_note":
-      return `/note_delete: ${args.title}`;
-
-    case "list_inactive_notes":
-      return null; // Handled directly in executeTools
-
-    case "edit_note":
-      // Handled directly in executeTools (content may contain | characters like markdown tables)
-      return null;
-
-    case "edit_lore_replace":
-      // Handled directly in executeTools
-      return null;
-
-    case "edit_lore_append":
-      // Handled directly in executeTools
-      return null;
-
-    case "edit_lore_prepend":
-      // Handled directly in executeTools
-      return null;
-
-    case "toggle_lore":
-      // Handled directly in executeTools
-      return null;
-
-    case "edit_lore_insert":
-      // Handled directly in executeTools
-      return null;
-
-    case "merge_lore":
-      // Handled directly in executeTools
-      return null;
-
-    case "duplicate_lore":
-      // Handled directly in executeTools
-      return null;
-
-    case "search_notes":
-      // Handled directly in executeTools
-      return null;
-
-    // Ability Management - handled directly in executeTools (description may contain | characters)
-    case "add_ability":
-      return null;
-
-    case "remove_ability":
-      return `/remove_ability: ${args.name}`;
-
-    case "modify_ability": {
-      // Handle different modification types
-      if (args.costs !== undefined) {
-        const costsStr =
-          args.costs
-            ?.map(
-              (c: { type: string; name: string; amount: number }) =>
-                `${c.type}:${c.name}:${c.amount}`
-            )
-            .join(",") || "none";
-        return `/modify_ability: ${args.name} | costs | ${costsStr}`;
-      } else if (args.description !== undefined) {
-        return `/modify_ability: ${args.name} | description | ${args.description}`;
-      } else if (args.stat !== undefined) {
-        return `/modify_ability: ${args.name} | stat | ${args.stat || "none"}`;
-      } else if (args.maxCooldown !== undefined) {
-        return `/modify_ability: ${args.name} | maxCooldown | ${args.maxCooldown}`;
-      }
-      return null; // No valid modifications specified
-    }
-
-    case "upgrade_ability":
-      return `/upgrade_ability: ${args.name}`;
-
-    case "reset_ability_cooldown":
-      return `/refresh_ability: ${args.name}`;
-
-    case "reduce_cooldown":
-      return `/reduce_cooldown: ${args.name} | ${args.amount}`;
-
-    case "refresh_ability":
-      return `/refresh_ability: ${args.name}`;
-
-    // Memory - handled directly in executeTools, not via command
-    case "add_memory":
-      return null; // Signal to handle directly
-
-    default:
-      throw new Error(`Unhandled tool: ${toolName}`);
-  }
 }
 
 /**

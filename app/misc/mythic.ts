@@ -9,6 +9,13 @@
  * - Scene setup (altered/interrupted/normal)
  */
 
+import type {
+  StoryData,
+  PendingDirectorMove,
+  CouchPlayer,
+  PlayerStyleType,
+} from "./structs";
+
 export type FateAnswer = "Exceptional Yes" | "Yes" | "No" | "Exceptional No";
 export type SceneType = "Normal" | "Altered" | "Interrupted";
 export type Likelihood =
@@ -258,6 +265,340 @@ export function adjustChaosFactor(
 ): number {
   const newChaos = currentChaos + adjustment;
   return Math.max(1, Math.min(9, newChaos));
+}
+
+/**
+ * Director-layer tension/hope-fear estimate (0-10, default 5).
+ *
+ * Same clamped-scalar shape as chaos factor, updated at the same
+ * increment_scene hook point, but tracking a different thing: how much
+ * pressure is currently on the PCs, for the director's move-selection
+ * policy to read (see selectDirectorMove below). Escalating signals (an
+ * "Interrupted" scene check, active combat, a countdown timer about to
+ * hit zero) push it up; a calm "Normal" scene with none of those pushes it
+ * back down. An "Altered" scene with no other pressure is neutral.
+ */
+export interface TensionSignals {
+  sceneType: SceneType;
+  combatActive?: boolean;
+  timerNearZero?: boolean; // Any active CountdownTimer at currentTicks <= 1
+}
+
+export function adjustTension(
+  currentTension: number,
+  signals: TensionSignals
+): number {
+  const escalating =
+    signals.sceneType === "Interrupted" ||
+    !!signals.combatActive ||
+    !!signals.timerNearZero;
+  const calming = signals.sceneType === "Normal" && !escalating;
+
+  const delta = escalating ? 1 : calming ? -1 : 0;
+  return Math.max(0, Math.min(10, currentTension + delta));
+}
+
+/**
+ * How far through the story the campaign currently is, as a 0-1 fraction.
+ * Uses currentChapter/max_chapters - the same progress markers already
+ * shown to the player elsewhere in the UI - rather than inventing a new
+ * progress signal. Returns 0 for a story with no chapter structure
+ * (max_chapters <= 0) rather than dividing by zero.
+ */
+export function storyProgress(storyData: StoryData): number {
+  const maxChapters = storyData.max_chapters || 0;
+  if (maxChapters <= 0) return 0;
+  return Math.max(
+    0,
+    Math.min(1, (storyData.currentChapter || 0) / maxChapters)
+  );
+}
+
+/**
+ * Freytag-shaped target tension curve (0-10) for a given story progress
+ * (0-1): a calm opening rises through the middle toward a climax window,
+ * then releases into a falling-action/resolution close. This is a *target*
+ * the director layer can compare the live, reactive `tension` scalar
+ * against - it never overrides `adjustTension`'s own per-scene nudges, it
+ * only tells `selectDirectorMove` when the story is falling noticeably
+ * behind its own dramatic arc (e.g. still calm well past the midpoint) so
+ * it can proactively raise stakes instead of only reacting after the fact.
+ */
+export function targetTensionForProgress(progress: number): number {
+  const p = Math.max(0, Math.min(1, progress));
+  if (p < 0.6) {
+    // Rising action: climbs from a calm opening toward the climax window.
+    return 2 + (p / 0.6) * 6; // 2 -> 8
+  }
+  if (p < 0.8) {
+    // Climax window: sustained high tension.
+    return 8 + ((p - 0.6) / 0.2) * 1; // 8 -> 9
+  }
+  // Falling action / resolution: tension releases toward a calmer close.
+  return 9 - ((p - 0.8) / 0.2) * 6; // 9 -> 3
+}
+
+// How far below the macro-arc's target tension the live tension scalar must
+// fall before the director proactively raises stakes to catch the story
+// back up to its own arc, rather than waiting for a reactive escalation.
+const ARC_LAG_THRESHOLD = 3;
+
+// Deliberately narrow, keyword-only classification of what a PLAYER typed -
+// never the GM's own narration (that would risk grading prose, the
+// unreliable pattern this codebase's audit history rules out elsewhere).
+// Same class of lightweight regex heuristic already used in
+// embeddings.ts's calculateMemoryImportance. First match wins; ambiguous or
+// keyword-free input classifies as null (no signal), not guessed.
+const ACTION_KEYWORDS =
+  /\b(attack|fight|strike|shoot|charge|kill|stab|swing|punch|slash|dodge|block|chase)\b/i;
+const SOCIAL_KEYWORDS =
+  /\b(ask|tell|talk|say|persuade|negotiate|convince|greet|apologize|lie|flirt|threaten|charm|explain)\b/i;
+const TACTICAL_KEYWORDS =
+  /\b(search|investigate|examine|inspect|sneak|hide|check|study|analyze|plan|scout|pick|unlock|look)\b/i;
+
+/**
+ * Classifies a player's own freeform input into a lightweight PaSSAGE-
+ * inspired style bucket (Robin Laws' player-type taxonomy, narrowed to
+ * three deterministically-detectable buckets). Returns null when nothing
+ * matches - "no signal" is preferred over guessing.
+ */
+export function classifyPlayerStyle(input: string): PlayerStyleType | null {
+  if (ACTION_KEYWORDS.test(input)) return "action";
+  if (SOCIAL_KEYWORDS.test(input)) return "social";
+  if (TACTICAL_KEYWORDS.test(input)) return "tactical";
+  return null;
+}
+
+// Deterministic, name-based classification of what a turn's GM tool
+// activity actually *did* - a second, independent signal alongside
+// classifyPlayerStyle's freeform-text keyword read of what the player
+// *typed*. Neither replaces the other; page.tsx blends both into the same
+// playerStyleCounts accumulator. Tool names not listed here contribute no
+// signal (formula_roll, add_memory, etc. are too generic to imply a style
+// on their own).
+const ACTION_TOOL_NAMES = new Set([
+  "start_combat",
+  "add_combatant",
+  "remove_combatant",
+  "update_combatant_stat",
+  "toggle_combatant_condition",
+  "advance_turn",
+  "end_combat",
+  "opposed_formula",
+]);
+const SOCIAL_TOOL_NAMES = new Set(["npc_reaction", "update_npc"]);
+const TACTICAL_TOOL_NAMES = new Set([
+  "start_challenge",
+  "update_challenge",
+  "resolve_challenge",
+  "cancel_challenge",
+  "formula_challenge_check",
+  "search_memory",
+  "read_notes",
+  "roll_table",
+  "manage_timer",
+  "calculate",
+]);
+
+/**
+ * Classifies a turn's GM tool-call activity into the same lightweight style
+ * buckets as classifyPlayerStyle, by counting which category each called
+ * tool falls into. Returns the bucket with the most matches, or null when
+ * there's no signal (no matching tools called) or the top two buckets are
+ * tied (an ambiguous turn shouldn't guess a style any more than ambiguous
+ * freeform text should).
+ */
+export function classifyToolActivityStyle(
+  toolNames: string[]
+): PlayerStyleType | null {
+  let action = 0;
+  let social = 0;
+  let tactical = 0;
+  for (const name of toolNames) {
+    if (ACTION_TOOL_NAMES.has(name)) action++;
+    else if (SOCIAL_TOOL_NAMES.has(name)) social++;
+    else if (TACTICAL_TOOL_NAMES.has(name)) tactical++;
+  }
+
+  const counts: [PlayerStyleType, number][] = [
+    ["action", action],
+    ["social", social],
+    ["tactical", tactical],
+  ];
+  counts.sort((a, b) => b[1] - a[1]);
+
+  if (counts[0][1] === 0 || counts[0][1] === counts[1][1]) return null;
+  return counts[0][0];
+}
+
+/** The style with the highest observed count, or null if there's no signal yet. */
+export function dominantPlayerStyle(
+  counts: Record<PlayerStyleType, number> | undefined
+): PlayerStyleType | null {
+  if (!counts) return null;
+  const withSignal = (
+    Object.entries(counts) as [PlayerStyleType, number][]
+  ).filter(([, n]) => n > 0);
+  if (withSignal.length === 0) return null;
+  withSignal.sort((a, b) => b[1] - a[1]);
+  return withSignal[0][0];
+}
+
+// Minimum consecutive turns a couch player must have gone unheard before
+// selectDirectorMove will spotlight them - low enough to matter in a short
+// session, high enough not to nag every turn in a fast-moving scene.
+const SPOTLIGHT_NEGLECT_THRESHOLD = 3;
+
+// How close two players' neglect counts must be to be considered "tied" for
+// spotlight purposes - close enough that style preference is a reasonable
+// tiebreaker, not so wide that it overrides basic fairness of screen time.
+const SPOTLIGHT_TIE_WINDOW = 1;
+
+// Given the current scene's pressure, which player style best fits being
+// put in the spotlight right now - a high-tension moment suits an
+// action-styled player more than a calm one, a chaotic scene check suits
+// investigation, and a routine/calm moment suits social/dialogue framing.
+function preferredStyleForScene(
+  tension: number,
+  sceneType: SceneType
+): PlayerStyleType {
+  if (tension >= 7) return "action";
+  if (sceneType === "Interrupted" || sceneType === "Altered") return "tactical";
+  return "social";
+}
+
+/**
+ * Deterministic GM-move selection policy (PbtA-style bounded move menu).
+ *
+ * This is the director layer's equivalent of the oracle: the engine decides
+ * WHICH move fires and WHEN, from live state - never the model's own
+ * judgment (the same anti-pattern H7 already closed for reasoning-tier
+ * self-escalation applies here: a model that could pick its own move would
+ * reliably pick the gentlest one). The model only renders the chosen move
+ * as prose ("make your move, but never speak its name") after calling
+ * acknowledge_director_move - see ai_staged.ts/toolExecutor.ts.
+ *
+ * Priority order: a timer about to trigger outranks a chaotic scene check,
+ * which outranks high sustained tension, which outranks a neglected couch
+ * player (spotlight_couch_player - only relevant once there's more than one
+ * couchPlayer; a no-op for the single-player majority case). Returns null
+ * when nothing warrants a move, or when one is already pending and
+ * unacknowledged (a simple anti-pileup throttle - address what's already
+ * on the table before adding more).
+ */
+export function selectDirectorMove(
+  storyData: StoryData,
+  sceneType: SceneType
+): PendingDirectorMove | null {
+  if ((storyData.pendingDirectorMoves?.length || 0) > 0) {
+    return null;
+  }
+
+  const tension = storyData.agmtState?.tension ?? 5;
+  const activeThreads = (storyData.threads || []).filter(
+    (t) => t.status === "active"
+  );
+  const activeTimers = (storyData.timers || []).filter(
+    (t) => t.status === "active"
+  );
+
+  const nearZeroTimer = activeTimers.find((t) => t.currentTicks <= 1);
+  if (nearZeroTimer) {
+    const linkedThread = activeThreads.find(
+      (t) => t.linkedTimerId === nearZeroTimer.id
+    );
+    return {
+      id: crypto.randomUUID(),
+      move: "tick_a_clock",
+      targetTimerId: nearZeroTimer.id,
+      targetThreadId: linkedThread?.id,
+      context: `Timer "${nearZeroTimer.name}" is about to trigger`,
+      createdAt: Date.now(),
+    };
+  }
+
+  if (sceneType === "Interrupted" || sceneType === "Altered") {
+    const thread = activeThreads[0];
+    return {
+      id: crypto.randomUUID(),
+      move: "announce_future_badness",
+      targetThreadId: thread?.id,
+      context: `Scene check result: ${sceneType}`,
+      createdAt: Date.now(),
+    };
+  }
+
+  if (tension >= 8) {
+    return {
+      id: crypto.randomUUID(),
+      move: "put_someone_in_a_spot",
+      context: `Tension running high (${tension}/10)`,
+      createdAt: Date.now(),
+    };
+  }
+
+  // Macro-arc awareness: even when nothing in the current scene is escalating,
+  // check whether the live tension scalar has fallen noticeably behind where
+  // the story's own dramatic arc (targetTensionForProgress) says it should be
+  // by this point - e.g. still calm well past the midpoint of the campaign.
+  // This is what lets the director proactively raise stakes toward a climax
+  // instead of only ever reacting to whatever just happened in-scene.
+  const targetTension = targetTensionForProgress(storyProgress(storyData));
+  if (tension < targetTension - ARC_LAG_THRESHOLD) {
+    return {
+      id: crypto.randomUUID(),
+      move: "put_someone_in_a_spot",
+      context: `Story pacing is lagging its arc (tension ${tension}/10 vs. an expected ~${Math.round(
+        targetTension
+      )}/10 at this point in the story)`,
+      createdAt: Date.now(),
+    };
+  }
+
+  // Couch co-op spotlight tracking: bias toward whichever player has gone
+  // the longest without speaking (ScenePart.speakerIds / couchPlayerFocus,
+  // updated client-side in page.tsx's handleCustomInput). No-op for
+  // single-player stories - the overwhelming majority. Fairness of screen
+  // time always comes first - player-style modeling (playerStyleCounts)
+  // only breaks a close tie between similarly-neglected players, it never
+  // overrides who's actually most overdue.
+  const couchPlayers = storyData.multiplayer?.couchPlayers || [];
+  if (couchPlayers.length > 1) {
+    const focus = storyData.multiplayer?.couchPlayerFocus || {};
+    const styleCounts = storyData.multiplayer?.playerStyleCounts || {};
+
+    let maxTurnsSinceSpoken = -1;
+    for (const player of couchPlayers) {
+      maxTurnsSinceSpoken = Math.max(maxTurnsSinceSpoken, focus[player.id] ?? 0);
+    }
+
+    if (maxTurnsSinceSpoken >= SPOTLIGHT_NEGLECT_THRESHOLD) {
+      const candidates = couchPlayers.filter(
+        (p) => maxTurnsSinceSpoken - (focus[p.id] ?? 0) <= SPOTLIGHT_TIE_WINDOW
+      );
+
+      let chosen: CouchPlayer = candidates[0];
+      if (candidates.length > 1) {
+        const preferredStyle = preferredStyleForScene(tension, sceneType);
+        const styleMatch = candidates.find(
+          (p) => dominantPlayerStyle(styleCounts[p.id]) === preferredStyle
+        );
+        if (styleMatch) chosen = styleMatch;
+      }
+
+      return {
+        id: crypto.randomUUID(),
+        move: "spotlight_couch_player",
+        targetCouchPlayerId: chosen.id,
+        context: `${chosen.name} hasn't had the spotlight in ${
+          focus[chosen.id] ?? 0
+        } turns`,
+        createdAt: Date.now(),
+      };
+    }
+  }
+
+  return null;
 }
 
 /**

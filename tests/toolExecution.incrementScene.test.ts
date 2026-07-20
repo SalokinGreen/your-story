@@ -143,4 +143,96 @@ describe("increment_scene", () => {
     expect(storyData.agmtState).toBeDefined();
     expect(storyData.agmtState!.sceneCount).toBe(1);
   });
+
+  it("raises tension on an Interrupted scene and selects a director move", () => {
+    mockRandom(0); // roll 1 -> Interrupted at chaos 5
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 0,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+    });
+
+    const { responses } = executeTools([incrementSceneCall], storyData);
+
+    expect(storyData.agmtState!.tension).toBe(6);
+    expect(storyData.pendingDirectorMoves).toHaveLength(1);
+    expect(storyData.pendingDirectorMoves![0].move).toBe(
+      "announce_future_badness"
+    );
+    expect(responses[0].message).toContain("Director move");
+    expect(responses[0].message).toContain("acknowledge_director_move");
+  });
+
+  it("lowers tension on a calm Normal scene with no other pressure", () => {
+    mockRandom(0.99); // Normal
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 0,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+    });
+
+    executeTools([incrementSceneCall], storyData);
+
+    expect(storyData.agmtState!.tension).toBe(4);
+    expect(storyData.pendingDirectorMoves || []).toHaveLength(0);
+  });
+
+  it("acknowledge_director_move resolves a pending move", () => {
+    mockRandom(0); // Interrupted -> selects a director move
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 0,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+    });
+    executeTools([incrementSceneCall], storyData);
+    const moveId = storyData.pendingDirectorMoves![0].id;
+
+    const { responses } = executeTools(
+      [
+        {
+          type: "function",
+          function: {
+            name: "acknowledge_director_move",
+            arguments: { id: moveId },
+          },
+        },
+      ],
+      storyData
+    );
+
+    expect(responses[0].success).toBe(true);
+    expect(storyData.pendingDirectorMoves).toHaveLength(0);
+  });
+
+  it("acknowledge_director_move fails for an unknown id", () => {
+    const storyData = createTestStory();
+    const { responses } = executeTools(
+      [
+        {
+          type: "function",
+          function: {
+            name: "acknowledge_director_move",
+            arguments: { id: "does-not-exist" },
+          },
+        },
+      ],
+      storyData
+    );
+    expect(responses[0].success).toBe(false);
+  });
 });

@@ -27,6 +27,7 @@ import {
   NPCStatus,
   NPCAttitude,
   Adventure,
+  CouchPlayer,
 } from "../../misc/structs";
 import { useState, useEffect } from "react";
 import { useNotification } from "../../misc/NotificationContext";
@@ -47,10 +48,12 @@ export default function LoreEditor({
   lore,
   variables,
   onUpdate,
+  couchPlayers,
 }: {
   lore: StoryLore[];
   variables: Variable[];
   onUpdate: (lore: StoryLore[]) => void;
+  couchPlayers?: CouchPlayer[];
 }) {
   const [localLore, setLocalLore] = useState([...lore]);
   const [expandedIndex, setExpandedIndex] = useState<number | null>(null);
@@ -392,6 +395,44 @@ export default function LoreEditor({
                         : "Standard lore notes are shown based on triggers and visibility."}
                   </p>
                 </div>
+                {/* Owner assignment - only meaningful for a character sheet
+                    in a couch co-op story with more than one player, since a
+                    story can genuinely have multiple distinct character
+                    sheets (see StoryLore.ownerCouchPlayerId). */}
+                {editLore.type === "character_sheet" &&
+                  couchPlayers &&
+                  couchPlayers.length > 1 && (
+                    <div>
+                      <label className="block text-sm font-semibold text-blue-200 mb-2">
+                        <DynamicIcon
+                          name="User"
+                          className="inline-block w-4 h-4 mr-1"
+                        />
+                        Belongs To
+                      </label>
+                      <select
+                        value={editLore.ownerCouchPlayerId || ""}
+                        onChange={(e) =>
+                          setEditLore({
+                            ...editLore,
+                            ownerCouchPlayerId: e.target.value || undefined,
+                          })
+                        }
+                        className="w-full px-3 py-2 text-sm bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                      >
+                        <option value="">Shared / unspecified</option>
+                        {couchPlayers.map((player) => (
+                          <option key={player.id} value={player.id}>
+                            {player.name}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-xs text-blue-300/60 mt-1">
+                        Links this character sheet to a specific player. Leave
+                        unspecified if everyone shares one sheet.
+                      </p>
+                    </div>
+                  )}
                 <LoreImageGenerator
                   loreTitle={editLore.title}
                   loreContent={editLore.content}
@@ -1003,6 +1044,24 @@ export default function LoreEditor({
                           : "⚙️ RULES"}
                       </span>
                     )}
+                    {loreItem.type === "character_sheet" &&
+                      loreItem.ownerCouchPlayerId &&
+                      couchPlayers && (
+                        <span
+                          className="px-2 py-0.5 rounded-full text-xs font-semibold text-white"
+                          style={{
+                            backgroundColor:
+                              couchPlayers.find(
+                                (p) => p.id === loreItem.ownerCouchPlayerId,
+                              )?.color || "#6b7280",
+                          }}
+                          title="This character sheet belongs to this player"
+                        >
+                          {couchPlayers.find(
+                            (p) => p.id === loreItem.ownerCouchPlayerId,
+                          )?.name || "Unknown player"}
+                        </span>
+                      )}
                   </div>
                   {loreItem.thumbnailUrl && (
                     <img

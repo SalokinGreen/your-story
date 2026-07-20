@@ -17,6 +17,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getModelConfig, AIModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 import { CustomModel } from "@/app/misc/user_settings";
+import { extractFallbackToolCalls } from "@/app/misc/toolCallFallback";
 
 export const runtime = "nodejs";
 export const maxDuration = 60; // Allow up to 60 seconds for generation
@@ -42,6 +43,10 @@ interface ToolCall {
 interface RequestBody {
   messages: ChatMessage[];
   tools?: any[];
+  // Caller-forced tool_choice (e.g. the M2 roll-invariant gate's retry
+  // round, generation.ts). Only "required" is meaningful - anything else
+  // falls back to the provider's normal default.
+  toolChoice?: "required";
   model?: string;
   maxTokens?: number;
   temperature?: number;
@@ -108,9 +113,6 @@ const GOOGLE_ESSENTIAL_TOOLS = new Set([
   "add_combatant",
   "update_combatant_stat",
   "npc_roll",
-  // Items
-  "add_item",
-  "remove_item",
   // Terminal - required
   "end_gm_thinking",
 ]);
@@ -233,6 +235,7 @@ async function callAI(
   temperature: number,
   tools?: any[],
   reasoningEffort?: string,
+  toolChoice?: "required",
 ): Promise<AIResponse> {
   // Check if we have a prefill (trailing assistant message)
   const hasPrefill =
@@ -396,8 +399,10 @@ async function callAI(
       provider === "google" ? filterToolsForGoogle(tools) : tools;
     requestBody.tools = toolsToUse;
     // Google/Gemini needs tool_choice: "required" to actually invoke tools
-    // ("auto" often results in empty responses)
-    requestBody.tool_choice = provider === "google" ? "required" : "auto";
+    // ("auto" often results in empty responses); a caller can also force
+    // "required" for any provider - that always wins over the default.
+    requestBody.tool_choice =
+      toolChoice === "required" || provider === "google" ? "required" : "auto";
   }
 
   applyReasoningEffort(requestBody, provider, reasoningEffort);
@@ -500,6 +505,7 @@ export async function POST(req: NextRequest) {
     const {
       messages,
       tools,
+      toolChoice,
       model: rawModel,
       maxTokens = 4000,
       temperature = 0.7,
@@ -580,13 +586,34 @@ export async function POST(req: NextRequest) {
       temperature,
       tools,
       reasoningEffort,
+      toolChoice,
     );
 
     const content = aiResponse.choices[0]?.message?.content || "";
     const reasoning = aiResponse.choices[0]?.message?.reasoning || "";
     const reasoning_details =
       aiResponse.choices[0]?.message?.reasoning_details || [];
-    const toolCalls = aiResponse.choices[0]?.message?.tool_calls;
+    let toolCalls = aiResponse.choices[0]?.message?.tool_calls;
+
+    // Defensive fallback for a known DeepSeek reliability issue: a tool call
+    // sometimes arrives as text in `content` instead of populating
+    // `tool_calls` (see toolCallFallback.ts). Only attempt recovery when
+    // tools were actually offered - otherwise this is just ordinary prose.
+    if ((!toolCalls || toolCalls.length === 0) && tools && tools.length > 0) {
+      const recovered = extractFallbackToolCalls(content);
+      if (recovered) {
+        logger.action(
+          "Recovered tool call(s) from content fallback (tool_calls field was empty)",
+          {
+            provider: modelConfig.provider,
+            recoveredCount: recovered.length,
+            names: recovered.map((c) => c.function.name),
+          },
+        );
+        toolCalls = recovered;
+      }
+    }
+
     const usage = aiResponse.usage || {
       prompt_tokens: 0,
       completion_tokens: 0,

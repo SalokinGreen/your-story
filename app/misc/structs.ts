@@ -212,12 +212,25 @@ export interface StoryLore {
   // Links this entry to a note in the cross-story global Notes Library, so
   // it can be pushed/pulled instead of living as a disconnected one-time copy.
   libraryNoteId?: string;
+  // Multiplayer: which CouchPlayer this character_sheet-type entry belongs
+  // to. character_sheet lore entries are already a repeatable array (see
+  // LoreType above - buildInfoMessage/buildGMStagePrompt inject ALL of
+  // them, not just one), so a story can genuinely have multiple distinct
+  // character sheets; this is the missing link identifying whose is whose.
+  // Unset for the common single-player case, or a couch story where
+  // everyone still shares one sheet.
+  ownerCouchPlayerId?: string;
 }
 
 // Memory entry with embedding tracking
 export interface MemoryEntry {
   content: string;
   embedded?: boolean; // True if content has been embedded for semantic search
+  timestamp?: number; // Date.now() at creation, for recency ranking
+  sceneIndex?: number; // storyData.scene.parts.length at creation, for recency ranking
+  entityIds?: string[]; // Names of NPCs/threads mentioned in content, for entity-relevance ranking
+  importance?: number; // 0-10, optionally self-rated by the GM at creation time (Generative-Agents-style significance signal)
+  isReflection?: boolean; // True if this entry is a synthesized higher-level insight (see reflection.ts) rather than a directly-observed memory
 }
 
 // Helper to get memory content from either string or MemoryEntry format
@@ -308,6 +321,9 @@ export interface ScenePart {
   role: "system" | "user" | "assistant";
   // Optional player-visible comment that is NOT sent to AI (kept separate from content)
   playerComment?: string;
+  // Couch co-op: which CouchPlayer id(s) spoke this turn (see PlayerBubbles),
+  // for the director layer's spotlight tracking (couchPlayerFocus below).
+  speakerIds?: string[];
   reasoning?: string; // NEW: AI reasoning/thinking
   reasoning_details?: ReasoningDetail[]; // NEW: Structured reasoning tokens (OpenRouter)
   choices?: Choice[];
@@ -321,12 +337,24 @@ export interface ScenePart {
   gmThinking?: string[]; // GM stage "[GM]" reasoning text for UI display
   revealedLore?: string[]; // Lore titles manually revealed by AI in this part
   stateChanges?: string[]; // Human-readable game state changes from tool calls (for story context)
+  // Non-blocking Layer-5 consistency check results (see consistencyCheck.ts)
+  // - narration streams to the client before this can run, so it's recorded
+  // for display/debugging and eval-harness metrics, not a live gate.
+  consistencyWarnings?: ConsistencyWarning[];
   npcReactions?: NPCReaction[]; // NPC reactions to show as notifications (e.g., "Lisa liked this")
   endChapter?: boolean;
   endStory?: boolean;
   gameOver?: boolean;
   raw?: string; // Raw AI output before parsing, used for alternative context building
 }
+export type ConsistencyWarningType = "status_contradiction";
+
+export interface ConsistencyWarning {
+  type: ConsistencyWarningType;
+  entity: string;
+  detail: string;
+}
+
 export interface Choice {
   text: string;
   intro_override?: string; // Optional: For starting choices, use this text instead of AI generation
@@ -539,6 +567,13 @@ export interface ReasoningTierState {
   currentTier: number; // Tier used for adjudication last turn (decays toward baseline each turn)
   tier3CallsInScene: number; // Top-tier calls used against MAX_TIER3_CALLS_PER_SCENE
   lastSceneKey?: string; // Opaque scene-boundary key; resets tier3CallsInScene when it changes
+  // Scene-boundary key (same computeSceneKey format as lastSceneKey) as of
+  // the last formula_roll/opposed_formula that declared stakes: "high" or
+  // "deadly". Unlike currentTier (which decays every turn regardless of
+  // scene boundary), this persists for the whole scene, so the M2
+  // roll-invariant gate in generation.ts can tell "stakes were declared
+  // earlier this scene" apart from "tier happens to still be elevated."
+  highStakesSceneKey?: string;
 }
 
 export interface CombatState {
@@ -687,6 +722,16 @@ export type Variable =
 
 export type MultiplayerMode = "host" | "any" | "timer";
 
+// A lightweight, PaSSAGE-inspired player-preference signal (Robin Laws'
+// player-type taxonomy, narrowed to three deterministically-classifiable
+// buckets - see classifyPlayerStyle in mythic.ts): does this player's
+// freeform input lean toward action, social/dialogue, or
+// investigation/tactics? Classified by keyword heuristic at input time
+// (same class of lightweight regex classification this codebase already
+// uses in embeddings.ts's calculateMemoryImportance), never by grading the
+// GM's own narration - it only ever looks at what the player typed/said.
+export type PlayerStyleType = "action" | "social" | "tactical";
+
 // A couch co-op player: a colored, named "bubble" a person at the table taps
 // to speak their turn. Distinct from the legacy typed-name hot-seat flow.
 export interface CouchPlayer {
@@ -717,10 +762,28 @@ export interface StoryData {
     // Couch co-op: persistent named/colored player bubbles for same-device
     // pass-and-play speech-to-text turns (see PlayerBubbles component).
     couchPlayers?: CouchPlayer[];
+    // Director-layer spotlight tracking: CouchPlayer id -> turns since they
+    // last spoke (see ScenePart.speakerIds, and selectDirectorMove's
+    // spotlight_couch_player selection in mythic.ts). Only meaningful when
+    // couchPlayers.length > 1 - a no-op for single-player stories.
+    couchPlayerFocus?: Record<string, number>;
+    // Player modeling: CouchPlayer id -> observed counts per PlayerStyleType,
+    // accumulated as each player's turns come in (see classifyPlayerStyle,
+    // mythic.ts, and its call site in page.tsx's handleCustomInput). Read by
+    // selectDirectorMove to break close spotlight-selection ties toward
+    // whichever neglected player's style best fits the current scene
+    // (tension-driven vs. calm) rather than picking arbitrarily. Only
+    // meaningful when couchPlayers.length > 1.
+    playerStyleCounts?: Record<string, Record<PlayerStyleType, number>>;
   };
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;
   memory: (string | MemoryEntry)[]; // Supports both legacy string[] and new MemoryEntry[] format
+  // How far into `memory` the reflection pass (see reflection.ts) has
+  // already synthesized higher-level insights from. Same
+  // "cutoff index tracked so re-running is a no-op" convention as
+  // scene.summarizedThroughIndex for compaction.
+  memoryReflectedThroughIndex?: number;
   max_chapters: number;
   currentChapter: number;
   chapters: Chapter[];
@@ -766,6 +829,10 @@ export interface StoryData {
   // every turn until explicitly cleared via resolve_random_event - see
   // gmExecutor.ts (fate_question) and toolExecutor.ts (increment_scene).
   pendingRandomEvents?: PendingRandomEvent[];
+  // Director-layer GM moves selectDirectorMove has chosen but the GM hasn't
+  // yet acknowledged incorporating - same persist-until-resolved lifecycle
+  // as pendingRandomEvents above (see acknowledge_director_move).
+  pendingDirectorMoves?: PendingDirectorMove[];
   customTables?: CustomTable[]; // Creator-defined random tables
   variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
@@ -797,6 +864,12 @@ export interface AGMTState {
   currentStreak: number; // Positive = success streak, negative = failure streak
   lastChaosAdjustment: number; // Scene number of last chaos adjustment
   threads?: never[]; // DEPRECATED: Use StoryThread[] at storyData.threads instead
+  // Director-layer tension/hope-fear estimate (0-10, default 5). Nudged by
+  // increment_scene alongside chaosFactor (see adjustTension in mythic.ts) -
+  // combat, near-zero timers, and "Interrupted" scene checks raise it; calm
+  // scenes with no pressure lower it. Read by selectDirectorMove to bias
+  // beat-type/move selection - never set directly by the model.
+  tension?: number;
 }
 
 // Cap on how many unresolved random events accumulate on StoryData - if the
@@ -814,6 +887,29 @@ export interface PendingRandomEvent {
   action: string; // Meaning table Action roll (e.g. "Betray")
   subject: string; // Meaning table Subject roll (e.g. "A rival")
   context?: string; // The fate question asked, or scene-check context
+  createdAt: number;
+}
+
+// Cap on how many unresolved director moves accumulate on StoryData - same
+// "persist until acknowledged, drop oldest" convention as PendingRandomEvent.
+export const MAX_PENDING_DIRECTOR_MOVES = 5;
+
+// A PbtA-style GM move the director's deterministic selectDirectorMove policy
+// chose to fire (see mythic.ts), tracked as durable state until the GM calls
+// acknowledge_director_move - mirrors PendingRandomEvent's shape/lifecycle so
+// the model can't silently drop a move by burying it in one turn's prose.
+// The model renders the move as narration; it never selects which move fires.
+export interface PendingDirectorMove {
+  id: string;
+  move:
+    | "announce_future_badness"
+    | "tick_a_clock"
+    | "spotlight_couch_player"
+    | "put_someone_in_a_spot";
+  targetThreadId?: string; // For tick_a_clock / put_someone_in_a_spot
+  targetTimerId?: string; // For tick_a_clock
+  targetCouchPlayerId?: string; // For spotlight_couch_player
+  context?: string; // Why this move fired (e.g. which trigger condition)
   createdAt: number;
 }
 
@@ -835,6 +931,14 @@ export interface StoryThread {
   priority?: "main" | "side" | "background"; // Thread importance
   createdAt: number;
   resolvedAt?: number;
+  // Front/clock wrapper (Blades in the Dark-style): ties this thread to a
+  // CountdownTimer (see manage_timer) so GM-move-driven escalation has
+  // somewhere to tick, rather than only wall-clock/turn-count progress.
+  // Informational only - a timer reaching its threshold surfaces context to
+  // the GM; it does not automatically mutate thread status. That still goes
+  // through update_thread/resolve_thread like any other thread change.
+  linkedTimerId?: string;
+  threshold?: number;
 }
 
 /** @deprecated Use StoryThread instead */

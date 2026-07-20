@@ -77,6 +77,73 @@ describe("manage_timer", () => {
     expect(timer.status).toBe("triggered");
   });
 
+  it("surfaces a linked thread's Front when its clock nears or reaches zero", async () => {
+    const created = await executeGMTools(
+      [createToolCall("manage_timer", { action: "create", name: "Ritual", ticks: 2 })],
+      createMockStoryData()
+    );
+    const timerId = created.modifiedStoryData.timers![0].id;
+
+    const withLinkedThread = createMockStoryData({
+      timers: created.modifiedStoryData.timers,
+      threads: [
+        {
+          id: "th1",
+          title: "The Cult's Ritual",
+          description: "They're preparing something in the crypt",
+          status: "active",
+          createdAt: Date.now(),
+          linkedTimerId: timerId,
+        },
+      ],
+    });
+
+    // Advance to 1 tick remaining - not yet triggered, but near zero.
+    const nearZero = await executeGMTools(
+      [createToolCall("manage_timer", { action: "advance", timer: "Ritual", ticks: 1 })],
+      withLinkedThread
+    );
+    expect(nearZero.results[0].contextForStory).toContain("The Cult's Ritual");
+    expect(nearZero.results[0].contextForStory).not.toContain("TRIGGERED");
+
+    // Advance the rest of the way - triggered.
+    const triggered = await executeGMTools(
+      [createToolCall("manage_timer", { action: "advance", timer: "Ritual", ticks: 1 })],
+      nearZero.modifiedStoryData
+    );
+    expect(triggered.results[0].contextForStory).toContain("TIMER TRIGGERED");
+    expect(triggered.results[0].contextForStory).toContain("The Cult's Ritual");
+  });
+
+  it("does not surface an unlinked or resolved thread", async () => {
+    const created = await executeGMTools(
+      [createToolCall("manage_timer", { action: "create", name: "Ritual", ticks: 1 })],
+      createMockStoryData()
+    );
+    const timerId = created.modifiedStoryData.timers![0].id;
+
+    const withResolvedThread = createMockStoryData({
+      timers: created.modifiedStoryData.timers,
+      threads: [
+        {
+          id: "th1",
+          title: "Already Resolved",
+          description: "Not relevant anymore",
+          status: "resolved",
+          createdAt: Date.now(),
+          resolvedAt: Date.now(),
+          linkedTimerId: timerId,
+        },
+      ],
+    });
+
+    const triggered = await executeGMTools(
+      [createToolCall("manage_timer", { action: "advance", timer: "Ritual", ticks: 1 })],
+      withResolvedThread
+    );
+    expect(triggered.results[0].contextForStory).not.toContain("Already Resolved");
+  });
+
   it("rejects advance without a timer identifier", async () => {
     const storyData = createMockStoryData();
     const result = await executeGMTools(

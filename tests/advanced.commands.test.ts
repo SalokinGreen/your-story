@@ -1,11 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import type {
-  StoryData,
-  InventoryItem,
-  Resource,
-  Stat,
-  Quest,
-} from "@/app/misc/structs";
+import type { Resource, Stat, Quest } from "@/app/misc/structs";
 
 // Mock functions
 const mockNotifications: Array<{ message: string; type: string }> = [];
@@ -20,12 +14,6 @@ const mockLogger = {
 };
 
 // Simplified fuzzy matching for tests
-function findItemMatch(name: string, items: InventoryItem[]) {
-  const exact = items.find((i) => i.name === name);
-  if (exact) return { item: exact, name: exact.name, score: 1, isExact: true };
-  return null;
-}
-
 function findResourceMatch(name: string, resources: Resource[]) {
   const exact = resources.find((r) => r.name === name);
   if (exact) return { item: exact, name: exact.name, score: 1, isExact: true };
@@ -53,113 +41,6 @@ function processAdvancedCommands(
 ): void {
   for (const command of commands) {
     const trimmed = command.trim();
-
-    // /remove_item: item name | quantity
-    const removeItemMatch = trimmed.match(
-      /^\/remove_item:\s*(.+?)\s*\|\s*(\d+)$/i
-    );
-    if (removeItemMatch) {
-      const itemName = removeItemMatch[1].trim();
-      const quantity = parseInt(removeItemMatch[2], 10);
-      const matchResult = findItemMatch(itemName, storyData.inventory);
-      const item = matchResult?.item;
-
-      if (!item) {
-        addNotification(`⚠️ Item "${itemName}" not found`, "warning");
-      } else if (item.quantity < quantity) {
-        addNotification(
-          `⚠️ Not enough "${item.name}" (have ${item.quantity}, need ${quantity})`,
-          "warning"
-        );
-      } else {
-        item.quantity -= quantity;
-        if (item.quantity === 0) {
-          storyData.inventory = storyData.inventory.filter(
-            (i: InventoryItem) => i.name !== item.name
-          );
-          addNotification(`✨ Removed all ${item.name}`, "success");
-        } else {
-          addNotification(
-            `✨ Removed ${quantity} ${item.name} (${item.quantity} left)`,
-            "success"
-          );
-        }
-      }
-      continue;
-    }
-
-    // /modify_item_quantity: item name | quantity_delta
-    const modifyItemQuantityMatch = trimmed.match(
-      /^\/modify_item_quantity:\s*(.+?)\s*\|\s*(-?\d+)$/i
-    );
-    if (modifyItemQuantityMatch) {
-      const itemName = modifyItemQuantityMatch[1].trim();
-      const quantityDelta = parseInt(modifyItemQuantityMatch[2], 10);
-      const matchResult = findItemMatch(itemName, storyData.inventory);
-      const item = matchResult?.item;
-
-      if (!item) {
-        addNotification(`⚠️ Item "${itemName}" not found`, "warning");
-      } else {
-        const newQuantity = Math.max(0, item.quantity + quantityDelta);
-        const actualDelta = newQuantity - item.quantity;
-
-        if (newQuantity === 0) {
-          storyData.inventory = storyData.inventory.filter(
-            (i: InventoryItem) => i.name !== item.name
-          );
-          addNotification(`✨ ${item.name} depleted`, "success");
-        } else {
-          item.quantity = newQuantity;
-          addNotification(
-            `✨ ${item.name}: ${
-              actualDelta > 0 ? "+" : ""
-            }${actualDelta} (now ${newQuantity})`,
-            "success"
-          );
-        }
-      }
-      continue;
-    }
-
-    // /transform_item: old_item | new_item | description | type
-    const transformItemMatch = trimmed.match(
-      /^\/transform_item:\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(normal|consumable|story|misc)$/i
-    );
-    if (transformItemMatch) {
-      const oldItemName = transformItemMatch[1].trim();
-      const newItemName = transformItemMatch[2].trim();
-      const newDescription = transformItemMatch[3].trim();
-      const newType = transformItemMatch[4].trim() as
-        | "normal"
-        | "consumable"
-        | "story"
-        | "misc";
-      const matchResult = findItemMatch(oldItemName, storyData.inventory);
-      const oldItem = matchResult?.item;
-
-      if (!oldItem) {
-        addNotification(`⚠️ Item "${oldItemName}" not found`, "warning");
-      } else {
-        const quantity = oldItem.quantity;
-        const symbol = oldItem.symbol;
-        storyData.inventory = storyData.inventory.filter(
-          (i: InventoryItem) => i.name !== oldItem.name
-        );
-        storyData.inventory.push({
-          name: newItemName,
-          quantity,
-          description: newDescription,
-          type: newType,
-          symbol,
-        });
-        addNotification(
-          `✨ ${oldItem.name} → ${newItemName} (×${quantity})`,
-          "success"
-        );
-      }
-      continue;
-    }
 
     // /add_resource: name | description | current | max
     const addResourceMatch = trimmed.match(
@@ -347,22 +228,6 @@ describe("Advanced AI Commands", () => {
   beforeEach(() => {
     mockNotifications.length = 0;
     storyData = {
-      inventory: [
-        {
-          name: "Health Potion",
-          quantity: 5,
-          description: "Heals wounds",
-          type: "consumable",
-          symbol: "🧪",
-        },
-        {
-          name: "Steel Sword",
-          quantity: 1,
-          description: "A sharp blade",
-          type: "normal",
-          symbol: "⚔️",
-        },
-      ],
       resources: [
         {
           name: "Health",
@@ -405,80 +270,6 @@ describe("Advanced AI Commands", () => {
         },
       ],
     };
-  });
-
-  describe("Inventory Management", () => {
-    it("should remove items", () => {
-      processAdvancedCommands(
-        ["/remove_item: Health Potion | 2"],
-        storyData,
-        mockAddNotification,
-        mockLogger
-      );
-      const potion = storyData.inventory.find(
-        (i: InventoryItem) => i.name === "Health Potion"
-      );
-      expect(potion?.quantity).toBe(3);
-    });
-
-    it("should deplete items when quantity reaches zero", () => {
-      processAdvancedCommands(
-        ["/remove_item: Steel Sword | 1"],
-        storyData,
-        mockAddNotification,
-        mockLogger
-      );
-      expect(
-        storyData.inventory.find((i: InventoryItem) => i.name === "Steel Sword")
-      ).toBeUndefined();
-    });
-
-    it("should modify item quantity with delta", () => {
-      processAdvancedCommands(
-        ["/modify_item_quantity: Health Potion | 3"],
-        storyData,
-        mockAddNotification,
-        mockLogger
-      );
-      expect(
-        storyData.inventory.find(
-          (i: InventoryItem) => i.name === "Health Potion"
-        )?.quantity
-      ).toBe(8);
-    });
-
-    it("should handle negative quantity delta", () => {
-      processAdvancedCommands(
-        ["/modify_item_quantity: Health Potion | -4"],
-        storyData,
-        mockAddNotification,
-        mockLogger
-      );
-      expect(
-        storyData.inventory.find(
-          (i: InventoryItem) => i.name === "Health Potion"
-        )?.quantity
-      ).toBe(1);
-    });
-
-    it("should transform items", () => {
-      processAdvancedCommands(
-        [
-          "/transform_item: Steel Sword | Legendary Sword | An epic blade | story",
-        ],
-        storyData,
-        mockAddNotification,
-        mockLogger
-      );
-      expect(
-        storyData.inventory.find((i: InventoryItem) => i.name === "Steel Sword")
-      ).toBeUndefined();
-      const legendary = storyData.inventory.find(
-        (i: InventoryItem) => i.name === "Legendary Sword"
-      );
-      expect(legendary).toBeDefined();
-      expect(legendary?.type).toBe("story");
-    });
   });
 
   describe("Resource Management", () => {
@@ -611,31 +402,6 @@ describe("Advanced AI Commands", () => {
   });
 
   describe("Error Handling", () => {
-    it("should warn when removing non-existent items", () => {
-      processAdvancedCommands(
-        ["/remove_item: Magic Wand | 1"],
-        storyData,
-        mockAddNotification,
-        mockLogger
-      );
-      expect(mockNotifications).toContainEqual({
-        message: '⚠️ Item "Magic Wand" not found',
-        type: "warning",
-      });
-    });
-
-    it("should warn when insufficient item quantity", () => {
-      processAdvancedCommands(
-        ["/remove_item: Health Potion | 10"],
-        storyData,
-        mockAddNotification,
-        mockLogger
-      );
-      expect(
-        mockNotifications.some((n) => n.message.includes("Not enough"))
-      ).toBe(true);
-    });
-
     it("should prevent duplicate resource names", () => {
       processAdvancedCommands(
         ["/add_resource: Health | Duplicate | 50 | 50"],
@@ -668,7 +434,6 @@ describe("Advanced AI Commands", () => {
       const commands = [
         "/modify_stat: Strength | 10",
         "/modify_resource: Health | -20 | 0",
-        "/remove_item: Health Potion | 3",
         "/update_quest_description: Save the Village | New quest details",
       ];
       processAdvancedCommands(
@@ -684,11 +449,6 @@ describe("Advanced AI Commands", () => {
       expect(
         storyData.resources.find((r: Resource) => r.name === "Health")?.value
       ).toBe(60);
-      expect(
-        storyData.inventory.find(
-          (i: InventoryItem) => i.name === "Health Potion"
-        )?.quantity
-      ).toBe(2);
       expect(storyData.quests[0].description).toBe("New quest details");
     });
   });

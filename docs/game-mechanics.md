@@ -23,12 +23,6 @@ tabletop GM keeping notes rather than a video game character sheet.
 
 Some structured data still exists for systems that benefit from it:
 
-- **Inventory** (`InventoryItem[]`) - name, quantity, description, type
-  (`normal`/`consumable`/`story`/`misc`). Items are added, consumed,
-  damaged, or repaired by the GM via tools (`add_item`, `consume_item`,
-  `break_item`, `damage_item`, `repair_item`, `upgrade_item`) based on
-  narrative context - there's no automatic advantage/disadvantage roll
-  tied to carrying an item anymore.
 - **Abilities** (`Ability[]`) - named skills/spells/special moves with an
   optional cost and cooldown, managed via `add_ability`, `modify_ability`,
   `upgrade_ability`, `remove_ability`, `reset_ability_cooldown`.
@@ -128,6 +122,15 @@ the app and have been removed:
   a stat, resource max, or add a custom item.
 - **Structured Stats & Resources editor**: numeric stat blocks are now
   described in the character sheet note instead of a dedicated tab.
+- **Structured Inventory**: `InventoryItem[]` and its tools (`add_item`,
+  `remove_item`, `modify_item`, `break_item`, `repair_item`, `damage_item`,
+  `upgrade_item`, `consume_item`), the Inventory tab, and the creator's
+  starting-inventory authoring UI have all been removed. Items are now
+  described in the character sheet note like everything else, following
+  the same pattern already used for Stats & Resources. `Choice.item_used`
+  gating (predefined choices that reference a starting item) still reads
+  the legacy `inventory` field on old saves/presets for backward
+  compatibility.
 
 If you have an older save that still has these fields, they're preserved
 for backward compatibility but no longer do anything - the GM doesn't read

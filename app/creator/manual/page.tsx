@@ -8,7 +8,6 @@ import {
   StoryData,
   Stat,
   Resource,
-  InventoryItem,
   StoryLore,
   Achievement,
   Quest,
@@ -60,12 +59,6 @@ import LoreImageGenerator from "@/app/components/LoreImageGenerator";
 import MassLoreImageGenerator from "@/app/components/MassLoreImageGenerator";
 import PDFImporter from "@/app/components/PDFImporter";
 import {
-  GRADE_CONFIG,
-  getMaxDurability,
-  ItemGrade,
-  GRADE_ORDER,
-} from "@/app/misc/itemSystem";
-import {
   ABILITY_GRADE_CONFIG,
   ABILITY_GRADE_ORDER,
   initializeAbility,
@@ -108,11 +101,6 @@ type CreatorStep =
   | "preview";
 
 // Safe grade config getters with fallbacks
-function getGradeConfig(grade: string | undefined) {
-  const key = (grade as ItemGrade) || "common";
-  return GRADE_CONFIG[key] || GRADE_CONFIG.common;
-}
-
 function getAbilityGradeConfig(grade: string | undefined) {
   const key = (grade as AbilityGrade) || "novice";
   return ABILITY_GRADE_CONFIG[key] || ABILITY_GRADE_CONFIG.novice;
@@ -752,7 +740,6 @@ function AdventureCreatorContent() {
     intro: string;
     stats: Stat[];
     resources: Resource[];
-    inventory: InventoryItem[];
     relationships: Relationship[];
     conditions: Condition[];
     authorNotes: string;
@@ -1055,14 +1042,6 @@ function AdventureCreatorContent() {
       });
     }
 
-    if (data.inventory) {
-      data.inventory.forEach((item: any) => {
-        if (item._command === "delete") {
-          deletions.push(`Item: ${item.name}`);
-        }
-      });
-    }
-
     if (data.lore) {
       data.lore.forEach((l: any) => {
         if (l._command === "delete") {
@@ -1233,12 +1212,6 @@ function AdventureCreatorContent() {
     if (data.resources) {
       setResources(
         applyItemChanges(resources, data.resources as any, "resource", "name"),
-      );
-    }
-
-    if (data.inventory) {
-      setInventory(
-        applyItemChanges(inventory, data.inventory as any, "item", "name"),
       );
     }
 
@@ -1589,10 +1562,9 @@ function AdventureCreatorContent() {
           setCharacterSheetTemplate(adventure.characterSheetTemplate);
         }
 
-        // Load stats, resources, inventory, etc.
+        // Load stats, resources, etc.
         setStats(template.stats || []);
         setResources(template.resources || []);
-        setInventory(template.inventory || []);
         setAbilities(template.abilities || []);
         setPassives(template.nodeEffects?.passives || []);
         setLore(template.lore || []);
@@ -1671,7 +1643,6 @@ function AdventureCreatorContent() {
 
     if (Array.isArray(saved.stats)) setStats(saved.stats);
     if (Array.isArray(saved.resources)) setResources(saved.resources);
-    if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
     if (Array.isArray(saved.abilities)) setAbilities(saved.abilities);
     if (Array.isArray(saved.passives)) setPassives(saved.passives);
     if (Array.isArray(saved.lore)) setLore(saved.lore);
@@ -1784,10 +1755,9 @@ function AdventureCreatorContent() {
           );
           setPresets(template.presets || adventure.presets || [DEFAULT_PRESET]);
 
-          // Load stats, resources, inventory, etc.
+          // Load stats, resources, etc.
           setStats(template.stats || []);
           setResources(template.resources || []);
-          setInventory(template.inventory || []);
           setAbilities(template.abilities || []);
           setPassives(template.nodeEffects?.passives || []);
           setLore(template.lore || []);
@@ -1874,28 +1844,6 @@ function AdventureCreatorContent() {
     number | null
   >(null);
   const [editResource, setEditResource] = useState<Partial<Resource>>({});
-
-  // Starting Inventory
-  const [inventory, setInventory] = useState<InventoryItem[]>([]);
-  const [newItem, setNewItem] = useState<Partial<InventoryItem>>({
-    name: "",
-    quantity: 1,
-    description: "",
-    type: "misc",
-    symbol: "Package",
-    grade: "common",
-    durability: 3,
-    maxDurability: 3,
-  });
-  const [draggedInventoryIndex, setDraggedInventoryIndex] = useState<
-    number | null
-  >(null);
-  const [editingInventoryIndex, setEditingInventoryIndex] = useState<
-    number | null
-  >(null);
-  const [editInventoryItem, setEditInventoryItem] = useState<
-    Partial<InventoryItem>
-  >({});
 
   // Starting Abilities
   const [abilities, setAbilities] = useState<Ability[]>([]);
@@ -2202,7 +2150,6 @@ function AdventureCreatorContent() {
 
       if (Array.isArray(saved.stats)) setStats(saved.stats);
       if (Array.isArray(saved.resources)) setResources(saved.resources);
-      if (Array.isArray(saved.inventory)) setInventory(saved.inventory);
       if (Array.isArray(saved.abilities)) setAbilities(saved.abilities);
       if (Array.isArray(saved.passives)) setPassives(saved.passives);
       if (Array.isArray(saved.lore)) setLore(saved.lore);
@@ -2281,7 +2228,6 @@ function AdventureCreatorContent() {
       authorNotes,
       stats,
       resources,
-      inventory,
       abilities,
       passives,
       lore,
@@ -2417,7 +2363,6 @@ function AdventureCreatorContent() {
     authorNotes,
     stats,
     resources,
-    inventory,
     abilities,
     passives,
     lore,
@@ -2609,26 +2554,6 @@ ${description || ""}`;
     setResources(resources.filter((_, i) => i !== index));
   };
 
-  const addInventoryItem = () => {
-    if (newItem.name) {
-      setInventory([...inventory, newItem as InventoryItem]);
-      setNewItem({
-        name: "",
-        quantity: 1,
-        description: "",
-        type: "misc",
-        symbol: "Package",
-        grade: "common",
-        durability: 3,
-        maxDurability: 3,
-      });
-    }
-  };
-
-  const removeInventoryItem = (index: number) => {
-    setInventory(inventory.filter((_, i) => i !== index));
-  };
-
   // Stat drag-and-drop and edit functions
   const handleStatDragStart = (index: number) => {
     setDraggedStatIndex(index);
@@ -2754,69 +2679,6 @@ ${description || ""}`;
       setResources(updated);
       setEditingResourceIndex(null);
       setEditResource({});
-    }
-  };
-
-  // Inventory drag-and-drop and edit functions
-  const handleInventoryDragStart = (index: number) => {
-    setDraggedInventoryIndex(index);
-  };
-
-  const handleInventoryDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedInventoryIndex === null || draggedInventoryIndex === index)
-      return;
-
-    const newInventory = [...inventory];
-    const draggedItem = newInventory[draggedInventoryIndex];
-    newInventory.splice(draggedInventoryIndex, 1);
-    newInventory.splice(index, 0, draggedItem);
-
-    setInventory(newInventory);
-    setDraggedInventoryIndex(index);
-  };
-
-  const handleInventoryDragEnd = () => {
-    setDraggedInventoryIndex(null);
-  };
-
-  const moveInventoryUp = (index: number) => {
-    if (index === 0) return;
-    const newInventory = [...inventory];
-    [newInventory[index - 1], newInventory[index]] = [
-      newInventory[index],
-      newInventory[index - 1],
-    ];
-    setInventory(newInventory);
-  };
-
-  const moveInventoryDown = (index: number) => {
-    if (index === inventory.length - 1) return;
-    const newInventory = [...inventory];
-    [newInventory[index], newInventory[index + 1]] = [
-      newInventory[index + 1],
-      newInventory[index],
-    ];
-    setInventory(newInventory);
-  };
-
-  const startEditInventoryItem = (index: number) => {
-    setEditingInventoryIndex(index);
-    setEditInventoryItem({ ...inventory[index] });
-  };
-
-  const cancelEditInventoryItem = () => {
-    setEditingInventoryIndex(null);
-    setEditInventoryItem({});
-  };
-
-  const saveEditInventoryItem = () => {
-    if (editingInventoryIndex !== null && editInventoryItem.name) {
-      const updated = [...inventory];
-      updated[editingInventoryIndex] = editInventoryItem as InventoryItem;
-      setInventory(updated);
-      setEditingInventoryIndex(null);
-      setEditInventoryItem({});
     }
   };
 
@@ -3335,7 +3197,6 @@ ${description || ""}`;
       setAuthorNotes("");
       setStats([]);
       setResources([]);
-      setInventory([]);
       setLore([]);
       setRelationships([]);
       setAchievements([]);
@@ -3396,7 +3257,7 @@ ${description || ""}`;
       scene: { parts: [] },
       stats,
       resources,
-      inventory,
+      inventory: [],
       abilities,
       achievements,
       lore,
@@ -4052,9 +3913,9 @@ ${description || ""}`;
                         className="w-4 h-4 inline mr-2 text-yellow-400"
                       />{" "}
                       <strong>Tip:</strong> The preset will copy your current
-                      Character Sheet, Intro, Stats, Resources, Inventory, and
-                      Author Notes. Make sure they&apos;re configured as you
-                      want before saving!
+                      Character Sheet, Intro, Stats, Resources, and Author
+                      Notes. Make sure they&apos;re configured as you want
+                      before saving!
                     </p>
                   </div>
 
@@ -4088,9 +3949,6 @@ ${description || ""}`;
                                     resources: JSON.parse(
                                       JSON.stringify(resources),
                                     ),
-                                    inventory: JSON.parse(
-                                      JSON.stringify(inventory),
-                                    ),
                                     relationships: JSON.parse(
                                       JSON.stringify(relationships),
                                     ),
@@ -4113,7 +3971,6 @@ ${description || ""}`;
                             intro,
                             stats,
                             resources,
-                            inventory,
                             relationships,
                             conditions,
                             authorNotes,
@@ -4177,7 +4034,6 @@ ${description || ""}`;
                             intro,
                             stats: [...stats],
                             resources: [...resources],
-                            inventory: [...inventory],
                             relationships: [...relationships],
                             conditions: [...conditions],
                             authorNotes,
@@ -4194,7 +4050,6 @@ ${description || ""}`;
                             setIntro,
                             setStats,
                             setResources,
-                            setInventory,
                             setRelationships,
                             setConditions,
                             setAuthorNotes,
@@ -4210,7 +4065,6 @@ ${description || ""}`;
                             setIntro(savedCustomValues.intro);
                             setStats(savedCustomValues.stats);
                             setResources(savedCustomValues.resources);
-                            setInventory(savedCustomValues.inventory);
                             setRelationships(savedCustomValues.relationships);
                             setConditions(savedCustomValues.conditions);
                             setAuthorNotes(savedCustomValues.authorNotes);
@@ -4366,7 +4220,7 @@ ${description || ""}`;
                         setConfirmDialog({
                           isOpen: true,
                           title: "Reset to Preset?",
-                          message: `This will overwrite your current stats, resources, inventory, and other character data with the original "${preset.name}" preset values.`,
+                          message: `This will overwrite your current stats, resources, and other character data with the original "${preset.name}" preset values.`,
                           icon: "RefreshCw",
                           confirmText: "Reset",
                           confirmButtonClass:
@@ -4382,7 +4236,6 @@ ${description || ""}`;
                               setIntro,
                               setStats,
                               setResources,
-                              setInventory,
                               setRelationships,
                               setConditions,
                               setAuthorNotes,
@@ -4705,7 +4558,8 @@ ${description || ""}`;
                     <label className="block text-sm font-semibold text-blue-200 mb-1">
                       Requires Item (optional)
                     </label>
-                    <select
+                    <input
+                      type="text"
                       value={newStartingChoice.item_used || ""}
                       onChange={(e) =>
                         setNewStartingChoice({
@@ -4713,15 +4567,9 @@ ${description || ""}`;
                           item_used: e.target.value || undefined,
                         })
                       }
+                      placeholder="Item name (optional)"
                       className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                    >
-                      <option value="">No item required</option>
-                      {inventory.map((item) => (
-                        <option key={item.name} value={item.name}>
-                          {item.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                     {newStartingChoice.item_used && (
                       <label className="flex items-center gap-2 mt-2 text-sm text-blue-300">
                         <input
@@ -5067,7 +4915,8 @@ ${description || ""}`;
                             <label className="block text-sm font-semibold text-blue-200 mb-1">
                               Requires Item
                             </label>
-                            <select
+                            <input
+                              type="text"
                               value={editStartingChoice.item_used || ""}
                               onChange={(e) =>
                                 setEditStartingChoice({
@@ -5075,15 +4924,9 @@ ${description || ""}`;
                                   item_used: e.target.value || undefined,
                                 })
                               }
+                              placeholder="Item name (optional)"
                               className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                            >
-                              <option value="">No item required</option>
-                              {inventory.map((item) => (
-                                <option key={item.name} value={item.name}>
-                                  {item.name}
-                                </option>
-                              ))}
-                            </select>
+                            />
                             {editStartingChoice.item_used && (
                               <label className="flex items-center gap-2 mt-2 text-sm text-blue-300">
                                 <input
@@ -9130,12 +8973,6 @@ ${description || ""}`;
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">Starting Items:</span>
-                    <span className="ml-2 font-semibold text-white">
-                      {inventory.length}
-                    </span>
-                  </div>
-                  <div>
                     <span className="text-blue-300/60">Notes:</span>
                     <span className="ml-2 font-semibold text-white">
                       {lore.length}
@@ -9459,7 +9296,6 @@ ${description || ""}`;
                                 intro,
                                 stats: [...stats],
                                 resources: [...resources],
-                                inventory: [...inventory],
                                 relationships: [...relationships],
                                 conditions: [...conditions],
                                 authorNotes,
@@ -9474,7 +9310,6 @@ ${description || ""}`;
                                 setIntro,
                                 setStats,
                                 setResources,
-                                setInventory,
                                 setRelationships,
                                 setConditions,
                                 setAuthorNotes,
@@ -9492,7 +9327,6 @@ ${description || ""}`;
                                 setIntro(savedCustomValues.intro);
                                 setStats(savedCustomValues.stats);
                                 setResources(savedCustomValues.resources);
-                                setInventory(savedCustomValues.inventory);
                                 setRelationships(
                                   savedCustomValues.relationships,
                                 );
@@ -9879,7 +9713,6 @@ ${description || ""}`;
           author_notes: authorNotes,
           stats,
           resources,
-          inventory,
           abilities,
           nodeEffects: {
             statBonuses: [],

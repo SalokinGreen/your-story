@@ -39,6 +39,8 @@ import {
 } from "@/app/misc/ai_staged";
 import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
+import { ensureStoryReflected } from "@/app/misc/reflection";
+import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   outputToScenePart,
   stripThinkingTags,
@@ -50,7 +52,7 @@ import {
   GMToolResult,
   GMExecutionResult,
 } from "@/app/misc/gmExecutor";
-import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
+import { executeTools, ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecutor";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import { logger } from "@/app/misc/logger";
 import { getModelConfig } from "@/app/misc/ai_prices";
@@ -80,6 +82,8 @@ import {
   classificationLabelToTier,
   decayTierTowardBaseline,
   computeSceneKey,
+  isSceneGatedForRoll,
+  hasSatisfiedRollGate,
   fallbackTier,
   describeTier,
   getTierState,
@@ -769,6 +773,37 @@ export async function generateStoryTurn(
           });
         }
 
+        // Memory reflection (see reflection.ts): synthesize higher-level
+        // insights from clusters of recent memories, Generative Agents'
+        // actual differentiator over flat similarity-ranked recall. Same
+        // "safe/cheap every turn, no-op until due" posture as compaction
+        // above - only fires once enough importance-weighted new memory has
+        // accumulated since the last pass.
+        try {
+          const reflectionResult = await ensureStoryReflected(storyData, {
+            model: options.storyModel || gmModel,
+            token,
+            openRouterKey: options.openRouterKey,
+            deepseekKey: options.deepseekKey,
+            googleKey: options.googleKey,
+            abortSignal: options.abortSignal,
+          });
+          if (reflectionResult.ran) {
+            logger.action("Reflected on recent memory, synthesized insights", {
+              insightCount: reflectionResult.insights?.length ?? 0,
+            });
+          }
+        } catch (reflectionError) {
+          // Non-fatal: reflection is a nice-to-have enrichment, not required
+          // for the turn to proceed.
+          logger.action("Reflection failed, continuing without it", {
+            error:
+              reflectionError instanceof Error
+                ? reflectionError.message
+                : String(reflectionError),
+          });
+        }
+
         // GM stage loop - continues until no more tool calls (AI writes final story)
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         let gmRound = 0;
@@ -784,6 +819,11 @@ export async function generateStoryTurn(
         let isComplete = false;
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
         const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
+        // Set by the M2 roll-invariant gate (search "M2 roll-invariant gate"
+        // below) when it forces a retry round - makes that one round require
+        // a tool call outright rather than relying on prose alone to ask for
+        // one. Consumed (read then cleared) at the top of the next round.
+        let forceToolChoiceNextRound: "required" | undefined;
         // Client-side token budgeting is only an estimate, so a request can
         // still overflow the model's real context window. currentGMBudget
         // starts at the configured (or default) budget and is permanently
@@ -810,6 +850,12 @@ export async function generateStoryTurn(
 
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
+
+          // Consume this round's forced tool_choice (if the M2 gate set one
+          // for us on the previous round) and clear it immediately - it
+          // must apply to exactly this one round, not leak into later ones.
+          const toolChoiceThisRound = forceToolChoiceNextRound;
+          forceToolChoiceNextRound = undefined;
 
           // Re-derive tier from storyData.reasoningTierState each round: if the
           // previous round's tool execution included a set_reasoning_tier call,
@@ -899,6 +945,13 @@ export async function generateStoryTurn(
               mistralKey: options.mistralKey,
               deepinfraKey: options.deepinfraKey,
               customModel: getCustomModelIfUUID(model),
+              // Set only on the round immediately after the M2 gate fires -
+              // forces the model to call some tool rather than relying on
+              // the prose re-prompt alone. Omitted otherwise, letting the
+              // route apply its normal per-provider default.
+              ...(toolChoiceThisRound
+                ? { toolChoice: toolChoiceThisRound }
+                : {}),
             });
 
           let gmResponse = await fetch("/api/generate-stream", {
@@ -1369,6 +1422,69 @@ export async function generateStoryTurn(
               );
             }
 
+            // M2 roll-invariant gate (see isSceneGatedForRoll/
+            // hasSatisfiedRollGate, reasoningTiers.ts): when this scene is
+            // gated (combat active, a challenge active, or the GM itself
+            // declared high/deadly stakes on a roll earlier this scene),
+            // require at least one roll/oracle tool call somewhere in this
+            // turn's accumulated results before letting the round end on
+            // prose alone.
+            const sceneIsGated = isSceneGatedForRoll(storyData);
+            const rollToolCalledThisTurn = hasSatisfiedRollGate(
+              gmResults.map((r) => r.toolName)
+            );
+
+            if (
+              sceneIsGated &&
+              !rollToolCalledThisTurn &&
+              !isRepetitive &&
+              noToolCallPrompts < MAX_NO_TOOL_PROMPTS
+            ) {
+              noToolCallPrompts++;
+              logger.action(
+                "M2 gate: gated scene ended with no roll/oracle tool call - forcing another round",
+                {
+                  noToolCallPrompts,
+                  combatActive: storyData.combatState?.active,
+                  challengeActive: storyData.activeChallenge?.active,
+                  highStakesSceneKey:
+                    storyData.reasoningTierState?.highStakesSceneKey,
+                },
+              );
+              conversationHistory.push({
+                role: "user",
+                content:
+                  "This scene requires a roll before the turn can end - combat or a challenge is active, or you declared high/deadly stakes earlier this scene. Resolve the pending action with formula_roll, opposed_formula, formula_challenge_check, fate_question, or npc_roll, then continue.",
+              });
+              forceToolChoiceNextRound = "required";
+              continue gmRoundLoop;
+            }
+
+            // Leniency audit (widened past M2's hard gate): M2 only forces a
+            // retry when combat/challenge/high-stakes is active. This is a
+            // purely advisory, non-blocking log of the same underlying drift
+            // outside that scope too - e.g. a narrated "you persuade the
+            // merchant" success with no roll, in an ungated scene. Never
+            // affects control flow; just widens visibility for later audits.
+            if (!rollToolCalledThisTurn) {
+              const stateChangingToolsThisTurn = gmResults
+                .map((r) => r.toolName)
+                .filter((name) => STATE_CHANGE_TOOLS.has(name));
+              if (stateChangingToolsThisTurn.length > 0) {
+                logger.action(
+                  "Leniency audit: state-changing tool(s) fired with no roll/oracle tool call this turn",
+                  {
+                    stateChangingTools: stateChangingToolsThisTurn,
+                    sceneGated: sceneIsGated,
+                  },
+                );
+              }
+            }
+
+            // Gate cap hit, or not gated at all - fail open (complete
+            // anyway) rather than get the turn stuck, matching this
+            // codebase's established "warn, don't hard-block" posture for
+            // every other advisory check.
             isComplete = true;
             break;
           }
@@ -2062,6 +2178,19 @@ export async function generateStoryTurn(
         ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
       }));
 
+    // Layer-5 consistency check (see consistencyCheck.ts): narration has
+    // already streamed to the client by this point, so this is recorded
+    // for display/debugging and eval-harness metrics, never a live gate.
+    const consistencyWarnings = checkNarrationConsistency(
+      storyContent,
+      storyData
+    );
+    if (consistencyWarnings.length > 0) {
+      logger.action("Consistency check flagged narration", {
+        warnings: consistencyWarnings,
+      });
+    }
+
     const scenePart: ScenePart = {
       content: storyContent,
       raw: rawStoryContent || undefined,
@@ -2082,6 +2211,8 @@ export async function generateStoryTurn(
           : undefined,
       gmStoryContext: gmStoryContext || undefined,
       gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
+      consistencyWarnings:
+        consistencyWarnings.length > 0 ? consistencyWarnings : undefined,
     };
 
     const result: GenerationResult = {

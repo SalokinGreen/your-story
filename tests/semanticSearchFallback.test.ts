@@ -129,4 +129,99 @@ describe("semanticSearchFallback", () => {
     });
     expect(result).toEqual({ status: "ok", matches: [] });
   });
+
+  describe("reranking by recency/importance/entity-relevance (memoryEntries param)", () => {
+    it("re-orders a lower-similarity but more recent/important match ahead of a stale one", async () => {
+      mockedSearch.mockResolvedValue({
+        lore: [],
+        memories: [
+          { entry_type: "memory", entry_key: "a", content: "Old debt to the blacksmith", similarity: 0.7, importance: 5 },
+          { entry_type: "memory", entry_key: "b", content: "Fresh warning about the ambush", similarity: 0.65, importance: 5 },
+        ],
+        totalResults: 2,
+      });
+
+      const memoryEntries = [
+        { content: "Old debt to the blacksmith", sceneIndex: 1, importance: 0 },
+        { content: "Fresh warning about the ambush", sceneIndex: 20, importance: 10 },
+      ];
+
+      const result = await semanticSearchFallback(
+        "memory",
+        "what's going on",
+        { enabled: true, storyId: "s1", token: "t1" },
+        memoryEntries
+      );
+
+      expect(result.status).toBe("ok");
+      // "Fresh warning" starts behind on raw similarity (0.65 < 0.7) but
+      // should be reranked ahead once recency+importance are factored in.
+      expect(result.matches[0].content).toContain("Fresh warning");
+      expect(result.matches[1].content).toContain("Old debt");
+    });
+
+    it("boosts a match whose entityIds are mentioned in the query", async () => {
+      mockedSearch.mockResolvedValue({
+        lore: [],
+        memories: [
+          { entry_type: "memory", entry_key: "a", content: "General rumor about the town", similarity: 0.7, importance: 5 },
+          { entry_type: "memory", entry_key: "b", content: "Aldric owes 50 gold", similarity: 0.68, importance: 5 },
+        ],
+        totalResults: 2,
+      });
+
+      const memoryEntries = [
+        { content: "General rumor about the town", sceneIndex: 5 },
+        { content: "Aldric owes 50 gold", sceneIndex: 5, entityIds: ["Aldric"] },
+      ];
+
+      const result = await semanticSearchFallback(
+        "memory",
+        "what does Aldric want",
+        { enabled: true, storyId: "s1", token: "t1" },
+        memoryEntries
+      );
+
+      expect(result.matches[0].content).toContain("Aldric owes");
+    });
+
+    it("does not rerank when memoryEntries is omitted (unchanged existing behavior)", async () => {
+      mockedSearch.mockResolvedValue({
+        lore: [],
+        memories: [
+          { entry_type: "memory", entry_key: "a", content: "First", similarity: 0.9, importance: 5 },
+          { entry_type: "memory", entry_key: "b", content: "Second", similarity: 0.5, importance: 5 },
+        ],
+        totalResults: 2,
+      });
+
+      const result = await semanticSearchFallback("memory", "query", {
+        enabled: true,
+        storyId: "s1",
+        token: "t1",
+      });
+
+      expect(result.matches.map((m) => m.content)).toEqual(["First", "Second"]);
+    });
+
+    it("does not rerank lore matches even if memoryEntries is passed", async () => {
+      mockedSearch.mockResolvedValue({
+        lore: [
+          { entry_type: "lore", entry_key: "a", content: "First", similarity: 0.9, importance: 5 },
+          { entry_type: "lore", entry_key: "b", content: "Second", similarity: 0.5, importance: 5 },
+        ],
+        memories: [],
+        totalResults: 2,
+      });
+
+      const result = await semanticSearchFallback(
+        "lore",
+        "query",
+        { enabled: true, storyId: "s1", token: "t1" },
+        [{ content: "Second", sceneIndex: 100, importance: 10 }]
+      );
+
+      expect(result.matches.map((m) => m.content)).toEqual(["First", "Second"]);
+    });
+  });
 });
