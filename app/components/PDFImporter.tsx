@@ -46,6 +46,9 @@ const LOW_MEMORY_DEVICE_THRESHOLD_GB = 4;
 const VERY_LARGE_FILE_SIZE_MB = 25;
 // Timeout for summarize requests (4 minutes - server allows 5)
 const SUMMARIZE_TIMEOUT_MS = 240000;
+// Timeout per OCR upload attempt (4 minutes - server allows 5). Large,
+// image-heavy chunks can legitimately take Mistral several minutes.
+const OCR_TIMEOUT_MS = 240000;
 // Retry attempts for failed requests
 const MAX_RETRIES = 2;
 
@@ -142,42 +145,50 @@ async function fetchWithRetry(
   timeoutMs: number = SUMMARIZE_TIMEOUT_MS,
   maxRetries: number = MAX_RETRIES,
 ): Promise<Response> {
-  let lastError: Error | null = null;
+  let lastError: Error = new Error("Request failed after retries");
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeoutId = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
 
-      const response = await fetch(url, {
+    try {
+      return await fetch(url, {
         ...options,
         signal: controller.signal,
       });
-
-      clearTimeout(timeoutId);
-      return response;
     } catch (error: any) {
-      lastError = error;
-
-      // Don't retry on abort (user cancelled) or auth errors
       if (error.name === "AbortError") {
-        throw new Error(`Request timed out after ${timeoutMs / 1000}s`);
+        // Only aborts fired by our own timeout timer are retryable; any
+        // other AbortError came from outside (user cancelled) and must
+        // propagate immediately.
+        if (!timedOut) {
+          throw error;
+        }
+        lastError = new Error(`Request timed out after ${timeoutMs / 1000}s`);
+      } else {
+        lastError = error;
       }
 
       // Wait before retry (exponential backoff)
       if (attempt < maxRetries) {
         const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
         console.log(
-          `Request failed, retrying in ${delay}ms (attempt ${
+          `Request failed (${lastError.message}), retrying in ${delay}ms (attempt ${
             attempt + 1
           }/${maxRetries})...`,
         );
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
-  throw lastError || new Error("Request failed after retries");
+  throw lastError;
 }
 
 /**
@@ -280,6 +291,23 @@ interface PDFChunkPlan {
   pdfDoc: PDFDocument;
   ranges: PDFChunkRange[];
 }
+
+type OCRChunkTaskResult =
+  | {
+      chunkIndex: number;
+      success: true;
+      markdown: string;
+      pageStart: number;
+      pageEnd: number;
+      totalPages: number;
+    }
+  | {
+      chunkIndex: number;
+      success: false;
+      error: string;
+      pageStart: number;
+      pageEnd: number;
+    };
 
 /**
  * Load a large PDF and compute how it should be split into smaller chunks,
@@ -434,7 +462,7 @@ async function ocrPDFRange(
           mistralKey,
         }),
       },
-      180000, // 3 minute timeout for OCR
+      OCR_TIMEOUT_MS,
     );
   } finally {
     // Allow the (potentially multi-MB) base64 string to be garbage
@@ -1072,6 +1100,11 @@ export default function PDFImporter({
           );
           setProgress(fileProgressStart + fileProgressRange * 0.1);
 
+          // One failed chunk must not abort the whole import (a single
+          // timed-out request on a large file used to throw here and
+          // discard every other chunk's work). Failed chunks are marked
+          // in the status panel and the rest continue; only bail out if
+          // *every* chunk failed.
           const ocrTasks = ranges.map((range, chunkIdx) => async () => {
             // Update status to ocr
             setChunkStatuses((prev) =>
@@ -1096,7 +1129,24 @@ export default function PDFImporter({
             } catch (err: unknown) {
               const message =
                 err instanceof Error ? err.message : "OCR processing failed";
-              throw new Error(`Chunk ${chunkIdx + 1} (${message})`);
+              console.error(
+                `Pages ${range.pageStart}-${range.pageEnd} OCR failed:`,
+                message,
+              );
+              setChunkStatuses((prev) =>
+                prev.map((cs) =>
+                  cs.chunkIndex === chunkIdx
+                    ? { ...cs, status: "failed", error: message }
+                    : cs,
+                ),
+              );
+              return {
+                chunkIndex: chunkIdx,
+                success: false as const,
+                error: message,
+                pageStart: range.pageStart,
+                pageEnd: range.pageEnd,
+              };
             }
 
             // Update status with OCR markdown
@@ -1110,6 +1160,7 @@ export default function PDFImporter({
 
             return {
               chunkIndex: chunkIdx,
+              success: true as const,
               markdown: chunkResult.markdown,
               pageStart: range.pageStart,
               pageEnd: range.pageEnd,
@@ -1117,7 +1168,7 @@ export default function PDFImporter({
             };
           });
 
-          const ocrResults = await runWithConcurrency(
+          const ocrTaskResults = await runWithConcurrency(
             ocrTasks,
             ocrConcurrency,
             (completed, total) => {
@@ -1129,6 +1180,27 @@ export default function PDFImporter({
               setStatusMessage(`OCR: ${completed}/${total} chunks complete...`);
             },
           );
+
+          const ocrResults = ocrTaskResults.filter(
+            (r): r is Extract<OCRChunkTaskResult, { success: true }> =>
+              r.success,
+          );
+          const failedOcr = ocrTaskResults.filter(
+            (r): r is Extract<OCRChunkTaskResult, { success: false }> =>
+              !r.success,
+          );
+          if (failedOcr.length > 0) {
+            setShowChunkDetails(true);
+            if (ocrResults.length === 0) {
+              throw new Error(
+                `OCR failed for all ${totalChunks} chunks. First error: ${failedOcr[0].error}`,
+              );
+            }
+            addNotification(
+              `${failedOcr.length}/${totalChunks} chunks failed OCR and were skipped (${failedOcr[0].error})`,
+              "warning",
+            );
+          }
 
           // Sort by page order and combine results
           ocrResults.sort((a, b) => a.pageStart - b.pageStart);
