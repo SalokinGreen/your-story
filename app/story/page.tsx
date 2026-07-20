@@ -222,6 +222,33 @@ function StoryPageContent() {
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY,
   );
+  // Real, JS-measured viewport height in px. Some mobile browsers (in
+  // particular embedded/in-app webviews) don't support the `dvh` unit and
+  // fall back to a stale `100vh` that ignores the address bar/toolbar,
+  // leaving a gap of bare body background below the game area. Measuring
+  // window.visualViewport (falling back to window.innerHeight) and applying
+  // it as an inline min-height is a more reliable fix than CSS units alone.
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  useEffect(() => {
+    function updateViewportHeight() {
+      setViewportHeight(window.visualViewport?.height ?? window.innerHeight);
+    }
+    updateViewportHeight();
+    window.visualViewport?.addEventListener("resize", updateViewportHeight);
+    window.addEventListener("resize", updateViewportHeight);
+    window.addEventListener("orientationchange", updateViewportHeight);
+    return () => {
+      window.visualViewport?.removeEventListener(
+        "resize",
+        updateViewportHeight,
+      );
+      window.removeEventListener("resize", updateViewportHeight);
+      window.removeEventListener("orientationchange", updateViewportHeight);
+    };
+  }, []);
+  const fullHeightStyle = viewportHeight
+    ? { minHeight: `${viewportHeight}px` }
+    : undefined;
   const [storyData, setStoryData] = useState<StoryData | null>(null);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
   const [sourceAdventureId, setSourceAdventureId] = useState<string | null>(
@@ -2843,7 +2870,10 @@ function StoryPageContent() {
 
   if (loadingStory) {
     return (
-      <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+      <div
+        className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950"
+        style={fullHeightStyle}
+      >
         <div className="flex items-center justify-center min-h-dvh">
           <div className="text-center">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-400 border-t-transparent mx-auto"></div>
@@ -2860,7 +2890,10 @@ function StoryPageContent() {
 
   if (!storyData) {
     return (
-      <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+      <div
+        className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950"
+        style={fullHeightStyle}
+      >
         <div className="flex items-center justify-center min-h-dvh">
           <div className="text-center bg-blue-950/50 rounded-xl p-6 border border-blue-800/30">
             <DynamicIcon
@@ -2887,7 +2920,10 @@ function StoryPageContent() {
     const totalGoals = storyData.goals?.length || 0;
 
     return (
-      <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4">
+      <div
+        className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4"
+        style={fullHeightStyle}
+      >
         <div className="w-full px-2 sm:max-w-3xl mx-auto">
           {/* Game Over Header */}
           <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-6 mb-4 text-center">
@@ -3256,7 +3292,10 @@ function StoryPageContent() {
     ];
 
     return (
-      <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+      <div
+        className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950"
+        style={fullHeightStyle}
+      >
         <div className="py-6 px-4">
           <div className="w-full px-2 sm:max-w-3xl mx-auto">
             {/* Header */}
@@ -3364,7 +3403,10 @@ function StoryPageContent() {
   }
 
   return (
-    <div className="relative min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20">
+    <div
+      className="relative min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20"
+      style={fullHeightStyle}
+    >
       {/* Ambient glow orbs - purely decorative, sits behind all content */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-700/20 blur-[100px]" />
