@@ -2843,8 +2843,8 @@ function StoryPageContent() {
 
   if (loadingStory) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
-        <div className="flex items-center justify-center min-h-screen">
+      <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+        <div className="flex items-center justify-center min-h-dvh">
           <div className="text-center">
             <div className="animate-spin rounded-full h-10 w-10 border-2 border-blue-400 border-t-transparent mx-auto"></div>
             <p className="mt-4 text-sm text-blue-200/60">Loading story...</p>
@@ -2860,8 +2860,8 @@ function StoryPageContent() {
 
   if (!storyData) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
-        <div className="flex items-center justify-center min-h-screen">
+      <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+        <div className="flex items-center justify-center min-h-dvh">
           <div className="text-center bg-blue-950/50 rounded-xl p-6 border border-blue-800/30">
             <DynamicIcon
               name="FileQuestion"
@@ -2887,7 +2887,7 @@ function StoryPageContent() {
     const totalGoals = storyData.goals?.length || 0;
 
     return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4">
+      <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4">
         <div className="w-full px-2 sm:max-w-3xl mx-auto">
           {/* Game Over Header */}
           <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-6 mb-4 text-center">
@@ -3256,7 +3256,7 @@ function StoryPageContent() {
     ];
 
     return (
-      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+      <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
         <div className="py-6 px-4">
           <div className="w-full px-2 sm:max-w-3xl mx-auto">
             {/* Header */}
@@ -3364,7 +3364,7 @@ function StoryPageContent() {
   }
 
   return (
-    <div className="relative min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20">
+    <div className="relative min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20">
       {/* Ambient glow orbs - purely decorative, sits behind all content */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-700/20 blur-[100px]" />
@@ -3622,7 +3622,7 @@ export default function StoryPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
+        <div className="min-h-dvh bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
         </div>
       }
