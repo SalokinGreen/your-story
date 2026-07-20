@@ -224,8 +224,14 @@ function StoryPageContent() {
 
   const { addNotification } = useNotification();
   const { keys: apiKeys } = useAPIKeys();
-  const { openRouterKey, deepseekKey, googleKey, mistralKey, deepinfraKey } =
-    apiKeys;
+  const {
+    openRouterKey,
+    deepseekKey,
+    googleKey,
+    mistralKey,
+    deepinfraKey,
+    braveSearchKey,
+  } = apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY,
   );
@@ -1201,6 +1207,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("embeddingsEnabled") === "true"
           : false;
+      const webResearchEnabled =
+        typeof window !== "undefined"
+          ? localStorage.getItem("webResearchEnabled") === "true"
+          : false;
       const embeddingThreshold =
         typeof window !== "undefined"
           ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -1254,6 +1264,8 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
+          webResearchEnabled,
+          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -1949,6 +1961,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"
         : false;
+    const webResearchEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("webResearchEnabled") === "true"
+        : false;
     const embeddingThreshold =
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -2011,6 +2027,8 @@ function StoryPageContent() {
           abortSignal: generationAbortRef.current.signal,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
+          webResearchEnabled,
+          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -2441,6 +2459,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"
         : false;
+    const webResearchEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("webResearchEnabled") === "true"
+        : false;
     const embeddingThreshold =
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -2511,6 +2533,8 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
+          webResearchEnabled,
+          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,

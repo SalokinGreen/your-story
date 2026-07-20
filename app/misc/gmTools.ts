@@ -501,6 +501,22 @@ export interface ReactionCheckParams {
 }
 
 /**
+ * Delegate Task - Hand off a self-contained generation/research job to a
+ * separate, narrowly-scoped sub-call instead of doing it inline. Mirrors
+ * how a human GM might jot "flesh this out later" and come back to it with
+ * fresh focus: the sub-call gets its own small prompt and context (not the
+ * full turn history), so it can spend more effort on one job without
+ * bloating the main GM context. Its output is converted into ordinary
+ * tools (add_npc, create_note) or a plain summary - it never writes to
+ * StoryData directly.
+ */
+export interface DelegateTaskParams {
+  task_type: "generate_npc" | "generate_location" | "research" | "web_research";
+  brief: string; // What to produce, e.g. "an NPC called Bob, a dockworker who owes the player money"
+  scope?: string[]; // Optional note titles to restrict sub-context to (keeps the call cheap and focused)
+}
+
+/**
  * Negotiate Price - GURPS-style structured haggling. Reduces a price
  * negotiation to a deterministic procedure instead of GM-improvised
  * economic judgment: an opposed Quick Contest (Merchant/Diplomacy/
@@ -554,7 +570,8 @@ export type GMToolParams =
   | { name: "remove_npc"; params: RemoveNPCParams }
   | { name: "npc_reaction"; params: NPCReactionParams }
   | { name: "reaction_check"; params: ReactionCheckParams }
-  | { name: "negotiate_price"; params: NegotiatePriceParams };
+  | { name: "negotiate_price"; params: NegotiatePriceParams }
+  | { name: "delegate_task"; params: DelegateTaskParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -2150,6 +2167,50 @@ Example:
 };
 
 // ============================================
+// DELEGATE TASK TOOL SCHEMA
+// ============================================
+
+const delegateTaskTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "delegate_task",
+    description: `Hand off a self-contained generation or research job to a separate, focused sub-call instead of doing it inline.
+
+Use when a job is meaty enough to deserve its own undivided attention (a whole NPC, a whole location, tracking down scattered information) rather than something to improvise in passing.
+
+task_type options:
+- "generate_npc": Produces a fully fleshed-out NPC from a short brief, then registers it automatically (equivalent to add_npc, but with more thought put into who they are).
+- "generate_location": Produces a detailed location writeup (layout, atmosphere, notable features/dangers) and saves it as a note automatically.
+- "research": Re-reads this adventure's own notes/lore/memory and synthesizes a focused answer to a question - use for "what do we know about X" when the answer might be scattered across many notes.
+- "web_research": Like research, but searches the real internet for grounding facts (how something historically/technically works) - only for real-world facts, not in-fiction content. Only available if the player has enabled Web Research and configured a search key in Settings; if not, this call will fail and you should proceed without it.
+
+Each call costs an extra round-trip - use it for jobs worth the wait, not simple lookups (use search_notes/read_notes for those).`,
+    parameters: {
+      type: "object",
+      properties: {
+        task_type: {
+          type: "string",
+          enum: ["generate_npc", "generate_location", "research", "web_research"],
+          description: "What kind of job to delegate",
+        },
+        brief: {
+          type: "string",
+          description:
+            "What to produce or find out, in plain language, e.g. 'an NPC called Bob, a grizzled dockworker who owes the player money' or 'everything we know about the Sunken Cathedral'",
+        },
+        scope: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional: exact titles of notes to restrict the sub-call's context to, keeping it cheap and focused. Omit to let it consider everything relevant.",
+        },
+      },
+      required: ["task_type", "brief"],
+    },
+  },
+};
+
+// ============================================
 // EXPORT
 // ============================================
 
@@ -2190,6 +2251,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   npcReactionTool,
   reactionCheckTool,
   negotiatePriceTool,
+  // Sub-agent delegation
+  delegateTaskTool,
   // Terminal tool - ends GM loop
   endGmThinkingTool,
   // Reasoning-tier self-escalation

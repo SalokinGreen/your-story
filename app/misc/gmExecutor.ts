@@ -68,7 +68,13 @@ import {
   NegotiatePriceParams,
   GM_TOOL_MAP,
   SetReasoningTierParams,
+  DelegateTaskParams,
 } from "./gmTools";
+import {
+  runDelegateTask,
+  SubagentContext,
+  DelegateTaskOutcome,
+} from "./subagentExecutor";
 import { validateToolArgs, formatValidationErrors } from "./toolValidation";
 import {
   semanticSearchFallback,
@@ -647,7 +653,8 @@ export async function executeGMTools(
   toolCalls: { id: string; function: { name: string; arguments: string } }[],
   storyData: StoryData,
   semanticContext: SemanticSearchContext = {},
-  interaction: GMInteractionHandlers = {}
+  interaction: GMInteractionHandlers = {},
+  subagentContext: SubagentContext = {}
 ): Promise<GMExecutionResult> {
   // Check for premature end_gm_thinking calls when there are other tools
   // The AI sometimes calls end_gm_thinking before processing roll results
@@ -973,6 +980,14 @@ export async function executeGMTools(
             call.id,
             params as SetReasoningTierParams,
             modified
+          );
+          break;
+        case "delegate_task":
+          result = await executeDelegateTask(
+            call.id,
+            params as DelegateTaskParams,
+            modified,
+            subagentContext
           );
           break;
         default:
@@ -5068,4 +5083,106 @@ function executeNegotiatePrice(
     } as GMNegotiatePriceResult,
     contextForStory,
   };
+}
+
+// ============================================
+// SUB-AGENT DELEGATION TOOL EXECUTION
+// ============================================
+
+/**
+ * Execute delegate_task - hands off to a separate, focused sub-call (see
+ * subagentExecutor.ts) and folds the result into ordinary state-mutating
+ * tools (add_npc, create_note) or a plain summary. Never writes to
+ * storyData itself - that stays the job of executeAddNPC/executeStateTools.
+ */
+async function executeDelegateTask(
+  toolCallId: string,
+  params: DelegateTaskParams,
+  storyData: StoryData,
+  subagentContext: SubagentContext
+): Promise<GMToolResult> {
+  const execResult = await runDelegateTask(params, storyData, subagentContext);
+
+  if (!execResult.success || !execResult.outcome) {
+    return {
+      toolName: "delegate_task",
+      toolCallId,
+      success: false,
+      result: {
+        type: "state_change",
+        message: execResult.error || "Delegated task failed",
+        command: "delegate_task",
+      },
+      contextForStory: `[Delegated Task Failed (${params.task_type}): ${
+        execResult.error || "unknown error"
+      }]`,
+    };
+  }
+
+  const outcome: DelegateTaskOutcome = execResult.outcome;
+
+  switch (outcome.kind) {
+    case "npc": {
+      const addResult = executeAddNPC(
+        toolCallId,
+        {
+          name: outcome.name,
+          description: outcome.description,
+          role: outcome.role,
+          attitude: outcome.attitude as AddNPCParams["attitude"],
+          relationship: outcome.relationship,
+          faction: outcome.faction,
+        },
+        storyData
+      );
+      return {
+        ...addResult,
+        toolName: "delegate_task",
+        contextForStory: `[Delegated Task (generate_npc)]\n${addResult.contextForStory}`,
+      };
+    }
+    case "note": {
+      const stateToolCalls = [
+        {
+          id: toolCallId,
+          type: "function" as const,
+          function: {
+            name: "create_note",
+            arguments: {
+              title: outcome.title,
+              content: outcome.content,
+              type: outcome.noteType,
+            },
+          },
+        },
+      ];
+      const stateResult = executeStateTools(stateToolCalls, storyData);
+      const response = stateResult.responses[0];
+      const message = response?.message || `Created note "${outcome.title}"`;
+      return {
+        toolName: "delegate_task",
+        toolCallId,
+        success: response?.success === true,
+        result: {
+          type: "state_change",
+          message,
+          command: "create_note",
+        },
+        contextForStory: `[Delegated Task (${params.task_type})]\n[State: ${message}]`,
+      };
+    }
+    case "summary": {
+      return {
+        toolName: "delegate_task",
+        toolCallId,
+        success: true,
+        result: {
+          type: "state_change",
+          message: outcome.text,
+          command: "delegate_task",
+        },
+        contextForStory: `[Delegated Task (${params.task_type})]\n${outcome.text}`,
+      };
+    }
+  }
 }
