@@ -284,6 +284,31 @@ function bytesToBase64(bytes: Uint8Array): string {
 }
 
 /**
+ * Normalize a pasted document link into a form Mistral's OCR API can
+ * fetch directly as `document_url`. Google Drive's "share" links point at
+ * an HTML viewer page rather than the raw file, so a Drive share link is
+ * rewritten into its direct-download form. Any other URL (Dropbox direct
+ * links, self-hosted files, etc.) is passed through unchanged.
+ */
+function normalizeDocumentLink(url: string): string {
+  const trimmed = url.trim();
+
+  // Standard share link: https://drive.google.com/file/d/<id>/view?usp=...
+  const fileMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (fileMatch) {
+    return `https://drive.google.com/uc?export=download&id=${fileMatch[1]}`;
+  }
+
+  // "open?id=<id>" link form.
+  const openMatch = trimmed.match(/drive\.google\.com\/open\?id=([^&]+)/);
+  if (openMatch) {
+    return `https://drive.google.com/uc?export=download&id=${openMatch[1]}`;
+  }
+
+  return trimmed;
+}
+
+/**
  * Best-effort detection of memory-constrained devices (mobile phones/
  * tablets) via the non-standard `navigator.deviceMemory` API. Safari
  * (iOS/iPadOS, including desktop-mode iPad) has never implemented that API
@@ -627,6 +652,13 @@ export default function PDFImporter({
   const [pageCount, setPageCount] = useState(0);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
+  // Import mode: upload a file directly, or point at a shareable link
+  // (e.g. Google Drive) so Mistral fetches the document itself. Link mode
+  // skips the client-side chunking pipeline entirely - it's a single OCR
+  // call regardless of document size.
+  const [importMode, setImportMode] = useState<"file" | "link">("file");
+  const [linkUrl, setLinkUrl] = useState("");
+
   // AI model selection for summarization
   const [aiModel, setAIModel] = useState("ministral-14b-2512");
 
@@ -706,16 +738,20 @@ export default function PDFImporter({
 
   // Save imports to IndexedDB
   const saveImport = useCallback(
-    async (data: {
-      lore: StoryLore[];
-      mechanicNotes: StoryLore[];
-      customTables: CustomTable[];
-      summary: string;
-    }) => {
+    async (
+      data: {
+        lore: StoryLore[];
+        mechanicNotes: StoryLore[];
+        customTables: CustomTable[];
+        summary: string;
+      },
+      fileNameOverride?: string,
+    ) => {
       const fileName =
-        selectedFiles.length > 1
+        fileNameOverride ||
+        (selectedFiles.length > 1
           ? `${selectedFiles.length} files`
-          : selectedFiles[0]?.name || "Unknown";
+          : selectedFiles[0]?.name || "Unknown");
 
       try {
         const newImport = await savePDFImport(data, fileName);
@@ -1778,6 +1814,153 @@ export default function PDFImporter({
     }
   };
 
+  // Import a document by URL (e.g. a Google Drive share link) instead of
+  // uploading a file. Mistral fetches the document itself from the URL, so
+  // there's no local file to chunk - this is always a single OCR call,
+  // regardless of the document's size.
+  const processLinkImport = async () => {
+    const trimmedUrl = linkUrl.trim();
+    if (!trimmedUrl) {
+      addNotification("Please paste a document link", "warning");
+      return;
+    }
+
+    const selectedModel = getSelectedModel();
+    if (!selectedModel.model) {
+      addNotification("Please enter a custom model ID", "warning");
+      return;
+    }
+    if (!keys[PROVIDER_KEY_FIELD[selectedModel.provider]]) {
+      addNotification(
+        `Please add your ${PROVIDER_LABELS[selectedModel.provider]} API key in Settings`,
+        "warning",
+      );
+      return;
+    }
+    if (!keys.mistralKey) {
+      addNotification(
+        "Please add your Mistral API key in Settings to use OCR",
+        "warning",
+      );
+      return;
+    }
+
+    const documentUrl = normalizeDocumentLink(trimmedUrl);
+
+    try {
+      setStep("ocr");
+      setProgress(10);
+      setStatusMessage("Fetching and extracting text from the link...");
+
+      const ocrResponse = await fetchWithRetry(
+        "/api/ocr/process",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            signedUrl: documentUrl,
+            includeImages: false,
+            mistralKey: keys.mistralKey,
+          }),
+        },
+        OCR_TIMEOUT_MS,
+        MAX_RETRIES,
+      );
+
+      if (!ocrResponse.ok) {
+        const errorMsg = await extractErrorMessage(
+          ocrResponse,
+          "OCR processing failed",
+        );
+        throw new Error(
+          `${errorMsg}. Make sure the link is shared as "Anyone with the link" - very large files may also fail if Drive shows a virus-scan warning page instead of the file; try the file upload option instead in that case.`,
+        );
+      }
+
+      const ocrResult: OCRProcessResult = await ocrResponse.json();
+
+      setProgress(45);
+      setStep("summarizing");
+      setStatusMessage("Extracting notes from the document...");
+
+      const summarizeResponse = await fetchWithRetry(
+        "/api/ocr/summarize",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            markdown: ocrResult.markdown,
+            focus: ["all"],
+            customInstructions,
+            model: selectedModel.model,
+            provider: selectedModel.provider,
+            maxTokens: maxOutputTokens,
+            openRouterKey: keys.openRouterKey,
+            deepseekKey: keys.deepseekKey,
+            mistralKey: keys.mistralKey,
+            googleKey: keys.googleKey,
+            deepinfraKey: keys.deepinfraKey,
+          }),
+        },
+        SUMMARIZE_TIMEOUT_MS,
+        MAX_RETRIES,
+      );
+
+      if (!summarizeResponse.ok) {
+        const errorMsg = await extractErrorMessage(
+          summarizeResponse,
+          "Note extraction failed",
+        );
+        throw new Error(errorMsg);
+      }
+
+      const summarizeResult = await summarizeResponse.json();
+
+      setStep("complete");
+      setStatusMessage("Import complete!");
+      setProgress(100);
+
+      const importData = {
+        lore: summarizeResult.lore || [],
+        mechanicNotes: summarizeResult.mechanicNotes || [],
+        customTables: summarizeResult.customTables || [],
+        summary: "Imported from link",
+      };
+
+      saveImport(importData, "Link import");
+      onImportComplete(importData);
+
+      const totalItems =
+        importData.lore.length +
+        importData.mechanicNotes.length +
+        importData.customTables.length;
+      addNotification(
+        `Imported ${totalItems} items from ${ocrResult.totalPages} pages (~$${estimateOCRCostUSD(
+          ocrResult.totalPages,
+        ).toFixed(3)} in OCR costs, paid to your own API key)`,
+        "success",
+      );
+
+      setTimeout(() => {
+        setIsOpen(false);
+        resetState();
+      }, 1500);
+    } catch (error: unknown) {
+      console.error("PDF link import error:", error);
+      const message = sanitizeErrorMessage(
+        error instanceof Error ? error.message : "",
+        "Import failed",
+      );
+      setStep("error");
+      setStatusMessage(message);
+      addNotification(message, "failure");
+    }
+  };
+
   const removeFile = (index: number) => {
     const file = selectedFiles[index];
     const filePages = Math.max(1, Math.ceil(file.size / (100 * 1024)));
@@ -1791,6 +1974,7 @@ export default function PDFImporter({
     setProgress(0);
     setStatusMessage("");
     setSelectedFiles([]);
+    setLinkUrl("");
     setEstimatedCost(0);
     setPageCount(0);
     setCurrentFileIndex(0);
@@ -2342,48 +2526,99 @@ export default function PDFImporter({
               {/* File Selection */}
               {step === "idle" && (
                 <>
-                  {/* Drop Zone */}
-                  <div
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
-                      selectedFiles.length > 0
-                        ? "border-green-500/50 bg-green-900/20"
-                        : "border-blue-700/50 hover:border-purple-500/50 hover:bg-purple-900/20"
-                    }`}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md"
-                      onChange={handleFileSelect}
-                      multiple
-                      className="hidden"
-                    />
-                    <div className="space-y-2">
-                      <DynamicIcon
-                        name={selectedFiles.length > 0 ? "FilePlus" : "Upload"}
-                        className={`w-10 h-10 mx-auto ${
-                          selectedFiles.length > 0
-                            ? "text-green-400"
-                            : "text-blue-400"
-                        }`}
-                      />
-                      <p className="font-medium text-white">
-                        {selectedFiles.length > 0
-                          ? "Drop more files or click to add"
-                          : "Drop your PDFs here or click to browse"}
-                      </p>
-                      <p className="text-sm text-blue-300/60">
-                        Supports multiple files • PDF, PNG, JPEG, WebP • Max{" "}
-                        {MAX_PDF_SIZE_MB}MB each
-                      </p>
-                    </div>
+                  {/* Import Mode Toggle */}
+                  <div className="flex gap-2 p-1 bg-blue-900/30 rounded-lg">
+                    <button
+                      onClick={() => setImportMode("file")}
+                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        importMode === "file"
+                          ? "bg-purple-600 text-white"
+                          : "text-blue-300 hover:text-white"
+                      }`}
+                    >
+                      Upload file
+                    </button>
+                    <button
+                      onClick={() => setImportMode("link")}
+                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        importMode === "link"
+                          ? "bg-purple-600 text-white"
+                          : "text-blue-300 hover:text-white"
+                      }`}
+                    >
+                      Import from link
+                    </button>
                   </div>
 
+                  {importMode === "link" ? (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-blue-200">
+                        Document link (e.g. Google Drive)
+                      </label>
+                      <input
+                        type="url"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        placeholder="https://drive.google.com/file/d/.../view"
+                        className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white placeholder-blue-300/50"
+                      />
+                      <p className="text-xs text-blue-300/60">
+                        The file must be shared as &quot;Anyone with the
+                        link&quot;. Mistral fetches it directly, so there
+                        isn&apos;t an upload size limit here - but very
+                        large files can trigger Drive&apos;s virus-scan
+                        warning page instead of serving the file directly;
+                        use the file upload tab if that happens.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Drop Zone */}
+                      <div
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                          selectedFiles.length > 0
+                            ? "border-green-500/50 bg-green-900/20"
+                            : "border-blue-700/50 hover:border-purple-500/50 hover:bg-purple-900/20"
+                        }`}
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md"
+                          onChange={handleFileSelect}
+                          multiple
+                          className="hidden"
+                        />
+                        <div className="space-y-2">
+                          <DynamicIcon
+                            name={
+                              selectedFiles.length > 0 ? "FilePlus" : "Upload"
+                            }
+                            className={`w-10 h-10 mx-auto ${
+                              selectedFiles.length > 0
+                                ? "text-green-400"
+                                : "text-blue-400"
+                            }`}
+                          />
+                          <p className="font-medium text-white">
+                            {selectedFiles.length > 0
+                              ? "Drop more files or click to add"
+                              : "Drop your PDFs here or click to browse"}
+                          </p>
+                          <p className="text-sm text-blue-300/60">
+                            Supports multiple files • PDF, PNG, JPEG, WebP •
+                            Max {MAX_PDF_SIZE_MB}MB each
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   {/* Selected Files List */}
-                  {selectedFiles.length > 0 && (
+                  {importMode === "file" && selectedFiles.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-semibold text-blue-200">
@@ -2813,9 +3048,13 @@ export default function PDFImporter({
                 Cancel
               </button>
               <button
-                onClick={processFiles}
+                onClick={
+                  importMode === "link" ? processLinkImport : processFiles
+                }
                 disabled={
-                  selectedFiles.length === 0 ||
+                  (importMode === "link"
+                    ? !linkUrl.trim()
+                    : selectedFiles.length === 0) ||
                   step !== "idle" ||
                   (aiModel === "custom-model" && !customModelId.trim())
                 }
