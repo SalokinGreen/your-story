@@ -40,7 +40,7 @@ import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
 import ManualRollModal from "../components/ManualRollModal";
 import type { ManualRollRequest } from "../misc/gmExecutor";
 import { logger } from "../misc/logger";
-import { useState, useEffect, useRef, Suspense } from "react";
+import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { useSearchParams, useRouter } from "next/navigation";
@@ -229,23 +229,47 @@ function StoryPageContent() {
   // window.visualViewport (falling back to window.innerHeight) and applying
   // it as an inline min-height is a more reliable fix than CSS units alone.
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
-  useEffect(() => {
-    function updateViewportHeight() {
-      setViewportHeight(window.visualViewport?.height ?? window.innerHeight);
+  // How tall the active tab's content area can be before it must scroll
+  // internally, computed from where that area actually starts on screen
+  // (below the tab bar) rather than guessed offsets. The Story tab uses
+  // this as a hard height (not just a minimum) so long chat history
+  // scrolls inside its own card and the composer stays pinned at the
+  // bottom, instead of the whole page growing.
+  const [contentAreaHeight, setContentAreaHeight] = useState<number | null>(
+    null,
+  );
+  const contentWrapperRef = useRef<HTMLDivElement | null>(null);
+  const updateHeights = useCallback(() => {
+    const vh = window.visualViewport?.height ?? window.innerHeight;
+    setViewportHeight(vh);
+    if (contentWrapperRef.current) {
+      const top = contentWrapperRef.current.getBoundingClientRect().top;
+      setContentAreaHeight(Math.max(200, vh - top));
     }
-    updateViewportHeight();
-    window.visualViewport?.addEventListener("resize", updateViewportHeight);
-    window.addEventListener("resize", updateViewportHeight);
-    window.addEventListener("orientationchange", updateViewportHeight);
-    return () => {
-      window.visualViewport?.removeEventListener(
-        "resize",
-        updateViewportHeight,
-      );
-      window.removeEventListener("resize", updateViewportHeight);
-      window.removeEventListener("orientationchange", updateViewportHeight);
-    };
   }, []);
+  // A callback ref (rather than a plain useRef + mount-only effect) because
+  // this wrapper only enters the DOM once storyData finishes loading - a
+  // mount-only effect on StoryPageContent would fire during the loading
+  // spinner branch, see contentWrapperRef.current as null, and never
+  // re-measure once the real content appears.
+  const setContentWrapperRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      contentWrapperRef.current = node;
+      if (node) updateHeights();
+    },
+    [updateHeights],
+  );
+  useEffect(() => {
+    updateHeights();
+    window.visualViewport?.addEventListener("resize", updateHeights);
+    window.addEventListener("resize", updateHeights);
+    window.addEventListener("orientationchange", updateHeights);
+    return () => {
+      window.visualViewport?.removeEventListener("resize", updateHeights);
+      window.removeEventListener("resize", updateHeights);
+      window.removeEventListener("orientationchange", updateHeights);
+    };
+  }, [updateHeights]);
   const fullHeightStyle = viewportHeight
     ? { minHeight: `${viewportHeight}px` }
     : undefined;
@@ -3404,7 +3428,7 @@ function StoryPageContent() {
 
   return (
     <div
-      className="relative min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20"
+      className="relative flex flex-col min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20"
       style={fullHeightStyle}
     >
       {/* Ambient glow orbs - purely decorative, sits behind all content */}
@@ -3413,7 +3437,7 @@ function StoryPageContent() {
         <div className="absolute top-1/3 -right-32 w-96 h-96 rounded-full bg-blue-700/15 blur-[110px]" />
         <div className="absolute bottom-0 left-1/4 w-80 h-80 rounded-full bg-indigo-600/10 blur-[100px]" />
       </div>
-      <main className="flex gap-2 sm:gap-4 w-full px-0 sm:px-2 sm:max-w-4xl mx-auto flex-col">
+      <main className="flex flex-1 min-h-0 gap-2 sm:gap-4 w-full px-0 sm:px-2 sm:max-w-4xl mx-auto flex-col">
         {/* Tab Navigation + leave/settings controls */}
         <div className="flex items-center gap-2">
           <button
@@ -3458,8 +3482,20 @@ function StoryPageContent() {
         </div>
 
         {/* Render current page */}
-        <div key={currentState} className="animate-fade-in">
+        <div
+          key={currentState}
+          ref={setContentWrapperRef}
+          className="animate-fade-in flex-1 min-h-0 flex flex-col"
+        >
         {currentState === StoryState.STORY && (
+          <div
+            className="flex flex-col"
+            style={
+              contentAreaHeight
+                ? { height: `${contentAreaHeight}px` }
+                : undefined
+            }
+          >
           <Story
             storyData={storyData}
             storyText={storyText}
@@ -3490,6 +3526,7 @@ function StoryPageContent() {
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
           />
+          </div>
         )}
         {currentState === StoryState.CHARACTER_CREATION && (
           <CharacterCreationForm
