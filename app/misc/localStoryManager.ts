@@ -184,7 +184,17 @@ export interface FreeformPlayerSetup {
   name: string;
   color: string; // hex color, e.g. "#22c55e"
   personality: string[]; // curated personality tags picked in the wizard
-  wish: string; // what this player wants from the story
+  wishTags: string[]; // curated "what do you want from this story" tags
+  wishText: string; // freeform addition to the above, not tag-matchable
+}
+
+// Combines a player's curated wish tags and freeform wish text into one
+// display string, for the pinned note - kept as a pure function (rather than
+// merging the two eagerly in GuidedStoryStart) so wishTags survive
+// separately for selectDirectorMove's spotlight_tag move (see
+// tagFocusExamples.ts), which can only match against the curated vocabulary.
+function combinedWish(p: FreeformPlayerSetup): string {
+  return [...p.wishTags, p.wishText].filter(Boolean).join("; ");
 }
 
 function buildPlayerPreferencesNote(
@@ -197,8 +207,9 @@ function buildPlayerPreferencesNote(
       if (p.personality.length > 0) {
         lines.push(`- Personality: ${p.personality.join(", ")}`);
       }
-      if (p.wish.trim()) {
-        lines.push(`- Wants from this story: ${p.wish.trim()}`);
+      const wish = combinedWish(p);
+      if (wish) {
+        lines.push(`- Wants from this story: ${wish}`);
       }
       return lines.join("\n");
     })
@@ -313,9 +324,18 @@ export async function startFreeformStoryLocally(
             id: p.id,
             name: p.name,
             color: p.color,
+            personalityTags: p.personality.length ? p.personality : undefined,
+            wishTags: p.wishTags.length ? p.wishTags : undefined,
           })),
         }
       : undefined;
+
+  // Solo equivalent of the per-CouchPlayer tags above - only meaningful when
+  // there's exactly one wizard-configured player (a real multi-player table
+  // stores tags per CouchPlayer instead; the legacy `playerName`-only path
+  // has no tags to persist).
+  const soloPlayer =
+    players && players.length === 1 ? players[0] : undefined;
 
   const newStoryData = {
     story_name: "New Story",
@@ -323,6 +343,12 @@ export async function startFreeformStoryLocally(
     player_name: resolvedPlayerName,
     player_summary: "",
     player_notes: defaultUserNotes,
+    playerPersonalityTags: soloPlayer?.personality.length
+      ? soloPlayer.personality
+      : undefined,
+    playerWishTags: soloPlayer?.wishTags.length
+      ? soloPlayer.wishTags
+      : undefined,
     intro: "",
     memory: [],
     max_chapters: 0,
