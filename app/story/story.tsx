@@ -2,6 +2,7 @@
 import { Choice, Choices, StoryData, ActionAnalysis } from "../misc/structs";
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import TTSControls from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
@@ -1208,7 +1209,7 @@ export default function Story({
                 <STTButton
                   onTranscript={handleSTTTranscript}
                   disabled={loading || !!loadingStage || composerBusy}
-                  className="shrink-0"
+                  className="shrink-0 self-stretch"
                 />
               )}
 
@@ -1279,16 +1280,6 @@ export default function Story({
                   </button>
                 )}
               </div>
-
-              {/* More options: dice builder, comments, reroll */}
-              <button
-                onClick={() => setShowChoicesModal(true)}
-                disabled={loading || !!loadingStage}
-                className="shrink-0 p-3 rounded-xl bg-blue-900/25 hover:bg-blue-800/40 border border-blue-700/40 text-blue-300 hover:text-white transition-colors disabled:opacity-40 touch-manipulation"
-                title="More options (action builder, comments)"
-              >
-                <DynamicIcon name="Dices" className="w-5 h-5" />
-              </button>
             </div>
           </div>
         )}
@@ -1376,6 +1367,7 @@ const prettify = (
       style={customStyle}
     >
       <ReactMarkdown
+        remarkPlugins={[remarkGfm]}
         components={{
           p: ({ node, children, ...props }) => {
             // Track hidden state across all children
