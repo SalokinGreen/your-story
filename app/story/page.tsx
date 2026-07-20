@@ -3256,7 +3256,7 @@ function StoryPageContent() {
     ];
 
     return (
-      <div className="min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
         <div className="py-6 px-4">
           <div className="w-full px-2 sm:max-w-3xl mx-auto">
             {/* Header */}
@@ -3364,7 +3364,7 @@ function StoryPageContent() {
   }
 
   return (
-    <div className="relative min-h-[calc(100vh-4rem)] bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20">
+    <div className="relative min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-0 px-0 pb-0 sm:py-4 sm:px-4 sm:pb-20">
       {/* Ambient glow orbs - purely decorative, sits behind all content */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-purple-700/20 blur-[100px]" />
