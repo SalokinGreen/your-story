@@ -672,6 +672,9 @@ export interface CustomTable {
   name: string; // Display name (e.g., "Weather Conditions")
   description: string; // What this table is for
   entries: CustomTableEntry[]; // Array of possible results
+  // Links this entry to a table in the cross-story global Tables Library, so
+  // it can be traced back instead of living as a disconnected one-time copy.
+  libraryTableId?: string;
 }
 
 // Variables system - dynamic named values the AI and player can track

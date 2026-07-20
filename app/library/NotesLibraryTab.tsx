@@ -20,6 +20,14 @@ import {
   LibraryNote,
 } from "@/app/misc/localNotesLibraryManager";
 import {
+  listLibraryTables,
+  createLibraryTable,
+  deleteLibraryTable,
+  bulkDeleteLibraryTables,
+  unassignFolderFromTables,
+  LibraryTable,
+} from "@/app/misc/localTablesLibraryManager";
+import {
   createLocalFolder,
   updateLocalFolder,
   deleteLocalFolder,
@@ -76,6 +84,8 @@ export default function NotesLibraryTab({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [notes, setNotes] = useState<LibraryNote[]>([]);
+  const [tables, setTables] = useState<LibraryTable[]>([]);
+  const [subView, setSubView] = useState<"notes" | "tables">("notes");
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -84,6 +94,7 @@ export default function NotesLibraryTab({
 
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedNotes, setSelectedNotes] = useState<Set<string>>(new Set());
+  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
   const [showMassMoveDropdown, setShowMassMoveDropdown] = useState(false);
 
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
@@ -137,8 +148,12 @@ export default function NotesLibraryTab({
   const loadData = async () => {
     setLoading(true);
     try {
-      const notesList = await listLibraryNotes();
+      const [notesList, tablesList] = await Promise.all([
+        listLibraryNotes(),
+        listLibraryTables(),
+      ]);
       setNotes(notesList);
+      setTables(tablesList);
     } catch (error: any) {
       console.error("Error loading notes library:", error);
       addNotification(`Failed to load notes library: ${error.message}`, "failure");
@@ -283,6 +298,7 @@ export default function NotesLibraryTab({
   const toggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
     setSelectedNotes(new Set());
+    setSelectedTables(new Set());
   };
 
   const toggleNoteSelection = (noteId: string) => {
@@ -401,10 +417,18 @@ export default function NotesLibraryTab({
           deleteLocalFolder(folderId);
           setFolders((prev) => prev.filter((f) => f.id !== folderId));
           setSelectedFolder((prev) => (prev === folderId ? null : prev));
-          await unassignFolderFromNotes(folderId);
+          await Promise.all([
+            unassignFolderFromNotes(folderId),
+            unassignFolderFromTables(folderId),
+          ]);
           setNotes((prev) =>
             prev.map((n) =>
               n.folderId === folderId ? { ...n, folderId: undefined } : n,
+            ),
+          );
+          setTables((prev) =>
+            prev.map((t) =>
+              t.folderId === folderId ? { ...t, folderId: undefined } : t,
             ),
           );
           addNotification("Folder deleted successfully", "success");
@@ -485,32 +509,56 @@ export default function NotesLibraryTab({
     summary: string;
   }) => {
     const allNotes = [...data.lore, ...data.mechanicNotes];
-    if (allNotes.length === 0) return;
+    if (allNotes.length === 0 && data.customTables.length === 0) return;
 
     try {
-      const created = await Promise.all(
-        allNotes.map((note) =>
-          createLibraryNote({
-            title: note.title,
-            content: note.content,
-            type: note.type || "lore",
-            tags: note.tags || [],
-            folderId: selectedFolder || undefined,
-            pinned: false,
-            source: "ocr",
-            relatedCharacters: note.relatedCharacters || [],
-            relatedLocations: note.relatedLocations || [],
-            keys: note.keys || [],
-          }),
+      const [createdNotes, createdTables] = await Promise.all([
+        Promise.all(
+          allNotes.map((note) =>
+            createLibraryNote({
+              title: note.title,
+              content: note.content,
+              type: note.type || "lore",
+              tags: note.tags || [],
+              folderId: selectedFolder || undefined,
+              pinned: false,
+              source: "ocr",
+              relatedCharacters: note.relatedCharacters || [],
+              relatedLocations: note.relatedLocations || [],
+              keys: note.keys || [],
+            }),
+          ),
         ),
-      );
-      setNotes((prev) => [...created, ...prev]);
+        Promise.all(
+          data.customTables.map((table) =>
+            createLibraryTable({
+              name: table.name,
+              description: table.description,
+              entries: table.entries,
+              tags: [],
+              folderId: selectedFolder || undefined,
+              pinned: false,
+              source: "ocr",
+            }),
+          ),
+        ),
+      ]);
+      setNotes((prev) => [...createdNotes, ...prev]);
+      setTables((prev) => [...createdTables, ...prev]);
+      const parts = [
+        createdNotes.length > 0
+          ? `${createdNotes.length} note${createdNotes.length === 1 ? "" : "s"}`
+          : null,
+        createdTables.length > 0
+          ? `${createdTables.length} table${createdTables.length === 1 ? "" : "s"}`
+          : null,
+      ].filter(Boolean);
       addNotification(
-        `Saved ${created.length} note${created.length === 1 ? "" : "s"} from PDF to your library`,
+        `Saved ${parts.join(" and ")} from PDF to your library`,
         "success",
       );
     } catch (error: any) {
-      addNotification(`Failed to save OCR notes: ${error.message}`, "failure");
+      addNotification(`Failed to save OCR import: ${error.message}`, "failure");
     }
   };
 
@@ -540,6 +588,93 @@ export default function NotesLibraryTab({
       if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
+
+  const filteredTables = tables
+    .filter((table) => {
+      if (selectedFolder !== null) {
+        if (selectedFolder === "uncategorized") {
+          if (table.folderId) return false;
+        } else if (table.folderId !== selectedFolder) {
+          return false;
+        }
+      }
+      if (
+        search &&
+        !table.name.toLowerCase().includes(search.toLowerCase()) &&
+        !table.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
+      ) {
+        return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
+
+  const toggleTableSelection = (tableId: string) => {
+    const next = new Set(selectedTables);
+    if (next.has(tableId)) next.delete(tableId);
+    else next.add(tableId);
+    setSelectedTables(next);
+  };
+
+  const selectAllTables = () => {
+    setSelectedTables(new Set(filteredTables.map((t) => t.id)));
+  };
+
+  const deselectAllTables = () => setSelectedTables(new Set());
+
+  const handleDeleteTable = (tableId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Table?",
+      message: "Are you sure you want to delete this table? This action cannot be undone.",
+      icon: "Trash2",
+      confirmText: "Delete Table",
+      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        try {
+          setDeleting(tableId);
+          await deleteLibraryTable(tableId);
+          setTables((prev) => prev.filter((t) => t.id !== tableId));
+          addNotification("Table deleted", "success");
+        } catch (error: any) {
+          addNotification(`Failed to delete: ${error.message}`, "failure");
+        } finally {
+          setDeleting(null);
+        }
+      },
+    });
+  };
+
+  const handleMassDeleteTables = () => {
+    if (selectedTables.size === 0) return;
+    const ids = Array.from(selectedTables);
+
+    setConfirmDialog({
+      isOpen: true,
+      title: "Delete Multiple Tables?",
+      message: `Are you sure you want to delete ${ids.length} table${ids.length === 1 ? "" : "s"}? This action cannot be undone.`,
+      icon: "Trash2",
+      confirmText: `Delete ${ids.length} Table${ids.length === 1 ? "" : "s"}`,
+      confirmButtonClass: "bg-red-600 hover:bg-red-700",
+      onConfirm: async () => {
+        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
+        try {
+          await bulkDeleteLibraryTables(ids);
+          const idSet = new Set(ids);
+          setTables((prev) => prev.filter((t) => !idSet.has(t.id)));
+          setSelectedTables(new Set());
+          setSelectionMode(false);
+          addNotification(`${ids.length} table${ids.length === 1 ? "" : "s"} deleted`, "success");
+        } catch (error: any) {
+          addNotification(`Failed to delete tables: ${error.message}`, "failure");
+        }
+      },
+    });
+  };
 
   if (loading && notes.length === 0) {
     return <LibrarySkeleton />;
@@ -599,6 +734,38 @@ export default function NotesLibraryTab({
         </div>
       </div>
 
+      {/* Notes / Tables sub-view toggle */}
+      <div className="flex border border-blue-800/40 rounded-xl overflow-hidden w-fit">
+        <button
+          onClick={() => {
+            setSubView("notes");
+            setSelectionMode(false);
+          }}
+          className={`px-4 py-2 text-sm font-medium transition-colors flex items-center gap-1.5 ${
+            subView === "notes"
+              ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+              : "bg-blue-950/50 text-blue-200/60 hover:bg-blue-900/50"
+          }`}
+        >
+          <DynamicIcon name="NotebookText" className="w-3.5 h-3.5" />
+          Notes ({notes.length})
+        </button>
+        <button
+          onClick={() => {
+            setSubView("tables");
+            setSelectionMode(false);
+          }}
+          className={`px-4 py-2 text-sm font-medium transition-colors flex items-center gap-1.5 ${
+            subView === "tables"
+              ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+              : "bg-blue-950/50 text-blue-200/60 hover:bg-blue-900/50"
+          }`}
+        >
+          <DynamicIcon name="Dices" className="w-3.5 h-3.5" />
+          Tables ({tables.length})
+        </button>
+      </div>
+
       {/* Folder Chips */}
       <DraggableScroll className="pb-2" innerClassName="gap-2 px-1">
         <button
@@ -610,7 +777,7 @@ export default function NotesLibraryTab({
           }`}
         >
           <DynamicIcon name="NotebookText" className="w-3.5 h-3.5" />
-          All ({notes.length})
+          All ({subView === "notes" ? notes.length : tables.length})
         </button>
         <button
           onClick={() => setSelectedFolder("uncategorized")}
@@ -621,7 +788,11 @@ export default function NotesLibraryTab({
           }`}
         >
           <DynamicIcon name="FileText" className="w-3.5 h-3.5" />
-          Uncategorized ({notes.filter((n) => !n.folderId).length})
+          Uncategorized (
+          {subView === "notes"
+            ? notes.filter((n) => !n.folderId).length
+            : tables.filter((t) => !t.folderId).length}
+          )
         </button>
         {folders.map((folder) => (
           <button
@@ -635,7 +806,11 @@ export default function NotesLibraryTab({
             style={{ borderLeft: `3px solid ${folder.color}` }}
           >
             <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
-            {folder.name} ({notes.filter((n) => n.folderId === folder.id).length})
+            {folder.name} (
+            {subView === "notes"
+              ? notes.filter((n) => n.folderId === folder.id).length
+              : tables.filter((t) => t.folderId === folder.id).length}
+            )
           </button>
         ))}
         <button
@@ -650,7 +825,7 @@ export default function NotesLibraryTab({
       {/* Select mode + selection bar */}
       <div className="flex items-center gap-2">
         <div className="flex-1" />
-        {filteredNotes.length > 0 && (
+        {(subView === "notes" ? filteredNotes.length : filteredTables.length) > 0 && (
           <button
             onClick={toggleSelectionMode}
             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
@@ -668,7 +843,7 @@ export default function NotesLibraryTab({
         )}
       </div>
 
-      {selectionMode && selectedNotes.size > 0 && (
+      {subView === "notes" && selectionMode && selectedNotes.size > 0 && (
         <div className="flex items-center gap-3 p-3 bg-purple-900/30 border border-purple-700/30 rounded-xl flex-wrap">
           <span className="text-sm font-medium">{selectedNotes.size} selected</span>
           <div className="flex-1" />
@@ -736,8 +911,34 @@ export default function NotesLibraryTab({
         </div>
       )}
 
+      {subView === "tables" && selectionMode && selectedTables.size > 0 && (
+        <div className="flex items-center gap-3 p-3 bg-purple-900/30 border border-purple-700/30 rounded-xl flex-wrap">
+          <span className="text-sm font-medium">{selectedTables.size} selected</span>
+          <div className="flex-1" />
+          <button
+            onClick={selectAllTables}
+            className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
+          >
+            Select All
+          </button>
+          <button
+            onClick={handleMassDeleteTables}
+            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-sm rounded-lg transition-colors flex items-center gap-2"
+          >
+            <DynamicIcon name="Trash2" className="w-4 h-4" />
+            Delete
+          </button>
+          <button
+            onClick={deselectAllTables}
+            className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       {/* Notes Grid */}
-      {filteredNotes.length === 0 ? (
+      {subView === "notes" && (filteredNotes.length === 0 ? (
         <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
           <DynamicIcon
             name="NotebookText"
@@ -862,7 +1063,102 @@ export default function NotesLibraryTab({
             </div>
           ))}
         </div>
-      )}
+      ))}
+
+      {/* Tables Grid */}
+      {subView === "tables" &&
+        (filteredTables.length === 0 ? (
+          <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
+            <DynamicIcon
+              name="Dices"
+              className="w-16 h-16 text-blue-400/30 mx-auto mb-4"
+            />
+            <h3 className="text-xl font-bold mb-2">
+              {tables.length === 0 ? "No Tables Yet" : "No Tables Match Filters"}
+            </h3>
+            <p className="text-blue-200/60 mb-6">
+              {tables.length === 0
+                ? "Import a PDF with tables to build your library - detected tables are saved here automatically."
+                : "Try adjusting your search or folder filter."}
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {filteredTables.map((table) => (
+              <div
+                key={table.id}
+                onClick={() =>
+                  selectionMode && toggleTableSelection(table.id)
+                }
+                className={`group relative p-4 rounded-xl border transition-all ${
+                  selectionMode ? "cursor-pointer" : ""
+                } ${
+                  selectionMode && selectedTables.has(table.id)
+                    ? "bg-purple-900/30 border-purple-500"
+                    : "bg-blue-950/50 border-blue-800/30 hover:bg-blue-900/50 hover:border-blue-700/50"
+                }`}
+              >
+                <div className="flex items-start gap-3">
+                  {selectionMode && (
+                    <div
+                      className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
+                        selectedTables.has(table.id)
+                          ? "bg-purple-600 border-purple-600"
+                          : "border-blue-600"
+                      }`}
+                    >
+                      {selectedTables.has(table.id) && (
+                        <DynamicIcon name="Check" className="w-3 h-3" />
+                      )}
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <h3 className="font-semibold truncate">{table.name}</h3>
+                      <span className="px-1.5 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded shrink-0">
+                        {table.entries.length} entries
+                      </span>
+                      {table.source === "ocr" && (
+                        <span
+                          className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded flex items-center gap-1 shrink-0"
+                          title="Extracted via OCR"
+                        >
+                          <DynamicIcon name="ScanText" className="w-3 h-3" />
+                          OCR
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-blue-200/50 line-clamp-2 mb-2">
+                      {table.description || "No description"}
+                    </p>
+                    <div className="flex items-center gap-3 text-xs text-blue-200/40">
+                      <span>{getRelativeTime(table.updatedAt)}</span>
+                    </div>
+                  </div>
+                  {!selectionMode && (
+                    <div
+                      className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <button
+                        onClick={() => handleDeleteTable(table.id)}
+                        disabled={deleting === table.id}
+                        className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
+                        title="Delete"
+                      >
+                        {deleting === table.id ? (
+                          <DynamicIcon name="Loader2" className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <DynamicIcon name="Trash2" className="w-4 h-4" />
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
 
       {/* New/Edit Note Modal */}
       {editingNoteId && (

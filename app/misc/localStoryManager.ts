@@ -1,4 +1,4 @@
-import { Adventure, DiceMode, StoryData, StoryLore } from "./structs";
+import { Adventure, CustomTable, DiceMode, StoryData, StoryLore } from "./structs";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -145,6 +145,7 @@ export async function startAdventureLocally(
   adventure: Partial<Adventure>,
   playerName: string = "Player",
   initialLore?: StoryLore[],
+  initialTables?: CustomTable[],
 ): Promise<string> {
   const localId = `local_${Date.now()}_${Math.random()
     .toString(36)
@@ -164,6 +165,10 @@ export async function startAdventureLocally(
       defaultUserNotes || adventure.storyTemplate?.player_notes || "",
     characterSheetTemplate: adventure.characterSheetTemplate,
     lore: [...(adventure.storyTemplate?.lore || []), ...(initialLore || [])],
+    customTables: [
+      ...(adventure.storyTemplate?.customTables || []),
+      ...(initialTables || []),
+    ],
   } as unknown as StoryData;
 
   await saveLocalStory(localId, newStoryData);
@@ -273,6 +278,7 @@ export async function startFreeformStoryLocally(
   playerName: string = "Player",
   initialLore?: StoryLore[],
   setup?: { players?: FreeformPlayerSetup[]; diceMode?: DiceMode },
+  initialTables?: CustomTable[],
 ): Promise<string> {
   const localId = `local_${Date.now()}_${Math.random()
     .toString(36)
@@ -340,6 +346,7 @@ export async function startFreeformStoryLocally(
     inventory: [],
     abilities: [],
     lore,
+    customTables: initialTables || [],
     goals: [],
     relationships: [],
     npcs: [],
