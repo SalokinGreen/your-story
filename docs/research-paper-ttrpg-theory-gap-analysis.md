@@ -3,7 +3,9 @@
 ## What this document is
 
 A user-supplied paper, *"Architecting the Artificial Game Master: Translating
-Analog TTRPG Frameworks into LLM-Driven Narrative Engines,"* was analyzed
+Analog TTRPG Frameworks into LLM-Driven Narrative Engines"*
+(reproduced in full at
+`docs/research-paper-ttrpg-theory-for-ai-gms.md`), was analyzed
 against this codebase as it exists today. The paper argues that reliable AI
 Game Masters come from translating four analog TTRPG traditions — **PbtA**
 (constrained GM-move menus, seven dimensions of "hardness"), **GURPS** (a
@@ -25,6 +27,23 @@ a deterministic Mythic chaos factor and director-move menu, tiered model
 routing, memory with reflection, and a roll-invariant gate that blocks the
 model from narrating a success it didn't earn. Re-pitching that work here
 would be noise.
+
+## Implementation status
+
+Every item in §2 and §3.2 below has been built, tested (27 new unit tests
+across `tests/gmTools.reactionCheck.test.ts`,
+`tests/gmTools.hardnessDimensions.test.ts`,
+`tests/mythic.chaosTemperature.test.ts`, and `tests/twoPassVisibility.test.ts`,
+plus the existing suite - 706 tests total, all passing), and typechecked
+clean. One honest caveat surfaced during implementation, on §2.3
+specifically: see the note at the end of that section - the structural
+filter closes the spoiler-leak gap for the codebase's separate-Narrator-call
+path, but the *dominant* path (the GM's own streamed prose IS the
+narration, in the same conversation that saw hidden content) can only be
+mitigated by strong in-context instructions, not a structural guarantee,
+because content is already streaming to the player before any full-text
+filter could run. This is flagged rather than papered over, in keeping
+with this repo's own documentation conventions.
 
 So this document does two things instead:
 
@@ -122,6 +141,16 @@ optional persistence follow-up is deferred. This is the single most direct,
 well-precedented gap the paper identifies that isn't already covered by
 `architecture-frontier.md`.
 
+**Implemented.** `reaction_check` (`gmTools.ts`/`gmExecutor.ts`) rolls 3d6
+via the existing `diceFormula.ts` roller, applies a `bias` baseline
+(hostile/neutral/favorable) plus GM-declared `modifiers`, and returns a
+category + hard mandate string in `contextForStory`. The optional
+persistence follow-up (an `incidentalReactions` record) was left out, per
+the plan's own "don't build ahead of a demonstrated need" - the mandate is
+scoped to the current scene by instruction, not enforced state, for now.
+Covered by `tests/gmTools.reactionCheck.test.ts` (5 tests, deterministic
+via `Math.random` mocking - pins down exact roll → category boundaries).
+
 ### 2.2 Formalize hardness beyond a single `stakes` dial
 
 **The paper's point:** consequence severity isn't one dial, it's several
@@ -165,6 +194,12 @@ demonstrated need" posture applies here too:
 
 **Effort/risk:** Low. Additive optional fields on an existing tool
 interface, no new mechanism, no migration.
+
+**Implemented, exactly as scoped** - just the two dimensions named above,
+on both `formula_roll` and `opposed_formula`. `target`/`forces_choice`
+render into `contextForStory` only on the losing outcome (a roll's failure,
+or the opponent winning an opposed roll) - success paths are unaffected.
+Covered by `tests/gmTools.hardnessDimensions.test.ts` (6 tests).
 
 ### 2.3 Two-Pass Visibility for spoiler prevention
 
@@ -219,6 +254,40 @@ Frontier 4 problem) because the filtering happens *before* generation
 starts, not after — it's a strictly cheaper fix than the contradiction
 checker's open problem, solving a different but related failure mode.
 
+**Implemented, with one honest caveat found during the build.** `StoryLore`
+now carries `visibility` (`LoreVisibility` in `structs.ts`); `read_notes`
+(`gmExecutor.ts`) wraps hidden/to_be_revealed/check_per_turn content in
+`[[HIDDEN_LORE:...]]` markers with an explicit do-not-narrate instruction;
+`stripHiddenLoreContent` (`ai_staged.ts`) removes those markers (content
+included) from GM reasoning before it reaches the Narrator, applied at
+`buildStoryAffirmation` and at scene-history replay; `resolveCheckPerTurnVisibility`
+(`gmExecutor.ts`) resolves a flat-probability passive-reveal roll once per
+turn, wired in right before the GM round loop starts in `generation.ts`.
+
+The caveat: this structurally closes the leak only for the codebase's
+separate-Narrator-call path (`buildStoryPrompt`, used for NovelAI,
+precomputed-context retries, or when the GM stage is skipped). Tracing the
+actual dominant path in `generation.ts` during implementation surfaced
+something the original plan didn't account for: on the common path, the
+GM's own accumulated prose *is* the narration (`gmFinalStoryContent`), or
+narration is a short continuation appended to the *same* GM conversation
+(`continueGMConversation`) — either way, it's the same model, same
+context, same streamed response that already saw raw hidden content earlier
+in that turn. A post-hoc string filter can't retroactively un-leak content
+that already streamed to the player's screen token-by-token before the
+full text was even known, and there's no marker wrapping the model's own
+freely-written prose the way there is around tool-result text. Closing
+this fully would mean restructuring the pipeline to run a genuinely
+separate, freshly-context'd Narrator call on every turn — reopening the
+"Archivist merged into Brain" efficiency tradeoff this codebase deliberately
+made, and out of scope for this pass. What *is* shipped for the dominant
+path is the strong, explicit in-context instruction in the `read_notes`
+result itself ("HIDDEN FROM PLAYER - do not narrate..."), which the model
+sees directly, adjacent to the content, right before it might write prose
+in the same breath — the same "soft constraint, model instructed to honor
+it" discipline this codebase already relies on for `stakes`/`consequences`
+elsewhere, not a structural guarantee. Flagged here rather than overclaimed.
+
 ### 2.4 Chaos Factor–modulated sampling temperature
 
 **The paper's point:** "a low Chaos Factor can instruct the system to lower
@@ -243,6 +312,16 @@ grounded prose, and this should nudge, not override, that choice.
 already assembled, no schema change, easily reverted or feature-flagged if
 it doesn't measurably help. Good candidate to bundle with 2.1 or ship alone
 as a quick win.
+
+**Implemented, and applied at the temperature call site that actually
+matters.** `chaosFactorTemperatureDelta` (`mythic.ts`) is a bounded
+±0.12 delta, neutral at chaos factor 5. Tracing where temperature is
+actually set surfaced the same dominant-path nuance as §2.3: the GM
+stage's own request (`generation.ts`, base 0.4) is what matters most, since
+its output *is* the story on the common path — not just the separate
+story-stage fallback (base 0.7) or the NovelAI path (base 1), which is
+where a first pass might have stopped. All three now apply the delta.
+Covered by `tests/mythic.chaosTemperature.test.ts` (5 tests).
 
 ### 2.5 Misread-input vs. state-error correction
 
@@ -298,6 +377,34 @@ engineering (e.g., should a rolled-back turn's dice result be visibly
 discarded, or does that feel like save-scumming against the game's own
 tension model?).
 
+**Implemented, de-risked from the original design.** The build surfaced a
+better answer than a new UI affordance: `app/story/page.tsx` already had an
+`Undo` button (`handleUndo`) that *claimed* to undo the last turn but only
+ever popped `scene.parts` — any mechanical state a turn's GM tool calls had
+already applied (an NPC attitude change, a quest update, a stat change)
+silently survived the "undo." That's a real correctness bug, not a
+hypothetical: it's the exact "misread input" failure mode the paper
+describes, just under an existing control the player already trusts to
+mean "undo." Rather than add a new, separate "that's not what I meant"
+concept needing its own product sign-off, `handleChoiceWithAction` now
+takes a full `structuredClone` snapshot of `storyData` immediately before
+each turn's GM tool calls can run (`preTurnSnapshotRef`, session-only, not
+persisted), and `handleUndo` restores the *entire* pre-turn state (mutating
+`storyData` in place, matching this codebase's existing convention) when
+the snapshot matches the current turn, falling back to the old
+scene.parts-only behavior otherwise (e.g. after a page reload). This is a
+narrower, lower-risk change than the original plan: it fixes what an
+existing button does rather than introducing a new interaction the paper's
+"misread input" framing calls for but that needed its own UX decision.
+
+For the state-error path: `checkNarrationConsistency`'s warnings
+(previously visible only in the `ContextViewer` debug panel, never to an
+actual player) are now surfaced as a player-facing notification the moment
+a turn completes with one, pointing at the already-existing Edit and Retry
+actions as the fix. No new mechanism - this was purely a "the pieces exist
+but aren't connected" gap, closed by making the warning visible where a
+player can act on it.
+
 ---
 
 ## 3. Two smaller items
@@ -317,6 +424,22 @@ imminent? If not, a minor tweak (prefer summarizing at the most recent scene
 break under budget pressure, rather than an arbitrary token cutoff) would
 tighten this alignment cheaply. Low priority, low effort — verify before
 building, this may already be close enough in practice.
+
+**Verified, then implemented.** The check found something worth recording:
+`storyData.scene` is not a per-encounter unit in this data model at all -
+it's the container for the story's *entire* linear `parts` history, and
+`MemoryEntry.sceneIndex` is really just `parts.length` at write time (a
+turn counter, not a scene identity). There was no existing structural
+"scene boundary" concept to snap to - except one: the agentic
+`increment_scene` tool (`toolExecutor.ts`) is a real, explicit, GM-decided
+scene-transition signal that already existed and just wasn't recorded
+anywhere. `Scene.lastSceneBoundaryIndex` now captures `parts.length` at
+the moment `increment_scene` fires, and `planCompaction` (`compaction.ts`)
+extends its token-budget cutoff forward to that boundary when it falls
+within a small window (`SCENE_BOUNDARY_SNAP_WINDOW = 6` parts) after the
+raw cutoff - forward-only, so it can only summarize a few extra
+already-in-budget parts for a cleaner cut, never backward (which would
+open a content-loss gap between the live tail and the summary).
 
 ---
 
@@ -384,6 +507,19 @@ needs explicit product-owner sign-off on what "undo" should feel like to a
 player before any engineering starts, the same way H6 (content safety) and
 networked multiplayer are already gated on a product decision rather than a
 technical one in `architecture-frontier.md`.
+
+**Update: all of §2 and §3.2 have since been implemented** (see the
+"Implemented" note at the end of each section above for what actually
+shipped and where it differs from this original design). §2.5's product
+question turned out to have a narrower answer than expected: rather than
+a new UX concept needing sign-off, the fix was to make an existing `Undo`
+button actually undo what it already claimed to - a correctness fix, not a
+new product decision. Everything else shipped close to plan, with two
+honest caveats recorded in place: §2.3's structural filter doesn't (and,
+short of a larger pipeline restructure, can't) cover the dominant streamed
+narration path, and §2.4's delta needed to land on the GM stage's own
+request temperature, not just the separate story-stage fallback, to
+actually matter on that same dominant path.
 
 ---
 

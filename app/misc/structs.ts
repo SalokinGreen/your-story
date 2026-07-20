@@ -185,6 +185,32 @@ export type LoreType =
   | "faction" // Organizations, groups, guilds
   | "event"; // Historical events, plot points
 
+// Two-Pass Visibility state machine (see
+// docs/research-paper-ttrpg-theory-gap-analysis.md §2.3). Distinct from
+// `type: "secret"`, which only controls the human player's note-list UI
+// (titles-only folder display). `visibility` controls what the *Narrator*
+// stage is allowed to see at all, closing the "Omniscient Narrator"
+// spoiler problem at the source (filtering before generation) rather than
+// catching it after the fact the way consistencyCheck.ts does for a
+// different failure class.
+//   - always_reveal: normal, unrestricted content (the default/unset state)
+//   - hidden: never surfaced to the Narrator; the GM Stage can still reason
+//     about it, but it must explicitly reveal it (flip to always_reveal via
+//     edit_note) for it to ever reach prose
+//   - to_be_revealed: same filtering as hidden, but names an entity the GM
+//     intends to reveal once a specific trigger fires (a perception check
+//     succeeding, a door being opened) - the GM flips it explicitly
+//   - check_per_turn: filtered like hidden, but resolved automatically each
+//     turn by a small deterministic chance roll (resolveCheckPerTurnVisibility
+//     in gmExecutor.ts) - the digital equivalent of a passive Perception
+//     check a human GM tracks silently (e.g. a patrol that might notice
+//     the party)
+export type LoreVisibility =
+  | "always_reveal"
+  | "hidden"
+  | "to_be_revealed"
+  | "check_per_turn";
+
 export interface StoryLore {
   title: string;
   content: string;
@@ -193,6 +219,7 @@ export interface StoryLore {
   secrtet: boolean;
   keys: string[];
   type?: LoreType; // Note category - defaults to "lore"
+  visibility?: LoreVisibility; // Two-Pass Visibility state - defaults to "always_reveal" when unset
   alwaysOn?: boolean; // If true, lore is always visible regardless of triggers
   enabled?: boolean; // If false, lore is never visible/checked. Defaults to true.
   on_triggers?: string[]; // Word triggers to turn lore on
@@ -407,6 +434,14 @@ export interface Scene {
   // a heavily-referenced entity dropped entirely from the summary. Human-
   // readable strings, undefined/omitted when the last summary was clean.
   summaryWarnings?: string[];
+  // Index into `parts` (same convention as summarizedThroughIndex) as of
+  // the most recent increment_scene tool call - i.e. "everything before
+  // this index belongs to the scene that just ended." Used by
+  // compaction.ts to prefer summarizing exactly through a scene boundary
+  // rather than an arbitrary token-budget cutoff, when one is available
+  // within a reasonable window of that cutoff (see §3.2 in
+  // docs/research-paper-ttrpg-theory-gap-analysis.md).
+  lastSceneBoundaryIndex?: number;
 }
 export interface Quest {
   id: string; // Unique identifier for the quest

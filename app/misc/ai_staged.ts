@@ -46,6 +46,24 @@ export const STORY_AFFIRMATION_FALLBACK = `I am the NARRATOR. No mechanical reso
 `;
 
 /**
+ * Two-Pass Visibility (see docs/research-paper-ttrpg-theory-gap-analysis.md
+ * §2.3 and gmExecutor.ts's executeReadNotes): strips everything between
+ * [[HIDDEN_LORE:...]]...[[/HIDDEN_LORE]] markers out of GM reasoning before
+ * it ever reaches the Narrator stage. The GM Stage can read and reason
+ * about hidden/to_be_revealed/check_per_turn lore while deciding what
+ * happens; the Narrator - the agent that actually writes player-facing
+ * prose - must never see it unless the GM has explicitly revealed it
+ * (flipped the entry's visibility to "always_reveal" via edit_note, at
+ * which point future read_notes calls return it unwrapped). This is the
+ * "second pass" - a structural filter applied before generation, not a
+ * post-hoc contradiction check like consistencyCheck.ts.
+ */
+export function stripHiddenLoreContent(text: string): string {
+  if (!text || text.indexOf("[[HIDDEN_LORE:") === -1) return text;
+  return text.replace(/\[\[HIDDEN_LORE:[^\]]*\]\][\s\S]*?\[\[\/HIDDEN_LORE\]\]/g, "");
+}
+
+/**
  * Build the story stage prefill with GM reasoning as a "thinking" block
  * This mimics reasoning model behavior where the AI processes internally before responding
  *
@@ -90,6 +108,10 @@ export function buildStoryAffirmation(
 
     gmReasoning = parts.join("\n\n");
   }
+
+  // Two-Pass Visibility: strip anything the GM hasn't explicitly revealed
+  // before it can reach the Narrator (see stripHiddenLoreContent above).
+  gmReasoning = stripHiddenLoreContent(gmReasoning);
 
   // If no GM reasoning, use fallback
   if (!gmReasoning.trim()) {
@@ -1510,9 +1532,14 @@ export function buildStoryPrompt({
       );
     }
 
-    // Add GAME MASTER tool calls and results summary
+    // Add GAME MASTER tool calls and results summary. Two-Pass Visibility:
+    // strip hidden-lore markers here too - this is scene HISTORY being
+    // replayed into a future turn's Narrator context, so an unrevealed
+    // secret read in a past turn must not keep leaking on every later turn.
     if (part.gmStoryContext) {
-      sections.push(`[GAME MASTER]\n${part.gmStoryContext}`);
+      sections.push(
+        `[GAME MASTER]\n${stripHiddenLoreContent(part.gmStoryContext)}`,
+      );
     }
 
     return sections.join("\n\n");

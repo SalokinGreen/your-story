@@ -56,6 +56,12 @@ export interface FormulaRollParams {
   reason: string;
   display_name?: string;
   stakes?: "low" | "medium" | "high" | "deadly";
+  // Two of the PbtA "seven dimensions of hardness", independent of `stakes`:
+  // a consequence can be low-stakes but still land on a loved one, or
+  // high-stakes without forcing a dilemma. Optional, additive - omit for
+  // an ordinary consequence landing squarely on the character themselves.
+  target?: "self" | "someone_they_love" | "someone_present";
+  forces_choice?: boolean; // Present failure as a dilemma between two costs, not one flat cost
   consequences?: {
     success?: string;
     failure?: string;
@@ -80,6 +86,10 @@ export interface OpposedFormulaParams {
   reason: string;
   display_name?: string;
   stakes?: "low" | "medium" | "high" | "deadly";
+  // See FormulaRollParams.target/forces_choice - same hardness dimensions,
+  // applied to the consequence if the player loses.
+  target?: "self" | "someone_they_love" | "someone_present";
+  forces_choice?: boolean;
   consequences?: {
     player_wins?: string;
     opponent_wins?: string;
@@ -452,6 +462,24 @@ export interface NPCReactionParams {
   context?: string; // What triggered the reaction (shown as subtext)
 }
 
+/**
+ * Reaction Check - GURPS-style deterministic disposition roll for an NPC
+ * the GM hasn't necessarily added to the persistent NPC tracker (a merchant,
+ * a guard, a noble met once). Rolls 3d6, applies a baseline bias plus
+ * GM-declared situational modifiers, and returns a hard behavioral mandate
+ * the GM must narrate the NPC as actually having - not a suggestion the
+ * model can talk itself out of. Exists specifically to counteract LLM
+ * sycophancy drift (RLHF-tuned helpfulness softening antagonists over a
+ * long conversation) for NPCs too minor to warrant a full tracked NPC entry.
+ */
+export interface ReactionCheckParams {
+  npc_name: string; // Name of the NPC reacting (need not exist in NPCs list)
+  bias?: "hostile" | "neutral" | "favorable"; // Baseline disposition skew before the roll
+  modifiers?: number; // Sum of situational/trait bonuses (charisma, reputation, prior favors, an established grudge, etc.) - GM-declared, like formula_roll's formula
+  reason: string; // What's being reacted to (e.g., "player asks the guard to look the other way")
+  show_to_player?: boolean; // Show the roll itself to the player (default: false)
+}
+
 // Union type for all GM tool parameters
 export type GMToolParams =
   | { name: "start_challenge"; params: StartChallengeParams }
@@ -484,7 +512,8 @@ export type GMToolParams =
   | { name: "add_npc"; params: AddNPCParams }
   | { name: "update_npc"; params: UpdateNPCParams }
   | { name: "remove_npc"; params: RemoveNPCParams }
-  | { name: "npc_reaction"; params: NPCReactionParams };
+  | { name: "npc_reaction"; params: NPCReactionParams }
+  | { name: "reaction_check"; params: ReactionCheckParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -674,6 +703,17 @@ Example formulas:
           enum: ["low", "medium", "high", "deadly"],
           description: "Consequence tier on failure",
         },
+        target: {
+          type: "string",
+          enum: ["self", "someone_they_love", "someone_present"],
+          description:
+            "Who the failure consequence actually lands on. Independent of stakes - a low-stakes consequence landing on someone the character loves can matter more than a high-stakes one landing on the character. Omit for an ordinary consequence to the character themselves.",
+        },
+        forces_choice: {
+          type: "boolean",
+          description:
+            "If true, present the failure consequence as a dilemma between two costs the player must choose between, not a single flat cost.",
+        },
         consequences: {
           type: "object",
           description: "What happens on each outcome",
@@ -741,6 +781,17 @@ Examples:
           type: "string",
           enum: ["low", "medium", "high", "deadly"],
           description: "Consequence tier if player loses",
+        },
+        target: {
+          type: "string",
+          enum: ["self", "someone_they_love", "someone_present"],
+          description:
+            "Who the losing consequence actually lands on, independent of stakes. Omit for an ordinary consequence to the character themselves.",
+        },
+        forces_choice: {
+          type: "boolean",
+          description:
+            "If true, present the losing consequence as a dilemma between two costs, not a single flat cost.",
         },
         consequences: {
           type: "object",
@@ -1849,6 +1900,74 @@ Examples:
   },
 };
 
+const reactionCheckTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "reaction_check",
+    description: `Roll a deterministic disposition check for an NPC (GURPS Reaction Table style).
+
+Use this for INCIDENTAL NPCs - a merchant, guard, noble, or stranger the
+player is dealing with, especially for the first time - where you need an
+externally-imposed, non-negotiable read on how they feel about the player
+RIGHT NOW. This is not for NPCs already tracked with an "attitude" in the
+NPCs list (use update_npc/npc_reaction for those) - it's for everyone else,
+and specifically for moments where the player is trying to talk, bribe, or
+charm their way past someone.
+
+WHY THIS EXISTS: left to your own judgment, you will tend to soften
+antagonists and let players talk their way past resistance, because you're
+tuned to be helpful. This tool takes that decision out of your hands. Roll
+it, then narrate the NPC as GENUINELY having the resulting disposition -
+do not let them warm up within the same scene just because the player asked
+nicely again. A bad reaction should feel bad. It can only change via another
+reaction_check (a new roll, on a new attempt, with new circumstances) or a
+clear in-fiction reason (a bribe paid, a favor delivered, a persuasive
+formula_roll that specifically targets changing their mind).
+
+Rolls 3d6, applies the chosen baseline bias, adds any modifiers you declare
+(charisma, reputation, an established grudge, local politics - be honest
+about what actually applies), and returns a category from Disastrous to
+Excellent with a specific behavioral mandate. Treat that mandate as a hard
+constraint on what you narrate next, the same way you treat a failed
+formula_roll.
+
+Examples:
+- { npc_name: "the gate guard", bias: "neutral", modifiers: 2, reason: "player tries to talk their way past the checkpoint" }
+- { npc_name: "Duke Ashford", bias: "hostile", modifiers: -3, reason: "player, a known thief, requests an audience" }`,
+    parameters: {
+      type: "object",
+      properties: {
+        npc_name: {
+          type: "string",
+          description:
+            "Name of the NPC reacting (doesn't need to exist in the NPCs list)",
+        },
+        bias: {
+          type: "string",
+          enum: ["hostile", "neutral", "favorable"],
+          description:
+            "Baseline disposition before the roll - hostile for enemies/rivals, favorable for allies/friends, neutral for strangers (default: neutral)",
+        },
+        modifiers: {
+          type: "number",
+          description:
+            "Sum of situational/trait modifiers you're declaring (e.g. +2 for high charisma, -3 for a known grudge, +1 for a prior favor). Be honest and specific in `reason`.",
+        },
+        reason: {
+          type: "string",
+          description:
+            "What's being reacted to, in enough detail to justify your modifiers",
+        },
+        show_to_player: {
+          type: "boolean",
+          description: "Show the roll to the player (default: false)",
+        },
+      },
+      required: ["npc_name", "reason"],
+    },
+  },
+};
+
 // ============================================
 // EXPORT
 // ============================================
@@ -1887,6 +2006,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   updateNPCTool,
   removeNPCTool,
   npcReactionTool,
+  reactionCheckTool,
   // Terminal tool - ends GM loop
   endGmThinkingTool,
   // Reasoning-tier self-escalation

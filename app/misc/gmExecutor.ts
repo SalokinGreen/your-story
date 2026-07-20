@@ -23,6 +23,7 @@ import {
   getMemoryContent,
   MAX_PENDING_RANDOM_EVENTS,
   PendingRandomEvent,
+  LoreVisibility,
 } from "./structs";
 import {
   StartChallengeParams,
@@ -61,6 +62,7 @@ import {
   UpdateNPCParams,
   RemoveNPCParams,
   NPCReactionParams,
+  ReactionCheckParams,
   GM_TOOL_MAP,
   SetReasoningTierParams,
 } from "./gmTools";
@@ -143,7 +145,8 @@ export interface GMToolResult {
     | GMAddNPCResult
     | GMUpdateNPCResult
     | GMRemoveNPCResult
-    | GMNPCReactionResult;
+    | GMNPCReactionResult
+    | GMReactionCheckResult;
   contextForStory: string; // Formatted bracket notation for story stage
 }
 
@@ -205,6 +208,8 @@ export interface GMFormulaRollResult {
   displayName?: string;
   showToPlayer?: boolean; // Show dice animation to player (default true)
   stakes?: string;
+  target?: string; // Hardness dimension: who the failure consequence lands on
+  forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
   consequences?: {
     success?: string;
     failure?: string;
@@ -230,6 +235,8 @@ export interface GMOpposedFormulaResult {
   displayName?: string;
   showToPlayer?: boolean; // Show dice animation to player (default true)
   stakes?: string;
+  target?: string; // Hardness dimension: who the losing consequence lands on
+  forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
   consequences?: {
     player_wins?: string;
     opponent_wins?: string;
@@ -493,6 +500,19 @@ export interface GMNPCReactionResult {
   type: "npc_reaction";
   reaction: NPCReaction;
   message: string;
+}
+
+export interface GMReactionCheckResult {
+  type: "reaction_check";
+  npcName: string;
+  rolls: number[];
+  bias: "hostile" | "neutral" | "favorable";
+  modifiers: number;
+  total: number;
+  category: ReactionCategory;
+  mandate: string;
+  reason: string;
+  showToPlayer: boolean;
 }
 
 // ============================================
@@ -914,6 +934,9 @@ export async function executeGMTools(
             params as NPCReactionParams,
             modified
           );
+          break;
+        case "reaction_check":
+          result = executeReactionCheck(call.id, params as ReactionCheckParams);
           break;
         case "set_reasoning_tier":
           result = executeSetReasoningTier(
@@ -1623,6 +1646,32 @@ function applyStakesEscalation(
  * Execute a formula roll with optional DC check
  * GM must provide formulas with actual numeric values (no variable substitution)
  */
+/**
+ * Renders the "target"/"forces_choice" hardness dimensions (PbtA's seven
+ * dimensions of hardness, scoped to the two most distinct - see
+ * docs/research-paper-ttrpg-theory-gap-analysis.md §2.2) as a hard
+ * narrative instruction, the same way `stakes` already is. Independent of
+ * stakes: these describe WHO a consequence lands on and WHETHER it's a
+ * dilemma, not how severe it is.
+ */
+function describeHardness(
+  target: "self" | "someone_they_love" | "someone_present" | undefined,
+  forcesChoice: boolean | undefined
+): string {
+  let out = "";
+  if (target && target !== "self") {
+    const targetDesc =
+      target === "someone_they_love"
+        ? "someone the character loves or cares about, not the character directly"
+        : "someone else present in the scene, not the character directly";
+    out += `\n[Target: this consequence lands on ${targetDesc} - narrate it landing there.]`;
+  }
+  if (forcesChoice) {
+    out += `\n[Forces a choice: present this as a dilemma between two costs the player must choose between - do not resolve it as a single flat consequence.]`;
+  }
+  return out;
+}
+
 function executeFormulaRoll(
   toolCallId: string,
   params: FormulaRollParams,
@@ -1719,6 +1768,10 @@ function executeFormulaRoll(
     }
   }
 
+  if (success === false) {
+    contextForStory += describeHardness(params.target, params.forces_choice);
+  }
+
   return {
     toolName: "formula_roll",
     toolCallId,
@@ -1736,6 +1789,8 @@ function executeFormulaRoll(
       reason: params.reason,
       displayName: params.display_name,
       stakes: params.stakes,
+      target: params.target,
+      forcesChoice: params.forces_choice,
       consequences: params.consequences,
       breakdown: rollResult.breakdown,
       showToPlayer: params.show_to_player !== false, // Default true
@@ -1870,6 +1925,10 @@ function executeOpposedFormula(
     }
   }
 
+  if (winner === "opponent") {
+    contextForStory += describeHardness(params.target, params.forces_choice);
+  }
+
   return {
     toolName: "opposed_formula",
     toolCallId,
@@ -1891,6 +1950,8 @@ function executeOpposedFormula(
       reason: params.reason,
       displayName: params.display_name,
       stakes: params.stakes,
+      target: params.target,
+      forcesChoice: params.forces_choice,
       consequences: params.consequences,
       showToPlayer: params.show_to_player !== false, // Default true
     } as GMOpposedFormulaResult,
@@ -2276,8 +2337,12 @@ function executeReadNotes(
 
   // Search through lore entries for matching titles
   const loreEntries = storyData.lore || [];
-  const foundNotes: Array<{ title: string; content: string; type: string }> =
-    [];
+  const foundNotes: Array<{
+    title: string;
+    content: string;
+    type: string;
+    visibility?: LoreVisibility;
+  }> = [];
   const notFoundTitles: string[] = [];
 
   // Helper to normalize title for matching (strip .md suffix, case-insensitive)
@@ -2298,6 +2363,7 @@ function executeReadNotes(
         title: entry.title,
         content: entry.content,
         type: entry.type || "lore",
+        visibility: entry.visibility,
       });
     } else {
       notFoundTitles.push(requestedTitle);
@@ -2324,7 +2390,21 @@ function executeReadNotes(
           : note.type === "mechanics"
           ? " (Rules)"
           : "";
-      contextForStory += `\n\n---\n### ${note.title}${typeSuffix}\n${note.content}`;
+      // Two-Pass Visibility (§2.3): hidden/to_be_revealed/check_per_turn
+      // content is wrapped in HIDDEN_LORE markers. You (the GM) can read
+      // and reason about it now, but stripHiddenLoreContent() removes
+      // everything between these markers before the Narrator stage ever
+      // sees it - it literally cannot leak into prose until you call
+      // edit_note to flip this entry's visibility to "always_reveal".
+      const isHidden =
+        note.visibility === "hidden" ||
+        note.visibility === "to_be_revealed" ||
+        note.visibility === "check_per_turn";
+      if (isHidden) {
+        contextForStory += `\n\n---\n### ${note.title}${typeSuffix} [[HIDDEN_LORE:${note.title}]]\n(HIDDEN FROM PLAYER - do not narrate this content or reveal its existence. To reveal it once the player genuinely discovers it, call edit_note with visibility: "always_reveal".)\n${note.content}[[/HIDDEN_LORE]]`;
+      } else {
+        contextForStory += `\n\n---\n### ${note.title}${typeSuffix}\n${note.content}`;
+      }
     }
     contextForStory += `\n---`;
   }
@@ -2341,6 +2421,38 @@ function executeReadNotes(
     },
     contextForStory,
   };
+}
+
+/**
+ * Flat probability a "check_per_turn" lore entry gets passively noticed on
+ * any given turn - tunable, deliberately simple (no stat/DC comparison,
+ * since freeform character-sheet adventures have no reliable numeric
+ * perception score to check against - see H8's residual gap in
+ * docs/architecture-frontier.md). Digital equivalent of a passive
+ * Perception check a human GM tracks silently.
+ */
+const CHECK_PER_TURN_REVEAL_CHANCE = 0.2;
+
+/**
+ * Resolves all "check_per_turn" visibility lore entries once per GM turn,
+ * flipping some to "always_reveal" via a flat-probability roll (see
+ * CHECK_PER_TURN_REVEAL_CHANCE). Pure and synchronous - mutates storyData
+ * in place, same "deterministic engine decides, model narrates" discipline
+ * as selectDirectorMove in mythic.ts. Call once per turn, before the GM
+ * round loop starts, so a freshly-revealed entry is available to both GM
+ * reasoning and (once revealed) the Narrator this same turn.
+ */
+export function resolveCheckPerTurnVisibility(storyData: StoryData): string[] {
+  const revealed: string[] = [];
+  if (!storyData.lore) return revealed;
+  for (const entry of storyData.lore) {
+    if (entry.visibility !== "check_per_turn") continue;
+    if (Math.random() < CHECK_PER_TURN_REVEAL_CHANCE) {
+      entry.visibility = "always_reveal";
+      revealed.push(entry.title);
+    }
+  }
+  return revealed;
 }
 
 /**
@@ -4534,5 +4646,159 @@ function executeNPCReaction(
     contextForStory: `[💬 ${displayStr}${
       params.context ? ` — ${params.context}` : ""
     }]`,
+  };
+}
+
+/**
+ * GURPS-style Reaction Table, ported to a deterministic 3d6 roll.
+ * Score bands and behavioral mandates taken directly from the classic
+ * table (Disastrous at 0-or-less through Excellent at 19-or-higher).
+ */
+type ReactionCategory =
+  | "Disastrous"
+  | "Very Bad"
+  | "Bad"
+  | "Poor"
+  | "Neutral"
+  | "Good"
+  | "Very Good"
+  | "Excellent";
+
+const REACTION_TABLE: { max: number; category: ReactionCategory; mandate: string }[] = [
+  {
+    max: 0,
+    category: "Disastrous",
+    mandate:
+      "Hates the player. Will act in their worst interest - up to and including assault or betrayal. Do not soften this within the scene.",
+  },
+  {
+    max: 3,
+    category: "Very Bad",
+    mandate:
+      "Dislikes the player. Offers grossly unfair terms, or attacks if it's convenient. Not interested in being talked out of it.",
+  },
+  {
+    max: 6,
+    category: "Bad",
+    mandate:
+      "Cares nothing for the player. Will act against them if there's profit in it. Persuasion alone should not move this.",
+  },
+  {
+    max: 9,
+    category: "Poor",
+    mandate:
+      "Unimpressed. Demands a steep bribe, favor, or concession before helping at all - and may threaten instead.",
+  },
+  {
+    max: 12,
+    category: "Neutral",
+    mandate:
+      "Genuinely indifferent. Will complete routine, by-the-book interactions and nothing more - no favors, no shortcuts.",
+  },
+  {
+    max: 15,
+    category: "Good",
+    mandate:
+      "Likes the player. Helpful within normal, everyday limits - won't take real risks for them.",
+  },
+  {
+    max: 18,
+    category: "Very Good",
+    mandate:
+      "Thinks highly of the player. Freely offers aid and favorable terms.",
+  },
+  {
+    max: Infinity,
+    category: "Excellent",
+    mandate:
+      "Extremely impressed. Will risk life, wealth, or reputation for the player.",
+  },
+];
+
+const REACTION_BIAS_MODIFIER: Record<
+  NonNullable<ReactionCheckParams["bias"]>,
+  number
+> = {
+  hostile: -4,
+  neutral: 0,
+  favorable: 4,
+};
+
+function categorizeReaction(score: number): {
+  category: ReactionCategory;
+  mandate: string;
+} {
+  const band = REACTION_TABLE.find((b) => score <= b.max)!;
+  return { category: band.category, mandate: band.mandate };
+}
+
+/**
+ * Execute reaction_check - GURPS Reaction Table style deterministic NPC
+ * disposition roll. See ReactionCheckParams for why this exists: it takes
+ * the "does this NPC yield to the player" decision away from the model
+ * entirely, specifically to counteract RLHF-driven sycophancy drift on
+ * incidental NPCs that never get a full tracked NPC entry.
+ */
+function executeReactionCheck(
+  toolCallId: string,
+  params: ReactionCheckParams
+): GMToolResult {
+  const bias = params.bias ?? "neutral";
+  const modifiers = params.modifiers ?? 0;
+
+  let rollResult: RollResult;
+  try {
+    rollResult = rollFormula("3d6");
+  } catch (e) {
+    return {
+      toolName: "reaction_check",
+      toolCallId,
+      success: false,
+      result: {
+        type: "reaction_check",
+        npcName: params.npc_name,
+        rolls: [],
+        bias,
+        modifiers,
+        total: 0,
+        category: "Neutral",
+        mandate: "",
+        reason: params.reason,
+        showToPlayer: params.show_to_player ?? false,
+      } as GMReactionCheckResult,
+      contextForStory: `[ERROR: reaction_check failed to roll - ${
+        e instanceof Error ? e.message : "Unknown error"
+      }]`,
+    };
+  }
+
+  const rolls = flattenRolls(rollResult.rolls);
+  const total = rollResult.total + REACTION_BIAS_MODIFIER[bias] + modifiers;
+  const { category, mandate } = categorizeReaction(total);
+
+  const contextForStory =
+    `[Reaction Check: ${params.npc_name} - [${rolls.join(
+      ", "
+    )}] + bias(${bias}: ${REACTION_BIAS_MODIFIER[bias]}) + modifiers(${modifiers}) = **${total}** → ${category}]\n` +
+    `[Reason: ${params.reason}]\n` +
+    `[MANDATE: ${params.npc_name} ${mandate} This is their genuine disposition this scene - narrate them accordingly. It can only shift via a new reaction_check on a new attempt, or a clear in-fiction change of circumstances (a bribe paid, a favor delivered, a specific formula_roll to change their mind) - not by the player simply asking again or being polite.]`;
+
+  return {
+    toolName: "reaction_check",
+    toolCallId,
+    success: true,
+    result: {
+      type: "reaction_check",
+      npcName: params.npc_name,
+      rolls,
+      bias,
+      modifiers,
+      total,
+      category,
+      mandate,
+      reason: params.reason,
+      showToPlayer: params.show_to_player ?? false,
+    } as GMReactionCheckResult,
+    contextForStory,
   };
 }

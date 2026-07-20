@@ -225,6 +225,25 @@ export function askFate(
 }
 
 /**
+ * Chaos Factor -> sampling temperature nudge (see
+ * docs/research-paper-ttrpg-theory-gap-analysis.md §2.4 - a direct
+ * implementation of the source paper's "a low Chaos Factor can instruct
+ * the system to lower the LLM's temperature... as the Chaos Factor peaks,
+ * the system can dynamically increase the LLM's temperature"). Returns a
+ * small, bounded delta to ADD on top of whatever base/user-chosen
+ * temperature is already in use - this nudges generation volatility with
+ * narrative volatility, it does not replace the user's own sampling
+ * preference. Chaos Factor 5 (the default, "business as usual") is neutral;
+ * 1 (maximally stable) and 9 (maximally chaotic) contribute the full swing.
+ *
+ * @param chaosFactor - Current chaos level (1-9, default 5)
+ */
+export function chaosFactorTemperatureDelta(chaosFactor: number = 5): number {
+  const clamped = Math.max(1, Math.min(9, chaosFactor));
+  return (clamped - 5) * 0.03; // range: -0.12 (chaos 1) .. +0.12 (chaos 9)
+}
+
+/**
  * Determine scene setup
  *
  * This is a d10 roll against the chaos factor (1-9), per the AGMT rulebook

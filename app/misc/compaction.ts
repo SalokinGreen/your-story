@@ -24,6 +24,15 @@ const MIN_UNCOVERED_TOKENS_TO_SUMMARIZE = 1500;
 // very long campaign and start eating the budget it's meant to protect.
 const MAX_SUMMARY_TOKENS = 1500;
 
+// If a recorded scene boundary (Scene.lastSceneBoundaryIndex, set on
+// increment_scene - see §3.2 in
+// docs/research-paper-ttrpg-theory-gap-analysis.md) falls within this many
+// parts AFTER the token-budget cutoff, extend the cutoff out to it instead
+// of cutting mid-scene. Only ever extends FORWARD (summarizes a few extra
+// still-live-budget-fitting parts) - never pulled backward, which would
+// leave a content-loss gap between the summary and the live tail.
+const SCENE_BOUNDARY_SNAP_WINDOW = 6;
+
 export interface CompactionPlan {
   cutoffIndex: number; // parts[0, cutoffIndex) are the ones to fold into the summary
   textToSummarize: string;
@@ -201,9 +210,22 @@ export function planCompaction(
   if (!parts || parts.length === 0) return null;
 
   const included = getPartsWithinTokenBudget(parts, historyBudget);
-  const cutoffIndex = parts.length - included.length;
+  const rawCutoffIndex = parts.length - included.length;
 
   const alreadyCovered = storyData.scene.summarizedThroughIndex || 0;
+
+  // Prefer cutting exactly at a scene boundary over an arbitrary mid-scene
+  // token cutoff, when one is close by - see SCENE_BOUNDARY_SNAP_WINDOW.
+  const boundary = storyData.scene.lastSceneBoundaryIndex;
+  const cutoffIndex =
+    boundary !== undefined &&
+    boundary > alreadyCovered &&
+    boundary >= rawCutoffIndex &&
+    boundary - rawCutoffIndex <= SCENE_BOUNDARY_SNAP_WINDOW &&
+    boundary <= parts.length
+      ? boundary
+      : rawCutoffIndex;
+
   if (cutoffIndex <= alreadyCovered) {
     return null; // nothing new has aged out since the last summary
   }

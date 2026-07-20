@@ -385,6 +385,12 @@ const createNoteTool: ToolSchema = {
           ],
           description: "Category for the note (defaults to 'lore')",
         },
+        visibility: {
+          type: "string",
+          enum: ["always_reveal", "hidden", "to_be_revealed", "check_per_turn"],
+          description:
+            "Two-Pass Visibility state, independent of `type`. Set 'hidden' or 'to_be_revealed' for anything the Narrator must not be able to describe until you explicitly reveal it (a trap, a hidden villain, a secret motive) - the content is stripped from the Narrator's context entirely until you flip it to 'always_reveal' via edit_note. Use 'check_per_turn' for something that might be noticed passively each turn without the player specifically looking (e.g. a nearby patrol). Omit for ordinary, immediately-narratable content.",
+        },
       },
       required: ["title", "content"],
     },
@@ -428,7 +434,7 @@ const updateNoteTool: ToolSchema = {
   function: {
     name: "edit_note",
     description:
-      "Update an existing note entry's content, title, or type. Use this to modify notes as the story reveals more information.",
+      "Update an existing note entry's content, title, type, or visibility. Use this to modify notes as the story reveals more information - most importantly, to REVEAL a hidden/to_be_revealed note by setting visibility to 'always_reveal' once the player has actually discovered it.",
     parameters: {
       type: "object",
       properties: {
@@ -458,6 +464,12 @@ const updateNoteTool: ToolSchema = {
             "mechanics",
           ],
           description: "Update the note category (optional)",
+        },
+        visibility: {
+          type: "string",
+          enum: ["always_reveal", "hidden", "to_be_revealed", "check_per_turn"],
+          description:
+            "Update the Two-Pass Visibility state (optional). Set to 'always_reveal' to reveal a hidden/to_be_revealed note once the player has genuinely discovered it - this is the only way that content ever reaches the Narrator.",
         },
       },
       required: ["title"],
