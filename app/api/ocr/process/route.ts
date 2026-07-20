@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Allow up to 2 minutes for OCR processing of large PDFs
-export const maxDuration = 120;
+// Allow up to 5 minutes for OCR processing of large PDFs. This must stay
+// comfortably above the client-side per-attempt OCR timeout (see
+// PDFImporter.tsx), otherwise Vercel kills the function first and the
+// client surfaces it as a chunk timeout.
+export const maxDuration = 300;
 
 // Allow large payloads for base64 PDF uploads (up to 50MB)
 // Note: This works in Vercel. For development, Next.js has no built-in body limit.
