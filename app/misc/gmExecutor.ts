@@ -2364,7 +2364,8 @@ async function executeSearchMemory(
     const semanticOutcome = await semanticSearchFallback(
       "memory",
       patterns.join(" "),
-      semanticContext
+      semanticContext,
+      memoryEntries
     );
     if (semanticOutcome.status === "ok" && semanticOutcome.matches.length > 0) {
       const semanticMatches = semanticOutcome.matches;
