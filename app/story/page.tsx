@@ -318,11 +318,16 @@ function StoryPageContent() {
   const {
     netSession,
     peers: netPeers,
+    activity: netActivity,
+    hostDisconnected,
     createRoom: createNetRoom,
     joinRoom: joinNetRoom,
     leaveRoom: leaveNetRoom,
+    switchBackend: switchNetBackend,
     sendChoice: sendNetChoice,
     sendFreeform: sendNetFreeform,
+    sendVoice: sendNetVoice,
+    sendActivity: sendNetActivity,
   } = useNetSession({
     storyData,
     loading,
@@ -372,6 +377,42 @@ function StoryPageContent() {
       });
     },
   });
+
+  // Guest's only link (the host) dropped - fall back to a normal local view
+  // rather than leaving the player stuck sending actions into the void.
+  useEffect(() => {
+    if (!hostDisconnected) return;
+    addNotification("Host disconnected", "failure");
+    leaveNetRoom();
+  }, [hostDisconnected, addNotification, leaveNetRoom]);
+
+  // Give the host their own bubble too (Discord-call parity - guests get
+  // one automatically via onGuestJoined above; the host doesn't send itself
+  // a presence_join, so it needs adding explicitly, once, on room creation.
+  useEffect(() => {
+    if (!netSession || netSession.role !== "host") return;
+    setStoryData((prev) => {
+      if (!prev) return prev;
+      const existingPlayers = prev.multiplayer?.couchPlayers ?? [];
+      if (existingPlayers.some((p) => p.id === netSession.myLocalPlayerId)) {
+        return prev;
+      }
+      const hostPlayer: CouchPlayer = {
+        id: netSession.myLocalPlayerId,
+        name: netSession.displayName,
+        color: netSession.color,
+      };
+      return {
+        ...prev,
+        multiplayer: {
+          ...prev.multiplayer,
+          enabled: true,
+          couchPlayers: [...existingPlayers, hostPlayer],
+        },
+      };
+    });
+  }, [netSession]);
+
   // Live GM streaming state - interleaved thinking and tool results
   type GMEntry =
     | { type: "thinking"; content: string; isStreaming?: boolean }
@@ -1145,6 +1186,7 @@ function StoryPageContent() {
     customText: string,
     playerComment?: string,
     speakerIds?: string[],
+    inputKind: "freeform" | "voice" = "freeform",
   ) {
     if (!storyData) return;
 
@@ -1152,7 +1194,11 @@ function StoryPageContent() {
       logger.action("Guest custom input, sending to host", { customText });
       setLoading(true);
       setLoadingStage("story");
-      sendNetFreeform(customText, speakerIds);
+      if (inputKind === "voice") {
+        sendNetVoice(customText, speakerIds ?? []);
+      } else {
+        sendNetFreeform(customText, speakerIds);
+      }
       return;
     }
 
@@ -3611,6 +3657,9 @@ function StoryPageContent() {
             onOpenJournal={() => setCurrentState(StoryState.GOALS)}
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
+            myPlayerId={netSession ? netSession.myLocalPlayerId : undefined}
+            remoteActivity={netActivity}
+            onLocalActivity={sendNetActivity}
           />
           </div>
         )}
@@ -3654,6 +3703,7 @@ function StoryPageContent() {
             onCreateNetRoom={createNetRoom}
             onJoinNetRoom={joinNetRoom}
             onLeaveNetRoom={leaveNetRoom}
+            onSwitchNetBackend={switchNetBackend}
           />
         )}
         {currentState === StoryState.LOGS && <LogViewer />}

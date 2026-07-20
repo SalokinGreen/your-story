@@ -30,7 +30,13 @@ interface StoryProps {
     text: string,
     playerComment?: string,
     speakerIds?: string[],
+    inputKind?: "freeform" | "voice",
   ) => void;
+  // Networked P2P multiplayer (internet, not couch co-op) - see
+  // app/misc/multiplayer/. All unset in couch co-op / single-player.
+  myPlayerId?: string;
+  remoteActivity?: Record<string, "recording" | "processing" | "idle">;
+  onLocalActivity?: (state: "recording" | "processing" | "idle") => void;
   onActionSubmit?: (
     text: string,
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
@@ -362,6 +368,9 @@ export default function Story({
   onOpenJournal,
   pendingUserChoice,
   liveGMEntries,
+  myPlayerId,
+  remoteActivity,
+  onLocalActivity,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -1292,9 +1301,12 @@ export default function Story({
           <PlayerBubbles
             players={storyData.multiplayer.couchPlayers!}
             onSubmit={(text, speakerIds) =>
-              onCustomInput(text, undefined, speakerIds)
+              onCustomInput(text, undefined, speakerIds, "voice")
             }
             disabled={loading || !!loadingStage}
+            myPlayerId={myPlayerId}
+            remoteActivity={remoteActivity}
+            onLocalActivity={onLocalActivity}
           />
         )}
 

@@ -20,6 +20,7 @@ import type {
   MPBackend,
   MPRole,
   PlayerActionKind,
+  PresenceActivityState,
   RoomId,
   WireMessage,
 } from "./types";
@@ -29,6 +30,8 @@ export interface NetSessionInfo {
   backend: MPBackend;
   roomId: RoomId;
   myLocalPlayerId: string;
+  displayName: string;
+  color: string;
 }
 
 export interface ValidatedGuestAction {
@@ -68,6 +71,11 @@ export class NetSession {
     (info: GuestJoinedInfo) => void
   >();
   private readonly peerLeftListeners = new Set<(localPlayerId: string) => void>();
+  private readonly activityListeners = new Set<
+    (localPlayerId: string, state: PresenceActivityState) => void
+  >();
+  private readonly hostDisconnectedListeners = new Set<() => void>();
+  private readonly backendSwitchListeners = new Set<(to: MPBackend) => void>();
 
   private constructor(
     role: MPRole,
@@ -100,22 +108,32 @@ export class NetSession {
           color: this.color,
         });
       });
-    } else {
-      this.transport.onPeerLeave((peerId) => {
+    }
+
+    this.transport.onPeerLeave((peerId) => {
+      if (this.role === "host") {
         const localPlayerId = this.seatOwners.get(peerId);
         if (!localPlayerId) return;
         this.seatOwners.delete(peerId);
         this.peerLeftListeners.forEach((cb) => cb(localPlayerId));
-      });
-    }
+      } else {
+        // A guest only ever has one link - to the host - regardless of
+        // backend (Trystero mesh or PeerJS star), so any peer-leave here
+        // means the host went away.
+        this.hostDisconnectedListeners.forEach((cb) => cb());
+      }
+    });
   }
 
   static async createHost(
     backend: MPBackend,
     displayName: string,
     color: string,
+    // Left undefined for a brand-new room; switchBackend() passes the
+    // existing room's id through so a backend swap doesn't change the code
+    // guests already have.
+    roomId: RoomId = generateRoomCode(),
   ): Promise<NetSession> {
-    const roomId = generateRoomCode();
     const transport = createTransport(backend);
     const session = new NetSession("host", backend, roomId, transport, displayName, color);
     await transport.join(roomId);
@@ -140,6 +158,8 @@ export class NetSession {
       backend: this.backend,
       roomId: this.roomId,
       myLocalPlayerId: this.myLocalPlayerId,
+      displayName: this.displayName,
+      color: this.color,
     };
   }
 
@@ -161,6 +181,21 @@ export class NetSession {
   onPeerLeft(cb: (localPlayerId: string) => void): () => void {
     this.peerLeftListeners.add(cb);
     return () => this.peerLeftListeners.delete(cb);
+  }
+
+  onActivity(cb: (localPlayerId: string, state: PresenceActivityState) => void): () => void {
+    this.activityListeners.add(cb);
+    return () => this.activityListeners.delete(cb);
+  }
+
+  onHostDisconnected(cb: () => void): () => void {
+    this.hostDisconnectedListeners.add(cb);
+    return () => this.hostDisconnectedListeners.delete(cb);
+  }
+
+  onBackendSwitch(cb: (to: MPBackend) => void): () => void {
+    this.backendSwitchListeners.add(cb);
+    return () => this.backendSwitchListeners.delete(cb);
   }
 
   broadcastSnapshot(storyData: StoryData): void {
@@ -196,11 +231,65 @@ export class NetSession {
     });
   }
 
+  sendVoice(text: string, speakerIds: string[]): void {
+    if (this.role !== "guest") return;
+    this.transport.send({
+      type: "player_action",
+      kind: "voice",
+      choiceIndex: null,
+      text,
+      claimedSpeakerIds: speakerIds.length > 0 ? speakerIds : null,
+      playerId: this.myLocalPlayerId,
+    });
+  }
+
+  sendActivity(state: PresenceActivityState): void {
+    this.transport.send({
+      type: "presence_activity",
+      playerId: this.myLocalPlayerId,
+      state,
+    });
+  }
+
   async leave(): Promise<void> {
     await this.transport.leave();
   }
 
+  // Tears down this session's transport and rejoins the same room under a
+  // different backend, preserving role/roomId/identity. Only meaningful for
+  // the host to call directly - it also warns connected guests first, who
+  // pick the switch up via onBackendSwitch and call this same method
+  // themselves (see useNetSession's auto-follow wiring).
+  async switchBackend(to: MPBackend): Promise<NetSession> {
+    if (this.role === "host") {
+      this.transport.send({ type: "backend_switch", to });
+    }
+    await this.leave();
+    return this.role === "host"
+      ? NetSession.createHost(to, this.displayName, this.color, this.roomId)
+      : NetSession.joinAsGuest(to, this.roomId, this.displayName, this.color);
+  }
+
   private handleMessage(peerId: string, msg: WireMessage): void {
+    if (msg.type === "backend_switch") {
+      this.backendSwitchListeners.forEach((cb) => cb(msg.to));
+      return;
+    }
+
+    if (msg.type === "presence_activity") {
+      if (msg.playerId !== this.myLocalPlayerId) {
+        this.activityListeners.forEach((cb) => cb(msg.playerId, msg.state));
+      }
+      if (this.role === "host") {
+        // Fan out to every other connected peer. Redundant-but-harmless in
+        // Trystero's mesh (they'd already have heard it directly); required
+        // in PeerJS's star, where a guest's broadcast only ever reaches the
+        // host.
+        this.transport.send(msg);
+      }
+      return;
+    }
+
     if (this.role === "host") {
       if (msg.type === "presence_join") {
         this.seatOwners.set(peerId, msg.playerId);

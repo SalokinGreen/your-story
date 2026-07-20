@@ -10,9 +10,16 @@ vi.mock("../app/misc/multiplayer/transports", () => ({
   generateRoomCode: () => "TESTROOM",
 }));
 
-const localPlayerIds: string[] = [];
+// Models a real browser tab's persistent localPlayerId: stable across
+// repeated calls (e.g. switchBackend() reconstructing a NetSession for the
+// same actor), only changing when a test explicitly simulates moving to a
+// different device via setLocalPlayerId().
+let currentLocalPlayerId = "unknown-player";
+function setLocalPlayerId(id: string) {
+  currentLocalPlayerId = id;
+}
 vi.mock("../app/misc/localPlayerId", () => ({
-  getLocalPlayerId: () => localPlayerIds.shift() ?? "unknown-player",
+  getLocalPlayerId: () => currentLocalPlayerId,
 }));
 
 // Dynamically imported after the mocks above are registered, so NetSession
@@ -69,12 +76,52 @@ function createFakeTransportPair(): [MultiplayerTransport, MultiplayerTransport]
   return [transportA, transportB];
 }
 
+// Models PeerJS's star topology specifically (not Trystero's mesh): a spoke
+// can only ever reach the center directly, mirroring real PeerJS where a
+// guest has exactly one DataConnection, to the host. This is the topology
+// where NetSession's host-side relay of presence_activity actually matters -
+// without it, two guests could never hear each other at all.
+function createFakeStarHub(spokeCount: number): MultiplayerTransport[] {
+  const ids = ["center", ...Array.from({ length: spokeCount }, (_, i) => `spoke-${i}`)];
+  const messageCbs: Array<Array<(peerId: string, msg: WireMessage) => void>> = ids.map(() => []);
+  const peerJoinCbs: Array<Array<(peerId: string) => void>> = ids.map(() => []);
+  const peerLeaveCbs: Array<Array<(peerId: string) => void>> = ids.map(() => []);
+
+  return ids.map((selfId, index) => ({
+    backend: "manual",
+    async join() {
+      if (index === 0) return; // center joins first, alone - nothing to connect to yet
+      peerJoinCbs[0].forEach((cb) => cb(ids[index]));
+      peerJoinCbs[index].forEach((cb) => cb(ids[0]));
+    },
+    onPeerJoin: (cb) => peerJoinCbs[index].push(cb),
+    onPeerLeave: (cb) => peerLeaveCbs[index].push(cb),
+    onMessage: (cb) => messageCbs[index].push(cb),
+    send: (msg) => {
+      if (index === 0) {
+        for (let i = 1; i < ids.length; i++) {
+          messageCbs[i].forEach((cb) => cb(ids[0], msg));
+        }
+      } else {
+        messageCbs[0].forEach((cb) => cb(ids[index], msg));
+      }
+    },
+    selfId: () => ids[index],
+    leave: async () => {
+      if (index === 0) return;
+      peerLeaveCbs[0].forEach((cb) => cb(ids[index]));
+      peerLeaveCbs[index].forEach((cb) => cb(ids[0]));
+    },
+  }));
+}
+
 async function createHostAndGuest(hostId: string, guestId: string) {
   const [hostTransport, guestTransport] = createFakeTransportPair();
-  localPlayerIds.push(hostId, guestId);
   createTransport.mockImplementationOnce(() => hostTransport).mockImplementationOnce(() => guestTransport);
 
+  setLocalPlayerId(hostId);
   const host = await NetSession.createHost("manual", "Host Name", "#111111");
+  setLocalPlayerId(guestId);
   const guest = await NetSession.joinAsGuest("manual", "TESTROOM", "Guest Name", "#222222");
   return { host, guest };
 }
@@ -85,7 +132,7 @@ function fakeStoryData(overrides: Partial<StoryData> = {}): StoryData {
 
 afterEach(() => {
   createTransport.mockReset();
-  localPlayerIds.length = 0;
+  currentLocalPlayerId = "unknown-player";
 });
 
 describe("NetSession", () => {
@@ -95,13 +142,14 @@ describe("NetSession", () => {
     // fires synchronously as part of the guest's join() handshake, so
     // subscribing afterward would miss it.
     const [hostTransport, guestTransport] = createFakeTransportPair();
-    localPlayerIds.push("host-1", "guest-1");
     createTransport.mockImplementationOnce(() => hostTransport).mockImplementationOnce(() => guestTransport);
 
+    setLocalPlayerId("host-1");
     const host = await NetSession.createHost("manual", "Host Name", "#111111");
     const joined = vi.fn();
     host.onGuestJoined(joined);
 
+    setLocalPlayerId("guest-1");
     await NetSession.joinAsGuest("manual", "TESTROOM", "Guest Name", "#222222");
 
     expect(joined).toHaveBeenCalledWith({
@@ -145,8 +193,8 @@ describe("NetSession", () => {
 
   it("ignores player_action from a peer that never sent presence_join", async () => {
     const [hostTransport, rogueTransport] = createFakeTransportPair();
-    localPlayerIds.push("host-1");
     createTransport.mockImplementationOnce(() => hostTransport);
+    setLocalPlayerId("host-1");
     const host = await NetSession.createHost("manual", "Host", "#111111");
 
     const action = vi.fn();
@@ -206,5 +254,73 @@ describe("NetSession", () => {
     host.onGuestAction(action);
     guest.sendChoice(0);
     expect(action).not.toHaveBeenCalled();
+  });
+
+  it("relays a guest's activity to other guests in a star topology (PeerJS)", async () => {
+    const [centerTransport, spoke0, spoke1] = createFakeStarHub(2);
+    createTransport
+      .mockImplementationOnce(() => centerTransport)
+      .mockImplementationOnce(() => spoke0)
+      .mockImplementationOnce(() => spoke1);
+
+    setLocalPlayerId("host-1");
+    const host = await NetSession.createHost("manual", "Host", "#111111");
+    setLocalPlayerId("guest-0");
+    const guest0 = await NetSession.joinAsGuest("manual", "TESTROOM", "G0", "#222222");
+    setLocalPlayerId("guest-1");
+    const guest1 = await NetSession.joinAsGuest("manual", "TESTROOM", "G1", "#333333");
+
+    const hostHeard = vi.fn();
+    const guest1Heard = vi.fn();
+    const guest0Heard = vi.fn();
+    host.onActivity(hostHeard);
+    guest1.onActivity(guest1Heard);
+    guest0.onActivity(guest0Heard); // should never fire for its own activity
+
+    guest0.sendActivity("recording");
+
+    expect(hostHeard).toHaveBeenCalledWith("guest-0", "recording");
+    expect(guest1Heard).toHaveBeenCalledWith("guest-0", "recording");
+    expect(guest0Heard).not.toHaveBeenCalled();
+  });
+
+  it("tells a guest when the host disconnects", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const disconnected = vi.fn();
+    guest.onHostDisconnected(disconnected);
+
+    await host.leave();
+
+    expect(disconnected).toHaveBeenCalledTimes(1);
+  });
+
+  it("switchBackend preserves role/roomId/identity across a transport swap", async () => {
+    const { host } = await createHostAndGuest("host-1", "guest-1");
+    const [newHostTransport] = createFakeTransportPair();
+    createTransport.mockImplementationOnce(() => newHostTransport);
+
+    // switchBackend runs on the host's own device, so its device identity
+    // is still "host-1" - reset it here since createHostAndGuest left the
+    // fixture's shared identity pointed at the guest it created last.
+    setLocalPlayerId("host-1");
+    const switched = await host.switchBackend("peerjs");
+
+    expect(switched.role).toBe("host");
+    expect(switched.roomId).toBe(host.roomId);
+    expect(switched.backend).toBe("peerjs");
+    expect(switched.myLocalPlayerId).toBe(host.myLocalPlayerId);
+  });
+
+  it("notifies a guest to follow when the host switches backends", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const switchTo = vi.fn();
+    guest.onBackendSwitch(switchTo);
+
+    const [newHostTransport] = createFakeTransportPair();
+    createTransport.mockImplementationOnce(() => newHostTransport);
+    setLocalPlayerId("host-1");
+    await host.switchBackend("peerjs");
+
+    expect(switchTo).toHaveBeenCalledWith("peerjs");
   });
 });

@@ -64,6 +64,7 @@ interface MenuProps extends StoryData {
     color: string,
   ) => Promise<void>;
   onLeaveNetRoom: () => Promise<void>;
+  onSwitchNetBackend: (backend: MPBackend) => Promise<void>;
 }
 
 type MenuTab =
@@ -93,6 +94,7 @@ export default function MenuPage({
   onCreateNetRoom,
   onJoinNetRoom,
   onLeaveNetRoom,
+  onSwitchNetBackend,
   ...storyData
 }: MenuProps) {
   const router = useRouter();
@@ -1148,6 +1150,7 @@ export default function MenuPage({
                       createRoom={onCreateNetRoom}
                       joinRoom={onJoinNetRoom}
                       leaveRoom={onLeaveNetRoom}
+                      switchBackend={onSwitchNetBackend}
                     />
                   </div>
                   </div>

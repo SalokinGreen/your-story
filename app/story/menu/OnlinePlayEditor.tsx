@@ -26,6 +26,7 @@ interface OnlinePlayEditorProps {
     color: string,
   ) => Promise<void>;
   leaveRoom: () => Promise<void>;
+  switchBackend: (backend: MPBackend) => Promise<void>;
 }
 
 export default function OnlinePlayEditor({
@@ -35,8 +36,10 @@ export default function OnlinePlayEditor({
   createRoom,
   joinRoom,
   leaveRoom,
+  switchBackend,
 }: OnlinePlayEditorProps) {
   const { addNotification } = useNotification();
+  const [switching, setSwitching] = useState(false);
 
   const [intent, setIntent] = useState<"host" | "join" | null>(null);
   const [backend, setBackend] = useState<MPBackend>("torrent");
@@ -93,6 +96,20 @@ export default function OnlinePlayEditor({
     }
   }
 
+  async function handleSwitch(to: MPBackend) {
+    if (!netSession || to === netSession.backend) return;
+    setSwitching(true);
+    try {
+      await switchBackend(to);
+      addNotification("Switched connection - reconnecting players now", "success");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to switch";
+      addNotification(message, "failure");
+    } finally {
+      setSwitching(false);
+    }
+  }
+
   if (netSession) {
     return (
       <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40 space-y-3">
@@ -126,9 +143,29 @@ export default function OnlinePlayEditor({
           </button>
         </div>
 
-        <p className="text-xs text-blue-200/60">
-          Backend: {BACKEND_OPTIONS.find((b) => b.value === netSession.backend)?.label}
-        </p>
+        {netSession.role === "host" ? (
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-blue-200">
+              Connection (switch if players can&apos;t connect)
+            </label>
+            <select
+              value={netSession.backend}
+              disabled={switching}
+              onChange={(e) => handleSwitch(e.target.value as MPBackend)}
+              className="w-full px-3 py-2 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+            >
+              {BACKEND_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <p className="text-xs text-blue-200/60">
+            Backend: {BACKEND_OPTIONS.find((b) => b.value === netSession.backend)?.label}
+          </p>
+        )}
 
         {netSession.role === "host" && (
           <div className="space-y-1.5">
