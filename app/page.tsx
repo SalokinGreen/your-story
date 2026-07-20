@@ -2,7 +2,7 @@ import Link from "next/link";
 import {
   BookOpen,
   Dices,
-  TrendingUp,
+  Target,
   Wand2,
   Volume2,
   Heart,
@@ -11,9 +11,9 @@ import {
   Compass,
   MessageSquare,
   Sparkles,
-  Bot,
+  KeyRound,
   Palette,
-  Shield,
+  HardDrive,
   Zap,
 } from "lucide-react";
 
@@ -27,7 +27,12 @@ import InfoTabs from "./components/InfoTabs";
 export const revalidate = 300;
 
 // Roadmap data - static, server-rendered
-const road_map = [
+const road_map: {
+  title: string;
+  description: string;
+  status: "done" | "wip" | "planned";
+  Icon: typeof BookOpen;
+}[] = [
   {
     title: "Core Story Engine",
     description: "AI-powered narrative generation with branching choices",
@@ -35,16 +40,18 @@ const road_map = [
     Icon: BookOpen,
   },
   {
-    title: "RPG Systems",
-    description: "8 dice systems including PbtA, Fate, YZE, and more",
+    title: "Improvised Dice & Mechanics",
+    description:
+      "The AI GM calls dice-roll tools on the fly - no fixed system, fully improvised per adventure",
     status: "done" as const,
     Icon: Dices,
   },
   {
-    title: "Character Progression",
-    description: "Stats, inventory, achievements, and skill checks",
+    title: "Goals & Story Threads",
+    description:
+      "Freeform character sheets, player goals, and ongoing plotlines instead of levels and loot",
     status: "done" as const,
-    Icon: TrendingUp,
+    Icon: Target,
   },
   {
     title: "Adventure Creator",
@@ -59,15 +66,15 @@ const road_map = [
     Icon: Volume2,
   },
   {
-    title: "Relationships",
-    description: "NPC relationship tracking and dynamics",
-    status: "wip" as const,
+    title: "NPC Relationships",
+    description: "Freeform relationship tracking that shifts with your choices",
+    status: "done" as const,
     Icon: Heart,
   },
   {
-    title: "Multiplayer",
-    description: "Collaborative storytelling sessions",
-    status: "planned" as const,
+    title: "Couch Co-op",
+    description: "Pass one device between up to 4 players in the same story",
+    status: "done" as const,
     Icon: Users,
   },
   {
@@ -99,11 +106,11 @@ const steps = [
 
 // Features - static
 const features = [
-  { Icon: Bot, label: "9 AI Models" },
-  { Icon: Dices, label: "8 RPG Systems" },
+  { Icon: KeyRound, label: "Bring Your Own API Key" },
+  { Icon: Dices, label: "Improvised AI Game Master" },
   { Icon: Volume2, label: "Voice Narration" },
   { Icon: Palette, label: "Custom Adventures" },
-  { Icon: Shield, label: "Private Stories" },
+  { Icon: HardDrive, label: "Stories Saved Locally" },
   { Icon: Zap, label: "Fast Generation" },
 ];
 
@@ -118,7 +125,8 @@ export default async function Home() {
           </h1>
           <p className="text-blue-200/60 text-lg max-w-xl mx-auto mb-6">
             AI-powered interactive fiction where every choice shapes your unique
-            adventure
+            adventure. Bring your own API key - no accounts, no subscriptions,
+            stories stay on your device.
           </p>
 
           {/* Auth Section - Client component */}
@@ -251,7 +259,7 @@ export default async function Home() {
         {/* Footer - Static server-rendered */}
         <footer className="text-center pt-4 border-t border-blue-800/20">
           <p className="text-xs text-blue-200/30">
-            © 2025 Your Story • AI-powered interactive fiction
+            © 2026 Your Story • AI-powered interactive fiction
           </p>
           <div className="mt-2 flex justify-center gap-4">
             <Link

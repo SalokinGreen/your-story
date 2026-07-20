@@ -64,7 +64,6 @@ const genres = [
 ];
 
 // Size presets with token counts and time estimates
-// Cost calculation: Mistral Large 3.0 pricing via server (Coins mode)
 // With 8 substages, estimates are higher than the old 4-stage model
 // Time accounts for network latency, continuations, and processing
 const sizePresets = [
@@ -75,7 +74,6 @@ const sizePresets = [
     timeMin: 6,
     timeMax: 10,
     description: "Basic adventure, fewer details",
-    estimatedCoins: 15, // 8 stages × ~2K tokens each
   },
   {
     name: "Standard",
@@ -84,7 +82,6 @@ const sizePresets = [
     timeMin: 12,
     timeMax: 20,
     description: "Well-rounded adventure",
-    estimatedCoins: 35, // 8 stages × ~5K tokens each
   },
   {
     name: "Detailed",
@@ -93,7 +90,6 @@ const sizePresets = [
     timeMin: 25,
     timeMax: 40,
     description: "Rich lore and content",
-    estimatedCoins: 65, // 8 stages × ~10K tokens each
   },
   {
     name: "Epic",
@@ -102,7 +98,6 @@ const sizePresets = [
     timeMin: 45,
     timeMax: 70,
     description: "Maximum depth and detail",
-    estimatedCoins: 120, // 8 stages × ~20K tokens each
   },
 ];
 
@@ -237,9 +232,6 @@ export default function QuickStartGenres() {
                     <div className="text-sm font-medium text-purple-300">
                       ~{selectedSize.timeMin}-{selectedSize.timeMax} min
                     </div>
-                    <div className="text-xs text-amber-400">
-                      ~{selectedSize.estimatedCoins} coins
-                    </div>
                   </div>
                 </div>
               </div>
@@ -253,10 +245,13 @@ export default function QuickStartGenres() {
                   className="w-4 h-4 text-purple-400 mt-0.5 shrink-0"
                 />
                 <div className="text-sm text-purple-200/80">
-                  <p className="font-medium mb-1">Powered by Mistral Large!</p>
+                  <p className="font-medium mb-1">
+                    Uses your DeepSeek or OpenRouter API key
+                  </p>
                   <p className="text-purple-300/60 text-xs">
-                    AI will choose the best RPG system, complexity, and settings
-                    for your genre.
+                    The AI will choose the mechanics, complexity, and setting
+                    details for your genre. Add a key in Settings if you
+                    haven&apos;t already.
                   </p>
                 </div>
               </div>
