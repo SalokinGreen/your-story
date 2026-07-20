@@ -12,6 +12,12 @@ export default function SiteHeader() {
 
   const isActive = (path: string) => pathname === path;
 
+  // Hidden while actively playing a story — the story page has its own
+  // compact controls and doesn't need the persistent site chrome.
+  if (pathname?.startsWith("/story")) {
+    return null;
+  }
+
   const handleNavClick = (e: React.MouseEvent, path: string) => {
     // Middle click
     if (e.button === 1) {

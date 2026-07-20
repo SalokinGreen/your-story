@@ -84,7 +84,7 @@ import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import SyncConflictModal from "../components/SyncConflictModal";
 import SyncIndicator from "../components/SyncIndicator";
-import { authenticatedFetch, getAuthToken } from "../misc/getAuthToken";
+import { getAuthToken } from "../misc/getAuthToken";
 import {
   syncLoreEmbeddings,
   syncNewMemories,
@@ -268,7 +268,6 @@ function StoryPageContent() {
   const [canUndo, setCanUndo] = useState(false);
   const [showPresetSelection, setShowPresetSelection] = useState(false);
   const [selectedPreset, setSelectedPreset] = useState<Preset | null>(null);
-  const [tokenBalance, setTokenBalance] = useState<number | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -548,26 +547,6 @@ function StoryPageContent() {
     setStoryText(part.content);
     setChoices({ choices: part.choices || [] });
   }
-
-  // Fetch token balance on mount
-  useEffect(() => {
-    async function fetchBalance() {
-      try {
-        const response = await authenticatedFetch("/api/tokens/balance", {
-          headers: {
-            "Content-Type": "application/json",
-          },
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setTokenBalance(data.balance.total);
-        }
-      } catch (error) {
-        console.error("Failed to fetch token balance:", error);
-      }
-    }
-    fetchBalance();
-  }, []);
 
   // Update canUndo and canRetry based on story state
   useEffect(() => {
@@ -1437,11 +1416,6 @@ function StoryPageContent() {
             });
           },
           onComplete: (result) => {
-            // Update token balance
-            if (result.meta.balance !== undefined) {
-              setTokenBalance(result.meta.balance);
-            }
-
             if (result.meta.totalTokenCost) {
               addNotification(
                 `Used ${result.meta.totalTokenCost} tokens`,
@@ -2218,10 +2192,6 @@ function StoryPageContent() {
             });
           },
           onComplete: (result) => {
-            if (result.meta.balance !== undefined) {
-              setTokenBalance(result.meta.balance);
-            }
-
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
               const currentChapter = storyData.chapters.length;
               addNotification(
@@ -2604,11 +2574,6 @@ function StoryPageContent() {
             });
           },
           onComplete: (result) => {
-            // Update token balance
-            if (result.meta.balance !== undefined) {
-              setTokenBalance(result.meta.balance);
-            }
-
             // Check for chapter completion
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
               const currentChapter = storyData.chapters.length;
@@ -3407,77 +3372,48 @@ function StoryPageContent() {
         <div className="absolute bottom-0 left-1/4 w-80 h-80 rounded-full bg-indigo-600/10 blur-[100px]" />
       </div>
       <main className="flex gap-2 sm:gap-4 w-full px-0 sm:px-2 sm:max-w-4xl mx-auto flex-col">
-        {/* Compact Story Header */}
-        <div className="bg-blue-950/50 backdrop-blur-sm rounded-none sm:rounded-2xl border-x-0 sm:border border-blue-800/30 px-4 py-3 sm:shadow-lg sm:shadow-purple-950/20">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3 min-w-0">
-              <button
-                onClick={() => router.push("/library")}
-                className="p-1.5 hover:bg-blue-900/50 rounded-lg transition-colors"
-                title="Back to Library"
-              >
-                <DynamicIcon
-                  name="ArrowLeft"
-                  className="w-5 h-5 text-blue-300"
-                />
-              </button>
-              <h1 className="text-lg font-semibold text-white truncate">
-                {storyData.story_name}
-              </h1>
-            </div>
-            <div className="flex items-center gap-3">
-              {/* Sync Status */}
-              <div
-                className={`w-2 h-2 rounded-full ${
-                  syncStatus === "synced"
-                    ? "bg-green-500"
-                    : syncStatus === "pending"
-                      ? "bg-yellow-500 animate-pulse"
-                      : syncStatus === "local-only"
-                        ? "bg-blue-500"
-                        : "bg-red-500"
-                }`}
-                title={`Sync: ${syncStatus}`}
-              />
-              {/* Token Balance */}
-              {tokenBalance !== null && (
-                <div className="flex items-center gap-1.5 text-yellow-400 font-medium">
-                  <DynamicIcon name="Coins" className="w-4 h-4" />
-                  <span className="text-sm">{tokenBalance}</span>
-                </div>
-              )}
-              {/* Menu / Settings entry (moved out of the tab row) */}
-              <button
-                type="button"
-                onClick={() => setCurrentState(StoryState.MENU)}
-                aria-label="Menu"
-                aria-current={
-                  currentState === StoryState.MENU ? "page" : undefined
-                }
-                title="Menu"
-                className={`focus-ring rounded-lg p-1.5 transition-colors ${
-                  currentState === StoryState.MENU
-                    ? "bg-purple-600/20 text-purple-300 ring-1 ring-purple-400/40 shadow-[0_0_10px_rgba(147,51,234,0.4)]"
-                    : "text-blue-300 hover:bg-blue-900/50 hover:text-white"
-                }`}
-              >
-                <DynamicIcon name="Settings" className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
+        {/* Tab Navigation + leave/settings controls */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => router.push("/library")}
+            className="focus-ring shrink-0 rounded-lg p-1.5 text-blue-300 hover:bg-blue-900/50 hover:text-white transition-colors"
+            title="Leave to Library"
+            aria-label="Leave to Library"
+          >
+            <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
+          </button>
 
-        {/* Tab Navigation */}
-        <StoryTabBar
-          currentState={currentState}
-          onSelect={(state) => setCurrentState(state as StoryState)}
-          tabs={[
-            { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
-            { state: StoryState.LORE, icon: "Scroll", label: "Notes" },
-            { state: StoryState.NPCS, icon: "Users", label: "NPCs" },
-            { state: StoryState.GOALS, icon: "Target", label: "Goals" },
-          ]}
-        />
+          <div className="min-w-0 flex-1">
+            <StoryTabBar
+              currentState={currentState}
+              onSelect={(state) => setCurrentState(state as StoryState)}
+              tabs={[
+                { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
+                { state: StoryState.LORE, icon: "Scroll", label: "Notes" },
+                { state: StoryState.NPCS, icon: "Users", label: "NPCs" },
+                { state: StoryState.GOALS, icon: "Target", label: "Goals" },
+              ]}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setCurrentState(StoryState.MENU)}
+            aria-label="Menu"
+            aria-current={
+              currentState === StoryState.MENU ? "page" : undefined
+            }
+            title="Menu"
+            className={`focus-ring shrink-0 rounded-lg p-1.5 transition-colors ${
+              currentState === StoryState.MENU
+                ? "bg-purple-600/20 text-purple-300 ring-1 ring-purple-400/40 shadow-[0_0_10px_rgba(147,51,234,0.4)]"
+                : "text-blue-300 hover:bg-blue-900/50 hover:text-white"
+            }`}
+          >
+            <DynamicIcon name="Settings" className="w-5 h-5" />
+          </button>
+        </div>
 
         {/* Render current page */}
         <div key={currentState} className="animate-fade-in">
