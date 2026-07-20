@@ -707,6 +707,14 @@ export async function POST(req: NextRequest) {
         let toolCalls: any[] = [];
         let promptTokens = 0;
         let completionTokens = 0;
+        // Tracks the most recent finish_reason seen across chunks. "length"
+        // means the provider cut the response off at the token cap - if that
+        // happens mid tool-call, the accumulated arguments string will be
+        // unterminated JSON. Surfacing this (see parsedToolCalls below and
+        // the "done" event) lets callers tell "truncated" apart from "the
+        // model just sent nothing", which otherwise look identical once
+        // JSON.parse fails on both.
+        let lastFinishReason: string | undefined;
         let estimatedCost: number | undefined; // DeepInfra provides this
         let streamComplete = false;
 
@@ -733,6 +741,7 @@ export async function POST(req: NextRequest) {
               const parsed = JSON.parse(data);
               const delta = parsed.choices?.[0]?.delta;
               const finishReason = parsed.choices?.[0]?.finish_reason;
+              if (finishReason) lastFinishReason = finishReason;
 
               if (delta?.content !== undefined && delta?.content !== null) {
                 const textContent = extractTextContent(delta.content);
@@ -870,6 +879,8 @@ export async function POST(req: NextRequest) {
               try {
                 const parsed = JSON.parse(data);
                 const delta = parsed.choices?.[0]?.delta;
+                const finishReason = parsed.choices?.[0]?.finish_reason;
+                if (finishReason) lastFinishReason = finishReason;
 
                 // Process any final tool call arguments in the buffer
                 if (delta?.tool_calls) {
@@ -969,9 +980,19 @@ export async function POST(req: NextRequest) {
                       : String(parseError),
                 },
               );
-              // Return with empty object as fallback to avoid downstream undefined errors
+              // Fall back to an empty object so downstream code always gets
+              // a plain object (never undefined) - but mark *why* it's empty.
+              // A "length" finish_reason means the provider cut the response
+              // off before this call's arguments finished, so the raw string
+              // is unterminated JSON rather than the model genuinely sending
+              // no arguments. Without this marker, downstream validation
+              // reports "missing required parameter" for every field, which
+              // reads as "the model forgot everything" when it may have
+              // written most of a valid call that just got cut off.
               return {
                 ...tc,
+                argsTruncated: lastFinishReason === "length",
+                rawArgumentsPreview: tc.function?.arguments?.substring(0, 200),
                 function: {
                   ...tc.function,
                   arguments: {},
@@ -1004,6 +1025,7 @@ export async function POST(req: NextRequest) {
           promptTokens,
           completionTokens,
           hasToolCalls: parsedToolCalls.length > 0,
+          finishReason: lastFinishReason,
           estimatedCost,
         });
 
@@ -1016,6 +1038,7 @@ export async function POST(req: NextRequest) {
                 model: modelConfig.model,
                 modelName: model,
                 provider: modelConfig.provider,
+                finishReason: lastFinishReason,
                 usage: {
                   promptTokens,
                   completionTokens,

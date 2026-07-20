@@ -662,6 +662,38 @@ export async function executeGMTools(
     hasOtherTools && endGmThinkingCall ? otherToolCalls : toolCalls;
 
   for (const call of toolsToProcess) {
+    // route.ts marks a tool call this way when the response hit the token
+    // limit before this call's arguments finished streaming - the raw
+    // arguments string was unterminated JSON and got replaced with `{}`.
+    // Report that accurately instead of letting it fall through to normal
+    // schema validation, which would report every required field as
+    // "missing" and read as "the model forgot everything" when it may have
+    // written most of a valid call that simply got cut off.
+    if ((call as { argsTruncated?: boolean }).argsTruncated) {
+      const rawPreview = (call as { rawArgumentsPreview?: string })
+        .rawArgumentsPreview;
+      const errorMsg = `Tool call "${
+        call.function.name
+      }" was cut off - the response hit the token limit before its arguments finished writing, so this call did not go through.${
+        rawPreview ? ` (got as far as: ${rawPreview})` : ""
+      } Retry it with shorter content - splitting into more, more-focused tool calls is fine.`;
+      console.warn(`[GM Tool Truncated] ${errorMsg}`, { toolCallId: call.id });
+      const errorResult: GMToolResult = {
+        toolName: call.function.name,
+        toolCallId: call.id,
+        success: false,
+        result: {
+          type: "state_change" as const,
+          message: errorMsg,
+          command: call.function.name,
+        },
+        contextForStory: `[ERROR: ${errorMsg}]`,
+      };
+      results.push(errorResult);
+      contextParts.push(errorResult.contextForStory);
+      continue;
+    }
+
     let params: unknown;
     try {
       // Handle both string and already-parsed object arguments
