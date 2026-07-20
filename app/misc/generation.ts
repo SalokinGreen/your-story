@@ -43,10 +43,10 @@ import { ensureStoryReflected } from "@/app/misc/reflection";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   outputToScenePart,
-  stripThinkingTags,
   extractThinkingTags,
   detectRepetition,
 } from "@/app/misc/ai";
+import { extractVisibleText } from "@/app/misc/turnTimeline";
 import {
   executeGMTools,
   GMToolResult,
@@ -205,6 +205,11 @@ export interface GenerationCallbacks {
   onGMStageStart?: () => void;
   // NEW: Stream GM content as it generates (thinking text)
   onGMContent?: (content: string, fullContent: string) => void;
+  // Stream the model's native reasoning/CoT field as it generates (only
+  // fires for providers that support it, e.g. DeepSeek reasoner,
+  // OpenRouter reasoning-enabled models) - scoped to the current GM round,
+  // resets at the start of each round same as onGMContent.
+  onGMReasoning?: (content: string, fullReasoning: string) => void;
   // NEW: Called after each GM tool execution with interleaved results
   onGMToolResult?: (result: GMToolResult) => void;
   // Manual dice mode: the GM asked the player to roll real dice. The UI
@@ -1078,6 +1083,7 @@ export async function generateStoryTurn(
             }
             if (event.type === "reasoning" && event.content) {
               gmReasoning += event.content;
+              callbacks.onGMReasoning?.(event.content, gmReasoning);
             }
             if (event.type === "reasoning_details" && event.details) {
               for (const detail of event.details) {
@@ -1187,7 +1193,7 @@ export async function generateStoryTurn(
               gmInterleavedParts.push(formattedThinking);
 
               // NEW: Add raw content to accumulated story (preserve <output> tags)
-              // The UI will call stripThinkingTags to extract visible content
+              // extractVisibleText() pulls the player-visible narration out below
               const rawContent = gmResult.content.trim();
               if (rawContent) {
                 // Check for duplicate content
@@ -1589,8 +1595,13 @@ export async function generateStoryTurn(
       );
 
       // Use GM's content directly as the story
-      storyContent = gmFinalStoryContent;
       rawStoryContent = gmFinalStoryContent;
+
+      // Extract only the player-visible narration - robust against a
+      // truncated/dangling <output> tag (unlike the old stripThinkingTags
+      // call this replaced, which only ran at final-save time and could
+      // leak a raw tag fragment if generation was cut off mid-tag).
+      storyContent = extractVisibleText(gmFinalStoryContent);
 
       // Prune leading dividers (---, ***, ___) that the model might add
       while (/^[\s\n]*([-*_]{3,})/.test(storyContent)) {
@@ -2054,8 +2065,10 @@ export async function generateStoryTurn(
         .replace(/\n+(?:• [^\n]*→[^\n]*\n?)+$/, "")
         .trim();
 
-      // Final thorough cleaning to isolate ONLY story content
-      storyContent = stripThinkingTags(storyContent);
+      // Final thorough cleaning to isolate ONLY story content - robust
+      // against a dangling tag even though the prompt no longer asks for
+      // <output> wrapping (defends against a model that adds one anyway).
+      storyContent = extractVisibleText(storyContent);
 
       callbacks.onStoryComplete?.(
         storyContent,

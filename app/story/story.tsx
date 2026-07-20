@@ -10,12 +10,17 @@ import SyncIndicator from "../components/SyncIndicator";
 import STTButton from "../components/STTButton";
 import PlayerBubbles from "../components/PlayerBubbles";
 import CombatDisplay from "../components/CombatDisplay";
-import { GMProgressPanel } from "../components/GMProgressPanel";
 import { ChapterNav } from "../components/ChapterNav";
 import { ObjectivesStrip } from "../components/ObjectivesStrip";
 import type { SyncStatus } from "../misc/localStoryManager";
-import type { GMToolResult } from "../misc/gmExecutor";
-import { stripThinkingTags, cleanTextForSpeech } from "../misc/ai";
+import { cleanTextForSpeech } from "../misc/ai";
+import {
+  type TimelineBlock,
+  buildSavedTimeline,
+  narrationCameFromGMStage,
+  extractVisibleText,
+} from "../misc/turnTimeline";
+import { getToolProgressLabel } from "../misc/gmToolLabels";
 
 interface StoryProps {
   storyData: StoryData;
@@ -52,11 +57,9 @@ interface StoryProps {
   onOpenJournal?: () => void;
   // The last user choice that was submitted (shown while GM is thinking)
   pendingUserChoice?: string;
-  // Interleaved GM streaming entries (thinking text and tool results in order)
-  liveGMEntries?: Array<
-    | { type: "thinking"; content: string; isStreaming?: boolean }
-    | { type: "tool"; result: GMToolResult }
-  >;
+  // Chronological thinking/tool/text blocks for the turn currently
+  // generating - see turnTimeline.ts
+  liveGMEntries?: TimelineBlock[];
 }
 
 // Font settings interface
@@ -73,6 +76,96 @@ interface FontSettings {
   };
 }
 
+// A single minimized, expandable thinking/tool row - click to see the full
+// text or tool result. Modeled on how Claude's own UI shows thinking and
+// tool-use blocks: collapsed by default, inline with the reply, not
+// gated behind one all-or-nothing toggle.
+function TimelineEntryPill({ block }: { block: TimelineBlock }) {
+  const [expanded, setExpanded] = React.useState(false);
+  if (block.kind === "text") return null; // handled by the caller directly
+
+  const isTool = block.kind === "tool";
+  const label = isTool
+    ? getToolProgressLabel(block.toolName || "")
+    : block.isReasoning
+      ? "Thought"
+      : "Thinking";
+  const detail = isTool ? block.contextForStory : block.content;
+  const canExpand = !!detail;
+
+  return (
+    <div className="my-1 text-xs">
+      <button
+        type="button"
+        onClick={() => canExpand && setExpanded((prev) => !prev)}
+        className={`flex items-center gap-1.5 text-gray-400 ${
+          canExpand ? "hover:text-gray-300 cursor-pointer" : "cursor-default"
+        } transition-colors`}
+      >
+        {isTool ? (
+          <DynamicIcon
+            name={block.success === false ? "X" : "Check"}
+            className={`w-3.5 h-3.5 shrink-0 ${
+              block.success === false ? "text-red-400" : "text-green-400"
+            }`}
+          />
+        ) : (
+          <DynamicIcon
+            name="Brain"
+            className={`w-3.5 h-3.5 shrink-0 ${block.streaming ? "animate-pulse text-blue-400" : ""}`}
+          />
+        )}
+        <span>
+          {label}
+          {block.streaming ? "…" : ""}
+        </span>
+        {canExpand && (
+          <DynamicIcon
+            name={expanded ? "ChevronUp" : "ChevronDown"}
+            className="w-3 h-3 text-gray-500"
+          />
+        )}
+      </button>
+      {expanded && detail && (
+        <p className="mt-1 ml-5 pl-2 border-l-2 border-gray-700/50 text-gray-500 italic whitespace-pre-wrap">
+          {detail}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// Renders a turn's timeline in reading order - thinking/tool blocks as
+// minimized pills, text blocks as normal flowing prose.
+function TimelineView({
+  blocks,
+  animate,
+  showHiddenMessages,
+  fontSettings,
+}: {
+  blocks: TimelineBlock[];
+  animate: boolean;
+  showHiddenMessages: boolean;
+  fontSettings?: FontSettings;
+}) {
+  return (
+    <>
+      {blocks.map((block) =>
+        block.kind === "text" ? (
+          <React.Fragment key={block.id}>
+            {prettify(block.content || "", animate, showHiddenMessages, fontSettings)}
+            {block.streaming && (
+              <span className="animate-pulse text-blue-400">▌</span>
+            )}
+          </React.Fragment>
+        ) : (
+          <TimelineEntryPill key={block.id} block={block} />
+        ),
+      )}
+    </>
+  );
+}
+
 // Chat message bubble component
 interface ChatMessageProps {
   isUser: boolean;
@@ -84,10 +177,12 @@ interface ChatMessageProps {
   showHiddenMessages?: boolean;
   fontSettings?: FontSettings;
   messageType?: "normal" | "comment";
-  // Thinking data for Gemini-style display - interleaved entries
+  // Saved GM conversation for a historical turn - used to rebuild its
+  // timeline (see turnTimeline.ts:buildSavedTimeline)
   gmConversation?: Array<{
     role: "assistant" | "tool";
     content: string;
+    reasoning?: string;
     tool_calls?: Array<{
       id: string;
       function: { name: string; arguments: string };
@@ -99,15 +194,10 @@ interface ChatMessageProps {
     string,
     { success: boolean; contextForStory: string; toolName: string }
   >;
-  // Live streaming entries
-  liveThinkingEntries?: Array<{
-    type: "thinking" | "tool";
-    content?: string;
-    result?: any;
-    isStreaming?: boolean;
-  }>;
+  // Live timeline for the turn currently generating - undefined for
+  // historical messages (which rebuild their timeline from gmConversation).
+  liveTimeline?: TimelineBlock[];
   isStreaming?: boolean;
-  showThinking?: boolean;
 }
 
 function ChatMessage({
@@ -122,31 +212,52 @@ function ChatMessage({
   messageType = "normal",
   gmConversation,
   toolResults,
-  liveThinkingEntries,
+  liveTimeline,
   isStreaming = false,
-  showThinking: showThinkingProp = false,
 }: ChatMessageProps) {
-  const [expanded, setExpanded] = React.useState(false);
   const opacity = isPrevious ? "opacity-50" : "opacity-100";
   const isComment = messageType === "comment";
 
   // Always stack vertically: avatar + name row at top, content below
   const rowAlign = isUser ? "justify-end" : "justify-start";
 
-  // Determine if we should show thinking section
-  const hasThinking =
-    (gmConversation && gmConversation.length > 0) ||
-    (liveThinkingEntries && liveThinkingEntries.length > 0);
-  const shouldShowThinking = showThinkingProp && hasThinking;
+  // On the common path the GM stage narrates the story itself, so its
+  // <output> segments ARE `content` - rebuilding the timeline can extract
+  // them inline, interleaved with that round's tool calls, instead of
+  // showing "thinking" first and the narration separately afterward.
+  const narrationInline = React.useMemo(
+    () =>
+      !isUser && gmConversation
+        ? narrationCameFromGMStage(gmConversation, content)
+        : false,
+    [isUser, gmConversation, content],
+  );
+  const savedTimeline = React.useMemo(
+    () =>
+      !isUser && gmConversation
+        ? buildSavedTimeline(gmConversation, toolResults, narrationInline)
+        : [],
+    [isUser, gmConversation, toolResults, narrationInline],
+  );
 
-  // Default is collapsed; user can expand/collapse even while streaming
-  const isExpanded = expanded;
+  const isLive = !isUser && liveTimeline !== undefined;
+  const timeline = isLive ? liveTimeline! : savedTimeline;
+  // The separate story-stage path (GM stage didn't narrate anything
+  // itself) still needs `content` rendered on its own, after the timeline.
+  const showSeparateContent = !isUser && !isLive && !narrationInline;
+
+  const showBox =
+    isUser ||
+    timeline.length > 0 ||
+    !!content ||
+    isLoading ||
+    !isStreaming;
 
   return (
     <div
       className={`flex flex-col gap-1 ${opacity} transition-opacity duration-300`}
     >
-      {/* Avatar + Name + Thinking toggle row */}
+      {/* Avatar + Name row */}
       <div className={`flex items-center gap-2 ${rowAlign}`}>
         {isUser ? (
           avatarUrl ? (
@@ -175,132 +286,11 @@ function ChatMessage({
         {isUser && isComment && (
           <span className="text-[10px] text-blue-300/50">comment</span>
         )}
-        {/* Thinking toggle - inline with name for GM messages */}
-        {!isUser && shouldShowThinking && (
-          <button
-            onClick={() => setExpanded((prev) => !prev)}
-            className="flex items-center gap-1 text-blue-400 hover:text-blue-300 transition-colors ml-1"
-          >
-            <span className="text-xs">
-              {isExpanded
-                ? "Hide thinking"
-                : isStreaming
-                  ? "Thinking..."
-                  : "Show thinking"}
-            </span>
-            <DynamicIcon
-              name={isExpanded ? "ChevronUp" : "ChevronDown"}
-              className="w-3 h-3"
-            />
-          </button>
-        )}
       </div>
 
       {/* Message Content */}
       <div className="w-full">
-        {!isUser && shouldShowThinking && isExpanded && (
-          <div className="mb-3 pl-3 border-l-2 border-blue-500/30 space-y-2 text-sm text-gray-400 italic">
-            {/* Live streaming entries */}
-            {liveThinkingEntries && liveThinkingEntries.length > 0
-              ? liveThinkingEntries.map((entry, idx) =>
-                  entry.type === "thinking" ? (
-                    <p
-                      key={`live-think-${idx}`}
-                      className="whitespace-pre-wrap"
-                    >
-                      {entry.content}
-                      {entry.isStreaming && (
-                        <span className="animate-pulse text-blue-400">▌</span>
-                      )}
-                    </p>
-                  ) : entry.result ? (
-                    <div
-                      key={`live-tool-${idx}`}
-                      className="not-italic text-xs bg-gray-800/50 rounded px-2 py-1.5 flex items-start gap-2"
-                    >
-                      <span
-                        className={`shrink-0 ${
-                          entry.result.success
-                            ? "text-green-400"
-                            : "text-red-400"
-                        }`}
-                      >
-                        {entry.result.success ? "✓" : "✗"}
-                      </span>
-                      <div>
-                        <span className="text-gray-300 font-medium">
-                          {entry.result.toolName?.replace(/_/g, " ")}
-                        </span>
-                        {entry.result.contextForStory && (
-                          <p className="text-gray-500 mt-0.5">
-                            {entry.result.contextForStory}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  ) : null,
-                )
-              : gmConversation && gmConversation.length > 0
-                ? /* Saved GM conversation - interleaved thinking and tool results */
-                  gmConversation.map((msg, idx) => {
-                    if (msg.role === "assistant") {
-                      return (
-                        <React.Fragment key={`gm-${idx}`}>
-                          {/* Thinking text */}
-                          {msg.content && (
-                            <p className="whitespace-pre-wrap">{msg.content}</p>
-                          )}
-                          {/* Tool calls made by this message */}
-                          {msg.tool_calls &&
-                            msg.tool_calls.map((tc, tcIdx) => {
-                              const result = toolResults?.get(tc.id);
-                              return (
-                                <div
-                                  key={`tc-${idx}-${tcIdx}`}
-                                  className="not-italic text-xs bg-gray-800/50 rounded px-2 py-1.5 flex items-start gap-2"
-                                >
-                                  <span
-                                    className={`shrink-0 ${
-                                      result?.success
-                                        ? "text-green-400"
-                                        : result?.success === false
-                                          ? "text-red-400"
-                                          : "text-gray-500"
-                                    }`}
-                                  >
-                                    {result?.success
-                                      ? "✓"
-                                      : result?.success === false
-                                        ? "✗"
-                                        : "•"}
-                                  </span>
-                                  <div>
-                                    <span className="text-gray-300 font-medium">
-                                      {(
-                                        result?.toolName || tc.function.name
-                                      )?.replace(/_/g, " ")}
-                                    </span>
-                                    {result?.contextForStory && (
-                                      <p className="text-gray-500 mt-0.5">
-                                        {result.contextForStory}
-                                      </p>
-                                    )}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                        </React.Fragment>
-                      );
-                    }
-                    // Skip tool role messages - results are shown inline with their tool_calls above
-                    return null;
-                  })
-                : null}
-          </div>
-        )}
-
-        {/* Content - hide the empty box when only streaming thinking */}
-        {(content || isLoading || !isStreaming) && (
+        {showBox && (
           <div
             className={`rounded-xl p-2 sm:p-3 ${
               isUser
@@ -310,7 +300,7 @@ function ChatMessage({
                 : "bg-purple-900/20 border border-purple-700/20"
             }`}
           >
-            {isLoading ? (
+            {isLoading && timeline.length === 0 && !content ? (
               <div className="flex items-center gap-2 text-purple-200/60">
                 <div className="w-4 h-4 border-2 border-purple-400/60 border-t-purple-300 rounded-full animate-spin" />
                 <span>Thinking...</span>
@@ -324,7 +314,16 @@ function ChatMessage({
                 {content}
               </p>
             ) : (
-              prettify(content, !isPrevious, showHiddenMessages, fontSettings)
+              <>
+                <TimelineView
+                  blocks={timeline}
+                  animate={!isPrevious}
+                  showHiddenMessages={showHiddenMessages}
+                  fontSettings={fontSettings}
+                />
+                {showSeparateContent &&
+                  prettify(content, !isPrevious, showHiddenMessages, fontSettings)}
+              </>
             )}
           </div>
         )}
@@ -774,12 +773,6 @@ export default function Story({
   const previousExchanges = exchanges.slice(0, -visibleExchangeCount);
   const currentExchangeIndex = visibleExchanges.length - 1;
 
-  // Get current scene part for GM thinking display
-  const currentScenePart =
-    storyData.scene.parts[storyData.scene.parts.length - 1] || null;
-  const gmConversation = currentScenePart?.gmConversation || [];
-  const gmToolCalls = currentScenePart?.gmToolCalls || [];
-
   // Helper to get GM conversation and tool results for a scene part
   const getGMDataForPart = (partIndex: number) => {
     const part = storyData.scene.parts[partIndex];
@@ -807,29 +800,6 @@ export default function Story({
       toolResults,
     };
   };
-
-  // Build toolResults map for current scene part
-  const currentToolResults = React.useMemo(() => {
-    const results = new Map<
-      string,
-      { success: boolean; contextForStory: string; toolName: string }
-    >();
-    if (gmToolCalls) {
-      for (const tc of gmToolCalls) {
-        if (tc.toolCallId) {
-          results.set(tc.toolCallId, {
-            success: tc.success,
-            contextForStory: tc.contextForStory || "",
-            toolName: tc.toolName || "",
-          });
-        }
-      }
-    }
-    return results;
-  }, [gmToolCalls]);
-
-  // GM thinking display is always enabled
-  const displayGMThinkingEnabled = true;
 
   // State for combat display expansion
   const [showCombat, setShowCombat] = React.useState(true);
@@ -937,7 +907,6 @@ export default function Story({
                   toolResults={
                     getGMDataForPart(exchange.gmMsg.partIndex).toolResults
                   }
-                  showThinking={displayGMThinkingEnabled}
                 />
               )}
             </React.Fragment>
@@ -975,7 +944,6 @@ export default function Story({
                     toolResults={
                       getGMDataForPart(exchange.gmMsg.partIndex).toolResults
                     }
-                    showThinking={displayGMThinkingEnabled}
                   />
                 )}
               </React.Fragment>
@@ -995,40 +963,19 @@ export default function Story({
             />
           )}
 
-          {/* Always-visible step-by-step progress, independent of the "Show Thinking" toggle */}
-          {loadingStage === "gm" && liveGMEntries && liveGMEntries.length > 0 && (
-            <GMProgressPanel entries={liveGMEntries} active={true} />
-          )}
-
-          {/* Loading indicator for GM response - shows live thinking during GM stage */}
-          {loading && loadingStage !== "story" && (
+          {/* Turn currently generating - one continuous message with
+              thinking/tool calls shown as minimized pills interleaved with
+              the streaming narration, in the order they actually happened. */}
+          {(loadingStage === "gm" || loadingStage === "story") && (
             <ChatMessage
               isUser={false}
               content=""
               displayName="Game Master"
-              isLoading={loadingStage !== "gm"}
+              isLoading={true}
               showHiddenMessages={showHiddenMessages}
               fontSettings={fontSettings}
-              liveThinkingEntries={
-                loadingStage === "gm" ? liveGMEntries : undefined
-              }
-              isStreaming={loadingStage === "gm"}
-              showThinking={displayGMThinkingEnabled}
-            />
-          )}
-
-          {/* Streaming story text (during story stage) */}
-          {loadingStage === "story" && storyText && (
-            <ChatMessage
-              isUser={false}
-              content={storyText}
-              displayName="Game Master"
-              isPrevious={false}
-              showHiddenMessages={showHiddenMessages}
-              fontSettings={fontSettings}
-              gmConversation={gmConversation}
-              toolResults={currentToolResults}
-              showThinking={displayGMThinkingEnabled}
+              liveTimeline={liveGMEntries || []}
+              isStreaming={true}
             />
           )}
         </div>
@@ -1340,8 +1287,10 @@ const prettify = (
   showHiddenMessages: boolean = false,
   fontSettings?: FontSettings,
 ) => {
-  // Process tags and hidden text before rendering
-  const cleanedText = stripThinkingTags(text);
+  // Process tags and hidden text before rendering - defensive against a
+  // stray tag even though content is expected to already be clean by the
+  // time it reaches here (see turnTimeline.ts:extractVisibleText).
+  const cleanedText = extractVisibleText(text);
   const processedText = parseHiddenText(cleanedText, showHiddenMessages);
 
   const customStyle = fontSettings

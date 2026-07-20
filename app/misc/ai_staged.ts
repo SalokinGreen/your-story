@@ -37,13 +37,10 @@ export const STORY_AFFIRMATION_TEMPLATE = `<thinking>
 </thinking>
 
 I am the NARRATOR. The GAME MASTER has determined the outcome. Now I write the story.
-<output>
 `;
 
 // Fallback when no GM reasoning is available
-// NOTE: Must end with same marker as STORY_AFFIRMATION_TEMPLATE for consistent stripping
 export const STORY_AFFIRMATION_FALLBACK = `I am the NARRATOR. No mechanical resolution was needed this turn. Now I write the story.
-<output>
 `;
 
 /**
@@ -233,8 +230,7 @@ const FEW_SHOT_STORY_EXAMPLE_1 = {
 ${FEW_SHOT_GM_REASONING_1}
 
 ${FEW_SHOT_GM_TOOLS_1}`,
-  assistant: `<output>
-The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear. You run your fingers along the edge of a brass tray, pretending to inspect the saffron threads while your eyes scan the shadows beneath the counter.
+  assistant: `The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear. You run your fingers along the edge of a brass tray, pretending to inspect the saffron threads while your eyes scan the shadows beneath the counter.
 
 *There.*
 
@@ -243,7 +239,6 @@ A glint of silver catches the lamplight. The amulet—your client's family heirl
 The merchant notices your stillness. His smile doesn't reach his eyes. "Something catch your interest, friend?"
 
 Behind you, the crowd's murmur shifts. Two men in dark robes have stopped at the neighboring stall, their gazes too casual, too fixed.
-</output>
 [STOP]`,
   stateChanges: [
     "Memory added: The stolen amulet is at Farouk's spice stall, hidden under silk",
@@ -286,8 +281,7 @@ const FEW_SHOT_STORY_EXAMPLE_2 = {
 ${FEW_SHOT_GM_REASONING_2}
 
 ${FEW_SHOT_GM_TOOLS_2}`,
-  assistant: `<output>
-"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
+  assistant: `"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
 
 Farouk's hand shoots out, faster than a striking cobra. His fingers close around your wrist like a vice.
 
@@ -298,7 +292,6 @@ The two robed figures are moving now, cutting through the crowd with purpose. On
 Your curved dagger presses against your hip. The exit is three stalls away, blocked by a cart of melons. The rooftops—if you could reach them—offer another path.
 
 Farouk's grip tightens. "Now. We talk price. Or we talk to the Caliph's men."
-</output>
 [STOP]`,
   stateChanges: [
     "New thread: Escape Farouk's Grip (side) - the merchant has you by the wrist and is threatening to call the Caliph's men",
@@ -362,8 +355,7 @@ const DM_FEW_SHOT_STORY_EXAMPLE_1 = {
 ${FEW_SHOT_GM_REASONING_1}
 
 ${FEW_SHOT_GM_TOOLS_1}`,
-  assistant: `<output>
-The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear.
+  assistant: `The spice merchant's stall reeks of cinnamon and something fouler—old sweat, perhaps, or fear.
 
 **Perception check to spot the hidden amulet... you rolled a 12, plus your +1 bonus = 13 against DC 10. Success!**
 
@@ -376,7 +368,6 @@ But Farouk noticed you noticing. His smile doesn't reach his eyes.
 Behind you, two men in dark robes have stopped at the neighboring stall. Their gazes are too casual, too fixed.
 
 *You've found the amulet, but you're not the only one watching.*
-</output>
 [STOP]`,
   stateChanges: [
     "Memory added: The stolen amulet is at Farouk's spice stall, hidden under silk",
@@ -393,8 +384,7 @@ const DM_FEW_SHOT_STORY_EXAMPLE_2 = {
 ${FEW_SHOT_GM_REASONING_2}
 
 ${FEW_SHOT_GM_TOOLS_2}`,
-  assistant: `<output>
-"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
+  assistant: `"Those saffron threads," you say, gesturing to the upper shelf. "Are they from the southern provinces? The color seems—"
 
 **Persuasion check to fool Farouk... you rolled a 7, no bonus. Against DC 14? That's a failure by 7.**
 
@@ -411,7 +401,6 @@ Your curved dagger presses against your hip. The exit is three stalls away, bloc
 "Now," Farouk growls. "We talk price. Or we talk to the Caliph's men."
 
 *What do you do?*
-</output>
 [STOP]`,
   stateChanges: [
     "New thread: Escape Farouk's Grip (side) - the merchant has you by the wrist and is threatening to call the Caliph's men",
@@ -1256,14 +1245,7 @@ function getNarratorSystemPrompt(): string {
 
 The GAME MASTER handles all mechanics. Your job: Transform those decisions into vivid, emotionally resonant narrative.
 
-═══════════════════════════════════════════════════════════════
-SECTION 0: VISIBILITY RULES (CRITICAL)
-═══════════════════════════════════════════════════════════════
-
-**The player ONLY sees text inside <output>...</output> tags.**
-- ALL story prose, NPC dialogue, and sensory descriptions MUST be wrapped in <output> tags.
-- Any text outside these tags is treated as private reasoning and hidden from the player.
-- This prevents "reasoning leakage" into the player's experience.
+**Everything you write is shown directly to the player as-is.** Write only the story prose, NPC dialogue, and sensory descriptions - no meta-commentary, no notes to yourself, nothing outside the narrative itself.
 
 ═══════════════════════════════════════════════════════════════
 SECTION 1: THE CONTRACT (NON-NEGOTIABLE)
@@ -1292,7 +1274,6 @@ SECTION 1: THE CONTRACT (NON-NEGOTIABLE)
 SECTION 5: OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════════
 
-- **Wrap all prose in <output>...</output> tags.**
 - **Markdown:** *italics* for thoughts/whispers, **bold** for impact, --- for scene breaks
 - **No headers** (## or #) in prose - save for major scene changes only
 - **No meta-text:** No "Scene:", "Chapter:", "Progress 2/3"
@@ -1314,7 +1295,7 @@ SECTION 5: OUTPUT FORMAT
 
 Notice the example stops right after the NPC's reaction and question - it does NOT decide what the player says or does next.
 
-NOW WRITE THE NARRATIVE INSIDE <output> TAGS.`;
+NOW WRITE THE NARRATIVE.`;
 }
 
 /**
@@ -1326,13 +1307,7 @@ function getDMSystemPrompt(): string {
 
 The GAME MASTER has already determined outcomes. Your job: Narrate the action AND communicate the mechanical results clearly.
 
-═══════════════════════════════════════════════════════════════
-SECTION 0: VISIBILITY RULES (CRITICAL)
-═══════════════════════════════════════════════════════════════
-
-**The player ONLY sees text inside <output>...</output> tags.**
-- ALL story prose, NPC dialogue, and mechanical announcements MUST be wrapped in <output> tags.
-- Any text outside these tags is treated as private reasoning and hidden from the player.
+**Everything you write is shown directly to the player as-is.** Write only story prose, NPC dialogue, and mechanical announcements - no meta-commentary, no notes to yourself, nothing outside the narrative itself.
 
 ═══════════════════════════════════════════════════════════════
 SECTION 1: THE CONTRACT (NON-NEGOTIABLE)
@@ -1360,7 +1335,6 @@ SECTION 1: THE CONTRACT (NON-NEGOTIABLE)
 SECTION 5: OUTPUT FORMAT
 ═══════════════════════════════════════════════════════════════
 
-- **Wrap all prose and mechanics in <output>...</output> tags.**
 - **Bold** for mechanical announcements (rolls, damage, conditions)
 - *Italics* for internal thoughts, whispers, emphasis
 - Keep paragraphs short during action
@@ -1383,7 +1357,7 @@ SECTION 5: OUTPUT FORMAT
 
 Notice the flow stops immediately after the mechanical result and prompt - it does NOT decide what the player does next.
 
-NOW NARRATE THE ACTION INSIDE <output> TAGS.`;
+NOW NARRATE THE ACTION.`;
 }
 
 // Stage 1: Story narration only
@@ -3300,15 +3274,15 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
 export function buildStoryContinuationPrompt(
   storytellerMode: StorytellerMode = "narrator",
 ): string {
-  const basePrompt = `Now write the story from the player's perspective. WRAP ALL PLAYER-VISIBLE PROSE IN <output>...</output> TAGS.`;
+  const basePrompt = `Now write the story from the player's perspective. Write only the prose the player should see - no meta-commentary, no notes to yourself.`;
 
   const narratorGuidelines = `
 Write immersive prose - show, don't tell. No dice results or mechanical language.
-Use vivid sensory details. 2-4 paragraphs. Content MUST be inside <output> tags.`;
+Use vivid sensory details. 2-4 paragraphs.`;
 
   const dmGuidelines = `
 Write as a Dungeon Master narrating to the player. You may reference dice results naturally.
-Use second person ("You swing your sword..."). 2-4 paragraphs. Content MUST be inside <output> tags.`;
+Use second person ("You swing your sword..."). 2-4 paragraphs.`;
 
   return (
     basePrompt + (storytellerMode === "dm" ? dmGuidelines : narratorGuidelines)
