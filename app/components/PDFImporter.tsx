@@ -191,24 +191,67 @@ async function fetchWithRetry(
   throw lastError;
 }
 
+// Maximum length of any error message we surface to the UI. Raw error
+// bodies from the platform/CDN (e.g. a 413 "Request Entity Too Large" HTML
+// page, or a stack trace) can be many KB of text - rendering that verbatim
+// into a toast or a chunk status row is what visually breaks the modal and
+// can hang memory-constrained mobile browsers trying to lay it out.
+const MAX_ERROR_MESSAGE_LENGTH = 300;
+
+/**
+ * Sanitize a raw error string (which may be an HTML error page, a huge
+ * stack trace, or arbitrary platform output) into a short, plain-text
+ * message safe to render in the UI. Strips HTML tags, collapses
+ * whitespace, and truncates to a fixed length.
+ */
+function sanitizeErrorMessage(raw: string, fallback: string): string {
+  if (!raw) return fallback;
+
+  let text = raw;
+  // Detect and replace HTML error pages (e.g. Vercel/CDN 413 pages) with a
+  // friendly message rather than trying to render markup as text.
+  if (/<html|<!doctype html/i.test(text)) {
+    return "The file or page is too large for the server to accept. Try a smaller file or fewer pages per chunk.";
+  }
+  // Strip any remaining tags defensively, then collapse whitespace.
+  text = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+  if (!text) return fallback;
+
+  if (text.length > MAX_ERROR_MESSAGE_LENGTH) {
+    text = `${text.slice(0, MAX_ERROR_MESSAGE_LENGTH)}…`;
+  }
+
+  return text;
+}
+
 /**
  * Extract an error message from a failed fetch Response. Reads the body as
  * text exactly once (a Response body stream can only be consumed once -
  * calling `.json()` and then falling back to `.text()` on parse failure
  * throws "body stream already read", since `.json()` already consumed the
  * stream even though `JSON.parse` failed).
+ *
+ * A 413 (Entity Too Large) response in particular often has no JSON body
+ * at all - the platform/CDN rejects the request before it reaches our
+ * handler - so that status is special-cased with a clear, actionable
+ * message instead of falling through to whatever raw text came back.
  */
 async function extractErrorMessage(
   response: Response,
   fallback: string,
 ): Promise<string> {
+  if (response.status === 413) {
+    return "File or page too large for the server to accept. Try a smaller file, or fewer pages per chunk.";
+  }
+
   const text = await response.text();
   if (!text) return fallback;
   try {
     const parsed = JSON.parse(text);
-    return parsed.error || fallback;
+    return sanitizeErrorMessage(parsed.error || "", fallback);
   } catch {
-    return text || fallback;
+    return sanitizeErrorMessage(text, fallback);
   }
 }
 
@@ -238,6 +281,31 @@ function bytesToBase64(bytes: Uint8Array): string {
     );
   }
   return btoa(parts.join(""));
+}
+
+/**
+ * Normalize a pasted document link into a form Mistral's OCR API can
+ * fetch directly as `document_url`. Google Drive's "share" links point at
+ * an HTML viewer page rather than the raw file, so a Drive share link is
+ * rewritten into its direct-download form. Any other URL (Dropbox direct
+ * links, self-hosted files, etc.) is passed through unchanged.
+ */
+function normalizeDocumentLink(url: string): string {
+  const trimmed = url.trim();
+
+  // Standard share link: https://drive.google.com/file/d/<id>/view?usp=...
+  const fileMatch = trimmed.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+  if (fileMatch) {
+    return `https://drive.google.com/uc?export=download&id=${fileMatch[1]}`;
+  }
+
+  // "open?id=<id>" link form.
+  const openMatch = trimmed.match(/drive\.google\.com\/open\?id=([^&]+)/);
+  if (openMatch) {
+    return `https://drive.google.com/uc?export=download&id=${openMatch[1]}`;
+  }
+
+  return trimmed;
 }
 
 /**
@@ -420,6 +488,16 @@ async function ocrPDFRange(
   }
 
   const pageCount = range.endIndex - range.startIndex + 1;
+  if (base64.length > SAFE_BASE64_PAYLOAD_BYTES && pageCount === 1) {
+    // Can't split a single page any further - sending it anyway would just
+    // hit the platform's hard body-size limit and come back as a raw 413
+    // ("Entity Too Large"). Fail this page with a clear, actionable
+    // message instead so the rest of the document can still complete.
+    base64 = "";
+    throw new Error(
+      `page ${range.pageStart} is too image-heavy to upload directly (exceeds the server's request size limit). Try a lower-resolution scan of this page.`,
+    );
+  }
   if (base64.length > SAFE_BASE64_PAYLOAD_BYTES && pageCount > 1) {
     base64 = "";
     const half = Math.floor(pageCount / 2);
@@ -435,13 +513,42 @@ async function ocrPDFRange(
       pageStart: range.pageStart + half,
       pageEnd: range.pageEnd,
     };
-    const [first, second] = await Promise.all([
+    // Use allSettled rather than Promise.all: a single too-image-heavy
+    // page failing outright (see the pageCount === 1 branch above)
+    // shouldn't discard OCR output already obtained for its sibling
+    // half - the rest of the document should still complete, with the
+    // failed sub-range's pages simply missing (and noted) from the
+    // combined markdown.
+    const [firstResult, secondResult] = await Promise.allSettled([
       ocrPDFRange(pdfDoc, firstRange, fileNameBase, mistralKey),
       ocrPDFRange(pdfDoc, secondRange, fileNameBase, mistralKey),
     ]);
+
+    if (
+      firstResult.status === "rejected" &&
+      secondResult.status === "rejected"
+    ) {
+      throw firstResult.reason;
+    }
+
+    const parts: string[] = [];
+    let totalPages = 0;
+    for (const result of [firstResult, secondResult]) {
+      if (result.status === "fulfilled") {
+        parts.push(result.value.markdown);
+        totalPages += result.value.totalPages;
+      } else {
+        const message =
+          result.reason instanceof Error
+            ? result.reason.message
+            : "OCR failed for part of this range";
+        parts.push(`<!-- ${message} -->`);
+      }
+    }
+
     return {
-      markdown: `${first.markdown}\n\n---\n\n${second.markdown}`,
-      totalPages: first.totalPages + second.totalPages,
+      markdown: parts.join("\n\n---\n\n"),
+      totalPages,
     };
   }
 
@@ -545,6 +652,13 @@ export default function PDFImporter({
   const [pageCount, setPageCount] = useState(0);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
 
+  // Import mode: upload a file directly, or point at a shareable link
+  // (e.g. Google Drive) so Mistral fetches the document itself. Link mode
+  // skips the client-side chunking pipeline entirely - it's a single OCR
+  // call regardless of document size.
+  const [importMode, setImportMode] = useState<"file" | "link">("file");
+  const [linkUrl, setLinkUrl] = useState("");
+
   // AI model selection for summarization
   const [aiModel, setAIModel] = useState("ministral-14b-2512");
 
@@ -564,6 +678,17 @@ export default function PDFImporter({
   // Chunk tracking state for large PDFs
   const [chunkStatuses, setChunkStatuses] = useState<ChunkStatus[]>([]);
   const [showChunkDetails, setShowChunkDetails] = useState(false);
+  // Which chunk (by index) currently has its live preview (raw OCR text
+  // and/or extracted notes) expanded in the chunk status panel.
+  const [expandedChunkIndex, setExpandedChunkIndex] = useState<number | null>(
+    null,
+  );
+  // Whether the expanded chunk's preview is showing raw OCR markdown
+  // ("text") or extracted notes ("notes"). Only meaningful while
+  // expandedChunkIndex is set.
+  const [chunkPreviewTab, setChunkPreviewTab] = useState<"text" | "notes">(
+    "notes",
+  );
   // Parsed pdf-lib document of the most recent chunked import, retained so
   // chunks that failed during the OCR phase can be retried from the chunk
   // panel (re-running OCR needs the source pages, not just markdown).
@@ -613,16 +738,20 @@ export default function PDFImporter({
 
   // Save imports to IndexedDB
   const saveImport = useCallback(
-    async (data: {
-      lore: StoryLore[];
-      mechanicNotes: StoryLore[];
-      customTables: CustomTable[];
-      summary: string;
-    }) => {
+    async (
+      data: {
+        lore: StoryLore[];
+        mechanicNotes: StoryLore[];
+        customTables: CustomTable[];
+        summary: string;
+      },
+      fileNameOverride?: string,
+    ) => {
       const fileName =
-        selectedFiles.length > 1
+        fileNameOverride ||
+        (selectedFiles.length > 1
           ? `${selectedFiles.length} files`
-          : selectedFiles[0]?.name || "Unknown";
+          : selectedFiles[0]?.name || "Unknown");
 
       try {
         const newImport = await savePDFImport(data, fileName);
@@ -765,7 +894,10 @@ export default function PDFImporter({
         );
 
         if (!summarizeResponse.ok) {
-          const errorMsg = await summarizeResponse.text();
+          const errorMsg = await extractErrorMessage(
+            summarizeResponse,
+            "Note extraction failed",
+          );
           setChunkStatuses((prev) =>
             prev.map((cs) =>
               cs.chunkIndex === chunkIndex
@@ -821,18 +953,22 @@ export default function PDFImporter({
         );
         addNotification(`Chunk ${chunkIndex + 1} retry successful!`, "success");
       } catch (err: any) {
+        const message = sanitizeErrorMessage(
+          err?.message || "",
+          "Unknown error",
+        );
         setChunkStatuses((prev) =>
           prev.map((cs) =>
             cs.chunkIndex === chunkIndex
               ? {
                   ...cs,
                   status: "failed",
-                  error: err.message || "Unknown error",
+                  error: message,
                 }
               : cs,
           ),
         );
-        addNotification(`Retry failed: ${err.message}`, "failure");
+        addNotification(`Retry failed: ${message}`, "failure");
       }
     },
     [
@@ -1192,8 +1328,10 @@ export default function PDFImporter({
                 keys.mistralKey,
               );
             } catch (err: unknown) {
-              const message =
-                err instanceof Error ? err.message : "OCR processing failed";
+              const message = sanitizeErrorMessage(
+                err instanceof Error ? err.message : "",
+                "OCR processing failed",
+              );
               console.error(
                 `Pages ${range.pageStart}-${range.pageEnd} OCR failed:`,
                 message,
@@ -1326,7 +1464,10 @@ export default function PDFImporter({
               );
 
               if (!summarizeResponse.ok) {
-                const errorMsg = await summarizeResponse.text();
+                const errorMsg = await extractErrorMessage(
+                  summarizeResponse,
+                  "Note extraction failed",
+                );
                 console.error(
                   `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization failed:`,
                   errorMsg,
@@ -1397,6 +1538,10 @@ export default function PDFImporter({
                 customTables: result.customTables || [],
               };
             } catch (err: any) {
+              const message = sanitizeErrorMessage(
+                err?.message || "",
+                "Unknown error",
+              );
               console.error(
                 `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization error:`,
                 err.message || err,
@@ -1408,7 +1553,7 @@ export default function PDFImporter({
                     ? {
                         ...cs,
                         status: "failed",
-                        error: err.message || "Unknown error",
+                        error: message,
                       }
                     : cs,
                 ),
@@ -1657,11 +1802,162 @@ export default function PDFImporter({
       }, 1500);
     } catch (error: any) {
       console.error("PDF import error:", error);
+      const message = sanitizeErrorMessage(
+        error?.message || "",
+        "Import failed",
+      );
       setStep("error");
-      setStatusMessage(error.message || "Import failed");
-      addNotification(error.message || "PDF import failed", "failure");
+      setStatusMessage(message);
+      addNotification(message, "failure");
     } finally {
       // No cleanup needed - files are processed entirely client-side/BYOK now
+    }
+  };
+
+  // Import a document by URL (e.g. a Google Drive share link) instead of
+  // uploading a file. Mistral fetches the document itself from the URL, so
+  // there's no local file to chunk - this is always a single OCR call,
+  // regardless of the document's size.
+  const processLinkImport = async () => {
+    const trimmedUrl = linkUrl.trim();
+    if (!trimmedUrl) {
+      addNotification("Please paste a document link", "warning");
+      return;
+    }
+
+    const selectedModel = getSelectedModel();
+    if (!selectedModel.model) {
+      addNotification("Please enter a custom model ID", "warning");
+      return;
+    }
+    if (!keys[PROVIDER_KEY_FIELD[selectedModel.provider]]) {
+      addNotification(
+        `Please add your ${PROVIDER_LABELS[selectedModel.provider]} API key in Settings`,
+        "warning",
+      );
+      return;
+    }
+    if (!keys.mistralKey) {
+      addNotification(
+        "Please add your Mistral API key in Settings to use OCR",
+        "warning",
+      );
+      return;
+    }
+
+    const documentUrl = normalizeDocumentLink(trimmedUrl);
+
+    try {
+      setStep("ocr");
+      setProgress(10);
+      setStatusMessage("Fetching and extracting text from the link...");
+
+      const ocrResponse = await fetchWithRetry(
+        "/api/ocr/process",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            signedUrl: documentUrl,
+            includeImages: false,
+            mistralKey: keys.mistralKey,
+          }),
+        },
+        OCR_TIMEOUT_MS,
+        MAX_RETRIES,
+      );
+
+      if (!ocrResponse.ok) {
+        const errorMsg = await extractErrorMessage(
+          ocrResponse,
+          "OCR processing failed",
+        );
+        throw new Error(
+          `${errorMsg}. Make sure the link is shared as "Anyone with the link" - very large files may also fail if Drive shows a virus-scan warning page instead of the file; try the file upload option instead in that case.`,
+        );
+      }
+
+      const ocrResult: OCRProcessResult = await ocrResponse.json();
+
+      setProgress(45);
+      setStep("summarizing");
+      setStatusMessage("Extracting notes from the document...");
+
+      const summarizeResponse = await fetchWithRetry(
+        "/api/ocr/summarize",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            markdown: ocrResult.markdown,
+            focus: ["all"],
+            customInstructions,
+            model: selectedModel.model,
+            provider: selectedModel.provider,
+            maxTokens: maxOutputTokens,
+            openRouterKey: keys.openRouterKey,
+            deepseekKey: keys.deepseekKey,
+            mistralKey: keys.mistralKey,
+            googleKey: keys.googleKey,
+            deepinfraKey: keys.deepinfraKey,
+          }),
+        },
+        SUMMARIZE_TIMEOUT_MS,
+        MAX_RETRIES,
+      );
+
+      if (!summarizeResponse.ok) {
+        const errorMsg = await extractErrorMessage(
+          summarizeResponse,
+          "Note extraction failed",
+        );
+        throw new Error(errorMsg);
+      }
+
+      const summarizeResult = await summarizeResponse.json();
+
+      setStep("complete");
+      setStatusMessage("Import complete!");
+      setProgress(100);
+
+      const importData = {
+        lore: summarizeResult.lore || [],
+        mechanicNotes: summarizeResult.mechanicNotes || [],
+        customTables: summarizeResult.customTables || [],
+        summary: "Imported from link",
+      };
+
+      saveImport(importData, "Link import");
+      onImportComplete(importData);
+
+      const totalItems =
+        importData.lore.length +
+        importData.mechanicNotes.length +
+        importData.customTables.length;
+      addNotification(
+        `Imported ${totalItems} items from ${ocrResult.totalPages} pages (~$${estimateOCRCostUSD(
+          ocrResult.totalPages,
+        ).toFixed(3)} in OCR costs, paid to your own API key)`,
+        "success",
+      );
+
+      setTimeout(() => {
+        setIsOpen(false);
+        resetState();
+      }, 1500);
+    } catch (error: unknown) {
+      console.error("PDF link import error:", error);
+      const message = sanitizeErrorMessage(
+        error instanceof Error ? error.message : "",
+        "Import failed",
+      );
+      setStep("error");
+      setStatusMessage(message);
+      addNotification(message, "failure");
     }
   };
 
@@ -1678,6 +1974,7 @@ export default function PDFImporter({
     setProgress(0);
     setStatusMessage("");
     setSelectedFiles([]);
+    setLinkUrl("");
     setEstimatedCost(0);
     setPageCount(0);
     setCurrentFileIndex(0);
@@ -1844,16 +2141,12 @@ export default function PDFImporter({
               )}
 
               {/* Chunk Details Panel - Shows status of individual chunks */}
-              {chunkStatuses.length > 0 &&
-                (step === "summarizing" ||
-                  step === "complete" ||
-                  step === "error" ||
-                  chunkStatuses.some((cs) => cs.status === "failed")) && (
-                  <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 overflow-hidden">
-                    <button
-                      onClick={() => setShowChunkDetails(!showChunkDetails)}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-900/30 transition-colors"
-                    >
+              {chunkStatuses.length > 0 && (
+                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 overflow-hidden">
+                  <button
+                    onClick={() => setShowChunkDetails(!showChunkDetails)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-900/30 transition-colors"
+                  >
                       <div className="flex items-center gap-2">
                         <DynamicIcon
                           name="Layers"
@@ -1886,114 +2179,283 @@ export default function PDFImporter({
                     </button>
 
                     {showChunkDetails && (
-                      <div className="p-3 pt-0 space-y-2 max-h-60 overflow-y-auto">
-                        {chunkStatuses.map((chunk) => (
-                          <div
-                            key={chunk.chunkIndex}
-                            className={`flex items-center gap-3 p-2 rounded-lg ${
-                              chunk.status === "complete"
-                                ? "bg-green-900/20 border border-green-700/30"
-                                : chunk.status === "failed"
-                                  ? "bg-red-900/20 border border-red-700/30"
-                                  : chunk.status === "summarizing" ||
-                                      chunk.status === "ocr"
-                                    ? "bg-blue-900/30 border border-blue-700/30"
-                                    : "bg-gray-900/20 border border-gray-700/30"
-                            }`}
-                          >
-                            <div className="shrink-0">
-                              {chunk.status === "complete" && (
-                                <DynamicIcon
-                                  name="CheckCircle"
-                                  className="w-5 h-5 text-green-400"
-                                />
-                              )}
-                              {chunk.status === "failed" && (
-                                <DynamicIcon
-                                  name="XCircle"
-                                  className="w-5 h-5 text-red-400"
-                                />
-                              )}
-                              {(chunk.status === "summarizing" ||
-                                chunk.status === "ocr") && (
-                                <DynamicIcon
-                                  name="Loader2"
-                                  className="w-5 h-5 text-blue-400 animate-spin"
-                                />
-                              )}
-                              {chunk.status === "pending" && (
-                                <DynamicIcon
-                                  name="Clock"
-                                  className="w-5 h-5 text-gray-400"
-                                />
-                              )}
-                            </div>
+                      <div className="p-3 pt-0 space-y-2 max-h-96 overflow-y-auto">
+                        {chunkStatuses.map((chunk) => {
+                          const isExpanded =
+                            expandedChunkIndex === chunk.chunkIndex;
+                          const canPreviewText = !!chunk.ocrMarkdown;
+                          const canPreviewNotes = !!chunk.result;
+                          const canPreview =
+                            canPreviewText || canPreviewNotes;
+                          return (
+                            <div
+                              key={chunk.chunkIndex}
+                              className={`rounded-lg ${
+                                chunk.status === "complete"
+                                  ? "bg-green-900/20 border border-green-700/30"
+                                  : chunk.status === "failed"
+                                    ? "bg-red-900/20 border border-red-700/30"
+                                    : chunk.status === "summarizing" ||
+                                        chunk.status === "ocr"
+                                      ? "bg-blue-900/30 border border-blue-700/30"
+                                      : "bg-gray-900/20 border border-gray-700/30"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 p-2">
+                                <div className="shrink-0">
+                                  {chunk.status === "complete" && (
+                                    <DynamicIcon
+                                      name="CheckCircle"
+                                      className="w-5 h-5 text-green-400"
+                                    />
+                                  )}
+                                  {chunk.status === "failed" && (
+                                    <DynamicIcon
+                                      name="XCircle"
+                                      className="w-5 h-5 text-red-400"
+                                    />
+                                  )}
+                                  {(chunk.status === "summarizing" ||
+                                    chunk.status === "ocr") && (
+                                    <DynamicIcon
+                                      name="Loader2"
+                                      className="w-5 h-5 text-blue-400 animate-spin"
+                                    />
+                                  )}
+                                  {chunk.status === "pending" && (
+                                    <DynamicIcon
+                                      name="Clock"
+                                      className="w-5 h-5 text-gray-400"
+                                    />
+                                  )}
+                                </div>
 
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-white">
-                                Chunk {chunk.chunkIndex + 1}: Pages{" "}
-                                {chunk.pageStart}-{chunk.pageEnd}
-                              </p>
-                              {chunk.status === "complete" && chunk.result && (
-                                <p className="text-xs text-green-300/70">
-                                  {chunk.result.lore.length} lore,{" "}
-                                  {chunk.result.mechanicNotes.length} mechanics,{" "}
-                                  {chunk.result.customTables.length} tables
-                                </p>
-                              )}
-                              {chunk.status === "failed" && chunk.error && (
-                                <p
-                                  className="text-xs text-red-300/70 truncate"
-                                  title={chunk.error}
-                                >
-                                  {chunk.error}
-                                </p>
-                              )}
-                              {chunk.status === "summarizing" && (
-                                <p className="text-xs text-blue-300/70">
-                                  Creating notes...
-                                </p>
-                              )}
-                              {chunk.status === "ocr" && (
-                                <p className="text-xs text-blue-300/70">
-                                  Extracting text...
-                                </p>
-                              )}
-                            </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-white">
+                                    Chunk {chunk.chunkIndex + 1}: Pages{" "}
+                                    {chunk.pageStart}-{chunk.pageEnd}
+                                  </p>
+                                  {chunk.status === "complete" &&
+                                    chunk.result && (
+                                      <p className="text-xs text-green-300/70">
+                                        {chunk.result.lore.length} lore,{" "}
+                                        {chunk.result.mechanicNotes.length}{" "}
+                                        mechanics,{" "}
+                                        {chunk.result.customTables.length}{" "}
+                                        tables
+                                      </p>
+                                    )}
+                                  {chunk.status === "failed" &&
+                                    chunk.error && (
+                                      <p
+                                        className="text-xs text-red-300/70 break-words max-h-16 overflow-y-auto"
+                                        title={chunk.error}
+                                      >
+                                        {chunk.error}
+                                      </p>
+                                    )}
+                                  {chunk.status === "summarizing" && (
+                                    <p className="text-xs text-blue-300/70">
+                                      Creating notes...
+                                    </p>
+                                  )}
+                                  {chunk.status === "ocr" && (
+                                    <p className="text-xs text-blue-300/70">
+                                      Extracting text...
+                                    </p>
+                                  )}
+                                  {chunk.status === "pending" && (
+                                    <p className="text-xs text-gray-400/70">
+                                      Waiting...
+                                    </p>
+                                  )}
+                                </div>
 
-                            {/* Actions for failed chunks */}
-                            {chunk.status === "failed" && (
-                              <div className="flex gap-1 shrink-0">
-                                <button
-                                  onClick={() => retryChunk(chunk.chunkIndex)}
-                                  className="px-2 py-1 text-xs bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors flex items-center gap-1"
-                                  title="Retry this chunk"
-                                >
-                                  <DynamicIcon
-                                    name="RefreshCw"
-                                    className="w-3 h-3"
-                                  />
-                                  Retry
-                                </button>
-                                {chunk.rawSummarizeOutput && (
+                                {/* Preview toggle - read the extracted
+                                    text/notes for this chunk while (or
+                                    after) it's processed */}
+                                {canPreview && (
                                   <button
-                                    onClick={() =>
-                                      openRepairModal(chunk.chunkIndex)
-                                    }
-                                    className="px-2 py-1 text-xs bg-amber-600/80 hover:bg-amber-600 text-white rounded transition-colors flex items-center gap-1"
-                                    title="Manually fix JSON"
+                                    onClick={() => {
+                                      setExpandedChunkIndex(
+                                        isExpanded ? null : chunk.chunkIndex,
+                                      );
+                                      setChunkPreviewTab(
+                                        canPreviewNotes ? "notes" : "text",
+                                      );
+                                    }}
+                                    className="px-2 py-1 text-xs bg-blue-900/40 hover:bg-blue-800/50 text-blue-200 rounded transition-colors flex items-center gap-1 shrink-0"
+                                    title="Preview extracted content"
                                   >
                                     <DynamicIcon
-                                      name="Wrench"
+                                      name={isExpanded ? "EyeOff" : "Eye"}
                                       className="w-3 h-3"
                                     />
-                                    Fix
+                                    {isExpanded ? "Hide" : "Preview"}
                                   </button>
                                 )}
+
+                                {/* Actions for failed chunks */}
+                                {chunk.status === "failed" && (
+                                  <div className="flex gap-1 shrink-0">
+                                    <button
+                                      onClick={() =>
+                                        retryChunk(chunk.chunkIndex)
+                                      }
+                                      className="px-2 py-1 text-xs bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors flex items-center gap-1"
+                                      title="Retry this chunk"
+                                    >
+                                      <DynamicIcon
+                                        name="RefreshCw"
+                                        className="w-3 h-3"
+                                      />
+                                      Retry
+                                    </button>
+                                    {chunk.rawSummarizeOutput && (
+                                      <button
+                                        onClick={() =>
+                                          openRepairModal(chunk.chunkIndex)
+                                        }
+                                        className="px-2 py-1 text-xs bg-amber-600/80 hover:bg-amber-600 text-white rounded transition-colors flex items-center gap-1"
+                                        title="Manually fix JSON"
+                                      >
+                                        <DynamicIcon
+                                          name="Wrench"
+                                          className="w-3 h-3"
+                                        />
+                                        Fix
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        ))}
+
+                              {/* Expanded live preview: raw OCR text
+                                  and/or extracted notes for this chunk */}
+                              {isExpanded && canPreview && (
+                                <div className="px-2 pb-2">
+                                  <div className="flex gap-1 mb-2">
+                                    {canPreviewNotes && (
+                                      <button
+                                        onClick={() =>
+                                          setChunkPreviewTab("notes")
+                                        }
+                                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                                          chunkPreviewTab === "notes"
+                                            ? "bg-purple-600/80 text-white"
+                                            : "bg-blue-900/40 text-blue-300/70 hover:bg-blue-900/60"
+                                        }`}
+                                      >
+                                        Notes
+                                      </button>
+                                    )}
+                                    {canPreviewText && (
+                                      <button
+                                        onClick={() =>
+                                          setChunkPreviewTab("text")
+                                        }
+                                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                                          chunkPreviewTab === "text"
+                                            ? "bg-purple-600/80 text-white"
+                                            : "bg-blue-900/40 text-blue-300/70 hover:bg-blue-900/60"
+                                        }`}
+                                      >
+                                        Raw Text
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {chunkPreviewTab === "text" &&
+                                    canPreviewText && (
+                                      <pre className="text-xs text-blue-200/80 whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-black/20 rounded p-2">
+                                        {chunk.ocrMarkdown}
+                                      </pre>
+                                    )}
+
+                                  {chunkPreviewTab === "notes" &&
+                                    canPreviewNotes &&
+                                    chunk.result && (
+                                      <div className="space-y-2 max-h-48 overflow-y-auto bg-black/20 rounded p-2">
+                                        {chunk.result.lore.length > 0 && (
+                                          <div>
+                                            <p className="text-xs font-semibold text-blue-300 mb-1">
+                                              📚 Lore (
+                                              {chunk.result.lore.length})
+                                            </p>
+                                            {chunk.result.lore.map((l, i) => (
+                                              <p
+                                                key={i}
+                                                className="text-xs text-blue-200/80 break-words"
+                                              >
+                                                <span className="font-medium">
+                                                  {l.title}:
+                                                </span>{" "}
+                                                {l.content}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {chunk.result.mechanicNotes.length >
+                                          0 && (
+                                          <div>
+                                            <p className="text-xs font-semibold text-amber-300 mb-1">
+                                              ⚙️ Mechanics (
+                                              {chunk.result.mechanicNotes.length}
+                                              )
+                                            </p>
+                                            {chunk.result.mechanicNotes.map(
+                                              (m, i) => (
+                                                <p
+                                                  key={i}
+                                                  className="text-xs text-amber-200/80 break-words"
+                                                >
+                                                  <span className="font-medium">
+                                                    {m.title}:
+                                                  </span>{" "}
+                                                  {m.content}
+                                                </p>
+                                              ),
+                                            )}
+                                          </div>
+                                        )}
+                                        {chunk.result.customTables.length >
+                                          0 && (
+                                          <div>
+                                            <p className="text-xs font-semibold text-purple-300 mb-1">
+                                              🎲 Tables (
+                                              {chunk.result.customTables.length}
+                                              )
+                                            </p>
+                                            {chunk.result.customTables.map(
+                                              (t, i) => (
+                                                <p
+                                                  key={i}
+                                                  className="text-xs text-purple-200/80 break-words"
+                                                >
+                                                  {t.name} ({t.entries.length}{" "}
+                                                  entries)
+                                                </p>
+                                              ),
+                                            )}
+                                          </div>
+                                        )}
+                                        {chunk.result.lore.length === 0 &&
+                                          chunk.result.mechanicNotes.length ===
+                                            0 &&
+                                          chunk.result.customTables.length ===
+                                            0 && (
+                                            <p className="text-xs text-blue-300/50 italic">
+                                              No notes extracted from this
+                                              chunk.
+                                            </p>
+                                          )}
+                                      </div>
+                                    )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
 
                         {/* Complete with current results button */}
                         {chunkStatuses.some((cs) => cs.status === "failed") &&
@@ -2041,13 +2503,13 @@ export default function PDFImporter({
               {/* Error State */}
               {step === "error" && (
                 <div className="bg-red-900/30 rounded-lg p-4 border border-red-700/40">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <DynamicIcon
                       name="XCircle"
-                      className="w-6 h-6 text-red-400"
+                      className="w-6 h-6 text-red-400 shrink-0"
                     />
-                    <div className="flex-1">
-                      <p className="font-medium text-red-300">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-red-300 break-words max-h-32 overflow-y-auto">
                         {statusMessage}
                       </p>
                       <button
@@ -2064,48 +2526,99 @@ export default function PDFImporter({
               {/* File Selection */}
               {step === "idle" && (
                 <>
-                  {/* Drop Zone */}
-                  <div
-                    onDrop={handleDrop}
-                    onDragOver={handleDragOver}
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
-                      selectedFiles.length > 0
-                        ? "border-green-500/50 bg-green-900/20"
-                        : "border-blue-700/50 hover:border-purple-500/50 hover:bg-purple-900/20"
-                    }`}
-                  >
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md"
-                      onChange={handleFileSelect}
-                      multiple
-                      className="hidden"
-                    />
-                    <div className="space-y-2">
-                      <DynamicIcon
-                        name={selectedFiles.length > 0 ? "FilePlus" : "Upload"}
-                        className={`w-10 h-10 mx-auto ${
-                          selectedFiles.length > 0
-                            ? "text-green-400"
-                            : "text-blue-400"
-                        }`}
-                      />
-                      <p className="font-medium text-white">
-                        {selectedFiles.length > 0
-                          ? "Drop more files or click to add"
-                          : "Drop your PDFs here or click to browse"}
-                      </p>
-                      <p className="text-sm text-blue-300/60">
-                        Supports multiple files • PDF, PNG, JPEG, WebP • Max{" "}
-                        {MAX_PDF_SIZE_MB}MB each
-                      </p>
-                    </div>
+                  {/* Import Mode Toggle */}
+                  <div className="flex gap-2 p-1 bg-blue-900/30 rounded-lg">
+                    <button
+                      onClick={() => setImportMode("file")}
+                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        importMode === "file"
+                          ? "bg-purple-600 text-white"
+                          : "text-blue-300 hover:text-white"
+                      }`}
+                    >
+                      Upload file
+                    </button>
+                    <button
+                      onClick={() => setImportMode("link")}
+                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                        importMode === "link"
+                          ? "bg-purple-600 text-white"
+                          : "text-blue-300 hover:text-white"
+                      }`}
+                    >
+                      Import from link
+                    </button>
                   </div>
 
+                  {importMode === "link" ? (
+                    <div className="space-y-2">
+                      <label className="block text-sm font-semibold text-blue-200">
+                        Document link (e.g. Google Drive)
+                      </label>
+                      <input
+                        type="url"
+                        value={linkUrl}
+                        onChange={(e) => setLinkUrl(e.target.value)}
+                        placeholder="https://drive.google.com/file/d/.../view"
+                        className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white placeholder-blue-300/50"
+                      />
+                      <p className="text-xs text-blue-300/60">
+                        The file must be shared as &quot;Anyone with the
+                        link&quot;. Mistral fetches it directly, so there
+                        isn&apos;t an upload size limit here - but very
+                        large files can trigger Drive&apos;s virus-scan
+                        warning page instead of serving the file directly;
+                        use the file upload tab if that happens.
+                      </p>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Drop Zone */}
+                      <div
+                        onDrop={handleDrop}
+                        onDragOver={handleDragOver}
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                          selectedFiles.length > 0
+                            ? "border-green-500/50 bg-green-900/20"
+                            : "border-blue-700/50 hover:border-purple-500/50 hover:bg-purple-900/20"
+                        }`}
+                      >
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept=".pdf,.png,.jpg,.jpeg,.webp,.txt,.md"
+                          onChange={handleFileSelect}
+                          multiple
+                          className="hidden"
+                        />
+                        <div className="space-y-2">
+                          <DynamicIcon
+                            name={
+                              selectedFiles.length > 0 ? "FilePlus" : "Upload"
+                            }
+                            className={`w-10 h-10 mx-auto ${
+                              selectedFiles.length > 0
+                                ? "text-green-400"
+                                : "text-blue-400"
+                            }`}
+                          />
+                          <p className="font-medium text-white">
+                            {selectedFiles.length > 0
+                              ? "Drop more files or click to add"
+                              : "Drop your PDFs here or click to browse"}
+                          </p>
+                          <p className="text-sm text-blue-300/60">
+                            Supports multiple files • PDF, PNG, JPEG, WebP •
+                            Max {MAX_PDF_SIZE_MB}MB each
+                          </p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+
                   {/* Selected Files List */}
-                  {selectedFiles.length > 0 && (
+                  {importMode === "file" && selectedFiles.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-sm font-semibold text-blue-200">
@@ -2535,9 +3048,13 @@ export default function PDFImporter({
                 Cancel
               </button>
               <button
-                onClick={processFiles}
+                onClick={
+                  importMode === "link" ? processLinkImport : processFiles
+                }
                 disabled={
-                  selectedFiles.length === 0 ||
+                  (importMode === "link"
+                    ? !linkUrl.trim()
+                    : selectedFiles.length === 0) ||
                   step !== "idle" ||
                   (aiModel === "custom-model" && !customModelId.trim())
                 }
