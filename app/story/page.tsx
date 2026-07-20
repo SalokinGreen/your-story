@@ -277,10 +277,16 @@ function StoryPageContent() {
   useEffect(() => {
     updateHeights();
     window.visualViewport?.addEventListener("resize", updateHeights);
+    // "scroll" fires when the visual viewport's offset changes without a
+    // height change - notably when iOS scrolls the focused input into view
+    // above the keyboard, which can happen after (not during) the "resize"
+    // event and otherwise leaves contentAreaHeight computed from a stale top.
+    window.visualViewport?.addEventListener("scroll", updateHeights);
     window.addEventListener("resize", updateHeights);
     window.addEventListener("orientationchange", updateHeights);
     return () => {
       window.visualViewport?.removeEventListener("resize", updateHeights);
+      window.visualViewport?.removeEventListener("scroll", updateHeights);
       window.removeEventListener("resize", updateHeights);
       window.removeEventListener("orientationchange", updateHeights);
     };
@@ -3681,6 +3687,7 @@ function StoryPageContent() {
             onLocalActivity={sendNetActivity}
             netSession={netSession}
             netPeers={netPeers}
+            onViewportRecalc={updateHeights}
           />
           </div>
         )}

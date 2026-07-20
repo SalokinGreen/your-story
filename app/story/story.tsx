@@ -1,5 +1,11 @@
 "use client";
-import { Choice, Choices, StoryData, ActionAnalysis } from "../misc/structs";
+import {
+  Choice,
+  Choices,
+  StoryData,
+  ActionAnalysis,
+  CouchPlayer,
+} from "../misc/structs";
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -70,6 +76,10 @@ interface StoryProps {
   // Chronological thinking/tool/text blocks for the turn currently
   // generating - see turnTimeline.ts
   liveGMEntries?: TimelineBlock[];
+  // Re-measure the page's keyboard-aware viewport height (see page.tsx) -
+  // called on composer focus/blur since iOS can scroll/resize the visual
+  // viewport asynchronously, after the initial resize event.
+  onViewportRecalc?: () => void;
 }
 
 // Font settings interface
@@ -342,6 +352,315 @@ function ChatMessage({
   );
 }
 
+interface StoryComposerProps {
+  choices: Choices;
+  loading: boolean;
+  loadingStage?: "gm" | "story" | "choices" | null;
+  couchPlayers: CouchPlayer[];
+  onCustomInput?: StoryProps["onCustomInput"];
+  onActionSubmit?: StoryProps["onActionSubmit"];
+  onActionConfirm?: StoryProps["onActionConfirm"];
+  onStop?: () => void;
+  onFocusChange?: () => void;
+}
+
+// The chat input row - suggested-choice chips, couch co-op player switcher,
+// textarea, send/stop button - split out of Story so a keystroke only
+// re-renders this small subtree instead of the entire chat history above it.
+const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
+  function StoryComposer(
+    {
+      choices,
+      loading,
+      loadingStage,
+      couchPlayers,
+      onCustomInput,
+      onActionSubmit,
+      onActionConfirm,
+      onStop,
+      onFocusChange,
+    },
+    forwardedRef,
+  ) {
+    const [composerText, setComposerText] = React.useState("");
+    const [composerBusy, setComposerBusy] = React.useState(false);
+    const composerRef = useRef<HTMLTextAreaElement>(null);
+    React.useImperativeHandle(
+      forwardedRef,
+      () => composerRef.current as HTMLTextAreaElement,
+    );
+
+    // STT state
+    const [sttEnabled, setSttEnabled] = React.useState(false);
+    React.useEffect(() => {
+      if (typeof window !== "undefined") {
+        setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
+      }
+      const handleStorageChange = () => {
+        setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
+      };
+      window.addEventListener("storage", handleStorageChange);
+      const interval = setInterval(handleStorageChange, 500);
+      return () => {
+        window.removeEventListener("storage", handleStorageChange);
+        clearInterval(interval);
+      };
+    }, []);
+
+    // Couch co-op: which player the next typed line belongs to
+    const [activeSpeakerId, setActiveSpeakerId] = React.useState<
+      string | null
+    >(null);
+    const activeSpeaker =
+      couchPlayers.find((p) => p.id === activeSpeakerId) ||
+      couchPlayers[0] ||
+      null;
+
+    const autoGrowComposer = () => {
+      const el = composerRef.current;
+      if (!el) return;
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 140) + "px";
+    };
+
+    // Shared freeform submit path (composer + STT): analyze the action for
+    // mechanics (skill checks, items, tables), then submit it as a Choice.
+    const submitFreeformAction = async (text: string, isStt = false) => {
+      const trimmed = text.trim();
+      if (!trimmed) return;
+      const sttFlag = isStt || undefined;
+
+      if (onActionSubmit && onActionConfirm) {
+        try {
+          const result = await onActionSubmit(trimmed);
+          if (result) {
+            // Submit with analyzed mechanics (skill checks, tables, etc.)
+            const choice: Choice = {
+              text: trimmed,
+              skill_used: result.analysis.skill_used || undefined,
+              skill_dc: result.analysis.skill_dc || undefined,
+              item_used: result.analysis.item_used || undefined,
+              ability_used: result.analysis.ability_used || undefined,
+              resource_used: result.analysis.resource_used || undefined,
+              agmt_check: result.analysis.agmt_check || undefined,
+              table: result.analysis.table || undefined,
+              stt_input: sttFlag,
+            };
+            onActionConfirm(choice);
+          } else {
+            // Analysis failed, submit as plain action
+            onActionConfirm({ text: trimmed, stt_input: sttFlag });
+          }
+        } catch (error) {
+          console.error("Action analysis failed:", error);
+          // Fallback to plain action
+          onActionConfirm({ text: trimmed, stt_input: sttFlag });
+        }
+      } else if (onActionConfirm) {
+        // No analysis available, submit plain
+        onActionConfirm({ text: trimmed, stt_input: sttFlag });
+      } else if (onCustomInput) {
+        onCustomInput(trimmed);
+      }
+    };
+
+    // Handle STT transcript - same path as the composer, flagged as voice input
+    const handleSTTTranscript = async (text: string) => {
+      await submitFreeformAction(text, true);
+    };
+
+    const handleComposerSubmit = async () => {
+      const text = composerText.trim();
+      if (!text || loading || loadingStage || composerBusy) return;
+
+      setComposerText("");
+      if (composerRef.current) composerRef.current.style.height = "auto";
+
+      // Couch co-op: attribute the line to the active player (same "> Name:
+      // action" format PlayerBubbles uses), then pass the mic to the next one.
+      if (couchPlayers.length > 1 && activeSpeaker && onCustomInput) {
+        onCustomInput(`> ${activeSpeaker.name}: ${text}`, undefined, [
+          activeSpeaker.id,
+        ]);
+        const idx = couchPlayers.findIndex((p) => p.id === activeSpeaker.id);
+        setActiveSpeakerId(couchPlayers[(idx + 1) % couchPlayers.length].id);
+        return;
+      }
+
+      setComposerBusy(true);
+      try {
+        await submitFreeformAction(text);
+      } finally {
+        setComposerBusy(false);
+      }
+    };
+
+    // Tapping a suggested-choice chip submits that choice directly (mechanics
+    // like skill checks and intro overrides ride along on the Choice object).
+    const handleChipSelect = (choice: Choice) => {
+      if (loading || loadingStage || composerBusy) return;
+      if (onActionConfirm) {
+        onActionConfirm({ ...choice });
+      }
+    };
+
+    // iOS can resize/scroll the visual viewport asynchronously after the
+    // keyboard's open/close animation, after the initial focus/blur event -
+    // re-measure once immediately and again once it's had time to settle.
+    const handleFocusChange = () => {
+      onFocusChange?.();
+      window.setTimeout(() => onFocusChange?.(), 300);
+    };
+
+    return (
+      <div
+        className="p-3 pt-2 space-y-2"
+        style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
+      >
+        {/* Suggested choices as tappable chips */}
+        {!loading &&
+          !loadingStage &&
+          (choices?.choices?.length ?? 0) > 0 && (
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-0.5">
+              {choices.choices.map((choice, i) => (
+                <button
+                  key={`chip-${i}-${choice.text}`}
+                  onClick={() => handleChipSelect(choice)}
+                  disabled={composerBusy}
+                  className="shrink-0 max-w-[16rem] px-3 py-1.5 rounded-full bg-purple-900/25 hover:bg-purple-800/40 border border-purple-600/30 hover:border-purple-500/60 text-purple-100/90 text-xs transition-colors truncate touch-manipulation disabled:opacity-50"
+                  title={choice.text}
+                >
+                  {choice.text}
+                </button>
+              ))}
+            </div>
+          )}
+
+        {/* Couch co-op: switch who's speaking */}
+        {couchPlayers.length > 1 && (
+          <div className="flex items-center gap-1 p-1 bg-black/25 border border-white/10 rounded-full overflow-x-auto scrollbar-hide w-fit max-w-full">
+            {couchPlayers.map((player) => {
+              const isActive = activeSpeaker?.id === player.id;
+              return (
+                <button
+                  key={player.id}
+                  onClick={() => setActiveSpeakerId(player.id)}
+                  className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all touch-manipulation ${
+                    isActive
+                      ? "text-white shadow-md"
+                      : "text-blue-200/60 hover:text-white"
+                  }`}
+                  style={
+                    isActive
+                      ? { backgroundColor: player.color }
+                      : undefined
+                  }
+                  title={`Play as ${player.name}`}
+                >
+                  <span
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      isActive ? "bg-white/90" : ""
+                    }`}
+                    style={
+                      isActive
+                        ? undefined
+                        : { backgroundColor: player.color }
+                    }
+                  />
+                  <span className="max-w-[7rem] truncate">
+                    {player.name}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Input row */}
+        <div className="flex items-end gap-2">
+          {sttEnabled && (
+            <STTButton
+              onTranscript={handleSTTTranscript}
+              disabled={loading || !!loadingStage || composerBusy}
+              className="shrink-0 self-stretch"
+            />
+          )}
+
+          <div className="relative flex-1">
+            <textarea
+              ref={composerRef}
+              value={composerText}
+              onChange={(e) => {
+                setComposerText(e.target.value);
+                autoGrowComposer();
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleComposerSubmit();
+                }
+              }}
+              onFocus={handleFocusChange}
+              onBlur={handleFocusChange}
+              rows={1}
+              placeholder={
+                loading || loadingStage
+                  ? loadingStage === "gm"
+                    ? "GM is thinking..."
+                    : loadingStage === "choices"
+                      ? "Preparing choices..."
+                      : "Writing the story..."
+                  : couchPlayers.length > 1 && activeSpeaker
+                    ? `What does ${activeSpeaker.name} do?`
+                    : "What do you do?"
+              }
+              className="w-full resize-none pl-4 pr-12 py-3 bg-blue-900/25 border border-blue-700/40 rounded-2xl text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/70 text-base leading-snug"
+              style={
+                couchPlayers.length > 1 && activeSpeaker
+                  ? { borderColor: `${activeSpeaker.color}66` }
+                  : undefined
+              }
+            />
+
+            {/* Send / Stop button, embedded like other chat UIs */}
+            {loading || loadingStage ? (
+              <button
+                onClick={onStop}
+                className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full bg-red-500/15 hover:bg-red-500/30 border border-red-400/40 flex items-center justify-center transition-colors touch-manipulation"
+                title="Stop generating"
+              >
+                <span className="relative flex items-center justify-center">
+                  <span className="absolute w-7 h-7 border-2 border-red-400/30 border-t-red-300 rounded-full animate-spin" />
+                  <DynamicIcon
+                    name="Square"
+                    className="w-3 h-3 text-red-300 fill-current"
+                  />
+                </span>
+              </button>
+            ) : (
+              <button
+                onClick={handleComposerSubmit}
+                disabled={!composerText.trim() || composerBusy}
+                className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full flex items-center justify-center transition-all bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 disabled:opacity-40 shadow-md shadow-purple-950/40 touch-manipulation"
+                title="Send"
+              >
+                {composerBusy ? (
+                  <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <DynamicIcon
+                    name="ArrowUp"
+                    className="w-4 h-4 text-white"
+                  />
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  },
+);
+
 export default function Story({
   storyData,
   storyText,
@@ -376,6 +695,7 @@ export default function Story({
   onLocalActivity,
   netSession,
   netPeers,
+  onViewportRecalc,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -417,9 +737,6 @@ export default function Story({
   React.useEffect(() => {
     localStorage.setItem("actionMode", actionMode.toString());
   }, [actionMode]);
-
-  // STT state
-  const [sttEnabled, setSttEnabled] = React.useState(false);
 
   // Font settings state
   const [fontSettings, setFontSettings] = useState({
@@ -486,127 +803,15 @@ export default function Story({
       window.removeEventListener("fontSettingsChanged", handleFontChange);
   }, []);
 
-  // Load STT settings from localStorage
-  React.useEffect(() => {
-    if (typeof window !== "undefined") {
-      setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
-    }
-    // Listen for changes
-    const handleStorageChange = () => {
-      setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
-    };
-    window.addEventListener("storage", handleStorageChange);
-    const interval = setInterval(handleStorageChange, 500);
-    return () => {
-      window.removeEventListener("storage", handleStorageChange);
-      clearInterval(interval);
-    };
-  }, []);
-
-  // Shared freeform submit path (composer + STT): analyze the action for
-  // mechanics (skill checks, items, tables), then submit it as a Choice.
-  const submitFreeformAction = async (text: string, isStt = false) => {
-    const trimmed = text.trim();
-    if (!trimmed) return;
-    const sttFlag = isStt || undefined;
-
-    if (onActionSubmit && onActionConfirm) {
-      try {
-        const result = await onActionSubmit(trimmed);
-        if (result) {
-          // Submit with analyzed mechanics (skill checks, tables, etc.)
-          const choice: Choice = {
-            text: trimmed,
-            skill_used: result.analysis.skill_used || undefined,
-            skill_dc: result.analysis.skill_dc || undefined,
-            item_used: result.analysis.item_used || undefined,
-            ability_used: result.analysis.ability_used || undefined,
-            resource_used: result.analysis.resource_used || undefined,
-            agmt_check: result.analysis.agmt_check || undefined,
-            table: result.analysis.table || undefined,
-            stt_input: sttFlag,
-          };
-          onActionConfirm(choice);
-        } else {
-          // Analysis failed, submit as plain action
-          onActionConfirm({ text: trimmed, stt_input: sttFlag });
-        }
-      } catch (error) {
-        console.error("Action analysis failed:", error);
-        // Fallback to plain action
-        onActionConfirm({ text: trimmed, stt_input: sttFlag });
-      }
-    } else if (onActionConfirm) {
-      // No analysis available, submit plain
-      onActionConfirm({ text: trimmed, stt_input: sttFlag });
-    } else if (onCustomInput) {
-      onCustomInput(trimmed);
-    }
-  };
-
-  // Handle STT transcript - same path as the composer, flagged as voice input
-  const handleSTTTranscript = async (text: string) => {
-    await submitFreeformAction(text, true);
-  };
-
-  // Composer (inline chat input) state
-  const [composerText, setComposerText] = React.useState("");
-  const [composerBusy, setComposerBusy] = React.useState(false);
-  const composerRef = useRef<HTMLTextAreaElement>(null);
-
-  // Couch co-op: which player the next typed line belongs to
+  // Couch co-op: which player the next typed line belongs to (passed to
+  // StoryComposer; also read below to gate the PlayerBubbles voice UI)
   const couchPlayers =
     (storyData.multiplayer?.enabled && storyData.multiplayer.couchPlayers) ||
     [];
-  const [activeSpeakerId, setActiveSpeakerId] = React.useState<string | null>(
-    null,
-  );
-  const activeSpeaker =
-    couchPlayers.find((p) => p.id === activeSpeakerId) ||
-    couchPlayers[0] ||
-    null;
 
-  const autoGrowComposer = () => {
-    const el = composerRef.current;
-    if (!el) return;
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, 140) + "px";
-  };
-
-  const handleComposerSubmit = async () => {
-    const text = composerText.trim();
-    if (!text || loading || loadingStage || composerBusy) return;
-
-    setComposerText("");
-    if (composerRef.current) composerRef.current.style.height = "auto";
-
-    // Couch co-op: attribute the line to the active player (same "> Name:
-    // action" format PlayerBubbles uses), then pass the mic to the next one.
-    if (couchPlayers.length > 1 && activeSpeaker && onCustomInput) {
-      onCustomInput(`> ${activeSpeaker.name}: ${text}`, undefined, [
-        activeSpeaker.id,
-      ]);
-      const idx = couchPlayers.findIndex((p) => p.id === activeSpeaker.id);
-      setActiveSpeakerId(couchPlayers[(idx + 1) % couchPlayers.length].id);
-      return;
-    }
-
-    setComposerBusy(true);
-    try {
-      await submitFreeformAction(text);
-    } finally {
-      setComposerBusy(false);
-    }
-  };
-
-  // Tapping a suggested-choice chip submits that choice directly (mechanics
-  // like skill checks and intro overrides ride along on the Choice object).
-  const handleChipSelect = (choice: Choice) => {
-    if (loading || loadingStage || composerBusy) return;
-    if (onActionConfirm) {
-      onActionConfirm({ ...choice });
-    }
-  };
+  // Kept at this level (rather than inside StoryComposer) so the "Enter/Space
+  // jumps into the composer" keyboard shortcut below can reach it.
+  const composerRef = useRef<HTMLTextAreaElement>(null);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -1112,145 +1317,18 @@ export default function Story({
 
         {/* Composer: suggested choices, player switcher, and chat input */}
         {!editMode && (
-          <div className="p-3 pt-2 space-y-2">
-            {/* Suggested choices as tappable chips */}
-            {!loading &&
-              !loadingStage &&
-              (choices?.choices?.length ?? 0) > 0 && (
-                <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-0.5">
-                  {choices.choices.map((choice, i) => (
-                    <button
-                      key={`chip-${i}-${choice.text}`}
-                      onClick={() => handleChipSelect(choice)}
-                      disabled={composerBusy}
-                      className="shrink-0 max-w-[16rem] px-3 py-1.5 rounded-full bg-purple-900/25 hover:bg-purple-800/40 border border-purple-600/30 hover:border-purple-500/60 text-purple-100/90 text-xs transition-colors truncate touch-manipulation disabled:opacity-50"
-                      title={choice.text}
-                    >
-                      {choice.text}
-                    </button>
-                  ))}
-                </div>
-              )}
-
-            {/* Couch co-op: switch who's speaking */}
-            {couchPlayers.length > 1 && (
-              <div className="flex items-center gap-1 p-1 bg-black/25 border border-white/10 rounded-full overflow-x-auto scrollbar-hide w-fit max-w-full">
-                {couchPlayers.map((player) => {
-                  const isActive = activeSpeaker?.id === player.id;
-                  return (
-                    <button
-                      key={player.id}
-                      onClick={() => setActiveSpeakerId(player.id)}
-                      className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all touch-manipulation ${
-                        isActive
-                          ? "text-white shadow-md"
-                          : "text-blue-200/60 hover:text-white"
-                      }`}
-                      style={
-                        isActive
-                          ? { backgroundColor: player.color }
-                          : undefined
-                      }
-                      title={`Play as ${player.name}`}
-                    >
-                      <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                          isActive ? "bg-white/90" : ""
-                        }`}
-                        style={
-                          isActive
-                            ? undefined
-                            : { backgroundColor: player.color }
-                        }
-                      />
-                      <span className="max-w-[7rem] truncate">
-                        {player.name}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-
-            {/* Input row */}
-            <div className="flex items-end gap-2">
-              {sttEnabled && (
-                <STTButton
-                  onTranscript={handleSTTTranscript}
-                  disabled={loading || !!loadingStage || composerBusy}
-                  className="shrink-0 self-stretch"
-                />
-              )}
-
-              <div className="relative flex-1">
-                <textarea
-                  ref={composerRef}
-                  value={composerText}
-                  onChange={(e) => {
-                    setComposerText(e.target.value);
-                    autoGrowComposer();
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      handleComposerSubmit();
-                    }
-                  }}
-                  rows={1}
-                  placeholder={
-                    loading || loadingStage
-                      ? loadingStage === "gm"
-                        ? "GM is thinking..."
-                        : loadingStage === "choices"
-                          ? "Preparing choices..."
-                          : "Writing the story..."
-                      : couchPlayers.length > 1 && activeSpeaker
-                        ? `What does ${activeSpeaker.name} do?`
-                        : "What do you do?"
-                  }
-                  className="w-full resize-none pl-4 pr-12 py-3 bg-blue-900/25 border border-blue-700/40 rounded-2xl text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/70 text-base leading-snug"
-                  style={
-                    couchPlayers.length > 1 && activeSpeaker
-                      ? { borderColor: `${activeSpeaker.color}66` }
-                      : undefined
-                  }
-                />
-
-                {/* Send / Stop button, embedded like other chat UIs */}
-                {loading || loadingStage ? (
-                  <button
-                    onClick={onStop}
-                    className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full bg-red-500/15 hover:bg-red-500/30 border border-red-400/40 flex items-center justify-center transition-colors touch-manipulation"
-                    title="Stop generating"
-                  >
-                    <span className="relative flex items-center justify-center">
-                      <span className="absolute w-7 h-7 border-2 border-red-400/30 border-t-red-300 rounded-full animate-spin" />
-                      <DynamicIcon
-                        name="Square"
-                        className="w-3 h-3 text-red-300 fill-current"
-                      />
-                    </span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={handleComposerSubmit}
-                    disabled={!composerText.trim() || composerBusy}
-                    className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full flex items-center justify-center transition-all bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 disabled:opacity-40 shadow-md shadow-purple-950/40 touch-manipulation"
-                    title="Send"
-                  >
-                    {composerBusy ? (
-                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    ) : (
-                      <DynamicIcon
-                        name="ArrowUp"
-                        className="w-4 h-4 text-white"
-                      />
-                    )}
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+          <StoryComposer
+            ref={composerRef}
+            choices={choices}
+            loading={loading}
+            loadingStage={loadingStage}
+            couchPlayers={couchPlayers}
+            onCustomInput={onCustomInput}
+            onActionSubmit={onActionSubmit}
+            onActionConfirm={onActionConfirm}
+            onStop={onStop}
+            onFocusChange={onViewportRecalc}
+          />
         )}
       </div>
 
