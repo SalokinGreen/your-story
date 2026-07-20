@@ -257,6 +257,14 @@ function StoryPageContent() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const hasLoadedStoryRef = useRef<string | null>(null); // Track loaded story ID to prevent re-fetching on tab focus
   const generationAbortRef = useRef<AbortController | null>(null); // Abort controller for stopping generation
+  // Full pre-turn StoryData snapshot, taken right before each turn's GM
+  // tool calls can mutate state. Session-only (not persisted) - lets
+  // handleUndo actually undo a turn's mechanical state changes (NPC
+  // attitude, quests, stats, etc.), not just its scene.parts entries. See
+  // §2.5 in docs/research-paper-ttrpg-theory-gap-analysis.md - this closes
+  // the "misread input" rollback gap by fixing Undo's existing scope
+  // rather than adding a new UX concept.
+  const preTurnSnapshotRef = useRef<StoryData | null>(null);
   const [choices, setChoices] = useState<Choices>({ choices: [] });
   const [input, setInput] = useState<Record<string, boolean>>({});
   const [storyText, setStoryText] = useState("");
@@ -1483,6 +1491,25 @@ function StoryPageContent() {
               };
             }
 
+            // Copy and surface consistency-check warnings (§2.5 state-error
+            // path, see docs/research-paper-ttrpg-theory-gap-analysis.md).
+            // checkNarrationConsistency runs after streaming completes, so
+            // these previously only reached storyData via result.scenePart -
+            // they were never actually shown to the player, only visible in
+            // the ContextViewer debug panel. Surfacing them as a notification
+            // (with the fix already one click away via Edit + Retry, both of
+            // which already exist) is what actually connects the pieces.
+            if (lastIdx >= 0 && result.scenePart?.consistencyWarnings?.length) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                consistencyWarnings: result.scenePart.consistencyWarnings,
+              };
+              addNotification(
+                `Possible inconsistency: ${result.scenePart.consistencyWarnings[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+                "warning",
+              );
+            }
+
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
@@ -1639,6 +1666,18 @@ function StoryPageContent() {
     playerComment?: string,
   ) {
     if (!storyData) return;
+
+    // Snapshot full state before this turn's GM tool calls can mutate it,
+    // so handleUndo can restore mechanical state (not just pop scene.parts)
+    // if the player says "that's not what I meant." Best-effort: if the
+    // structure somehow isn't cloneable, undo just falls back to its old
+    // scene.parts-only behavior rather than failing the turn.
+    try {
+      preTurnSnapshotRef.current = structuredClone(storyData);
+    } catch (snapshotError) {
+      console.error("Failed to snapshot pre-turn state for undo", snapshotError);
+      preTurnSnapshotRef.current = null;
+    }
 
     let choice: Choice | undefined;
     if (actionChoice) {
@@ -2592,6 +2631,25 @@ function StoryPageContent() {
               };
             }
 
+            // Copy and surface consistency-check warnings (§2.5 state-error
+            // path, see docs/research-paper-ttrpg-theory-gap-analysis.md).
+            // checkNarrationConsistency runs after streaming completes, so
+            // these previously only reached storyData via result.scenePart -
+            // they were never actually shown to the player, only visible in
+            // the ContextViewer debug panel. Surfacing them as a notification
+            // (with the fix already one click away via Edit + Retry, both of
+            // which already exist) is what actually connects the pieces.
+            if (lastIdx >= 0 && result.scenePart?.consistencyWarnings?.length) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                consistencyWarnings: result.scenePart.consistencyWarnings,
+              };
+              addNotification(
+                `Possible inconsistency: ${result.scenePart.consistencyWarnings[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+                "warning",
+              );
+            }
+
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
@@ -2655,9 +2713,38 @@ function StoryPageContent() {
 
     logger.action("User requested undo");
 
-    // Remove both the AI response and the user choice
-    storyData.scene.parts.pop();
-    storyData.scene.parts.pop();
+    // Prefer restoring the full pre-turn snapshot over just popping
+    // scene.parts - a turn's GM tool calls may have mutated NPCs, quests,
+    // stats, timers, etc. directly on storyData, and popping the
+    // conversational record alone left those mechanical changes in place
+    // (the "misread input" gap - see §2.5 in
+    // docs/research-paper-ttrpg-theory-gap-analysis.md). Only usable to
+    // undo the single most recent turn - the snapshot is consumed and not
+    // stacked, matching the paper's "misread input rolls back the whole
+    // turn" behavior rather than a general multi-step undo history.
+    const snapshot = preTurnSnapshotRef.current;
+    const snapshotMatchesCurrentTurn =
+      snapshot &&
+      snapshot.scene.parts.length === storyData.scene.parts.length - 2;
+
+    if (snapshotMatchesCurrentTurn) {
+      // Restore in place (mutate the existing object, matching this
+      // codebase's storyData-mutation convention) rather than swapping to a
+      // new object reference, so every other handler's closure over
+      // `storyData` keeps working unchanged.
+      for (const key of Object.keys(storyData)) {
+        delete (storyData as unknown as Record<string, unknown>)[key];
+      }
+      Object.assign(storyData, snapshot);
+      preTurnSnapshotRef.current = null;
+      logger.action("Undo restored full pre-turn state (mechanics included)");
+    } else {
+      // No matching snapshot (e.g. page was reloaded, or undoing further
+      // back than the single most recent turn) - fall back to the old
+      // scene.parts-only behavior rather than failing the undo outright.
+      storyData.scene.parts.pop();
+      storyData.scene.parts.pop();
+    }
 
     // Update state to previous scene part
     if (storyData.scene.parts.length > 0) {

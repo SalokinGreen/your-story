@@ -23,6 +23,9 @@ import {
   getMemoryContent,
   MAX_PENDING_RANDOM_EVENTS,
   PendingRandomEvent,
+  LoreVisibility,
+  ReactionCategory,
+  IncidentalReaction,
 } from "./structs";
 import {
   StartChallengeParams,
@@ -61,6 +64,8 @@ import {
   UpdateNPCParams,
   RemoveNPCParams,
   NPCReactionParams,
+  ReactionCheckParams,
+  NegotiatePriceParams,
   GM_TOOL_MAP,
   SetReasoningTierParams,
 } from "./gmTools";
@@ -143,7 +148,9 @@ export interface GMToolResult {
     | GMAddNPCResult
     | GMUpdateNPCResult
     | GMRemoveNPCResult
-    | GMNPCReactionResult;
+    | GMNPCReactionResult
+    | GMReactionCheckResult
+    | GMNegotiatePriceResult;
   contextForStory: string; // Formatted bracket notation for story stage
 }
 
@@ -205,6 +212,8 @@ export interface GMFormulaRollResult {
   displayName?: string;
   showToPlayer?: boolean; // Show dice animation to player (default true)
   stakes?: string;
+  target?: string; // Hardness dimension: who the failure consequence lands on
+  forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
   consequences?: {
     success?: string;
     failure?: string;
@@ -230,6 +239,8 @@ export interface GMOpposedFormulaResult {
   displayName?: string;
   showToPlayer?: boolean; // Show dice animation to player (default true)
   stakes?: string;
+  target?: string; // Hardness dimension: who the losing consequence lands on
+  forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
   consequences?: {
     player_wins?: string;
     opponent_wins?: string;
@@ -493,6 +504,37 @@ export interface GMNPCReactionResult {
   type: "npc_reaction";
   reaction: NPCReaction;
   message: string;
+}
+
+export interface GMReactionCheckResult {
+  type: "reaction_check";
+  npcName: string;
+  rolls: number[];
+  bias: "hostile" | "neutral" | "favorable";
+  modifiers: number;
+  total: number;
+  category: ReactionCategory;
+  mandate: string;
+  reason: string;
+  showToPlayer: boolean;
+  cached?: boolean; // True if this returned an existing scene-cached reaction instead of rolling fresh
+}
+
+export interface GMNegotiatePriceResult {
+  type: "negotiate_price";
+  itemName: string;
+  listPrice: number;
+  playerRolls: number[];
+  playerTotal: number;
+  sellerRolls: number[];
+  sellerTotal: number;
+  margin: number;
+  discountPercent: number;
+  finalPrice: number;
+  clampedToFloor: boolean;
+  failed: boolean; // True if the negotiation failed outright (target below seller's floor)
+  reason: string;
+  showToPlayer: boolean;
 }
 
 // ============================================
@@ -913,6 +955,19 @@ export async function executeGMTools(
             call.id,
             params as NPCReactionParams,
             modified
+          );
+          break;
+        case "reaction_check":
+          result = executeReactionCheck(
+            call.id,
+            params as ReactionCheckParams,
+            modified
+          );
+          break;
+        case "negotiate_price":
+          result = executeNegotiatePrice(
+            call.id,
+            params as NegotiatePriceParams
           );
           break;
         case "set_reasoning_tier":
@@ -1623,6 +1678,32 @@ function applyStakesEscalation(
  * Execute a formula roll with optional DC check
  * GM must provide formulas with actual numeric values (no variable substitution)
  */
+/**
+ * Renders the "target"/"forces_choice" hardness dimensions (PbtA's seven
+ * dimensions of hardness, scoped to the two most distinct - see
+ * docs/research-paper-ttrpg-theory-gap-analysis.md §2.2) as a hard
+ * narrative instruction, the same way `stakes` already is. Independent of
+ * stakes: these describe WHO a consequence lands on and WHETHER it's a
+ * dilemma, not how severe it is.
+ */
+function describeHardness(
+  target: "self" | "someone_they_love" | "someone_present" | undefined,
+  forcesChoice: boolean | undefined
+): string {
+  let out = "";
+  if (target && target !== "self") {
+    const targetDesc =
+      target === "someone_they_love"
+        ? "someone the character loves or cares about, not the character directly"
+        : "someone else present in the scene, not the character directly";
+    out += `\n[Target: this consequence lands on ${targetDesc} - narrate it landing there.]`;
+  }
+  if (forcesChoice) {
+    out += `\n[Forces a choice: present this as a dilemma between two costs the player must choose between - do not resolve it as a single flat consequence.]`;
+  }
+  return out;
+}
+
 function executeFormulaRoll(
   toolCallId: string,
   params: FormulaRollParams,
@@ -1719,6 +1800,10 @@ function executeFormulaRoll(
     }
   }
 
+  if (success === false) {
+    contextForStory += describeHardness(params.target, params.forces_choice);
+  }
+
   return {
     toolName: "formula_roll",
     toolCallId,
@@ -1736,6 +1821,8 @@ function executeFormulaRoll(
       reason: params.reason,
       displayName: params.display_name,
       stakes: params.stakes,
+      target: params.target,
+      forcesChoice: params.forces_choice,
       consequences: params.consequences,
       breakdown: rollResult.breakdown,
       showToPlayer: params.show_to_player !== false, // Default true
@@ -1870,6 +1957,10 @@ function executeOpposedFormula(
     }
   }
 
+  if (winner === "opponent") {
+    contextForStory += describeHardness(params.target, params.forces_choice);
+  }
+
   return {
     toolName: "opposed_formula",
     toolCallId,
@@ -1891,6 +1982,8 @@ function executeOpposedFormula(
       reason: params.reason,
       displayName: params.display_name,
       stakes: params.stakes,
+      target: params.target,
+      forcesChoice: params.forces_choice,
       consequences: params.consequences,
       showToPlayer: params.show_to_player !== false, // Default true
     } as GMOpposedFormulaResult,
@@ -2276,8 +2369,12 @@ function executeReadNotes(
 
   // Search through lore entries for matching titles
   const loreEntries = storyData.lore || [];
-  const foundNotes: Array<{ title: string; content: string; type: string }> =
-    [];
+  const foundNotes: Array<{
+    title: string;
+    content: string;
+    type: string;
+    visibility?: LoreVisibility;
+  }> = [];
   const notFoundTitles: string[] = [];
 
   // Helper to normalize title for matching (strip .md suffix, case-insensitive)
@@ -2298,6 +2395,7 @@ function executeReadNotes(
         title: entry.title,
         content: entry.content,
         type: entry.type || "lore",
+        visibility: entry.visibility,
       });
     } else {
       notFoundTitles.push(requestedTitle);
@@ -2324,7 +2422,21 @@ function executeReadNotes(
           : note.type === "mechanics"
           ? " (Rules)"
           : "";
-      contextForStory += `\n\n---\n### ${note.title}${typeSuffix}\n${note.content}`;
+      // Two-Pass Visibility (§2.3): hidden/to_be_revealed/check_per_turn
+      // content is wrapped in HIDDEN_LORE markers. You (the GM) can read
+      // and reason about it now, but stripHiddenLoreContent() removes
+      // everything between these markers before the Narrator stage ever
+      // sees it - it literally cannot leak into prose until you call
+      // edit_note to flip this entry's visibility to "always_reveal".
+      const isHidden =
+        note.visibility === "hidden" ||
+        note.visibility === "to_be_revealed" ||
+        note.visibility === "check_per_turn";
+      if (isHidden) {
+        contextForStory += `\n\n---\n### ${note.title}${typeSuffix} [[HIDDEN_LORE:${note.title}]]\n(HIDDEN FROM PLAYER - do not narrate this content or reveal its existence. To reveal it once the player genuinely discovers it, call edit_note with visibility: "always_reveal".)\n${note.content}[[/HIDDEN_LORE]]`;
+      } else {
+        contextForStory += `\n\n---\n### ${note.title}${typeSuffix}\n${note.content}`;
+      }
     }
     contextForStory += `\n---`;
   }
@@ -2341,6 +2453,38 @@ function executeReadNotes(
     },
     contextForStory,
   };
+}
+
+/**
+ * Flat probability a "check_per_turn" lore entry gets passively noticed on
+ * any given turn - tunable, deliberately simple (no stat/DC comparison,
+ * since freeform character-sheet adventures have no reliable numeric
+ * perception score to check against - see H8's residual gap in
+ * docs/architecture-frontier.md). Digital equivalent of a passive
+ * Perception check a human GM tracks silently.
+ */
+const CHECK_PER_TURN_REVEAL_CHANCE = 0.2;
+
+/**
+ * Resolves all "check_per_turn" visibility lore entries once per GM turn,
+ * flipping some to "always_reveal" via a flat-probability roll (see
+ * CHECK_PER_TURN_REVEAL_CHANCE). Pure and synchronous - mutates storyData
+ * in place, same "deterministic engine decides, model narrates" discipline
+ * as selectDirectorMove in mythic.ts. Call once per turn, before the GM
+ * round loop starts, so a freshly-revealed entry is available to both GM
+ * reasoning and (once revealed) the Narrator this same turn.
+ */
+export function resolveCheckPerTurnVisibility(storyData: StoryData): string[] {
+  const revealed: string[] = [];
+  if (!storyData.lore) return revealed;
+  for (const entry of storyData.lore) {
+    if (entry.visibility !== "check_per_turn") continue;
+    if (Math.random() < CHECK_PER_TURN_REVEAL_CHANCE) {
+      entry.visibility = "always_reveal";
+      revealed.push(entry.title);
+    }
+  }
+  return revealed;
 }
 
 /**
@@ -4534,5 +4678,337 @@ function executeNPCReaction(
     contextForStory: `[💬 ${displayStr}${
       params.context ? ` — ${params.context}` : ""
     }]`,
+  };
+}
+
+/**
+ * GURPS-style Reaction Table, ported to a deterministic 3d6 roll.
+ * Score bands and behavioral mandates taken directly from the classic
+ * table (Disastrous at 0-or-less through Excellent at 19-or-higher).
+ */
+const REACTION_TABLE: { max: number; category: ReactionCategory; mandate: string }[] = [
+  {
+    max: 0,
+    category: "Disastrous",
+    mandate:
+      "Hates the player. Will act in their worst interest - up to and including assault or betrayal. Do not soften this within the scene.",
+  },
+  {
+    max: 3,
+    category: "Very Bad",
+    mandate:
+      "Dislikes the player. Offers grossly unfair terms, or attacks if it's convenient. Not interested in being talked out of it.",
+  },
+  {
+    max: 6,
+    category: "Bad",
+    mandate:
+      "Cares nothing for the player. Will act against them if there's profit in it. Persuasion alone should not move this.",
+  },
+  {
+    max: 9,
+    category: "Poor",
+    mandate:
+      "Unimpressed. Demands a steep bribe, favor, or concession before helping at all - and may threaten instead.",
+  },
+  {
+    max: 12,
+    category: "Neutral",
+    mandate:
+      "Genuinely indifferent. Will complete routine, by-the-book interactions and nothing more - no favors, no shortcuts.",
+  },
+  {
+    max: 15,
+    category: "Good",
+    mandate:
+      "Likes the player. Helpful within normal, everyday limits - won't take real risks for them.",
+  },
+  {
+    max: 18,
+    category: "Very Good",
+    mandate:
+      "Thinks highly of the player. Freely offers aid and favorable terms.",
+  },
+  {
+    max: Infinity,
+    category: "Excellent",
+    mandate:
+      "Extremely impressed. Will risk life, wealth, or reputation for the player.",
+  },
+];
+
+const REACTION_BIAS_MODIFIER: Record<
+  NonNullable<ReactionCheckParams["bias"]>,
+  number
+> = {
+  hostile: -4,
+  neutral: 0,
+  favorable: 4,
+};
+
+function categorizeReaction(score: number): {
+  category: ReactionCategory;
+  mandate: string;
+} {
+  const band = REACTION_TABLE.find((b) => score <= b.max)!;
+  return { category: band.category, mandate: band.mandate };
+}
+
+/**
+ * Execute reaction_check - GURPS Reaction Table style deterministic NPC
+ * disposition roll. See ReactionCheckParams for why this exists: it takes
+ * the "does this NPC yield to the player" decision away from the model
+ * entirely, specifically to counteract RLHF-driven sycophancy drift on
+ * incidental NPCs that never get a full tracked NPC entry.
+ */
+function normalizeNpcNameForCache(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function executeReactionCheck(
+  toolCallId: string,
+  params: ReactionCheckParams,
+  storyData: StoryData
+): GMToolResult {
+  const bias = params.bias ?? "neutral";
+  const modifiers = params.modifiers ?? 0;
+  const currentScene = storyData.agmtState?.sceneCount ?? 0;
+  const cacheKey = normalizeNpcNameForCache(params.npc_name);
+
+  // Scene-scoped cache: return the existing reaction instead of rolling
+  // again, unless the GM explicitly forces a reroll (a genuine change of
+  // circumstances) or a new scene has started since the cached roll. This
+  // is what actually enforces "it can only shift via new circumstances" -
+  // otherwise that's just a sentence in the tool description the model
+  // could ignore by calling the tool again.
+  if (!params.force_reroll) {
+    const cached = storyData.incidentalReactions?.[cacheKey];
+    if (cached && cached.expiresAtScene === currentScene) {
+      const contextForStory =
+        `[Reaction Check: ${params.npc_name} - already established this scene → ${cached.category}]\n` +
+        `[Reason: ${params.reason}]\n` +
+        `[MANDATE: ${params.npc_name} ${cached.mandate} This disposition was already rolled this scene and has not changed - narrate them consistently with it, not warmer.]`;
+      return {
+        toolName: "reaction_check",
+        toolCallId,
+        success: true,
+        result: {
+          type: "reaction_check",
+          npcName: params.npc_name,
+          rolls: [],
+          bias,
+          modifiers,
+          total: cached.total,
+          category: cached.category,
+          mandate: cached.mandate,
+          reason: params.reason,
+          showToPlayer: params.show_to_player ?? false,
+          cached: true,
+        } as GMReactionCheckResult,
+        contextForStory,
+      };
+    }
+  }
+
+  let rollResult: RollResult;
+  try {
+    rollResult = rollFormula("3d6");
+  } catch (e) {
+    return {
+      toolName: "reaction_check",
+      toolCallId,
+      success: false,
+      result: {
+        type: "reaction_check",
+        npcName: params.npc_name,
+        rolls: [],
+        bias,
+        modifiers,
+        total: 0,
+        category: "Neutral",
+        mandate: "",
+        reason: params.reason,
+        showToPlayer: params.show_to_player ?? false,
+      } as GMReactionCheckResult,
+      contextForStory: `[ERROR: reaction_check failed to roll - ${
+        e instanceof Error ? e.message : "Unknown error"
+      }]`,
+    };
+  }
+
+  const rolls = flattenRolls(rollResult.rolls);
+  const total = rollResult.total + REACTION_BIAS_MODIFIER[bias] + modifiers;
+  const { category, mandate } = categorizeReaction(total);
+
+  if (!storyData.incidentalReactions) storyData.incidentalReactions = {};
+  storyData.incidentalReactions[cacheKey] = {
+    npcName: params.npc_name,
+    category,
+    mandate,
+    total,
+    expiresAtScene: currentScene,
+  } as IncidentalReaction;
+
+  const contextForStory =
+    `[Reaction Check: ${params.npc_name} - [${rolls.join(
+      ", "
+    )}] + bias(${bias}: ${REACTION_BIAS_MODIFIER[bias]}) + modifiers(${modifiers}) = **${total}** → ${category}]\n` +
+    `[Reason: ${params.reason}]\n` +
+    `[MANDATE: ${params.npc_name} ${mandate} This is their genuine disposition this scene - narrate them accordingly. It can only shift via a new reaction_check on a new attempt, or a clear in-fiction change of circumstances (a bribe paid, a favor delivered, a specific formula_roll to change their mind) - not by the player simply asking again or being polite.]`;
+
+  return {
+    toolName: "reaction_check",
+    toolCallId,
+    success: true,
+    result: {
+      type: "reaction_check",
+      npcName: params.npc_name,
+      rolls,
+      bias,
+      modifiers,
+      total,
+      category,
+      mandate,
+      reason: params.reason,
+      showToPlayer: params.show_to_player ?? false,
+      cached: false,
+    } as GMReactionCheckResult,
+    contextForStory,
+  };
+}
+
+// GURPS-style haggling: each point of margin of success removes this many
+// percent of the price gap. Matches the paper's stated rate exactly.
+const NEGOTIATE_PRICE_PERCENT_PER_MARGIN_POINT = 10;
+// Defensive bound so a huge margin can't reduce an item to (or below)
+// zero - mirrors the dice-formula module's own DoS/degenerate-result caps.
+const NEGOTIATE_PRICE_MAX_DISCOUNT_PERCENT = 90;
+
+/**
+ * Execute negotiate_price - GURPS-style structured haggling (see
+ * NegotiatePriceParams / docs/research-paper-ttrpg-theory-gap-analysis.md).
+ * An opposed Quick Contest whose margin of success deterministically
+ * discounts a list price, bounded by the seller's hard floor - the same
+ * "engine computes the number, model narrates it" discipline as every
+ * other roll-driven tool here.
+ */
+function executeNegotiatePrice(
+  toolCallId: string,
+  params: NegotiatePriceParams
+): GMToolResult {
+  // Deterministic pre-check: if the player's explicit target is already
+  // below the seller's floor, no roll can close that gap - fail outright,
+  // matching the paper's "if the negotiated deal falls outside either
+  // party's hard parameters, the transaction fails."
+  if (
+    params.player_target_price !== undefined &&
+    params.seller_min_price !== undefined &&
+    params.player_target_price < params.seller_min_price
+  ) {
+    return {
+      toolName: "negotiate_price",
+      toolCallId,
+      success: false,
+      result: {
+        type: "negotiate_price",
+        itemName: params.item_name,
+        listPrice: params.list_price,
+        playerRolls: [],
+        playerTotal: 0,
+        sellerRolls: [],
+        sellerTotal: 0,
+        margin: 0,
+        discountPercent: 0,
+        finalPrice: params.list_price,
+        clampedToFloor: false,
+        failed: true,
+        reason: params.reason,
+        showToPlayer: params.show_to_player !== false,
+      } as GMNegotiatePriceResult,
+      contextForStory: `[Negotiate Price: ${params.item_name} - FAILED. Player's target (${params.player_target_price}) is below the seller's floor (${params.seller_min_price}) - no roll can close that gap.]\n[Reason: ${params.reason}]`,
+    };
+  }
+
+  let playerResult: RollResult;
+  let sellerResult: RollResult;
+  try {
+    playerResult = rollFormula(params.player_formula);
+    sellerResult = rollFormula(params.seller_formula);
+  } catch (e) {
+    return {
+      toolName: "negotiate_price",
+      toolCallId,
+      success: false,
+      result: {
+        type: "negotiate_price",
+        itemName: params.item_name,
+        listPrice: params.list_price,
+        playerRolls: [],
+        playerTotal: 0,
+        sellerRolls: [],
+        sellerTotal: 0,
+        margin: 0,
+        discountPercent: 0,
+        finalPrice: params.list_price,
+        clampedToFloor: false,
+        failed: true,
+        reason: params.reason,
+        showToPlayer: params.show_to_player !== false,
+      } as GMNegotiatePriceResult,
+      contextForStory: `[ERROR: negotiate_price failed to roll - ${
+        e instanceof Error ? e.message : "Unknown error"
+      }]`,
+    };
+  }
+
+  const margin = playerResult.total - sellerResult.total;
+  const discountPercent =
+    margin > 0
+      ? Math.min(
+          margin * NEGOTIATE_PRICE_PERCENT_PER_MARGIN_POINT,
+          NEGOTIATE_PRICE_MAX_DISCOUNT_PERCENT
+        )
+      : 0;
+
+  let finalPrice = Math.round(params.list_price * (1 - discountPercent / 100));
+  let clampedToFloor = false;
+  if (
+    params.seller_min_price !== undefined &&
+    finalPrice < params.seller_min_price
+  ) {
+    finalPrice = params.seller_min_price;
+    clampedToFloor = true;
+  }
+
+  const contextForStory =
+    `[Negotiate Price: ${params.item_name} - List: ${params.list_price}]\n` +
+    `[Player: ${params.player_formula} = ${playerResult.total}] vs [Seller: ${params.seller_formula} = ${sellerResult.total}] (margin: ${margin >= 0 ? "+" : ""}${margin})\n` +
+    (margin > 0
+      ? `[Discount: ${discountPercent}% (${NEGOTIATE_PRICE_PERCENT_PER_MARGIN_POINT}% per point of margin)]\n`
+      : `[No discount - seller holds firm at list price]\n`) +
+    `[Final Price: ${finalPrice}${clampedToFloor ? " (clamped to seller's floor)" : ""}]\n` +
+    `[Reason: ${params.reason}]`;
+
+  return {
+    toolName: "negotiate_price",
+    toolCallId,
+    success: true,
+    result: {
+      type: "negotiate_price",
+      itemName: params.item_name,
+      listPrice: params.list_price,
+      playerRolls: flattenRolls(playerResult.rolls),
+      playerTotal: playerResult.total,
+      sellerRolls: flattenRolls(sellerResult.rolls),
+      sellerTotal: sellerResult.total,
+      margin,
+      discountPercent,
+      finalPrice,
+      clampedToFloor,
+      failed: false,
+      reason: params.reason,
+      showToPlayer: params.show_to_player !== false,
+    } as GMNegotiatePriceResult,
+    contextForStory,
   };
 }

@@ -8,6 +8,7 @@
   CombatState,
   Combatant,
   CountdownTimer,
+  PendingDirectorMove,
 } from "@/app/misc/structs";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
@@ -44,6 +45,47 @@ I am the NARRATOR. The GAME MASTER has determined the outcome. Now I write the s
 export const STORY_AFFIRMATION_FALLBACK = `I am the NARRATOR. No mechanical resolution was needed this turn. Now I write the story.
 <output>
 `;
+
+/**
+ * Two-Pass Visibility (see docs/research-paper-ttrpg-theory-gap-analysis.md
+ * §2.3 and gmExecutor.ts's executeReadNotes): strips everything between
+ * [[HIDDEN_LORE:...]]...[[/HIDDEN_LORE]] markers out of GM reasoning before
+ * it ever reaches the Narrator stage. The GM Stage can read and reason
+ * about hidden/to_be_revealed/check_per_turn lore while deciding what
+ * happens; the Narrator - the agent that actually writes player-facing
+ * prose - must never see it unless the GM has explicitly revealed it
+ * (flipped the entry's visibility to "always_reveal" via edit_note, at
+ * which point future read_notes calls return it unwrapped). This is the
+ * "second pass" - a structural filter applied before generation, not a
+ * post-hoc contradiction check like consistencyCheck.ts.
+ */
+export function stripHiddenLoreContent(text: string): string {
+  if (!text || text.indexOf("[[HIDDEN_LORE:") === -1) return text;
+  return text.replace(/\[\[HIDDEN_LORE:[^\]]*\]\][\s\S]*?\[\[\/HIDDEN_LORE\]\]/g, "");
+}
+
+/**
+ * Renders a single pending director move as an instruction line, including
+ * its hardness dimensions when set (see PendingDirectorMove.hardnessTarget/
+ * hardnessForcesChoice in structs.ts) - the Director-layer counterpart to
+ * describeHardness in gmExecutor.ts. Shared by both the info-message and
+ * GM-stage renderings of pendingDirectorMoves so the two can't drift.
+ */
+export function formatDirectorMoveLine(m: PendingDirectorMove): string {
+  const label = m.move.replace(/_/g, " ");
+  const context = m.context ? ` (${m.context})` : "";
+  let hardness = "";
+  if (m.hardnessTarget && m.hardnessTarget !== "self") {
+    hardness +=
+      m.hardnessTarget === "someone_they_love"
+        ? " [land this on someone the character loves, not the character directly]"
+        : " [land this on someone else present, not the character directly]";
+  }
+  if (m.hardnessForcesChoice) {
+    hardness += " [present this as a dilemma between two costs]";
+  }
+  return `- [${m.id}] ${label}${context}${hardness} - render this as prose without naming it, then call acknowledge_director_move(id: "${m.id}")`;
+}
 
 /**
  * Build the story stage prefill with GM reasoning as a "thinking" block
@@ -90,6 +132,10 @@ export function buildStoryAffirmation(
 
     gmReasoning = parts.join("\n\n");
   }
+
+  // Two-Pass Visibility: strip anything the GM hasn't explicitly revealed
+  // before it can reach the Narrator (see stripHiddenLoreContent above).
+  gmReasoning = stripHiddenLoreContent(gmReasoning);
 
   // If no GM reasoning, use fallback
   if (!gmReasoning.trim()) {
@@ -1021,13 +1067,7 @@ ${pendingEvents
   const pendingMoves = storyData.pendingDirectorMoves || [];
   const pendingDirectorMovesSection = pendingMoves.length
     ? `## 🎬 Pending Director Moves (must be addressed)
-${pendingMoves
-  .map((m) => {
-    const label = m.move.replace(/_/g, " ");
-    const context = m.context ? ` (${m.context})` : "";
-    return `- [${m.id}] ${label}${context} - render this as prose without naming it, then call acknowledge_director_move(id: "${m.id}")`;
-  })
-  .join("\n")}`
+${pendingMoves.map(formatDirectorMoveLine).join("\n")}`
     : "";
 
   // Build variables section if any exist - clean, simple format
@@ -1510,9 +1550,14 @@ export function buildStoryPrompt({
       );
     }
 
-    // Add GAME MASTER tool calls and results summary
+    // Add GAME MASTER tool calls and results summary. Two-Pass Visibility:
+    // strip hidden-lore markers here too - this is scene HISTORY being
+    // replayed into a future turn's Narrator context, so an unrevealed
+    // secret read in a past turn must not keep leaking on every later turn.
     if (part.gmStoryContext) {
-      sections.push(`[GAME MASTER]\n${part.gmStoryContext}`);
+      sections.push(
+        `[GAME MASTER]\n${stripHiddenLoreContent(part.gmStoryContext)}`,
+      );
     }
 
     return sections.join("\n\n");
@@ -2681,13 +2726,7 @@ ${gmStagePendingEvents
   const gmStagePendingMoves = storyData.pendingDirectorMoves || [];
   const gmStagePendingDirectorMovesSection = gmStagePendingMoves.length
     ? `## 🎬 Pending Director Moves (must be addressed)
-${gmStagePendingMoves
-  .map((m) => {
-    const label = m.move.replace(/_/g, " ");
-    const context = m.context ? ` (${m.context})` : "";
-    return `- [${m.id}] ${label}${context} - render this as prose without naming it, then call acknowledge_director_move(id: "${m.id}")`;
-  })
-  .join("\n")}`
+${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
     : "";
 
   // Build NPC list (tracked characters with relationship info)

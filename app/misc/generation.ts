@@ -51,6 +51,7 @@ import {
   executeGMTools,
   GMToolResult,
   GMExecutionResult,
+  resolveCheckPerTurnVisibility,
 } from "@/app/misc/gmExecutor";
 import { executeTools, ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecutor";
 import { getAuthToken } from "@/app/misc/getAuthToken";
@@ -70,7 +71,10 @@ import {
   getSamplingSettings,
   filterSettingsForProvider,
 } from "@/app/misc/samplingSettings";
-import { MYTHIC_TABLE_NAMES } from "@/app/misc/mythic";
+import {
+  MYTHIC_TABLE_NAMES,
+  chaosFactorTemperatureDelta,
+} from "@/app/misc/mythic";
 import {
   SCENE_BASELINE_TIER,
   ReasoningEffort,
@@ -664,6 +668,16 @@ export async function generateStoryTurn(
         logger.action("GM stage skipped - no user choice found");
         gmStoryContext = "";
       } else {
+        // Two-Pass Visibility (§2.3): resolve "check_per_turn" lore once per
+        // turn, before the round loop starts - the digital equivalent of a
+        // passive Perception check. See resolveCheckPerTurnVisibility.
+        const passivelyRevealed = resolveCheckPerTurnVisibility(storyData);
+        if (passivelyRevealed.length > 0) {
+          logger.action("Passively revealed check_per_turn lore entries", {
+            titles: passivelyRevealed,
+          });
+        }
+
         // ============================================
         // Reasoning-Tier Router: pick the starting tier for this turn.
         // Priority: hard rules (combat) > deterministic classifier > decayed
@@ -942,7 +956,13 @@ export async function generateStoryTurn(
                 options.customMaxOutput || 12000,
                 getModelConfig(model).maxOutputTokens || 4000,
               ),
-              temperature: 0.4, // Slightly higher for more natural GM thinking
+              // Base 0.4 for natural GM thinking, nudged by the story's
+              // Chaos Factor (§2.4) - this is the GM stage's own request,
+              // and its output IS the player-visible story on the common
+              // path (see gmFinalStoryContent above), so this is where the
+              // Chaos Factor -> temperature link actually needs to live.
+              temperature:
+                0.4 + chaosFactorTemperatureDelta(storyData.agmtState?.chaosFactor),
               openRouterKey: options.openRouterKey,
               deepseekKey: options.deepseekKey,
               googleKey: options.googleKey,
@@ -1707,7 +1727,9 @@ export async function generateStoryTurn(
               messages: storyMessages,
               novelaiKey: options.novelaiKey,
               maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
-              temperature: options.novelaiTemperature ?? 1,
+              temperature:
+                (options.novelaiTemperature ?? 1) +
+                chaosFactorTemperatureDelta(storyData.agmtState?.chaosFactor),
             }),
             signal: options.abortSignal,
           });
@@ -1724,7 +1746,9 @@ export async function generateStoryTurn(
             messages: storyMessages,
             model: storyModelToUse,
             maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
-            temperature: options.samplingSettings?.temperature ?? 0.7,
+            temperature:
+              (options.samplingSettings?.temperature ?? 0.7) +
+              chaosFactorTemperatureDelta(storyData.agmtState?.chaosFactor),
             openRouterKey: options.openRouterKey,
             deepseekKey: options.deepseekKey,
             googleKey: options.googleKey,

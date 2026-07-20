@@ -15,7 +15,8 @@ import {
   storyProgress,
   targetTensionForProgress,
 } from "../app/misc/mythic";
-import type { StoryData } from "../app/misc/structs";
+import { formatDirectorMoveLine } from "../app/misc/ai_staged";
+import type { StoryData, PendingDirectorMove } from "../app/misc/structs";
 
 function createTestStory(overrides: Partial<StoryData> = {}): StoryData {
   return {
@@ -151,6 +152,69 @@ describe("selectDirectorMove", () => {
     });
     const move = selectDirectorMove(storyData, "Normal");
     expect(move?.move).toBe("put_someone_in_a_spot");
+  });
+
+  it("forces a choice (hardness dimension) at the hard tension ceiling, and targets an allied NPC if one is tracked", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 9,
+      },
+      npcs: [
+        {
+          id: "npc1",
+          name: "Marcus",
+          status: "alive",
+          attitude: "allied",
+        } as any,
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.hardnessForcesChoice).toBe(true);
+    expect(move?.hardnessTarget).toBe("someone_they_love");
+  });
+
+  it("leaves hardnessTarget unset at the tension ceiling when no allied NPC is tracked", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 9,
+      },
+      npcs: [
+        { id: "npc1", name: "A Stranger", status: "alive", attitude: "neutral" } as any,
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.hardnessForcesChoice).toBe(true);
+    expect(move?.hardnessTarget).toBeUndefined();
+  });
+
+  it("does not set hardness dimensions on moves other than the hard-tension put_someone_in_a_spot trigger", () => {
+    const storyData = createTestStory({
+      threads: [
+        { id: "th1", title: "T", description: "D", status: "active", createdAt: Date.now() },
+      ],
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 3, // low, so an "Interrupted" scene check drives the move instead
+      },
+    });
+    const move = selectDirectorMove(storyData, "Interrupted");
+    expect(move?.move).toBe("announce_future_badness");
+    expect(move?.hardnessForcesChoice).toBeUndefined();
+    expect(move?.hardnessTarget).toBeUndefined();
   });
 
   it("does not fire a new move while one is already pending (anti-pileup throttle)", () => {
@@ -478,5 +542,52 @@ describe("selectDirectorMove: player-style spotlight tie-breaking", () => {
     const move = selectDirectorMove(storyData, "Normal");
     expect(move?.move).toBe("spotlight_couch_player");
     expect(["p1", "p2"]).toContain(move?.targetCouchPlayerId);
+  });
+});
+
+describe("formatDirectorMoveLine", () => {
+  function baseMove(overrides: Partial<PendingDirectorMove> = {}): PendingDirectorMove {
+    return {
+      id: "mv1",
+      move: "put_someone_in_a_spot",
+      createdAt: Date.now(),
+      ...overrides,
+    };
+  }
+
+  it("renders a plain move with no hardness annotations", () => {
+    const line = formatDirectorMoveLine(baseMove());
+    expect(line).toContain("put someone in a spot");
+    expect(line).not.toContain("[land this on");
+    expect(line).not.toContain("[present this as a dilemma");
+  });
+
+  it("annotates hardnessTarget: someone_they_love", () => {
+    const line = formatDirectorMoveLine(
+      baseMove({ hardnessTarget: "someone_they_love" }),
+    );
+    expect(line).toContain("someone the character loves");
+  });
+
+  it("annotates hardnessTarget: someone_present", () => {
+    const line = formatDirectorMoveLine(
+      baseMove({ hardnessTarget: "someone_present" }),
+    );
+    expect(line).toContain("someone else present");
+  });
+
+  it("does not annotate hardnessTarget: self", () => {
+    const line = formatDirectorMoveLine(baseMove({ hardnessTarget: "self" }));
+    expect(line).not.toContain("[land this on");
+  });
+
+  it("annotates hardnessForcesChoice", () => {
+    const line = formatDirectorMoveLine(baseMove({ hardnessForcesChoice: true }));
+    expect(line).toContain("[present this as a dilemma between two costs]");
+  });
+
+  it("still includes the acknowledgement instruction with the move id", () => {
+    const line = formatDirectorMoveLine(baseMove({ id: "mv-xyz" }));
+    expect(line).toContain('acknowledge_director_move(id: "mv-xyz")');
   });
 });

@@ -599,6 +599,7 @@ export function executeTools(
           secrtet: false,
           keys: [],
           type: noteType,
+          visibility: args.visibility || undefined, // Two-Pass Visibility - defaults to always_reveal when unset
           on: true, // Agentic notes are visible by default
           alwaysOn: true, // No more triggers needed with read_notes
           on_triggers: [], // Empty for agentic notes
@@ -814,6 +815,12 @@ export function executeTools(
         if (args.type) {
           noteEntry.type = args.type;
           changes.push("type");
+        }
+
+        // Update visibility if provided (Two-Pass Visibility - see structs.ts LoreVisibility)
+        if (args.visibility) {
+          noteEntry.visibility = args.visibility;
+          changes.push("visibility");
         }
 
         // Agentic notes are always on
@@ -1475,6 +1482,11 @@ export function executeTools(
 
         // Increment scene
         storyData.agmtState.sceneCount++;
+
+        // Record this as a scene boundary for compaction.ts to prefer over
+        // an arbitrary token-budget cutoff (see §3.2 in
+        // docs/research-paper-ttrpg-theory-gap-analysis.md).
+        storyData.scene.lastSceneBoundaryIndex = storyData.scene.parts.length;
 
         // Scene check (Mythic-style): roll against the current chaos
         // factor to see whether the new scene proceeds as expected

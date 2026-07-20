@@ -56,6 +56,12 @@ export interface FormulaRollParams {
   reason: string;
   display_name?: string;
   stakes?: "low" | "medium" | "high" | "deadly";
+  // Two of the PbtA "seven dimensions of hardness", independent of `stakes`:
+  // a consequence can be low-stakes but still land on a loved one, or
+  // high-stakes without forcing a dilemma. Optional, additive - omit for
+  // an ordinary consequence landing squarely on the character themselves.
+  target?: "self" | "someone_they_love" | "someone_present";
+  forces_choice?: boolean; // Present failure as a dilemma between two costs, not one flat cost
   consequences?: {
     success?: string;
     failure?: string;
@@ -80,6 +86,10 @@ export interface OpposedFormulaParams {
   reason: string;
   display_name?: string;
   stakes?: "low" | "medium" | "high" | "deadly";
+  // See FormulaRollParams.target/forces_choice - same hardness dimensions,
+  // applied to the consequence if the player loses.
+  target?: "self" | "someone_they_love" | "someone_present";
+  forces_choice?: boolean;
   consequences?: {
     player_wins?: string;
     opponent_wins?: string;
@@ -452,6 +462,48 @@ export interface NPCReactionParams {
   context?: string; // What triggered the reaction (shown as subtext)
 }
 
+/**
+ * Reaction Check - GURPS-style deterministic disposition roll for an NPC
+ * the GM hasn't necessarily added to the persistent NPC tracker (a merchant,
+ * a guard, a noble met once). Rolls 3d6, applies a baseline bias plus
+ * GM-declared situational modifiers, and returns a hard behavioral mandate
+ * the GM must narrate the NPC as actually having - not a suggestion the
+ * model can talk itself out of. Exists specifically to counteract LLM
+ * sycophancy drift (RLHF-tuned helpfulness softening antagonists over a
+ * long conversation) for NPCs too minor to warrant a full tracked NPC entry.
+ */
+export interface ReactionCheckParams {
+  npc_name: string; // Name of the NPC reacting (need not exist in NPCs list)
+  bias?: "hostile" | "neutral" | "favorable"; // Baseline disposition skew before the roll
+  modifiers?: number; // Sum of situational/trait bonuses (charisma, reputation, prior favors, an established grudge, etc.) - GM-declared, like formula_roll's formula
+  reason: string; // What's being reacted to (e.g., "player asks the guard to look the other way")
+  show_to_player?: boolean; // Show the roll itself to the player (default: false)
+  // Force a fresh roll even if this NPC already has a cached reaction this
+  // scene (see incidentalReactions in structs.ts / executeReactionCheck) -
+  // use only when circumstances have genuinely changed (a bribe paid, a
+  // favor delivered), not just because the player asked again.
+  force_reroll?: boolean;
+}
+
+/**
+ * Negotiate Price - GURPS-style structured haggling. Reduces a price
+ * negotiation to a deterministic procedure instead of GM-improvised
+ * economic judgment: an opposed Quick Contest (Merchant/Diplomacy/
+ * Fast-Talk vs. the seller's resistance) where each point of margin of
+ * success shaves a fixed percentage off the list price, bounded by the
+ * seller's hard floor.
+ */
+export interface NegotiatePriceParams {
+  item_name: string; // What's being negotiated over
+  list_price: number; // Seller's asking price, AFTER you've already applied any local economic modifiers (storefront vs. warehouse, taxes, etc.) - describe those in `reason`, this tool doesn't recompute them
+  player_formula: string; // Player's negotiation roll with actual numbers, e.g. "1d20+4" (Merchant/Diplomacy/Fast-Talk)
+  seller_formula: string; // Seller's resistance roll with actual numbers, e.g. "1d20+3"
+  seller_min_price?: number; // Seller's hard floor - the deal can never land below this
+  player_target_price?: number; // Optional: what the player is explicitly asking for. If this is below seller_min_price, the negotiation fails outright before any roll - no amount of skill closes a gap neither party's parameters allow
+  reason: string; // What's being negotiated and why (haggling over a sword, bribing a guard, etc.)
+  show_to_player?: boolean; // Show dice animation (default true)
+}
+
 // Union type for all GM tool parameters
 export type GMToolParams =
   | { name: "start_challenge"; params: StartChallengeParams }
@@ -484,7 +536,9 @@ export type GMToolParams =
   | { name: "add_npc"; params: AddNPCParams }
   | { name: "update_npc"; params: UpdateNPCParams }
   | { name: "remove_npc"; params: RemoveNPCParams }
-  | { name: "npc_reaction"; params: NPCReactionParams };
+  | { name: "npc_reaction"; params: NPCReactionParams }
+  | { name: "reaction_check"; params: ReactionCheckParams }
+  | { name: "negotiate_price"; params: NegotiatePriceParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -674,6 +728,17 @@ Example formulas:
           enum: ["low", "medium", "high", "deadly"],
           description: "Consequence tier on failure",
         },
+        target: {
+          type: "string",
+          enum: ["self", "someone_they_love", "someone_present"],
+          description:
+            "Who the failure consequence actually lands on. Independent of stakes - a low-stakes consequence landing on someone the character loves can matter more than a high-stakes one landing on the character. Omit for an ordinary consequence to the character themselves.",
+        },
+        forces_choice: {
+          type: "boolean",
+          description:
+            "If true, present the failure consequence as a dilemma between two costs the player must choose between, not a single flat cost.",
+        },
         consequences: {
           type: "object",
           description: "What happens on each outcome",
@@ -741,6 +806,17 @@ Examples:
           type: "string",
           enum: ["low", "medium", "high", "deadly"],
           description: "Consequence tier if player loses",
+        },
+        target: {
+          type: "string",
+          enum: ["self", "someone_they_love", "someone_present"],
+          description:
+            "Who the losing consequence actually lands on, independent of stakes. Omit for an ordinary consequence to the character themselves.",
+        },
+        forces_choice: {
+          type: "boolean",
+          description:
+            "If true, present the losing consequence as a dilemma between two costs, not a single flat cost.",
         },
         consequences: {
           type: "object",
@@ -1849,6 +1925,165 @@ Examples:
   },
 };
 
+const reactionCheckTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "reaction_check",
+    description: `Roll a deterministic disposition check for an NPC (GURPS Reaction Table style).
+
+Use this for INCIDENTAL NPCs - a merchant, guard, noble, or stranger the
+player is dealing with, especially for the first time - where you need an
+externally-imposed, non-negotiable read on how they feel about the player
+RIGHT NOW. This is not for NPCs already tracked with an "attitude" in the
+NPCs list (use update_npc/npc_reaction for those) - it's for everyone else,
+and specifically for moments where the player is trying to talk, bribe, or
+charm their way past someone.
+
+WHY THIS EXISTS: left to your own judgment, you will tend to soften
+antagonists and let players talk their way past resistance, because you're
+tuned to be helpful. This tool takes that decision out of your hands. Roll
+it, then narrate the NPC as GENUINELY having the resulting disposition -
+do not let them warm up within the same scene just because the player asked
+nicely again. A bad reaction should feel bad. It can only change via another
+reaction_check (a new roll, on a new attempt, with new circumstances) or a
+clear in-fiction reason (a bribe paid, a favor delivered, a persuasive
+formula_roll that specifically targets changing their mind).
+
+Rolls 3d6, applies the chosen baseline bias, adds any modifiers you declare
+(charisma, reputation, an established grudge, local politics - be honest
+about what actually applies), and returns a category from Disastrous to
+Excellent with a specific behavioral mandate. Treat that mandate as a hard
+constraint on what you narrate next, the same way you treat a failed
+formula_roll.
+
+If you call this again for the SAME named NPC later in the SAME scene, you
+get back the SAME cached result instead of a fresh roll - this is
+intentional, so the player can't wear an NPC down by asking the same thing
+repeatedly. Only pass force_reroll: true when circumstances have genuinely
+changed (a bribe paid, a favor delivered, new leverage) - not just because
+the player tried again.
+
+Examples:
+- { npc_name: "the gate guard", bias: "neutral", modifiers: 2, reason: "player tries to talk their way past the checkpoint" }
+- { npc_name: "Duke Ashford", bias: "hostile", modifiers: -3, reason: "player, a known thief, requests an audience" }`,
+    parameters: {
+      type: "object",
+      properties: {
+        npc_name: {
+          type: "string",
+          description:
+            "Name of the NPC reacting (doesn't need to exist in the NPCs list)",
+        },
+        bias: {
+          type: "string",
+          enum: ["hostile", "neutral", "favorable"],
+          description:
+            "Baseline disposition before the roll - hostile for enemies/rivals, favorable for allies/friends, neutral for strangers (default: neutral)",
+        },
+        modifiers: {
+          type: "number",
+          description:
+            "Sum of situational/trait modifiers you're declaring (e.g. +2 for high charisma, -3 for a known grudge, +1 for a prior favor). Be honest and specific in `reason`.",
+        },
+        reason: {
+          type: "string",
+          description:
+            "What's being reacted to, in enough detail to justify your modifiers",
+        },
+        show_to_player: {
+          type: "boolean",
+          description: "Show the roll to the player (default: false)",
+        },
+        force_reroll: {
+          type: "boolean",
+          description:
+            "Force a fresh roll even if this NPC already has a cached reaction this scene. Only use when circumstances have genuinely changed - a bribe, a favor, new leverage - not because the player just asked again.",
+        },
+      },
+      required: ["npc_name", "reason"],
+    },
+  },
+};
+
+const negotiatePriceTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "negotiate_price",
+    description: `Resolve a price negotiation deterministically (GURPS-style haggling).
+
+Use this instead of improvising a discount whenever the player is
+haggling, bribing, or trying to talk down a price - buying gear from a
+merchant, negotiating a bounty, bribing a guard. It reduces the whole
+back-and-forth to one deterministic Quick Contest instead of you deciding
+the outcome by feel.
+
+You set the list price first, having already folded in any local economic
+factors (storefront markup vs. warehouse discount, taxes, scarcity) - just
+describe those in \`reason\`, this tool doesn't recompute them for you. Then
+both sides roll: the player's negotiation skill (Merchant/Diplomacy/
+Fast-Talk - whatever fits) against the seller's resistance. If the player
+wins, each point of margin removes 10% of the price. If the player loses
+or ties, the price doesn't move - the seller holds firm, it doesn't get
+WORSE. If you set seller_min_price, the deal can never land below it, no
+matter how good the roll. If you also set player_target_price and it's
+already below seller_min_price, the negotiation fails outright before any
+dice are rolled - some gaps no amount of skill closes.
+
+Example:
+{ item_name: "steel longsword", list_price: 150, player_formula: "1d20+5", seller_formula: "1d20+3", seller_min_price: 100, reason: "player haggles with the blacksmith over a used but well-maintained sword" }`,
+    parameters: {
+      type: "object",
+      properties: {
+        item_name: {
+          type: "string",
+          description: "What's being negotiated over",
+        },
+        list_price: {
+          type: "number",
+          description:
+            "Seller's asking price, AFTER you've already applied any local economic modifiers - describe those in `reason`",
+        },
+        player_formula: {
+          type: "string",
+          description:
+            "Player's negotiation roll with actual numbers, e.g. '1d20+4' (Merchant/Diplomacy/Fast-Talk)",
+        },
+        seller_formula: {
+          type: "string",
+          description:
+            "Seller's resistance roll with actual numbers, e.g. '1d20+3'",
+        },
+        seller_min_price: {
+          type: "number",
+          description:
+            "Seller's hard floor - the final price can never land below this, however good the roll",
+        },
+        player_target_price: {
+          type: "number",
+          description:
+            "Optional: what the player is explicitly asking for. If this is already below seller_min_price, the negotiation fails immediately, no roll needed.",
+        },
+        reason: {
+          type: "string",
+          description:
+            "What's being negotiated and why, including any economic factors already folded into list_price",
+        },
+        show_to_player: {
+          type: "boolean",
+          description: "Show dice animation to player (default true)",
+        },
+      },
+      required: [
+        "item_name",
+        "list_price",
+        "player_formula",
+        "seller_formula",
+        "reason",
+      ],
+    },
+  },
+};
+
 // ============================================
 // EXPORT
 // ============================================
@@ -1887,6 +2122,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   updateNPCTool,
   removeNPCTool,
   npcReactionTool,
+  reactionCheckTool,
+  negotiatePriceTool,
   // Terminal tool - ends GM loop
   endGmThinkingTool,
   // Reasoning-tier self-escalation

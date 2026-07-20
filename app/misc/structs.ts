@@ -185,6 +185,32 @@ export type LoreType =
   | "faction" // Organizations, groups, guilds
   | "event"; // Historical events, plot points
 
+// Two-Pass Visibility state machine (see
+// docs/research-paper-ttrpg-theory-gap-analysis.md §2.3). Distinct from
+// `type: "secret"`, which only controls the human player's note-list UI
+// (titles-only folder display). `visibility` controls what the *Narrator*
+// stage is allowed to see at all, closing the "Omniscient Narrator"
+// spoiler problem at the source (filtering before generation) rather than
+// catching it after the fact the way consistencyCheck.ts does for a
+// different failure class.
+//   - always_reveal: normal, unrestricted content (the default/unset state)
+//   - hidden: never surfaced to the Narrator; the GM Stage can still reason
+//     about it, but it must explicitly reveal it (flip to always_reveal via
+//     edit_note) for it to ever reach prose
+//   - to_be_revealed: same filtering as hidden, but names an entity the GM
+//     intends to reveal once a specific trigger fires (a perception check
+//     succeeding, a door being opened) - the GM flips it explicitly
+//   - check_per_turn: filtered like hidden, but resolved automatically each
+//     turn by a small deterministic chance roll (resolveCheckPerTurnVisibility
+//     in gmExecutor.ts) - the digital equivalent of a passive Perception
+//     check a human GM tracks silently (e.g. a patrol that might notice
+//     the party)
+export type LoreVisibility =
+  | "always_reveal"
+  | "hidden"
+  | "to_be_revealed"
+  | "check_per_turn";
+
 export interface StoryLore {
   title: string;
   content: string;
@@ -193,6 +219,7 @@ export interface StoryLore {
   secrtet: boolean;
   keys: string[];
   type?: LoreType; // Note category - defaults to "lore"
+  visibility?: LoreVisibility; // Two-Pass Visibility state - defaults to "always_reveal" when unset
   alwaysOn?: boolean; // If true, lore is always visible regardless of triggers
   enabled?: boolean; // If false, lore is never visible/checked. Defaults to true.
   on_triggers?: string[]; // Word triggers to turn lore on
@@ -407,6 +434,14 @@ export interface Scene {
   // a heavily-referenced entity dropped entirely from the summary. Human-
   // readable strings, undefined/omitted when the last summary was clean.
   summaryWarnings?: string[];
+  // Index into `parts` (same convention as summarizedThroughIndex) as of
+  // the most recent increment_scene tool call - i.e. "everything before
+  // this index belongs to the scene that just ended." Used by
+  // compaction.ts to prefer summarizing exactly through a scene boundary
+  // rather than an arbitrary token-budget cutoff, when one is available
+  // within a reasonable window of that cutoff (see §3.2 in
+  // docs/research-paper-ttrpg-theory-gap-analysis.md).
+  lastSceneBoundaryIndex?: number;
 }
 export interface Quest {
   id: string; // Unique identifier for the quest
@@ -833,6 +868,14 @@ export interface StoryData {
   // yet acknowledged incorporating - same persist-until-resolved lifecycle
   // as pendingRandomEvents above (see acknowledge_director_move).
   pendingDirectorMoves?: PendingDirectorMove[];
+  // Scene-scoped cache of reaction_check results, keyed by normalized
+  // (lowercased, trimmed) NPC name - see gmExecutor.ts's executeReactionCheck
+  // and §2.1's follow-up in docs/research-paper-ttrpg-theory-gap-analysis.md.
+  // A cached entry is valid only while expiresAtScene matches the story's
+  // current agmtState.sceneCount; once increment_scene fires, entries from
+  // the prior scene are simply stale and get overwritten on next roll -
+  // this is a read-time check, not something that needs active pruning.
+  incidentalReactions?: Record<string, IncidentalReaction>;
   customTables?: CustomTable[]; // Creator-defined random tables
   variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
@@ -911,6 +954,37 @@ export interface PendingDirectorMove {
   targetCouchPlayerId?: string; // For spotlight_couch_player
   context?: string; // Why this move fired (e.g. which trigger condition)
   createdAt: number;
+  // Hardness dimensions (see FormulaRollParams.target/forces_choice in
+  // gmTools.ts and §2.2/the Director-layer follow-up in
+  // docs/research-paper-ttrpg-theory-gap-analysis.md), extended to the
+  // pacing layer so a director-driven consequence can be tuned the same
+  // way a dice-driven one is. Deliberately set only at selectDirectorMove's
+  // most severe trigger, from already-tracked state - not a general dial.
+  hardnessTarget?: "self" | "someone_they_love" | "someone_present";
+  hardnessForcesChoice?: boolean;
+}
+
+// GURPS Reaction Table categories (see gmExecutor.ts's executeReactionCheck
+// and §2.1 in docs/research-paper-ttrpg-theory-gap-analysis.md).
+export type ReactionCategory =
+  | "Disastrous"
+  | "Very Bad"
+  | "Bad"
+  | "Poor"
+  | "Neutral"
+  | "Good"
+  | "Very Good"
+  | "Excellent";
+
+// A reaction_check result cached for the rest of the current scene, so
+// asking an NPC the same thing twice in one scene returns the same
+// disposition instead of a fresh roll - see StoryData.incidentalReactions.
+export interface IncidentalReaction {
+  npcName: string;
+  category: ReactionCategory;
+  mandate: string;
+  total: number;
+  expiresAtScene: number; // Valid only while this matches agmtState.sceneCount
 }
 
 export interface SkillCheckResult {
