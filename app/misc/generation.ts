@@ -174,6 +174,10 @@ export interface GenerationOptions {
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
   embeddingThreshold?: number; // Similarity threshold (0.1-0.5, default 0.25)
+  // Sub-agent delegation (delegate_task tool) - web_research needs both a
+  // BYOK search key and this explicit opt-in, off by default
+  webResearchEnabled?: boolean;
+  braveSearchKey?: string;
   // GM Stage (new architecture: AI determines mechanics via tool calls)
   enableGMStage?: boolean; // Use GM stage instead of ActionAnalysis JSON
   gmStageModel?: string; // Model to use for GM stage (defaults to toolsModel)
@@ -1273,6 +1277,18 @@ export async function generateStoryTurn(
                 token,
               },
               { requestManualRoll: callbacks.onAskForRoll },
+              {
+                apiKeys: {
+                  openRouterKey: options.openRouterKey,
+                  deepseekKey: options.deepseekKey,
+                  googleKey: options.googleKey,
+                  mistralKey: options.mistralKey,
+                  deepinfraKey: options.deepinfraKey,
+                },
+                token,
+                webResearchEnabled: options.webResearchEnabled,
+                braveSearchKey: options.braveSearchKey,
+              },
             );
 
             // Accumulate results across rounds
