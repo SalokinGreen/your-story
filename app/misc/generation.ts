@@ -1425,11 +1425,19 @@ export async function generateStoryTurn(
             const content = gmResult.content || "";
 
             // IMPORTANT: Add the final assistant response to conversation history
-            // even without tool calls, so it gets saved in gmConversation
+            // even without tool calls, so it gets saved in gmConversation.
+            // Must include reasoning/reasoning_details like the tool-call
+            // branch above - this terminal round is the only round on a
+            // single-round turn, so omitting them here was silently
+            // dropping the model's actual reasoning before it ever reached
+            // gmConversation/ScenePart, even though it streamed live via
+            // onGMReasoning during generation.
             if (content.trim()) {
               conversationHistory.push({
                 role: "assistant",
                 content: content,
+                reasoning: gmResult.reasoning,
+                reasoning_details: gmResult.reasoning_details,
               });
             }
 

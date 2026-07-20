@@ -95,39 +95,54 @@ function applyReasoningEffort(
 }
 
 /**
- * Extract text content from delta, handling both plain strings
- * and Magistral's array format with thinking/text content parts.
+ * Split delta content into visible text and reasoning, handling both plain
+ * strings and Magistral's array format with thinking/text content parts.
+ * Magistral's own CoT ships inline in `content` (not a separate `reasoning`
+ * delta field like DeepSeek/OpenRouter), so it has to be pulled out here or
+ * it's lost entirely rather than just unstreamed.
  */
-function extractTextContent(content: unknown): string {
+function extractContentParts(content: unknown): {
+  text: string;
+  thinking: string;
+} {
   // Plain string (most models)
   if (typeof content === "string") {
-    return content;
+    return { text: content, thinking: "" };
   }
 
   // Array format (Magistral thinking models)
   // Format: [{ type: "thinking", thinking: [...] }, { type: "text", text: "..." }, ...]
   if (Array.isArray(content)) {
-    return content
-      .map((part) => {
-        if (typeof part === "string") return part;
-        if (part?.type === "text" && typeof part.text === "string") {
-          return part.text;
+    let text = "";
+    let thinking = "";
+    for (const part of content) {
+      if (typeof part === "string") {
+        text += part;
+      } else if (part?.type === "text" && typeof part.text === "string") {
+        text += part.text;
+      } else if (part?.type === "thinking") {
+        const chunks = Array.isArray(part.thinking)
+          ? part.thinking
+          : [part.thinking];
+        for (const chunk of chunks) {
+          if (typeof chunk === "string") thinking += chunk;
+          else if (chunk && typeof chunk.text === "string")
+            thinking += chunk.text;
         }
-        // Skip thinking chunks - we only want the final answer
-        return "";
-      })
-      .join("");
+      }
+    }
+    return { text, thinking };
   }
 
   // Single object with text property
   if (content && typeof content === "object" && "text" in content) {
     const obj = content as { text?: unknown };
     if (typeof obj.text === "string") {
-      return obj.text;
+      return { text: obj.text, thinking: "" };
     }
   }
 
-  return "";
+  return { text: "", thinking: "" };
 }
 
 /**
@@ -744,7 +759,8 @@ export async function POST(req: NextRequest) {
               if (finishReason) lastFinishReason = finishReason;
 
               if (delta?.content !== undefined && delta?.content !== null) {
-                const textContent = extractTextContent(delta.content);
+                const { text: textContent, thinking: thinkingContent } =
+                  extractContentParts(delta.content);
                 if (textContent) {
                   fullContent += textContent;
                   controller.enqueue(
@@ -752,6 +768,17 @@ export async function POST(req: NextRequest) {
                       `data: ${JSON.stringify({
                         type: "content",
                         content: textContent,
+                      })}\n\n`,
+                    ),
+                  );
+                }
+                if (thinkingContent) {
+                  fullReasoning += thinkingContent;
+                  controller.enqueue(
+                    encoder.encode(
+                      `data: ${JSON.stringify({
+                        type: "reasoning",
+                        content: thinkingContent,
                       })}\n\n`,
                     ),
                   );

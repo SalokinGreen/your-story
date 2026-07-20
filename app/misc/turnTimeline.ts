@@ -175,7 +175,19 @@ export function updateLiveRoundBlocks(
     if (i === 0) roundStart = 0;
   }
   const frozen = prevBlocks.slice(0, roundStart);
-  const liveBlocks = withIds(parseTaggedContent(roundBuffer));
+  // Reuse ids from the previous parse of this same round's buffer, matched
+  // by position - re-parsing from scratch on every streamed delta rebuilds
+  // the block array every call, but for a growing buffer the block
+  // sequence only ever extends or appends, so the block at a given index
+  // is still the same logical block it was last call. Handing out a fresh
+  // id here regardless (the old behavior) defeats React's key-based
+  // reconciliation: it sees "removed old block, added new block" on nearly
+  // every token and unmounts/remounts the DOM node, which is what caused
+  // the text to visibly disappear and re-fade-in while streaming.
+  const prevLive = prevBlocks.slice(roundStart);
+  const liveBlocks: TimelineBlock[] = parseTaggedContent(roundBuffer).map(
+    (b, i) => ({ id: prevLive[i]?.id ?? nextId(), ...b }),
+  );
   if (liveBlocks.length > 0) {
     liveBlocks[liveBlocks.length - 1].streaming = true;
   }
