@@ -630,6 +630,55 @@ export function selectDirectorMove(
     }
   }
 
+  // Another soft, non-escalating default for the calm case: PbtA's "reveal
+  // an unwelcome truth" maps directly onto this app's own Two-Pass
+  // Visibility system (StoryLore.visibility === "to_be_revealed" - a
+  // secret already queued to surface eventually, see
+  // docs/research-paper-ttrpg-theory-gap-analysis.md §2.3). That system's
+  // own design leaves *when* to reveal one entirely to the model's
+  // narrative judgment; this move gives it a deterministic nudge instead
+  // of relying on the model to remember a backlog of pending secrets on
+  // its own. The model still does the actual reveal (prose plus flipping
+  // the entry's visibility via edit_lore/edit_note, unchanged) - this only
+  // says "now's a good time," the same "engine decides when, model decides
+  // how" split every other move already uses. Checked before
+  // offer_opportunity below: clearing a pending secret takes priority over
+  // purely optional flavor.
+  const revealableLore = (storyData.lore || []).find(
+    (l) => l.visibility === "to_be_revealed" && l.enabled !== false
+  );
+  if (revealableLore) {
+    return {
+      id: crypto.randomUUID(),
+      move: "reveal_unwelcome_truth",
+      targetLoreTitle: revealableLore.title,
+      context: `"${revealableLore.title}" is queued to be revealed`,
+      createdAt: Date.now(),
+    };
+  }
+
+  // Soft, non-escalating move for the common "nothing's wrong" case: PbtA's
+  // own move list isn't only about danger - "offer an opportunity, with or
+  // without a cost" is the classic default for an otherwise uneventful
+  // scene. Everything above this point already covers the escalating
+  // signals (timer, chaotic scene check, tension ceiling, arc lag, a
+  // neglected couch player, a pending secret reveal); reaching here means
+  // the scene resolved normally and pacing is on track, which used to mean
+  // no move fired at all. Gated on there being an active thread to hang
+  // the opportunity on (the same "engine decides from already-tracked
+  // state" pattern the other moves use) - with nothing open to offer an
+  // opportunity about, this stays a no-op rather than inventing one from
+  // nothing.
+  if (activeThreads.length > 0) {
+    return {
+      id: crypto.randomUUID(),
+      move: "offer_opportunity",
+      targetThreadId: activeThreads[0].id,
+      context: `Scene resolved normally, pacing on track (tension ${tension}/10)`,
+      createdAt: Date.now(),
+    };
+  }
+
   return null;
 }
 

@@ -164,14 +164,39 @@ problem.
   cheapest, safest item in this entire document - it's a read-only view of
   state that already exists, with zero model-facing changes.
 - **Expanding the GM-move menu**: PbtA's own move vocabulary is much larger
-  than the 4 moves implemented (`announce_future_badness`, `tick_a_clock`,
-  `put_someone_in_a_spot`, `spotlight_couch_player`) - "reveal an unwelcome
-  truth," "show a downside of their class/ability/gear," "offer an
-  opportunity, with or without a cost," and others. Mechanically cheap to
+  than what's implemented, though the menu has grown past the original 4
+  (`announce_future_badness`, `tick_a_clock`, `put_someone_in_a_spot`,
+  `spotlight_couch_player`):
+  - `offer_opportunity` - a non-escalating soft move that fires as the
+    fallback for an otherwise-calm, on-pace scene with an open thread to
+    hang the opportunity on, replacing what used to just be `null`.
+  - `reveal_unwelcome_truth` - fires when a `StoryLore` entry is queued
+    for reveal (`visibility: "to_be_revealed"`, part of the existing
+    Two-Pass Visibility system) and nothing more urgent is happening;
+    checked before `offer_opportunity` in the same calm-scene fallback,
+    so a pending secret backlog takes priority over pure flavor. The
+    model still does the actual reveal (prose + flipping visibility via
+    `edit_lore`); this only supplies deterministic timing.
+
+  "Show a downside of their gear/ability" was tried (`activate_downside`,
+  keyed off a tracked `Ability`'s cost/cooldown) and reverted: `Ability[]`
+  is itself soft-deprecated (`buildInfoMessage` in `ai_staged.ts` already
+  says "Stats, resources, abilities, and rpgSystem are DEPRECATED - all
+  mechanics are now defined in mechanics-type lore entries," and the
+  creator AI hasn't populated structured abilities for new adventures in a
+  long time) - `docs/game-mechanics.md` is stale on this point and should
+  be corrected. A move keyed off data new adventures increasingly won't
+  have is the same failure class as building on the old dead
+  `currentCooldown` field, just at the level of the whole mechanism; it
+  needs a different, non-deprecated structured hook (or none) before
+  trying again. Remaining unimplemented from PbtA's broader vocabulary:
+  separating the characters, capturing someone, trading harm for harm,
+  turning a player's move back on them, and others. Mechanically cheap to
   add (an enum entry plus a branch in `selectDirectorMove`), but each new
   move needs its own trigger condition reasoned through with the same care
-  the existing four got - do this one move at a time with real playtesting
-  in between, not as a batch.
+  the existing ones got - do this one move at a time with real
+  playtesting in between, not
+  as a batch.
 
 ## Frontier 4: adjudication - beyond NPC-status contradictions
 
