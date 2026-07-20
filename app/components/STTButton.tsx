@@ -320,13 +320,13 @@ export default function STTButton({
   };
 
   return (
-    <div className={`relative inline-flex flex-col items-center ${className}`}>
+    <div className={`relative inline-flex ${className}`}>
       <button
         type="button"
         onClick={handleClick}
         disabled={disabled || !isSupported || state === "processing"}
         title={getTitle()}
-        className={`h-full px-4 rounded-lg transition-all flex items-center justify-center touch-manipulation ${getButtonStyle()}`}
+        className={`h-full w-11 rounded-xl transition-all flex items-center justify-center touch-manipulation ${getButtonStyle()}`}
       >
         <DynamicIcon
           name={getIcon()}
