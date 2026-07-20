@@ -52,6 +52,7 @@ import {
   Drama,
   Crosshair,
   Moon,
+  Play,
   type LucideProps,
 } from "lucide-react";
 import React from "react";
@@ -109,6 +110,7 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   Drama,
   Crosshair,
   Moon,
+  Play,
 };
 
 interface StaticIconProps extends LucideProps {
