@@ -380,6 +380,7 @@ const createNoteTool: ToolSchema = {
             "event",
             "secret",
             "dm_instructions",
+            "character_sheet",
             "mechanics",
           ],
           description: "Category for the note (defaults to 'lore')",
