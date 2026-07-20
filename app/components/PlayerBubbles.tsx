@@ -74,16 +74,29 @@ interface RecordingSession {
   stopped: boolean;
 }
 
+type ActivityState = "recording" | "processing" | "idle";
+
 interface PlayerBubblesProps {
   players: CouchPlayer[];
   onSubmit: (text: string, speakerIds?: string[]) => void;
   disabled?: boolean;
+  // Networked play only (see app/misc/multiplayer/) - unset in couch co-op,
+  // where anyone at the table can tap anyone's bubble by design. When set,
+  // only the bubble matching this id is tappable from this device, and
+  // other players' bubbles reflect remoteActivity instead of local
+  // recording state.
+  myPlayerId?: string;
+  remoteActivity?: Record<string, ActivityState>;
+  onLocalActivity?: (state: ActivityState) => void;
 }
 
 export default function PlayerBubbles({
   players,
   onSubmit,
   disabled = false,
+  myPlayerId,
+  remoteActivity,
+  onLocalActivity,
 }: PlayerBubblesProps) {
   const { addNotification } = useNotification();
   const { keys } = useAPIKeys();
@@ -165,11 +178,18 @@ export default function PlayerBubbles({
     ) => {
       setActivePlayerId((cur) => (cur === player.id ? null : cur));
 
-      if (chunks.length === 0) return;
+      if (chunks.length === 0) {
+        onLocalActivity?.("idle");
+        return;
+      }
       const blob = new Blob(chunks, { type: mimeType });
-      if (blob.size < 1000) return;
+      if (blob.size < 1000) {
+        onLocalActivity?.("idle");
+        return;
+      }
 
       setProcessingPlayerId(player.id);
+      onLocalActivity?.("processing");
       try {
         const transcript = await transcribe(blob);
         const trimmed = transcript.trim();
@@ -207,9 +227,10 @@ export default function PlayerBubbles({
         addNotification(message, "failure");
       } finally {
         setProcessingPlayerId((cur) => (cur === player.id ? null : cur));
+        onLocalActivity?.("idle");
       }
     },
-    [transcribe, submitLines, addNotification],
+    [transcribe, submitLines, addNotification, onLocalActivity],
   );
 
   const stopRecording = useCallback(
@@ -314,10 +335,12 @@ export default function PlayerBubbles({
           sessionRef.current = null;
           teardownAudio();
           setActivePlayerId((cur) => (cur === player.id ? null : cur));
+          onLocalActivity?.("idle");
         };
 
         mediaRecorder.start(100);
         setActivePlayerId(player.id);
+        onLocalActivity?.("recording");
         watchSilence(session);
       } catch (error) {
         let message =
@@ -334,12 +357,13 @@ export default function PlayerBubbles({
         teardownAudio();
       }
     },
-    [addNotification, handleRecordingStopped, teardownAudio, watchSilence],
+    [addNotification, handleRecordingStopped, teardownAudio, watchSilence, onLocalActivity],
   );
 
   const handleBubbleTap = useCallback(
     async (player: CouchPlayer) => {
       if (disabled || processingPlayerId) return;
+      if (myPlayerId && player.id !== myPlayerId) return;
 
       if (activePlayerId === player.id) {
         stopRecording("generate");
@@ -353,6 +377,7 @@ export default function PlayerBubbles({
     [
       disabled,
       processingPlayerId,
+      myPlayerId,
       activePlayerId,
       stopRecording,
       beginRecording,
@@ -373,17 +398,25 @@ export default function PlayerBubbles({
 
   return (
     <>
-      {players.map((player, index) => (
-        <Bubble
-          key={player.id}
-          player={player}
-          index={index}
-          isActive={activePlayerId === player.id}
-          isProcessing={processingPlayerId === player.id}
-          disabled={disabled}
-          onTap={() => handleBubbleTap(player)}
-        />
-      ))}
+      {players.map((player, index) => {
+        // In networked play, only my own bubble ever runs local
+        // recording/processing state (handleBubbleTap gates on
+        // myPlayerId) - everyone else's bubble reflects what they
+        // broadcast instead.
+        const isOwnBubble = !myPlayerId || player.id === myPlayerId;
+        const remote = isOwnBubble ? undefined : remoteActivity?.[player.id];
+        return (
+          <Bubble
+            key={player.id}
+            player={player}
+            index={index}
+            isActive={isOwnBubble ? activePlayerId === player.id : remote === "recording"}
+            isProcessing={isOwnBubble ? processingPlayerId === player.id : remote === "processing"}
+            disabled={disabled || !isOwnBubble}
+            onTap={() => handleBubbleTap(player)}
+          />
+        );
+      })}
 
       {pendingLines.length > 0 && (
         <PendingLinesPanel lines={pendingLines} onRemove={removePendingLine} />

@@ -7,6 +7,8 @@ import TTSControls from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
+import NetStatusBadge from "../components/NetStatusBadge";
+import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
 import STTButton from "../components/STTButton";
 import PlayerBubbles from "../components/PlayerBubbles";
 import CombatDisplay from "../components/CombatDisplay";
@@ -35,7 +37,15 @@ interface StoryProps {
     text: string,
     playerComment?: string,
     speakerIds?: string[],
+    inputKind?: "freeform" | "voice",
   ) => void;
+  // Networked P2P multiplayer (internet, not couch co-op) - see
+  // app/misc/multiplayer/. All unset in couch co-op / single-player.
+  myPlayerId?: string;
+  remoteActivity?: Record<string, "recording" | "processing" | "idle">;
+  onLocalActivity?: (state: "recording" | "processing" | "idle") => void;
+  netSession?: NetSessionInfo | null;
+  netPeers?: GuestJoinedInfo[];
   onActionSubmit?: (
     text: string,
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
@@ -361,6 +371,11 @@ export default function Story({
   onOpenJournal,
   pendingUserChoice,
   liveGMEntries,
+  myPlayerId,
+  remoteActivity,
+  onLocalActivity,
+  netSession,
+  netPeers,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -836,6 +851,13 @@ export default function Story({
           </div>
         )}
 
+        {/* Networked multiplayer connection status - top left corner */}
+        {netSession && (
+          <div className="absolute top-3 left-3 z-10">
+            <NetStatusBadge netSession={netSession} peers={netPeers ?? []} />
+          </div>
+        )}
+
         {/* Header with story name, chapter nav, and scroll indicator */}
         <div className="flex items-center justify-between px-3 py-1 sm:px-4 sm:py-2 bg-linear-to-r from-blue-900/40 via-blue-900/30 to-purple-900/20 border-b border-blue-800/30">
           <div className="flex items-center gap-2 min-w-0">
@@ -1239,9 +1261,12 @@ export default function Story({
           <PlayerBubbles
             players={storyData.multiplayer.couchPlayers!}
             onSubmit={(text, speakerIds) =>
-              onCustomInput(text, undefined, speakerIds)
+              onCustomInput(text, undefined, speakerIds, "voice")
             }
             disabled={loading || !!loadingStage}
+            myPlayerId={myPlayerId}
+            remoteActivity={remoteActivity}
+            onLocalActivity={onLocalActivity}
           />
         )}
 

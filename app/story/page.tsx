@@ -16,7 +16,9 @@ import {
   deduplicateMemories,
   NPCReaction,
   Adventure,
+  CouchPlayer,
 } from "../misc/structs";
+import { useNetSession } from "../misc/multiplayer/useNetSession";
 import {
   askFate,
   generateElement,
@@ -320,6 +322,118 @@ function StoryPageContent() {
   >(null);
   // Pending user choice text - shown in chat while GM is generating
   const [pendingUserChoice, setPendingUserChoice] = useState<string>("");
+
+  // Networked P2P multiplayer (internet, not couch co-op - see
+  // app/misc/multiplayer/session.ts). Host role runs generation locally as
+  // usual and this just mirrors resulting state out to guests; guest role
+  // never calls generateStoryTurn itself, see the early returns in
+  // handleChoiceWithAction/handleCustomInput below.
+  const {
+    netSession,
+    peers: netPeers,
+    activity: netActivity,
+    hostDisconnected,
+    createRoom: createNetRoom,
+    joinRoom: joinNetRoom,
+    leaveRoom: leaveNetRoom,
+    switchBackend: switchNetBackend,
+    sendChoice: sendNetChoice,
+    sendFreeform: sendNetFreeform,
+    sendVoice: sendNetVoice,
+    sendActivity: sendNetActivity,
+  } = useNetSession({
+    storyData,
+    loading,
+    onGuestAction: (action) => {
+      if (action.kind === "choice") {
+        if (action.choiceIndex === null) return;
+        const targetChoice = choices.choices[action.choiceIndex];
+        if (targetChoice) handleChoiceWithAction(targetChoice);
+      } else if (action.text) {
+        // freeform and voice (voice arrives as already-transcribed text -
+        // see PlayerBubbles wiring) both land here as a custom input
+        // attributed to the sending guest's seat.
+        handleCustomInput(action.text, undefined, [action.localPlayerId]);
+      }
+    },
+    onSnapshot: (incoming) => {
+      setStoryData(incoming);
+      const lastPart = incoming.scene.parts[incoming.scene.parts.length - 1];
+      if (lastPart) {
+        setStoryText(lastPart.content);
+        setChoices({ choices: lastPart.choices || [] });
+      }
+      setPendingUserChoice("");
+      setLoading(false);
+      setLoadingStage(null);
+    },
+    onGuestJoined: (info) => {
+      setStoryData((prev) => {
+        if (!prev) return prev;
+        const existingPlayers = prev.multiplayer?.couchPlayers ?? [];
+        if (existingPlayers.some((p) => p.id === info.localPlayerId)) {
+          addNotification(`${info.displayName} reconnected`, "success");
+          return prev; // reconnect - seat already exists
+        }
+        addNotification(`${info.displayName} joined the room`, "success");
+        const newPlayer: CouchPlayer = {
+          id: info.localPlayerId,
+          name: info.displayName,
+          color: info.color,
+        };
+        return {
+          ...prev,
+          multiplayer: {
+            ...prev.multiplayer,
+            enabled: true,
+            couchPlayers: [...existingPlayers, newPlayer],
+          },
+        };
+      });
+    },
+    onPeerLeft: (localPlayerId) => {
+      const departed = storyData?.multiplayer?.couchPlayers?.find(
+        (p) => p.id === localPlayerId,
+      );
+      addNotification(`${departed?.name ?? "A player"} disconnected`, "warning");
+    },
+  });
+
+  // Guest's only link (the host) dropped - fall back to a normal local view
+  // rather than leaving the player stuck sending actions into the void.
+  useEffect(() => {
+    if (!hostDisconnected) return;
+    addNotification("Host disconnected", "failure");
+    leaveNetRoom();
+  }, [hostDisconnected, addNotification, leaveNetRoom]);
+
+  // Give the host their own bubble too (Discord-call parity - guests get
+  // one automatically via onGuestJoined above; the host doesn't send itself
+  // a presence_join, so it needs adding explicitly, once, on room creation.
+  useEffect(() => {
+    if (!netSession || netSession.role !== "host") return;
+    setStoryData((prev) => {
+      if (!prev) return prev;
+      const existingPlayers = prev.multiplayer?.couchPlayers ?? [];
+      if (existingPlayers.some((p) => p.id === netSession.myLocalPlayerId)) {
+        return prev;
+      }
+      const hostPlayer: CouchPlayer = {
+        id: netSession.myLocalPlayerId,
+        name: netSession.displayName,
+        color: netSession.color,
+      };
+      return {
+        ...prev,
+        multiplayer: {
+          ...prev.multiplayer,
+          enabled: true,
+          couchPlayers: [...existingPlayers, hostPlayer],
+        },
+      };
+    });
+  }, [netSession]);
+
   // Live GM streaming state - chronological thinking/tool/text blocks,
   // rendered inline (Claude-style) as they arrive - see turnTimeline.ts
   const [liveGMEntries, setLiveGMEntries] = useState<TimelineBlock[]>([]);
@@ -1091,8 +1205,22 @@ function StoryPageContent() {
     customText: string,
     playerComment?: string,
     speakerIds?: string[],
+    inputKind: "freeform" | "voice" = "freeform",
   ) {
     if (!storyData) return;
+
+    if (netSession?.role === "guest") {
+      logger.action("Guest custom input, sending to host", { customText });
+      setLoading(true);
+      setLoadingStage("story");
+      if (inputKind === "voice") {
+        sendNetVoice(customText, speakerIds ?? []);
+      } else {
+        sendNetFreeform(customText, speakerIds);
+      }
+      return;
+    }
+
     logger.action("User custom input", { customText });
 
     setLoading(true);
@@ -1701,6 +1829,18 @@ function StoryPageContent() {
 
     if (!choice) return;
     const key = actionChoice ? 0 : choices.choices.indexOf(choice);
+
+    if (netSession?.role === "guest") {
+      logger.action("Guest selected choice, sending to host", {
+        choice: choice.text,
+        index: key,
+      });
+      setLoading(true);
+      setLoadingStage("story");
+      setPendingUserChoice(choice.text);
+      sendNetChoice(key);
+      return;
+    }
 
     logger.action("User selected choice", { choice: choice.text, index: key });
 
@@ -3536,6 +3676,11 @@ function StoryPageContent() {
             onOpenJournal={() => setCurrentState(StoryState.GOALS)}
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
+            myPlayerId={netSession ? netSession.myLocalPlayerId : undefined}
+            remoteActivity={netActivity}
+            onLocalActivity={sendNetActivity}
+            netSession={netSession}
+            netPeers={netPeers}
           />
           </div>
         )}
@@ -3574,6 +3719,12 @@ function StoryPageContent() {
             onViewLogs={() => setCurrentState(StoryState.LOGS)}
             onViewContext={() => setCurrentState(StoryState.CONTEXT)}
             onOpenAIAssistant={() => setShowAIAssistant(true)}
+            netSession={netSession}
+            netPeers={netPeers}
+            onCreateNetRoom={createNetRoom}
+            onJoinNetRoom={joinNetRoom}
+            onLeaveNetRoom={leaveNetRoom}
+            onSwitchNetBackend={switchNetBackend}
           />
         )}
         {currentState === StoryState.LOGS && <LogViewer />}
