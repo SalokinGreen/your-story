@@ -564,6 +564,14 @@ export default function PDFImporter({
   // Chunk tracking state for large PDFs
   const [chunkStatuses, setChunkStatuses] = useState<ChunkStatus[]>([]);
   const [showChunkDetails, setShowChunkDetails] = useState(false);
+  // Parsed pdf-lib document of the most recent chunked import, retained so
+  // chunks that failed during the OCR phase can be retried from the chunk
+  // panel (re-running OCR needs the source pages, not just markdown).
+  // Cleared in resetState to release the (potentially large) document.
+  const chunkedPdfSourceRef = useRef<{
+    pdfDoc: PDFDocument;
+    fileName: string;
+  } | null>(null);
 
   // JSON Repair Modal state - for manual fixing of broken chunk output
   const [repairModalOpen, setRepairModalOpen] = useState(false);
@@ -660,9 +668,63 @@ export default function PDFImporter({
   const retryChunk = useCallback(
     async (chunkIndex: number) => {
       const chunk = chunkStatuses.find((cs) => cs.chunkIndex === chunkIndex);
-      if (!chunk || !chunk.ocrMarkdown) {
-        addNotification("Cannot retry: OCR data not available", "warning");
-        return;
+      if (!chunk) return;
+
+      let ocrMarkdown = chunk.ocrMarkdown;
+
+      // Chunks that failed during the OCR phase have no markdown yet -
+      // re-run OCR for this chunk's page range from the retained source
+      // document before summarizing.
+      if (!ocrMarkdown) {
+        const source = chunkedPdfSourceRef.current;
+        if (!source) {
+          addNotification("Cannot retry: OCR data not available", "warning");
+          return;
+        }
+
+        setChunkStatuses((prev) =>
+          prev.map((cs) =>
+            cs.chunkIndex === chunkIndex
+              ? { ...cs, status: "ocr", error: undefined }
+              : cs,
+          ),
+        );
+
+        try {
+          const ocrResult = await ocrPDFRange(
+            source.pdfDoc,
+            {
+              pageStart: chunk.pageStart,
+              pageEnd: chunk.pageEnd,
+              startIndex: chunk.pageStart - 1,
+              endIndex: chunk.pageEnd - 1,
+            },
+            source.fileName,
+            keys.mistralKey,
+          );
+          ocrMarkdown = ocrResult.markdown;
+        } catch (err: unknown) {
+          const message =
+            err instanceof Error ? err.message : "OCR processing failed";
+          setChunkStatuses((prev) =>
+            prev.map((cs) =>
+              cs.chunkIndex === chunkIndex
+                ? { ...cs, status: "failed", error: message }
+                : cs,
+            ),
+          );
+          addNotification(`Retry failed: ${message}`, "failure");
+          return;
+        }
+
+        const markdown = ocrMarkdown;
+        setChunkStatuses((prev) =>
+          prev.map((cs) =>
+            cs.chunkIndex === chunkIndex
+              ? { ...cs, ocrMarkdown: markdown }
+              : cs,
+          ),
+        );
       }
 
       // Update status to summarizing
@@ -683,7 +745,7 @@ export default function PDFImporter({
               "Content-Type": "application/json",
             },
             body: JSON.stringify({
-              markdown: chunk.ocrMarkdown,
+              markdown: ocrMarkdown,
               focus: ["all"],
               customInstructions:
                 customInstructions +
@@ -1076,6 +1138,9 @@ export default function PDFImporter({
           }
 
           const { pdfDoc, ranges } = chunkPlan;
+          // Retain the parsed document so failed chunks can re-run OCR
+          // from the chunk panel after the import finishes.
+          chunkedPdfSourceRef.current = { pdfDoc, fileName: file.name };
           const totalChunks = ranges.length;
           // Fewer concurrent OCR uploads on memory-constrained devices (or
           // for very large source files), since each chunk carries its
@@ -1618,6 +1683,7 @@ export default function PDFImporter({
     setCurrentFileIndex(0);
     setChunkStatuses([]);
     setShowChunkDetails(false);
+    chunkedPdfSourceRef.current = null;
     setRepairModalOpen(false);
     setRepairChunkIndex(null);
     setRepairContent("");
