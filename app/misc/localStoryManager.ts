@@ -1,4 +1,4 @@
-import { Adventure, StoryData, StoryLore } from "./structs";
+import { Adventure, DiceMode, StoryData, StoryLore } from "./structs";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -171,6 +171,89 @@ export async function startAdventureLocally(
   return localId;
 }
 
+// A player configured through the guided freeform setup wizard (see
+// GuidedStoryStart). Extends the persisted CouchPlayer identity with
+// setup-only preferences that get baked into a pinned GM note.
+export interface FreeformPlayerSetup {
+  id: string;
+  name: string;
+  color: string; // hex color, e.g. "#22c55e"
+  personality: string[]; // curated personality tags picked in the wizard
+  wish: string; // what this player wants from the story
+}
+
+function buildPlayerPreferencesNote(
+  players: FreeformPlayerSetup[],
+): StoryLore {
+  const isParty = players.length > 1;
+  const playerBlocks = players
+    .map((p) => {
+      const lines = [`### ${p.name}`];
+      if (p.personality.length > 0) {
+        lines.push(`- Personality: ${p.personality.join(", ")}`);
+      }
+      if (p.wish.trim()) {
+        lines.push(`- Wants from this story: ${p.wish.trim()}`);
+      }
+      return lines.join("\n");
+    })
+    .join("\n\n");
+
+  const guidance = isParty
+    ? "\n\nThis is a same-device co-op session. Each person above plays their OWN character - when you set up the world, create a separate `character_sheet` note per player (titled \"Character: <name>\") that reflects their personality tags. Player turns arrive as \"> Name: action\" lines. Weave everyone's wishes into the story and rotate the spotlight so nobody is left out."
+    : "\n\nUse the personality tags to shape the player's character concept when you create their `character_sheet` note, and steer the story toward what they said they want.";
+
+  return {
+    title: "Players & Preferences",
+    content:
+      `The player${isParty ? "s" : ""} filled out a quick setup before starting:\n\n` +
+      playerBlocks +
+      guidance,
+    relatedCharacters: players.map((p) => p.name),
+    relatedLocations: [],
+    secrtet: false,
+    keys: [],
+    type: "dm_instructions",
+    alwaysOn: true,
+    enabled: true,
+  };
+}
+
+function buildFreeformGreeting(
+  hasCharacterSheet: boolean,
+  players?: FreeformPlayerSetup[],
+): string {
+  if (players && players.length > 1) {
+    const names = players.map((p) => p.name);
+    const nameList =
+      names.slice(0, -1).join(", ") + " and " + names[names.length - 1];
+    return (
+      `Welcome, ${nameList}! I've read through what everyone's looking for - this is going to be fun.\n\n` +
+      "Tell me what kind of world you all want to play in (genre, tone, setting), " +
+      "or just say \"surprise me\" and I'll cook something up that fits the whole table."
+    );
+  }
+  if (players && players.length === 1) {
+    return (
+      `Welcome, ${players[0].name}! I've got your preferences in front of me.\n\n` +
+      "Tell me what kind of story you're in the mood for (genre, tone, setting), " +
+      "or just say \"surprise me\" and I'll take it from there."
+    );
+  }
+  if (hasCharacterSheet) {
+    return (
+      "Welcome back! I can see the character and notes you brought with you.\n\n" +
+      "Tell me what kind of story you're in the mood for (genre, tone, setting), " +
+      "or just say \"surprise me\" and I'll take it from there."
+    );
+  }
+  return (
+    "Welcome! There's no adventure set up yet - so let's build one together.\n\n" +
+    "Tell me what kind of story you're in the mood for (genre, tone, a character concept, anything at all), " +
+    "or just say \"surprise me\" and I'll take it from there."
+  );
+}
+
 /**
  * Creates a new local story with no premise, lore, stats, or character
  * schema - just a single GM greeting. This is the "Freeform Story" entry
@@ -178,10 +261,18 @@ export async function startAdventureLocally(
  * directly to the GM, who interviews them briefly and sets up the world and
  * character on the fly via tool calls (see the "FRESH STORY" block in
  * buildGMStagePrompt).
+ *
+ * When `setup.players` is provided (guided wizard flow), the players'
+ * names/personalities/wishes are baked into a pinned `dm_instructions`
+ * note, and 2+ players enables couch co-op with named/colored players.
+ * `setup.diceMode` chooses who rolls the dice: "ai" (default) or "manual"
+ * (the players roll physical dice; the GM collects results via
+ * ask_for_roll).
  */
 export async function startFreeformStoryLocally(
   playerName: string = "Player",
   initialLore?: StoryLore[],
+  setup?: { players?: FreeformPlayerSetup[]; diceMode?: DiceMode },
 ): Promise<string> {
   const localId = `local_${Date.now()}_${Math.random()
     .toString(36)
@@ -196,10 +287,34 @@ export async function startFreeformStoryLocally(
     (l) => l.type === "character_sheet",
   );
 
+  const players = setup?.players?.filter((p) => p.name.trim());
+  const lore: StoryLore[] = [...(initialLore || [])];
+  if (players && players.length > 0) {
+    lore.push(buildPlayerPreferencesNote(players));
+  }
+
+  const resolvedPlayerName =
+    players && players.length > 0
+      ? players.map((p) => p.name).join(" & ")
+      : playerName;
+
+  const multiplayer =
+    players && players.length > 1
+      ? {
+          enabled: true,
+          mode: "any" as const,
+          couchPlayers: players.map((p) => ({
+            id: p.id,
+            name: p.name,
+            color: p.color,
+          })),
+        }
+      : undefined;
+
   const newStoryData = {
     story_name: "New Story",
     premise: "",
-    player_name: playerName,
+    player_name: resolvedPlayerName,
     player_summary: "",
     player_notes: defaultUserNotes,
     intro: "",
@@ -207,16 +322,12 @@ export async function startFreeformStoryLocally(
     max_chapters: 0,
     currentChapter: 0,
     chapters: [],
+    multiplayer,
+    diceMode: setup?.diceMode || "ai",
     scene: {
       parts: [
         {
-          content: hasCharacterSheet
-            ? "Welcome back! I can see the character and notes you brought with you.\n\n" +
-              "Tell me what kind of story you're in the mood for (genre, tone, setting), " +
-              "or just say \"surprise me\" and I'll take it from there."
-            : "Welcome! There's no adventure set up yet - so let's build one together.\n\n" +
-              "Tell me what kind of story you're in the mood for (genre, tone, a character concept, anything at all), " +
-              "or just say \"surprise me\" and I'll take it from there.",
+          content: buildFreeformGreeting(hasCharacterSheet, players),
           imageUrl: "",
           user: false,
           role: "assistant",
@@ -228,7 +339,7 @@ export async function startFreeformStoryLocally(
     resources: [],
     inventory: [],
     abilities: [],
-    lore: initialLore || [],
+    lore,
     goals: [],
     relationships: [],
     npcs: [],

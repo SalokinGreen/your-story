@@ -148,6 +148,7 @@ export default function MenuPage({
     max_chapters: storyData.max_chapters,
     displayName: storyData.displayName || "",
     displayAvatar: storyData.displayAvatar || "",
+    diceMode: storyData.diceMode || "ai",
   });
 
   // Advanced editing states
@@ -330,6 +331,7 @@ export default function MenuPage({
         max_chapters: settingsForm.max_chapters,
         displayName: settingsForm.displayName || undefined,
         displayAvatar: settingsForm.displayAvatar || undefined,
+        diceMode: settingsForm.diceMode,
         multiplayer: {
           enabled: multiplayerEnabled,
           mode: multiplayerMode,
@@ -1554,6 +1556,7 @@ export default function MenuPage({
                     max_chapters: storyData.max_chapters,
                     displayName: storyData.displayName || "",
                     displayAvatar: storyData.displayAvatar || "",
+                    diceMode: storyData.diceMode || "ai",
                   });
                   setMultiplayerEnabled(!!storyData.multiplayer?.enabled);
                   setMultiplayerMode(storyData.multiplayer?.mode || "host");

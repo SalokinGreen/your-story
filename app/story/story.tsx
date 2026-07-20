@@ -488,18 +488,20 @@ export default function Story({
     };
   }, []);
 
-  // Handle STT transcript - analyze action then submit as freeform action
-  const handleSTTTranscript = async (text: string) => {
-    if (!text.trim()) return;
+  // Shared freeform submit path (composer + STT): analyze the action for
+  // mechanics (skill checks, items, tables), then submit it as a Choice.
+  const submitFreeformAction = async (text: string, isStt = false) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    const sttFlag = isStt || undefined;
 
-    // Analyze the action first (like ChoicesModal does)
     if (onActionSubmit && onActionConfirm) {
       try {
-        const result = await onActionSubmit(text.trim());
+        const result = await onActionSubmit(trimmed);
         if (result) {
           // Submit with analyzed mechanics (skill checks, tables, etc.)
           const choice: Choice = {
-            text: text.trim(),
+            text: trimmed,
             skill_used: result.analysis.skill_used || undefined,
             skill_dc: result.analysis.skill_dc || undefined,
             item_used: result.analysis.item_used || undefined,
@@ -507,30 +509,87 @@ export default function Story({
             resource_used: result.analysis.resource_used || undefined,
             agmt_check: result.analysis.agmt_check || undefined,
             table: result.analysis.table || undefined,
-            stt_input: true,
+            stt_input: sttFlag,
           };
           onActionConfirm(choice);
         } else {
           // Analysis failed, submit as plain action
-          onActionConfirm({
-            text: text.trim(),
-            stt_input: true,
-          });
+          onActionConfirm({ text: trimmed, stt_input: sttFlag });
         }
       } catch (error) {
-        console.error("STT action analysis failed:", error);
+        console.error("Action analysis failed:", error);
         // Fallback to plain action
-        onActionConfirm({
-          text: text.trim(),
-          stt_input: true,
-        });
+        onActionConfirm({ text: trimmed, stt_input: sttFlag });
       }
     } else if (onActionConfirm) {
       // No analysis available, submit plain
-      onActionConfirm({
-        text: text.trim(),
-        stt_input: true,
-      });
+      onActionConfirm({ text: trimmed, stt_input: sttFlag });
+    } else if (onCustomInput) {
+      onCustomInput(trimmed);
+    }
+  };
+
+  // Handle STT transcript - same path as the composer, flagged as voice input
+  const handleSTTTranscript = async (text: string) => {
+    await submitFreeformAction(text, true);
+  };
+
+  // Composer (inline chat input) state
+  const [composerText, setComposerText] = React.useState("");
+  const [composerBusy, setComposerBusy] = React.useState(false);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  // Couch co-op: which player the next typed line belongs to
+  const couchPlayers =
+    (storyData.multiplayer?.enabled && storyData.multiplayer.couchPlayers) ||
+    [];
+  const [activeSpeakerId, setActiveSpeakerId] = React.useState<string | null>(
+    null,
+  );
+  const activeSpeaker =
+    couchPlayers.find((p) => p.id === activeSpeakerId) ||
+    couchPlayers[0] ||
+    null;
+
+  const autoGrowComposer = () => {
+    const el = composerRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(el.scrollHeight, 140) + "px";
+  };
+
+  const handleComposerSubmit = async () => {
+    const text = composerText.trim();
+    if (!text || loading || loadingStage || composerBusy) return;
+
+    setComposerText("");
+    if (composerRef.current) composerRef.current.style.height = "auto";
+
+    // Couch co-op: attribute the line to the active player (same "> Name:
+    // action" format PlayerBubbles uses), then pass the mic to the next one.
+    if (couchPlayers.length > 1 && activeSpeaker && onCustomInput) {
+      onCustomInput(`> ${activeSpeaker.name}: ${text}`, undefined, [
+        activeSpeaker.id,
+      ]);
+      const idx = couchPlayers.findIndex((p) => p.id === activeSpeaker.id);
+      setActiveSpeakerId(couchPlayers[(idx + 1) % couchPlayers.length].id);
+      return;
+    }
+
+    setComposerBusy(true);
+    try {
+      await submitFreeformAction(text);
+    } finally {
+      setComposerBusy(false);
+    }
+  };
+
+  // Tapping a suggested-choice chip submits that choice directly (mechanics
+  // like skill checks and intro overrides ride along on the Choice object).
+  const handleChipSelect = (choice: Choice) => {
+    if (loading || loadingStage || composerBusy) return;
+    if (onActionConfirm) {
+      onActionConfirm({ ...choice });
     }
   };
 
@@ -552,16 +611,14 @@ export default function Story({
         return;
       }
 
-      // Enter/Space to open choices modal (when not loading and modal closed)
+      // Enter/Space to jump into the composer (when modal closed)
       if (
         (e.key === "Enter" || e.key === " ") &&
-        !loading &&
-        !loadingStage &&
         !showChoicesModal &&
         !editMode
       ) {
         e.preventDefault();
-        setShowChoicesModal(true);
+        composerRef.current?.focus();
         return;
       }
 
@@ -1083,43 +1140,155 @@ export default function Story({
           </div>
         )}
 
-        {/* Continue Button with STT */}
+        {/* Composer: suggested choices, player switcher, and chat input */}
         {!editMode && (
-          <div className="p-3">
-            <div className="flex gap-2 items-stretch">
-              {/* STT Button - shown when STT is enabled */}
+          <div className="p-3 pt-2 space-y-2">
+            {/* Suggested choices as tappable chips */}
+            {!loading &&
+              !loadingStage &&
+              (choices?.choices?.length ?? 0) > 0 && (
+                <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-1 px-1 pb-0.5">
+                  {choices.choices.map((choice, i) => (
+                    <button
+                      key={`chip-${i}-${choice.text}`}
+                      onClick={() => handleChipSelect(choice)}
+                      disabled={composerBusy}
+                      className="shrink-0 max-w-[16rem] px-3 py-1.5 rounded-full bg-purple-900/25 hover:bg-purple-800/40 border border-purple-600/30 hover:border-purple-500/60 text-purple-100/90 text-xs transition-colors truncate touch-manipulation disabled:opacity-50"
+                      title={choice.text}
+                    >
+                      {choice.text}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+            {/* Couch co-op: switch who's speaking */}
+            {couchPlayers.length > 1 && (
+              <div className="flex items-center gap-1 p-1 bg-black/25 border border-white/10 rounded-full overflow-x-auto scrollbar-hide w-fit max-w-full">
+                {couchPlayers.map((player) => {
+                  const isActive = activeSpeaker?.id === player.id;
+                  return (
+                    <button
+                      key={player.id}
+                      onClick={() => setActiveSpeakerId(player.id)}
+                      className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all touch-manipulation ${
+                        isActive
+                          ? "text-white shadow-md"
+                          : "text-blue-200/60 hover:text-white"
+                      }`}
+                      style={
+                        isActive
+                          ? { backgroundColor: player.color }
+                          : undefined
+                      }
+                      title={`Play as ${player.name}`}
+                    >
+                      <span
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          isActive ? "bg-white/90" : ""
+                        }`}
+                        style={
+                          isActive
+                            ? undefined
+                            : { backgroundColor: player.color }
+                        }
+                      />
+                      <span className="max-w-[7rem] truncate">
+                        {player.name}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Input row */}
+            <div className="flex items-end gap-2">
               {sttEnabled && (
                 <STTButton
                   onTranscript={handleSTTTranscript}
-                  disabled={loading || !!loadingStage}
+                  disabled={loading || !!loadingStage || composerBusy}
                   className="shrink-0"
                 />
               )}
 
-              {/* Continue/Cancel Button */}
-              {loading || loadingStage ? (
-                <button
-                  onClick={onStop}
-                  className="flex-1 py-3.5 sm:py-2.5 text-base font-medium rounded-xl bg-blue-500/10 hover:bg-blue-500/20 border border-blue-400/30 text-blue-300 transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation cursor-pointer"
-                  title="Cancel generation"
-                >
-                  <div className="w-4 h-4 border-2 border-blue-400/60 border-t-blue-300 rounded-full animate-spin" />
-                  {loadingStage === "gm"
-                    ? "Thinking..."
-                    : loadingStage === "choices"
-                      ? "Preparing choices..."
-                      : "Generating..."}
-                  <span className="text-blue-400/80 text-sm ml-1">Cancel</span>
-                </button>
-              ) : (
-                <button
-                  onClick={() => setShowChoicesModal(true)}
-                  className="flex-1 py-3.5 sm:py-2.5 text-base font-semibold rounded-xl transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.98] text-white shadow-lg shadow-purple-950/40"
-                >
-                  <DynamicIcon name="Compass" className="w-4 h-4" />
-                  Continue
-                </button>
-              )}
+              <div className="relative flex-1">
+                <textarea
+                  ref={composerRef}
+                  value={composerText}
+                  onChange={(e) => {
+                    setComposerText(e.target.value);
+                    autoGrowComposer();
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      handleComposerSubmit();
+                    }
+                  }}
+                  rows={1}
+                  placeholder={
+                    loading || loadingStage
+                      ? loadingStage === "gm"
+                        ? "GM is thinking..."
+                        : loadingStage === "choices"
+                          ? "Preparing choices..."
+                          : "Writing the story..."
+                      : couchPlayers.length > 1 && activeSpeaker
+                        ? `What does ${activeSpeaker.name} do?`
+                        : "What do you do?"
+                  }
+                  className="w-full resize-none pl-4 pr-12 py-3 bg-blue-900/25 border border-blue-700/40 rounded-2xl text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/70 text-base leading-snug"
+                  style={
+                    couchPlayers.length > 1 && activeSpeaker
+                      ? { borderColor: `${activeSpeaker.color}66` }
+                      : undefined
+                  }
+                />
+
+                {/* Send / Stop button, embedded like other chat UIs */}
+                {loading || loadingStage ? (
+                  <button
+                    onClick={onStop}
+                    className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full bg-red-500/15 hover:bg-red-500/30 border border-red-400/40 flex items-center justify-center transition-colors touch-manipulation"
+                    title="Stop generating"
+                  >
+                    <span className="relative flex items-center justify-center">
+                      <span className="absolute w-7 h-7 border-2 border-red-400/30 border-t-red-300 rounded-full animate-spin" />
+                      <DynamicIcon
+                        name="Square"
+                        className="w-3 h-3 text-red-300 fill-current"
+                      />
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleComposerSubmit}
+                    disabled={!composerText.trim() || composerBusy}
+                    className="absolute right-1.5 bottom-2.5 w-9 h-9 rounded-full flex items-center justify-center transition-all bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 disabled:opacity-40 shadow-md shadow-purple-950/40 touch-manipulation"
+                    title="Send"
+                  >
+                    {composerBusy ? (
+                      <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <DynamicIcon
+                        name="ArrowUp"
+                        className="w-4 h-4 text-white"
+                      />
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* More options: dice builder, comments, reroll */}
+              <button
+                onClick={() => setShowChoicesModal(true)}
+                disabled={loading || !!loadingStage}
+                className="shrink-0 p-3 rounded-xl bg-blue-900/25 hover:bg-blue-800/40 border border-blue-700/40 text-blue-300 hover:text-white transition-colors disabled:opacity-40 touch-manipulation"
+                title="More options (action builder, comments)"
+              >
+                <DynamicIcon name="Dices" className="w-5 h-5" />
+              </button>
             </div>
           </div>
         )}

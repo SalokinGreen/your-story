@@ -50,6 +50,7 @@ import {
 import {
   executeGMTools,
   GMToolResult,
+  ManualRollRequest,
   GMExecutionResult,
   resolveCheckPerTurnVisibility,
 } from "@/app/misc/gmExecutor";
@@ -105,6 +106,7 @@ import { getCustomModelIfUUID, CustomModel } from "@/app/misc/user_settings";
 // Only an explicit "ERROR" marker in contextForStory counts as a real failure.
 const DICE_TOOLS = [
   "formula_roll",
+  "ask_for_roll",
   "opposed_formula",
   "formula_challenge_check",
   "npc_roll",
@@ -205,6 +207,9 @@ export interface GenerationCallbacks {
   onGMContent?: (content: string, fullContent: string) => void;
   // NEW: Called after each GM tool execution with interleaved results
   onGMToolResult?: (result: GMToolResult) => void;
+  // Manual dice mode: the GM asked the player to roll real dice. The UI
+  // shows a roll prompt and resolves with the entered total (null = skipped).
+  onAskForRoll?: (request: ManualRollRequest) => Promise<number | null>;
   onGMStageComplete?: (
     results: GMToolResult[],
     storyContext: string,
@@ -1267,6 +1272,7 @@ export async function generateStoryTurn(
                 storyId: options.storyId,
                 token,
               },
+              { requestManualRoll: callbacks.onAskForRoll },
             );
 
             // Accumulate results across rounds

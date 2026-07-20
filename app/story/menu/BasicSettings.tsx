@@ -23,6 +23,7 @@ import {
   NPCStatus,
   NPCAttitude,
   Adventure,
+  DiceMode,
 } from "../../misc/structs";
 import { DynamicIcon } from "../../components/DynamicIcon";
 
@@ -34,6 +35,7 @@ export interface BasicSettingsForm {
   max_chapters: number;
   displayName: string;
   displayAvatar: string;
+  diceMode: DiceMode;
 }
 
 
@@ -103,6 +105,48 @@ export default function BasicSettings({
           }
           className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         />
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
+          Who Rolls the Dice?
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onChange({ ...form, diceMode: "ai" })}
+            className={`p-3 rounded-lg border text-left transition-all ${
+              form.diceMode === "ai"
+                ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
+                : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+              <DynamicIcon name="Sparkles" className="w-4 h-4 text-purple-300" />
+              GM rolls
+            </span>
+            <span className="block text-xs text-blue-300/50">
+              The AI rolls digitally and narrates the results
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ ...form, diceMode: "manual" })}
+            className={`p-3 rounded-lg border text-left transition-all ${
+              form.diceMode === "manual"
+                ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
+                : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+              <DynamicIcon name="Dices" className="w-4 h-4 text-purple-300" />
+              We roll
+            </span>
+            <span className="block text-xs text-blue-300/50">
+              Roll real dice - the GM pauses and asks for your results
+            </span>
+          </button>
+        </div>
       </div>
 
     </div>
