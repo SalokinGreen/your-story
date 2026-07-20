@@ -306,6 +306,69 @@ describe("selectDirectorMove", () => {
     // No active timer/thread pressure and a Normal scene check -> no move.
     expect(selectDirectorMove(storyData, "Normal")).toBeNull();
   });
+
+  it("selects offer_opportunity on a calm, on-pace scene with an open thread", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+      threads: [
+        {
+          id: "th1",
+          title: "The Locked Vault",
+          description: "Something valuable is sealed inside",
+          status: "active",
+          createdAt: Date.now(),
+        },
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("offer_opportunity");
+    expect(move?.targetThreadId).toBe("th1");
+  });
+
+  it("stays a no-op on a calm, on-pace scene with no open thread to offer", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+    });
+    expect(selectDirectorMove(storyData, "Normal")).toBeNull();
+  });
+
+  it("still prioritizes put_someone_in_a_spot over offer_opportunity when tension is high", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 9,
+      },
+      threads: [
+        {
+          id: "th1",
+          title: "The Locked Vault",
+          description: "Something valuable is sealed inside",
+          status: "active",
+          createdAt: Date.now(),
+        },
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("put_someone_in_a_spot");
+  });
 });
 
 describe("storyProgress", () => {

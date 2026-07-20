@@ -630,6 +630,27 @@ export function selectDirectorMove(
     }
   }
 
+  // Soft, non-escalating move for the common "nothing's wrong" case: PbtA's
+  // own move list isn't only about danger - "offer an opportunity, with or
+  // without a cost" is the classic default for an otherwise uneventful
+  // scene. Everything above this point already covers the escalating
+  // signals (timer, chaotic scene check, tension ceiling, arc lag, a
+  // neglected couch player); reaching here means the scene resolved
+  // normally and pacing is on track, which used to mean no move fired at
+  // all. Gated on there being an active thread to hang the opportunity on
+  // (the same "engine decides from already-tracked state" pattern the
+  // other moves use) - with nothing open to offer an opportunity about,
+  // this stays a no-op rather than inventing one from nothing.
+  if (activeThreads.length > 0) {
+    return {
+      id: crypto.randomUUID(),
+      move: "offer_opportunity",
+      targetThreadId: activeThreads[0].id,
+      context: `Scene resolved normally, pacing on track (tension ${tension}/10)`,
+      createdAt: Date.now(),
+    };
+  }
+
   return null;
 }
 

@@ -164,11 +164,14 @@ problem.
   cheapest, safest item in this entire document - it's a read-only view of
   state that already exists, with zero model-facing changes.
 - **Expanding the GM-move menu**: PbtA's own move vocabulary is much larger
-  than the 4 moves implemented (`announce_future_badness`, `tick_a_clock`,
-  `put_someone_in_a_spot`, `spotlight_couch_player`) - "reveal an unwelcome
-  truth," "show a downside of their class/ability/gear," "offer an
-  opportunity, with or without a cost," and others. Mechanically cheap to
-  add (an enum entry plus a branch in `selectDirectorMove`), but each new
+  than the 5 moves implemented (`announce_future_badness`, `tick_a_clock`,
+  `put_someone_in_a_spot`, `spotlight_couch_player`, and now
+  `offer_opportunity` - a non-escalating soft move that fires as the
+  fallback for an otherwise-calm, on-pace scene with an open thread to
+  hang the opportunity on, replacing what used to just be `null`) -
+  "reveal an unwelcome truth," "show a downside of their class/ability/
+  gear," and others remain unimplemented. Mechanically cheap to add (an
+  enum entry plus a branch in `selectDirectorMove`), but each new
   move needs its own trigger condition reasoned through with the same care
   the existing four got - do this one move at a time with real playtesting
   in between, not as a batch.
