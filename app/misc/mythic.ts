@@ -577,37 +577,12 @@ export function selectDirectorMove(
   // instead of only ever reacting to whatever just happened in-scene.
   const targetTension = targetTensionForProgress(storyProgress(storyData));
   if (tension < targetTension - ARC_LAG_THRESHOLD) {
-    const lagContext = `Story pacing is lagging its arc (tension ${tension}/10 vs. an expected ~${Math.round(
-      targetTension
-    )}/10 at this point in the story)`;
-
-    // PbtA's "activate the downside of a character's equipment or
-    // abilities" - a more concrete, flavorful hard consequence than a
-    // generic "spot" when the adventure already has structured ability
-    // data to draw on (Ability.cost/cooldown, populated by add_ability/
-    // modify_ability - real tracked state, not invented). Only claims this
-    // one trigger, not the tension-ceiling branch above, which keeps its
-    // existing, tested put_someone_in_a_spot behavior unconditionally -
-    // this is deliberately the softer of the two hard-tension triggers,
-    // matching the arc-lag branch's own "proactively raise stakes" framing
-    // rather than the acute crisis the ceiling represents.
-    const costedAbility = (storyData.abilities || []).find(
-      (a) => (a.cost && a.cost.length > 0) || (a.cooldown ?? 0) > 0
-    );
-    if (costedAbility) {
-      return {
-        id: crypto.randomUUID(),
-        move: "activate_downside",
-        targetAbilityName: costedAbility.name,
-        context: `${lagContext} - "${costedAbility.name}"'s own cost/cooldown becomes the price paid now`,
-        createdAt: Date.now(),
-      };
-    }
-
     return {
       id: crypto.randomUUID(),
       move: "put_someone_in_a_spot",
-      context: lagContext,
+      context: `Story pacing is lagging its arc (tension ${tension}/10 vs. an expected ~${Math.round(
+        targetTension
+      )}/10 at this point in the story)`,
       createdAt: Date.now(),
     };
   }

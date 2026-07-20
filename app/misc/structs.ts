@@ -897,13 +897,11 @@ export interface PendingDirectorMove {
     | "spotlight_couch_player"
     | "put_someone_in_a_spot"
     | "offer_opportunity"
-    | "reveal_unwelcome_truth"
-    | "activate_downside";
+    | "reveal_unwelcome_truth";
   targetThreadId?: string; // For tick_a_clock / put_someone_in_a_spot / offer_opportunity
   targetTimerId?: string; // For tick_a_clock
   targetCouchPlayerId?: string; // For spotlight_couch_player
   targetLoreTitle?: string; // For reveal_unwelcome_truth - a StoryLore.title
-  targetAbilityName?: string; // For activate_downside - an Ability.name
   context?: string; // Why this move fired (e.g. which trigger condition)
   createdAt: number;
   // Hardness dimensions (see FormulaRollParams.target/forces_choice in

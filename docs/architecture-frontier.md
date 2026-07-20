@@ -177,16 +177,25 @@ problem.
     so a pending secret backlog takes priority over pure flavor. The
     model still does the actual reveal (prose + flipping visibility via
     `edit_lore`); this only supplies deterministic timing.
-  - `activate_downside` - claims the arc-lag "proactively raise stakes"
-    trigger (not the tension-ceiling one, which keeps `put_someone_in_a_spot`
-    unconditionally) when a tracked `Ability` has a defined cost or
-    cooldown, targeting that ability by name instead of a generic "spot."
-  Remaining unimplemented from PbtA's broader vocabulary: separating the
-  characters, capturing someone, trading harm for harm, turning a player's
-  move back on them, and others. Mechanically cheap to add (an enum entry
-  plus a branch in `selectDirectorMove`), but each new move needs its own
-  trigger condition reasoned through with the same care the existing ones
-  got - do this one move at a time with real playtesting in between, not
+
+  "Show a downside of their gear/ability" was tried (`activate_downside`,
+  keyed off a tracked `Ability`'s cost/cooldown) and reverted: `Ability[]`
+  is itself soft-deprecated (`buildInfoMessage` in `ai_staged.ts` already
+  says "Stats, resources, abilities, and rpgSystem are DEPRECATED - all
+  mechanics are now defined in mechanics-type lore entries," and the
+  creator AI hasn't populated structured abilities for new adventures in a
+  long time) - `docs/game-mechanics.md` is stale on this point and should
+  be corrected. A move keyed off data new adventures increasingly won't
+  have is the same failure class as building on the old dead
+  `currentCooldown` field, just at the level of the whole mechanism; it
+  needs a different, non-deprecated structured hook (or none) before
+  trying again. Remaining unimplemented from PbtA's broader vocabulary:
+  separating the characters, capturing someone, trading harm for harm,
+  turning a player's move back on them, and others. Mechanically cheap to
+  add (an enum entry plus a branch in `selectDirectorMove`), but each new
+  move needs its own trigger condition reasoned through with the same care
+  the existing ones got - do this one move at a time with real
+  playtesting in between, not
   as a batch.
 
 ## Frontier 4: adjudication - beyond NPC-status contradictions

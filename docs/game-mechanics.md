@@ -26,7 +26,14 @@ Some structured data still exists for systems that benefit from it:
 
 - **Abilities** (`Ability[]`) - named skills/spells/special moves with an
   optional cost and cooldown, managed via `add_ability`, `modify_ability`,
-  `upgrade_ability`, `remove_ability`, `reset_ability_cooldown`.
+  `upgrade_ability`, `remove_ability`, `reset_ability_cooldown`. **Soft-
+  deprecated**: the tools still work for backward compatibility, but
+  `buildInfoMessage` (the GM stage's own context builder, in `ai_staged.ts`)
+  already treats abilities the same as stats/resources - "all mechanics
+  are now defined in mechanics-type lore entries" - and the creator AI
+  hasn't populated structured abilities for new adventures for some time.
+  New adventures should describe abilities in the freeform character sheet
+  note instead, the same as stats/resources/inventory below.
 - **NPCs** (`NPC[]`) - tracked characters with status/attitude, managed via
   `add_npc`, `update_npc`, `remove_npc`, plus `npc_reaction` for toast
   notifications when an NPC's opinion shifts.
