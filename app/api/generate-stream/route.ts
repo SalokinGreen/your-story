@@ -39,6 +39,10 @@ interface ChatMessage {
 interface RequestBody {
   messages: ChatMessage[];
   tools?: any[];
+  // Caller-forced tool_choice (e.g. the M2 roll-invariant gate's retry
+  // round, generation.ts). Only "required" is meaningful here - anything
+  // else falls back to the provider's normal default below.
+  toolChoice?: "required";
   model?: string;
   maxTokens?: number;
   temperature?: number;
@@ -319,6 +323,7 @@ export async function POST(req: NextRequest) {
         const {
           messages,
           tools,
+          toolChoice,
           model: rawModel,
           maxTokens = 4000,
           temperature = 0.7,
@@ -630,10 +635,14 @@ export async function POST(req: NextRequest) {
               ? filterToolsForGoogle(tools)
               : tools;
           requestBody.tools = toolsToUse;
-          // Google/Gemini needs tool_choice: "required" to actually invoke tools
-          // ("auto" often results in empty responses)
+          // Google/Gemini needs tool_choice: "required" to actually invoke
+          // tools ("auto" often results in empty responses); a caller can
+          // also force "required" for any provider (e.g. the M2 gate's
+          // retry round) - that always wins over the per-provider default.
           requestBody.tool_choice =
-            modelConfig.provider === "google" ? "required" : "auto";
+            toolChoice === "required" || modelConfig.provider === "google"
+              ? "required"
+              : "auto";
         }
 
         applyReasoningEffort(

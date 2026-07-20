@@ -43,6 +43,10 @@ interface ToolCall {
 interface RequestBody {
   messages: ChatMessage[];
   tools?: any[];
+  // Caller-forced tool_choice (e.g. the M2 roll-invariant gate's retry
+  // round, generation.ts). Only "required" is meaningful - anything else
+  // falls back to the provider's normal default.
+  toolChoice?: "required";
   model?: string;
   maxTokens?: number;
   temperature?: number;
@@ -231,6 +235,7 @@ async function callAI(
   temperature: number,
   tools?: any[],
   reasoningEffort?: string,
+  toolChoice?: "required",
 ): Promise<AIResponse> {
   // Check if we have a prefill (trailing assistant message)
   const hasPrefill =
@@ -394,8 +399,10 @@ async function callAI(
       provider === "google" ? filterToolsForGoogle(tools) : tools;
     requestBody.tools = toolsToUse;
     // Google/Gemini needs tool_choice: "required" to actually invoke tools
-    // ("auto" often results in empty responses)
-    requestBody.tool_choice = provider === "google" ? "required" : "auto";
+    // ("auto" often results in empty responses); a caller can also force
+    // "required" for any provider - that always wins over the default.
+    requestBody.tool_choice =
+      toolChoice === "required" || provider === "google" ? "required" : "auto";
   }
 
   applyReasoningEffort(requestBody, provider, reasoningEffort);
@@ -498,6 +505,7 @@ export async function POST(req: NextRequest) {
     const {
       messages,
       tools,
+      toolChoice,
       model: rawModel,
       maxTokens = 4000,
       temperature = 0.7,
@@ -578,6 +586,7 @@ export async function POST(req: NextRequest) {
       temperature,
       tools,
       reasoningEffort,
+      toolChoice,
     );
 
     const content = aiResponse.choices[0]?.message?.content || "";

@@ -787,6 +787,11 @@ export async function generateStoryTurn(
         let isComplete = false;
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
         const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
+        // Set by the M2 roll-invariant gate (search "M2 roll-invariant gate"
+        // below) when it forces a retry round - makes that one round require
+        // a tool call outright rather than relying on prose alone to ask for
+        // one. Consumed (read then cleared) at the top of the next round.
+        let forceToolChoiceNextRound: "required" | undefined;
         // Client-side token budgeting is only an estimate, so a request can
         // still overflow the model's real context window. currentGMBudget
         // starts at the configured (or default) budget and is permanently
@@ -813,6 +818,12 @@ export async function generateStoryTurn(
 
         gmRoundLoop: while (gmRound < MAX_GM_ROUNDS && !isComplete) {
           gmRound++;
+
+          // Consume this round's forced tool_choice (if the M2 gate set one
+          // for us on the previous round) and clear it immediately - it
+          // must apply to exactly this one round, not leak into later ones.
+          const toolChoiceThisRound = forceToolChoiceNextRound;
+          forceToolChoiceNextRound = undefined;
 
           // Re-derive tier from storyData.reasoningTierState each round: if the
           // previous round's tool execution included a set_reasoning_tier call,
@@ -902,6 +913,13 @@ export async function generateStoryTurn(
               mistralKey: options.mistralKey,
               deepinfraKey: options.deepinfraKey,
               customModel: getCustomModelIfUUID(model),
+              // Set only on the round immediately after the M2 gate fires -
+              // forces the model to call some tool rather than relying on
+              // the prose re-prompt alone. Omitted otherwise, letting the
+              // route apply its normal per-provider default.
+              ...(toolChoiceThisRound
+                ? { toolChoice: toolChoiceThisRound }
+                : {}),
             });
 
           let gmResponse = await fetch("/api/generate-stream", {
@@ -1406,6 +1424,7 @@ export async function generateStoryTurn(
                 content:
                   "This scene requires a roll before the turn can end - combat or a challenge is active, or you declared high/deadly stakes earlier this scene. Resolve the pending action with formula_roll, opposed_formula, formula_challenge_check, fate_question, or npc_roll, then continue.",
               });
+              forceToolChoiceNextRound = "required";
               continue gmRoundLoop;
             }
 

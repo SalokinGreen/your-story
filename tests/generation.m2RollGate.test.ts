@@ -136,6 +136,12 @@ describe("M2 roll-invariant gate - generateStoryTurn integration", () => {
         (m) => m.role === "user" && m.content?.includes(REPROMPT_TEXT),
       ),
     ).toBe(false);
+
+    // toolChoice: "required" is set on exactly the rounds immediately after
+    // a gate firing (2 and 3), not on round 1 (the gate hasn't fired yet).
+    expect(calls[0].body.toolChoice).toBeUndefined();
+    expect(calls[1].body.toolChoice).toBe("required");
+    expect(calls[2].body.toolChoice).toBe("required");
   });
 
   it("does not fire when the gate is already satisfied by a roll tool call earlier this turn", async () => {
@@ -188,6 +194,7 @@ describe("M2 roll-invariant gate - generateStoryTurn integration", () => {
           (m) => m.role === "user" && m.content?.includes(REPROMPT_TEXT),
         ),
       ).toBe(false);
+      expect(call.body.toolChoice).toBeUndefined();
     }
   });
 
@@ -216,5 +223,6 @@ describe("M2 roll-invariant gate - generateStoryTurn integration", () => {
         (m) => m.role === "user" && m.content?.includes(REPROMPT_TEXT),
       ),
     ).toBe(false);
+    expect(calls[0].body.toolChoice).toBeUndefined();
   });
 });
