@@ -162,8 +162,6 @@ export async function startAdventureLocally(
     starting_choices: adventure.startingChoices,
     player_notes:
       defaultUserNotes || adventure.storyTemplate?.player_notes || "",
-    level: 1,
-    upgradesSpent: 0,
     characterSheetTemplate: adventure.characterSheetTemplate,
     lore: [...(adventure.storyTemplate?.lore || []), ...(initialLore || [])],
   } as unknown as StoryData;
@@ -230,17 +228,10 @@ export async function startFreeformStoryLocally(
     resources: [],
     inventory: [],
     abilities: [],
-    achievements: [],
     lore: initialLore || [],
-    points: 0,
-    level: 1,
-    upgradesSpent: 0,
-    earnedPointsFromChapters: [],
-    quests: [],
-    earnedPointsFromQuests: [],
+    goals: [],
     relationships: [],
     npcs: [],
-    conditions: [],
   } as unknown as StoryData;
 
   await saveLocalStory(localId, newStoryData);

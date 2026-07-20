@@ -30,8 +30,7 @@ import {
 import { NARRATION_MODEL_KEY } from "../misc/reasoningTiers";
 import Story from "./story";
 import LorePage from "./lore";
-import QuestsPage from "./quests";
-import AchievementsPage from "./achievements";
+import GoalsPage from "./goals";
 import NPCsPage from "./npcs";
 import MenuPage from "./menu";
 import { StoryTabBar } from "./StoryTabBar";
@@ -135,7 +134,7 @@ function trackPlayerAction(storyData: StoryData, action: string) {
   storyData.pendingPlayerActions.push(action);
 }
 
-// Helper to trigger notifications for quest-related tool responses
+// Helper to trigger notifications for goal-related tool responses
 function processQuestNotifications(
   toolResponses: CommandResponse[],
   addNotification: (
@@ -148,71 +147,44 @@ function processQuestNotifications(
 
     const command = response.command.toLowerCase();
 
-    // Quest created
-    if (command.includes("/create_quest:")) {
-      // Extract quest title from message like 'Created quest "Title" (X points)'
-      const match = response.message.match(/Created quest "([^"]+)"/);
+    // Goal created
+    if (command.includes("/create_goal") || command.includes("create_goal")) {
+      // Extract goal title from message like 'Created goal "Title"'
+      const match = response.message.match(/Created goal "([^"]+)"/);
       if (match) {
-        addNotification(`📜 New Quest: ${match[1]}`, "info");
+        addNotification(`📜 New Goal: ${match[1]}`, "info");
       }
     }
 
-    // Quest completed
-    if (command.includes("/complete_quest:")) {
-      const match = response.message.match(/Completed quest "([^"]+)"/);
+    // Goal completed
+    if (command.includes("/complete_goal:")) {
+      const match = response.message.match(/Completed goal "([^"]+)"/);
       if (match) {
-        const pointsMatch = response.message.match(/\+(\d+) points/);
-        if (pointsMatch) {
-          addNotification(
-            `✅ Quest Complete: ${match[1]} (+${pointsMatch[1]} points)`,
-            "success",
-          );
-        } else {
-          addNotification(`✅ Quest Complete: ${match[1]}`, "success");
-        }
+        addNotification(`✅ Goal Complete: ${match[1]}`, "success");
       }
     }
 
-    // Quest failed
-    if (command.includes("/fail_quest:")) {
-      const match = response.message.match(/Failed quest "([^"]+)"/);
+    // Goal failed
+    if (command.includes("/fail_goal:")) {
+      const match = response.message.match(/Failed goal "([^"]+)"/);
       if (match) {
-        addNotification(`❌ Quest Failed: ${match[1]}`, "warning");
+        addNotification(`❌ Goal Failed: ${match[1]}`, "warning");
       }
     }
 
-    // Quest updated
-    if (
-      command.includes("/update_quest_description:") ||
-      command.includes("/update_quest_short_description:")
-    ) {
-      const match = response.message.match(/Updated quest "([^"]+)"/);
+    // Goal updated
+    if (command.includes("/update_goal:")) {
+      const match = response.message.match(/Updated goal "([^"]+)"/);
       if (match) {
-        addNotification(`📝 Quest Updated: ${match[1]}`, "info");
+        addNotification(`📝 Goal Updated: ${match[1]}`, "info");
       }
     }
 
-    // Quest deactivated
-    if (command.includes("/deactivate_quest:")) {
-      const match = response.message.match(/Deactivated quest "([^"]+)"/);
+    // Goal deleted
+    if (command.includes("/delete_goal:")) {
+      const match = response.message.match(/Deleted goal "([^"]+)"/);
       if (match) {
-        addNotification(`⏸️ Quest Deactivated: ${match[1]}`, "info");
-      }
-    }
-
-    // Quest activated
-    if (command.includes("/activate_quest:")) {
-      const match = response.message.match(/Activated quest "([^"]+)"/);
-      if (match) {
-        addNotification(`▶️ Quest Activated: ${match[1]}`, "info");
-      }
-    }
-
-    // Quest deleted
-    if (command.includes("/delete_quest:")) {
-      const match = response.message.match(/Deleted quest "([^"]+)"/);
-      if (match) {
-        addNotification(`🗑️ Quest Removed: ${match[1]}`, "info");
+        addNotification(`🗑️ Goal Removed: ${match[1]}`, "info");
       }
     }
   }
@@ -223,8 +195,7 @@ enum StoryState {
   STATS = "STATS",
   LORE = "LORE",
   NPCS = "NPCS",
-  QUESTS = "QUESTS",
-  ACHIEVEMENTS = "ACHIEVEMENTS",
+  GOALS = "GOALS",
   MENU = "MENU",
   LOGS = "LOGS",
   CONTEXT = "CONTEXT",
@@ -628,8 +599,8 @@ function StoryPageContent() {
         },
       );
 
-      //Initializequestarraysiftheydon'texist(forbackwardscompatibility)
-      if (!loadedStoryData.quests) loadedStoryData.quests = [];
+      //Initializegoalarraysiftheydon'texist(forbackwardscompatibility)
+      if (!loadedStoryData.goals) loadedStoryData.goals = [];
 
       //ProcessLoretriggersonloadtoinitializeLorevisibility
       processLoreTriggers(loadedStoryData, addNotification, true);
@@ -899,10 +870,6 @@ function StoryPageContent() {
       if (preset.relationships?.length)
         updatedStoryData.relationships = JSON.parse(
           JSON.stringify(preset.relationships),
-        );
-      if (preset.conditions?.length)
-        updatedStoryData.conditions = JSON.parse(
-          JSON.stringify(preset.conditions),
         );
       if (preset.authorNotes)
         updatedStoryData.author_notes = preset.authorNotes;
@@ -2833,13 +2800,9 @@ function StoryPageContent() {
 
   //GameOverScreen
   if (isGameOver && storyData) {
-    const achievedCount = storyData.achievements.filter(
-      (a) => a.dateAchieved,
-    ).length;
-    const totalAchievements = storyData.achievements.length;
-    const completedQuests =
-      storyData.quests?.filter((q) => q.fulfilled).length || 0;
-    const totalQuests = storyData.quests?.length || 0;
+    const completedGoals =
+      storyData.goals?.filter((g) => g.fulfilled).length || 0;
+    const totalGoals = storyData.goals?.length || 0;
 
     return (
       <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 py-6 px-4">
@@ -2866,93 +2829,53 @@ function StoryPageContent() {
               Final Statistics
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-purple-500/10 rounded-lg border border-purple-500/30">
-                <div className="flex items-center gap-2 mb-1">
-                  <DynamicIcon
-                    name="Trophy"
-                    className="w-5 h-5 text-purple-400"
-                  />
-                  <span className="text-sm font-medium text-white">
-                    Achievements
-                  </span>
-                </div>
-                <div className="text-2xl font-bold text-purple-400">
-                  {achievedCount}/{totalAchievements}
-                </div>
-                <div className="text-xs text-blue-200/40">
-                  {totalAchievements > 0
-                    ? Math.round((achievedCount / totalAchievements) * 100)
-                    : 0}
-                  % Complete
-                </div>
-              </div>
-
               <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30">
                 <div className="flex items-center gap-2 mb-1">
                   <DynamicIcon
                     name="Target"
                     className="w-5 h-5 text-green-400"
                   />
-                  <span className="text-sm font-medium text-white">Quests</span>
+                  <span className="text-sm font-medium text-white">Goals</span>
                 </div>
                 <div className="text-2xl font-bold text-green-400">
-                  {completedQuests}/{totalQuests}
+                  {completedGoals}/{totalGoals}
                 </div>
                 <div className="text-xs text-blue-200/40">
-                  {totalQuests > 0
-                    ? Math.round((completedQuests / totalQuests) * 100)
+                  {totalGoals > 0
+                    ? Math.round((completedGoals / totalGoals) * 100)
                     : 0}
                   % Complete
-                </div>
-              </div>
-
-              <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/30">
-                <div className="flex items-center gap-2 mb-1">
-                  <DynamicIcon
-                    name="Coins"
-                    className="w-5 h-5 text-yellow-400"
-                  />
-                  <span className="text-sm font-medium text-white">Points</span>
-                </div>
-                <div className="text-2xl font-bold text-yellow-400">
-                  {storyData.points}
-                </div>
-                <div className="text-xs text-blue-200/40">
-                  Progression Earned
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Achievements Earned */}
-          {achievedCount > 0 && (
+          {/* Goals Completed */}
+          {completedGoals > 0 && (
             <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-                <DynamicIcon name="Trophy" className="w-5 h-5 text-amber-400" />
-                Achievements Earned
+                <DynamicIcon name="Target" className="w-5 h-5 text-green-400" />
+                Goals Completed
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {storyData.achievements
-                  .filter((a) => a.dateAchieved)
-                  .map((achievement, idx) => (
+                {storyData.goals
+                  .filter((g) => g.fulfilled)
+                  .map((goal, idx) => (
                     <div
                       key={idx}
-                      className="p-3 bg-amber-500/10 rounded-lg border border-amber-500/30"
+                      className="p-3 bg-green-500/10 rounded-lg border border-green-500/30"
                     >
                       <div className="flex items-start gap-2">
                         <DynamicIcon
-                          name={achievement.symbol}
-                          className="w-5 h-5 text-amber-400 shrink-0"
+                          name="Check"
+                          className="w-5 h-5 text-green-400 shrink-0"
                         />
                         <div className="min-w-0">
                           <div className="font-medium text-white text-sm">
-                            {achievement.title}
+                            {goal.title}
                           </div>
                           <div className="text-xs text-blue-200/40 line-clamp-1">
-                            {achievement.description}
-                          </div>
-                          <div className="text-xs text-amber-400 font-medium mt-0.5">
-                            +{achievement.points} points
+                            {goal.shortDescription}
                           </div>
                         </div>
                       </div>
@@ -3012,7 +2935,6 @@ function StoryPageContent() {
                             freshTemplate?.inventory || storyData.inventory,
                           abilities:
                             freshTemplate?.abilities || storyData.abilities,
-                          conditions: freshTemplate?.conditions || [],
                           relationships:
                             freshTemplate?.relationships ||
                             storyData.relationships,
@@ -3037,20 +2959,10 @@ function StoryPageContent() {
                           memory: [],
                           currentChapter: 0,
                           chapters: [],
-                          points: 0,
-                          earnedPointsFromChapters: [],
-                          earnedPointsFromQuests: [],
-                          achievements: (
-                            freshTemplate?.achievements ||
-                            storyData.achievements
-                          ).map((a) => ({
-                            ...a,
-                            dateAchieved: null,
-                          })),
-                          quests:
-                            (freshTemplate?.quests || storyData.quests)?.map(
-                              (q) => ({
-                                ...q,
+                          goals:
+                            (freshTemplate?.goals || storyData.goals)?.map(
+                              (g) => ({
+                                ...g,
                                 fulfilled: false,
                                 active: false,
                               }),
@@ -3100,21 +3012,20 @@ function StoryPageContent() {
                     isOpen: true,
                     title: "New Game Plus",
                     message:
-                      "Start a New Game Plus run? You&apos;ll keep all achievements, stats, resources, and items, plus earn bonus rewards!",
+                      "Start a New Game Plus run? You&apos;ll keep all stats, resources, and items!",
                     icon: "Star",
                     confirmText: "Start NG+",
                     confirmButtonClass:
                       "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700",
                     onConfirm: async () => {
                       setConfirmDialog({ ...confirmDialog, isOpen: false });
-                      //New Game Plus - keep achievements and increase difficulty
+                      //New Game Plus - keep progress and increase difficulty
                       if (!storyDbId) return;
                       try {
                         const ngPlusCount =
                           (storyData.newGamePlusCount || 0) + 1;
-                        const bonusPoints = ngPlusCount * 50; //50pointsperNG+run
 
-                        // Try to fetch fresh adventure data for story-specific fields (lore, quests)
+                        // Try to fetch fresh adventure data for story-specific fields (lore, goals)
                         let freshTemplate: Partial<StoryData> | null = null;
                         if (sourceAdventureId) {
                           try {
@@ -3132,23 +3043,18 @@ function StoryPageContent() {
                           }
                         }
 
-                        //Resetstorybutkeepachievements,stats,resources,andinventory
+                        //Resetstorybutkeepstats,resources,andinventory
                         const ngPlusStoryData: StoryData = {
                           ...storyData,
                           scene: { parts: [] },
                           memory: [],
                           currentChapter: 0,
                           chapters: [],
-                          points: bonusPoints, //Startwithbonuspoints
-                          earnedPointsFromChapters: [],
-                          earnedPointsFromQuests: [],
-                          //Keepachievements,stats,resources,inventory,abilities!
-                          achievements: storyData.achievements,
+                          //Keepstats,resources,inventory,abilities!
                           stats: storyData.stats, //Keepstats
                           resources: storyData.resources, //Keepresources
                           inventory: storyData.inventory, //Keepinventory
                           abilities: storyData.abilities, //Keepabilities
-                          conditions: [], // Clear conditions
                           // Reset story-specific fields from fresh adventure
                           relationships:
                             freshTemplate?.relationships ||
@@ -3164,11 +3070,11 @@ function StoryPageContent() {
                           // Keep skill tree progress!
                           skillTrees: storyData.skillTrees,
                           unlockedNodes: storyData.unlockedNodes,
-                          // Reset quests from fresh adventure or current story
-                          quests:
-                            (freshTemplate?.quests || storyData.quests)?.map(
-                              (q) => ({
-                                ...q,
+                          // Reset goals from fresh adventure or current story
+                          goals:
+                            (freshTemplate?.goals || storyData.goals)?.map(
+                              (g) => ({
+                                ...g,
                                 fulfilled: false,
                                 active: false,
                               }),
@@ -3193,7 +3099,7 @@ function StoryPageContent() {
                         await saveLocalStory(storyDbId, ngPlusStoryData);
 
                         addNotification(
-                          `New Game Plus ${ngPlusCount} activated! +${bonusPoints} points`,
+                          `New Game Plus ${ngPlusCount} activated!`,
                           "success",
                         );
                         router.push(`/story?storyId=${storyDbId}`);
@@ -3344,12 +3250,6 @@ function StoryPageContent() {
                               {preset.inventory.length} Items
                             </span>
                           )}
-                          {preset.conditions &&
-                            preset.conditions.length > 0 && (
-                              <span className="px-2 py-0.5 bg-rose-500/20 text-rose-300 text-xs rounded">
-                                {preset.conditions.length} Conditions
-                              </span>
-                            )}
                         </>
                       ) : (
                         <>
@@ -3458,12 +3358,7 @@ function StoryPageContent() {
             { state: StoryState.STORY, icon: "BookOpen", label: "Story" },
             { state: StoryState.LORE, icon: "Scroll", label: "Notes" },
             { state: StoryState.NPCS, icon: "Users", label: "NPCs" },
-            { state: StoryState.QUESTS, icon: "Target", label: "Quests" },
-            {
-              state: StoryState.ACHIEVEMENTS,
-              icon: "Trophy",
-              label: "Achievements",
-            },
+            { state: StoryState.GOALS, icon: "Target", label: "Goals" },
           ]}
         />
 
@@ -3496,7 +3391,7 @@ function StoryPageContent() {
             onNavigateToIndex={handleNavigateToIndex}
             onResetToCurrentPart={resetToCurrentPart}
             syncStatus={syncStatus}
-            onOpenJournal={() => setCurrentState(StoryState.QUESTS)}
+            onOpenJournal={() => setCurrentState(StoryState.GOALS)}
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
           />
@@ -3523,10 +3418,7 @@ function StoryPageContent() {
             }
           />
         )}
-        {currentState === StoryState.QUESTS && <QuestsPage {...storyData} />}
-        {currentState === StoryState.ACHIEVEMENTS && (
-          <AchievementsPage {...storyData} />
-        )}
+        {currentState === StoryState.GOALS && <GoalsPage {...storyData} />}
         {currentState === StoryState.MENU && (
           <MenuPage
             {...storyData}

@@ -4,8 +4,7 @@ import {
   findItemMatch,
   findResourceMatch,
   findStatMatch,
-  findAchievementMatch,
-  findQuestMatch,
+  findGoalMatch,
 } from "../app/misc/fuzzyMatch";
 
 describe("fuzzyMatch", () => {
@@ -191,59 +190,33 @@ describe("fuzzyMatch", () => {
     });
   });
 
-  describe("findAchievementMatch", () => {
-    const achievements = [
-      { title: "First Blood", points: 10 },
-      { title: "Dragon Slayer", points: 50 },
-      { title: "Master Thief", points: 30 },
-    ];
-
-    it("should match exact achievement title", () => {
-      const result = findAchievementMatch("First Blood", achievements);
-      expect(result).not.toBeNull();
-      expect(result?.item.title).toBe("First Blood");
-    });
-
-    it("should fuzzy match 'dragon' to 'Dragon Slayer'", () => {
-      const result = findAchievementMatch("dragon", achievements);
-      expect(result).not.toBeNull();
-      expect(result?.item.title).toBe("Dragon Slayer");
-    });
-
-    it("should fuzzy match 'slayer dragon' to 'Dragon Slayer'", () => {
-      const result = findAchievementMatch("slayer dragon", achievements);
-      expect(result).not.toBeNull();
-      expect(result?.item.title).toBe("Dragon Slayer");
-    });
-  });
-
-  describe("findQuestMatch", () => {
-    const quests = [
+  describe("findGoalMatch", () => {
+    const goals = [
       { title: "Find the Lost Amulet", active: true, fulfilled: false },
       { title: "Defeat the Goblin King", active: false, fulfilled: false },
       { title: "Rescue the Princess", active: true, fulfilled: false },
     ];
 
-    it("should match exact quest title", () => {
-      const result = findQuestMatch("Find the Lost Amulet", quests);
+    it("should match exact goal title", () => {
+      const result = findGoalMatch("Find the Lost Amulet", goals);
       expect(result).not.toBeNull();
       expect(result?.item.title).toBe("Find the Lost Amulet");
     });
 
     it("should fuzzy match 'lost amulet' to 'Find the Lost Amulet'", () => {
-      const result = findQuestMatch("lost amulet", quests);
+      const result = findGoalMatch("lost amulet", goals);
       expect(result).not.toBeNull();
       expect(result?.item.title).toBe("Find the Lost Amulet");
     });
 
     it("should fuzzy match 'goblin' to 'Defeat the Goblin King'", () => {
-      const result = findQuestMatch("goblin", quests);
+      const result = findGoalMatch("goblin", goals);
       expect(result).not.toBeNull();
       expect(result?.item.title).toBe("Defeat the Goblin King");
     });
 
     it("should fuzzy match 'rescue princess' to 'Rescue the Princess'", () => {
-      const result = findQuestMatch("rescue princess", quests);
+      const result = findGoalMatch("rescue princess", goals);
       expect(result).not.toBeNull();
       expect(result?.item.title).toBe("Rescue the Princess");
     });

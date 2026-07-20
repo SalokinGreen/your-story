@@ -21,7 +21,7 @@ Your Story is a Next.js 16 application that generates interactive, choice-driven
 - **Resources**: Consumable values (Health, Stamina, etc.)
 - **Inventory**: Items that provide advantages or are consumed
 - **Story Progression**: Branching narratives with multiple endings
-- **Achievements**: Unlockable milestones
+- **Goals**: Player-facing objectives, tracked alongside Story Threads
 
 ## 🚀 Key Features
 
@@ -32,7 +32,7 @@ Your Story is a Next.js 16 application that generates interactive, choice-driven
 - **Resource Management**: Track health, stamina, and other consumables
 - **Item System**: Use items for advantages, risk losing them on failure
 - **Memory System**: AI remembers important story events
-- **Toast Notifications**: Real-time feedback on checks, items, and achievements
+- **Toast Notifications**: Real-time feedback on checks, items, and goals
 - **Mobile Responsive**: Optimized for both desktop and mobile play
 - **Markdown Support**: Rich text formatting in story content
 - **Authentication**: Supabase-powered user accounts
@@ -85,7 +85,7 @@ AI can issue commands to modify game state:
 - `/modify_item: name(amount)` - Add/remove items
 - `/modify_stat: name(amount)` - Adjust stats
 - `/modify_resource: name(amount)` - Adjust resources
-- `/add_achievement: title` - Unlock achievements
+- `/complete_goal: title` - Complete a goal
 
 ## 🎲 Dice Mechanics
 

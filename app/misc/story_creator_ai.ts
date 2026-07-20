@@ -43,19 +43,15 @@ export function buildStoryCreatorMessages({
     intro: storyData.intro,
     author_notes: storyData.author_notes,
     abilities: storyData.abilities,
-    achievements: storyData.achievements,
     lore: storyData.lore,
-    quests: storyData.quests,
+    goals: storyData.goals,
     relationships: storyData.relationships,
     variables: storyData.variables,
     presets: storyData.presets,
     customTables: storyData.customTables,
     agmtState: storyData.agmtState,
     upgradeSettings: storyData.upgradeSettings,
-    levelingSettings: storyData.levelingSettings,
     skillTrees: storyData.skillTrees,
-    points: storyData.points,
-    conditions: storyData.conditions,
     characterSheet: storyData.characterSheet,
     characterSheetTemplate: storyData.characterSheetTemplate,
   };
@@ -131,9 +127,6 @@ ${recentMemories.map((m) => `• ${getMemoryContent(m)}`).join("\n")}
           );
           skillTreeSummary = `
 **Progression System:** This story uses SKILL TREES (${storyData.skillTrees.length} trees: ${treeNames}) with ${totalNodes} total nodes.
-- 1 upgrade point = 1 skill tree node unlock
-- Current levelingSettings.defaultUpgradesPerLevel determines points per level
-- Adjust defaultUpgradesPerLevel (1-3 typical) and startingUpgrades based on skill tree depth
 `;
         }
 
@@ -169,7 +162,6 @@ export function applyCreatorChangesToStoryData(
   if (changes.intro !== undefined) updates.intro = changes.intro;
   if (changes.author_notes !== undefined)
     updates.author_notes = changes.author_notes;
-  if (changes.points !== undefined) updates.points = changes.points;
   if (changes.characterSheet !== undefined)
     updates.characterSheet = changes.characterSheet;
 
@@ -182,14 +174,6 @@ export function applyCreatorChangesToStoryData(
     );
   }
 
-  if (changes.achievements) {
-    updates.achievements = mergeArrayWithCommands(
-      storyData.achievements || [],
-      changes.achievements,
-      "title"
-    );
-  }
-
   if (changes.lore) {
     updates.lore = mergeArrayWithCommands(
       storyData.lore || [],
@@ -198,10 +182,10 @@ export function applyCreatorChangesToStoryData(
     );
   }
 
-  if (changes.quests) {
-    updates.quests = mergeArrayWithCommands(
-      storyData.quests || [],
-      changes.quests,
+  if (changes.goals) {
+    updates.goals = mergeArrayWithCommands(
+      storyData.goals || [],
+      changes.goals,
       "title"
     );
   }
@@ -260,55 +244,6 @@ export function applyCreatorChangesToStoryData(
       };
     } else {
       updates.agmtState = changes.agmtState;
-    }
-  }
-
-  // Leveling settings - merge with existing
-  if (changes.levelingSettings !== undefined) {
-    if (storyData.levelingSettings && changes.levelingSettings) {
-      // Normalize customCurve: handle both 'xp' and 'cumulativeXP' field names
-      let normalizedCustomCurve = changes.levelingSettings.customCurve;
-      if (normalizedCustomCurve) {
-        normalizedCustomCurve = normalizedCustomCurve.map(
-          (point: { level: number; cumulativeXP?: number; xp?: number }) => ({
-            level: point.level,
-            cumulativeXP: point.cumulativeXP ?? point.xp ?? 0,
-          })
-        );
-      }
-
-      updates.levelingSettings = {
-        ...storyData.levelingSettings,
-        ...changes.levelingSettings,
-        // Handle nested objects/arrays carefully
-        customCurve:
-          normalizedCustomCurve !== undefined
-            ? normalizedCustomCurve
-            : storyData.levelingSettings.customCurve,
-        upgradeOverrides:
-          changes.levelingSettings.upgradeOverrides !== undefined
-            ? changes.levelingSettings.upgradeOverrides
-            : storyData.levelingSettings.upgradeOverrides,
-        startingUpgrades:
-          changes.levelingSettings.startingUpgrades !== undefined
-            ? {
-                ...storyData.levelingSettings.startingUpgrades,
-                ...changes.levelingSettings.startingUpgrades,
-              }
-            : storyData.levelingSettings.startingUpgrades,
-      };
-    } else {
-      // Normalize customCurve for new levelingSettings too
-      if (changes.levelingSettings?.customCurve) {
-        changes.levelingSettings.customCurve =
-          changes.levelingSettings.customCurve.map(
-            (point: { level: number; cumulativeXP?: number; xp?: number }) => ({
-              level: point.level,
-              cumulativeXP: point.cumulativeXP ?? point.xp ?? 0,
-            })
-          );
-      }
-      updates.levelingSettings = changes.levelingSettings;
     }
   }
 
@@ -487,7 +422,6 @@ export function summarizeChanges(changes: CreatorOutputData): string[] {
   if (changes.premise) summaries.push("Updated premise");
   if (changes.intro) summaries.push("Updated intro");
   if (changes.author_notes) summaries.push("Updated author notes");
-  if (changes.points !== undefined) summaries.push(`Points: ${changes.points}`);
   if (changes.characterSheet) summaries.push("Updated character sheet");
 
   // Array changes with command awareness
@@ -524,9 +458,8 @@ export function summarizeChanges(changes: CreatorOutputData): string[] {
   };
 
   describeArrayChanges(changes.abilities, "Abilities", "name");
-  describeArrayChanges(changes.achievements, "Achievements", "title");
   describeArrayChanges(changes.lore, "Lore", "title");
-  describeArrayChanges(changes.quests, "Quests", "title");
+  describeArrayChanges(changes.goals, "Goals", "title");
   describeArrayChanges(changes.relationships, "Relationships", "name");
   describeArrayChanges(changes.variables, "Variables", "id");
   describeArrayChanges(changes.presets, "Presets", "id");
@@ -621,9 +554,9 @@ export function buildStoryCreatorMessagesWithTools(
 ## YOUR ROLE
 You help players by using tools to make precise changes to their story's data. You have access to a comprehensive set of tools for modifying:
 - **Abilities** - Skills, spells, techniques
-- **Lore & Achievements** - World-building entries, unlockable achievements
-- **Quests** - Active objectives
-- **Variables & Conditions** - Story flags, character afflictions
+- **Lore** - World-building entries
+- **Goals & Threads** - Active objectives and open plotlines
+- **Variables** - Story flags
 - **Game Settings** - RPG system, difficulty, etc.
 
 ## TOOL USAGE GUIDELINES
@@ -643,17 +576,15 @@ You help players by using tools to make precise changes to their story's data. Y
   **THREAT PROFILES:** When creating lore for enemies/threats, include in the content:
   - Challenge Difficulty (Easy/Medium/Hard/Boss)
   - Approach DCs (e.g., "Combat: hard, Stealth: average")
-  - Per-Failure Condition (e.g., "Claw Wound Tier II")
-  - Challenge Loss Stakes (e.g., "Devoured - Tier VI, game over")
-- add_achievement, modify_achievement, remove_achievement
+  - Per-Failure Consequence (e.g., "Claw Wound - narrative injury, hinders melee")
+  - Challenge Loss Stakes (e.g., "Devoured - fatal, game over")
 - add_memory
 
-### Quests
-- add_quest, modify_quest, remove_quest
+### Goals
+- add_goals, modify_goals, remove_goals
 
-### Variables & Conditions
+### Variables
 - add_variable, modify_variable, remove_variable
-- add_condition, modify_condition, remove_condition
 
 ### Character Presets & Character Sheets
 - add_presets, modify_presets, remove_presets - Character builds/classes
@@ -663,10 +594,7 @@ You help players by using tools to make precise changes to their story's data. Y
 
 ### Game Configuration
 - update_settings (difficulty, etc.)
-- update_leveling_settings, update_upgrade_settings
-
-### Player Progression
-- set_progression - Set player points directly for rewards, etc.
+- update_upgrade_settings
 
 ## STORY CONTEXT
 The player is currently in an active story. Here's what's been happening recently:

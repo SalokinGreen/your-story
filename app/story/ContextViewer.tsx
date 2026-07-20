@@ -286,11 +286,10 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     acc[n.status] = (acc[n.status] || 0) + 1;
     return acc;
   }, {});
-  const quests = storyData.quests || [];
-  const activeQuests = quests.filter((q) => q.active && !q.fulfilled).length;
+  const goals = storyData.goals || [];
+  const activeGoals = goals.filter((g) => g.active && !g.fulfilled).length;
   const threads = storyData.threads || [];
   const activeThreads = threads.filter((t) => t.status === "active");
-  const conditions = storyData.conditions || [];
   const combat = storyData.combatState;
 
   const agmt = storyData.agmtState;
@@ -701,12 +700,11 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
               <div className="text-xs text-slate-600 dark:text-slate-400 space-y-1">
                 <p>
                   Stats: <strong>{storyData.stats.length}</strong> · Resources:{" "}
-                  <strong>{storyData.resources.length}</strong> · Conditions:{" "}
-                  <strong>{conditions.length}</strong>
+                  <strong>{storyData.resources.length}</strong>
                 </p>
                 <p>
-                  Quests: <strong>{activeQuests}</strong> active /{" "}
-                  {quests.length} total
+                  Goals: <strong>{activeGoals}</strong> active /{" "}
+                  {goals.length} total
                 </p>
                 <p>
                   NPCs: <strong>{aliveNpcs}</strong> alive / {npcs.length}{" "}

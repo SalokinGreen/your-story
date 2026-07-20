@@ -9,15 +9,11 @@ import {
   Stat,
   Resource,
   StoryLore,
-  Achievement,
-  Quest,
+  Goal,
   Relationship,
-  Condition,
-  ConditionTier,
   Preset,
   UpgradeSettings,
   DEFAULT_UPGRADE_SETTINGS,
-  LevelingSettings,
   Adventure,
   AGMTState,
   CustomTable,
@@ -81,7 +77,6 @@ import {
   DEFAULT_CHARACTER_SHEET_TEMPLATE,
 } from "@/app/misc/characterSheetTemplate";
 import { createEmptyTree } from "@/app/misc/skillTree";
-import { DEFAULT_LEVELING_SETTINGS } from "@/app/misc/leveling";
 
 type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 type DeepInfraImageModelKey = keyof typeof DEEPINFRA_IMAGE_MODELS;
@@ -92,8 +87,7 @@ type CreatorStep =
   | "premise"
   | "starting-choices"
   | "lore"
-  | "achievements"
-  | "quests"
+  | "goals"
   | "npcs"
   | "mythic"
   | "variables"
@@ -126,53 +120,6 @@ function getChaosDescription(chaos: number): string {
   if (chaos <= 5) return "Standard chaos level";
   if (chaos <= 7) return "Unexpected twists likely";
   return "Anything can happen!";
-}
-
-function cloneLevelingSettings(value?: LevelingSettings): LevelingSettings {
-  const defaults = DEFAULT_LEVELING_SETTINGS;
-  const customCurveSource = value?.customCurve ?? defaults.customCurve ?? [];
-  const upgradeOverrideSource =
-    value?.upgradeOverrides ?? defaults.upgradeOverrides ?? [];
-  const startingDefaults =
-    defaults.startingUpgrades || STARTING_UPGRADES_BY_DIFFICULTY;
-
-  return {
-    xpBase: value?.xpBase ?? defaults.xpBase ?? 100,
-    levelCap: value?.levelCap ?? defaults.levelCap ?? 100,
-    useCustomCurve: value?.useCustomCurve ?? defaults.useCustomCurve ?? false,
-    customCurve: customCurveSource
-      .map((entry) => ({
-        level: entry.level,
-        cumulativeXP: entry.cumulativeXP,
-      }))
-      .sort((a, b) => a.level - b.level),
-    defaultUpgradesPerLevel:
-      value?.defaultUpgradesPerLevel ?? defaults.defaultUpgradesPerLevel ?? 1,
-    upgradeOverrides: upgradeOverrideSource
-      .map((entry) => ({
-        level: entry.level,
-        upgrades: entry.upgrades,
-      }))
-      .sort((a, b) => a.level - b.level),
-    startingUpgrades: {
-      easy:
-        value?.startingUpgrades?.easy ??
-        startingDefaults.easy ??
-        STARTING_UPGRADES_BY_DIFFICULTY.easy,
-      medium:
-        value?.startingUpgrades?.medium ??
-        startingDefaults.medium ??
-        STARTING_UPGRADES_BY_DIFFICULTY.medium,
-      hard:
-        value?.startingUpgrades?.hard ??
-        startingDefaults.hard ??
-        STARTING_UPGRADES_BY_DIFFICULTY.hard,
-      expert:
-        value?.startingUpgrades?.expert ??
-        startingDefaults.expert ??
-        STARTING_UPGRADES_BY_DIFFICULTY.expert,
-    },
-  };
 }
 
 // Variable Editor Card Component
@@ -741,116 +688,16 @@ function AdventureCreatorContent() {
     stats: Stat[];
     resources: Resource[];
     relationships: Relationship[];
-    conditions: Condition[];
     authorNotes: string;
   } | null>(null);
 
   // Upgrade Settings
-  const [levelingSettings, setLevelingSettings] = useState<LevelingSettings>(
-    () => cloneLevelingSettings(),
-  );
   const [upgradeSettings, setUpgradeSettings] = useState<UpgradeSettings>(
     DEFAULT_UPGRADE_SETTINGS,
   );
 
   // Skill Trees
   const [skillTrees, setSkillTrees] = useState<SkillTree[]>([]);
-
-  const handleAddCustomCurveEntry = () => {
-    setLevelingSettings((prev) => {
-      const existing = [...(prev.customCurve || [])];
-      const nextLevel =
-        existing.length > 0 ? existing[existing.length - 1].level + 1 : 2;
-      const xpIncrement =
-        prev.xpBase ?? DEFAULT_LEVELING_SETTINGS.xpBase ?? 100;
-      const nextXP =
-        existing.length > 0
-          ? existing[existing.length - 1].cumulativeXP + xpIncrement
-          : xpIncrement;
-      const updated = [...existing, { level: nextLevel, cumulativeXP: nextXP }];
-      updated.sort((a, b) => a.level - b.level);
-      return { ...prev, customCurve: updated };
-    });
-  };
-
-  const handleCustomCurveChange = (
-    index: number,
-    field: "level" | "cumulativeXP",
-    value: number,
-  ) => {
-    setLevelingSettings((prev) => {
-      const existing = [...(prev.customCurve || [])];
-      if (!existing[index]) return prev;
-      const clamped =
-        field === "level" ? Math.max(2, value) : Math.max(0, value);
-      existing[index] = { ...existing[index], [field]: clamped };
-      existing.sort((a, b) => a.level - b.level);
-      return { ...prev, customCurve: existing };
-    });
-  };
-
-  const handleRemoveCustomCurveEntry = (index: number) => {
-    setLevelingSettings((prev) => {
-      const existing = [...(prev.customCurve || [])];
-      existing.splice(index, 1);
-      return { ...prev, customCurve: existing };
-    });
-  };
-
-  const handleAddUpgradeOverride = () => {
-    setLevelingSettings((prev) => {
-      const existing = [...(prev.upgradeOverrides || [])];
-      const nextLevel =
-        existing.length > 0 ? existing[existing.length - 1].level + 1 : 2;
-      const defaultUpgrade =
-        prev.defaultUpgradesPerLevel ??
-        DEFAULT_LEVELING_SETTINGS.defaultUpgradesPerLevel ??
-        1;
-      const updated = [
-        ...existing,
-        { level: nextLevel, upgrades: defaultUpgrade },
-      ];
-      updated.sort((a, b) => a.level - b.level);
-      return { ...prev, upgradeOverrides: updated };
-    });
-  };
-
-  const handleUpgradeOverrideChange = (
-    index: number,
-    field: "level" | "upgrades",
-    value: number,
-  ) => {
-    setLevelingSettings((prev) => {
-      const existing = [...(prev.upgradeOverrides || [])];
-      if (!existing[index]) return prev;
-      const clamped =
-        field === "level" ? Math.max(1, value) : Math.max(0, value);
-      existing[index] = { ...existing[index], [field]: clamped };
-      existing.sort((a, b) => a.level - b.level);
-      return { ...prev, upgradeOverrides: existing };
-    });
-  };
-
-  const handleRemoveUpgradeOverride = (index: number) => {
-    setLevelingSettings((prev) => {
-      const existing = [...(prev.upgradeOverrides || [])];
-      existing.splice(index, 1);
-      return { ...prev, upgradeOverrides: existing };
-    });
-  };
-
-  const handleStartingUpgradeChange = (
-    difficulty: AdventureDifficulty,
-    value: number,
-  ) => {
-    setLevelingSettings((prev) => ({
-      ...prev,
-      startingUpgrades: {
-        ...(prev.startingUpgrades || {}),
-        [difficulty]: Math.max(0, value),
-      },
-    }));
-  };
 
   // Basic Info
   const [title, setTitle] = useState("");
@@ -1050,18 +897,10 @@ function AdventureCreatorContent() {
       });
     }
 
-    if (data.achievements) {
-      data.achievements.forEach((a: any) => {
-        if (a._command === "delete") {
-          deletions.push(`Achievement: ${a.title}`);
-        }
-      });
-    }
-
-    if (data.quests) {
-      data.quests.forEach((q: any) => {
-        if (q._command === "delete") {
-          deletions.push(`Quest: ${q.title}`);
+    if (data.goals) {
+      data.goals.forEach((g: any) => {
+        if (g._command === "delete") {
+          deletions.push(`Goal: ${g.title}`);
         }
       });
     }
@@ -1219,19 +1058,10 @@ function AdventureCreatorContent() {
       setLore(applyItemChanges(lore, data.lore as any, "lore entry", "title"));
     }
 
-    if (data.achievements) {
-      setAchievements(
-        applyItemChanges(
-          achievements,
-          data.achievements as any,
-          "achievement",
-          "title",
-        ),
+    if (data.goals) {
+      setGoals(
+        applyItemChanges(goals, data.goals as any, "goal", "title"),
       );
-    }
-
-    if (data.quests) {
-      setQuests(applyItemChanges(quests, data.quests as any, "quest", "title"));
     }
 
     if (data.relationships) {
@@ -1338,40 +1168,6 @@ function AdventureCreatorContent() {
             "ability shop item",
             "name",
           );
-        }
-
-        return updated;
-      });
-    }
-
-    // Apply leveling settings
-    if (data.levelingSettings) {
-      const ls = data.levelingSettings;
-      setLevelingSettings((prev) => {
-        const updated = { ...prev };
-
-        if (ls.xpBase !== undefined) updated.xpBase = ls.xpBase;
-        if (ls.levelCap !== undefined) updated.levelCap = ls.levelCap;
-        if (ls.defaultUpgradesPerLevel !== undefined)
-          updated.defaultUpgradesPerLevel = ls.defaultUpgradesPerLevel;
-        if (ls.useCustomCurve !== undefined)
-          updated.useCustomCurve = ls.useCustomCurve;
-        if (ls.customCurve !== undefined) {
-          // Normalize customCurve: handle both 'xp' and 'cumulativeXP' field names
-          updated.customCurve = ls.customCurve.map(
-            (point: { level: number; cumulativeXP?: number; xp?: number }) => ({
-              level: point.level,
-              cumulativeXP: point.cumulativeXP ?? point.xp ?? 0,
-            }),
-          );
-        }
-        if (ls.upgradeOverrides !== undefined)
-          updated.upgradeOverrides = ls.upgradeOverrides;
-        if (ls.startingUpgrades !== undefined) {
-          updated.startingUpgrades = {
-            ...prev.startingUpgrades,
-            ...ls.startingUpgrades,
-          };
         }
 
         return updated;
@@ -1569,9 +1365,7 @@ function AdventureCreatorContent() {
         setPassives(template.nodeEffects?.passives || []);
         setLore(template.lore || []);
         setRelationships(template.relationships || []);
-        setConditions(template.conditions || []);
-        setAchievements(template.achievements || []);
-        setQuests(template.quests || []);
+        setGoals(template.goals || []);
         setNPCs(template.npcs || []);
         setCustomTables(template.customTables || []);
         setVariables(template.variables || []);
@@ -1579,7 +1373,6 @@ function AdventureCreatorContent() {
           ...DEFAULT_UPGRADE_SETTINGS,
           ...(template.upgradeSettings || {}),
         });
-        setLevelingSettings(cloneLevelingSettings(template.levelingSettings));
         setSkillTrees(template.skillTrees || []);
 
         // Load Advanced RPG Tools state
@@ -1648,9 +1441,7 @@ function AdventureCreatorContent() {
     if (Array.isArray(saved.lore)) setLore(saved.lore);
     if (Array.isArray(saved.relationships))
       setRelationships(saved.relationships);
-    if (Array.isArray(saved.conditions)) setConditions(saved.conditions);
-    if (Array.isArray(saved.achievements)) setAchievements(saved.achievements);
-    if (Array.isArray(saved.quests)) setQuests(saved.quests);
+    if (Array.isArray(saved.goals)) setGoals(saved.goals);
     if (Array.isArray(saved.npcs)) setNPCs(saved.npcs);
     if (Array.isArray(saved.customTables)) setCustomTables(saved.customTables);
     if (Array.isArray(saved.variables)) setVariables(saved.variables);
@@ -1762,9 +1553,7 @@ function AdventureCreatorContent() {
           setPassives(template.nodeEffects?.passives || []);
           setLore(template.lore || []);
           setRelationships(template.relationships || []);
-          setConditions(template.conditions || []);
-          setAchievements(template.achievements || []);
-          setQuests(template.quests || []);
+          setGoals(template.goals || []);
           setNPCs(template.npcs || []);
           setCustomTables(template.customTables || []);
           setVariables(template.variables || []);
@@ -1941,21 +1730,6 @@ function AdventureCreatorContent() {
   const [relationshipPage, setRelationshipPage] = useState(1);
   const relationshipItemsPerPage = 10;
 
-  // Conditions/Afflictions
-  const [conditions, setConditions] = useState<Condition[]>([]);
-  const [newCondition, setNewCondition] = useState<Partial<Condition>>({
-    name: "",
-    tier: 1,
-    description: "",
-    affects: [],
-    affectsAll: false,
-    permanent: false,
-  });
-  const [editingConditionIndex, setEditingConditionIndex] = useState<
-    number | null
-  >(null);
-  const [editCondition, setEditCondition] = useState<Partial<Condition>>({});
-
   // Advanced RPG Tools
   const [agmtEnabled, setAGMTEnabled] = useState(false);
   const [agmtState, setAGMTState] = useState<AGMTState>({
@@ -1966,41 +1740,22 @@ function AdventureCreatorContent() {
     lastChaosAdjustment: -999,
   });
 
-  // Achievements
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [newAchievement, setNewAchievement] = useState<Partial<Achievement>>({
-    title: "",
-    description: "",
-    points: 10,
-    symbol: "Trophy",
-  });
-  const [draggedAchievementIndex, setDraggedAchievementIndex] = useState<
-    number | null
-  >(null);
-  const [editingAchievementIndex, setEditingAchievementIndex] = useState<
-    number | null
-  >(null);
-  const [editAchievement, setEditAchievement] = useState<Partial<Achievement>>(
-    {},
-  );
-
-  // Quests
-  const [quests, setQuests] = useState<Quest[]>([]);
-  const [newQuest, setNewQuest] = useState<Partial<Quest>>({
+  // Goals
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [newGoal, setNewGoal] = useState<Partial<Goal>>({
     title: "",
     shortDescription: "",
     description: "",
-    points: 10,
     active: true,
     fulfilled: false,
   });
-  const [draggedQuestIndex, setDraggedQuestIndex] = useState<number | null>(
+  const [draggedGoalIndex, setDraggedGoalIndex] = useState<number | null>(
     null,
   );
-  const [editingQuestIndex, setEditingQuestIndex] = useState<number | null>(
+  const [editingGoalIndex, setEditingGoalIndex] = useState<number | null>(
     null,
   );
-  const [editQuest, setEditQuest] = useState<Partial<Quest>>({});
+  const [editGoal, setEditGoal] = useState<Partial<Goal>>({});
 
   // NPCs
   const [npcs, setNPCs] = useState<NPC[]>([]);
@@ -2100,8 +1855,7 @@ function AdventureCreatorContent() {
     { id: "premise", label: "Story Setup", icon: "BookOpen" },
     { id: "starting-choices", label: "Starting Choices", icon: "Play" },
     { id: "lore", label: "Notes", icon: "Scroll" },
-    { id: "achievements", label: "Achievements", icon: "Trophy" },
-    { id: "quests", label: "Quests", icon: "ClipboardList" },
+    { id: "goals", label: "Goals", icon: "ClipboardList" },
     { id: "npcs", label: "NPCs", icon: "UserCircle" },
     { id: "variables", label: "Variables", icon: "Variable" },
     { id: "tables", label: "Custom Tables", icon: "Dices" },
@@ -2153,9 +1907,7 @@ function AdventureCreatorContent() {
       if (Array.isArray(saved.abilities)) setAbilities(saved.abilities);
       if (Array.isArray(saved.passives)) setPassives(saved.passives);
       if (Array.isArray(saved.lore)) setLore(saved.lore);
-      if (Array.isArray(saved.achievements))
-        setAchievements(saved.achievements);
-      if (Array.isArray(saved.quests)) setQuests(saved.quests);
+      if (Array.isArray(saved.goals)) setGoals(saved.goals);
       if (Array.isArray(saved.npcs)) setNPCs(saved.npcs);
       if (Array.isArray(saved.customTables))
         setCustomTables(saved.customTables);
@@ -2165,8 +1917,6 @@ function AdventureCreatorContent() {
           ...DEFAULT_UPGRADE_SETTINGS,
           ...saved.upgradeSettings,
         });
-      if (saved.levelingSettings)
-        setLevelingSettings(cloneLevelingSettings(saved.levelingSettings));
       if (Array.isArray(saved.skillTrees)) setSkillTrees(saved.skillTrees);
       if (saved.agmtEnabled !== undefined) setAGMTEnabled(saved.agmtEnabled);
       if (saved.agmtState) setAGMTState(saved.agmtState);
@@ -2232,13 +1982,10 @@ function AdventureCreatorContent() {
       passives,
       lore,
       relationships,
-      conditions,
-      achievements,
-      quests,
+      goals,
       npcs,
       customTables,
       variables,
-      levelingSettings,
       upgradeSettings,
       skillTrees,
       agmtEnabled,
@@ -2367,13 +2114,10 @@ function AdventureCreatorContent() {
     passives,
     lore,
     relationships,
-    conditions,
-    achievements,
-    quests,
+    goals,
     npcs,
     customTables,
     variables,
-    levelingSettings,
     agmtEnabled,
     agmtState,
     upgradeSettings,
@@ -2850,49 +2594,6 @@ ${description || ""}`;
     setLore(newLore);
   };
 
-  // Achievement drag-and-drop and edit functions
-  const handleAchievementDragStart = (index: number) => {
-    setDraggedAchievementIndex(index);
-  };
-
-  const handleAchievementDragOver = (e: React.DragEvent, index: number) => {
-    e.preventDefault();
-    if (draggedAchievementIndex === null || draggedAchievementIndex === index)
-      return;
-
-    const newAchievements = [...achievements];
-    const draggedItem = newAchievements[draggedAchievementIndex];
-    newAchievements.splice(draggedAchievementIndex, 1);
-    newAchievements.splice(index, 0, draggedItem);
-
-    setAchievements(newAchievements);
-    setDraggedAchievementIndex(index);
-  };
-
-  const handleAchievementDragEnd = () => {
-    setDraggedAchievementIndex(null);
-  };
-
-  const moveAchievementUp = (index: number) => {
-    if (index === 0) return;
-    const newAchievements = [...achievements];
-    [newAchievements[index - 1], newAchievements[index]] = [
-      newAchievements[index],
-      newAchievements[index - 1],
-    ];
-    setAchievements(newAchievements);
-  };
-
-  const moveAchievementDown = (index: number) => {
-    if (index === achievements.length - 1) return;
-    const newAchievements = [...achievements];
-    [newAchievements[index], newAchievements[index + 1]] = [
-      newAchievements[index + 1],
-      newAchievements[index],
-    ];
-    setAchievements(newAchievements);
-  };
-
   // Variable drag-and-drop and reorder functions
   const handleVariableDragStart = (index: number) => {
     setDraggedVariableIndex(index);
@@ -2933,30 +2634,6 @@ ${description || ""}`;
       newVariables[index],
     ];
     setVariables(newVariables);
-  };
-
-  const startEditAchievement = (index: number) => {
-    setEditingAchievementIndex(index);
-    setEditAchievement({ ...achievements[index] });
-  };
-
-  const cancelEditAchievement = () => {
-    setEditingAchievementIndex(null);
-    setEditAchievement({});
-  };
-
-  const saveEditAchievement = () => {
-    if (
-      editingAchievementIndex !== null &&
-      editAchievement.title &&
-      editAchievement.description
-    ) {
-      const updated = [...achievements];
-      updated[editingAchievementIndex] = editAchievement as Achievement;
-      setAchievements(updated);
-      setEditingAchievementIndex(null);
-      setEditAchievement({});
-    }
   };
 
   const addLoreOnTrigger = () => {
@@ -3154,25 +2831,6 @@ ${description || ""}`;
     }
   };
 
-  const addAchievement = () => {
-    if (newAchievement.title && newAchievement.description) {
-      setAchievements([
-        ...achievements,
-        { ...newAchievement, dateAchieved: null } as Achievement,
-      ]);
-      setNewAchievement({
-        title: "",
-        description: "",
-        points: 10,
-        symbol: "Trophy",
-      });
-    }
-  };
-
-  const removeAchievement = (index: number) => {
-    setAchievements(achievements.filter((_, i) => i !== index));
-  };
-
   const handleDiscardChanges = () => {
     if (!editAdventureId) {
       // For new adventures, clear the draft and reset to empty
@@ -3199,8 +2857,7 @@ ${description || ""}`;
       setResources([]);
       setLore([]);
       setRelationships([]);
-      setAchievements([]);
-      setQuests([]);
+      setGoals([]);
       setNPCs([]);
       setCustomTables([]);
       setSelectedPreset("custom");
@@ -3259,21 +2916,16 @@ ${description || ""}`;
       resources,
       inventory: [],
       abilities,
-      achievements,
       lore,
       relationships,
-      conditions: conditions.length > 0 ? conditions : undefined,
-      quests,
+      goals,
       npcs: npcs.length > 0 ? npcs : undefined,
       customTables,
       variables,
-      earnedPointsFromQuests: [],
-      earnedPointsFromChapters: [],
       author_notes: authorNotes,
       selected_preset: selectedPreset,
       presets: presets,
       upgradeSettings: upgradeSettings,
-      levelingSettings,
       agmtState: agmtEnabled ? agmtState : undefined,
       skillTrees: skillTrees.length > 0 ? skillTrees : undefined,
       nodeEffects:
@@ -3952,9 +3604,6 @@ ${description || ""}`;
                                     relationships: JSON.parse(
                                       JSON.stringify(relationships),
                                     ),
-                                    conditions: JSON.parse(
-                                      JSON.stringify(conditions),
-                                    ),
                                     authorNotes,
                                   }
                                 : p,
@@ -3972,7 +3621,6 @@ ${description || ""}`;
                             stats,
                             resources,
                             relationships,
-                            conditions,
                             authorNotes,
                           );
                           setPresets([...presets, newPreset]);
@@ -4035,7 +3683,6 @@ ${description || ""}`;
                             stats: [...stats],
                             resources: [...resources],
                             relationships: [...relationships],
-                            conditions: [...conditions],
                             authorNotes,
                           });
                         }
@@ -4051,7 +3698,6 @@ ${description || ""}`;
                             setStats,
                             setResources,
                             setRelationships,
-                            setConditions,
                             setAuthorNotes,
                           );
                           addNotification(
@@ -4066,7 +3712,6 @@ ${description || ""}`;
                             setStats(savedCustomValues.stats);
                             setResources(savedCustomValues.resources);
                             setRelationships(savedCustomValues.relationships);
-                            setConditions(savedCustomValues.conditions);
                             setAuthorNotes(savedCustomValues.authorNotes);
                             addNotification(
                               "Custom settings restored!",
@@ -4125,15 +3770,6 @@ ${description || ""}`;
                                 className="w-3 h-3"
                               />{" "}
                               Has character sheet
-                            </div>
-                          )}
-                          {(preset.conditions?.length || 0) > 0 && (
-                            <div className="flex items-center gap-1 text-rose-300/60">
-                              <DynamicIcon
-                                name="HeartPulse"
-                                className="w-3 h-3"
-                              />{" "}
-                              {preset.conditions?.length} conditions
                             </div>
                           )}
                         </div>
@@ -4237,7 +3873,6 @@ ${description || ""}`;
                               setStats,
                               setResources,
                               setRelationships,
-                              setConditions,
                               setAuthorNotes,
                             );
                             addNotification(
@@ -7278,396 +6913,7 @@ ${description || ""}`;
           </div>
         );
 
-      case "achievements":
-        return (
-          <div className="space-y-6">
-            <div className="bg-amber-900/20 border border-amber-800/50 rounded-lg p-4">
-              <p className="text-sm text-blue-300">
-                <DynamicIcon
-                  name="Lightbulb"
-                  className="inline-block w-4 h-4 mr-1 text-amber-600"
-                />
-                <strong>Tip:</strong> Achievements reward players for completing
-                specific goals or milestones (optional).
-              </p>
-            </div>
-
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">
-                Add Achievement
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Title *
-                  </label>
-                  <input
-                    type="text"
-                    value={newAchievement.title}
-                    onChange={(e) =>
-                      setNewAchievement({
-                        ...newAchievement,
-                        title: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., Dragon Slayer"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Icon
-                  </label>
-                  <IconPicker
-                    value={newAchievement.symbol || "Trophy"}
-                    onChange={(icon) =>
-                      setNewAchievement({ ...newAchievement, symbol: icon })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Points
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="1000"
-                    value={newAchievement.points}
-                    onChange={(e) =>
-                      setNewAchievement({
-                        ...newAchievement,
-                        points: clampNumber(parseInt(e.target.value), 1, 1000),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Description *{" "}
-                    <span className="text-xs text-gray-500">
-                      (shown to players)
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newAchievement.description}
-                    onChange={(e) =>
-                      setNewAchievement({
-                        ...newAchievement,
-                        description: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., Defeat your first dragon"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    AI Hint{" "}
-                    <span className="text-xs text-gray-500">
-                      (optional, for precise triggering)
-                    </span>
-                  </label>
-                  <input
-                    type="text"
-                    value={newAchievement.ai_hint || ""}
-                    onChange={(e) =>
-                      setNewAchievement({
-                        ...newAchievement,
-                        ai_hint: e.target.value,
-                      })
-                    }
-                    placeholder="e.g., Trigger when player defeats the red dragon in the mountain lair"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
-                  />
-                  <p className="text-xs text-blue-300/50 mt-1">
-                    <DynamicIcon
-                      name="Lightbulb"
-                      className="inline-block w-3 h-3 mr-1 text-amber-600"
-                    />
-                    Keep player description vague to encourage discovery; use AI
-                    hint for exact trigger conditions.
-                  </p>
-                </div>
-                <div className="sm:col-span-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={newAchievement.hidden || false}
-                      onChange={(e) =>
-                        setNewAchievement({
-                          ...newAchievement,
-                          hidden: e.target.checked,
-                        })
-                      }
-                      className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
-                    />
-                    <span className="text-sm font-semibold text-blue-200">
-                      <DynamicIcon
-                        name="Lock"
-                        className="inline-block w-3 h-3 mr-1"
-                      />
-                      Hidden Achievement
-                    </span>
-                  </label>
-                  <p className="text-xs text-blue-300/50 mt-1 ml-6">
-                    Hidden from player but visible to AI for triggering. Players
-                    discover these through gameplay.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={addAchievement}
-                disabled={!newAchievement.title || !newAchievement.description}
-                className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
-              >
-                Add Achievement
-              </button>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-lg font-bold text-white">
-                Achievements ({achievements.length})
-              </h3>
-              {achievements.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">
-                  No achievements added yet
-                </p>
-              ) : (
-                achievements.map((achievement, index) =>
-                  editingAchievementIndex === index ? (
-                    // Edit mode
-                    <div
-                      key={index}
-                      className="p-4 bg-amber-900/40 rounded-lg border-2 border-amber-600"
-                    >
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Title *
-                          </label>
-                          <input
-                            type="text"
-                            value={editAchievement.title || ""}
-                            onChange={(e) =>
-                              setEditAchievement({
-                                ...editAchievement,
-                                title: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Icon
-                          </label>
-                          <IconPicker
-                            value={editAchievement.symbol || "Trophy"}
-                            onChange={(icon) =>
-                              setEditAchievement({
-                                ...editAchievement,
-                                symbol: icon,
-                              })
-                            }
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Points
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="1000"
-                            value={editAchievement.points || 10}
-                            onChange={(e) =>
-                              setEditAchievement({
-                                ...editAchievement,
-                                points: clampNumber(
-                                  parseInt(e.target.value),
-                                  1,
-                                  1000,
-                                ),
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Description *{" "}
-                            <span className="text-xs text-gray-500">
-                              (shown to players)
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            value={editAchievement.description || ""}
-                            onChange={(e) =>
-                              setEditAchievement({
-                                ...editAchievement,
-                                description: e.target.value,
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            AI Hint{" "}
-                            <span className="text-xs text-gray-500">
-                              (optional)
-                            </span>
-                          </label>
-                          <input
-                            type="text"
-                            value={editAchievement.ai_hint || ""}
-                            onChange={(e) =>
-                              setEditAchievement({
-                                ...editAchievement,
-                                ai_hint: e.target.value,
-                              })
-                            }
-                            placeholder="Precise trigger conditions for AI"
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
-                        <div className="sm:col-span-2">
-                          <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={editAchievement.hidden || false}
-                              onChange={(e) =>
-                                setEditAchievement({
-                                  ...editAchievement,
-                                  hidden: e.target.checked,
-                                })
-                              }
-                              className="w-4 h-4 text-purple-600 bg-gray-100 border-gray-300 rounded focus:ring-purple-500"
-                            />
-                            <span className="text-xs font-semibold text-blue-300">
-                              <DynamicIcon
-                                name="Lock"
-                                className="inline-block w-3 h-3 mr-1"
-                              />
-                              Hidden Achievement
-                            </span>
-                          </label>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={saveEditAchievement}
-                          disabled={
-                            !editAchievement.title ||
-                            !editAchievement.description
-                          }
-                          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          <DynamicIcon
-                            name="Save"
-                            className="inline-block w-4 h-4 mr-1"
-                          />
-                          Save
-                        </button>
-                        <button
-                          onClick={cancelEditAchievement}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // View mode with drag-and-drop
-                    <div
-                      key={index}
-                      draggable
-                      onDragStart={() => handleAchievementDragStart(index)}
-                      onDragOver={(e) => handleAchievementDragOver(e, index)}
-                      onDragEnd={handleAchievementDragEnd}
-                      className="flex items-center gap-3 p-4 bg-amber-900/20 rounded-lg border border-amber-800/50 cursor-move hover:bg-amber-800/30 transition-colors"
-                      style={{
-                        opacity: draggedAchievementIndex === index ? 0.5 : 1,
-                      }}
-                    >
-                      <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
-                        <DynamicIcon name="GripVertical" className="w-5 h-5" />
-                      </div>
-                      <div className="p-2 bg-blue-900/20 rounded-lg border border-blue-800/30">
-                        <DynamicIcon
-                          name={achievement.symbol || "Trophy"}
-                          className="w-8 h-8 text-amber-400"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <div className="font-bold text-white">
-                            {achievement.title}
-                          </div>
-                          {achievement.hidden && (
-                            <span className="px-2 py-0.5 bg-purple-800/50 text-purple-200 rounded-full text-xs font-bold flex items-center gap-1">
-                              <DynamicIcon name="Lock" className="w-3 h-3" />{" "}
-                              Hidden
-                            </span>
-                          )}
-                        </div>
-                        <div className="text-sm text-blue-300/60">
-                          {achievement.description}
-                        </div>
-                        <div className="text-sm text-amber-400 font-semibold">
-                          {achievement.points} points
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="flex flex-row items-center gap-1">
-                          <button
-                            onClick={() => moveAchievementUp(index)}
-                            disabled={index === 0}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move up"
-                          >
-                            <DynamicIcon name="ChevronUp" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => moveAchievementDown(index)}
-                            disabled={index === achievements.length - 1}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
-                            title="Move down"
-                          >
-                            <DynamicIcon
-                              name="ChevronDown"
-                              className="w-4 h-4"
-                            />
-                          </button>
-                        </div>
-                        <div className="flex flex-row items-center gap-1">
-                          <button
-                            onClick={() => startEditAchievement(index)}
-                            className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Edit2" className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => removeAchievement(index)}
-                            className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
-                          >
-                            <DynamicIcon name="Trash2" className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ),
-                )
-              )}
-            </div>
-          </div>
-        );
-
-      case "quests":
+      case "goals":
         return (
           <div className="space-y-6">
             <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
@@ -7677,7 +6923,7 @@ ${description || ""}`;
                   className="w-5 h-5 text-blue-600 shrink-0 mt-0.5"
                 />
                 <span>
-                  <strong>Tip:</strong> Quests provide structured objectives for
+                  <strong>Tip:</strong> Goals provide structured objectives for
                   players. They can be created upfront or generated dynamically
                   by the AI during gameplay.
                 </span>
@@ -7685,7 +6931,7 @@ ${description || ""}`;
             </div>
 
             <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
-              <h3 className="text-lg font-bold mb-4 text-white">Add Quest</h3>
+              <h3 className="text-lg font-bold mb-4 text-white">Add Goal</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="sm:col-span-2">
                   <label className="block text-sm font-semibold text-blue-200 mb-1">
@@ -7693,10 +6939,10 @@ ${description || ""}`;
                   </label>
                   <input
                     type="text"
-                    value={newQuest.title}
+                    value={newGoal.title}
                     onChange={(e) =>
-                      setNewQuest({
-                        ...newQuest,
+                      setNewGoal({
+                        ...newGoal,
                         title: e.target.value,
                       })
                     }
@@ -7710,10 +6956,10 @@ ${description || ""}`;
                   </label>
                   <input
                     type="text"
-                    value={newQuest.shortDescription}
+                    value={newGoal.shortDescription}
                     onChange={(e) =>
-                      setNewQuest({
-                        ...newQuest,
+                      setNewGoal({
+                        ...newGoal,
                         shortDescription: e.target.value,
                       })
                     }
@@ -7726,44 +6972,26 @@ ${description || ""}`;
                     Full Description *
                   </label>
                   <textarea
-                    value={newQuest.description}
+                    value={newGoal.description}
                     onChange={(e) =>
-                      setNewQuest({
-                        ...newQuest,
+                      setNewGoal({
+                        ...newGoal,
                         description: e.target.value,
                       })
                     }
-                    placeholder="Detailed quest description with context and objectives..."
+                    placeholder="Detailed goal description with context and objectives..."
                     rows={3}
                     className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-blue-200 mb-1">
-                    Points Reward
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="1000"
-                    value={newQuest.points}
-                    onChange={(e) =>
-                      setNewQuest({
-                        ...newQuest,
-                        points: clampNumber(parseInt(e.target.value), 1, 1000),
-                      })
-                    }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
                   />
                 </div>
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={newQuest.active}
+                      checked={newGoal.active}
                       onChange={(e) =>
-                        setNewQuest({
-                          ...newQuest,
+                        setNewGoal({
+                          ...newGoal,
                           active: e.target.checked,
                         })
                       }
@@ -7776,10 +7004,10 @@ ${description || ""}`;
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={newQuest.fulfilled}
+                      checked={newGoal.fulfilled}
                       onChange={(e) =>
-                        setNewQuest({
-                          ...newQuest,
+                        setNewGoal({
+                          ...newGoal,
                           fulfilled: e.target.checked,
                         })
                       }
@@ -7794,9 +7022,9 @@ ${description || ""}`;
               <button
                 onClick={() => {
                   if (
-                    !newQuest.title ||
-                    !newQuest.shortDescription ||
-                    !newQuest.description
+                    !newGoal.title ||
+                    !newGoal.shortDescription ||
+                    !newGoal.description
                   ) {
                     addNotification(
                       "Please fill in all required fields",
@@ -7804,50 +7032,48 @@ ${description || ""}`;
                     );
                     return;
                   }
-                  const quest: Quest = {
+                  const goal: Goal = {
                     id: Date.now().toString(),
-                    title: newQuest.title,
-                    shortDescription: newQuest.shortDescription,
-                    description: newQuest.description,
-                    active: newQuest.active ?? true,
-                    fulfilled: newQuest.fulfilled ?? false,
-                    points: newQuest.points ?? 10,
+                    title: newGoal.title,
+                    shortDescription: newGoal.shortDescription,
+                    description: newGoal.description,
+                    active: newGoal.active ?? true,
+                    fulfilled: newGoal.fulfilled ?? false,
                     createdAt: new Date(),
                   };
-                  setQuests([...quests, quest]);
-                  setNewQuest({
+                  setGoals([...goals, goal]);
+                  setNewGoal({
                     title: "",
                     shortDescription: "",
                     description: "",
                     active: true,
                     fulfilled: false,
-                    points: 10,
                   });
-                  addNotification("Quest added!", "success");
+                  addNotification("Goal added!", "success");
                 }}
                 disabled={
-                  !newQuest.title ||
-                  !newQuest.shortDescription ||
-                  !newQuest.description
+                  !newGoal.title ||
+                  !newGoal.shortDescription ||
+                  !newGoal.description
                 }
                 className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
               >
-                Add Quest
+                Add Goal
               </button>
             </div>
 
             <div className="space-y-3">
               <h3 className="text-lg font-bold text-white">
-                Quests ({quests.length})
+                Goals ({goals.length})
               </h3>
-              {quests.length === 0 ? (
-                <p className="text-blue-300/60 text-sm">No quests added yet</p>
+              {goals.length === 0 ? (
+                <p className="text-blue-300/60 text-sm">No goals added yet</p>
               ) : (
-                quests.map((quest, index) =>
-                  editingQuestIndex === index ? (
+                goals.map((goal, index) =>
+                  editingGoalIndex === index ? (
                     // Edit mode
                     <div
-                      key={quest.id}
+                      key={goal.id}
                       className="p-4 bg-blue-900/40 rounded-lg border-2 border-blue-600"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
@@ -7857,10 +7083,10 @@ ${description || ""}`;
                           </label>
                           <input
                             type="text"
-                            value={editQuest.title || ""}
+                            value={editGoal.title || ""}
                             onChange={(e) =>
-                              setEditQuest({
-                                ...editQuest,
+                              setEditGoal({
+                                ...editGoal,
                                 title: e.target.value,
                               })
                             }
@@ -7873,10 +7099,10 @@ ${description || ""}`;
                           </label>
                           <input
                             type="text"
-                            value={editQuest.shortDescription || ""}
+                            value={editGoal.shortDescription || ""}
                             onChange={(e) =>
-                              setEditQuest({
-                                ...editQuest,
+                              setEditGoal({
+                                ...editGoal,
                                 shortDescription: e.target.value,
                               })
                             }
@@ -7888,10 +7114,10 @@ ${description || ""}`;
                             Full Description *
                           </label>
                           <textarea
-                            value={editQuest.description || ""}
+                            value={editGoal.description || ""}
                             onChange={(e) =>
-                              setEditQuest({
-                                ...editQuest,
+                              setEditGoal({
+                                ...editGoal,
                                 description: e.target.value,
                               })
                             }
@@ -7899,36 +7125,14 @@ ${description || ""}`;
                             className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm resize-none"
                           />
                         </div>
-                        <div>
-                          <label className="block text-xs font-semibold text-blue-300 mb-1">
-                            Points
-                          </label>
-                          <input
-                            type="number"
-                            min="1"
-                            max="1000"
-                            value={editQuest.points || 10}
-                            onChange={(e) =>
-                              setEditQuest({
-                                ...editQuest,
-                                points: clampNumber(
-                                  parseInt(e.target.value),
-                                  1,
-                                  1000,
-                                ),
-                              })
-                            }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
-                          />
-                        </div>
                         <div className="flex items-center gap-4">
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
-                              checked={editQuest.active || false}
+                              checked={editGoal.active || false}
                               onChange={(e) =>
-                                setEditQuest({
-                                  ...editQuest,
+                                setEditGoal({
+                                  ...editGoal,
                                   active: e.target.checked,
                                 })
                               }
@@ -7941,10 +7145,10 @@ ${description || ""}`;
                           <label className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
-                              checked={editQuest.fulfilled || false}
+                              checked={editGoal.fulfilled || false}
                               onChange={(e) =>
-                                setEditQuest({
-                                  ...editQuest,
+                                setEditGoal({
+                                  ...editGoal,
                                   fulfilled: e.target.checked,
                                 })
                               }
@@ -7960,9 +7164,9 @@ ${description || ""}`;
                         <button
                           onClick={() => {
                             if (
-                              !editQuest.title ||
-                              !editQuest.shortDescription ||
-                              !editQuest.description
+                              !editGoal.title ||
+                              !editGoal.shortDescription ||
+                              !editGoal.description
                             ) {
                               addNotification(
                                 "Please fill in all required fields",
@@ -7970,17 +7174,17 @@ ${description || ""}`;
                               );
                               return;
                             }
-                            const updated = [...quests];
-                            updated[editingQuestIndex] = editQuest as Quest;
-                            setQuests(updated);
-                            setEditingQuestIndex(null);
-                            setEditQuest({});
-                            addNotification("Quest updated!", "success");
+                            const updated = [...goals];
+                            updated[editingGoalIndex] = editGoal as Goal;
+                            setGoals(updated);
+                            setEditingGoalIndex(null);
+                            setEditGoal({});
+                            addNotification("Goal updated!", "success");
                           }}
                           disabled={
-                            !editQuest.title ||
-                            !editQuest.shortDescription ||
-                            !editQuest.description
+                            !editGoal.title ||
+                            !editGoal.shortDescription ||
+                            !editGoal.description
                           }
                           className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors text-sm"
                         >
@@ -7992,8 +7196,8 @@ ${description || ""}`;
                         </button>
                         <button
                           onClick={() => {
-                            setEditingQuestIndex(null);
-                            setEditQuest({});
+                            setEditingGoalIndex(null);
+                            setEditGoal({});
                           }}
                           className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
                         >
@@ -8004,29 +7208,29 @@ ${description || ""}`;
                   ) : (
                     // View mode with drag-and-drop
                     <div
-                      key={quest.id || `quest-${index}`}
+                      key={goal.id || `goal-${index}`}
                       draggable
-                      onDragStart={() => setDraggedQuestIndex(index)}
+                      onDragStart={() => setDraggedGoalIndex(index)}
                       onDragOver={(e) => {
                         e.preventDefault();
                         if (
-                          draggedQuestIndex !== null &&
-                          draggedQuestIndex !== index
+                          draggedGoalIndex !== null &&
+                          draggedGoalIndex !== index
                         ) {
-                          const updated = [...quests];
+                          const updated = [...goals];
                           const [dragged] = updated.splice(
-                            draggedQuestIndex,
+                            draggedGoalIndex,
                             1,
                           );
                           updated.splice(index, 0, dragged);
-                          setQuests(updated);
-                          setDraggedQuestIndex(index);
+                          setGoals(updated);
+                          setDraggedGoalIndex(index);
                         }
                       }}
-                      onDragEnd={() => setDraggedQuestIndex(null)}
+                      onDragEnd={() => setDraggedGoalIndex(null)}
                       className="flex items-start gap-3 p-4 bg-blue-900/20 rounded-lg border border-blue-800/50 cursor-move hover:bg-blue-800/30 transition-colors"
                       style={{
-                        opacity: draggedQuestIndex === index ? 0.5 : 1,
+                        opacity: draggedGoalIndex === index ? 0.5 : 1,
                       }}
                     >
                       <div className="text-blue-400/50 cursor-grab active:cursor-grabbing">
@@ -8035,27 +7239,24 @@ ${description || ""}`;
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <div className="font-bold text-white">
-                            {quest.title}
+                            {goal.title}
                           </div>
-                          {quest.active && (
+                          {goal.active && (
                             <span className="px-2 py-0.5 bg-blue-800/50 text-blue-200 rounded-full text-xs font-bold">
                               Active
                             </span>
                           )}
-                          {quest.fulfilled && (
+                          {goal.fulfilled && (
                             <span className="px-2 py-0.5 bg-green-800/50 text-green-200 rounded-full text-xs font-bold">
                               Fulfilled
                             </span>
                           )}
                         </div>
                         <div className="text-sm text-blue-300/60 mb-1">
-                          {quest.shortDescription}
+                          {goal.shortDescription}
                         </div>
                         <div className="text-xs text-blue-300/50 mb-2">
-                          {quest.description}
-                        </div>
-                        <div className="text-sm text-blue-400 font-semibold">
-                          {quest.points} points
+                          {goal.description}
                         </div>
                       </div>
                       <div className="flex flex-col items-center  gap-2 ml-3">
@@ -8063,12 +7264,12 @@ ${description || ""}`;
                           <button
                             onClick={() => {
                               if (index === 0) return;
-                              const updated = [...quests];
+                              const updated = [...goals];
                               [updated[index - 1], updated[index]] = [
                                 updated[index],
                                 updated[index - 1],
                               ];
-                              setQuests(updated);
+                              setGoals(updated);
                             }}
                             disabled={index === 0}
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
@@ -8078,15 +7279,15 @@ ${description || ""}`;
                           </button>
                           <button
                             onClick={() => {
-                              if (index === quests.length - 1) return;
-                              const updated = [...quests];
+                              if (index === goals.length - 1) return;
+                              const updated = [...goals];
                               [updated[index + 1], updated[index]] = [
                                 updated[index],
                                 updated[index + 1],
                               ];
-                              setQuests(updated);
+                              setGoals(updated);
                             }}
-                            disabled={index === quests.length - 1}
+                            disabled={index === goals.length - 1}
                             className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
                             title="Move down"
                           >
@@ -8099,8 +7300,8 @@ ${description || ""}`;
                         <div className="flex flex-row items-center gap-1 ml-3">
                           <button
                             onClick={() => {
-                              setEditingQuestIndex(index);
-                              setEditQuest({ ...quest });
+                              setEditingGoalIndex(index);
+                              setEditGoal({ ...goal });
                             }}
                             className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg transition-colors text-sm"
                           >
@@ -8110,8 +7311,8 @@ ${description || ""}`;
                             onClick={() => {
                               setConfirmDialog({
                                 isOpen: true,
-                                title: "Remove Quest?",
-                                message: `Remove quest "${quest.title}"? This cannot be undone.`,
+                                title: "Remove Goal?",
+                                message: `Remove goal "${goal.title}"? This cannot be undone.`,
                                 icon: "Trash2",
                                 confirmText: "Remove",
                                 confirmButtonClass:
@@ -8121,10 +7322,10 @@ ${description || ""}`;
                                     ...confirmDialog,
                                     isOpen: false,
                                   });
-                                  setQuests(
-                                    quests.filter((_, i) => i !== index),
+                                  setGoals(
+                                    goals.filter((_, i) => i !== index),
                                   );
-                                  addNotification("Quest removed", "success");
+                                  addNotification("Goal removed", "success");
                                 },
                               });
                             }}
@@ -8985,15 +8186,9 @@ ${description || ""}`;
                     </span>
                   </div>
                   <div>
-                    <span className="text-blue-300/60">Achievements:</span>
+                    <span className="text-blue-300/60">Goals:</span>
                     <span className="ml-2 font-semibold text-white">
-                      {achievements.length}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-blue-300/60">Quests:</span>
-                    <span className="ml-2 font-semibold text-white">
-                      {quests.length}
+                      {goals.length}
                     </span>
                   </div>
                   <div>
@@ -9297,7 +8492,6 @@ ${description || ""}`;
                                 stats: [...stats],
                                 resources: [...resources],
                                 relationships: [...relationships],
-                                conditions: [...conditions],
                                 authorNotes,
                               });
                             }
@@ -9311,7 +8505,6 @@ ${description || ""}`;
                                 setStats,
                                 setResources,
                                 setRelationships,
-                                setConditions,
                                 setAuthorNotes,
                               );
                               addNotification(
@@ -9330,7 +8523,6 @@ ${description || ""}`;
                                 setRelationships(
                                   savedCustomValues.relationships,
                                 );
-                                setConditions(savedCustomValues.conditions);
                                 setAuthorNotes(savedCustomValues.authorNotes);
                                 addNotification(
                                   "Custom settings restored!",
@@ -9720,14 +8912,12 @@ ${description || ""}`;
             passives: passives,
           },
           lore,
-          achievements,
-          quests,
+          goals,
           npcs,
           relationships,
           variables,
           presets,
           upgradeSettings,
-          levelingSettings,
           skillTrees,
           agmtState: agmtEnabled ? agmtState : undefined,
           customTables,

@@ -5,12 +5,8 @@ import {
   Stat,
   Resource,
   InventoryItem,
-  Achievement,
   StoryLore,
-  Quest,
   Relationship,
-  Condition,
-  ConditionTier,
   AGMTState,
   CustomTable,
   Variable,
@@ -451,5 +447,3 @@ export default function NPCEditor({
     </div>
   );
 }
-
-// Conditions Editor

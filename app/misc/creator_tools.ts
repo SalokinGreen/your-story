@@ -10,16 +10,14 @@ import {
   Resource,
   InventoryItem,
   Ability,
-  Achievement,
   StoryLore,
-  Quest,
+  Goal,
   Relationship,
   Variable,
   Preset,
   SkillTree,
   CustomTable,
   UpgradeSettings,
-  LevelingSettings,
   StartingChoice,
 } from "@/app/misc/structs";
 
@@ -305,193 +303,88 @@ export const remove_lore: ToolDefinition = {
 };
 
 // ============================================
-// ACHIEVEMENTS TOOLS
+// GOALS TOOLS
 // ============================================
 
-export const add_achievements: ToolDefinition = {
-  name: "add_achievements",
+export const add_goals: ToolDefinition = {
+  name: "add_goals",
   description:
-    "Add achievements. Achievements are milestones that award XP when unlocked by the AI during gameplay.",
+    "Add goals. Goals are objectives that can be activated, tracked, and completed during gameplay.",
   parameters: {
     type: "object",
     properties: {
-      achievements: {
+      goals: {
         type: "array",
-        description: "Array of achievements to add",
+        description: "Array of goals to add",
         items: {
           type: "object",
           properties: {
-            title: { type: "string", description: "Achievement title" },
-            description: {
-              type: "string",
-              description: "Player-visible description",
-            },
-            ai_hint: {
-              type: "string",
-              description:
-                "Precise conditions for AI to trigger this (not shown to player)",
-            },
-            points: { type: "number", description: "XP awarded when unlocked" },
-            hidden: {
-              type: "boolean",
-              description: "If true, hidden from player until unlocked",
-            },
-            rewardDescription: {
-              type: "string",
-              description: "Description of reward (optional)",
-            },
-            symbol: { type: "string", description: "Emoji symbol" },
-          },
-          required: ["title", "description", "points", "symbol"],
-        },
-      },
-    },
-    required: ["achievements"],
-  },
-};
-
-export const modify_achievements: ToolDefinition = {
-  name: "modify_achievements",
-  description: "Modify existing achievements by title.",
-  parameters: {
-    type: "object",
-    properties: {
-      achievements: {
-        type: "array",
-        description: "Array of achievement modifications",
-        items: {
-          type: "object",
-          properties: {
-            title: {
-              type: "string",
-              description: "Title of achievement to modify",
-            },
-            new_title: {
-              type: "string",
-              description: "New title (if renaming)",
-            },
-            description: { type: "string" },
-            ai_hint: { type: "string" },
-            points: { type: "number" },
-            hidden: { type: "boolean" },
-            rewardDescription: { type: "string" },
-            symbol: { type: "string" },
-          },
-          required: ["title"],
-        },
-      },
-    },
-    required: ["achievements"],
-  },
-};
-
-export const remove_achievements: ToolDefinition = {
-  name: "remove_achievements",
-  description: "Remove achievements by title.",
-  parameters: {
-    type: "object",
-    properties: {
-      titles: {
-        type: "array",
-        description: "Titles of achievements to remove",
-        items: { type: "string" },
-      },
-    },
-    required: ["titles"],
-  },
-};
-
-// ============================================
-// QUESTS TOOLS
-// ============================================
-
-export const add_quests: ToolDefinition = {
-  name: "add_quests",
-  description:
-    "Add quests. Quests are objectives that can be activated, tracked, and completed during gameplay.",
-  parameters: {
-    type: "object",
-    properties: {
-      quests: {
-        type: "array",
-        description: "Array of quests to add",
-        items: {
-          type: "object",
-          properties: {
-            id: { type: "string", description: "Unique quest ID" },
-            title: { type: "string", description: "Quest title" },
+            id: { type: "string", description: "Unique goal ID" },
+            title: { type: "string", description: "Goal title" },
             shortDescription: {
               type: "string",
-              description: "Brief summary for quest list",
+              description: "Brief summary for goal list",
             },
             description: {
               type: "string",
-              description: "Full quest description",
+              description: "Full goal description",
             },
             active: {
               type: "boolean",
-              description: "Whether quest starts active",
+              description: "Whether goal starts active",
             },
-            points: { type: "number", description: "XP awarded on completion" },
           },
-          required: [
-            "id",
-            "title",
-            "shortDescription",
-            "description",
-            "points",
-          ],
+          required: ["id", "title", "shortDescription", "description"],
         },
       },
     },
-    required: ["quests"],
+    required: ["goals"],
   },
 };
 
-export const modify_quests: ToolDefinition = {
-  name: "modify_quests",
-  description: "Modify existing quests by ID or title.",
+export const modify_goals: ToolDefinition = {
+  name: "modify_goals",
+  description: "Modify existing goals by ID or title.",
   parameters: {
     type: "object",
     properties: {
-      quests: {
+      goals: {
         type: "array",
-        description: "Array of quest modifications",
+        description: "Array of goal modifications",
         items: {
           type: "object",
           properties: {
             id: {
               type: "string",
-              description: "ID of quest to modify (or use title)",
+              description: "ID of goal to modify (or use title)",
             },
             title: {
               type: "string",
-              description: "Title of quest to modify (if no ID)",
+              description: "Title of goal to modify (if no ID)",
             },
             new_id: { type: "string" },
             new_title: { type: "string" },
             shortDescription: { type: "string" },
             description: { type: "string" },
             active: { type: "boolean" },
-            points: { type: "number" },
           },
           required: [],
         },
       },
     },
-    required: ["quests"],
+    required: ["goals"],
   },
 };
 
-export const remove_quests: ToolDefinition = {
-  name: "remove_quests",
-  description: "Remove quests by ID or title.",
+export const remove_goals: ToolDefinition = {
+  name: "remove_goals",
+  description: "Remove goals by ID or title.",
   parameters: {
     type: "object",
     properties: {
       ids: {
         type: "array",
-        description: "IDs or titles of quests to remove",
+        description: "IDs or titles of goals to remove",
         items: { type: "string" },
       },
     },
@@ -1274,91 +1167,6 @@ export const update_upgrade_settings: ToolDefinition = {
   },
 };
 
-export const set_progression: ToolDefinition = {
-  name: "set_progression",
-  description:
-    "Set the player's current progression: level, XP (points), and upgrade points spent. Use this to level up a player, give them XP, or adjust their progression.",
-  parameters: {
-    type: "object",
-    properties: {
-      level: {
-        type: "number",
-        description:
-          "Set player's level directly (1+). If not provided, level will be recalculated from XP.",
-      },
-      points: {
-        type: "number",
-        description:
-          "Set player's XP/points directly. Use this to give or remove XP.",
-      },
-      add_points: {
-        type: "number",
-        description:
-          "Add this amount of XP/points to current total (can be negative to remove).",
-      },
-      upgradesSpent: {
-        type: "number",
-        description:
-          "Set how many upgrade points have been spent (affects available upgrades).",
-      },
-    },
-    required: [],
-  },
-};
-
-export const update_leveling_settings: ToolDefinition = {
-  name: "update_leveling_settings",
-  description:
-    "Configure the leveling/XP system. Controls XP curve and upgrade points per level.",
-  parameters: {
-    type: "object",
-    properties: {
-      xpBase: {
-        type: "number",
-        description: "Base multiplier for XP curve (default 100)",
-      },
-      levelCap: { type: "number", description: "Maximum level (default 20)" },
-      defaultUpgradesPerLevel: {
-        type: "number",
-        description:
-          "Upgrade points per level up (1 point = 1 skill tree node)",
-      },
-      useCustomCurve: {
-        type: "boolean",
-        description: "Use custom XP thresholds instead of formula",
-      },
-      customCurve: {
-        type: "array",
-        description: "Custom XP requirements per level",
-        items: {
-          type: "object",
-          properties: {
-            level: { type: "number" },
-            cumulativeXP: { type: "number" },
-          },
-        },
-      },
-      upgradeOverrides: {
-        type: "array",
-        description: "Per-level upgrade point overrides",
-        items: {
-          type: "object",
-          properties: {
-            level: { type: "number" },
-            upgrades: { type: "number" },
-          },
-        },
-      },
-      startingUpgrades: {
-        type: "object",
-        description:
-          "Starting upgrades by difficulty: { easy: 3, medium: 2, hard: 1, expert: 0 }",
-      },
-    },
-    required: [],
-  },
-};
-
 // ============================================
 // STARTING CHOICES TOOLS
 // ============================================
@@ -1643,14 +1451,10 @@ export const CREATOR_TOOLS: ToolDefinition[] = [
   add_lore,
   modify_lore,
   remove_lore,
-  // Achievements
-  add_achievements,
-  modify_achievements,
-  remove_achievements,
-  // Quests
-  add_quests,
-  modify_quests,
-  remove_quests,
+  // Goals
+  add_goals,
+  modify_goals,
+  remove_goals,
   // Relationships
   add_relationships,
   modify_relationships,
@@ -1675,9 +1479,6 @@ export const CREATOR_TOOLS: ToolDefinition[] = [
   update_basic_info,
   update_adventure_metadata,
   update_upgrade_settings,
-  update_leveling_settings,
-  // Progression
-  set_progression,
   // Starting Choices
   add_starting_choices,
   modify_starting_choices,

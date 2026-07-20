@@ -18,30 +18,21 @@ function createTestStory(): StoryData {
     player_name: "Test Player",
     player_summary: "Test summary",
     intro: "Test intro",
-    points: 0,
-    earnedPointsFromQuests: [],
-    earnedPointsFromChapters: [],
     currentChapter: 0,
     max_chapters: 10,
     scene: {
       parts: [],
     },
     chapters: [],
-    quests: [],
+    goals: [],
     stats: [],
     resources: [],
     inventory: [],
-    achievements: [],
     lore: [],
     memory: [],
-    momentum: 0,
-    maxMomentum: 10,
     relationships: [],
     rpgSystem: "3d6",
     abilities: [],
-    level: 1,
-    upgradesSpent: 0,
-    conditions: [],
     npcs: [],
   } as StoryData;
 }
@@ -373,7 +364,7 @@ describe("Tool Execution", () => {
   });
 
   describe("game_over tool", () => {
-    test("rejects game_over with no matching tier 6 condition or downed player", () => {
+    test("rejects game_over with no downed player", () => {
       const storyData = createTestStory();
       const toolCalls: ToolCall[] = [
         {
@@ -382,7 +373,6 @@ describe("Tool Execution", () => {
             name: "game_over",
             arguments: {
               reason: "The character succumbs to their wounds",
-              condition: "Dying",
             },
           },
         },
@@ -392,61 +382,7 @@ describe("Tool Execution", () => {
 
       expect(responses).toHaveLength(1);
       expect(responses[0].success).toBe(false);
-      expect(responses[0].message).toContain("tier 6");
       expect(storyData.gameOver).toBeUndefined();
-    });
-
-    test("rejects game_over with no condition arg and no downed player", () => {
-      const storyData = createTestStory();
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "game_over",
-            arguments: {
-              reason: "The story reaches a definitive fatal end",
-            },
-          },
-        },
-      ];
-
-      const { responses } = executeTools(toolCalls, storyData);
-
-      expect(responses[0].success).toBe(false);
-      expect(storyData.gameOver).toBeUndefined();
-    });
-
-    test("accepts game_over when a matching tier 6 condition exists", () => {
-      const storyData = createTestStory();
-      storyData.conditions.push({
-        id: "cond-1",
-        name: "Dying",
-        tier: 6,
-        description: "Fatal wounds with no chance of recovery",
-        affects: [],
-        permanent: true,
-        createdAt: Date.now(),
-      });
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "game_over",
-            arguments: {
-              reason: "Succumbed to wounds after the battle",
-              condition: "Dying",
-            },
-          },
-        },
-      ];
-
-      const { responses } = executeTools(toolCalls, storyData);
-
-      expect(responses[0].success).toBe(true);
-      expect(storyData.gameOver).toBeDefined();
-      expect(storyData.gameOver?.reason).toBe(
-        "Succumbed to wounds after the battle"
-      );
     });
 
     test("accepts game_over when the player's combatant is downed in active combat", () => {
@@ -484,35 +420,6 @@ describe("Tool Execution", () => {
 
       expect(responses[0].success).toBe(true);
       expect(storyData.gameOver).toBeDefined();
-    });
-
-    test("rejects game_over when a non-tier-6 condition is named", () => {
-      const storyData = createTestStory();
-      storyData.conditions.push({
-        id: "cond-1",
-        name: "Wounded",
-        tier: 2,
-        description: "A minor injury",
-        affects: [],
-        createdAt: Date.now(),
-      });
-      const toolCalls: ToolCall[] = [
-        {
-          type: "function",
-          function: {
-            name: "game_over",
-            arguments: {
-              reason: "The wound proves too much to bear somehow",
-              condition: "Wounded",
-            },
-          },
-        },
-      ];
-
-      const { responses } = executeTools(toolCalls, storyData);
-
-      expect(responses[0].success).toBe(false);
-      expect(storyData.gameOver).toBeUndefined();
     });
   });
 

@@ -594,14 +594,14 @@ const takeRestTool: ToolSchema = {
   type: "function",
   function: {
     name: "take_rest",
-    description: `Process a rest period. Handles recovery, cooldowns, conditions.
+    description: `Process a rest period. Handles resource recovery and ability cooldowns.
 
 CANNOT rest during an active challenge.
 
 Types:
 - quick (~30 min): Brief recovery, small resource restore
 - short (4-8 hours): Sleep, significant recovery
-- long (several days): Full recovery, condition improvement`,
+- long (several days): Full recovery`,
     parameters: {
       type: "object",
       properties: {

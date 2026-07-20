@@ -1,179 +1,151 @@
 "use client";
 
-import {
-  StoryData,
-  Stat,
-  Resource,
-  InventoryItem,
-  Achievement,
-  StoryLore,
-  Quest,
-  Relationship,
-  Condition,
-  ConditionTier,
-  AGMTState,
-  CustomTable,
-  Variable,
-  NumberVariable,
-  BooleanVariable,
-  StringVariable,
-  ListVariable,
-  Ability,
-  AbilityCost,
-  AbilityGrade,
-  MemoryEntry,
-  getMemoryContent,
-  NPC,
-  NPCStatus,
-  NPCAttitude,
-  Adventure,
-} from "../../misc/structs";
-import { useState, useEffect } from "react";
+import { Goal } from "../../misc/structs";
+import { useState } from "react";
 import { DynamicIcon } from "../../components/DynamicIcon";
 
-export default function QuestEditor({
-  quests,
+export default function GoalEditor({
+  goals,
   onUpdate,
 }: {
-  quests: Quest[];
-  onUpdate: (quests: Quest[]) => void;
+  goals: Goal[];
+  onUpdate: (goals: Goal[]) => void;
 }) {
-  const [localQuests, setLocalQuests] = useState([...quests]);
-  const [draggedQuestIndex, setDraggedQuestIndex] = useState<number | null>(
+  const [localGoals, setLocalGoals] = useState([...goals]);
+  const [draggedGoalIndex, setDraggedGoalIndex] = useState<number | null>(
     null,
   );
-  const [editingQuestIndex, setEditingQuestIndex] = useState<number | null>(
+  const [editingGoalIndex, setEditingGoalIndex] = useState<number | null>(
     null,
   );
-  const [editQuest, setEditQuest] = useState<Quest | null>(null);
+  const [editGoal, setEditGoal] = useState<Goal | null>(null);
 
-  const addQuest = () => {
-    const newQuest: Quest = {
-      id: `quest_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      title: "New Quest",
-      shortDescription: "Quest objective",
-      description: "Detailed quest description",
+  const addGoal = () => {
+    const newGoal: Goal = {
+      id: `goal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      title: "New Goal",
+      shortDescription: "Goal objective",
+      description: "Detailed goal description",
       active: true,
       fulfilled: false,
-      points: 10,
       createdAt: new Date(),
     };
-    const updated = [...localQuests, newQuest];
-    setLocalQuests(updated);
+    const updated = [...localGoals, newGoal];
+    setLocalGoals(updated);
     onUpdate(updated);
   };
 
-  const removeQuest = (index: number) => {
-    const updated = localQuests.filter((_, i) => i !== index);
-    setLocalQuests(updated);
+  const removeGoal = (index: number) => {
+    const updated = localGoals.filter((_, i) => i !== index);
+    setLocalGoals(updated);
     onUpdate(updated);
   };
 
-  const startEditQuest = (index: number) => {
-    setEditingQuestIndex(index);
-    setEditQuest({ ...localQuests[index] });
+  const startEditGoal = (index: number) => {
+    setEditingGoalIndex(index);
+    setEditGoal({ ...localGoals[index] });
   };
 
-  const saveEditQuest = () => {
-    if (editingQuestIndex !== null && editQuest) {
-      const updated = [...localQuests];
-      updated[editingQuestIndex] = editQuest;
-      setLocalQuests(updated);
+  const saveEditGoal = () => {
+    if (editingGoalIndex !== null && editGoal) {
+      const updated = [...localGoals];
+      updated[editingGoalIndex] = editGoal;
+      setLocalGoals(updated);
       onUpdate(updated);
-      setEditingQuestIndex(null);
-      setEditQuest(null);
+      setEditingGoalIndex(null);
+      setEditGoal(null);
     }
   };
 
-  const cancelEditQuest = () => {
-    setEditingQuestIndex(null);
-    setEditQuest(null);
+  const cancelEditGoal = () => {
+    setEditingGoalIndex(null);
+    setEditGoal(null);
   };
 
-  const moveQuestUp = (index: number) => {
+  const moveGoalUp = (index: number) => {
     if (index > 0) {
-      const updated = [...localQuests];
+      const updated = [...localGoals];
       [updated[index - 1], updated[index]] = [
         updated[index],
         updated[index - 1],
       ];
-      setLocalQuests(updated);
+      setLocalGoals(updated);
       onUpdate(updated);
     }
   };
 
-  const moveQuestDown = (index: number) => {
-    if (index < localQuests.length - 1) {
-      const updated = [...localQuests];
+  const moveGoalDown = (index: number) => {
+    if (index < localGoals.length - 1) {
+      const updated = [...localGoals];
       [updated[index], updated[index + 1]] = [
         updated[index + 1],
         updated[index],
       ];
-      setLocalQuests(updated);
+      setLocalGoals(updated);
       onUpdate(updated);
     }
   };
 
-  const handleQuestDragStart = (index: number) => {
-    setDraggedQuestIndex(index);
+  const handleGoalDragStart = (index: number) => {
+    setDraggedGoalIndex(index);
   };
 
-  const handleQuestDragOver = (e: React.DragEvent, index: number) => {
+  const handleGoalDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
-    if (draggedQuestIndex === null || draggedQuestIndex === index) return;
+    if (draggedGoalIndex === null || draggedGoalIndex === index) return;
 
-    const updated = [...localQuests];
-    const draggedQuest = updated[draggedQuestIndex];
-    updated.splice(draggedQuestIndex, 1);
-    updated.splice(index, 0, draggedQuest);
+    const updated = [...localGoals];
+    const draggedGoal = updated[draggedGoalIndex];
+    updated.splice(draggedGoalIndex, 1);
+    updated.splice(index, 0, draggedGoal);
 
-    setLocalQuests(updated);
-    setDraggedQuestIndex(index);
+    setLocalGoals(updated);
+    setDraggedGoalIndex(index);
     onUpdate(updated);
   };
 
-  const handleQuestDragEnd = () => {
-    setDraggedQuestIndex(null);
+  const handleGoalDragEnd = () => {
+    setDraggedGoalIndex(null);
   };
 
   return (
     <div>
-      {/* Quests Editor */}
+      {/* Goals Editor */}
       <div>
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-lg font-bold text-white flex items-center gap-2">
-            <DynamicIcon name="Scroll" className="w-6 h-6" /> Quests
+            <DynamicIcon name="Scroll" className="w-6 h-6" /> Goals
           </h4>
           <button
-            onClick={addQuest}
+            onClick={addGoal}
             className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
           >
-            + Add Quest
+            + Add Goal
           </button>
         </div>
         <div className="space-y-3">
-          {localQuests.map((quest, index) =>
-            editingQuestIndex === index ? (
+          {localGoals.map((goal, index) =>
+            editingGoalIndex === index ? (
               <div
-                key={quest.id}
+                key={goal.id}
                 className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg"
               >
                 <div className="space-y-3">
                   <input
                     type="text"
-                    value={editQuest?.title || ""}
+                    value={editGoal?.title || ""}
                     onChange={(e) =>
-                      setEditQuest({ ...editQuest!, title: e.target.value })
+                      setEditGoal({ ...editGoal!, title: e.target.value })
                     }
-                    placeholder="Quest Title"
+                    placeholder="Goal Title"
                     className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <input
                     type="text"
-                    value={editQuest?.shortDescription || ""}
+                    value={editGoal?.shortDescription || ""}
                     onChange={(e) =>
-                      setEditQuest({
-                        ...editQuest!,
+                      setEditGoal({
+                        ...editGoal!,
                         shortDescription: e.target.value,
                       })
                     }
@@ -181,10 +153,10 @@ export default function QuestEditor({
                     className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                   />
                   <textarea
-                    value={editQuest?.description || ""}
+                    value={editGoal?.description || ""}
                     onChange={(e) =>
-                      setEditQuest({
-                        ...editQuest!,
+                      setEditGoal({
+                        ...editGoal!,
                         description: e.target.value,
                       })
                     }
@@ -192,26 +164,14 @@ export default function QuestEditor({
                     className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
                     rows={4}
                   />
-                  <input
-                    type="number"
-                    value={editQuest?.points ?? 0}
-                    onChange={(e) =>
-                      setEditQuest({
-                        ...editQuest!,
-                        points: parseInt(e.target.value) || 0,
-                      })
-                    }
-                    placeholder="Points"
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
-                  />
                   <div className="flex gap-4">
                     <label className="flex items-center gap-2 text-white">
                       <input
                         type="checkbox"
-                        checked={!!editQuest?.active}
+                        checked={!!editGoal?.active}
                         onChange={(e) =>
-                          setEditQuest({
-                            ...editQuest!,
+                          setEditGoal({
+                            ...editGoal!,
                             active: e.target.checked,
                           })
                         }
@@ -222,10 +182,10 @@ export default function QuestEditor({
                     <label className="flex items-center gap-2 text-white">
                       <input
                         type="checkbox"
-                        checked={!!editQuest?.fulfilled}
+                        checked={!!editGoal?.fulfilled}
                         onChange={(e) =>
-                          setEditQuest({
-                            ...editQuest!,
+                          setEditGoal({
+                            ...editGoal!,
                             fulfilled: e.target.checked,
                           })
                         }
@@ -236,13 +196,13 @@ export default function QuestEditor({
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => saveEditQuest()}
+                      onClick={() => saveEditGoal()}
                       className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
                     >
                       Save
                     </button>
                     <button
-                      onClick={cancelEditQuest}
+                      onClick={cancelEditGoal}
                       className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
                     >
                       Cancel
@@ -254,11 +214,11 @@ export default function QuestEditor({
               <div
                 key={index}
                 draggable
-                onDragStart={() => handleQuestDragStart(index)}
-                onDragOver={(e) => handleQuestDragOver(e, index)}
-                onDragEnd={handleQuestDragEnd}
+                onDragStart={() => handleGoalDragStart(index)}
+                onDragOver={(e) => handleGoalDragOver(e, index)}
+                onDragEnd={handleGoalDragEnd}
                 className={`p-4 bg-blue-900/20 rounded-lg cursor-move flex items-center gap-3 ${
-                  draggedQuestIndex === index ? "opacity-50" : ""
+                  draggedGoalIndex === index ? "opacity-50" : ""
                 }`}
               >
                 <span className="text-gray-400 select-none">
@@ -271,14 +231,14 @@ export default function QuestEditor({
                         name="Scroll"
                         className="w-5 h-5 text-amber-600 dark:text-amber-400"
                       />
-                      {quest.title} ({quest.points} pts)
+                      {goal.title}
                     </span>
-                    {quest.active && !quest.fulfilled && (
+                    {goal.active && !goal.fulfilled && (
                       <span className="px-2 py-0.5 bg-blue-200 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200 rounded-full text-xs font-bold">
                         Active
                       </span>
                     )}
-                    {quest.fulfilled && (
+                    {goal.fulfilled && (
                       <span className="text-green-500">
                         <DynamicIcon
                           name="Check"
@@ -286,20 +246,20 @@ export default function QuestEditor({
                         />
                       </span>
                     )}
-                    {!quest.active && !quest.fulfilled && (
+                    {!goal.active && !goal.fulfilled && (
                       <span className="px-2 py-0.5 bg-blue-800/30 text-blue-300/60 rounded-full text-xs font-bold">
                         Inactive
                       </span>
                     )}
                   </div>
                   <div className="text-sm text-blue-200/60">
-                    {quest.shortDescription}
+                    {goal.shortDescription}
                   </div>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <div className="flex gap-0.5">
                     <button
-                      onClick={() => moveQuestUp(index)}
+                      onClick={() => moveGoalUp(index)}
                       disabled={index === 0}
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                       title="Move up"
@@ -310,8 +270,8 @@ export default function QuestEditor({
                       />
                     </button>
                     <button
-                      onClick={() => moveQuestDown(index)}
-                      disabled={index === localQuests.length - 1}
+                      onClick={() => moveGoalDown(index)}
+                      disabled={index === localGoals.length - 1}
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded flex items-center justify-center"
                       title="Move down"
                     >
@@ -323,7 +283,7 @@ export default function QuestEditor({
                   </div>
                   <div className="flex gap-0.5">
                     <button
-                      onClick={() => startEditQuest(index)}
+                      onClick={() => startEditGoal(index)}
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
                       title="Edit"
                     >
@@ -333,7 +293,7 @@ export default function QuestEditor({
                       />
                     </button>
                     <button
-                      onClick={() => removeQuest(index)}
+                      onClick={() => removeGoal(index)}
                       className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
                       title="Remove"
                     >
@@ -347,13 +307,11 @@ export default function QuestEditor({
               </div>
             ),
           )}
-          {localQuests.length === 0 && (
-            <p className="text-sm text-blue-200/60">No quests yet.</p>
+          {localGoals.length === 0 && (
+            <p className="text-sm text-blue-200/60">No goals yet.</p>
           )}
         </div>
       </div>
     </div>
   );
 }
-
-// Inventory Editor

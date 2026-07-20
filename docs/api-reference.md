@@ -696,8 +696,8 @@ Commands modify game state and are returned in ScenePart:
 "/modify_resource: Health(+20)";
 "/modify_resource: Stamina(-10)";
 
-// Unlock achievements
-"/add_achievement: Dragon Slayer";
+// Complete a goal
+"/complete_goal: Dragon Slayer";
 ```
 
 ---

@@ -71,9 +71,8 @@ import {
   Resource,
   Ability,
   InventoryItem,
-  Achievement,
   StoryLore,
-  Quest,
+  Goal,
   Relationship,
   Variable,
   CustomTable,
@@ -723,20 +722,6 @@ function ContentBrowser({
     });
   }
 
-  if (storyTemplate?.achievements && storyTemplate.achievements.length > 0) {
-    sections.push({
-      key: "achievements",
-      label: "Achievements",
-      icon: "🏆",
-      color: "yellow",
-      items: storyTemplate.achievements.map((a) => ({
-        name: a.title,
-        description: a.description,
-        symbol: a.dateAchieved ? "✅" : "🔒",
-      })),
-    });
-  }
-
   if (storyTemplate?.stats && storyTemplate.stats.length > 0) {
     sections.push({
       key: "stats",
@@ -793,16 +778,16 @@ function ContentBrowser({
     });
   }
 
-  if (storyTemplate?.quests && storyTemplate.quests.length > 0) {
+  if (storyTemplate?.goals && storyTemplate.goals.length > 0) {
     sections.push({
-      key: "quests",
-      label: "Quests",
+      key: "goals",
+      label: "Goals",
       icon: "📋",
       color: "green",
-      items: storyTemplate.quests.map((q) => ({
-        name: q.title,
-        description: q.description,
-        symbol: q.fulfilled ? "✅" : q.active ? "🔵" : "⬜",
+      items: storyTemplate.goals.map((g) => ({
+        name: g.title,
+        description: g.description,
+        symbol: g.fulfilled ? "✅" : g.active ? "🔵" : "⬜",
       })),
     });
   }
@@ -3081,24 +3066,6 @@ ${result.description || ""}`;
                         </div>
                       )}
                     {previewStageData.partialResult.storyTemplate
-                      .achievements &&
-                      Array.isArray(
-                        previewStageData.partialResult.storyTemplate
-                          .achievements,
-                      ) && (
-                        <div className="bg-blue-900/30 rounded px-3 py-2">
-                          <span className="text-red-400 font-bold">
-                            {
-                              previewStageData.partialResult.storyTemplate
-                                .achievements.length
-                            }
-                          </span>
-                          <span className="text-blue-300/60 ml-2">
-                            Achievements
-                          </span>
-                        </div>
-                      )}
-                    {previewStageData.partialResult.storyTemplate
                       .relationships &&
                       Array.isArray(
                         previewStageData.partialResult.storyTemplate
@@ -3116,15 +3083,15 @@ ${result.description || ""}`;
                           </span>
                         </div>
                       )}
-                    {previewStageData.partialResult.storyTemplate.quests && (
+                    {previewStageData.partialResult.storyTemplate.goals && (
                       <div className="bg-blue-900/30 rounded px-3 py-2">
                         <span className="text-yellow-400 font-bold">
                           {
-                            previewStageData.partialResult.storyTemplate.quests
+                            previewStageData.partialResult.storyTemplate.goals
                               .length
                           }
                         </span>
-                        <span className="text-blue-300/60 ml-2">Quests</span>
+                        <span className="text-blue-300/60 ml-2">Goals</span>
                       </div>
                     )}
                   </div>
@@ -4692,8 +4659,7 @@ ${result.description || ""}`;
                         const allSections: RegenerateSection[] = [
                           "mechanicsLore",
                           "lore",
-                          "achievements",
-                          "quests",
+                          "goals",
                           "presets",
                           "variables",
                           "startingChoices",
@@ -4752,85 +4718,36 @@ ${result.description || ""}`;
                       }}
                     />
 
-                    {/* Achievements */}
+                    {/* Goals */}
                     <ExpandableContentCard
-                      section="achievements"
-                      label="Achievements"
-                      count={result.storyTemplate.achievements?.length || 0}
-                      color="red"
-                      items={result.storyTemplate.achievements || []}
-                      isExpanded={expandedSections.has("achievements")}
-                      onToggleExpand={() =>
-                        toggleSectionExpanded("achievements")
-                      }
-                      onRegenerate={() =>
-                        handleRegenerateSection(
-                          "achievements",
-                          extensionInstructions,
-                        )
-                      }
-                      onExtend={() =>
-                        handleExtendSection(
-                          "achievements",
-                          extensionOutputSize,
-                          extensionInstructions,
-                        )
-                      }
-                      isRegenerating={regeneratingSections.has("achievements")}
-                      isExtending={extendingSections.has("achievements")}
-                      renderItem={(item) => {
-                        const achievement = item as Achievement;
-                        return (
-                          <div className="flex items-center gap-2">
-                            <span className="text-lg">
-                              {achievement.symbol}
-                            </span>
-                            <div className="flex-1 min-w-0">
-                              <div className="font-medium text-red-300 truncate">
-                                {achievement.title}
-                              </div>
-                              <div className="text-xs text-blue-300/60 truncate">
-                                {achievement.description}
-                              </div>
-                            </div>
-                            <span className="text-yellow-400 text-xs font-bold">
-                              {achievement.points}pts
-                            </span>
-                          </div>
-                        );
-                      }}
-                    />
-
-                    {/* Quests */}
-                    <ExpandableContentCard
-                      section="quests"
-                      label="Quests"
-                      count={result.storyTemplate.quests?.length || 0}
+                      section="goals"
+                      label="Goals"
+                      count={result.storyTemplate.goals?.length || 0}
                       color="yellow"
-                      items={result.storyTemplate.quests || []}
-                      isExpanded={expandedSections.has("quests")}
-                      onToggleExpand={() => toggleSectionExpanded("quests")}
+                      items={result.storyTemplate.goals || []}
+                      isExpanded={expandedSections.has("goals")}
+                      onToggleExpand={() => toggleSectionExpanded("goals")}
                       onRegenerate={() =>
-                        handleRegenerateSection("quests", extensionInstructions)
+                        handleRegenerateSection("goals", extensionInstructions)
                       }
                       onExtend={() =>
                         handleExtendSection(
-                          "quests",
+                          "goals",
                           extensionOutputSize,
                           extensionInstructions,
                         )
                       }
-                      isRegenerating={regeneratingSections.has("quests")}
-                      isExtending={extendingSections.has("quests")}
+                      isRegenerating={regeneratingSections.has("goals")}
+                      isExtending={extendingSections.has("goals")}
                       renderItem={(item) => {
-                        const quest = item as Quest;
+                        const goal = item as Goal;
                         return (
                           <div>
                             <div className="font-medium text-yellow-300 truncate">
-                              {quest.title}
+                              {goal.title}
                             </div>
                             <div className="text-xs text-blue-300/60 line-clamp-2">
-                              {quest.shortDescription}
+                              {goal.shortDescription}
                             </div>
                           </div>
                         );

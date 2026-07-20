@@ -5,12 +5,8 @@ import {
   Stat,
   Resource,
   InventoryItem,
-  Achievement,
   StoryLore,
-  Quest,
   Relationship,
-  Condition,
-  ConditionTier,
   AGMTState,
   CustomTable,
   Variable,
@@ -37,12 +33,11 @@ import { DynamicIcon } from "../components/DynamicIcon";
 import { CustomTablesEditor } from "../components/CustomTablesEditor";
 import ChatDisplaySettings from "./menu/ChatDisplaySettings";
 import BasicSettings, { BasicSettingsForm } from "./menu/BasicSettings";
-import QuestEditor from "./menu/QuestEditor";
+import GoalEditor from "./menu/GoalEditor";
 import AbilitiesEditor from "./menu/AbilitiesEditor";
 import LoreEditor from "./menu/LoreEditor";
 import RelationshipsEditor from "./menu/RelationshipsEditor";
 import NPCEditor from "./menu/NPCEditor";
-import ConditionsEditor from "./menu/ConditionsEditor";
 import ThreadsEditor from "./menu/ThreadsEditor";
 import VariablesEditor from "./menu/VariablesEditor";
 import StoryMetaEditor from "./menu/StoryMetaEditor";
@@ -62,11 +57,10 @@ type MenuTab =
   | "basic"
   | "multiplayer"
   | "abilities"
-  | "quests"
+  | "goals"
   | "lore"
   | "npcs"
   | "relationships"
-  | "conditions"
   | "variables"
   | "tables"
   | "threads"
@@ -160,7 +154,6 @@ export default function MenuPage({
   const [editingStats, setEditingStats] = useState(false);
   const [editingResources, setEditingResources] = useState(false);
   const [editingInventory, setEditingInventory] = useState(false);
-  const [editingAchievements, setEditingAchievements] = useState(false);
   const [editingLore, setEditingLore] = useState(false);
 
   const [activeTab, setActiveTab] = useState<MenuTab>("basic");
@@ -170,13 +163,12 @@ export default function MenuPage({
     { id: "basic", label: "Basic", icon: "FileText" },
     { id: "multiplayer", label: "Multiplayer", icon: "Users" },
     { id: "abilities", label: "Abilities", icon: "Wand2" },
-    { id: "quests", label: "Quests", icon: "Scroll" },
+    { id: "goals", label: "Goals", icon: "Scroll" },
     { id: "lore", label: "Notes", icon: "Book" },
     { id: "npcs", label: "NPCs", icon: "Users" },
     { id: "tables", label: "Tables", icon: "Dices" },
     { id: "variables", label: "Variables", icon: "Variable" },
     { id: "relationships", label: "Relationships", icon: "Heart" },
-    { id: "conditions", label: "Conditions", icon: "HeartPulse" },
     { id: "threads", label: "Threads", icon: "GitBranch" },
     { id: "mythic", label: "Chaos/Oracle", icon: "Sparkles" },
     { id: "story", label: "Story", icon: "BookOpen" },
@@ -423,19 +415,15 @@ export default function MenuPage({
 
   const calculateStoryProgress = () => {
     const totalParts = storyData.scene.parts.length;
-    const achievementCount = storyData.achievements.length;
-    const achievedCount = storyData.achievements.filter(
-      (a) => a.dateAchieved,
-    ).length;
+    const goalCount = storyData.goals.length;
+    const fulfilledCount = storyData.goals.filter((g) => g.fulfilled).length;
 
     return {
       totalParts,
-      achievementCount,
-      achievedCount,
+      goalCount,
+      fulfilledCount,
       progress:
-        achievementCount > 0
-          ? Math.round((achievedCount / achievementCount) * 100)
-          : 0,
+        goalCount > 0 ? Math.round((fulfilledCount / goalCount) * 100) : 0,
     };
   };
 
@@ -473,9 +461,9 @@ export default function MenuPage({
           </div>
           <div className="bg-purple-900/30 rounded-lg py-2 px-1">
             <p className="text-lg font-bold text-purple-400">
-              {stats.achievedCount}/{stats.achievementCount}
+              {stats.fulfilledCount}/{stats.goalCount}
             </p>
-            <p className="text-[10px] text-purple-300/50">Achieved</p>
+            <p className="text-[10px] text-purple-300/50">Goals</p>
           </div>
         </div>
       </div>
@@ -778,7 +766,6 @@ export default function MenuPage({
                         freshTemplate?.inventory || storyData.inventory,
                       abilities:
                         freshTemplate?.abilities || storyData.abilities,
-                      conditions: freshTemplate?.conditions || [],
                       relationships:
                         freshTemplate?.relationships || storyData.relationships,
                       variables:
@@ -800,19 +787,10 @@ export default function MenuPage({
                       memory: [],
                       currentChapter: 0,
                       chapters: [],
-                      points: 0,
-                      earnedPointsFromChapters: [],
-                      earnedPointsFromQuests: [],
-                      achievements: (
-                        freshTemplate?.achievements || storyData.achievements
-                      ).map((a) => ({
-                        ...a,
-                        dateAchieved: null,
-                      })),
-                      quests:
-                        (freshTemplate?.quests || storyData.quests)?.map(
-                          (q) => ({
-                            ...q,
+                      goals:
+                        (freshTemplate?.goals || storyData.goals)?.map(
+                          (g) => ({
+                            ...g,
                             fulfilled: false,
                             active: false,
                           }),
@@ -1163,16 +1141,16 @@ export default function MenuPage({
 
                 <div
                   ref={(el) => {
-                    sectionRefs.current["quests"] = el;
+                    sectionRefs.current["goals"] = el;
                   }}
-                  data-section-id="quests"
+                  data-section-id="goals"
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={getSection("quests")} />
-                  <QuestEditor
-                    quests={storyData.quests || []}
-                    onUpdate={(quests) => onUpdateStoryData({ quests })}
+                  <SectionHeading tab={getSection("goals")} />
+                  <GoalEditor
+                    goals={storyData.goals || []}
+                    onUpdate={(goals) => onUpdateStoryData({ goals })}
                   />
                 </div>
 
@@ -1254,22 +1232,6 @@ export default function MenuPage({
                     onUpdate={(relationships) =>
                       onUpdateStoryData({ relationships })
                     }
-                  />
-                </div>
-
-                <div
-                  ref={(el) => {
-                    sectionRefs.current["conditions"] = el;
-                  }}
-                  data-section-id="conditions"
-                  style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
-                >
-                  <SectionHeading tab={getSection("conditions")} />
-                  <ConditionsEditor
-                    conditions={storyData.conditions || []}
-                    stats={storyData.stats || []}
-                    onUpdate={(conditions) => onUpdateStoryData({ conditions })}
                   />
                 </div>
 

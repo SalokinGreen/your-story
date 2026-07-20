@@ -135,28 +135,13 @@ export function findItemMatch(
 }
 
 /**
- * Convenience function for matching achievements by title
+ * Convenience function for matching goals by title
  */
-export function findAchievementMatch(
+export function findGoalMatch(
   searchTitle: string | undefined,
-  achievements: Array<{ title: string; [key: string]: any }>
+  goals: Array<{ title: string; [key: string]: any }>
 ) {
-  return findBestMatch(
-    searchTitle,
-    achievements,
-    (achievement) => achievement.title,
-    0.6
-  );
-}
-
-/**
- * Convenience function for matching quests by title
- */
-export function findQuestMatch(
-  searchTitle: string | undefined,
-  quests: Array<{ title: string; [key: string]: any }>
-) {
-  return findBestMatch(searchTitle, quests, (quest) => quest.title, 0.6);
+  return findBestMatch(searchTitle, goals, (goal) => goal.title, 0.6);
 }
 
 /**
