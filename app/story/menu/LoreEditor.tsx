@@ -37,6 +37,11 @@ import {
   libraryNoteToStoryLore,
   storyLoreToLibraryNoteFields,
 } from "../../misc/localNotesLibraryManager";
+import {
+  LibraryTable,
+  createLibraryTable,
+  libraryTableToCustomTable,
+} from "../../misc/localTablesLibraryManager";
 import PDFImporter from "../../components/PDFImporter";
 import LibraryPickerModal from "../../components/LibraryPickerModal";
 
@@ -44,11 +49,13 @@ export default function LoreEditor({
   lore,
   variables,
   onUpdate,
+  onImportTables,
   couchPlayers,
 }: {
   lore: StoryLore[];
   variables: Variable[];
   onUpdate: (lore: StoryLore[]) => void;
+  onImportTables?: (tables: CustomTable[]) => void;
   couchPlayers?: CouchPlayer[];
 }) {
   const [localLore, setLocalLore] = useState([...lore]);
@@ -179,18 +186,28 @@ export default function LoreEditor({
     onUpdate(updated);
   };
 
-  // Append notes picked from the shared LibraryPickerModal into this story's
-  // lore, tagged with libraryNoteId so they stay linked for push/pull.
-  const importSelectedLibraryNotes = (notes: LibraryNote[]) => {
-    if (notes.length === 0) return;
-    const newLore = notes.map(libraryNoteToStoryLore);
-    const updated = [...localLore, ...newLore];
-    setLocalLore(updated);
-    onUpdate(updated);
-    addNotification(
-      `Imported ${newLore.length} note${newLore.length === 1 ? "" : "s"} from library`,
-      "success",
-    );
+  // Append notes (and tables) picked from the shared LibraryPickerModal into
+  // this story's lore, tagged with libraryNoteId so they stay linked for
+  // push/pull. Tables bubble up to the story's customTables via onImportTables.
+  const importSelectedLibraryNotes = (
+    notes: LibraryNote[],
+    tables: LibraryTable[],
+  ) => {
+    if (notes.length === 0 && tables.length === 0) return;
+    if (notes.length > 0) {
+      const newLore = notes.map(libraryNoteToStoryLore);
+      const updated = [...localLore, ...newLore];
+      setLocalLore(updated);
+      onUpdate(updated);
+    }
+    if (tables.length > 0) {
+      onImportTables?.(tables.map(libraryTableToCustomTable));
+    }
+    const parts = [
+      notes.length > 0 ? `${notes.length} note${notes.length === 1 ? "" : "s"}` : null,
+      tables.length > 0 ? `${tables.length} table${tables.length === 1 ? "" : "s"}` : null,
+    ].filter(Boolean);
+    addNotification(`Imported ${parts.join(" and ")} from library`, "success");
     setShowLibraryPicker(false);
   };
 
@@ -265,8 +282,8 @@ export default function LoreEditor({
     }
   };
 
-  // Handle a PDF/OCR import: add to this story's live lore AND save to the
-  // persistent notes library for reuse in other stories.
+  // Handle a PDF/OCR import: add to this story's live lore/tables AND save to
+  // the persistent notes/tables libraries for reuse in other stories.
   const handlePDFImportComplete = async (data: {
     lore: StoryLore[];
     mechanicNotes: StoryLore[];
@@ -274,7 +291,6 @@ export default function LoreEditor({
     summary: string;
   }) => {
     const allNotes = [...data.lore, ...data.mechanicNotes];
-    if (allNotes.length === 0) return;
 
     let savedCount = 0;
     const linkedNotes: StoryLore[] = [];
@@ -292,14 +308,47 @@ export default function LoreEditor({
       }
     }
 
-    const updated = [...localLore, ...linkedNotes];
-    setLocalLore(updated);
-    onUpdate(updated);
+    if (linkedNotes.length > 0) {
+      const updated = [...localLore, ...linkedNotes];
+      setLocalLore(updated);
+      onUpdate(updated);
+    }
 
-    addNotification(
-      `Added ${allNotes.length} note${allNotes.length === 1 ? "" : "s"} to this story, saved ${savedCount} to your notes library`,
-      "success",
-    );
+    let savedTableCount = 0;
+    const linkedTables: CustomTable[] = [];
+    for (const table of data.customTables) {
+      try {
+        const libraryTable = await createLibraryTable({
+          name: table.name,
+          description: table.description,
+          entries: table.entries,
+          tags: [],
+          source: "ocr",
+        });
+        linkedTables.push({ ...table, libraryTableId: libraryTable.id });
+        savedTableCount++;
+      } catch (e) {
+        console.error("Error saving OCR table to library:", e);
+        linkedTables.push(table);
+      }
+    }
+
+    if (linkedTables.length > 0) {
+      onImportTables?.(linkedTables);
+    }
+
+    if (allNotes.length === 0 && linkedTables.length === 0) return;
+
+    const parts = [
+      allNotes.length > 0
+        ? `${allNotes.length} note${allNotes.length === 1 ? "" : "s"} (saved ${savedCount} to library)`
+        : null,
+      linkedTables.length > 0
+        ? `${linkedTables.length} table${linkedTables.length === 1 ? "" : "s"} (saved ${savedTableCount} to library)`
+        : null,
+    ].filter(Boolean);
+
+    addNotification(`Added ${parts.join(" and ")} to this story`, "success");
   };
 
   return (
@@ -1209,8 +1258,9 @@ export default function LoreEditor({
         isOpen={showLibraryPicker}
         onClose={() => setShowLibraryPicker(false)}
         title="Import from Library"
-        description="Bring saved notes into this story. Imported notes stay linked so you can push/pull updates later."
+        description="Bring saved notes or tables into this story. Imported notes stay linked so you can push/pull updates later."
         confirmLabel="Add Selected"
+        includeTables
         onImport={importSelectedLibraryNotes}
       />
     </div>

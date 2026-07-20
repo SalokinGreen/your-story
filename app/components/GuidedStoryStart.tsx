@@ -6,7 +6,8 @@ import { StaticIcon } from "./StaticIcon";
 import { DynamicIcon } from "./DynamicIcon";
 import LibraryPickerModal from "./LibraryPickerModal";
 import { libraryNoteToStoryLore } from "../misc/localNotesLibraryManager";
-import type { DiceMode, StoryLore } from "../misc/structs";
+import { libraryTableToCustomTable } from "../misc/localTablesLibraryManager";
+import type { CustomTable, DiceMode, StoryLore } from "../misc/structs";
 import type { FreeformPlayerSetup } from "../misc/localStoryManager";
 
 // Same palette as CouchPlayersEditor so colors stay consistent across the app
@@ -97,6 +98,7 @@ export default function GuidedStoryStart() {
     null,
   );
   const [attachedLore, setAttachedLore] = useState<StoryLore[]>([]);
+  const [attachedTables, setAttachedTables] = useState<CustomTable[]>([]);
   const [diceMode, setDiceMode] = useState<DiceMode>("ai");
   const nameInputRef = useRef<HTMLInputElement>(null);
 
@@ -119,6 +121,7 @@ export default function GuidedStoryStart() {
     setPlayerIndex(0);
     setPlayers([]);
     setAttachedLore([]);
+    setAttachedTables([]);
     setDiceMode("ai");
     setOpen(true);
   };
@@ -171,6 +174,7 @@ export default function GuidedStoryStart() {
         setupPlayers[0]?.name || "Player",
         attachedLore.length ? attachedLore : undefined,
         { players: setupPlayers, diceMode },
+        attachedTables.length ? attachedTables : undefined,
       );
       router.push(`/story?storyId=${localId}`);
     } catch (error) {
@@ -609,8 +613,17 @@ export default function GuidedStoryStart() {
                       className="flex-1 px-3 py-2.5 rounded-xl border bg-blue-900/20 hover:bg-blue-900/40 border-blue-700/40 text-blue-200/70 text-xs font-medium transition-all flex items-center justify-center gap-1.5"
                     >
                       <DynamicIcon name="Library" className="w-4 h-4" />
-                      {noteCount > 0
-                        ? `${noteCount} note${noteCount === 1 ? "" : "s"} attached`
+                      {noteCount > 0 || attachedTables.length > 0
+                        ? [
+                            noteCount > 0
+                              ? `${noteCount} note${noteCount === 1 ? "" : "s"}`
+                              : null,
+                            attachedTables.length > 0
+                              ? `${attachedTables.length} table${attachedTables.length === 1 ? "" : "s"}`
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(", ") + " attached"
                         : "Bring world notes"}
                     </button>
                   </div>
@@ -656,14 +669,23 @@ export default function GuidedStoryStart() {
         isOpen={pickerMode === "notes"}
         onClose={() => setPickerMode(null)}
         title="Bring World Notes"
-        description="Attach saved lore, mechanics, or GM notes before you start."
+        description="Attach saved lore, mechanics, GM notes, or random tables before you start."
         confirmLabel="Attach & Continue"
-        onImport={(notes) => {
+        includeTables
+        onImport={(notes, tables) => {
           const chosen = notes.map(libraryNoteToStoryLore);
           setAttachedLore((prev) => [
             ...prev,
             ...chosen.filter(
               (c) => !prev.some((p) => p.libraryNoteId === c.libraryNoteId),
+            ),
+          ]);
+          const chosenTables = tables.map(libraryTableToCustomTable);
+          setAttachedTables((prev) => [
+            ...prev,
+            ...chosenTables.filter(
+              (c) =>
+                !prev.some((p) => p.libraryTableId === c.libraryTableId),
             ),
           ]);
           setPickerMode(null);
