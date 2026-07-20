@@ -323,4 +323,30 @@ describe("NetSession", () => {
 
     expect(switchTo).toHaveBeenCalledWith("peerjs");
   });
+
+  it("times out joining as guest when no host ever appears, and cleans up the transport", async () => {
+    const leaveSpy = vi.fn(async () => {});
+    // A transport that connects fine at the signaling level (join()
+    // resolves) but never actually finds a peer - the realistic shape of
+    // "wrong room code" or "host isn't there" for backends like Trystero,
+    // whose join() resolves regardless of whether the room is reachable.
+    const deadEndTransport: MultiplayerTransport = {
+      backend: "manual",
+      async join() {},
+      onPeerJoin: () => {},
+      onPeerLeave: () => {},
+      onMessage: () => {},
+      send: () => {},
+      selfId: () => null,
+      leave: leaveSpy,
+    };
+    createTransport.mockImplementationOnce(() => deadEndTransport);
+    setLocalPlayerId("guest-lonely");
+
+    await expect(
+      NetSession.joinAsGuest("manual", "GHOSTRM", "Lonely", "#444444", 20),
+    ).rejects.toThrow(/Couldn't find a host with room code "GHOSTRM"/);
+
+    expect(leaveSpy).toHaveBeenCalledTimes(1);
+  });
 });

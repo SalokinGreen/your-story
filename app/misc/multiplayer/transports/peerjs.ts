@@ -13,6 +13,15 @@ import Peer, { type DataConnection } from "peerjs";
 import type { MultiplayerTransport } from "../transport";
 import type { WireMessage } from "../types";
 
+function describePeerError(err: Error & { type?: string }): Error {
+  if (err.type === "unavailable-id") {
+    return new Error(
+      "That room code is already in use on PeerJS - go back and create a new room to get a fresh code.",
+    );
+  }
+  return err;
+}
+
 export function createPeerjsTransport(): MultiplayerTransport {
   let peer: Peer | null = null;
   const connections = new Map<string, DataConnection>();
@@ -37,30 +46,26 @@ export function createPeerjsTransport(): MultiplayerTransport {
   return {
     backend: "peerjs",
 
-    async join(roomId) {
-      // Try to claim the room code as our own id first. If it's already
-      // taken, PeerJS emits an "unavailable-id" error and we fall back to an
-      // auto-assigned id and connect out to the room code instead. This lets
-      // one adapter cover both sides of the star without the caller
-      // pre-declaring a transport-level role - which peer becomes host is a
-      // separate, app-level decision made by session.ts/hostSync.ts (it
-      // creates the room first, so it wins the id race in the normal case).
+    async join(roomId, role) {
+      // Respects the caller's declared role rather than racing to claim the
+      // room id and silently falling back - session.ts already decided
+      // whether this is a host or a guest, and a name collision on the
+      // host side should be a clear, surfaced error, not a silent demotion
+      // to guest that leaves a NetSession thinking it's the host while the
+      // transport underneath it is actually a spoke.
       await new Promise<void>((resolve, reject) => {
-        const hostAttempt = new Peer(roomId);
-
-        hostAttempt.on("open", () => {
-          peer = hostAttempt;
-          peer.on("connection", wireConnection);
-          resolve();
-        });
-
-        hostAttempt.on("error", (err) => {
-          if (err.type !== "unavailable-id") {
-            reject(err);
-            return;
-          }
-          hostAttempt.destroy();
-
+        if (role === "host") {
+          const hostPeer = new Peer(roomId);
+          hostPeer.on("open", () => {
+            peer = hostPeer;
+            peer.on("connection", wireConnection);
+            resolve();
+          });
+          hostPeer.on("error", (err) => {
+            hostPeer.destroy();
+            reject(describePeerError(err));
+          });
+        } else {
           const guestPeer = new Peer();
           guestPeer.on("open", () => {
             peer = guestPeer;
@@ -68,8 +73,11 @@ export function createPeerjsTransport(): MultiplayerTransport {
             wireConnection(conn);
             resolve();
           });
-          guestPeer.on("error", (guestErr) => reject(guestErr));
-        });
+          guestPeer.on("error", (err) => {
+            guestPeer.destroy();
+            reject(describePeerError(err));
+          });
+        }
       });
     },
 

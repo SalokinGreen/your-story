@@ -23,7 +23,7 @@ export function createTransport(backend: MPBackend): MultiplayerTransport {
 // alphanumeric only (PeerJS ids must start/end alphanumeric; keeping the
 // whole thing alphanumeric sidesteps the question for every backend).
 const ROOM_CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I
-const ROOM_CODE_LENGTH = 6;
+export const ROOM_CODE_LENGTH = 6;
 
 export function generateRoomCode(): string {
   let code = "";
@@ -31,4 +31,12 @@ export function generateRoomCode(): string {
     code += ROOM_CODE_ALPHABET[Math.floor(Math.random() * ROOM_CODE_ALPHABET.length)];
   }
   return code;
+}
+
+// Lets the join UI fail fast on a mistyped code (wrong length, or a
+// character - like 0/O/1/I - this alphabet never generates) instead of
+// spending the full connect timeout on a code that could never have been
+// real. Expects the same case-normalization the UI already does.
+export function isValidRoomCode(code: string): boolean {
+  return code.length === ROOM_CODE_LENGTH && [...code].every((c) => ROOM_CODE_ALPHABET.includes(c));
 }

@@ -5,6 +5,7 @@ import { DynamicIcon } from "../../components/DynamicIcon";
 import { useNotification } from "../../misc/NotificationContext";
 import type { GuestJoinedInfo, NetSessionInfo } from "../../misc/multiplayer/session";
 import type { MPBackend } from "../../misc/multiplayer/types";
+import { isValidRoomCode, ROOM_CODE_LENGTH } from "../../misc/multiplayer/transports";
 import { PALETTE } from "./CouchPlayersEditor";
 
 const BACKEND_OPTIONS: { value: MPBackend; label: string }[] = [
@@ -69,6 +70,10 @@ export default function OnlinePlayEditor({
     const code = roomCodeInput.trim().toUpperCase();
     if (!code) {
       addNotification("Enter a room code first", "warning");
+      return;
+    }
+    if (!isValidRoomCode(code)) {
+      addNotification("That doesn't look like a valid room code - double-check it", "warning");
       return;
     }
     if (!name.trim()) {
@@ -302,6 +307,7 @@ export default function OnlinePlayEditor({
                   }
                 }}
                 placeholder="Room code"
+                maxLength={ROOM_CODE_LENGTH}
                 className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
               <button

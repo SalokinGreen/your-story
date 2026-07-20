@@ -136,7 +136,7 @@ export class NetSession {
   ): Promise<NetSession> {
     const transport = createTransport(backend);
     const session = new NetSession("host", backend, roomId, transport, displayName, color);
-    await transport.join(roomId);
+    await transport.join(roomId, "host");
     return session;
   }
 
@@ -145,10 +145,39 @@ export class NetSession {
     roomId: RoomId,
     displayName: string,
     color: string,
+    // Trystero's join() resolves almost instantly regardless of whether the
+    // room is actually reachable (it just starts trying strategies in the
+    // background) - the only signal that actually means "connected" is a
+    // peer showing up, so that's what this waits for instead of trusting
+    // join() itself to reject on failure.
+    connectTimeoutMs = 20000,
   ): Promise<NetSession> {
     const transport = createTransport(backend);
     const session = new NetSession("guest", backend, roomId, transport, displayName, color);
-    await transport.join(roomId);
+
+    const connected = new Promise<void>((resolve) => {
+      transport.onPeerJoin(() => resolve());
+    });
+
+    await transport.join(roomId, "guest");
+
+    const timedOut = Symbol("timeout");
+    let timeoutHandle: ReturnType<typeof setTimeout>;
+    const timeoutTimer = new Promise<typeof timedOut>((resolve) => {
+      timeoutHandle = setTimeout(() => resolve(timedOut), connectTimeoutMs);
+    });
+
+    const result = await Promise.race([connected.then(() => "connected" as const), timeoutTimer]);
+    clearTimeout(timeoutHandle!);
+
+    if (result === timedOut) {
+      await transport.leave();
+      throw new Error(
+        `Couldn't find a host with room code "${roomId}" within ${Math.round(connectTimeoutMs / 1000)}s. ` +
+          "Double-check the code, and make sure everyone picked the same connection option.",
+      );
+    }
+
     return session;
   }
 
