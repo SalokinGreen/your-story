@@ -75,6 +75,21 @@ export interface FormulaRollParams {
 }
 
 /**
+ * Manual dice mode: ask the player to roll physical dice and enter the
+ * result. Only offered when storyData.diceMode === "manual". The frontend
+ * pauses the GM loop, shows a roll prompt, and returns the number the
+ * player typed in.
+ */
+export interface AskForRollParams {
+  title: string; // Short label, e.g. "Perception Check"
+  description: string; // What's happening / why this roll matters
+  player_name?: string; // Which player should roll (couch co-op)
+  formula?: string; // What to roll, e.g. "1d20+3" (GM pre-computes modifiers)
+  dc?: number; // Optional target number to compare the entered total against
+  reverse_dc?: boolean; // If true, success = roll ≤ DC (roll-under systems)
+}
+
+/**
  * Opposed roll using formulas for both sides
  * GM should insert actual calculated values
  * Example: player "1d20+4" vs opponent "1d20+5"
@@ -510,6 +525,7 @@ export type GMToolParams =
   | { name: "calculate"; params: CalculateParams }
   | { name: "take_rest"; params: TakeRestParams }
   | { name: "formula_roll"; params: FormulaRollParams }
+  | { name: "ask_for_roll"; params: AskForRollParams }
   | { name: "opposed_formula"; params: OpposedFormulaParams }
   | { name: "formula_challenge_check"; params: FormulaChallengeCheckParams }
   | { name: "fate_question"; params: FateQuestionParams }
@@ -759,6 +775,55 @@ Example formulas:
         },
       },
       required: ["formula", "reason"],
+    },
+  },
+};
+
+const askForRollTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "ask_for_roll",
+    description: `Ask the player to roll REAL dice at the table and enter their result. Only available in Manual Dice Mode.
+
+Use this INSTEAD of formula_roll whenever a player character makes a roll:
+- Tell them exactly what to roll in \`formula\` (look up their modifiers yourself, e.g. "1d20+3")
+- The game pauses until the player types in their total
+- The entered total is compared against \`dc\` if you provide one
+
+Do NOT use this for NPC/enemy/secret rolls - roll those yourself with formula_roll or npc_roll (show_to_player: false for hidden rolls).`,
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description: "Short label for the roll (e.g., 'Perception Check', 'Attack Roll')",
+        },
+        description: {
+          type: "string",
+          description:
+            "What's happening and what's at stake, shown to the player (1-2 sentences)",
+        },
+        player_name: {
+          type: "string",
+          description:
+            "Name of the player who should roll (important in co-op so the right person rolls)",
+        },
+        formula: {
+          type: "string",
+          description:
+            "What to roll, with modifiers pre-computed: '1d20+5', '2d6+3', '1d100'",
+        },
+        dc: {
+          type: "number",
+          description: "Target number to compare the entered total against (optional)",
+        },
+        reverse_dc: {
+          type: "boolean",
+          description:
+            "If true, success = total ≤ DC (Call of Cthulhu/BRP roll-under). Default: false (total ≥ DC)",
+        },
+      },
+      required: ["title", "description"],
     },
   },
 };
@@ -2097,6 +2162,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   takeRestTool,
   // Formula-based tools (primary dice mechanics)
   formulaRollTool,
+  askForRollTool,
   opposedFormulaTool,
   formulaChallengeCheckTool,
   // Oracle & utility tools

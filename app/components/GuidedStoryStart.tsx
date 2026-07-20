@@ -6,7 +6,7 @@ import { StaticIcon } from "./StaticIcon";
 import { DynamicIcon } from "./DynamicIcon";
 import LibraryPickerModal from "./LibraryPickerModal";
 import { libraryNoteToStoryLore } from "../misc/localNotesLibraryManager";
-import type { StoryLore } from "../misc/structs";
+import type { DiceMode, StoryLore } from "../misc/structs";
 import type { FreeformPlayerSetup } from "../misc/localStoryManager";
 
 // Same palette as CouchPlayersEditor so colors stay consistent across the app
@@ -97,6 +97,7 @@ export default function GuidedStoryStart() {
     null,
   );
   const [attachedLore, setAttachedLore] = useState<StoryLore[]>([]);
+  const [diceMode, setDiceMode] = useState<DiceMode>("ai");
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const characterAttached = attachedLore.some(
@@ -118,6 +119,7 @@ export default function GuidedStoryStart() {
     setPlayerIndex(0);
     setPlayers([]);
     setAttachedLore([]);
+    setDiceMode("ai");
     setOpen(true);
   };
 
@@ -168,7 +170,7 @@ export default function GuidedStoryStart() {
       const localId = await startFreeformStoryLocally(
         setupPlayers[0]?.name || "Player",
         attachedLore.length ? attachedLore : undefined,
-        { players: setupPlayers },
+        { players: setupPlayers, diceMode },
       );
       router.push(`/story?storyId=${localId}`);
     } catch (error) {
@@ -536,6 +538,53 @@ export default function GuidedStoryStart() {
                         />
                       </button>
                     ))}
+                  </div>
+
+                  {/* Dice mode: who rolls? */}
+                  <div>
+                    <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
+                      Who rolls the dice?
+                    </label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        onClick={() => setDiceMode("ai")}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          diceMode === "ai"
+                            ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
+                            : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+                          <StaticIcon
+                            name="Sparkles"
+                            className="w-4 h-4 text-purple-300"
+                          />
+                          GM rolls
+                        </span>
+                        <span className="block text-xs text-blue-300/50">
+                          The AI rolls digitally and narrates the results
+                        </span>
+                      </button>
+                      <button
+                        onClick={() => setDiceMode("manual")}
+                        className={`p-3 rounded-xl border text-left transition-all ${
+                          diceMode === "manual"
+                            ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
+                            : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                        }`}
+                      >
+                        <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+                          <StaticIcon
+                            name="Dices"
+                            className="w-4 h-4 text-purple-300"
+                          />
+                          We roll
+                        </span>
+                        <span className="block text-xs text-blue-300/50">
+                          Use real dice - the GM asks for your results
+                        </span>
+                      </button>
+                    </div>
                   </div>
 
                   {/* Optional library attachments */}

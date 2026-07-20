@@ -6,6 +6,7 @@
 const TOOL_LABELS: Record<string, string> = {
   // Dice / checks
   formula_roll: "Rolling dice",
+  ask_for_roll: "Waiting for your roll",
   opposed_formula: "Rolling opposed check",
   formula_challenge_check: "Rolling challenge check",
   npc_roll: "Rolling for NPC",

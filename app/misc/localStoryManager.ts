@@ -1,4 +1,4 @@
-import { Adventure, StoryData, StoryLore } from "./structs";
+import { Adventure, DiceMode, StoryData, StoryLore } from "./structs";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -265,11 +265,14 @@ function buildFreeformGreeting(
  * When `setup.players` is provided (guided wizard flow), the players'
  * names/personalities/wishes are baked into a pinned `dm_instructions`
  * note, and 2+ players enables couch co-op with named/colored players.
+ * `setup.diceMode` chooses who rolls the dice: "ai" (default) or "manual"
+ * (the players roll physical dice; the GM collects results via
+ * ask_for_roll).
  */
 export async function startFreeformStoryLocally(
   playerName: string = "Player",
   initialLore?: StoryLore[],
-  setup?: { players?: FreeformPlayerSetup[] },
+  setup?: { players?: FreeformPlayerSetup[]; diceMode?: DiceMode },
 ): Promise<string> {
   const localId = `local_${Date.now()}_${Math.random()
     .toString(36)
@@ -320,6 +323,7 @@ export async function startFreeformStoryLocally(
     currentChapter: 0,
     chapters: [],
     multiplayer,
+    diceMode: setup?.diceMode || "ai",
     scene: {
       parts: [
         {

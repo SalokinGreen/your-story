@@ -2747,6 +2747,24 @@ This is a brand-new story with no established setting or character yet - the pla
 `
       : "";
 
+  // 🎲 Manual dice mode: the players roll physical dice at the table. The
+  // GM collects player-facing rolls through ask_for_roll (which pauses the
+  // loop for input) instead of rolling digitally; NPC/hidden rolls stay
+  // digital. Only injected (and ask_for_roll only offered) when the story
+  // was created with diceMode === "manual".
+  const manualDiceMode = storyData.diceMode === "manual";
+  const manualDiceSection = manualDiceMode
+    ? `
+
+### 🎲 MANUAL DICE MODE (ACTIVE)
+The players roll REAL dice at the table. For ANY roll a player character makes:
+- Use \`ask_for_roll\` (NOT formula_roll) - the game pauses while the player rolls physically and types in their total
+- Pre-compute their modifiers and tell them exactly what to roll in \`formula\` (e.g. "1d20+3"), and give the roll a clear \`title\` and \`description\`
+- In co-op, always set \`player_name\` so the right person rolls
+- NPC/enemy/secret rolls are still YOURS: keep using \`formula_roll\` / \`npc_roll\` (show_to_player: false for hidden rolls)
+- If the player skips the roll prompt, roll it for them with \`formula_roll\` and move on`
+    : "";
+
   const systemPrompt = `You ARE the Game Master. Run this like a real tabletop session.
 ${freshStorySetupBlock}
 ## VISIBILITY RULES
@@ -2815,7 +2833,7 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Skill checks**: Use \`formula_roll\` for risky actions with meaningful stakes
 - **Enemy attacks**: Roll for them using their stats, apply damage to player resources
 - **Multiple enemies**: Start formal combat with \`start_combat\` for initiative tracking
-- **Routine actions**: No roll needed - just narrate success
+- **Routine actions**: No roll needed - just narrate success${manualDiceSection}
 
 ### Tables (USE THEM - DON'T JUST IMPROVISE)
 - Before inventing random content (loot, encounters, NPC traits, weather, complications, plot twists, rumors, etc.), check whether a relevant table exists and roll on it with \`roll_table\` instead of making it up.
@@ -2866,6 +2884,8 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
   const legacyToolNames = [
     // Rolling tools (formula-based)
     "formula_roll",
+    // Manual dice mode: player rolls real dice, GM asks for the result
+    ...(manualDiceMode ? ["ask_for_roll"] : []),
     "formula_challenge_check",
     "opposed_formula",
     "fate_question",

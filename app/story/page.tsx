@@ -37,6 +37,8 @@ import { StoryTabBar } from "./StoryTabBar";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
+import ManualRollModal from "../components/ManualRollModal";
+import type { ManualRollRequest } from "../misc/gmExecutor";
 import { logger } from "../misc/logger";
 import { useState, useEffect, useRef, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
@@ -228,6 +230,15 @@ function StoryPageContent() {
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const hasLoadedStoryRef = useRef<string | null>(null); // Track loaded story ID to prevent re-fetching on tab focus
   const generationAbortRef = useRef<AbortController | null>(null); // Abort controller for stopping generation
+  // Manual dice mode: a pending ask_for_roll request means the GM loop is
+  // paused awaiting the player's physical roll. The resolver ref completes
+  // the promise the GM executor is awaiting (number = entered total,
+  // null = player skipped / generation stopped).
+  const [manualRollRequest, setManualRollRequest] =
+    useState<ManualRollRequest | null>(null);
+  const manualRollResolveRef = useRef<((value: number | null) => void) | null>(
+    null,
+  );
   // Full pre-turn StoryData snapshot, taken right before each turn's GM
   // tool calls can mutate state. Session-only (not persisted) - lets
   // handleUndo actually undo a turn's mechanical state changes (NPC
@@ -1221,6 +1232,7 @@ function StoryPageContent() {
             setLiveGMEntries([]);
             logger.action("GM stage started (custom input)");
           },
+          onAskForRoll: requestManualRoll,
           onCompaction: (summary) => {
             addNotification(
               "Recap: earlier events were condensed into a summary to save space",
@@ -1991,6 +2003,7 @@ function StoryPageContent() {
             setLiveGMEntries([]);
             logger.action("GM stage started - determining mechanics");
           },
+          onAskForRoll: requestManualRoll,
           onCompaction: (summary) => {
             addNotification(
               "Recap: earlier events were condensed into a summary to save space",
@@ -2294,8 +2307,25 @@ function StoryPageContent() {
     setInput({ ...newInput });
   }
 
+  // Manual dice mode: called by the GM executor when ask_for_roll fires.
+  // Shows the roll prompt and resolves once the player enters their total.
+  function requestManualRoll(request: ManualRollRequest) {
+    return new Promise<number | null>((resolve) => {
+      manualRollResolveRef.current = resolve;
+      setManualRollRequest(request);
+    });
+  }
+
+  function resolveManualRoll(value: number | null) {
+    manualRollResolveRef.current?.(value);
+    manualRollResolveRef.current = null;
+    setManualRollRequest(null);
+  }
+
   // Stop generation (abort ongoing requests)
   function handleStop() {
+    // Unblock the GM loop if it's paused waiting for a physical roll
+    resolveManualRoll(null);
     if (generationAbortRef.current) {
       generationAbortRef.current.abort();
       generationAbortRef.current = null;
@@ -3540,6 +3570,15 @@ function StoryPageContent() {
         }}
         isPinned={isAIPinned}
         onPinToggle={handleAIPinToggle}
+      />
+
+      {/* Manual dice mode: the GM asked for a physical roll - generation is
+          paused until the player enters their total (or skips) */}
+      <ManualRollModal
+        request={manualRollRequest}
+        couchPlayers={storyData?.multiplayer?.couchPlayers}
+        onSubmit={(value) => resolveManualRoll(value)}
+        onSkip={() => resolveManualRoll(null)}
       />
 
       {/*ConfirmDialog*/}

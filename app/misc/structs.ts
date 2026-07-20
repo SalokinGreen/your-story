@@ -46,6 +46,9 @@ export interface Resource {
 // Adventure difficulty setting (affects all tier conversions)
 export type AdventureDifficulty = "easy" | "medium" | "hard" | "expert";
 
+// Who rolls the dice for player-character actions (see StoryData.diceMode)
+export type DiceMode = "ai" | "manual";
+
 export const STARTING_UPGRADES_BY_DIFFICULTY: Record<
   AdventureDifficulty,
   number
@@ -802,6 +805,10 @@ export interface StoryData {
   nsfw?: boolean; // Whether the story contains NSFW content
   reverseDC?: boolean; // If true, success = roll ≤ DC (Call of Cthulhu style)
   difficulty?: AdventureDifficulty; // Adventure difficulty (affects DC/points scaling)
+  // Who rolls the player's dice: "ai" (default) = the GM rolls digitally via
+  // formula_roll etc.; "manual" = the players roll physical dice at the table
+  // and the GM uses ask_for_roll to collect their results.
+  diceMode?: DiceMode;
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
   agmtState?: AGMTState; // Advanced RPG Tools state (chaos factor, threads, characters)

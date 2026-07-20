@@ -31,6 +31,7 @@ import {
   CalculateParams,
   TakeRestParams,
   FormulaRollParams,
+  AskForRollParams,
   OpposedFormulaParams,
   FormulaChallengeCheckParams,
   FateQuestionParams,
@@ -116,6 +117,7 @@ export interface GMToolResult {
     | GMCalculateResult
     | GMRestResult
     | GMFormulaRollResult
+    | GMAskForRollResult
     | GMOpposedFormulaResult
     | GMFormulaChallengeResult
     | GMFateQuestionResult
@@ -217,6 +219,21 @@ export interface GMFormulaRollResult {
   };
   unresolvedVariables?: string[]; // Variables that couldn't be resolved
   breakdown?: string; // Human-readable breakdown
+}
+
+export interface GMAskForRollResult {
+  type: "ask_for_roll";
+  title: string;
+  description: string;
+  playerName?: string;
+  formula?: string;
+  dc?: number;
+  reverseDC?: boolean;
+  // The total the player typed in; null when they skipped/cancelled
+  rollValue: number | null;
+  success?: boolean; // vs dc, when both a value and a dc exist
+  margin?: number;
+  skipped?: boolean;
 }
 
 export interface GMOpposedFormulaResult {
@@ -590,6 +607,24 @@ function parseDifficulty(
 // MAIN EXECUTOR
 // ============================================
 
+// A pending "roll your real dice" request shown to the player (manual dice
+// mode). Produced by the ask_for_roll tool; the UI answers with the total
+// the player rolled, or null if they skipped.
+export interface ManualRollRequest {
+  title: string;
+  description: string;
+  playerName?: string;
+  formula?: string;
+  dc?: number;
+  reverseDC?: boolean;
+}
+
+// Handlers the frontend injects so interactive GM tools can pause the loop
+// and wait for real player input.
+export interface GMInteractionHandlers {
+  requestManualRoll?: (request: ManualRollRequest) => Promise<number | null>;
+}
+
 export interface GMExecutionResult {
   results: GMToolResult[];
   modifiedStoryData: StoryData;
@@ -611,7 +646,8 @@ export interface GMExecutionResult {
 export async function executeGMTools(
   toolCalls: { id: string; function: { name: string; arguments: string } }[],
   storyData: StoryData,
-  semanticContext: SemanticSearchContext = {}
+  semanticContext: SemanticSearchContext = {},
+  interaction: GMInteractionHandlers = {}
 ): Promise<GMExecutionResult> {
   // Check for premature end_gm_thinking calls when there are other tools
   // The AI sometimes calls end_gm_thinking before processing roll results
@@ -769,6 +805,13 @@ export async function executeGMTools(
             call.id,
             params as FormulaRollParams,
             modified
+          );
+          break;
+        case "ask_for_roll":
+          result = await executeAskForRoll(
+            call.id,
+            params as AskForRollParams,
+            interaction
           );
           break;
         case "opposed_formula":
@@ -1751,6 +1794,96 @@ function executeFormulaRoll(
       breakdown: rollResult.breakdown,
       showToPlayer: params.show_to_player !== false, // Default true
     } as GMFormulaRollResult,
+    contextForStory,
+  };
+}
+
+/**
+ * Execute ask_for_roll (manual dice mode): pause the GM loop and wait for
+ * the player to roll physical dice and type in their total. The injected
+ * `interaction.requestManualRoll` handler resolves with the entered number,
+ * or null when the player skipped (then the GM should roll digitally).
+ */
+async function executeAskForRoll(
+  toolCallId: string,
+  params: AskForRollParams,
+  interaction: GMInteractionHandlers
+): Promise<GMToolResult> {
+  const baseResult: Omit<GMAskForRollResult, "rollValue"> = {
+    type: "ask_for_roll",
+    title: params.title,
+    description: params.description,
+    playerName: params.player_name,
+    formula: params.formula,
+    dc: params.dc,
+    reverseDC: params.reverse_dc,
+  };
+
+  if (!interaction.requestManualRoll) {
+    return {
+      toolName: "ask_for_roll",
+      toolCallId,
+      success: false,
+      result: { ...baseResult, rollValue: null, skipped: true },
+      contextForStory:
+        "[ERROR: Manual dice input isn't available right now - roll digitally with formula_roll instead.]",
+    };
+  }
+
+  const rollValue = await interaction.requestManualRoll({
+    title: params.title,
+    description: params.description,
+    playerName: params.player_name,
+    formula: params.formula,
+    dc: params.dc,
+    reverseDC: params.reverse_dc,
+  });
+
+  if (rollValue === null || !Number.isFinite(rollValue)) {
+    return {
+      toolName: "ask_for_roll",
+      toolCallId,
+      success: false,
+      result: { ...baseResult, rollValue: null, skipped: true },
+      contextForStory: `[Manual Roll Skipped: ${params.title} - the player didn't enter a roll. Roll it for them digitally with formula_roll${
+        params.formula ? ` ("${params.formula}"${params.dc !== undefined ? `, dc: ${params.dc}` : ""})` : ""
+      } and continue.]`,
+    };
+  }
+
+  // Compare against DC if one was given
+  let success: boolean | undefined;
+  let margin: number | undefined;
+  const reverseDC = params.reverse_dc || false;
+  if (params.dc !== undefined) {
+    if (reverseDC) {
+      success = rollValue <= params.dc;
+      margin = params.dc - rollValue;
+    } else {
+      success = rollValue >= params.dc;
+      margin = rollValue - params.dc;
+    }
+  }
+
+  let contextForStory = `[Manual Roll: ${params.title}`;
+  if (params.player_name) {
+    contextForStory += ` - ${params.player_name}`;
+  }
+  contextForStory += ` rolled${params.formula ? ` ${params.formula}` : ""} = **${rollValue}** (real dice, entered by the player)`;
+  if (params.dc !== undefined) {
+    contextForStory += ` vs DC ${params.dc} → ${success ? "SUCCESS" : "FAILURE"}`;
+    if (margin !== undefined) {
+      contextForStory += ` (margin: ${margin >= 0 ? "+" : ""}${margin})`;
+    }
+  }
+  contextForStory += `]`;
+  contextForStory += `\n[Reason: ${params.description}]`;
+
+  return {
+    toolName: "ask_for_roll",
+    toolCallId,
+    success: success ?? true,
+    result: { ...baseResult, rollValue, success, margin },
     contextForStory,
   };
 }
