@@ -43,10 +43,10 @@ import { ensureStoryReflected } from "@/app/misc/reflection";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   outputToScenePart,
-  stripThinkingTags,
   extractThinkingTags,
   detectRepetition,
 } from "@/app/misc/ai";
+import { extractVisibleText } from "@/app/misc/turnTimeline";
 import {
   executeGMTools,
   GMToolResult,
@@ -174,6 +174,10 @@ export interface GenerationOptions {
   storyId?: string; // Required for embedding search
   enableEmbeddings?: boolean; // Whether to use embedding-based context
   embeddingThreshold?: number; // Similarity threshold (0.1-0.5, default 0.25)
+  // Sub-agent delegation (delegate_task tool) - web_research needs both a
+  // BYOK search key and this explicit opt-in, off by default
+  webResearchEnabled?: boolean;
+  braveSearchKey?: string;
   // GM Stage (new architecture: AI determines mechanics via tool calls)
   enableGMStage?: boolean; // Use GM stage instead of ActionAnalysis JSON
   gmStageModel?: string; // Model to use for GM stage (defaults to toolsModel)
@@ -205,6 +209,11 @@ export interface GenerationCallbacks {
   onGMStageStart?: () => void;
   // NEW: Stream GM content as it generates (thinking text)
   onGMContent?: (content: string, fullContent: string) => void;
+  // Stream the model's native reasoning/CoT field as it generates (only
+  // fires for providers that support it, e.g. DeepSeek reasoner,
+  // OpenRouter reasoning-enabled models) - scoped to the current GM round,
+  // resets at the start of each round same as onGMContent.
+  onGMReasoning?: (content: string, fullReasoning: string) => void;
   // NEW: Called after each GM tool execution with interleaved results
   onGMToolResult?: (result: GMToolResult) => void;
   // Manual dice mode: the GM asked the player to roll real dice. The UI
@@ -1078,6 +1087,7 @@ export async function generateStoryTurn(
             }
             if (event.type === "reasoning" && event.content) {
               gmReasoning += event.content;
+              callbacks.onGMReasoning?.(event.content, gmReasoning);
             }
             if (event.type === "reasoning_details" && event.details) {
               for (const detail of event.details) {
@@ -1187,7 +1197,7 @@ export async function generateStoryTurn(
               gmInterleavedParts.push(formattedThinking);
 
               // NEW: Add raw content to accumulated story (preserve <output> tags)
-              // The UI will call stripThinkingTags to extract visible content
+              // extractVisibleText() pulls the player-visible narration out below
               const rawContent = gmResult.content.trim();
               if (rawContent) {
                 // Check for duplicate content
@@ -1273,6 +1283,18 @@ export async function generateStoryTurn(
                 token,
               },
               { requestManualRoll: callbacks.onAskForRoll },
+              {
+                apiKeys: {
+                  openRouterKey: options.openRouterKey,
+                  deepseekKey: options.deepseekKey,
+                  googleKey: options.googleKey,
+                  mistralKey: options.mistralKey,
+                  deepinfraKey: options.deepinfraKey,
+                },
+                token,
+                webResearchEnabled: options.webResearchEnabled,
+                braveSearchKey: options.braveSearchKey,
+              },
             );
 
             // Accumulate results across rounds
@@ -1419,11 +1441,19 @@ export async function generateStoryTurn(
             const content = gmResult.content || "";
 
             // IMPORTANT: Add the final assistant response to conversation history
-            // even without tool calls, so it gets saved in gmConversation
+            // even without tool calls, so it gets saved in gmConversation.
+            // Must include reasoning/reasoning_details like the tool-call
+            // branch above - this terminal round is the only round on a
+            // single-round turn, so omitting them here was silently
+            // dropping the model's actual reasoning before it ever reached
+            // gmConversation/ScenePart, even though it streamed live via
+            // onGMReasoning during generation.
             if (content.trim()) {
               conversationHistory.push({
                 role: "assistant",
                 content: content,
+                reasoning: gmResult.reasoning,
+                reasoning_details: gmResult.reasoning_details,
               });
             }
 
@@ -1589,8 +1619,13 @@ export async function generateStoryTurn(
       );
 
       // Use GM's content directly as the story
-      storyContent = gmFinalStoryContent;
       rawStoryContent = gmFinalStoryContent;
+
+      // Extract only the player-visible narration - robust against a
+      // truncated/dangling <output> tag (unlike the old stripThinkingTags
+      // call this replaced, which only ran at final-save time and could
+      // leak a raw tag fragment if generation was cut off mid-tag).
+      storyContent = extractVisibleText(gmFinalStoryContent);
 
       // Prune leading dividers (---, ***, ___) that the model might add
       while (/^[\s\n]*([-*_]{3,})/.test(storyContent)) {
@@ -2054,8 +2089,10 @@ export async function generateStoryTurn(
         .replace(/\n+(?:• [^\n]*→[^\n]*\n?)+$/, "")
         .trim();
 
-      // Final thorough cleaning to isolate ONLY story content
-      storyContent = stripThinkingTags(storyContent);
+      // Final thorough cleaning to isolate ONLY story content - robust
+      // against a dangling tag even though the prompt no longer asks for
+      // <output> wrapping (defends against a model that adds one anyway).
+      storyContent = extractVisibleText(storyContent);
 
       callbacks.onStoryComplete?.(
         storyContent,

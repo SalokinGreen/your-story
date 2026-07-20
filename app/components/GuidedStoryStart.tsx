@@ -165,7 +165,8 @@ export default function GuidedStoryStart() {
         name: p.name.trim() || `Player ${i + 1}`,
         color: p.color,
         personality: p.personality,
-        wish: [...p.wishTags, p.wishText.trim()].filter(Boolean).join("; "),
+        wishTags: p.wishTags,
+        wishText: p.wishText.trim(),
       }));
       const { startFreeformStoryLocally } = await import(
         "../misc/localStoryManager"

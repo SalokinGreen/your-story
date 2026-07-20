@@ -734,6 +734,14 @@ export interface CouchPlayer {
   id: string;
   name: string;
   color: string; // hex color, e.g. "#22c55e"
+  // Curated tags picked in the GuidedStoryStart wizard (PERSONALITY_TAGS /
+  // WISH_TAGS in GuidedStoryStart.tsx) - persisted here (not just baked into
+  // the one-off "Players & Preferences" lore note) so selectDirectorMove's
+  // spotlight_tag move has durable state to read. Solo play has no
+  // CouchPlayer at all; see StoryData.playerPersonalityTags/playerWishTags
+  // for that case.
+  personalityTags?: string[];
+  wishTags?: string[];
 }
 
 export interface StoryData {
@@ -772,6 +780,14 @@ export interface StoryData {
     // meaningful when couchPlayers.length > 1.
     playerStyleCounts?: Record<string, Record<PlayerStyleType, number>>;
   };
+  // Solo-play equivalent of CouchPlayer.personalityTags/wishTags below - the
+  // GuidedStoryStart wizard collects these for every story (including
+  // single-player), but `multiplayer`/`couchPlayers` is only ever created
+  // when there's more than one player. Read by selectDirectorMove's
+  // spotlight_tag move; undefined/empty means the player picked no tags
+  // (an older save, or they skipped the wizard step) and the move is a no-op.
+  playerPersonalityTags?: string[];
+  playerWishTags?: string[];
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;
   memory: (string | MemoryEntry)[]; // Supports both legacy string[] and new MemoryEntry[] format
@@ -907,7 +923,8 @@ export interface PendingDirectorMove {
     | "spotlight_couch_player"
     | "put_someone_in_a_spot"
     | "offer_opportunity"
-    | "reveal_unwelcome_truth";
+    | "reveal_unwelcome_truth"
+    | "spotlight_tag";
   targetThreadId?: string; // For tick_a_clock / put_someone_in_a_spot / offer_opportunity
   targetTimerId?: string; // For tick_a_clock
   targetCouchPlayerId?: string; // For spotlight_couch_player
@@ -922,6 +939,14 @@ export interface PendingDirectorMove {
   // most severe trigger, from already-tracked state - not a general dial.
   hardnessTarget?: "self" | "someone_they_love" | "someone_present";
   hardnessForcesChoice?: boolean;
+  // For spotlight_tag: which player/tag was chosen, and a fixed sample of 3
+  // (of that tag's 10 curated) TagFocusExample entries from
+  // tagFocusExamples.ts - sampled once at selectDirectorMove time and
+  // persisted here so they stay stable across the turns this move remains
+  // pending/unacknowledged, rather than re-rolling on every render.
+  targetPlayerName?: string;
+  targetTag?: string;
+  tagFocusExamples?: { prompt: string; table: string }[];
 }
 
 // GURPS Reaction Table categories (see gmExecutor.ts's executeReactionCheck

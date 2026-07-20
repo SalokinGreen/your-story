@@ -41,6 +41,14 @@ import ContextViewer from "./ContextViewer";
 import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
 import ManualRollModal from "../components/ManualRollModal";
 import type { ManualRollRequest } from "../misc/gmExecutor";
+import {
+  type TimelineBlock,
+  updateLiveRoundBlocks,
+  updateLiveReasoningBlock,
+  appendStreamingText,
+  toolResultBlock,
+  freezeBlocks,
+} from "../misc/turnTimeline";
 import { logger } from "../misc/logger";
 import { useState, useEffect, useRef, useCallback, Suspense } from "react";
 import { useNotification } from "../misc/NotificationContext";
@@ -100,7 +108,6 @@ import { DiceVisualizer } from "../components/DiceVisualizer";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn, analyzeAction } from "../misc/generation";
 import {
-  GMToolResult,
   GMNPCReactionResult,
   GMFormulaRollResult,
 } from "../misc/gmExecutor";
@@ -219,8 +226,14 @@ function StoryPageContent() {
 
   const { addNotification } = useNotification();
   const { keys: apiKeys } = useAPIKeys();
-  const { openRouterKey, deepseekKey, googleKey, mistralKey, deepinfraKey } =
-    apiKeys;
+  const {
+    openRouterKey,
+    deepseekKey,
+    googleKey,
+    mistralKey,
+    deepinfraKey,
+    braveSearchKey,
+  } = apiKeys;
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY,
   );
@@ -421,11 +434,9 @@ function StoryPageContent() {
     });
   }, [netSession]);
 
-  // Live GM streaming state - interleaved thinking and tool results
-  type GMEntry =
-    | { type: "thinking"; content: string; isStreaming?: boolean }
-    | { type: "tool"; result: import("@/app/misc/gmExecutor").GMToolResult };
-  const [liveGMEntries, setLiveGMEntries] = useState<GMEntry[]>([]);
+  // Live GM streaming state - chronological thinking/tool/text blocks,
+  // rendered inline (Claude-style) as they arrive - see turnTimeline.ts
+  const [liveGMEntries, setLiveGMEntries] = useState<TimelineBlock[]>([]);
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
   const [started, setStarted] = useState(false);
@@ -1324,6 +1335,10 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? localStorage.getItem("embeddingsEnabled") === "true"
           : false;
+      const webResearchEnabled =
+        typeof window !== "undefined"
+          ? localStorage.getItem("webResearchEnabled") === "true"
+          : false;
       const embeddingThreshold =
         typeof window !== "undefined"
           ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -1377,6 +1392,8 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
+          webResearchEnabled,
+          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -1402,34 +1419,21 @@ function StoryPageContent() {
             });
           },
           onGMContent: (delta, fullContent) => {
-            // Update or add the current thinking entry (last one if streaming)
-            setLiveGMEntries((prev) => {
-              const lastEntry = prev[prev.length - 1];
-              if (lastEntry?.type === "thinking" && lastEntry.isStreaming) {
-                // Update the existing streaming thinking entry
-                return [
-                  ...prev.slice(0, -1),
-                  { type: "thinking", content: fullContent, isStreaming: true },
-                ];
-              } else {
-                // Start a new thinking entry
-                return [
-                  ...prev,
-                  { type: "thinking", content: fullContent, isStreaming: true },
-                ];
-              }
-            });
+            // Re-parse the current round's buffer into thinking/text blocks
+            // (see turnTimeline.ts) - earlier rounds stay frozen behind
+            // their tool-call block.
+            setLiveGMEntries((prev) => updateLiveRoundBlocks(prev, fullContent));
+          },
+          onGMReasoning: (delta, fullReasoning) => {
+            setLiveGMEntries((prev) =>
+              updateLiveReasoningBlock(prev, fullReasoning),
+            );
           },
           onGMToolResult: (result) => {
-            // Finalize any streaming thinking entry, then add tool result
-            setLiveGMEntries((prev) => {
-              const updated = prev.map((entry) =>
-                entry.type === "thinking" && entry.isStreaming
-                  ? { ...entry, isStreaming: false }
-                  : entry,
-              );
-              return [...updated, { type: "tool", result }];
-            });
+            setLiveGMEntries((prev) => [
+              ...freezeBlocks(prev),
+              toolResultBlock(result),
+            ]);
           },
           onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
             logger.ai_response("GM stage complete (custom input)", {
@@ -1523,10 +1527,14 @@ function StoryPageContent() {
             setStoryText(fullContent);
             // Don't call setStoryData here - it causes infinite loops during rapid streaming
             // storyText is sufficient for display, full update happens in onStoryComplete
+            // Fallback story stage (GM stage narrated nothing itself) - append as a
+            // trailing streaming text block after the GM's thinking/tool blocks.
+            setLiveGMEntries((prev) => appendStreamingText(prev, fullContent));
             setLoading(false); // Let player read while tools/choices generate
             setPendingUserChoice(""); // Clear pending choice - response is here
           },
           onStoryComplete: (content: string, usage: any) => {
+            setLiveGMEntries((prev) => freezeBlocks(prev));
             // Update the partial part with the cleaned content (strips [GM State Update] etc)
             partialPart.content = content;
             setStoryText(content);
@@ -2093,6 +2101,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"
         : false;
+    const webResearchEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("webResearchEnabled") === "true"
+        : false;
     const embeddingThreshold =
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -2155,6 +2167,8 @@ function StoryPageContent() {
           abortSignal: generationAbortRef.current.signal,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
+          webResearchEnabled,
+          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -2180,39 +2194,21 @@ function StoryPageContent() {
             });
           },
           onGMContent: (delta, fullContent) => {
-            // Stream GM thinking content - accumulate entries properly
-            setLiveGMEntries((prev) => {
-              const lastEntry = prev[prev.length - 1];
-              if (lastEntry?.type === "thinking" && lastEntry.isStreaming) {
-                return [
-                  ...prev.slice(0, -1),
-                  {
-                    type: "thinking",
-                    content: fullContent,
-                    isStreaming: true,
-                  },
-                ];
-              } else {
-                return [
-                  ...prev,
-                  {
-                    type: "thinking",
-                    content: fullContent,
-                    isStreaming: true,
-                  },
-                ];
-              }
-            });
+            // Re-parse the current round's buffer into thinking/text blocks
+            // (see turnTimeline.ts) - earlier rounds stay frozen behind
+            // their tool-call block.
+            setLiveGMEntries((prev) => updateLiveRoundBlocks(prev, fullContent));
+          },
+          onGMReasoning: (delta, fullReasoning) => {
+            setLiveGMEntries((prev) =>
+              updateLiveReasoningBlock(prev, fullReasoning),
+            );
           },
           onGMToolResult: (result) => {
-            setLiveGMEntries((prev) => {
-              const updated = prev.map((entry) =>
-                entry.type === "thinking" && entry.isStreaming
-                  ? { ...entry, isStreaming: false }
-                  : entry,
-              );
-              return [...updated, { type: "tool", result }];
-            });
+            setLiveGMEntries((prev) => [
+              ...freezeBlocks(prev),
+              toolResultBlock(result),
+            ]);
           },
           onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
             logger.ai_response("GM stage complete", {
@@ -2603,6 +2599,10 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? localStorage.getItem("embeddingsEnabled") === "true"
         : false;
+    const webResearchEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("webResearchEnabled") === "true"
+        : false;
     const embeddingThreshold =
       typeof window !== "undefined"
         ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
@@ -2631,6 +2631,11 @@ function StoryPageContent() {
 
     // Create abort controller for this generation
     generationAbortRef.current = new AbortController();
+    // This retry path skips the GM stage entirely (reuses saved context),
+    // so nothing will reset liveGMEntries the way onGMStageStart normally
+    // does - clear it here so a stale timeline from a previous turn can't
+    // linger into this one.
+    setLiveGMEntries([]);
 
     // Re-add the user choice part before generation (matching normal flow)
     // The prompt builder will deduplicate this when building the context
@@ -2668,6 +2673,8 @@ function StoryPageContent() {
           storyId: storyDbId || undefined,
           enableEmbeddings: embeddingsEnabled,
           embeddingThreshold,
+          webResearchEnabled,
+          braveSearchKey,
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
@@ -2693,10 +2700,14 @@ function StoryPageContent() {
             setStoryText(fullContent);
             // Don't call setStoryData here - it causes infinite loops during rapid streaming
             // storyText is sufficient for display, full update happens in onStoryComplete
+            // Fallback story stage (GM stage narrated nothing itself) - append as a
+            // trailing streaming text block after the GM's thinking/tool blocks.
+            setLiveGMEntries((prev) => appendStreamingText(prev, fullContent));
             setLoading(false); // Let player read while tools/choices generate
             setPendingUserChoice(""); // Clear pending choice - response is here
           },
           onStoryComplete: (content: string, usage: any) => {
+            setLiveGMEntries((prev) => freezeBlocks(prev));
             // Update the partial part with the cleaned content (strips [GM State Update] etc)
             partialPart.content = content;
             setStoryText(content);

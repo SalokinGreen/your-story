@@ -15,6 +15,7 @@ export interface APIKeys {
   googleKey: string;
   mistralKey: string;
   deepinfraKey: string;
+  braveSearchKey: string;
 }
 
 export interface APIKeysContextType {
@@ -41,6 +42,7 @@ const defaultKeys: APIKeys = {
   googleKey: "",
   mistralKey: "",
   deepinfraKey: "",
+  braveSearchKey: "",
 };
 
 const APIKeysContext = createContext<APIKeysContextType | undefined>(undefined);
@@ -53,6 +55,7 @@ const LOCAL_KEYS = {
   googleKey: "googleKey",
   mistralKey: "mistralKey",
   deepinfraKey: "deepinfraKey",
+  braveSearchKey: "braveSearchKey",
   oauthCodeVerifier: "openrouter_code_verifier",
 };
 
@@ -70,6 +73,7 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
       googleKey: localStorage.getItem(LOCAL_KEYS.googleKey) || "",
       mistralKey: localStorage.getItem(LOCAL_KEYS.mistralKey) || "",
       deepinfraKey: localStorage.getItem(LOCAL_KEYS.deepinfraKey) || "",
+      braveSearchKey: localStorage.getItem(LOCAL_KEYS.braveSearchKey) || "",
     };
 
     setKeys(localKeys);

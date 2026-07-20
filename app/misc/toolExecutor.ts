@@ -1564,7 +1564,29 @@ export function executeTools(
           const label = directorMove.move.replace(/_/g, " ");
           message += `\n🎬 Director move: ${label}${
             directorMove.context ? ` (${directorMove.context})` : ""
-          } - render this as prose without naming it, then call acknowledge_director_move(id: "${directorMove.id}"). It will keep reappearing every turn until resolved.`;
+          }`;
+
+          // spotlight_tag carries sampled inspiration (3 of the tag's 10
+          // curated examples, each with a suggested roll_table table_name -
+          // see tagFocusExamples.ts) that the generic context string above
+          // doesn't have room for. Listed as optional inspiration, not a
+          // script: the model picks one, blends them, or ignores all three
+          // and improvises its own take on the tag - same "engine decides
+          // when, model decides how" split every other move uses.
+          if (
+            directorMove.move === "spotlight_tag" &&
+            directorMove.tagFocusExamples?.length
+          ) {
+            const examplesText = directorMove.tagFocusExamples
+              .map(
+                (ex, i) =>
+                  `  ${i + 1}. ${ex.prompt} (optional: roll_table table_name="${ex.table}" for inspiration)`
+              )
+              .join("\n");
+            message += `\nInspiration - pick one, blend them, or improvise your own take on the tag:\n${examplesText}`;
+          }
+
+          message += ` - render this as prose without naming it, then call acknowledge_director_move(id: "${directorMove.id}"). It will keep reappearing every turn until resolved.`;
         }
 
         logger.action("Scene count incremented via tool", {

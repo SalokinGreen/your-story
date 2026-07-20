@@ -15,6 +15,7 @@ import type {
   CouchPlayer,
   PlayerStyleType,
 } from "./structs";
+import { pickTagFocusExamples } from "./tagFocusExamples";
 
 export type FateAnswer = "Exceptional Yes" | "Yes" | "No" | "Exceptional No";
 export type SceneType = "Normal" | "Altered" | "Interrupted";
@@ -486,6 +487,41 @@ function preferredStyleForScene(
   return "social";
 }
 
+// A (tag, whose tag it is) pair the spotlight_tag move can pick from -
+// flattened from wherever the player(s) actually picked tags at story
+// start: per-CouchPlayer for couch co-op, or the solo StoryData fields when
+// there's no couch roster at all (see StoryData.playerPersonalityTags/
+// playerWishTags and CouchPlayer.personalityTags/wishTags in structs.ts).
+interface TagCandidate {
+  tag: string;
+  playerName: string;
+}
+
+// Gathers every curated personality/wish tag any player picked in the
+// GuidedStoryStart wizard, tagged with whose it is. Empty for older saves
+// or anyone who skipped/typed past the wizard - spotlight_tag is simply
+// unavailable then, the same "no data, no move" posture activate_downside's
+// revert already established for this codebase (see
+// docs/architecture-frontier.md's Frontier 3 note on that revert).
+function availableTagCandidates(storyData: StoryData): TagCandidate[] {
+  const couchPlayers = storyData.multiplayer?.couchPlayers || [];
+  if (couchPlayers.length > 0) {
+    return couchPlayers.flatMap((p) => [
+      ...(p.personalityTags || []).map((tag) => ({ tag, playerName: p.name })),
+      ...(p.wishTags || []).map((tag) => ({ tag, playerName: p.name })),
+    ]);
+  }
+
+  const playerName = storyData.player_name || "The player";
+  return [
+    ...(storyData.playerPersonalityTags || []).map((tag) => ({
+      tag,
+      playerName,
+    })),
+    ...(storyData.playerWishTags || []).map((tag) => ({ tag, playerName })),
+  ];
+}
+
 /**
  * Deterministic GM-move selection policy (PbtA-style bounded move menu).
  *
@@ -500,10 +536,13 @@ function preferredStyleForScene(
  * Priority order: a timer about to trigger outranks a chaotic scene check,
  * which outranks high sustained tension, which outranks a neglected couch
  * player (spotlight_couch_player - only relevant once there's more than one
- * couchPlayer; a no-op for the single-player majority case). Returns null
- * when nothing warrants a move, or when one is already pending and
- * unacknowledged (a simple anti-pileup throttle - address what's already
- * on the table before adding more).
+ * couchPlayer; a no-op for the single-player majority case), which outranks
+ * a queued lore reveal (reveal_unwelcome_truth), which outranks bringing one
+ * of a player's story-start tags into focus (spotlight_tag - a no-op if
+ * nobody picked any tags), which outranks the generic open-thread fallback
+ * (offer_opportunity). Returns null when nothing warrants a move, or when
+ * one is already pending and unacknowledged (a simple anti-pileup throttle -
+ * address what's already on the table before adding more).
  */
 export function selectDirectorMove(
   storyData: StoryData,
@@ -655,6 +694,36 @@ export function selectDirectorMove(
       context: `"${revealableLore.title}" is queued to be revealed`,
       createdAt: Date.now(),
     };
+  }
+
+  // A third soft, non-escalating calm-scene default: bring one of the
+  // curated personality/wish tags a player picked at story start into
+  // focus, rather than only ever reacting to tracked plot state. Checked
+  // before offer_opportunity (below) since it needs no active thread to
+  // fire from - just any player having picked at least one tag - so it's a
+  // strictly better calm-scene default than offer_opportunity whenever
+  // tags are available. A no-op (falls through to offer_opportunity) for
+  // older saves or anyone who skipped the wizard's tag step. The engine
+  // only picks WHICH tag/player and samples 3 of that tag's 10 curated
+  // examples (pickTagFocusExamples, tagFocusExamples.ts) as inspiration -
+  // the model still chooses how to actually play it out, same split as
+  // every other move.
+  const tagCandidates = availableTagCandidates(storyData);
+  if (tagCandidates.length > 0) {
+    const choice =
+      tagCandidates[Math.floor(Math.random() * tagCandidates.length)];
+    const examples = pickTagFocusExamples(choice.tag, 3);
+    if (examples.length > 0) {
+      return {
+        id: crypto.randomUUID(),
+        move: "spotlight_tag",
+        targetPlayerName: choice.playerName,
+        targetTag: choice.tag,
+        tagFocusExamples: examples,
+        context: `Bringing ${choice.playerName}'s "${choice.tag}" tag into focus`,
+        createdAt: Date.now(),
+      };
+    }
   }
 
   // Soft, non-escalating move for the common "nothing's wrong" case: PbtA's
