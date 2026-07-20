@@ -136,7 +136,7 @@ function NotificationToast({
           >
             {getIcon()}
           </span>
-          <p className="text-sm font-medium flex-1 wrap-break-word pt-0.5">
+          <p className="text-sm font-medium flex-1 wrap-break-word pt-0.5 max-h-40 overflow-y-auto">
             {notification.message}
           </p>
           <button

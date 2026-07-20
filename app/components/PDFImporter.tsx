@@ -191,24 +191,67 @@ async function fetchWithRetry(
   throw lastError;
 }
 
+// Maximum length of any error message we surface to the UI. Raw error
+// bodies from the platform/CDN (e.g. a 413 "Request Entity Too Large" HTML
+// page, or a stack trace) can be many KB of text - rendering that verbatim
+// into a toast or a chunk status row is what visually breaks the modal and
+// can hang memory-constrained mobile browsers trying to lay it out.
+const MAX_ERROR_MESSAGE_LENGTH = 300;
+
+/**
+ * Sanitize a raw error string (which may be an HTML error page, a huge
+ * stack trace, or arbitrary platform output) into a short, plain-text
+ * message safe to render in the UI. Strips HTML tags, collapses
+ * whitespace, and truncates to a fixed length.
+ */
+function sanitizeErrorMessage(raw: string, fallback: string): string {
+  if (!raw) return fallback;
+
+  let text = raw;
+  // Detect and replace HTML error pages (e.g. Vercel/CDN 413 pages) with a
+  // friendly message rather than trying to render markup as text.
+  if (/<html|<!doctype html/i.test(text)) {
+    return "The file or page is too large for the server to accept. Try a smaller file or fewer pages per chunk.";
+  }
+  // Strip any remaining tags defensively, then collapse whitespace.
+  text = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+
+  if (!text) return fallback;
+
+  if (text.length > MAX_ERROR_MESSAGE_LENGTH) {
+    text = `${text.slice(0, MAX_ERROR_MESSAGE_LENGTH)}…`;
+  }
+
+  return text;
+}
+
 /**
  * Extract an error message from a failed fetch Response. Reads the body as
  * text exactly once (a Response body stream can only be consumed once -
  * calling `.json()` and then falling back to `.text()` on parse failure
  * throws "body stream already read", since `.json()` already consumed the
  * stream even though `JSON.parse` failed).
+ *
+ * A 413 (Entity Too Large) response in particular often has no JSON body
+ * at all - the platform/CDN rejects the request before it reaches our
+ * handler - so that status is special-cased with a clear, actionable
+ * message instead of falling through to whatever raw text came back.
  */
 async function extractErrorMessage(
   response: Response,
   fallback: string,
 ): Promise<string> {
+  if (response.status === 413) {
+    return "File or page too large for the server to accept. Try a smaller file, or fewer pages per chunk.";
+  }
+
   const text = await response.text();
   if (!text) return fallback;
   try {
     const parsed = JSON.parse(text);
-    return parsed.error || fallback;
+    return sanitizeErrorMessage(parsed.error || "", fallback);
   } catch {
-    return text || fallback;
+    return sanitizeErrorMessage(text, fallback);
   }
 }
 
@@ -420,6 +463,16 @@ async function ocrPDFRange(
   }
 
   const pageCount = range.endIndex - range.startIndex + 1;
+  if (base64.length > SAFE_BASE64_PAYLOAD_BYTES && pageCount === 1) {
+    // Can't split a single page any further - sending it anyway would just
+    // hit the platform's hard body-size limit and come back as a raw 413
+    // ("Entity Too Large"). Fail this page with a clear, actionable
+    // message instead so the rest of the document can still complete.
+    base64 = "";
+    throw new Error(
+      `page ${range.pageStart} is too image-heavy to upload directly (exceeds the server's request size limit). Try a lower-resolution scan of this page.`,
+    );
+  }
   if (base64.length > SAFE_BASE64_PAYLOAD_BYTES && pageCount > 1) {
     base64 = "";
     const half = Math.floor(pageCount / 2);
@@ -435,13 +488,42 @@ async function ocrPDFRange(
       pageStart: range.pageStart + half,
       pageEnd: range.pageEnd,
     };
-    const [first, second] = await Promise.all([
+    // Use allSettled rather than Promise.all: a single too-image-heavy
+    // page failing outright (see the pageCount === 1 branch above)
+    // shouldn't discard OCR output already obtained for its sibling
+    // half - the rest of the document should still complete, with the
+    // failed sub-range's pages simply missing (and noted) from the
+    // combined markdown.
+    const [firstResult, secondResult] = await Promise.allSettled([
       ocrPDFRange(pdfDoc, firstRange, fileNameBase, mistralKey),
       ocrPDFRange(pdfDoc, secondRange, fileNameBase, mistralKey),
     ]);
+
+    if (
+      firstResult.status === "rejected" &&
+      secondResult.status === "rejected"
+    ) {
+      throw firstResult.reason;
+    }
+
+    const parts: string[] = [];
+    let totalPages = 0;
+    for (const result of [firstResult, secondResult]) {
+      if (result.status === "fulfilled") {
+        parts.push(result.value.markdown);
+        totalPages += result.value.totalPages;
+      } else {
+        const message =
+          result.reason instanceof Error
+            ? result.reason.message
+            : "OCR failed for part of this range";
+        parts.push(`<!-- ${message} -->`);
+      }
+    }
+
     return {
-      markdown: `${first.markdown}\n\n---\n\n${second.markdown}`,
-      totalPages: first.totalPages + second.totalPages,
+      markdown: parts.join("\n\n---\n\n"),
+      totalPages,
     };
   }
 
@@ -564,6 +646,17 @@ export default function PDFImporter({
   // Chunk tracking state for large PDFs
   const [chunkStatuses, setChunkStatuses] = useState<ChunkStatus[]>([]);
   const [showChunkDetails, setShowChunkDetails] = useState(false);
+  // Which chunk (by index) currently has its live preview (raw OCR text
+  // and/or extracted notes) expanded in the chunk status panel.
+  const [expandedChunkIndex, setExpandedChunkIndex] = useState<number | null>(
+    null,
+  );
+  // Whether the expanded chunk's preview is showing raw OCR markdown
+  // ("text") or extracted notes ("notes"). Only meaningful while
+  // expandedChunkIndex is set.
+  const [chunkPreviewTab, setChunkPreviewTab] = useState<"text" | "notes">(
+    "notes",
+  );
   // Parsed pdf-lib document of the most recent chunked import, retained so
   // chunks that failed during the OCR phase can be retried from the chunk
   // panel (re-running OCR needs the source pages, not just markdown).
@@ -765,7 +858,10 @@ export default function PDFImporter({
         );
 
         if (!summarizeResponse.ok) {
-          const errorMsg = await summarizeResponse.text();
+          const errorMsg = await extractErrorMessage(
+            summarizeResponse,
+            "Note extraction failed",
+          );
           setChunkStatuses((prev) =>
             prev.map((cs) =>
               cs.chunkIndex === chunkIndex
@@ -821,18 +917,22 @@ export default function PDFImporter({
         );
         addNotification(`Chunk ${chunkIndex + 1} retry successful!`, "success");
       } catch (err: any) {
+        const message = sanitizeErrorMessage(
+          err?.message || "",
+          "Unknown error",
+        );
         setChunkStatuses((prev) =>
           prev.map((cs) =>
             cs.chunkIndex === chunkIndex
               ? {
                   ...cs,
                   status: "failed",
-                  error: err.message || "Unknown error",
+                  error: message,
                 }
               : cs,
           ),
         );
-        addNotification(`Retry failed: ${err.message}`, "failure");
+        addNotification(`Retry failed: ${message}`, "failure");
       }
     },
     [
@@ -1192,8 +1292,10 @@ export default function PDFImporter({
                 keys.mistralKey,
               );
             } catch (err: unknown) {
-              const message =
-                err instanceof Error ? err.message : "OCR processing failed";
+              const message = sanitizeErrorMessage(
+                err instanceof Error ? err.message : "",
+                "OCR processing failed",
+              );
               console.error(
                 `Pages ${range.pageStart}-${range.pageEnd} OCR failed:`,
                 message,
@@ -1326,7 +1428,10 @@ export default function PDFImporter({
               );
 
               if (!summarizeResponse.ok) {
-                const errorMsg = await summarizeResponse.text();
+                const errorMsg = await extractErrorMessage(
+                  summarizeResponse,
+                  "Note extraction failed",
+                );
                 console.error(
                   `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization failed:`,
                   errorMsg,
@@ -1397,6 +1502,10 @@ export default function PDFImporter({
                 customTables: result.customTables || [],
               };
             } catch (err: any) {
+              const message = sanitizeErrorMessage(
+                err?.message || "",
+                "Unknown error",
+              );
               console.error(
                 `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization error:`,
                 err.message || err,
@@ -1408,7 +1517,7 @@ export default function PDFImporter({
                     ? {
                         ...cs,
                         status: "failed",
-                        error: err.message || "Unknown error",
+                        error: message,
                       }
                     : cs,
                 ),
@@ -1657,9 +1766,13 @@ export default function PDFImporter({
       }, 1500);
     } catch (error: any) {
       console.error("PDF import error:", error);
+      const message = sanitizeErrorMessage(
+        error?.message || "",
+        "Import failed",
+      );
       setStep("error");
-      setStatusMessage(error.message || "Import failed");
-      addNotification(error.message || "PDF import failed", "failure");
+      setStatusMessage(message);
+      addNotification(message, "failure");
     } finally {
       // No cleanup needed - files are processed entirely client-side/BYOK now
     }
@@ -1844,16 +1957,12 @@ export default function PDFImporter({
               )}
 
               {/* Chunk Details Panel - Shows status of individual chunks */}
-              {chunkStatuses.length > 0 &&
-                (step === "summarizing" ||
-                  step === "complete" ||
-                  step === "error" ||
-                  chunkStatuses.some((cs) => cs.status === "failed")) && (
-                  <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 overflow-hidden">
-                    <button
-                      onClick={() => setShowChunkDetails(!showChunkDetails)}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-900/30 transition-colors"
-                    >
+              {chunkStatuses.length > 0 && (
+                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 overflow-hidden">
+                  <button
+                    onClick={() => setShowChunkDetails(!showChunkDetails)}
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-900/30 transition-colors"
+                  >
                       <div className="flex items-center gap-2">
                         <DynamicIcon
                           name="Layers"
@@ -1886,114 +1995,283 @@ export default function PDFImporter({
                     </button>
 
                     {showChunkDetails && (
-                      <div className="p-3 pt-0 space-y-2 max-h-60 overflow-y-auto">
-                        {chunkStatuses.map((chunk) => (
-                          <div
-                            key={chunk.chunkIndex}
-                            className={`flex items-center gap-3 p-2 rounded-lg ${
-                              chunk.status === "complete"
-                                ? "bg-green-900/20 border border-green-700/30"
-                                : chunk.status === "failed"
-                                  ? "bg-red-900/20 border border-red-700/30"
-                                  : chunk.status === "summarizing" ||
-                                      chunk.status === "ocr"
-                                    ? "bg-blue-900/30 border border-blue-700/30"
-                                    : "bg-gray-900/20 border border-gray-700/30"
-                            }`}
-                          >
-                            <div className="shrink-0">
-                              {chunk.status === "complete" && (
-                                <DynamicIcon
-                                  name="CheckCircle"
-                                  className="w-5 h-5 text-green-400"
-                                />
-                              )}
-                              {chunk.status === "failed" && (
-                                <DynamicIcon
-                                  name="XCircle"
-                                  className="w-5 h-5 text-red-400"
-                                />
-                              )}
-                              {(chunk.status === "summarizing" ||
-                                chunk.status === "ocr") && (
-                                <DynamicIcon
-                                  name="Loader2"
-                                  className="w-5 h-5 text-blue-400 animate-spin"
-                                />
-                              )}
-                              {chunk.status === "pending" && (
-                                <DynamicIcon
-                                  name="Clock"
-                                  className="w-5 h-5 text-gray-400"
-                                />
-                              )}
-                            </div>
+                      <div className="p-3 pt-0 space-y-2 max-h-96 overflow-y-auto">
+                        {chunkStatuses.map((chunk) => {
+                          const isExpanded =
+                            expandedChunkIndex === chunk.chunkIndex;
+                          const canPreviewText = !!chunk.ocrMarkdown;
+                          const canPreviewNotes = !!chunk.result;
+                          const canPreview =
+                            canPreviewText || canPreviewNotes;
+                          return (
+                            <div
+                              key={chunk.chunkIndex}
+                              className={`rounded-lg ${
+                                chunk.status === "complete"
+                                  ? "bg-green-900/20 border border-green-700/30"
+                                  : chunk.status === "failed"
+                                    ? "bg-red-900/20 border border-red-700/30"
+                                    : chunk.status === "summarizing" ||
+                                        chunk.status === "ocr"
+                                      ? "bg-blue-900/30 border border-blue-700/30"
+                                      : "bg-gray-900/20 border border-gray-700/30"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3 p-2">
+                                <div className="shrink-0">
+                                  {chunk.status === "complete" && (
+                                    <DynamicIcon
+                                      name="CheckCircle"
+                                      className="w-5 h-5 text-green-400"
+                                    />
+                                  )}
+                                  {chunk.status === "failed" && (
+                                    <DynamicIcon
+                                      name="XCircle"
+                                      className="w-5 h-5 text-red-400"
+                                    />
+                                  )}
+                                  {(chunk.status === "summarizing" ||
+                                    chunk.status === "ocr") && (
+                                    <DynamicIcon
+                                      name="Loader2"
+                                      className="w-5 h-5 text-blue-400 animate-spin"
+                                    />
+                                  )}
+                                  {chunk.status === "pending" && (
+                                    <DynamicIcon
+                                      name="Clock"
+                                      className="w-5 h-5 text-gray-400"
+                                    />
+                                  )}
+                                </div>
 
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-white">
-                                Chunk {chunk.chunkIndex + 1}: Pages{" "}
-                                {chunk.pageStart}-{chunk.pageEnd}
-                              </p>
-                              {chunk.status === "complete" && chunk.result && (
-                                <p className="text-xs text-green-300/70">
-                                  {chunk.result.lore.length} lore,{" "}
-                                  {chunk.result.mechanicNotes.length} mechanics,{" "}
-                                  {chunk.result.customTables.length} tables
-                                </p>
-                              )}
-                              {chunk.status === "failed" && chunk.error && (
-                                <p
-                                  className="text-xs text-red-300/70 truncate"
-                                  title={chunk.error}
-                                >
-                                  {chunk.error}
-                                </p>
-                              )}
-                              {chunk.status === "summarizing" && (
-                                <p className="text-xs text-blue-300/70">
-                                  Creating notes...
-                                </p>
-                              )}
-                              {chunk.status === "ocr" && (
-                                <p className="text-xs text-blue-300/70">
-                                  Extracting text...
-                                </p>
-                              )}
-                            </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-white">
+                                    Chunk {chunk.chunkIndex + 1}: Pages{" "}
+                                    {chunk.pageStart}-{chunk.pageEnd}
+                                  </p>
+                                  {chunk.status === "complete" &&
+                                    chunk.result && (
+                                      <p className="text-xs text-green-300/70">
+                                        {chunk.result.lore.length} lore,{" "}
+                                        {chunk.result.mechanicNotes.length}{" "}
+                                        mechanics,{" "}
+                                        {chunk.result.customTables.length}{" "}
+                                        tables
+                                      </p>
+                                    )}
+                                  {chunk.status === "failed" &&
+                                    chunk.error && (
+                                      <p
+                                        className="text-xs text-red-300/70 break-words max-h-16 overflow-y-auto"
+                                        title={chunk.error}
+                                      >
+                                        {chunk.error}
+                                      </p>
+                                    )}
+                                  {chunk.status === "summarizing" && (
+                                    <p className="text-xs text-blue-300/70">
+                                      Creating notes...
+                                    </p>
+                                  )}
+                                  {chunk.status === "ocr" && (
+                                    <p className="text-xs text-blue-300/70">
+                                      Extracting text...
+                                    </p>
+                                  )}
+                                  {chunk.status === "pending" && (
+                                    <p className="text-xs text-gray-400/70">
+                                      Waiting...
+                                    </p>
+                                  )}
+                                </div>
 
-                            {/* Actions for failed chunks */}
-                            {chunk.status === "failed" && (
-                              <div className="flex gap-1 shrink-0">
-                                <button
-                                  onClick={() => retryChunk(chunk.chunkIndex)}
-                                  className="px-2 py-1 text-xs bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors flex items-center gap-1"
-                                  title="Retry this chunk"
-                                >
-                                  <DynamicIcon
-                                    name="RefreshCw"
-                                    className="w-3 h-3"
-                                  />
-                                  Retry
-                                </button>
-                                {chunk.rawSummarizeOutput && (
+                                {/* Preview toggle - read the extracted
+                                    text/notes for this chunk while (or
+                                    after) it's processed */}
+                                {canPreview && (
                                   <button
-                                    onClick={() =>
-                                      openRepairModal(chunk.chunkIndex)
-                                    }
-                                    className="px-2 py-1 text-xs bg-amber-600/80 hover:bg-amber-600 text-white rounded transition-colors flex items-center gap-1"
-                                    title="Manually fix JSON"
+                                    onClick={() => {
+                                      setExpandedChunkIndex(
+                                        isExpanded ? null : chunk.chunkIndex,
+                                      );
+                                      setChunkPreviewTab(
+                                        canPreviewNotes ? "notes" : "text",
+                                      );
+                                    }}
+                                    className="px-2 py-1 text-xs bg-blue-900/40 hover:bg-blue-800/50 text-blue-200 rounded transition-colors flex items-center gap-1 shrink-0"
+                                    title="Preview extracted content"
                                   >
                                     <DynamicIcon
-                                      name="Wrench"
+                                      name={isExpanded ? "EyeOff" : "Eye"}
                                       className="w-3 h-3"
                                     />
-                                    Fix
+                                    {isExpanded ? "Hide" : "Preview"}
                                   </button>
                                 )}
+
+                                {/* Actions for failed chunks */}
+                                {chunk.status === "failed" && (
+                                  <div className="flex gap-1 shrink-0">
+                                    <button
+                                      onClick={() =>
+                                        retryChunk(chunk.chunkIndex)
+                                      }
+                                      className="px-2 py-1 text-xs bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors flex items-center gap-1"
+                                      title="Retry this chunk"
+                                    >
+                                      <DynamicIcon
+                                        name="RefreshCw"
+                                        className="w-3 h-3"
+                                      />
+                                      Retry
+                                    </button>
+                                    {chunk.rawSummarizeOutput && (
+                                      <button
+                                        onClick={() =>
+                                          openRepairModal(chunk.chunkIndex)
+                                        }
+                                        className="px-2 py-1 text-xs bg-amber-600/80 hover:bg-amber-600 text-white rounded transition-colors flex items-center gap-1"
+                                        title="Manually fix JSON"
+                                      >
+                                        <DynamicIcon
+                                          name="Wrench"
+                                          className="w-3 h-3"
+                                        />
+                                        Fix
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
-                        ))}
+
+                              {/* Expanded live preview: raw OCR text
+                                  and/or extracted notes for this chunk */}
+                              {isExpanded && canPreview && (
+                                <div className="px-2 pb-2">
+                                  <div className="flex gap-1 mb-2">
+                                    {canPreviewNotes && (
+                                      <button
+                                        onClick={() =>
+                                          setChunkPreviewTab("notes")
+                                        }
+                                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                                          chunkPreviewTab === "notes"
+                                            ? "bg-purple-600/80 text-white"
+                                            : "bg-blue-900/40 text-blue-300/70 hover:bg-blue-900/60"
+                                        }`}
+                                      >
+                                        Notes
+                                      </button>
+                                    )}
+                                    {canPreviewText && (
+                                      <button
+                                        onClick={() =>
+                                          setChunkPreviewTab("text")
+                                        }
+                                        className={`px-2 py-1 text-xs rounded transition-colors ${
+                                          chunkPreviewTab === "text"
+                                            ? "bg-purple-600/80 text-white"
+                                            : "bg-blue-900/40 text-blue-300/70 hover:bg-blue-900/60"
+                                        }`}
+                                      >
+                                        Raw Text
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  {chunkPreviewTab === "text" &&
+                                    canPreviewText && (
+                                      <pre className="text-xs text-blue-200/80 whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-black/20 rounded p-2">
+                                        {chunk.ocrMarkdown}
+                                      </pre>
+                                    )}
+
+                                  {chunkPreviewTab === "notes" &&
+                                    canPreviewNotes &&
+                                    chunk.result && (
+                                      <div className="space-y-2 max-h-48 overflow-y-auto bg-black/20 rounded p-2">
+                                        {chunk.result.lore.length > 0 && (
+                                          <div>
+                                            <p className="text-xs font-semibold text-blue-300 mb-1">
+                                              📚 Lore (
+                                              {chunk.result.lore.length})
+                                            </p>
+                                            {chunk.result.lore.map((l, i) => (
+                                              <p
+                                                key={i}
+                                                className="text-xs text-blue-200/80 break-words"
+                                              >
+                                                <span className="font-medium">
+                                                  {l.title}:
+                                                </span>{" "}
+                                                {l.content}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        )}
+                                        {chunk.result.mechanicNotes.length >
+                                          0 && (
+                                          <div>
+                                            <p className="text-xs font-semibold text-amber-300 mb-1">
+                                              ⚙️ Mechanics (
+                                              {chunk.result.mechanicNotes.length}
+                                              )
+                                            </p>
+                                            {chunk.result.mechanicNotes.map(
+                                              (m, i) => (
+                                                <p
+                                                  key={i}
+                                                  className="text-xs text-amber-200/80 break-words"
+                                                >
+                                                  <span className="font-medium">
+                                                    {m.title}:
+                                                  </span>{" "}
+                                                  {m.content}
+                                                </p>
+                                              ),
+                                            )}
+                                          </div>
+                                        )}
+                                        {chunk.result.customTables.length >
+                                          0 && (
+                                          <div>
+                                            <p className="text-xs font-semibold text-purple-300 mb-1">
+                                              🎲 Tables (
+                                              {chunk.result.customTables.length}
+                                              )
+                                            </p>
+                                            {chunk.result.customTables.map(
+                                              (t, i) => (
+                                                <p
+                                                  key={i}
+                                                  className="text-xs text-purple-200/80 break-words"
+                                                >
+                                                  {t.name} ({t.entries.length}{" "}
+                                                  entries)
+                                                </p>
+                                              ),
+                                            )}
+                                          </div>
+                                        )}
+                                        {chunk.result.lore.length === 0 &&
+                                          chunk.result.mechanicNotes.length ===
+                                            0 &&
+                                          chunk.result.customTables.length ===
+                                            0 && (
+                                            <p className="text-xs text-blue-300/50 italic">
+                                              No notes extracted from this
+                                              chunk.
+                                            </p>
+                                          )}
+                                      </div>
+                                    )}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
 
                         {/* Complete with current results button */}
                         {chunkStatuses.some((cs) => cs.status === "failed") &&
@@ -2041,13 +2319,13 @@ export default function PDFImporter({
               {/* Error State */}
               {step === "error" && (
                 <div className="bg-red-900/30 rounded-lg p-4 border border-red-700/40">
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <DynamicIcon
                       name="XCircle"
-                      className="w-6 h-6 text-red-400"
+                      className="w-6 h-6 text-red-400 shrink-0"
                     />
-                    <div className="flex-1">
-                      <p className="font-medium text-red-300">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-red-300 break-words max-h-32 overflow-y-auto">
                         {statusMessage}
                       </p>
                       <button
