@@ -46,6 +46,11 @@ const LOW_MEMORY_DEVICE_THRESHOLD_GB = 4;
 const VERY_LARGE_FILE_SIZE_MB = 25;
 // Timeout for summarize requests (4 minutes - server allows 5)
 const SUMMARIZE_TIMEOUT_MS = 240000;
+// Timeout for a single OCR request (3 minutes - server allows 5). Chunks
+// that hit this are split in half and retried (see `ocrPDFRange`) rather
+// than failing the whole import, so this only needs to be long enough for
+// a reasonably-sized chunk, not a worst-case one.
+const OCR_TIMEOUT_MS = 180000;
 // Retry attempts for failed requests
 const MAX_RETRIES = 2;
 
@@ -159,9 +164,16 @@ async function fetchWithRetry(
     } catch (error: any) {
       lastError = error;
 
-      // Don't retry on abort (user cancelled) or auth errors
+      // Don't blindly re-send on timeout - a request that exceeded the
+      // budget once will likely do so again at the same size. Throw a
+      // recognizable TimeoutError so callers can recover in a smarter way
+      // (OCR splits the chunk in half and retries, see `ocrPDFRange`).
       if (error.name === "AbortError") {
-        throw new Error(`Request timed out after ${timeoutMs / 1000}s`);
+        const timeoutError = new Error(
+          `Request timed out after ${timeoutMs / 1000}s`,
+        );
+        timeoutError.name = "TimeoutError";
+        throw timeoutError;
       }
 
       // Wait before retry (exponential backoff)
@@ -367,13 +379,58 @@ async function buildPDFChunkBase64(
 }
 
 /**
+ * Split a page range in half and OCR both halves independently, merging the
+ * results in page order. Recovery path for a range that can't be processed
+ * whole - because its actual base64 payload exceeds Vercel's body-size
+ * limit, or because OCR on it timed out (see `ocrPDFRange`).
+ */
+async function splitOCRRange(
+  pdfDoc: PDFDocument,
+  range: PDFChunkRange,
+  fileNameBase: string,
+  mistralKey: string,
+): Promise<{ markdown: string; totalPages: number }> {
+  const pageCount = range.endIndex - range.startIndex + 1;
+  const half = Math.floor(pageCount / 2);
+  const firstRange: PDFChunkRange = {
+    startIndex: range.startIndex,
+    endIndex: range.startIndex + half - 1,
+    pageStart: range.pageStart,
+    pageEnd: range.pageStart + half - 1,
+  };
+  const secondRange: PDFChunkRange = {
+    startIndex: range.startIndex + half,
+    endIndex: range.endIndex,
+    pageStart: range.pageStart + half,
+    pageEnd: range.pageEnd,
+  };
+  const [first, second] = await Promise.all([
+    ocrPDFRange(pdfDoc, firstRange, fileNameBase, mistralKey),
+    ocrPDFRange(pdfDoc, secondRange, fileNameBase, mistralKey),
+  ]);
+  return {
+    markdown: `${first.markdown}\n\n---\n\n${second.markdown}`,
+    totalPages: first.totalPages + second.totalPages,
+  };
+}
+
+// HTTP statuses that mean the server (or a gateway in front of it) gave up
+// waiting rather than the request being invalid: 408 Request Timeout,
+// 504 Gateway Timeout, 524 (Cloudflare origin timeout).
+const TIMEOUT_HTTP_STATUSES = new Set([408, 504, 524]);
+
+/**
  * OCR a PDF page range via /api/ocr/process, splitting it in half and
- * recursing if the actual base64 payload turns out to exceed Vercel's
- * hard body-size limit. Chunk ranges are planned from the document's
- * *average* page size (see `planPDFChunks`), so a range can still land
- * over budget in practice if it happens to contain a few image-heavy
- * pages - splitting on the actual measured size, rather than trusting the
- * estimate, is what keeps this from failing outright.
+ * recursing if the range turns out to be too much for a single request:
+ *
+ * - The actual base64 payload exceeds Vercel's hard body-size limit.
+ *   Chunk ranges are planned from the document's *average* page size (see
+ *   `planPDFChunks`), so a range can still land over budget in practice if
+ *   it happens to contain a few image-heavy pages.
+ * - The request times out, client-side (`OCR_TIMEOUT_MS`) or server-side
+ *   (gateway timeout status). Image-heavy ranges can exceed the OCR time
+ *   budget even when their payload fits under the size limit; halving the
+ *   range shrinks per-request work until each piece completes in time.
  */
 async function ocrPDFRange(
   pdfDoc: PDFDocument,
@@ -394,27 +451,7 @@ async function ocrPDFRange(
   const pageCount = range.endIndex - range.startIndex + 1;
   if (base64.length > SAFE_BASE64_PAYLOAD_BYTES && pageCount > 1) {
     base64 = "";
-    const half = Math.floor(pageCount / 2);
-    const firstRange: PDFChunkRange = {
-      startIndex: range.startIndex,
-      endIndex: range.startIndex + half - 1,
-      pageStart: range.pageStart,
-      pageEnd: range.pageStart + half - 1,
-    };
-    const secondRange: PDFChunkRange = {
-      startIndex: range.startIndex + half,
-      endIndex: range.endIndex,
-      pageStart: range.pageStart + half,
-      pageEnd: range.pageEnd,
-    };
-    const [first, second] = await Promise.all([
-      ocrPDFRange(pdfDoc, firstRange, fileNameBase, mistralKey),
-      ocrPDFRange(pdfDoc, secondRange, fileNameBase, mistralKey),
-    ]);
-    return {
-      markdown: `${first.markdown}\n\n---\n\n${second.markdown}`,
-      totalPages: first.totalPages + second.totalPages,
-    };
+    return splitOCRRange(pdfDoc, range, fileNameBase, mistralKey);
   }
 
   let response: Response;
@@ -434,8 +471,20 @@ async function ocrPDFRange(
           mistralKey,
         }),
       },
-      180000, // 3 minute timeout for OCR
+      OCR_TIMEOUT_MS,
     );
+  } catch (err: unknown) {
+    if (err instanceof Error && err.name === "TimeoutError") {
+      if (pageCount > 1) {
+        return splitOCRRange(pdfDoc, range, fileNameBase, mistralKey);
+      }
+      throw new Error(
+        `pages ${range.pageStart}-${range.pageEnd}: OCR timed out after ${
+          OCR_TIMEOUT_MS / 1000
+        }s on a single page - the page may be extremely image-heavy. Try again, or import this page separately.`,
+      );
+    }
+    throw err;
   } finally {
     // Allow the (potentially multi-MB) base64 string to be garbage
     // collected as soon as the request body has been handed off.
@@ -443,6 +492,9 @@ async function ocrPDFRange(
   }
 
   if (!response.ok) {
+    if (TIMEOUT_HTTP_STATUSES.has(response.status) && pageCount > 1) {
+      return splitOCRRange(pdfDoc, range, fileNameBase, mistralKey);
+    }
     const errorMsg = await extractErrorMessage(
       response,
       "OCR processing failed",
