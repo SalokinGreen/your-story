@@ -851,10 +851,10 @@ export default function Story({
   }, [chatMessages.length, loading, storyText, pendingUserChoice]);
 
   return (
-    <div className="w-full px-0 sm:px-1 sm:max-w-3xl mx-auto">
+    <div className="w-full flex-1 min-h-0 flex flex-col px-0 sm:px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-blue-800/30 sm:shadow-2xl sm:shadow-purple-950/30 overflow-hidden relative flex flex-col max-h-[calc(100vh-100px)] sm:max-h-[calc(100vh-180px)]"
+        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-blue-800/30 sm:shadow-2xl sm:shadow-purple-950/30 overflow-hidden relative flex flex-col flex-1 min-h-0"
         style={{
           backgroundColor: fontSettings.themeColors?.background,
         }}
