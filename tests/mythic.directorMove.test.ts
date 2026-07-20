@@ -11,6 +11,8 @@ import {
   selectDirectorMove,
   classifyPlayerStyle,
   dominantPlayerStyle,
+  storyProgress,
+  targetTensionForProgress,
 } from "../app/misc/mythic";
 import type { StoryData } from "../app/misc/structs";
 
@@ -237,6 +239,87 @@ describe("selectDirectorMove", () => {
       ],
     });
     // No active timer/thread pressure and a Normal scene check -> no move.
+    expect(selectDirectorMove(storyData, "Normal")).toBeNull();
+  });
+});
+
+describe("storyProgress", () => {
+  it("returns 0 for a story that hasn't started", () => {
+    const storyData = createTestStory({ currentChapter: 0, max_chapters: 10 });
+    expect(storyProgress(storyData)).toBe(0);
+  });
+
+  it("returns a fraction of currentChapter/max_chapters", () => {
+    const storyData = createTestStory({ currentChapter: 5, max_chapters: 10 });
+    expect(storyProgress(storyData)).toBe(0.5);
+  });
+
+  it("clamps to 1 when currentChapter exceeds max_chapters", () => {
+    const storyData = createTestStory({ currentChapter: 15, max_chapters: 10 });
+    expect(storyProgress(storyData)).toBe(1);
+  });
+
+  it("returns 0 instead of dividing by zero when max_chapters is 0", () => {
+    const storyData = createTestStory({ currentChapter: 0, max_chapters: 0 });
+    expect(storyProgress(storyData)).toBe(0);
+  });
+});
+
+describe("targetTensionForProgress", () => {
+  it("starts low at the beginning of the story", () => {
+    expect(targetTensionForProgress(0)).toBe(2);
+  });
+
+  it("rises through the middle toward the climax window", () => {
+    expect(targetTensionForProgress(0.3)).toBeCloseTo(5, 1);
+  });
+
+  it("peaks during the climax window", () => {
+    expect(targetTensionForProgress(0.7)).toBeCloseTo(8.5, 1);
+  });
+
+  it("falls during the resolution", () => {
+    expect(targetTensionForProgress(1)).toBeCloseTo(3, 9);
+  });
+
+  it("clamps out-of-range progress to 0-1", () => {
+    expect(targetTensionForProgress(-1)).toBe(targetTensionForProgress(0));
+    expect(targetTensionForProgress(2)).toBe(targetTensionForProgress(1));
+  });
+});
+
+describe("selectDirectorMove: macro-arc lag", () => {
+  it("proactively raises stakes when tension has fallen far behind the story's own arc", () => {
+    const storyData = createTestStory({
+      currentChapter: 8,
+      max_chapters: 10, // progress 0.8 -> target tension 9
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 3, // far below the ~9 target for this point in the story
+      },
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("put_someone_in_a_spot");
+    expect(move?.context).toMatch(/pacing/i);
+  });
+
+  it("does not fire arc-lag when tension is reasonably close to the target", () => {
+    const storyData = createTestStory({
+      currentChapter: 0,
+      max_chapters: 10, // progress 0 -> target tension 2
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5, // above the low early-story target, no lag
+      },
+    });
     expect(selectDirectorMove(storyData, "Normal")).toBeNull();
   });
 });

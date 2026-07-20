@@ -230,6 +230,7 @@ export interface MemoryEntry {
   sceneIndex?: number; // storyData.scene.parts.length at creation, for recency ranking
   entityIds?: string[]; // Names of NPCs/threads mentioned in content, for entity-relevance ranking
   importance?: number; // 0-10, optionally self-rated by the GM at creation time (Generative-Agents-style significance signal)
+  isReflection?: boolean; // True if this entry is a synthesized higher-level insight (see reflection.ts) rather than a directly-observed memory
 }
 
 // Helper to get memory content from either string or MemoryEntry format
@@ -778,6 +779,11 @@ export interface StoryData {
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;
   memory: (string | MemoryEntry)[]; // Supports both legacy string[] and new MemoryEntry[] format
+  // How far into `memory` the reflection pass (see reflection.ts) has
+  // already synthesized higher-level insights from. Same
+  // "cutoff index tracked so re-running is a no-op" convention as
+  // scene.summarizedThroughIndex for compaction.
+  memoryReflectedThroughIndex?: number;
   max_chapters: number;
   currentChapter: number;
   chapters: Chapter[];

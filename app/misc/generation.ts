@@ -39,6 +39,7 @@ import {
 } from "@/app/misc/ai_staged";
 import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
+import { ensureStoryReflected } from "@/app/misc/reflection";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   outputToScenePart,
@@ -51,7 +52,7 @@ import {
   GMToolResult,
   GMExecutionResult,
 } from "@/app/misc/gmExecutor";
-import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
+import { executeTools, ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecutor";
 import { getAuthToken } from "@/app/misc/getAuthToken";
 import { logger } from "@/app/misc/logger";
 import { getModelConfig } from "@/app/misc/ai_prices";
@@ -772,6 +773,37 @@ export async function generateStoryTurn(
           });
         }
 
+        // Memory reflection (see reflection.ts): synthesize higher-level
+        // insights from clusters of recent memories, Generative Agents'
+        // actual differentiator over flat similarity-ranked recall. Same
+        // "safe/cheap every turn, no-op until due" posture as compaction
+        // above - only fires once enough importance-weighted new memory has
+        // accumulated since the last pass.
+        try {
+          const reflectionResult = await ensureStoryReflected(storyData, {
+            model: options.storyModel || gmModel,
+            token,
+            openRouterKey: options.openRouterKey,
+            deepseekKey: options.deepseekKey,
+            googleKey: options.googleKey,
+            abortSignal: options.abortSignal,
+          });
+          if (reflectionResult.ran) {
+            logger.action("Reflected on recent memory, synthesized insights", {
+              insightCount: reflectionResult.insights?.length ?? 0,
+            });
+          }
+        } catch (reflectionError) {
+          // Non-fatal: reflection is a nice-to-have enrichment, not required
+          // for the turn to proceed.
+          logger.action("Reflection failed, continuing without it", {
+            error:
+              reflectionError instanceof Error
+                ? reflectionError.message
+                : String(reflectionError),
+          });
+        }
+
         // GM stage loop - continues until no more tool calls (AI writes final story)
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         let gmRound = 0;
@@ -1426,6 +1458,27 @@ export async function generateStoryTurn(
               });
               forceToolChoiceNextRound = "required";
               continue gmRoundLoop;
+            }
+
+            // Leniency audit (widened past M2's hard gate): M2 only forces a
+            // retry when combat/challenge/high-stakes is active. This is a
+            // purely advisory, non-blocking log of the same underlying drift
+            // outside that scope too - e.g. a narrated "you persuade the
+            // merchant" success with no roll, in an ungated scene. Never
+            // affects control flow; just widens visibility for later audits.
+            if (!rollToolCalledThisTurn) {
+              const stateChangingToolsThisTurn = gmResults
+                .map((r) => r.toolName)
+                .filter((name) => STATE_CHANGE_TOOLS.has(name));
+              if (stateChangingToolsThisTurn.length > 0) {
+                logger.action(
+                  "Leniency audit: state-changing tool(s) fired with no roll/oracle tool call this turn",
+                  {
+                    stateChangingTools: stateChangingToolsThisTurn,
+                    sceneGated: sceneIsGated,
+                  },
+                );
+              }
             }
 
             // Gate cap hit, or not gated at all - fail open (complete

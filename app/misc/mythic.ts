@@ -298,6 +298,51 @@ export function adjustTension(
   return Math.max(0, Math.min(10, currentTension + delta));
 }
 
+/**
+ * How far through the story the campaign currently is, as a 0-1 fraction.
+ * Uses currentChapter/max_chapters - the same progress markers already
+ * shown to the player elsewhere in the UI - rather than inventing a new
+ * progress signal. Returns 0 for a story with no chapter structure
+ * (max_chapters <= 0) rather than dividing by zero.
+ */
+export function storyProgress(storyData: StoryData): number {
+  const maxChapters = storyData.max_chapters || 0;
+  if (maxChapters <= 0) return 0;
+  return Math.max(
+    0,
+    Math.min(1, (storyData.currentChapter || 0) / maxChapters)
+  );
+}
+
+/**
+ * Freytag-shaped target tension curve (0-10) for a given story progress
+ * (0-1): a calm opening rises through the middle toward a climax window,
+ * then releases into a falling-action/resolution close. This is a *target*
+ * the director layer can compare the live, reactive `tension` scalar
+ * against - it never overrides `adjustTension`'s own per-scene nudges, it
+ * only tells `selectDirectorMove` when the story is falling noticeably
+ * behind its own dramatic arc (e.g. still calm well past the midpoint) so
+ * it can proactively raise stakes instead of only reacting after the fact.
+ */
+export function targetTensionForProgress(progress: number): number {
+  const p = Math.max(0, Math.min(1, progress));
+  if (p < 0.6) {
+    // Rising action: climbs from a calm opening toward the climax window.
+    return 2 + (p / 0.6) * 6; // 2 -> 8
+  }
+  if (p < 0.8) {
+    // Climax window: sustained high tension.
+    return 8 + ((p - 0.6) / 0.2) * 1; // 8 -> 9
+  }
+  // Falling action / resolution: tension releases toward a calmer close.
+  return 9 - ((p - 0.8) / 0.2) * 6; // 9 -> 3
+}
+
+// How far below the macro-arc's target tension the live tension scalar must
+// fall before the director proactively raises stakes to catch the story
+// back up to its own arc, rather than waiting for a reactive escalation.
+const ARC_LAG_THRESHOLD = 3;
+
 // Deliberately narrow, keyword-only classification of what a PLAYER typed -
 // never the GM's own narration (that would risk grading prose, the
 // unreliable pattern this codebase's audit history rules out elsewhere).
@@ -426,6 +471,24 @@ export function selectDirectorMove(
       id: crypto.randomUUID(),
       move: "put_someone_in_a_spot",
       context: `Tension running high (${tension}/10)`,
+      createdAt: Date.now(),
+    };
+  }
+
+  // Macro-arc awareness: even when nothing in the current scene is escalating,
+  // check whether the live tension scalar has fallen noticeably behind where
+  // the story's own dramatic arc (targetTensionForProgress) says it should be
+  // by this point - e.g. still calm well past the midpoint of the campaign.
+  // This is what lets the director proactively raise stakes toward a climax
+  // instead of only ever reacting to whatever just happened in-scene.
+  const targetTension = targetTensionForProgress(storyProgress(storyData));
+  if (tension < targetTension - ARC_LAG_THRESHOLD) {
+    return {
+      id: crypto.randomUUID(),
+      move: "put_someone_in_a_spot",
+      context: `Story pacing is lagging its arc (tension ${tension}/10 vs. an expected ~${Math.round(
+        targetTension
+      )}/10 at this point in the story)`,
       createdAt: Date.now(),
     };
   }

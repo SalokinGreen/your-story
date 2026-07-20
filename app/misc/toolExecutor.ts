@@ -152,8 +152,13 @@ export interface ExecuteToolsResult {
 /**
  * Tools whose successful execution should generate state change notifications
  * for the story generation stage. Includes both tool names and their command equivalents.
+ *
+ * Exported for reuse by generation.ts's leniency audit (a soft, always-on
+ * widening of the M2 roll-invariant gate) - reusing this list rather than
+ * inventing a second, possibly-drifting one for "consequential state-changing
+ * tool."
  */
-const STATE_CHANGE_TOOLS = new Set([
+export const STATE_CHANGE_TOOLS = new Set([
   // Abilities - tool names and command names
   "add_ability",
   "remove_ability",
