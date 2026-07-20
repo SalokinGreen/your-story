@@ -134,3 +134,126 @@ describe("reaction_check tool", () => {
     expect(contextForStory).toContain("not by the player simply asking again");
   });
 });
+
+describe("reaction_check scene-scoped caching", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns the same cached result on a second call for the same NPC in the same scene", async () => {
+    // First roll uses 0.5 (3d6=12); if a second roll happened it would use
+    // a different mocked value and produce a different total - so an
+    // unchanged total proves the cache was used, not a fresh roll.
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const storyData = createMockStoryData({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+      } as any,
+    });
+
+    const first = await executeGMTools(
+      [
+        createToolCall("reaction_check", {
+          npc_name: "The Merchant",
+          reason: "first ask",
+        }),
+      ],
+      storyData
+    );
+    const firstResult = first.results[0].result as any;
+    expect(firstResult.cached).toBe(false);
+    expect(firstResult.total).toBe(12);
+
+    randomSpy.mockReturnValue(0.99); // would give a very different total if rolled again
+
+    // executeGMTools clones storyData internally (never mutates the
+    // caller's reference) and returns the mutated clone as
+    // modifiedStoryData - exactly like the real per-round orchestrator
+    // loop threads state forward, so the second call needs to use it.
+    const second = await executeGMTools(
+      [
+        createToolCall("reaction_check", {
+          npc_name: "the merchant", // different casing - should still hit the cache
+          reason: "asks again, hoping for a better answer",
+        }),
+      ],
+      first.modifiedStoryData
+    );
+    const secondResult = second.results[0].result as any;
+
+    expect(secondResult.cached).toBe(true);
+    expect(secondResult.total).toBe(12); // unchanged - proves no fresh roll happened
+    expect(secondResult.category).toBe(firstResult.category);
+  });
+
+  it("rolls fresh when force_reroll is set, even within the same scene", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const storyData = createMockStoryData({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+      } as any,
+    });
+
+    const first = await executeGMTools(
+      [createToolCall("reaction_check", { npc_name: "Guard", reason: "first ask" })],
+      storyData
+    );
+
+    randomSpy.mockReturnValue(0.99); // each d6 -> 6, 3d6 = 18
+
+    const result = await executeGMTools(
+      [
+        createToolCall("reaction_check", {
+          npc_name: "Guard",
+          reason: "player pays a bribe",
+          force_reroll: true,
+        }),
+      ],
+      first.modifiedStoryData
+    );
+    const reactionResult = result.results[0].result as any;
+
+    expect(reactionResult.cached).toBe(false);
+    expect(reactionResult.total).toBe(18);
+  });
+
+  it("rolls fresh once the scene has advanced past the cached entry", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
+    const storyData = createMockStoryData({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+      } as any,
+    });
+
+    const first = await executeGMTools(
+      [createToolCall("reaction_check", { npc_name: "Guard", reason: "first ask" })],
+      storyData
+    );
+
+    // Simulate a scene transition (increment_scene bumps sceneCount)
+    const advancedStoryData = first.modifiedStoryData;
+    advancedStoryData.agmtState!.sceneCount = 2;
+    randomSpy.mockReturnValue(0.99);
+
+    const result = await executeGMTools(
+      [createToolCall("reaction_check", { npc_name: "Guard", reason: "next scene" })],
+      advancedStoryData
+    );
+    const reactionResult = result.results[0].result as any;
+
+    expect(reactionResult.cached).toBe(false);
+    expect(reactionResult.total).toBe(18);
+  });
+});

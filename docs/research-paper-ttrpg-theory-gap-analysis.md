@@ -523,6 +523,66 @@ actually matter on that same dominant path.
 
 ---
 
+## 6. Follow-up round: three more ideas, also implemented
+
+After the first round shipped, three more paper-inspired ideas were raised
+and, on request, also built:
+
+**GURPS-style structured haggling.** The paper's "Quick Contest" haggling
+procedure (list price → local/economic modifiers, already folded in by the
+GM → opposed skill roll → margin-of-success removes a fixed % of the
+price) had no analog here - all bartering was pure GM improvisation. Now a
+`negotiate_price` tool (`gmTools.ts`/`gmExecutor.ts`): opposed
+`player_formula` vs. `seller_formula`, 10% price reduction per point of
+margin (capped at 90%, a defensive bound mirroring `diceFormula.ts`'s own
+degenerate-result caps), clamped to an optional `seller_min_price` floor,
+and a deterministic pre-check that fails the negotiation outright (no
+roll) when `player_target_price` is already below that floor - matching
+the paper's "if the deal falls outside either party's hard parameters, the
+transaction fails" exactly. Covered by `tests/gmTools.negotiatePrice.test.ts`
+(5 tests).
+
+**Hardness dimensions extended to the Director layer.** §2.2 added
+`target`/`forces_choice` to dice-driven consequences only; the Director's
+own moves (`selectDirectorMove` in `mythic.ts`) had no equivalent tuning.
+`PendingDirectorMove` now carries `hardnessTarget`/`hardnessForcesChoice`,
+deliberately set at exactly one place - the hard tension-ceiling
+`put_someone_in_a_spot` trigger (`tension >= 8`) - not as a general dial on
+every move, matching this document's own repeated caution against
+over-parameterizing consequence hardness. `hardnessTarget` is only set to
+`"someone_they_love"` when an already-tracked allied NPC exists to land it
+on (`storyData.npcs.find(n => n.attitude === "allied")`) - the same
+"engine decides, deterministically, from already-tracked state" pattern
+`targetThreadId`/`targetTimerId` already use elsewhere in the same
+function, not invented judgment about who a character loves.
+`formatDirectorMoveLine` (new shared helper in `ai_staged.ts`, replacing
+two copies of the same inline rendering logic) renders the annotation into
+the instruction the model sees, mirroring `describeHardness`'s wording in
+`gmExecutor.ts`. Covered by 10 new tests in `tests/mythic.directorMove.test.ts`.
+
+**`reaction_check` results now persist for the scene.** §2.1 explicitly
+deferred this ("build only if a demonstrated need shows up") but it turned
+out to be cheap and clearly correct to include once `negotiate_price` and
+the Director extension were already touching adjacent code. `StoryData.
+incidentalReactions` caches each rolled reaction by normalized NPC name,
+valid only while `expiresAtScene` matches the story's current
+`agmtState.sceneCount`. A second `reaction_check` call for the same NPC in
+the same scene now returns the cached category instead of rolling again -
+this is what actually *enforces* the tool's own description ("it can only
+shift via new circumstances"), rather than leaving that as a sentence the
+model could ignore by just calling the tool twice. `force_reroll: true`
+bypasses the cache for genuine in-fiction changes (a bribe, a favor). No
+active pruning needed - a stale entry from a prior scene is simply
+overwritten on the next roll for that NPC, the same "read-time check, not
+a background job" pattern already used elsewhere in this codebase. Covered
+by 3 new tests in `tests/gmTools.reactionCheck.test.ts`'s "scene-scoped
+caching" block.
+
+All three: typechecked clean, 723 total tests passing (44 new across this
+plus the original round).
+
+---
+
 _Written against the codebase state surveyed July 2026. Cross-references
 `docs/architecture-frontier.md`, `docs/game-mechanics.md`,
 `docs/five-layer-architecture-changelog.md`, and

@@ -24,6 +24,8 @@ import {
   MAX_PENDING_RANDOM_EVENTS,
   PendingRandomEvent,
   LoreVisibility,
+  ReactionCategory,
+  IncidentalReaction,
 } from "./structs";
 import {
   StartChallengeParams,
@@ -63,6 +65,7 @@ import {
   RemoveNPCParams,
   NPCReactionParams,
   ReactionCheckParams,
+  NegotiatePriceParams,
   GM_TOOL_MAP,
   SetReasoningTierParams,
 } from "./gmTools";
@@ -146,7 +149,8 @@ export interface GMToolResult {
     | GMUpdateNPCResult
     | GMRemoveNPCResult
     | GMNPCReactionResult
-    | GMReactionCheckResult;
+    | GMReactionCheckResult
+    | GMNegotiatePriceResult;
   contextForStory: string; // Formatted bracket notation for story stage
 }
 
@@ -511,6 +515,24 @@ export interface GMReactionCheckResult {
   total: number;
   category: ReactionCategory;
   mandate: string;
+  reason: string;
+  showToPlayer: boolean;
+  cached?: boolean; // True if this returned an existing scene-cached reaction instead of rolling fresh
+}
+
+export interface GMNegotiatePriceResult {
+  type: "negotiate_price";
+  itemName: string;
+  listPrice: number;
+  playerRolls: number[];
+  playerTotal: number;
+  sellerRolls: number[];
+  sellerTotal: number;
+  margin: number;
+  discountPercent: number;
+  finalPrice: number;
+  clampedToFloor: boolean;
+  failed: boolean; // True if the negotiation failed outright (target below seller's floor)
   reason: string;
   showToPlayer: boolean;
 }
@@ -936,7 +958,17 @@ export async function executeGMTools(
           );
           break;
         case "reaction_check":
-          result = executeReactionCheck(call.id, params as ReactionCheckParams);
+          result = executeReactionCheck(
+            call.id,
+            params as ReactionCheckParams,
+            modified
+          );
+          break;
+        case "negotiate_price":
+          result = executeNegotiatePrice(
+            call.id,
+            params as NegotiatePriceParams
+          );
           break;
         case "set_reasoning_tier":
           result = executeSetReasoningTier(
@@ -4654,16 +4686,6 @@ function executeNPCReaction(
  * Score bands and behavioral mandates taken directly from the classic
  * table (Disastrous at 0-or-less through Excellent at 19-or-higher).
  */
-type ReactionCategory =
-  | "Disastrous"
-  | "Very Bad"
-  | "Bad"
-  | "Poor"
-  | "Neutral"
-  | "Good"
-  | "Very Good"
-  | "Excellent";
-
 const REACTION_TABLE: { max: number; category: ReactionCategory; mandate: string }[] = [
   {
     max: 0,
@@ -4739,12 +4761,54 @@ function categorizeReaction(score: number): {
  * entirely, specifically to counteract RLHF-driven sycophancy drift on
  * incidental NPCs that never get a full tracked NPC entry.
  */
+function normalizeNpcNameForCache(name: string): string {
+  return name.trim().toLowerCase();
+}
+
 function executeReactionCheck(
   toolCallId: string,
-  params: ReactionCheckParams
+  params: ReactionCheckParams,
+  storyData: StoryData
 ): GMToolResult {
   const bias = params.bias ?? "neutral";
   const modifiers = params.modifiers ?? 0;
+  const currentScene = storyData.agmtState?.sceneCount ?? 0;
+  const cacheKey = normalizeNpcNameForCache(params.npc_name);
+
+  // Scene-scoped cache: return the existing reaction instead of rolling
+  // again, unless the GM explicitly forces a reroll (a genuine change of
+  // circumstances) or a new scene has started since the cached roll. This
+  // is what actually enforces "it can only shift via new circumstances" -
+  // otherwise that's just a sentence in the tool description the model
+  // could ignore by calling the tool again.
+  if (!params.force_reroll) {
+    const cached = storyData.incidentalReactions?.[cacheKey];
+    if (cached && cached.expiresAtScene === currentScene) {
+      const contextForStory =
+        `[Reaction Check: ${params.npc_name} - already established this scene → ${cached.category}]\n` +
+        `[Reason: ${params.reason}]\n` +
+        `[MANDATE: ${params.npc_name} ${cached.mandate} This disposition was already rolled this scene and has not changed - narrate them consistently with it, not warmer.]`;
+      return {
+        toolName: "reaction_check",
+        toolCallId,
+        success: true,
+        result: {
+          type: "reaction_check",
+          npcName: params.npc_name,
+          rolls: [],
+          bias,
+          modifiers,
+          total: cached.total,
+          category: cached.category,
+          mandate: cached.mandate,
+          reason: params.reason,
+          showToPlayer: params.show_to_player ?? false,
+          cached: true,
+        } as GMReactionCheckResult,
+        contextForStory,
+      };
+    }
+  }
 
   let rollResult: RollResult;
   try {
@@ -4776,6 +4840,15 @@ function executeReactionCheck(
   const total = rollResult.total + REACTION_BIAS_MODIFIER[bias] + modifiers;
   const { category, mandate } = categorizeReaction(total);
 
+  if (!storyData.incidentalReactions) storyData.incidentalReactions = {};
+  storyData.incidentalReactions[cacheKey] = {
+    npcName: params.npc_name,
+    category,
+    mandate,
+    total,
+    expiresAtScene: currentScene,
+  } as IncidentalReaction;
+
   const contextForStory =
     `[Reaction Check: ${params.npc_name} - [${rolls.join(
       ", "
@@ -4798,7 +4871,144 @@ function executeReactionCheck(
       mandate,
       reason: params.reason,
       showToPlayer: params.show_to_player ?? false,
+      cached: false,
     } as GMReactionCheckResult,
+    contextForStory,
+  };
+}
+
+// GURPS-style haggling: each point of margin of success removes this many
+// percent of the price gap. Matches the paper's stated rate exactly.
+const NEGOTIATE_PRICE_PERCENT_PER_MARGIN_POINT = 10;
+// Defensive bound so a huge margin can't reduce an item to (or below)
+// zero - mirrors the dice-formula module's own DoS/degenerate-result caps.
+const NEGOTIATE_PRICE_MAX_DISCOUNT_PERCENT = 90;
+
+/**
+ * Execute negotiate_price - GURPS-style structured haggling (see
+ * NegotiatePriceParams / docs/research-paper-ttrpg-theory-gap-analysis.md).
+ * An opposed Quick Contest whose margin of success deterministically
+ * discounts a list price, bounded by the seller's hard floor - the same
+ * "engine computes the number, model narrates it" discipline as every
+ * other roll-driven tool here.
+ */
+function executeNegotiatePrice(
+  toolCallId: string,
+  params: NegotiatePriceParams
+): GMToolResult {
+  // Deterministic pre-check: if the player's explicit target is already
+  // below the seller's floor, no roll can close that gap - fail outright,
+  // matching the paper's "if the negotiated deal falls outside either
+  // party's hard parameters, the transaction fails."
+  if (
+    params.player_target_price !== undefined &&
+    params.seller_min_price !== undefined &&
+    params.player_target_price < params.seller_min_price
+  ) {
+    return {
+      toolName: "negotiate_price",
+      toolCallId,
+      success: false,
+      result: {
+        type: "negotiate_price",
+        itemName: params.item_name,
+        listPrice: params.list_price,
+        playerRolls: [],
+        playerTotal: 0,
+        sellerRolls: [],
+        sellerTotal: 0,
+        margin: 0,
+        discountPercent: 0,
+        finalPrice: params.list_price,
+        clampedToFloor: false,
+        failed: true,
+        reason: params.reason,
+        showToPlayer: params.show_to_player !== false,
+      } as GMNegotiatePriceResult,
+      contextForStory: `[Negotiate Price: ${params.item_name} - FAILED. Player's target (${params.player_target_price}) is below the seller's floor (${params.seller_min_price}) - no roll can close that gap.]\n[Reason: ${params.reason}]`,
+    };
+  }
+
+  let playerResult: RollResult;
+  let sellerResult: RollResult;
+  try {
+    playerResult = rollFormula(params.player_formula);
+    sellerResult = rollFormula(params.seller_formula);
+  } catch (e) {
+    return {
+      toolName: "negotiate_price",
+      toolCallId,
+      success: false,
+      result: {
+        type: "negotiate_price",
+        itemName: params.item_name,
+        listPrice: params.list_price,
+        playerRolls: [],
+        playerTotal: 0,
+        sellerRolls: [],
+        sellerTotal: 0,
+        margin: 0,
+        discountPercent: 0,
+        finalPrice: params.list_price,
+        clampedToFloor: false,
+        failed: true,
+        reason: params.reason,
+        showToPlayer: params.show_to_player !== false,
+      } as GMNegotiatePriceResult,
+      contextForStory: `[ERROR: negotiate_price failed to roll - ${
+        e instanceof Error ? e.message : "Unknown error"
+      }]`,
+    };
+  }
+
+  const margin = playerResult.total - sellerResult.total;
+  const discountPercent =
+    margin > 0
+      ? Math.min(
+          margin * NEGOTIATE_PRICE_PERCENT_PER_MARGIN_POINT,
+          NEGOTIATE_PRICE_MAX_DISCOUNT_PERCENT
+        )
+      : 0;
+
+  let finalPrice = Math.round(params.list_price * (1 - discountPercent / 100));
+  let clampedToFloor = false;
+  if (
+    params.seller_min_price !== undefined &&
+    finalPrice < params.seller_min_price
+  ) {
+    finalPrice = params.seller_min_price;
+    clampedToFloor = true;
+  }
+
+  const contextForStory =
+    `[Negotiate Price: ${params.item_name} - List: ${params.list_price}]\n` +
+    `[Player: ${params.player_formula} = ${playerResult.total}] vs [Seller: ${params.seller_formula} = ${sellerResult.total}] (margin: ${margin >= 0 ? "+" : ""}${margin})\n` +
+    (margin > 0
+      ? `[Discount: ${discountPercent}% (${NEGOTIATE_PRICE_PERCENT_PER_MARGIN_POINT}% per point of margin)]\n`
+      : `[No discount - seller holds firm at list price]\n`) +
+    `[Final Price: ${finalPrice}${clampedToFloor ? " (clamped to seller's floor)" : ""}]\n` +
+    `[Reason: ${params.reason}]`;
+
+  return {
+    toolName: "negotiate_price",
+    toolCallId,
+    success: true,
+    result: {
+      type: "negotiate_price",
+      itemName: params.item_name,
+      listPrice: params.list_price,
+      playerRolls: flattenRolls(playerResult.rolls),
+      playerTotal: playerResult.total,
+      sellerRolls: flattenRolls(sellerResult.rolls),
+      sellerTotal: sellerResult.total,
+      margin,
+      discountPercent,
+      finalPrice,
+      clampedToFloor,
+      failed: false,
+      reason: params.reason,
+      showToPlayer: params.show_to_player !== false,
+    } as GMNegotiatePriceResult,
     contextForStory,
   };
 }

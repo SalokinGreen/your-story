@@ -478,6 +478,30 @@ export interface ReactionCheckParams {
   modifiers?: number; // Sum of situational/trait bonuses (charisma, reputation, prior favors, an established grudge, etc.) - GM-declared, like formula_roll's formula
   reason: string; // What's being reacted to (e.g., "player asks the guard to look the other way")
   show_to_player?: boolean; // Show the roll itself to the player (default: false)
+  // Force a fresh roll even if this NPC already has a cached reaction this
+  // scene (see incidentalReactions in structs.ts / executeReactionCheck) -
+  // use only when circumstances have genuinely changed (a bribe paid, a
+  // favor delivered), not just because the player asked again.
+  force_reroll?: boolean;
+}
+
+/**
+ * Negotiate Price - GURPS-style structured haggling. Reduces a price
+ * negotiation to a deterministic procedure instead of GM-improvised
+ * economic judgment: an opposed Quick Contest (Merchant/Diplomacy/
+ * Fast-Talk vs. the seller's resistance) where each point of margin of
+ * success shaves a fixed percentage off the list price, bounded by the
+ * seller's hard floor.
+ */
+export interface NegotiatePriceParams {
+  item_name: string; // What's being negotiated over
+  list_price: number; // Seller's asking price, AFTER you've already applied any local economic modifiers (storefront vs. warehouse, taxes, etc.) - describe those in `reason`, this tool doesn't recompute them
+  player_formula: string; // Player's negotiation roll with actual numbers, e.g. "1d20+4" (Merchant/Diplomacy/Fast-Talk)
+  seller_formula: string; // Seller's resistance roll with actual numbers, e.g. "1d20+3"
+  seller_min_price?: number; // Seller's hard floor - the deal can never land below this
+  player_target_price?: number; // Optional: what the player is explicitly asking for. If this is below seller_min_price, the negotiation fails outright before any roll - no amount of skill closes a gap neither party's parameters allow
+  reason: string; // What's being negotiated and why (haggling over a sword, bribing a guard, etc.)
+  show_to_player?: boolean; // Show dice animation (default true)
 }
 
 // Union type for all GM tool parameters
@@ -513,7 +537,8 @@ export type GMToolParams =
   | { name: "update_npc"; params: UpdateNPCParams }
   | { name: "remove_npc"; params: RemoveNPCParams }
   | { name: "npc_reaction"; params: NPCReactionParams }
-  | { name: "reaction_check"; params: ReactionCheckParams };
+  | { name: "reaction_check"; params: ReactionCheckParams }
+  | { name: "negotiate_price"; params: NegotiatePriceParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -1931,6 +1956,13 @@ Excellent with a specific behavioral mandate. Treat that mandate as a hard
 constraint on what you narrate next, the same way you treat a failed
 formula_roll.
 
+If you call this again for the SAME named NPC later in the SAME scene, you
+get back the SAME cached result instead of a fresh roll - this is
+intentional, so the player can't wear an NPC down by asking the same thing
+repeatedly. Only pass force_reroll: true when circumstances have genuinely
+changed (a bribe paid, a favor delivered, new leverage) - not just because
+the player tried again.
+
 Examples:
 - { npc_name: "the gate guard", bias: "neutral", modifiers: 2, reason: "player tries to talk their way past the checkpoint" }
 - { npc_name: "Duke Ashford", bias: "hostile", modifiers: -3, reason: "player, a known thief, requests an audience" }`,
@@ -1962,8 +1994,92 @@ Examples:
           type: "boolean",
           description: "Show the roll to the player (default: false)",
         },
+        force_reroll: {
+          type: "boolean",
+          description:
+            "Force a fresh roll even if this NPC already has a cached reaction this scene. Only use when circumstances have genuinely changed - a bribe, a favor, new leverage - not because the player just asked again.",
+        },
       },
       required: ["npc_name", "reason"],
+    },
+  },
+};
+
+const negotiatePriceTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "negotiate_price",
+    description: `Resolve a price negotiation deterministically (GURPS-style haggling).
+
+Use this instead of improvising a discount whenever the player is
+haggling, bribing, or trying to talk down a price - buying gear from a
+merchant, negotiating a bounty, bribing a guard. It reduces the whole
+back-and-forth to one deterministic Quick Contest instead of you deciding
+the outcome by feel.
+
+You set the list price first, having already folded in any local economic
+factors (storefront markup vs. warehouse discount, taxes, scarcity) - just
+describe those in \`reason\`, this tool doesn't recompute them for you. Then
+both sides roll: the player's negotiation skill (Merchant/Diplomacy/
+Fast-Talk - whatever fits) against the seller's resistance. If the player
+wins, each point of margin removes 10% of the price. If the player loses
+or ties, the price doesn't move - the seller holds firm, it doesn't get
+WORSE. If you set seller_min_price, the deal can never land below it, no
+matter how good the roll. If you also set player_target_price and it's
+already below seller_min_price, the negotiation fails outright before any
+dice are rolled - some gaps no amount of skill closes.
+
+Example:
+{ item_name: "steel longsword", list_price: 150, player_formula: "1d20+5", seller_formula: "1d20+3", seller_min_price: 100, reason: "player haggles with the blacksmith over a used but well-maintained sword" }`,
+    parameters: {
+      type: "object",
+      properties: {
+        item_name: {
+          type: "string",
+          description: "What's being negotiated over",
+        },
+        list_price: {
+          type: "number",
+          description:
+            "Seller's asking price, AFTER you've already applied any local economic modifiers - describe those in `reason`",
+        },
+        player_formula: {
+          type: "string",
+          description:
+            "Player's negotiation roll with actual numbers, e.g. '1d20+4' (Merchant/Diplomacy/Fast-Talk)",
+        },
+        seller_formula: {
+          type: "string",
+          description:
+            "Seller's resistance roll with actual numbers, e.g. '1d20+3'",
+        },
+        seller_min_price: {
+          type: "number",
+          description:
+            "Seller's hard floor - the final price can never land below this, however good the roll",
+        },
+        player_target_price: {
+          type: "number",
+          description:
+            "Optional: what the player is explicitly asking for. If this is already below seller_min_price, the negotiation fails immediately, no roll needed.",
+        },
+        reason: {
+          type: "string",
+          description:
+            "What's being negotiated and why, including any economic factors already folded into list_price",
+        },
+        show_to_player: {
+          type: "boolean",
+          description: "Show dice animation to player (default true)",
+        },
+      },
+      required: [
+        "item_name",
+        "list_price",
+        "player_formula",
+        "seller_formula",
+        "reason",
+      ],
     },
   },
 };
@@ -2007,6 +2123,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   removeNPCTool,
   npcReactionTool,
   reactionCheckTool,
+  negotiatePriceTool,
   // Terminal tool - ends GM loop
   endGmThinkingTool,
   // Reasoning-tier self-escalation

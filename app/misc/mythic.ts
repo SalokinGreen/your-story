@@ -548,10 +548,23 @@ export function selectDirectorMove(
   }
 
   if (tension >= 8) {
+    // Hardness dimensions extended to the Director layer (see
+    // docs/research-paper-ttrpg-theory-gap-analysis.md §2.2 follow-up):
+    // at the hard tension ceiling, force the consequence into a genuine
+    // dilemma, and land it on an already-tracked allied NPC when one
+    // exists - the same "engine decides, deterministically, from
+    // already-tracked state" pattern targetThreadId/targetTimerId below
+    // already use, not invented judgment. Deliberately only applied at
+    // this single, most-severe trigger - not a general dial on every move.
+    const alliedNpc = (storyData.npcs || []).find(
+      (n) => n.attitude === "allied"
+    );
     return {
       id: crypto.randomUUID(),
       move: "put_someone_in_a_spot",
       context: `Tension running high (${tension}/10)`,
+      hardnessForcesChoice: true,
+      hardnessTarget: alliedNpc ? "someone_they_love" : undefined,
       createdAt: Date.now(),
     };
   }

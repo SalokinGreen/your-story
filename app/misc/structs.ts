@@ -868,6 +868,14 @@ export interface StoryData {
   // yet acknowledged incorporating - same persist-until-resolved lifecycle
   // as pendingRandomEvents above (see acknowledge_director_move).
   pendingDirectorMoves?: PendingDirectorMove[];
+  // Scene-scoped cache of reaction_check results, keyed by normalized
+  // (lowercased, trimmed) NPC name - see gmExecutor.ts's executeReactionCheck
+  // and §2.1's follow-up in docs/research-paper-ttrpg-theory-gap-analysis.md.
+  // A cached entry is valid only while expiresAtScene matches the story's
+  // current agmtState.sceneCount; once increment_scene fires, entries from
+  // the prior scene are simply stale and get overwritten on next roll -
+  // this is a read-time check, not something that needs active pruning.
+  incidentalReactions?: Record<string, IncidentalReaction>;
   customTables?: CustomTable[]; // Creator-defined random tables
   variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
@@ -946,6 +954,37 @@ export interface PendingDirectorMove {
   targetCouchPlayerId?: string; // For spotlight_couch_player
   context?: string; // Why this move fired (e.g. which trigger condition)
   createdAt: number;
+  // Hardness dimensions (see FormulaRollParams.target/forces_choice in
+  // gmTools.ts and §2.2/the Director-layer follow-up in
+  // docs/research-paper-ttrpg-theory-gap-analysis.md), extended to the
+  // pacing layer so a director-driven consequence can be tuned the same
+  // way a dice-driven one is. Deliberately set only at selectDirectorMove's
+  // most severe trigger, from already-tracked state - not a general dial.
+  hardnessTarget?: "self" | "someone_they_love" | "someone_present";
+  hardnessForcesChoice?: boolean;
+}
+
+// GURPS Reaction Table categories (see gmExecutor.ts's executeReactionCheck
+// and §2.1 in docs/research-paper-ttrpg-theory-gap-analysis.md).
+export type ReactionCategory =
+  | "Disastrous"
+  | "Very Bad"
+  | "Bad"
+  | "Poor"
+  | "Neutral"
+  | "Good"
+  | "Very Good"
+  | "Excellent";
+
+// A reaction_check result cached for the rest of the current scene, so
+// asking an NPC the same thing twice in one scene returns the same
+// disposition instead of a fresh roll - see StoryData.incidentalReactions.
+export interface IncidentalReaction {
+  npcName: string;
+  category: ReactionCategory;
+  mandate: string;
+  total: number;
+  expiresAtScene: number; // Valid only while this matches agmtState.sceneCount
 }
 
 export interface SkillCheckResult {

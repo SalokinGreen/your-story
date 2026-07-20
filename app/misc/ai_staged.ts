@@ -8,6 +8,7 @@
   CombatState,
   Combatant,
   CountdownTimer,
+  PendingDirectorMove,
 } from "@/app/misc/structs";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
@@ -61,6 +62,29 @@ export const STORY_AFFIRMATION_FALLBACK = `I am the NARRATOR. No mechanical reso
 export function stripHiddenLoreContent(text: string): string {
   if (!text || text.indexOf("[[HIDDEN_LORE:") === -1) return text;
   return text.replace(/\[\[HIDDEN_LORE:[^\]]*\]\][\s\S]*?\[\[\/HIDDEN_LORE\]\]/g, "");
+}
+
+/**
+ * Renders a single pending director move as an instruction line, including
+ * its hardness dimensions when set (see PendingDirectorMove.hardnessTarget/
+ * hardnessForcesChoice in structs.ts) - the Director-layer counterpart to
+ * describeHardness in gmExecutor.ts. Shared by both the info-message and
+ * GM-stage renderings of pendingDirectorMoves so the two can't drift.
+ */
+export function formatDirectorMoveLine(m: PendingDirectorMove): string {
+  const label = m.move.replace(/_/g, " ");
+  const context = m.context ? ` (${m.context})` : "";
+  let hardness = "";
+  if (m.hardnessTarget && m.hardnessTarget !== "self") {
+    hardness +=
+      m.hardnessTarget === "someone_they_love"
+        ? " [land this on someone the character loves, not the character directly]"
+        : " [land this on someone else present, not the character directly]";
+  }
+  if (m.hardnessForcesChoice) {
+    hardness += " [present this as a dilemma between two costs]";
+  }
+  return `- [${m.id}] ${label}${context}${hardness} - render this as prose without naming it, then call acknowledge_director_move(id: "${m.id}")`;
 }
 
 /**
@@ -1043,13 +1067,7 @@ ${pendingEvents
   const pendingMoves = storyData.pendingDirectorMoves || [];
   const pendingDirectorMovesSection = pendingMoves.length
     ? `## 🎬 Pending Director Moves (must be addressed)
-${pendingMoves
-  .map((m) => {
-    const label = m.move.replace(/_/g, " ");
-    const context = m.context ? ` (${m.context})` : "";
-    return `- [${m.id}] ${label}${context} - render this as prose without naming it, then call acknowledge_director_move(id: "${m.id}")`;
-  })
-  .join("\n")}`
+${pendingMoves.map(formatDirectorMoveLine).join("\n")}`
     : "";
 
   // Build variables section if any exist - clean, simple format
@@ -2708,13 +2726,7 @@ ${gmStagePendingEvents
   const gmStagePendingMoves = storyData.pendingDirectorMoves || [];
   const gmStagePendingDirectorMovesSection = gmStagePendingMoves.length
     ? `## 🎬 Pending Director Moves (must be addressed)
-${gmStagePendingMoves
-  .map((m) => {
-    const label = m.move.replace(/_/g, " ");
-    const context = m.context ? ` (${m.context})` : "";
-    return `- [${m.id}] ${label}${context} - render this as prose without naming it, then call acknowledge_director_move(id: "${m.id}")`;
-  })
-  .join("\n")}`
+${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
     : "";
 
   // Build NPC list (tracked characters with relationship info)
