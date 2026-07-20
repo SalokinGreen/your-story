@@ -164,17 +164,30 @@ problem.
   cheapest, safest item in this entire document - it's a read-only view of
   state that already exists, with zero model-facing changes.
 - **Expanding the GM-move menu**: PbtA's own move vocabulary is much larger
-  than the 5 moves implemented (`announce_future_badness`, `tick_a_clock`,
-  `put_someone_in_a_spot`, `spotlight_couch_player`, and now
-  `offer_opportunity` - a non-escalating soft move that fires as the
-  fallback for an otherwise-calm, on-pace scene with an open thread to
-  hang the opportunity on, replacing what used to just be `null`) -
-  "reveal an unwelcome truth," "show a downside of their class/ability/
-  gear," and others remain unimplemented. Mechanically cheap to add (an
-  enum entry plus a branch in `selectDirectorMove`), but each new
-  move needs its own trigger condition reasoned through with the same care
-  the existing four got - do this one move at a time with real playtesting
-  in between, not as a batch.
+  than what's implemented, though the menu has grown past the original 4
+  (`announce_future_badness`, `tick_a_clock`, `put_someone_in_a_spot`,
+  `spotlight_couch_player`):
+  - `offer_opportunity` - a non-escalating soft move that fires as the
+    fallback for an otherwise-calm, on-pace scene with an open thread to
+    hang the opportunity on, replacing what used to just be `null`.
+  - `reveal_unwelcome_truth` - fires when a `StoryLore` entry is queued
+    for reveal (`visibility: "to_be_revealed"`, part of the existing
+    Two-Pass Visibility system) and nothing more urgent is happening;
+    checked before `offer_opportunity` in the same calm-scene fallback,
+    so a pending secret backlog takes priority over pure flavor. The
+    model still does the actual reveal (prose + flipping visibility via
+    `edit_lore`); this only supplies deterministic timing.
+  - `activate_downside` - claims the arc-lag "proactively raise stakes"
+    trigger (not the tension-ceiling one, which keeps `put_someone_in_a_spot`
+    unconditionally) when a tracked `Ability` has a defined cost or
+    cooldown, targeting that ability by name instead of a generic "spot."
+  Remaining unimplemented from PbtA's broader vocabulary: separating the
+  characters, capturing someone, trading harm for harm, turning a player's
+  move back on them, and others. Mechanically cheap to add (an enum entry
+  plus a branch in `selectDirectorMove`), but each new move needs its own
+  trigger condition reasoned through with the same care the existing ones
+  got - do this one move at a time with real playtesting in between, not
+  as a batch.
 
 ## Frontier 4: adjudication - beyond NPC-status contradictions
 

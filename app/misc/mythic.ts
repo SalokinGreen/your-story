@@ -577,12 +577,37 @@ export function selectDirectorMove(
   // instead of only ever reacting to whatever just happened in-scene.
   const targetTension = targetTensionForProgress(storyProgress(storyData));
   if (tension < targetTension - ARC_LAG_THRESHOLD) {
+    const lagContext = `Story pacing is lagging its arc (tension ${tension}/10 vs. an expected ~${Math.round(
+      targetTension
+    )}/10 at this point in the story)`;
+
+    // PbtA's "activate the downside of a character's equipment or
+    // abilities" - a more concrete, flavorful hard consequence than a
+    // generic "spot" when the adventure already has structured ability
+    // data to draw on (Ability.cost/cooldown, populated by add_ability/
+    // modify_ability - real tracked state, not invented). Only claims this
+    // one trigger, not the tension-ceiling branch above, which keeps its
+    // existing, tested put_someone_in_a_spot behavior unconditionally -
+    // this is deliberately the softer of the two hard-tension triggers,
+    // matching the arc-lag branch's own "proactively raise stakes" framing
+    // rather than the acute crisis the ceiling represents.
+    const costedAbility = (storyData.abilities || []).find(
+      (a) => (a.cost && a.cost.length > 0) || (a.cooldown ?? 0) > 0
+    );
+    if (costedAbility) {
+      return {
+        id: crypto.randomUUID(),
+        move: "activate_downside",
+        targetAbilityName: costedAbility.name,
+        context: `${lagContext} - "${costedAbility.name}"'s own cost/cooldown becomes the price paid now`,
+        createdAt: Date.now(),
+      };
+    }
+
     return {
       id: crypto.randomUUID(),
       move: "put_someone_in_a_spot",
-      context: `Story pacing is lagging its arc (tension ${tension}/10 vs. an expected ~${Math.round(
-        targetTension
-      )}/10 at this point in the story)`,
+      context: lagContext,
       createdAt: Date.now(),
     };
   }
@@ -630,17 +655,45 @@ export function selectDirectorMove(
     }
   }
 
+  // Another soft, non-escalating default for the calm case: PbtA's "reveal
+  // an unwelcome truth" maps directly onto this app's own Two-Pass
+  // Visibility system (StoryLore.visibility === "to_be_revealed" - a
+  // secret already queued to surface eventually, see
+  // docs/research-paper-ttrpg-theory-gap-analysis.md §2.3). That system's
+  // own design leaves *when* to reveal one entirely to the model's
+  // narrative judgment; this move gives it a deterministic nudge instead
+  // of relying on the model to remember a backlog of pending secrets on
+  // its own. The model still does the actual reveal (prose plus flipping
+  // the entry's visibility via edit_lore/edit_note, unchanged) - this only
+  // says "now's a good time," the same "engine decides when, model decides
+  // how" split every other move already uses. Checked before
+  // offer_opportunity below: clearing a pending secret takes priority over
+  // purely optional flavor.
+  const revealableLore = (storyData.lore || []).find(
+    (l) => l.visibility === "to_be_revealed" && l.enabled !== false
+  );
+  if (revealableLore) {
+    return {
+      id: crypto.randomUUID(),
+      move: "reveal_unwelcome_truth",
+      targetLoreTitle: revealableLore.title,
+      context: `"${revealableLore.title}" is queued to be revealed`,
+      createdAt: Date.now(),
+    };
+  }
+
   // Soft, non-escalating move for the common "nothing's wrong" case: PbtA's
   // own move list isn't only about danger - "offer an opportunity, with or
   // without a cost" is the classic default for an otherwise uneventful
   // scene. Everything above this point already covers the escalating
   // signals (timer, chaotic scene check, tension ceiling, arc lag, a
-  // neglected couch player); reaching here means the scene resolved
-  // normally and pacing is on track, which used to mean no move fired at
-  // all. Gated on there being an active thread to hang the opportunity on
-  // (the same "engine decides from already-tracked state" pattern the
-  // other moves use) - with nothing open to offer an opportunity about,
-  // this stays a no-op rather than inventing one from nothing.
+  // neglected couch player, a pending secret reveal); reaching here means
+  // the scene resolved normally and pacing is on track, which used to mean
+  // no move fired at all. Gated on there being an active thread to hang
+  // the opportunity on (the same "engine decides from already-tracked
+  // state" pattern the other moves use) - with nothing open to offer an
+  // opportunity about, this stays a no-op rather than inventing one from
+  // nothing.
   if (activeThreads.length > 0) {
     return {
       id: crypto.randomUUID(),

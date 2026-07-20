@@ -371,6 +371,124 @@ describe("selectDirectorMove", () => {
   });
 });
 
+describe("selectDirectorMove: reveal_unwelcome_truth", () => {
+  it("selects reveal_unwelcome_truth on a calm, on-pace scene with a to_be_revealed secret", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+      lore: [
+        {
+          title: "The Steward's Debt",
+          content: "The steward owes the crime lord a fortune",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: true,
+          keys: [],
+          visibility: "to_be_revealed",
+        } as any,
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("reveal_unwelcome_truth");
+    expect(move?.targetLoreTitle).toBe("The Steward's Debt");
+  });
+
+  it("takes priority over offer_opportunity when both a secret and an open thread exist", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+      threads: [
+        { id: "th1", title: "T", description: "D", status: "active", createdAt: Date.now() },
+      ],
+      lore: [
+        {
+          title: "The Steward's Debt",
+          content: "The steward owes the crime lord a fortune",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: true,
+          keys: [],
+          visibility: "to_be_revealed",
+        } as any,
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("reveal_unwelcome_truth");
+  });
+
+  it("ignores lore that isn't queued for reveal (hidden, always_reveal, or unset)", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+      lore: [
+        {
+          title: "Still Hidden",
+          content: "Not ready yet",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: true,
+          keys: [],
+          visibility: "hidden",
+        } as any,
+        {
+          title: "Already Known",
+          content: "Common knowledge",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          visibility: "always_reveal",
+        } as any,
+      ],
+    });
+    expect(selectDirectorMove(storyData, "Normal")).toBeNull();
+  });
+
+  it("ignores a to_be_revealed entry that's been disabled", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+      lore: [
+        {
+          title: "Disabled Secret",
+          content: "Not currently in play",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: true,
+          keys: [],
+          visibility: "to_be_revealed",
+          enabled: false,
+        } as any,
+      ],
+    });
+    expect(selectDirectorMove(storyData, "Normal")).toBeNull();
+  });
+});
+
 describe("storyProgress", () => {
   it("returns 0 for a story that hasn't started", () => {
     const storyData = createTestStory({ currentChapter: 0, max_chapters: 10 });
@@ -449,6 +567,78 @@ describe("selectDirectorMove: macro-arc lag", () => {
       },
     });
     expect(selectDirectorMove(storyData, "Normal")).toBeNull();
+  });
+});
+
+describe("selectDirectorMove: activate_downside (arc lag)", () => {
+  const lagAgmtState = {
+    chaosFactor: 5,
+    sceneCount: 1,
+    skillCheckHistory: [],
+    currentStreak: 0,
+    lastChaosAdjustment: -999,
+    tension: 3, // far below the ~9 target at chapter 8/10
+  };
+
+  it("targets a tracked ability's cost instead of put_someone_in_a_spot during arc lag", () => {
+    const storyData = createTestStory({
+      currentChapter: 8,
+      max_chapters: 10,
+      agmtState: lagAgmtState,
+      abilities: [
+        {
+          name: "Fireball",
+          description: "A burst of flame",
+          grade: "adept",
+          cost: [{ type: "resource", name: "Mana", amount: 10 }],
+          symbol: "fire",
+        } as any,
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("activate_downside");
+    expect(move?.targetAbilityName).toBe("Fireball");
+    expect(move?.context).toMatch(/pacing/i);
+  });
+
+  it("targets an ability with only a cooldown, not just a cost", () => {
+    const storyData = createTestStory({
+      currentChapter: 8,
+      max_chapters: 10,
+      agmtState: lagAgmtState,
+      abilities: [
+        {
+          name: "Second Wind",
+          description: "A burst of stamina",
+          grade: "novice",
+          cost: [],
+          cooldown: 3,
+          symbol: "wind",
+        } as any,
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("activate_downside");
+    expect(move?.targetAbilityName).toBe("Second Wind");
+  });
+
+  it("falls back to put_someone_in_a_spot during arc lag when no ability has a cost or cooldown", () => {
+    const storyData = createTestStory({
+      currentChapter: 8,
+      max_chapters: 10,
+      agmtState: lagAgmtState,
+      abilities: [
+        {
+          name: "Keen Eyes",
+          description: "Passively sharp senses",
+          grade: "novice",
+          cost: [],
+          symbol: "eye",
+        } as any,
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("put_someone_in_a_spot");
   });
 });
 
