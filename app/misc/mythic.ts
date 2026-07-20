@@ -9,7 +9,12 @@
  * - Scene setup (altered/interrupted/normal)
  */
 
-import type { StoryData, PendingDirectorMove, CouchPlayer } from "./structs";
+import type {
+  StoryData,
+  PendingDirectorMove,
+  CouchPlayer,
+  PlayerStyleType,
+} from "./structs";
 
 export type FateAnswer = "Exceptional Yes" | "Yes" | "No" | "Exceptional No";
 export type SceneType = "Normal" | "Altered" | "Interrupted";
@@ -293,10 +298,67 @@ export function adjustTension(
   return Math.max(0, Math.min(10, currentTension + delta));
 }
 
+// Deliberately narrow, keyword-only classification of what a PLAYER typed -
+// never the GM's own narration (that would risk grading prose, the
+// unreliable pattern this codebase's audit history rules out elsewhere).
+// Same class of lightweight regex heuristic already used in
+// embeddings.ts's calculateMemoryImportance. First match wins; ambiguous or
+// keyword-free input classifies as null (no signal), not guessed.
+const ACTION_KEYWORDS =
+  /\b(attack|fight|strike|shoot|charge|kill|stab|swing|punch|slash|dodge|block|chase)\b/i;
+const SOCIAL_KEYWORDS =
+  /\b(ask|tell|talk|say|persuade|negotiate|convince|greet|apologize|lie|flirt|threaten|charm|explain)\b/i;
+const TACTICAL_KEYWORDS =
+  /\b(search|investigate|examine|inspect|sneak|hide|check|study|analyze|plan|scout|pick|unlock|look)\b/i;
+
+/**
+ * Classifies a player's own freeform input into a lightweight PaSSAGE-
+ * inspired style bucket (Robin Laws' player-type taxonomy, narrowed to
+ * three deterministically-detectable buckets). Returns null when nothing
+ * matches - "no signal" is preferred over guessing.
+ */
+export function classifyPlayerStyle(input: string): PlayerStyleType | null {
+  if (ACTION_KEYWORDS.test(input)) return "action";
+  if (SOCIAL_KEYWORDS.test(input)) return "social";
+  if (TACTICAL_KEYWORDS.test(input)) return "tactical";
+  return null;
+}
+
+/** The style with the highest observed count, or null if there's no signal yet. */
+export function dominantPlayerStyle(
+  counts: Record<PlayerStyleType, number> | undefined
+): PlayerStyleType | null {
+  if (!counts) return null;
+  const withSignal = (
+    Object.entries(counts) as [PlayerStyleType, number][]
+  ).filter(([, n]) => n > 0);
+  if (withSignal.length === 0) return null;
+  withSignal.sort((a, b) => b[1] - a[1]);
+  return withSignal[0][0];
+}
+
 // Minimum consecutive turns a couch player must have gone unheard before
 // selectDirectorMove will spotlight them - low enough to matter in a short
 // session, high enough not to nag every turn in a fast-moving scene.
 const SPOTLIGHT_NEGLECT_THRESHOLD = 3;
+
+// How close two players' neglect counts must be to be considered "tied" for
+// spotlight purposes - close enough that style preference is a reasonable
+// tiebreaker, not so wide that it overrides basic fairness of screen time.
+const SPOTLIGHT_TIE_WINDOW = 1;
+
+// Given the current scene's pressure, which player style best fits being
+// put in the spotlight right now - a high-tension moment suits an
+// action-styled player more than a calm one, a chaotic scene check suits
+// investigation, and a routine/calm moment suits social/dialogue framing.
+function preferredStyleForScene(
+  tension: number,
+  sceneType: SceneType
+): PlayerStyleType {
+  if (tension >= 7) return "action";
+  if (sceneType === "Interrupted" || sceneType === "Altered") return "tactical";
+  return "social";
+}
 
 /**
  * Deterministic GM-move selection policy (PbtA-style bounded move menu).
@@ -371,25 +433,41 @@ export function selectDirectorMove(
   // Couch co-op spotlight tracking: bias toward whichever player has gone
   // the longest without speaking (ScenePart.speakerIds / couchPlayerFocus,
   // updated client-side in page.tsx's handleCustomInput). No-op for
-  // single-player stories - the overwhelming majority.
+  // single-player stories - the overwhelming majority. Fairness of screen
+  // time always comes first - player-style modeling (playerStyleCounts)
+  // only breaks a close tie between similarly-neglected players, it never
+  // overrides who's actually most overdue.
   const couchPlayers = storyData.multiplayer?.couchPlayers || [];
   if (couchPlayers.length > 1) {
     const focus = storyData.multiplayer?.couchPlayerFocus || {};
-    let neglectedPlayer: CouchPlayer | null = null;
+    const styleCounts = storyData.multiplayer?.playerStyleCounts || {};
+
     let maxTurnsSinceSpoken = -1;
     for (const player of couchPlayers) {
-      const turnsSinceSpoken = focus[player.id] ?? 0;
-      if (turnsSinceSpoken > maxTurnsSinceSpoken) {
-        maxTurnsSinceSpoken = turnsSinceSpoken;
-        neglectedPlayer = player;
-      }
+      maxTurnsSinceSpoken = Math.max(maxTurnsSinceSpoken, focus[player.id] ?? 0);
     }
-    if (neglectedPlayer && maxTurnsSinceSpoken >= SPOTLIGHT_NEGLECT_THRESHOLD) {
+
+    if (maxTurnsSinceSpoken >= SPOTLIGHT_NEGLECT_THRESHOLD) {
+      const candidates = couchPlayers.filter(
+        (p) => maxTurnsSinceSpoken - (focus[p.id] ?? 0) <= SPOTLIGHT_TIE_WINDOW
+      );
+
+      let chosen: CouchPlayer = candidates[0];
+      if (candidates.length > 1) {
+        const preferredStyle = preferredStyleForScene(tension, sceneType);
+        const styleMatch = candidates.find(
+          (p) => dominantPlayerStyle(styleCounts[p.id]) === preferredStyle
+        );
+        if (styleMatch) chosen = styleMatch;
+      }
+
       return {
         id: crypto.randomUUID(),
         move: "spotlight_couch_player",
-        targetCouchPlayerId: neglectedPlayer.id,
-        context: `${neglectedPlayer.name} hasn't had the spotlight in ${maxTurnsSinceSpoken} turns`,
+        targetCouchPlayerId: chosen.id,
+        context: `${chosen.name} hasn't had the spotlight in ${
+          focus[chosen.id] ?? 0
+        } turns`,
         createdAt: Date.now(),
       };
     }

@@ -212,6 +212,14 @@ export interface StoryLore {
   // Links this entry to a note in the cross-story global Notes Library, so
   // it can be pushed/pulled instead of living as a disconnected one-time copy.
   libraryNoteId?: string;
+  // Multiplayer: which CouchPlayer this character_sheet-type entry belongs
+  // to. character_sheet lore entries are already a repeatable array (see
+  // LoreType above - buildInfoMessage/buildGMStagePrompt inject ALL of
+  // them, not just one), so a story can genuinely have multiple distinct
+  // character sheets; this is the missing link identifying whose is whose.
+  // Unset for the common single-player case, or a couch story where
+  // everyone still shares one sheet.
+  ownerCouchPlayerId?: string;
 }
 
 // Memory entry with embedding tracking
@@ -713,6 +721,16 @@ export type Variable =
 
 export type MultiplayerMode = "host" | "any" | "timer";
 
+// A lightweight, PaSSAGE-inspired player-preference signal (Robin Laws'
+// player-type taxonomy, narrowed to three deterministically-classifiable
+// buckets - see classifyPlayerStyle in mythic.ts): does this player's
+// freeform input lean toward action, social/dialogue, or
+// investigation/tactics? Classified by keyword heuristic at input time
+// (same class of lightweight regex classification this codebase already
+// uses in embeddings.ts's calculateMemoryImportance), never by grading the
+// GM's own narration - it only ever looks at what the player typed/said.
+export type PlayerStyleType = "action" | "social" | "tactical";
+
 // A couch co-op player: a colored, named "bubble" a person at the table taps
 // to speak their turn. Distinct from the legacy typed-name hot-seat flow.
 export interface CouchPlayer {
@@ -748,6 +766,14 @@ export interface StoryData {
     // spotlight_couch_player selection in mythic.ts). Only meaningful when
     // couchPlayers.length > 1 - a no-op for single-player stories.
     couchPlayerFocus?: Record<string, number>;
+    // Player modeling: CouchPlayer id -> observed counts per PlayerStyleType,
+    // accumulated as each player's turns come in (see classifyPlayerStyle,
+    // mythic.ts, and its call site in page.tsx's handleCustomInput). Read by
+    // selectDirectorMove to break close spotlight-selection ties toward
+    // whichever neglected player's style best fits the current scene
+    // (tension-driven vs. calm) rather than picking arbitrarily. Only
+    // meaningful when couchPlayers.length > 1.
+    playerStyleCounts?: Record<string, Record<PlayerStyleType, number>>;
   };
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;

@@ -6,7 +6,12 @@
  * prose, it does not pick which move fires).
  */
 import { describe, it, expect } from "vitest";
-import { adjustTension, selectDirectorMove } from "../app/misc/mythic";
+import {
+  adjustTension,
+  selectDirectorMove,
+  classifyPlayerStyle,
+  dominantPlayerStyle,
+} from "../app/misc/mythic";
 import type { StoryData } from "../app/misc/structs";
 
 function createTestStory(overrides: Partial<StoryData> = {}): StoryData {
@@ -233,5 +238,117 @@ describe("selectDirectorMove", () => {
     });
     // No active timer/thread pressure and a Normal scene check -> no move.
     expect(selectDirectorMove(storyData, "Normal")).toBeNull();
+  });
+});
+
+describe("classifyPlayerStyle", () => {
+  it("classifies action-flavored input", () => {
+    expect(classifyPlayerStyle("I attack the goblin with my sword")).toBe("action");
+    expect(classifyPlayerStyle("I charge toward the bandits")).toBe("action");
+  });
+
+  it("classifies social-flavored input", () => {
+    expect(classifyPlayerStyle("I ask the innkeeper about the rumors")).toBe("social");
+    expect(classifyPlayerStyle("I try to persuade the guard to let us through")).toBe(
+      "social",
+    );
+  });
+
+  it("classifies tactical-flavored input", () => {
+    expect(classifyPlayerStyle("I search the room for traps")).toBe("tactical");
+    expect(classifyPlayerStyle("I sneak past the sleeping dragon")).toBe("tactical");
+  });
+
+  it("returns null for input with no matching keywords", () => {
+    expect(classifyPlayerStyle("The weather is nice today")).toBeNull();
+    expect(classifyPlayerStyle("")).toBeNull();
+  });
+});
+
+describe("dominantPlayerStyle", () => {
+  it("returns the style with the highest count", () => {
+    expect(dominantPlayerStyle({ action: 5, social: 1, tactical: 2 })).toBe("action");
+  });
+
+  it("returns null when counts are undefined or all zero", () => {
+    expect(dominantPlayerStyle(undefined)).toBeNull();
+    expect(dominantPlayerStyle({ action: 0, social: 0, tactical: 0 })).toBeNull();
+  });
+});
+
+describe("selectDirectorMove: player-style spotlight tie-breaking", () => {
+  it("breaks a close neglect tie toward the player whose style fits a high-tension scene", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        // 7 is high enough for preferredStyleForScene -> "action", but
+        // below 8, the threshold where put_someone_in_a_spot itself would
+        // fire first (higher priority than spotlight_couch_player).
+        tension: 7,
+      },
+      multiplayer: {
+        enabled: true,
+        couchPlayers: [
+          { id: "p1", name: "Alex", color: "#22c55e" },
+          { id: "p2", name: "Sam", color: "#3b82f6" },
+        ],
+        // Within the tie window (difference of 1) - both are candidates.
+        couchPlayerFocus: { p1: 3, p2: 4 },
+        playerStyleCounts: {
+          p1: { action: 5, social: 0, tactical: 0 },
+          p2: { action: 0, social: 5, tactical: 0 },
+        },
+      },
+    });
+
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("spotlight_couch_player");
+    // Sam is more neglected (4 vs 3) but Alex's action style fits the
+    // high-tension scene, and they're within the tie window - style wins.
+    expect(move?.targetCouchPlayerId).toBe("p1");
+  });
+
+  it("does not let style override a clear (non-tied) neglect gap", () => {
+    const storyData = createTestStory({
+      multiplayer: {
+        enabled: true,
+        couchPlayers: [
+          { id: "p1", name: "Alex", color: "#22c55e" },
+          { id: "p2", name: "Sam", color: "#3b82f6" },
+        ],
+        // Not within the tie window - p2 is clearly the most overdue.
+        couchPlayerFocus: { p1: 0, p2: 5 },
+        playerStyleCounts: {
+          p1: { action: 5, social: 0, tactical: 0 },
+          p2: { action: 0, social: 5, tactical: 0 },
+        },
+      },
+    });
+
+    // Normal, low tension -> preferredStyleForScene is "social", which is
+    // Sam's style anyway, but the point is fairness would pick Sam regardless.
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.targetCouchPlayerId).toBe("p2");
+  });
+
+  it("falls back to the most-neglected candidate when no style data exists", () => {
+    const storyData = createTestStory({
+      multiplayer: {
+        enabled: true,
+        couchPlayers: [
+          { id: "p1", name: "Alex", color: "#22c55e" },
+          { id: "p2", name: "Sam", color: "#3b82f6" },
+        ],
+        couchPlayerFocus: { p1: 3, p2: 3 },
+      },
+    });
+
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("spotlight_couch_player");
+    expect(["p1", "p2"]).toContain(move?.targetCouchPlayerId);
   });
 });

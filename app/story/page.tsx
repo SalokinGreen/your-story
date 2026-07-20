@@ -22,6 +22,7 @@ import {
   generateElement,
   generateEventFocus,
   generateEventMeaning,
+  classifyPlayerStyle,
   type Likelihood,
   type ElementCategory,
 } from "../misc/mythic";
@@ -1098,6 +1099,33 @@ function StoryPageContent() {
         ...storyData.multiplayer!,
         couchPlayerFocus: focus,
       };
+
+      // Player modeling (PaSSAGE-inspired): classify this player's own
+      // freeform input by keyword and bump their style counter. Read by
+      // selectDirectorMove to break close spotlight-selection ties toward
+      // whichever neglected player's style best fits the current scene,
+      // rather than picking arbitrarily among similarly-overdue players.
+      const style = classifyPlayerStyle(customText);
+      if (style) {
+        const styleCounts = {
+          ...(storyData.multiplayer!.playerStyleCounts || {}),
+        };
+        for (const speakerId of speakerIds) {
+          const current = styleCounts[speakerId] || {
+            action: 0,
+            social: 0,
+            tactical: 0,
+          };
+          styleCounts[speakerId] = {
+            ...current,
+            [style]: current[style] + 1,
+          };
+        }
+        storyData.multiplayer = {
+          ...storyData.multiplayer!,
+          playerStyleCounts: styleCounts,
+        };
+      }
     }
 
     //ProcessLoretriggersafteruserinput
