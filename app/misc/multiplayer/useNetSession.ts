@@ -25,6 +25,8 @@ interface UseNetSessionParams {
   onSnapshot: (storyData: StoryData) => void;
   // Host-only: called when a new guest announces itself.
   onGuestJoined: (info: GuestJoinedInfo) => void;
+  // Host-only: called when a connected guest's link drops.
+  onPeerLeft?: (localPlayerId: string) => void;
 }
 
 export function useNetSession({
@@ -33,6 +35,7 @@ export function useNetSession({
   onGuestAction,
   onSnapshot,
   onGuestJoined,
+  onPeerLeft,
 }: UseNetSessionParams) {
   const sessionRef = useRef<NetSession | null>(null);
   const [netSession, setNetSession] = useState<NetSessionInfo | null>(null);
@@ -53,11 +56,13 @@ export function useNetSession({
   const onGuestActionRef = useRef(onGuestAction);
   const onSnapshotRef = useRef(onSnapshot);
   const onGuestJoinedRef = useRef(onGuestJoined);
+  const onPeerLeftRef = useRef(onPeerLeft);
   useEffect(() => {
     onGuestActionRef.current = onGuestAction;
     onSnapshotRef.current = onSnapshot;
     onGuestJoinedRef.current = onGuestJoined;
-  }, [onGuestAction, onSnapshot, onGuestJoined]);
+    onPeerLeftRef.current = onPeerLeft;
+  }, [onGuestAction, onSnapshot, onGuestJoined, onPeerLeft]);
 
   // attach() calls itself (indirectly, via this ref) when a guest needs to
   // auto-follow a host's backend switch - going through a ref rather than
@@ -76,6 +81,7 @@ export function useNetSession({
       });
     });
     session.onPeerLeft((localPlayerId) => {
+      onPeerLeftRef.current?.(localPlayerId);
       setPeers((prev) => prev.filter((p) => p.localPlayerId !== localPlayerId));
     });
     session.onActivity((localPlayerId, state) => {

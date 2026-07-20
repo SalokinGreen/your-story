@@ -7,6 +7,8 @@ import TTSControls from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
+import NetStatusBadge from "../components/NetStatusBadge";
+import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
 import STTButton from "../components/STTButton";
 import PlayerBubbles from "../components/PlayerBubbles";
 import CombatDisplay from "../components/CombatDisplay";
@@ -37,6 +39,8 @@ interface StoryProps {
   myPlayerId?: string;
   remoteActivity?: Record<string, "recording" | "processing" | "idle">;
   onLocalActivity?: (state: "recording" | "processing" | "idle") => void;
+  netSession?: NetSessionInfo | null;
+  netPeers?: GuestJoinedInfo[];
   onActionSubmit?: (
     text: string,
   ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
@@ -371,6 +375,8 @@ export default function Story({
   myPlayerId,
   remoteActivity,
   onLocalActivity,
+  netSession,
+  netPeers,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -872,6 +878,13 @@ export default function Story({
         {syncStatus && syncStatus !== "local-only" && (
           <div className="absolute top-3 right-3 z-10">
             <SyncIndicator status={syncStatus} />
+          </div>
+        )}
+
+        {/* Networked multiplayer connection status - top left corner */}
+        {netSession && (
+          <div className="absolute top-3 left-3 z-10">
+            <NetStatusBadge netSession={netSession} peers={netPeers ?? []} />
           </div>
         )}
 

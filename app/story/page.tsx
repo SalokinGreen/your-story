@@ -359,8 +359,10 @@ function StoryPageContent() {
         if (!prev) return prev;
         const existingPlayers = prev.multiplayer?.couchPlayers ?? [];
         if (existingPlayers.some((p) => p.id === info.localPlayerId)) {
+          addNotification(`${info.displayName} reconnected`, "success");
           return prev; // reconnect - seat already exists
         }
+        addNotification(`${info.displayName} joined the room`, "success");
         const newPlayer: CouchPlayer = {
           id: info.localPlayerId,
           name: info.displayName,
@@ -375,6 +377,12 @@ function StoryPageContent() {
           },
         };
       });
+    },
+    onPeerLeft: (localPlayerId) => {
+      const departed = storyData?.multiplayer?.couchPlayers?.find(
+        (p) => p.id === localPlayerId,
+      );
+      addNotification(`${departed?.name ?? "A player"} disconnected`, "warning");
     },
   });
 
@@ -3660,6 +3668,8 @@ function StoryPageContent() {
             myPlayerId={netSession ? netSession.myLocalPlayerId : undefined}
             remoteActivity={netActivity}
             onLocalActivity={sendNetActivity}
+            netSession={netSession}
+            netPeers={netPeers}
           />
           </div>
         )}
