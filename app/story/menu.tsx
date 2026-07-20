@@ -43,6 +43,7 @@ import VariablesEditor from "./menu/VariablesEditor";
 import StoryMetaEditor from "./menu/StoryMetaEditor";
 import CouchPlayersEditor from "./menu/CouchPlayersEditor";
 import OnlinePlayEditor from "./menu/OnlinePlayEditor";
+import APIKeysModal from "../components/APIKeysModal";
 import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
 import type { MPBackend } from "../misc/multiplayer/types";
 
@@ -65,11 +66,15 @@ interface MenuProps extends StoryData {
   ) => Promise<void>;
   onLeaveNetRoom: () => Promise<void>;
   onSwitchNetBackend: (backend: MPBackend) => Promise<void>;
+  // Opens the Story Editor straight to this section on mount - used when
+  // arriving here via an auto-host deep link from the Library/home page.
+  autoOpenSection?: MenuTab;
 }
 
 type MenuTab =
   | "basic"
-  | "multiplayer"
+  | "hotseat"
+  | "online"
   | "abilities"
   | "goals"
   | "lore"
@@ -95,6 +100,7 @@ export default function MenuPage({
   onJoinNetRoom,
   onLeaveNetRoom,
   onSwitchNetBackend,
+  autoOpenSection,
   ...storyData
 }: MenuProps) {
   const router = useRouter();
@@ -108,6 +114,7 @@ export default function MenuPage({
   const [exporting, setExporting] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAPIKeysModal, setShowAPIKeysModal] = useState(false);
   const [editingNotes, setEditingNotes] = useState(false);
   const [playerNotes, setPlayerNotes] = useState(storyData.player_notes || "");
   const [editingChatDisplay, setEditingChatDisplay] = useState(false);
@@ -127,6 +134,18 @@ export default function MenuPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyData.displayName, storyData.displayAvatar]);
 
+  // Auto-open the Story Editor once on mount when arriving via a deep link
+  // (e.g. "Host" from the Library, which wants to land straight on Online
+  // Play instead of making the user find it).
+  const autoOpenAppliedRef = useRef(false);
+  useEffect(() => {
+    if (autoOpenSection && !autoOpenAppliedRef.current) {
+      autoOpenAppliedRef.current = true;
+      setShowSettings(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Track scroll position in the Story Editor content pane to highlight the
   // matching sidebar item as the user scrolls through the categories
   useEffect(() => {
@@ -135,7 +154,12 @@ export default function MenuPage({
     if (!container) return;
 
     container.scrollTop = 0;
-    setActiveTab("basic");
+
+    if (autoOpenSection) {
+      requestAnimationFrame(() => scrollToSection(autoOpenSection));
+    } else {
+      setActiveTab("basic");
+    }
 
     const handleScroll = () => {
       const containerTop = container.getBoundingClientRect().top;
@@ -182,7 +206,8 @@ export default function MenuPage({
   // Story Editor sections, in the order they're stacked in the scrolling content pane
   const sections: { id: MenuTab; label: string; icon: string }[] = [
     { id: "basic", label: "Basic", icon: "FileText" },
-    { id: "multiplayer", label: "Multiplayer", icon: "Users" },
+    { id: "hotseat", label: "Hot-seat", icon: "Users" },
+    { id: "online", label: "Online Play", icon: "Wifi" },
     { id: "abilities", label: "Abilities", icon: "Wand2" },
     { id: "goals", label: "Goals", icon: "Scroll" },
     { id: "lore", label: "Notes", icon: "Book" },
@@ -549,7 +574,7 @@ export default function MenuPage({
       </div>
 
       {/* Secondary Actions Row */}
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <button
           onClick={handleExportStory}
           disabled={exporting}
@@ -570,7 +595,21 @@ export default function MenuPage({
           <DynamicIcon name="ArrowLeft" className="w-3.5 h-3.5" />
           <span>Explorer</span>
         </button>
+
+        <button
+          onClick={() => setShowAPIKeysModal(true)}
+          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 text-blue-200 font-medium rounded-lg transition-colors text-sm border border-blue-700/30"
+          title="App-wide settings: API keys, voices, fonts, display"
+        >
+          <DynamicIcon name="Settings" className="w-3.5 h-3.5" />
+          <span>Settings</span>
+        </button>
       </div>
+
+      <APIKeysModal
+        isOpen={showAPIKeysModal}
+        onClose={() => setShowAPIKeysModal(false)}
+      />
 
       {/* AI Editor Button */}
       {onOpenAIAssistant && (
@@ -1011,13 +1050,17 @@ export default function MenuPage({
 
                 <div
                   ref={(el) => {
-                    sectionRefs.current["multiplayer"] = el;
+                    sectionRefs.current["hotseat"] = el;
                   }}
-                  data-section-id="multiplayer"
+                  data-section-id="hotseat"
                   style={{ scrollSnapAlign: "start" }}
                   className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
                 >
-                  <SectionHeading tab={getSection("multiplayer")} />
+                  <SectionHeading tab={getSection("hotseat")} />
+                  <p className="text-xs text-blue-200/50 -mt-3 mb-4">
+                    Pass one device around the table - the GM collects each
+                    player&apos;s action before generating.
+                  </p>
                   <div className="space-y-5">
                   <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
                     <div className="flex items-center justify-between">
@@ -1141,19 +1184,32 @@ export default function MenuPage({
                       }
                     />
                   </div>
+                  </div>
+                </div>
 
-                  <div className="pt-2 border-t border-blue-800/20">
-                    <OnlinePlayEditor
-                      netSession={netSession}
-                      peers={netPeers}
-                      defaultName={storyData.displayName || storyData.player_name}
-                      createRoom={onCreateNetRoom}
-                      joinRoom={onJoinNetRoom}
-                      leaveRoom={onLeaveNetRoom}
-                      switchBackend={onSwitchNetBackend}
-                    />
-                  </div>
-                  </div>
+                <div
+                  ref={(el) => {
+                    sectionRefs.current["online"] = el;
+                  }}
+                  data-section-id="online"
+                  style={{ scrollSnapAlign: "start" }}
+                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                >
+                  <SectionHeading tab={getSection("online")} />
+                  <p className="text-xs text-blue-200/50 -mt-3 mb-4">
+                    Peer-to-peer over the internet - no server, no account.
+                    Host creates a room and shares the code; everyone else
+                    joins with it.
+                  </p>
+                  <OnlinePlayEditor
+                    netSession={netSession}
+                    peers={netPeers}
+                    defaultName={storyData.displayName || storyData.player_name}
+                    createRoom={onCreateNetRoom}
+                    joinRoom={onJoinNetRoom}
+                    leaveRoom={onLeaveNetRoom}
+                    switchBackend={onSwitchNetBackend}
+                  />
                 </div>
 
                 <div

@@ -7,6 +7,18 @@ import { StoryData, ScenePart } from "@/app/misc/structs";
 export type MPBackend = "torrent" | "nostr" | "mqtt" | "peerjs" | "manual";
 export type MPRole = "host" | "guest";
 
+// User-selectable subset of MPBackend - "manual" is a fallback the code can
+// switch to but never something a player picks from a dropdown, so it's
+// deliberately left out of this list. Shared across every host/join UI
+// (OnlinePlayEditor, and the Library/home "Host"/"Join a Game" entry points)
+// so they can't drift out of sync with each other.
+export const MP_BACKEND_OPTIONS: { value: MPBackend; label: string }[] = [
+  { value: "torrent", label: "Default (BitTorrent)" },
+  { value: "nostr", label: "Nostr" },
+  { value: "mqtt", label: "MQTT" },
+  { value: "peerjs", label: "PeerJS Cloud" },
+];
+
 // Room/peer identifiers are plain alphanumeric so the same code works
 // unmodified as both a Trystero roomId and a PeerJS peer id (PeerJS ids must
 // start/end alphanumeric; keeping the whole thing alphanumeric sidesteps the

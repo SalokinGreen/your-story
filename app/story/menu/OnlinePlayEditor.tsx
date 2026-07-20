@@ -4,16 +4,11 @@ import { useState } from "react";
 import { DynamicIcon } from "../../components/DynamicIcon";
 import { useNotification } from "../../misc/NotificationContext";
 import type { GuestJoinedInfo, NetSessionInfo } from "../../misc/multiplayer/session";
-import type { MPBackend } from "../../misc/multiplayer/types";
+import { MP_BACKEND_OPTIONS, type MPBackend } from "../../misc/multiplayer/types";
 import { isValidRoomCode, ROOM_CODE_LENGTH } from "../../misc/multiplayer/transports";
 import { PALETTE } from "./CouchPlayersEditor";
 
-const BACKEND_OPTIONS: { value: MPBackend; label: string }[] = [
-  { value: "torrent", label: "Default (BitTorrent)" },
-  { value: "nostr", label: "Nostr" },
-  { value: "mqtt", label: "MQTT" },
-  { value: "peerjs", label: "PeerJS Cloud" },
-];
+const BACKEND_OPTIONS = MP_BACKEND_OPTIONS;
 
 interface OnlinePlayEditorProps {
   netSession: NetSessionInfo | null;
@@ -206,16 +201,6 @@ export default function OnlinePlayEditor({
 
   return (
     <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40 space-y-4">
-      <div>
-        <label className="block text-sm font-semibold text-blue-200 mb-1">
-          Play Online
-        </label>
-        <p className="text-xs text-blue-200/60">
-          Peer-to-peer over the internet - no server, no account. Host
-          creates a room and shares the code; everyone else joins with it.
-        </p>
-      </div>
-
       <div className="flex gap-2">
         <button
           type="button"

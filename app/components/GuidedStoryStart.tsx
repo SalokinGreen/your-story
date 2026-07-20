@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { StaticIcon } from "./StaticIcon";
 import { DynamicIcon } from "./DynamicIcon";
 import LibraryPickerModal from "./LibraryPickerModal";
+import JoinGameModal from "./JoinGameModal";
 import { libraryNoteToStoryLore } from "../misc/localNotesLibraryManager";
 import { libraryTableToCustomTable } from "../misc/localTablesLibraryManager";
 import type { CustomTable, DiceMode, StoryLore } from "../misc/structs";
@@ -100,6 +101,7 @@ export default function GuidedStoryStart() {
   const [attachedLore, setAttachedLore] = useState<StoryLore[]>([]);
   const [attachedTables, setAttachedTables] = useState<CustomTable[]>([]);
   const [diceMode, setDiceMode] = useState<DiceMode>("ai");
+  const [showJoinGameModal, setShowJoinGameModal] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const characterAttached = attachedLore.some(
@@ -156,7 +158,7 @@ export default function GuidedStoryStart() {
     }
   };
 
-  const beginStory = async () => {
+  const beginStory = async (hostOnline: boolean = false) => {
     if (starting) return;
     setStarting(true);
     try {
@@ -177,7 +179,17 @@ export default function GuidedStoryStart() {
         { players: setupPlayers, diceMode },
         attachedTables.length ? attachedTables : undefined,
       );
-      router.push(`/story?storyId=${localId}`);
+      if (hostOnline) {
+        const params = new URLSearchParams({
+          storyId: localId,
+          hostName: setupPlayers[0]?.name || "Player",
+          hostColor: setupPlayers[0]?.color || PALETTE[0],
+          hostBackend: "torrent",
+        });
+        router.push(`/story?${params.toString()}`);
+      } else {
+        router.push(`/story?storyId=${localId}`);
+      }
     } catch (error) {
       console.error("Error starting freeform story:", error);
       setStarting(false);
@@ -209,7 +221,19 @@ export default function GuidedStoryStart() {
           <StaticIcon name="Play" className="w-5 h-5" />
           {starting ? "Starting..." : "Play Now"}
         </button>
+        <button
+          onClick={() => setShowJoinGameModal(true)}
+          className="mt-3 flex items-center justify-center gap-1.5 mx-auto text-sm text-blue-300/70 hover:text-white transition-colors"
+        >
+          <DynamicIcon name="Wifi" className="w-3.5 h-3.5" />
+          Have a room code? Join a Game
+        </button>
       </div>
+
+      <JoinGameModal
+        isOpen={showJoinGameModal}
+        onClose={() => setShowJoinGameModal(false)}
+      />
 
       {/* Setup wizard modal */}
       {open && (
@@ -630,12 +654,21 @@ export default function GuidedStoryStart() {
                   </div>
 
                   <button
-                    onClick={beginStory}
+                    onClick={() => beginStory()}
                     disabled={starting}
                     className="w-full py-3.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white text-base font-semibold shadow-lg shadow-purple-950/40 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                   >
                     <StaticIcon name="Sparkles" className="w-5 h-5" />
                     {starting ? "Starting..." : "Begin Adventure"}
+                  </button>
+                  <button
+                    onClick={() => beginStory(true)}
+                    disabled={starting}
+                    className="w-full py-2.5 rounded-xl bg-blue-900/30 hover:bg-blue-900/50 border border-blue-700/40 active:scale-[0.99] text-blue-200 text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                    title="Start this story and immediately open it as an online room others can join"
+                  >
+                    <DynamicIcon name="Wifi" className="w-4 h-4" />
+                    Host Online Game
                   </button>
                   <p className="text-xs text-blue-300/40 text-center">
                     The GM will ask what kind of world you want - then build
