@@ -315,10 +315,15 @@ function StoryPageContent() {
   // usual and this just mirrors resulting state out to guests; guest role
   // never calls generateStoryTurn itself, see the early returns in
   // handleChoiceWithAction/handleCustomInput below.
-  // createRoom/joinRoom/leaveRoom aren't pulled in yet - nothing calls them
-  // until Phase 3's "Play together" panel exists; re-destructure them then.
-  const { netSession, sendChoice: sendNetChoice, sendFreeform: sendNetFreeform } =
-    useNetSession({
+  const {
+    netSession,
+    peers: netPeers,
+    createRoom: createNetRoom,
+    joinRoom: joinNetRoom,
+    leaveRoom: leaveNetRoom,
+    sendChoice: sendNetChoice,
+    sendFreeform: sendNetFreeform,
+  } = useNetSession({
     storyData,
     loading,
     onGuestAction: (action) => {
@@ -3644,6 +3649,11 @@ function StoryPageContent() {
             onViewLogs={() => setCurrentState(StoryState.LOGS)}
             onViewContext={() => setCurrentState(StoryState.CONTEXT)}
             onOpenAIAssistant={() => setShowAIAssistant(true)}
+            netSession={netSession}
+            netPeers={netPeers}
+            onCreateNetRoom={createNetRoom}
+            onJoinNetRoom={joinNetRoom}
+            onLeaveNetRoom={leaveNetRoom}
           />
         )}
         {currentState === StoryState.LOGS && <LogViewer />}

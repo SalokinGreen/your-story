@@ -4,7 +4,7 @@ import { useState } from "react";
 import { CouchPlayer } from "../../misc/structs";
 import { DynamicIcon } from "../../components/DynamicIcon";
 
-const PALETTE = [
+export const PALETTE = [
   "#22c55e", // green
   "#ec4899", // pink
   "#3b82f6", // blue

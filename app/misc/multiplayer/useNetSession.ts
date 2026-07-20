@@ -36,6 +36,10 @@ export function useNetSession({
 }: UseNetSessionParams) {
   const sessionRef = useRef<NetSession | null>(null);
   const [netSession, setNetSession] = useState<NetSessionInfo | null>(null);
+  // Host-only reactive roster, for a "N players connected" style status
+  // display. Keyed by localPlayerId so a reconnect (new presence_join from
+  // the same player) updates in place instead of duplicating.
+  const [peers, setPeers] = useState<GuestJoinedInfo[]>([]);
 
   // Refs so the long-lived event subscriptions (registered once per
   // session, not once per render) always call the latest callback rather
@@ -53,15 +57,26 @@ export function useNetSession({
   const attach = useCallback((session: NetSession) => {
     session.onGuestAction((action) => onGuestActionRef.current(action));
     session.onSnapshot((data) => onSnapshotRef.current(data));
-    session.onGuestJoined((info) => onGuestJoinedRef.current(info));
+    session.onGuestJoined((info) => {
+      onGuestJoinedRef.current(info);
+      setPeers((prev) => {
+        const others = prev.filter((p) => p.localPlayerId !== info.localPlayerId);
+        return [...others, info];
+      });
+    });
+    session.onPeerLeft((localPlayerId) => {
+      setPeers((prev) => prev.filter((p) => p.localPlayerId !== localPlayerId));
+    });
     sessionRef.current = session;
     setNetSession(session.info());
+    setPeers([]);
   }, []);
 
   const leaveRoom = useCallback(async () => {
     await sessionRef.current?.leave();
     sessionRef.current = null;
     setNetSession(null);
+    setPeers([]);
   }, []);
 
   const createRoom = useCallback(
@@ -101,5 +116,5 @@ export function useNetSession({
     };
   }, []);
 
-  return { netSession, createRoom, joinRoom, leaveRoom, sendChoice, sendFreeform };
+  return { netSession, peers, createRoom, joinRoom, leaveRoom, sendChoice, sendFreeform };
 }

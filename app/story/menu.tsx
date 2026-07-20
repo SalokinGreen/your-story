@@ -42,6 +42,9 @@ import ThreadsEditor from "./menu/ThreadsEditor";
 import VariablesEditor from "./menu/VariablesEditor";
 import StoryMetaEditor from "./menu/StoryMetaEditor";
 import CouchPlayersEditor from "./menu/CouchPlayersEditor";
+import OnlinePlayEditor from "./menu/OnlinePlayEditor";
+import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
+import type { MPBackend } from "../misc/multiplayer/types";
 
 interface MenuProps extends StoryData {
   storyDbId: string | null;
@@ -51,6 +54,16 @@ interface MenuProps extends StoryData {
   onViewLogs?: () => void;
   onViewContext?: () => void;
   onOpenAIAssistant?: () => void;
+  netSession: NetSessionInfo | null;
+  netPeers: GuestJoinedInfo[];
+  onCreateNetRoom: (backend: MPBackend, displayName: string, color: string) => Promise<void>;
+  onJoinNetRoom: (
+    backend: MPBackend,
+    roomId: string,
+    displayName: string,
+    color: string,
+  ) => Promise<void>;
+  onLeaveNetRoom: () => Promise<void>;
 }
 
 type MenuTab =
@@ -75,6 +88,11 @@ export default function MenuPage({
   onViewLogs,
   onViewContext,
   onOpenAIAssistant,
+  netSession,
+  netPeers,
+  onCreateNetRoom,
+  onJoinNetRoom,
+  onLeaveNetRoom,
   ...storyData
 }: MenuProps) {
   const router = useRouter();
@@ -1119,6 +1137,17 @@ export default function MenuPage({
                           },
                         })
                       }
+                    />
+                  </div>
+
+                  <div className="pt-2 border-t border-blue-800/20">
+                    <OnlinePlayEditor
+                      netSession={netSession}
+                      peers={netPeers}
+                      defaultName={storyData.displayName || storyData.player_name}
+                      createRoom={onCreateNetRoom}
+                      joinRoom={onJoinNetRoom}
+                      leaveRoom={onLeaveNetRoom}
                     />
                   </div>
                   </div>
