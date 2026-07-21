@@ -72,6 +72,8 @@ interface AIResponse {
       role: string;
       content: string | null;
       reasoning?: string;
+      // DeepSeek's native API returns chain-of-thought here, not `reasoning`.
+      reasoning_content?: string;
       reasoning_details?: any[];
       tool_calls?: ToolCall[];
     };
@@ -204,6 +206,29 @@ function applyReasoningEffort(
   provider: "deepseek" | "openrouter" | "mistral" | "deepinfra" | "google",
   reasoningEffort?: string,
 ): void {
+  // DeepSeek V4's thinking mode is an explicit toggle (`thinking.type`) that
+  // DEFAULTS to enabled server-side, so it must be handled before the early
+  // return below - including the "none"/undefined case, where we explicitly
+  // DISABLE it. Two reasons to disable at effort "none": it matches the tier
+  // system's intent (cheap turns skip reasoning), and thinking mode silently
+  // rejects temperature/top_p/presence_penalty/frequency_penalty, which the
+  // creative-narration tiers rely on. When we DO enable it, strip those
+  // unsupported sampling params so the request stays valid.
+  if (provider === "deepseek") {
+    const wantsThinking = !!reasoningEffort && reasoningEffort !== "none";
+    requestBody.thinking = { type: wantsThinking ? "enabled" : "disabled" };
+    if (wantsThinking) {
+      // DeepSeek maps low/medium -> high and xhigh -> max in thinking mode.
+      requestBody.reasoning_effort =
+        reasoningEffort === "xhigh" ? "max" : "high";
+      delete requestBody.temperature;
+      delete requestBody.top_p;
+      delete requestBody.presence_penalty;
+      delete requestBody.frequency_penalty;
+    }
+    return;
+  }
+
   if (!reasoningEffort || reasoningEffort === "none") return;
 
   if (provider === "mistral") {
@@ -222,7 +247,7 @@ function applyReasoningEffort(
       requestBody.reasoning = { effort: mapped };
     }
   }
-  // deepseek/deepinfra/google: no confirmed lever for the models this app
+  // deepinfra/google: no confirmed lever for the models this app
   // targets - left as a no-op rather than guessing at an unverified param.
 }
 
@@ -590,7 +615,13 @@ export async function POST(req: NextRequest) {
     );
 
     const content = aiResponse.choices[0]?.message?.content || "";
-    const reasoning = aiResponse.choices[0]?.message?.reasoning || "";
+    // DeepSeek-native models put CoT in `reasoning_content`; OpenRouter/others
+    // in `reasoning`. Read whichever is present so reasoning is preserved into
+    // saved history regardless of provider.
+    const reasoning =
+      aiResponse.choices[0]?.message?.reasoning ||
+      aiResponse.choices[0]?.message?.reasoning_content ||
+      "";
     const reasoning_details =
       aiResponse.choices[0]?.message?.reasoning_details || [];
     let toolCalls = aiResponse.choices[0]?.message?.tool_calls;
