@@ -185,13 +185,20 @@ export function updateLiveRoundBlocks(
   // every token and unmounts/remounts the DOM node, which is what caused
   // the text to visibly disappear and re-fade-in while streaming.
   const prevLive = prevBlocks.slice(roundStart);
+  // Native reasoning (see updateLiveReasoningBlock) is tracked separately
+  // from the tagged content buffer parsed below - preserve it instead of
+  // letting this reparse silently drop it the moment content/tool deltas
+  // start arriving for the round.
+  const reasoningBlock = prevLive.find((b) => b.isReasoning);
+  const prevContentLive = prevLive.filter((b) => !b.isReasoning);
   const liveBlocks: TimelineBlock[] = parseTaggedContent(roundBuffer).map(
-    (b, i) => ({ id: prevLive[i]?.id ?? nextId(), ...b }),
+    (b, i) => ({ id: prevContentLive[i]?.id ?? nextId(), ...b }),
   );
   if (liveBlocks.length > 0) {
     liveBlocks[liveBlocks.length - 1].streaming = true;
   }
-  return [...frozen, ...liveBlocks];
+  const merged = reasoningBlock ? [reasoningBlock, ...liveBlocks] : liveBlocks;
+  return [...frozen, ...merged];
 }
 
 /**
