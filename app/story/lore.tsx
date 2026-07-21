@@ -126,6 +126,8 @@ export default function LorePage(props: LorePageProps) {
   const [editType, setEditType] = useState<LoreType>("lore");
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
+  const [page, setPage] = useState(1);
+  const PAGE_SIZE = 100;
   const [newNote, setNewNote] = useState<Partial<StoryLore>>({
     title: "",
     content: "",
@@ -278,6 +280,17 @@ export default function LorePage(props: LorePageProps) {
       return a.title.localeCompare(b.title);
     });
   }, [storyData.lore, selectedType, searchTerm]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredLore.length / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginatedLore = useMemo(
+    () =>
+      filteredLore.slice(
+        (currentPage - 1) * PAGE_SIZE,
+        currentPage * PAGE_SIZE
+      ),
+    [filteredLore, currentPage]
+  );
 
   // Count entries by type
   const typeCounts = useMemo(() => {
@@ -433,6 +446,7 @@ export default function LorePage(props: LorePageProps) {
                           setSelectedType(type);
                           setIsTypeDropdownOpen(false);
                           setSelectedLore(null);
+                          setPage(1);
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
                           selectedType === type
@@ -471,7 +485,10 @@ export default function LorePage(props: LorePageProps) {
             type="text"
             placeholder="Search notes..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setPage(1);
+            }}
             className="w-full px-4 py-2.5 pl-10 bg-blue-900/40 border border-blue-700/30 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
           />
           <DynamicIcon
@@ -480,7 +497,10 @@ export default function LorePage(props: LorePageProps) {
           />
           {searchTerm && (
             <button
-              onClick={() => setSearchTerm("")}
+              onClick={() => {
+                setSearchTerm("");
+                setPage(1);
+              }}
               className="absolute right-3 top-2.5 p-0.5 hover:bg-blue-800/50 rounded"
             >
               <DynamicIcon name="X" className="h-4 w-4 text-blue-300/50" />
@@ -537,7 +557,7 @@ export default function LorePage(props: LorePageProps) {
           )}
 
           <div className="space-y-1 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-blue-800/50 scrollbar-track-transparent">
-            {filteredLore.map((loreItem, index) => {
+            {paginatedLore.map((loreItem, index) => {
               const itemType = loreItem.type || "lore";
               const isSecret = loreItem.secrtet;
               const isSelected = selectedLore?.title === loreItem.title;
@@ -649,6 +669,30 @@ export default function LorePage(props: LorePageProps) {
               );
             })}
           </div>
+
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-blue-800/30">
+              <button
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="p-1.5 rounded-lg text-blue-300 hover:bg-blue-800/50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                title="Previous page"
+              >
+                <DynamicIcon name="ChevronLeft" className="w-4 h-4" />
+              </button>
+              <span className="text-xs text-blue-300/50">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="p-1.5 rounded-lg text-blue-300 hover:bg-blue-800/50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                title="Next page"
+              >
+                <DynamicIcon name="ChevronRight" className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Lore Detail */}
