@@ -19,6 +19,7 @@ import {
   CouchPlayer,
 } from "../misc/structs";
 import { useNetSession } from "../misc/multiplayer/useNetSession";
+import type { MPBackend } from "../misc/multiplayer/types";
 import {
   askFate,
   generateElement,
@@ -445,6 +446,12 @@ function StoryPageContent() {
   const [liveGMEntries, setLiveGMEntries] = useState<TimelineBlock[]>([]);
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
+  // Deep-link auto-host: opens the Menu tab's Story Editor straight to the
+  // Online Play section once the room has been created (see the
+  // hostName/join query-param effect below).
+  const [autoOpenOnlineSection, setAutoOpenOnlineSection] = useState(false);
+  const autoHostAttemptedRef = useRef(false);
+  const autoJoinAttemptedRef = useRef(false);
   const [started, setStarted] = useState(false);
   const [canRetry, setCanRetry] = useState(false);
   const [canUndo, setCanUndo] = useState(false);
@@ -846,6 +853,60 @@ function StoryPageContent() {
 
     loadStory();
   }, [storyId, addNotification]);
+
+  // Deep-link auto-host / auto-join: the Library, home page, and
+  // GuidedStoryStart wizard route here with extra query params instead of
+  // making the player dig into Menu > Story Editor > Online Play manually.
+  // Each runs at most once (guarded by the refs) since the query params
+  // stay in the URL after being consumed.
+  useEffect(() => {
+    if (!storyData || loadingStory) return;
+    const VALID_BACKENDS: MPBackend[] = ["torrent", "nostr", "mqtt", "peerjs"];
+    const parseBackend = (value: string | null): MPBackend =>
+      VALID_BACKENDS.includes(value as MPBackend) ? (value as MPBackend) : "torrent";
+
+    const hostName = searchParams.get("hostName");
+    const joinCode = searchParams.get("join");
+
+    if (hostName && !autoHostAttemptedRef.current && !netSession) {
+      autoHostAttemptedRef.current = true;
+      const backend = parseBackend(searchParams.get("hostBackend"));
+      const color = searchParams.get("hostColor") || "#a855f7";
+      router.replace(`/story?storyId=${storyId}`);
+      createNetRoom(backend, hostName, color)
+        .then(() => {
+          addNotification(
+            "Room created - share the code with your players",
+            "success",
+          );
+          setAutoOpenOnlineSection(true);
+          setCurrentState(StoryState.MENU);
+        })
+        .catch((error) => {
+          addNotification(
+            error instanceof Error ? error.message : "Failed to create room",
+            "failure",
+          );
+        });
+    }
+
+    if (joinCode && !autoJoinAttemptedRef.current && !netSession) {
+      autoJoinAttemptedRef.current = true;
+      const backend = parseBackend(searchParams.get("joinBackend"));
+      const name = searchParams.get("joinName") || "Player";
+      const color = searchParams.get("joinColor") || "#22c55e";
+      router.replace(`/story?storyId=${storyId}`);
+      setLoading(true);
+      joinNetRoom(backend, joinCode, name, color).catch((error) => {
+        setLoading(false);
+        addNotification(
+          error instanceof Error ? error.message : "Failed to join room",
+          "failure",
+        );
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyData, loadingStory]);
 
   // Sync lore and memory embeddings when story is first loaded (if embeddings enabled and dirty)
   useEffect(() => {
@@ -3732,6 +3793,7 @@ function StoryPageContent() {
             onJoinNetRoom={joinNetRoom}
             onLeaveNetRoom={leaveNetRoom}
             onSwitchNetBackend={switchNetBackend}
+            autoOpenSection={autoOpenOnlineSection ? "online" : undefined}
           />
         )}
         {currentState === StoryState.LOGS && <LogViewer />}

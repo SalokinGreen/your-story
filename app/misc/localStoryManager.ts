@@ -383,6 +383,59 @@ export async function startFreeformStoryLocally(
   return localId;
 }
 
+/**
+ * Creates a minimal local story shell for a guest who is about to join an
+ * online room from the home page or Library - i.e. before they have any
+ * story of their own. `/story` needs an existing local storyId to load, so
+ * this exists purely as that placeholder: a single "connecting" scene part
+ * with no choices, which gets fully overwritten once the host's first
+ * state_snapshot arrives (see the onSnapshot handler in story/page.tsx).
+ */
+export async function createJoinPlaceholderStory(
+  playerName: string = "Player",
+): Promise<string> {
+  const localId = `local_${Date.now()}_${Math.random()
+    .toString(36)
+    .substring(2, 9)}`;
+
+  const newStoryData = {
+    story_name: "Joining room...",
+    premise: "",
+    player_name: playerName,
+    player_summary: "",
+    player_notes: "",
+    intro: "",
+    memory: [],
+    max_chapters: 0,
+    currentChapter: 0,
+    chapters: [],
+    scene: {
+      parts: [
+        {
+          content: "Connecting to the room...",
+          imageUrl: "",
+          user: false,
+          role: "assistant",
+          choices: [],
+        },
+      ],
+    },
+    stats: [],
+    resources: [],
+    inventory: [],
+    abilities: [],
+    lore: [],
+    customTables: [],
+    goals: [],
+    relationships: [],
+    npcs: [],
+  } as unknown as StoryData;
+
+  await saveLocalStory(localId, newStoryData);
+
+  return localId;
+}
+
 export async function getLocalStory(
   storyId: string,
 ): Promise<LocalStory | undefined> {

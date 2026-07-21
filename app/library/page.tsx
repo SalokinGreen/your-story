@@ -40,6 +40,8 @@ import {
 } from "@/app/misc/localNotesLibraryManager";
 import { libraryTableToCustomTable } from "@/app/misc/localTablesLibraryManager";
 import LibraryPickerModal from "@/app/components/LibraryPickerModal";
+import JoinGameModal from "@/app/components/JoinGameModal";
+import HostGameModal from "@/app/components/HostGameModal";
 import type { CustomTable, StoryLore } from "@/app/misc/structs";
 
 type LibraryView = "stories" | "adventures" | "notes";
@@ -229,6 +231,8 @@ export default function LibraryPage() {
   const [pendingPlay, setPendingPlay] = useState<
     { kind: "adventure"; adventure: LocalAdventure } | { kind: "freeform" } | null
   >(null);
+  const [showJoinGameModal, setShowJoinGameModal] = useState(false);
+  const [hostingStoryId, setHostingStoryId] = useState<string | null>(null);
 
   const handlePlayAdventure = (adventure: LocalAdventure) => {
     setPendingPlay({ kind: "adventure", adventure });
@@ -614,6 +618,14 @@ export default function LibraryPage() {
             <h1 className="text-lg font-bold">Library</h1>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowJoinGameModal(true)}
+              title="Join someone else's online room with a room code"
+              className="flex items-center gap-2 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-xl transition-colors text-sm font-medium"
+            >
+              <DynamicIcon name="Wifi" className="w-4 h-4" />
+              <span className="hidden sm:inline">Join a Game</span>
+            </button>
             {view === "stories" && (
               <button
                 onClick={handleStartFreeformStory}
@@ -1008,6 +1020,13 @@ export default function LibraryPage() {
                             className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                             onClick={(e) => e.stopPropagation()}
                           >
+                            <button
+                              onClick={() => setHostingStoryId(story.id)}
+                              className="p-1.5 hover:bg-blue-800/50 rounded-lg transition-colors"
+                              title="Host this story online"
+                            >
+                              <DynamicIcon name="Wifi" className="w-4 h-4" />
+                            </button>
                             <button
                               onClick={() => setMovingStory(story.id)}
                               className="p-1.5 hover:bg-blue-800/50 rounded-lg transition-colors"
@@ -1431,6 +1450,17 @@ export default function LibraryPage() {
             tables.map(libraryTableToCustomTable),
           )
         }
+      />
+
+      <JoinGameModal
+        isOpen={showJoinGameModal}
+        onClose={() => setShowJoinGameModal(false)}
+      />
+
+      <HostGameModal
+        isOpen={hostingStoryId !== null}
+        onClose={() => setHostingStoryId(null)}
+        storyId={hostingStoryId || ""}
       />
     </div>
   );
