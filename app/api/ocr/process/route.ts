@@ -7,10 +7,6 @@ import { processOCR, OCRProcessRequestBody } from "@/app/misc/ocrCall";
 // client surfaces it as a chunk timeout.
 export const maxDuration = 300;
 
-// Allow large payloads for base64 PDF uploads (up to 50MB)
-// Note: This works in Vercel. For development, Next.js has no built-in body limit.
-export const dynamic = "force-dynamic";
-
 export async function POST(request: NextRequest) {
   try {
     const body: OCRProcessRequestBody = await request.json();

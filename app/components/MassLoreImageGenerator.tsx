@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
+import { creatorImageFetch } from "@/app/misc/creatorFetch";
 import {
   getSavedImageGenSettings,
   saveImageGenSettings,
@@ -85,21 +86,15 @@ export default function MassLoreImageGenerator({
       const prompt = generatePromptForLore(loreEntry);
 
       // Call image generation API
-      const response = await fetch("/api/creator/generate-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt,
-          model: imageModel,
-          imageType: "thumbnail",
-          provider: imageProvider,
-          openRouterKey:
-            imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
-          deepInfraKey:
-            imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
-        }),
+      const response = await creatorImageFetch({
+        prompt,
+        model: imageModel,
+        imageType: "thumbnail",
+        provider: imageProvider,
+        openRouterKey:
+          imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
+        deepInfraKey:
+          imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
       });
 
       if (!response.ok) {

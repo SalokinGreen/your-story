@@ -3,6 +3,7 @@
 import { useState, useEffect, Suspense, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
+import { creatorImageFetch } from "@/app/misc/creatorFetch";
 
 import {
   StoryData,
@@ -2232,21 +2233,15 @@ ${description || ""}`;
 
     try {
       // Call image generation API
-      const response = await fetch("/api/creator/generate-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt,
-          model: imageModel,
-          imageType: type,
-          provider: imageProvider,
-          openRouterKey:
-            imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
-          deepInfraKey:
-            imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
-        }),
+      const response = await creatorImageFetch({
+        prompt,
+        model: imageModel,
+        imageType: type,
+        provider: imageProvider,
+        openRouterKey:
+          imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
+        deepInfraKey:
+          imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
       });
 
       if (!response.ok) {
