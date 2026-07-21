@@ -60,8 +60,8 @@ export async function updateUserSettings(
 // CUSTOM MODELS (user-added OpenRouter models, BYOK only)
 // ============================================================
 // Stored under their own localStorage key (not nested in STORAGE_KEY above)
-// since several components (CreatorAIChat, StoryCreativeAssistant) already
-// read/write "customModels" directly - these helpers are additive, reading
+// since CreatorAIChat already reads/writes "customModels" directly - these
+// helpers are additive, reading
 // and writing the exact same key/shape so all call sites stay in sync.
 
 const CUSTOM_MODELS_KEY = "customModels";

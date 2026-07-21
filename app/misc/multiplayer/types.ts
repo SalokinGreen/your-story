@@ -69,4 +69,14 @@ export type WireMessage =
       requestId: string;
       // null = the targeted guest skipped/cancelled the throw.
       faces: number[] | null;
+    }
+  // Out-of-character chat between online players - the GM never sees this,
+  // it's not part of StoryData and never enters the AI prompt context.
+  | {
+      type: "ooc_chat";
+      playerId: string;
+      displayName: string;
+      color: string;
+      text: string;
+      timestamp: number;
     };

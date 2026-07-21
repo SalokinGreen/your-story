@@ -14,6 +14,7 @@ import {
   GuestJoinedInfo,
   NetSession,
   NetSessionInfo,
+  OOCChatMessage,
   ValidatedGuestAction,
 } from "./session";
 import type { MPBackend, PresenceActivityState, RoomId } from "./types";
@@ -56,6 +57,9 @@ export function useNetSession({
   const [activity, setActivity] = useState<Record<string, PresenceActivityState>>({});
   // Guest-only: true once the single link to the host has dropped.
   const [hostDisconnected, setHostDisconnected] = useState(false);
+  // OOC chat history for the current room - never persisted, never touches
+  // StoryData, reset whenever the room is (re)joined or left.
+  const [oocMessages, setOOCMessages] = useState<OOCChatMessage[]>([]);
 
   // Refs so the long-lived event subscriptions (registered once per
   // session, not once per render) always call the latest callback rather
@@ -107,6 +111,9 @@ export function useNetSession({
       setActivity((prev) => ({ ...prev, [localPlayerId]: state }));
     });
     session.onHostDisconnected(() => setHostDisconnected(true));
+    session.onOOCChat((message) => {
+      setOOCMessages((prev) => [...prev, message]);
+    });
     session.onDiceThrowRequest((request) => onDiceThrowRequestRef.current?.(request));
     session.onDiceThrowResult((result) => onDiceThrowResultRef.current?.(result));
     session.onBackendSwitch(async (to) => {
@@ -122,6 +129,7 @@ export function useNetSession({
     setPeers([]);
     setActivity({});
     setHostDisconnected(false);
+    setOOCMessages([]);
   }, []);
 
   useEffect(() => {
@@ -135,6 +143,7 @@ export function useNetSession({
     setPeers([]);
     setActivity({});
     setHostDisconnected(false);
+    setOOCMessages([]);
   }, []);
 
   const createRoom = useCallback(
@@ -181,6 +190,25 @@ export function useNetSession({
     sessionRef.current?.sendActivity(state);
   }, []);
 
+  const sendOOCChat = useCallback((text: string) => {
+    const session = sessionRef.current;
+    if (!session) return;
+    session.sendOOCChat(text);
+    // NetSession's onOOCChat only fires for messages from other peers - add
+    // our own to local history right away so it shows up immediately.
+    const info = session.info();
+    setOOCMessages((prev) => [
+      ...prev,
+      {
+        playerId: info.myLocalPlayerId,
+        displayName: info.displayName,
+        color: info.color,
+        text,
+        timestamp: Date.now(),
+      },
+    ]);
+  }, []);
+
   const sendDiceThrowRequest = useCallback(
     (
       requestId: string,
@@ -215,6 +243,7 @@ export function useNetSession({
     peers,
     activity,
     hostDisconnected,
+    oocMessages,
     createRoom,
     joinRoom,
     leaveRoom,
@@ -223,6 +252,7 @@ export function useNetSession({
     sendFreeform,
     sendVoice,
     sendActivity,
+    sendOOCChat,
     sendDiceThrowRequest,
     sendDiceThrowResult,
   };
