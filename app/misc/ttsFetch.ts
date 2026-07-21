@@ -4,18 +4,23 @@
  */
 
 import { isStandalone } from "./standalone";
-import { generateTTSAudio, TTSRequestBody } from "./ttsCall";
+import { generateTTSAudioStream, TTSRequestBody } from "./ttsCall";
 
-export async function ttsFetch(body: TTSRequestBody): Promise<Response> {
+export async function ttsFetch(body: TTSRequestBody, signal?: AbortSignal): Promise<Response> {
   if (!isStandalone()) {
     return fetch("/api/tts/generate", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal,
     });
   }
 
-  const result = await generateTTSAudio(body);
+  // The standalone path calls generateTTSAudioStream in-process rather than
+  // over the network, so `signal` has nothing to abort here - cancellation
+  // for this path is handled by the caller discarding the returned stream's
+  // reader instead (see streamChunksToPlayer in TTSControls.tsx).
+  const result = await generateTTSAudioStream(body);
   if ("error" in result) {
     return new Response(JSON.stringify(result), {
       status: result.status,
@@ -23,11 +28,10 @@ export async function ttsFetch(body: TTSRequestBody): Promise<Response> {
     });
   }
 
-  return new Response(result.audioBuffer, {
+  return new Response(result.stream, {
     status: 200,
     headers: {
-      "Content-Type": "audio/mpeg",
-      "Content-Length": result.audioBuffer.byteLength.toString(),
+      "Content-Type": "application/octet-stream",
       "X-Chunks-Generated": result.chunksGenerated.toString(),
       "X-TTS-Model": result.model,
     },

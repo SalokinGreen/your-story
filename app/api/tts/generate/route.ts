@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateTTSAudio, TTSRequestBody } from "@/app/misc/ttsCall";
+import { generateTTSAudioStream, TTSRequestBody } from "@/app/misc/ttsCall";
 
 export async function POST(req: NextRequest) {
   try {
     const body: TTSRequestBody = await req.json();
-    const result = await generateTTSAudio(body);
+    const result = await generateTTSAudioStream(body);
 
     if ("error" in result) {
       return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    return new NextResponse(result.audioBuffer, {
+    return new NextResponse(result.stream, {
       status: 200,
       headers: {
-        "Content-Type": "audio/mpeg",
-        "Content-Length": result.audioBuffer.byteLength.toString(),
-        "Cache-Control": "public, max-age=3600",
+        // Framed chunk stream, not raw playable audio - see frameChunk() in
+        // ttsCall.ts and the client-side reader in TTSControls.tsx.
+        "Content-Type": "application/octet-stream",
+        "Cache-Control": "no-store",
         "X-Chunks-Generated": result.chunksGenerated.toString(),
         "X-TTS-Model": result.model,
       },
