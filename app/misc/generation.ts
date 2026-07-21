@@ -10,6 +10,8 @@
  * The backend is now just a thin AI proxy.
  */
 
+import { providerFetch } from "@/app/misc/providerFetch";
+import { GenerateRequestBody } from "@/app/misc/providerCall";
 import {
   StoryData,
   CommandResponse,
@@ -399,13 +401,9 @@ async function generateChoicesWithRetry(
       customBudget: budget,
     });
 
-    const response = await fetch("/api/generate-stream", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${fetchOptions.token}`,
-      },
-      body: JSON.stringify({
+    const response = await providerFetch(
+      "/api/generate-stream",
+      {
         messages: choicesPrompt.messages,
         model: fetchOptions.model,
         maxTokens: 1500,
@@ -416,9 +414,9 @@ async function generateChoicesWithRetry(
         mistralKey: fetchOptions.mistralKey,
         deepinfraKey: fetchOptions.deepinfraKey,
         customModel: getCustomModelIfUUID(fetchOptions.model),
-      }),
-      signal: fetchOptions.abortSignal,
-    });
+      },
+      fetchOptions.abortSignal,
+    );
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
@@ -986,8 +984,10 @@ export async function generateStoryTurn(
           }
 
           // Use streaming for GM stage so user can see thinking in real-time
-          const buildGmRequestBody = (model: string, effort: ReasoningEffort) =>
-            JSON.stringify({
+          const buildGmRequestBody = (
+            model: string,
+            effort: ReasoningEffort,
+          ): GenerateRequestBody => ({
               messages: messagesWithHistory,
               tools: gmBaseTools,
               model,
@@ -1022,15 +1022,11 @@ export async function generateStoryTurn(
                 : {}),
             });
 
-          let gmResponse = await fetch("/api/generate-stream", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: buildGmRequestBody(gmModel, gmReasoningEffort),
-            signal: options.abortSignal,
-          });
+          let gmResponse = await providerFetch(
+            "/api/generate-stream",
+            buildGmRequestBody(gmModel, gmReasoningEffort),
+            options.abortSignal,
+          );
 
           // Model unavailable - fall back to the next-lower tier instead of crashing.
           if (!gmResponse.ok) {
@@ -1053,15 +1049,11 @@ export async function generateStoryTurn(
                 ...getTierState(storyData),
                 currentTier: fallbackResolved.tier,
               };
-              gmResponse = await fetch("/api/generate-stream", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: buildGmRequestBody(gmModel, gmReasoningEffort),
-                signal: options.abortSignal,
-              });
+              gmResponse = await providerFetch(
+                "/api/generate-stream",
+                buildGmRequestBody(gmModel, gmReasoningEffort),
+                options.abortSignal,
+              );
             }
           }
 
@@ -1737,7 +1729,7 @@ export async function generateStoryTurn(
       // regardless of which tier adjudication used - this is what keeps
       // the GM's voice consistent even when a turn escalated to a heavier
       // reasoning tier.
-      const storyRequestBody: Record<string, unknown> = {
+      const storyRequestBody: GenerateRequestBody = {
         messages: storyMessages,
         model: narrationModel,
         maxTokens: storyMaxOutput,
@@ -1760,15 +1752,11 @@ export async function generateStoryTurn(
         storyRequestBody.samplingSettings = options.samplingSettings;
       }
 
-      const storyResponse = await fetch("/api/generate-stream", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(storyRequestBody),
-        signal: options.abortSignal,
-      });
+      const storyResponse = await providerFetch(
+        "/api/generate-stream",
+        storyRequestBody,
+        options.abortSignal,
+      );
 
       logger.action("Story stage request sent", {
         maxTokens: storyMaxOutput,
@@ -2208,28 +2196,18 @@ export async function generateSimple(
   toolCalls: ToolCall[];
   meta: GenerationMeta;
 }> {
-  // No backend auth system anymore - see generateStoryTurn's comment above.
-  const token: string | null = null;
-
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      messages,
-      tools: options.tools,
-      model: options.model,
-      maxTokens: options.maxTokens || 4000,
-      temperature: options.temperature || 0.7,
-      openRouterKey: options.openRouterKey,
-      deepseekKey: options.deepseekKey,
-      googleKey: options.googleKey,
-      mistralKey: options.mistralKey,
-      deepinfraKey: options.deepinfraKey,
-      customModel: options.customModel,
-    }),
+  const response = await providerFetch("/api/generate", {
+    messages,
+    tools: options.tools,
+    model: options.model,
+    maxTokens: options.maxTokens || 4000,
+    temperature: options.temperature || 0.7,
+    openRouterKey: options.openRouterKey,
+    deepseekKey: options.deepseekKey,
+    googleKey: options.googleKey,
+    mistralKey: options.mistralKey,
+    deepinfraKey: options.deepinfraKey,
+    customModel: options.customModel,
   });
 
   if (!response.ok) {
@@ -2263,27 +2241,17 @@ export async function* generateSimpleStream(
     deepinfraKey?: string;
   },
 ): AsyncGenerator<StreamEvent> {
-  // No backend auth system anymore - see generateStoryTurn's comment above.
-  const token: string | null = null;
-
-  const response = await fetch("/api/generate-stream", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      messages,
-      tools: options.tools,
-      model: options.model,
-      maxTokens: options.maxTokens || 4000,
-      temperature: options.temperature || 0.7,
-      openRouterKey: options.openRouterKey,
-      deepseekKey: options.deepseekKey,
-      googleKey: options.googleKey,
-      mistralKey: options.mistralKey,
-      deepinfraKey: options.deepinfraKey,
-    }),
+  const response = await providerFetch("/api/generate-stream", {
+    messages,
+    tools: options.tools,
+    model: options.model,
+    maxTokens: options.maxTokens || 4000,
+    temperature: options.temperature || 0.7,
+    openRouterKey: options.openRouterKey,
+    deepseekKey: options.deepseekKey,
+    googleKey: options.googleKey,
+    mistralKey: options.mistralKey,
+    deepinfraKey: options.deepinfraKey,
   });
 
   if (!response.ok) {
@@ -2319,9 +2287,6 @@ export async function analyzeAction(
     deepinfraKey?: string;
   },
 ): Promise<ActionAnalysisResult> {
-  // No backend auth system anymore - see generateStoryTurn's comment above.
-  const token: string | null = null;
-
   logger.action("Analyzing freeform action", { userAction, model });
 
   const prompt = buildActionAnalysisPrompt({ storyData, userAction });
@@ -2333,23 +2298,16 @@ export async function analyzeAction(
     userMessage: prompt.messages[1].content,
   });
 
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      messages: prompt.messages,
-      model,
-      maxTokens: 500,
-      temperature: 0.3, // Low temperature for structured output
-      openRouterKey: apiKeys?.openRouterKey,
-      deepseekKey: apiKeys?.deepseekKey,
-      googleKey: apiKeys?.googleKey,
-      mistralKey: apiKeys?.mistralKey,
-      deepinfraKey: apiKeys?.deepinfraKey,
-    }),
+  const response = await providerFetch("/api/generate", {
+    messages: prompt.messages,
+    model,
+    maxTokens: 500,
+    temperature: 0.3, // Low temperature for structured output
+    openRouterKey: apiKeys?.openRouterKey,
+    deepseekKey: apiKeys?.deepseekKey,
+    googleKey: apiKeys?.googleKey,
+    mistralKey: apiKeys?.mistralKey,
+    deepinfraKey: apiKeys?.deepinfraKey,
   });
 
   if (!response.ok) {
