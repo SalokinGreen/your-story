@@ -149,7 +149,7 @@ export default function QuickStartGenres() {
             <button
               key={genre.name}
               onClick={() => handleGenreClick(genre)}
-              className="px-4 py-2 bg-blue-950/50 hover:bg-blue-900/50 text-blue-200 rounded-lg border border-blue-800/30 transition-all hover:border-blue-600/50 flex items-center gap-2"
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-blue-200 rounded-lg border border-white/10 transition-all hover:border-purple-400/40 flex items-center gap-2"
             >
               <StaticIcon name={genre.icon} className="w-4 h-4" />
               {genre.name}
@@ -161,7 +161,7 @@ export default function QuickStartGenres() {
       {/* Quick Start Modal */}
       {selectedGenre && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-blue-950 border border-blue-700/50 rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl shadow-black/50">
             {/* Header */}
             <div className="flex items-center gap-3 mb-4">
               <div
@@ -192,7 +192,7 @@ export default function QuickStartGenres() {
                 value={customPrompt}
                 onChange={(e) => setCustomPrompt(e.target.value)}
                 placeholder={`Describe your ${selectedGenre.name.toLowerCase()} adventure idea, or leave blank for AI to decide...`}
-                className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
                 rows={3}
               />
             </div>
@@ -202,7 +202,7 @@ export default function QuickStartGenres() {
               <label className="block text-sm font-medium text-blue-200 mb-2">
                 Adventure Size
               </label>
-              <div className="bg-blue-900/30 border border-blue-700/30 rounded-lg p-4">
+              <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                 {/* Slider */}
                 <input
                   type="range"
@@ -210,7 +210,7 @@ export default function QuickStartGenres() {
                   max={sizePresets.length - 1}
                   value={sizeIndex}
                   onChange={(e) => setSizeIndex(parseInt(e.target.value))}
-                  className="w-full h-2 bg-blue-800/50 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                  className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
                 />
                 {/* Labels */}
                 <div className="flex justify-between text-xs text-blue-400/60 mt-1 px-1">
@@ -238,7 +238,7 @@ export default function QuickStartGenres() {
             </div>
 
             {/* Info Box */}
-            <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3 mb-4">
+            <div className="bg-purple-500/[0.06] border border-purple-400/20 rounded-lg p-3 mb-4">
               <div className="flex items-start gap-2">
                 <StaticIcon
                   name="Sparkles"
@@ -258,7 +258,7 @@ export default function QuickStartGenres() {
             </div>
 
             {/* Keep Tab Open Warning */}
-            <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-3 mb-4">
+            <div className="bg-amber-500/[0.06] border border-amber-400/20 rounded-lg p-3 mb-4">
               <div className="flex items-start gap-2">
                 <StaticIcon
                   name="AlertTriangle"
@@ -275,13 +275,13 @@ export default function QuickStartGenres() {
             <div className="flex gap-3">
               <button
                 onClick={() => setSelectedGenre(null)}
-                className="flex-1 px-4 py-2.5 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleGenerate}
-                className="flex-1 px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all font-medium flex items-center justify-center gap-2"
               >
                 <StaticIcon name="Wand2" className="w-4 h-4" />
                 Generate Adventure

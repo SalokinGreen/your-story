@@ -210,9 +210,9 @@ export default function LibraryPickerModal({
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-linear-to-br from-blue-950 to-slate-900 rounded-xl border border-blue-700/40 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl">
+      <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl border border-white/10 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl shadow-black/50">
         {/* Header */}
-        <div className="flex items-start justify-between gap-3 p-4 border-b border-blue-800/40">
+        <div className="flex items-start justify-between gap-3 p-4 border-b border-white/10">
           <div>
             <h3 className="text-lg font-semibold text-white flex items-center gap-2">
               <DynamicIcon
@@ -225,14 +225,14 @@ export default function LibraryPickerModal({
           </div>
           <button
             onClick={onClose}
-            className="p-1 hover:bg-blue-800/50 rounded-lg transition-colors shrink-0"
+            className="p-1 hover:bg-white/10 rounded-lg transition-colors shrink-0"
           >
             <DynamicIcon name="X" className="w-5 h-5 text-blue-300" />
           </button>
         </div>
 
         {includeTables && (
-          <div className="flex border-b border-blue-800/30">
+          <div className="flex border-b border-white/10">
             <button
               onClick={() => setTab("notes")}
               className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
@@ -261,7 +261,7 @@ export default function LibraryPickerModal({
         )}
 
         {/* Filters */}
-        <div className="p-4 space-y-3 border-b border-blue-800/30">
+        <div className="p-4 space-y-3 border-b border-white/10">
           <div className="relative">
             <input
               type="text"
@@ -272,7 +272,7 @@ export default function LibraryPickerModal({
                   ? "Search tables or tags..."
                   : "Search notes or tags..."
               }
-              className="w-full px-3 py-2 pl-9 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+              className="w-full px-3 py-2 pl-9 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
             />
             <DynamicIcon
               name="Search"
@@ -290,7 +290,7 @@ export default function LibraryPickerModal({
                   className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
                     selectedFolder === null
                       ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-                      : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+                      : "bg-white/5 text-blue-200/70 hover:bg-white/10"
                   }`}
                 >
                   All
@@ -300,7 +300,7 @@ export default function LibraryPickerModal({
                   className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all ${
                     selectedFolder === "uncategorized"
                       ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-                      : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+                      : "bg-white/5 text-blue-200/70 hover:bg-white/10"
                   }`}
                 >
                   Uncategorized
@@ -312,7 +312,7 @@ export default function LibraryPickerModal({
                     className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
                       selectedFolder === folder.id
                         ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-                        : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+                        : "bg-white/5 text-blue-200/70 hover:bg-white/10"
                     }`}
                   >
                     <DynamicIcon name={folder.icon} className="w-3 h-3" />
@@ -365,14 +365,14 @@ export default function LibraryPickerModal({
                       className={`w-full text-left p-2.5 rounded-lg border transition-all flex items-center gap-3 ${
                         isSelected
                           ? "border-purple-500/50 bg-purple-500/10"
-                          : "border-blue-800/20 hover:border-blue-600/40 hover:bg-blue-500/5"
+                          : "border-white/10 hover:border-purple-400/30 hover:bg-white/5"
                       }`}
                     >
                       <div
                         className={`w-4 h-4 shrink-0 rounded border flex items-center justify-center ${
                           isSelected
                             ? "bg-purple-600 border-purple-500"
-                            : "border-blue-600/50"
+                            : "border-white/20"
                         }`}
                       >
                         {isSelected && (
@@ -398,7 +398,7 @@ export default function LibraryPickerModal({
                           </p>
                         )}
                       </div>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300/70 shrink-0">
+                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-white/5 text-blue-300/70 shrink-0">
                         {noteTypeLabel(note.type)}
                       </span>
                     </button>
@@ -449,14 +449,14 @@ export default function LibraryPickerModal({
                       className={`w-full text-left p-2.5 rounded-lg border transition-all flex items-center gap-3 ${
                         isSelected
                           ? "border-purple-500/50 bg-purple-500/10"
-                          : "border-blue-800/20 hover:border-blue-600/40 hover:bg-blue-500/5"
+                          : "border-white/10 hover:border-purple-400/30 hover:bg-white/5"
                       }`}
                     >
                       <div
                         className={`w-4 h-4 shrink-0 rounded border flex items-center justify-center ${
                           isSelected
                             ? "bg-purple-600 border-purple-500"
-                            : "border-blue-600/50"
+                            : "border-white/20"
                         }`}
                       >
                         {isSelected && (
@@ -482,7 +482,7 @@ export default function LibraryPickerModal({
                           </p>
                         )}
                       </div>
-                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-900/50 text-blue-300/70 shrink-0">
+                      <span className="text-xs px-1.5 py-0.5 rounded-md bg-white/5 text-blue-300/70 shrink-0">
                         {tbl.entries.length} entries
                       </span>
                     </button>
@@ -494,21 +494,21 @@ export default function LibraryPickerModal({
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-blue-800/40">
+        <div className="flex items-center justify-between p-4 border-t border-white/10">
           <span className="text-xs text-blue-300/50">
             {totalSelected} selected
           </span>
           <div className="flex gap-2">
             <button
               onClick={onClose}
-              className="px-4 py-2 text-sm text-blue-300 hover:bg-blue-800/40 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
             >
               Cancel
             </button>
             {onSkip && (
               <button
                 onClick={onSkip}
-                className="px-4 py-2 text-sm text-blue-200 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
+                className="px-4 py-2 text-sm text-blue-200 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
               >
                 {skipLabel}
               </button>
@@ -516,7 +516,7 @@ export default function LibraryPickerModal({
             <button
               onClick={handleConfirm}
               disabled={totalSelected === 0}
-              className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-500 disabled:bg-blue-800/40 disabled:text-blue-400/50 text-white rounded-lg transition-colors flex items-center gap-2"
+              className="px-4 py-2 text-sm bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:from-white/10 disabled:to-white/10 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all flex items-center gap-2"
             >
               <DynamicIcon name="Import" className="w-4 h-4" />
               {confirmLabel || "Attach Selected"}
