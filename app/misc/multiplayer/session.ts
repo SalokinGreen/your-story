@@ -63,6 +63,16 @@ export interface GuestJoinedInfo {
   color: string;
 }
 
+// Out-of-character chat between online players - never touches StoryData or
+// the GM's context, see WireMessage's "ooc_chat" variant.
+export interface OOCChatMessage {
+  playerId: string;
+  displayName: string;
+  color: string;
+  text: string;
+  timestamp: number;
+}
+
 export class NetSession {
   readonly role: MPRole;
   readonly backend: MPBackend;
@@ -103,6 +113,7 @@ export class NetSession {
   private readonly diceThrowResultListeners = new Set<
     (result: DiceThrowRelayResult) => void
   >();
+  private readonly oocChatListeners = new Set<(message: OOCChatMessage) => void>();
 
   private constructor(
     role: MPRole,
@@ -259,6 +270,11 @@ export class NetSession {
     return () => this.activityListeners.delete(cb);
   }
 
+  onOOCChat(cb: (message: OOCChatMessage) => void): () => void {
+    this.oocChatListeners.add(cb);
+    return () => this.oocChatListeners.delete(cb);
+  }
+
   onHostDisconnected(cb: () => void): () => void {
     this.hostDisconnectedListeners.add(cb);
     return () => this.hostDisconnectedListeners.delete(cb);
@@ -322,6 +338,17 @@ export class NetSession {
     });
   }
 
+  sendOOCChat(text: string): void {
+    this.transport.send({
+      type: "ooc_chat",
+      playerId: this.myLocalPlayerId,
+      displayName: this.displayName,
+      color: this.color,
+      text,
+      timestamp: Date.now(),
+    });
+  }
+
   // Host-only: ask a specific connected guest to physically throw dice.
   sendDiceThrowRequest(
     requestId: string,
@@ -378,6 +405,25 @@ export class NetSession {
         // Trystero's mesh (they'd already have heard it directly); required
         // in PeerJS's star, where a guest's broadcast only ever reaches the
         // host.
+        this.transport.send(msg);
+      }
+      return;
+    }
+
+    if (msg.type === "ooc_chat") {
+      if (msg.playerId !== this.myLocalPlayerId) {
+        this.oocChatListeners.forEach((cb) =>
+          cb({
+            playerId: msg.playerId,
+            displayName: msg.displayName,
+            color: msg.color,
+            text: msg.text,
+            timestamp: msg.timestamp,
+          }),
+        );
+      }
+      if (this.role === "host") {
+        // Same fan-out reasoning as presence_activity above.
         this.transport.send(msg);
       }
       return;

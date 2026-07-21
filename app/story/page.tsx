@@ -39,7 +39,7 @@ import MenuPage from "./menu";
 import { StoryTabBar } from "./StoryTabBar";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
-import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
+import OOCChatPanel from "../components/OOCChatPanel";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
 import type {
@@ -388,6 +388,7 @@ function StoryPageContent() {
     peers: netPeers,
     activity: netActivity,
     hostDisconnected,
+    oocMessages,
     createRoom: createNetRoom,
     joinRoom: joinNetRoom,
     leaveRoom: leaveNetRoom,
@@ -396,6 +397,7 @@ function StoryPageContent() {
     sendFreeform: sendNetFreeform,
     sendVoice: sendNetVoice,
     sendActivity: sendNetActivity,
+    sendOOCChat: sendNetOOCChat,
     sendDiceThrowRequest: sendNetDiceThrowRequest,
     sendDiceThrowResult: sendNetDiceThrowResult,
   } = useNetSession({
@@ -653,22 +655,13 @@ function StoryPageContent() {
     serverPartCount: 0,
   });
 
-  // AI Story Editor state (lifted from menu so it persists across tabs)
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const [isAIPinned, setIsAIPinned] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("storyAIPinned") === "true";
-    }
-    return false;
-  });
-
-  const handleAIPinToggle = () => {
-    setIsAIPinned((prev) => {
-      const next = !prev;
-      localStorage.setItem("storyAIPinned", String(next));
-      return next;
-    });
-  };
+  // OOC chat state (lifted from menu so it persists across tabs). Only ever
+  // shown while netSession is active (online co-op) - see render below.
+  const [showOOCChat, setShowOOCChat] = useState(false);
+  const [oocLastSeenCount, setOOCLastSeenCount] = useState(0);
+  useEffect(() => {
+    if (showOOCChat) setOOCLastSeenCount(oocMessages.length);
+  }, [showOOCChat, oocMessages.length]);
 
   // Navigation handlers - only navigate through AI story parts with content
   function handleNavigateLeft() {
@@ -3837,7 +3830,7 @@ function StoryPageContent() {
             onUpdateStoryData={updateStoryData}
             onViewLogs={() => setCurrentState(StoryState.LOGS)}
             onViewContext={() => setCurrentState(StoryState.CONTEXT)}
-            onOpenAIAssistant={() => setShowAIAssistant(true)}
+            onOpenOOCChat={() => setShowOOCChat(true)}
             netSession={netSession}
             netPeers={netPeers}
             onCreateNetRoom={createNetRoom}
@@ -3854,20 +3847,21 @@ function StoryPageContent() {
         </div>
       </main>
 
-      {/* AI Story Editor - Rendered at page level to persist across tabs */}
-      <StoryCreativeAssistant
-        isOpen={showAIAssistant}
-        onClose={() => setShowAIAssistant(false)}
-        onOpen={() => setShowAIAssistant(true)}
-        storyData={storyData}
-        storyId={storyDbId || undefined}
-        onApplyChanges={(updates) => {
-          updateStoryData(updates);
-          addNotification("Changes applied! Don't forget to save.", "success");
-        }}
-        isPinned={isAIPinned}
-        onPinToggle={handleAIPinToggle}
-      />
+      {/* OOC chat - rendered at page level to persist across tabs, only
+          while an online multiplayer session is active. */}
+      {netSession && (
+        <OOCChatPanel
+          isOpen={showOOCChat}
+          onClose={() => setShowOOCChat(false)}
+          onOpen={() => setShowOOCChat(true)}
+          messages={oocMessages}
+          myLocalPlayerId={netSession.myLocalPlayerId}
+          onSend={sendNetOOCChat}
+          unreadCount={
+            showOOCChat ? 0 : Math.max(0, oocMessages.length - oocLastSeenCount)
+          }
+        />
+      )}
 
       {/* Manual dice mode: the GM asked for a physical roll - generation is
           paused until the player enters their total (or skips) */}
