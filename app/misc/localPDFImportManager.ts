@@ -14,6 +14,16 @@ const DB_VERSION = 1;
 // Keep imports for 90 days
 const IMPORT_EXPIRATION_DAYS = 90;
 
+// A page range that didn't make it into the import (OCR or note-extraction
+// failed for it), recorded so the player knows which pages to rework/retry
+// rather than silently missing content.
+export interface FailedPageRange {
+  fileName: string;
+  pageStart: number;
+  pageEnd: number;
+  reason: string;
+}
+
 export interface LocalPDFImport {
   id: string;
   timestamp: number;
@@ -22,6 +32,7 @@ export interface LocalPDFImport {
   mechanicNotes: StoryLore[];
   customTables: CustomTable[];
   summary: string;
+  failedPages?: FailedPageRange[];
 }
 
 function openDB(): Promise<IDBDatabase> {
@@ -56,11 +67,12 @@ export async function savePDFImport(
     mechanicNotes: StoryLore[];
     customTables: CustomTable[];
     summary: string;
+    failedPages?: FailedPageRange[];
   },
   fileName: string
 ): Promise<LocalPDFImport> {
   const db = await openDB();
-  
+
   const newImport: LocalPDFImport = {
     id: `import-${Date.now()}`,
     timestamp: Date.now(),
@@ -69,6 +81,7 @@ export async function savePDFImport(
     mechanicNotes: data.mechanicNotes,
     customTables: data.customTables,
     summary: data.summary,
+    failedPages: data.failedPages,
   };
 
   return new Promise((resolve, reject) => {
