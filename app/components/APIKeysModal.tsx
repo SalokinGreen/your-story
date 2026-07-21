@@ -8,6 +8,7 @@ import { DynamicIcon } from "./DynamicIcon";
 import AIConfigTab from "./AIConfigTab";
 import CustomVoiceManager from "./CustomVoiceManager";
 import FontSettingsTab from "./FontSettingsTab";
+import { TTSModelKey } from "@/app/misc/ai_prices";
 
 interface APIKeysModalProps {
   isOpen: boolean;
@@ -35,7 +36,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [ttsAutoGenerate, setTtsAutoGenerate] = useState(false);
   const [ttsVoice, setTtsVoice] = useState("af_heart");
-  const [ttsModel, setTtsModel] = useState<"kokoro" | "orpheus">("kokoro");
+  const [ttsModel, setTtsModel] = useState<TTSModelKey>("kokoro");
   const [ttsVolume, setTtsVolume] = useState(1.0);
   const [sttEnabled, setSttEnabled] = useState(true);
   const [showHiddenMessages, setShowHiddenMessages] = useState(false);
@@ -49,9 +50,16 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
       setTtsEnabled(localStorage.getItem("ttsEnabled") !== "false");
       setTtsAutoGenerate(localStorage.getItem("ttsAutoGenerate") === "true");
       setTtsVoice(localStorage.getItem("ttsLastVoice") || "af_heart");
-      setTtsModel(
-        (localStorage.getItem("ttsModel") as "kokoro" | "orpheus") || "kokoro",
-      );
+      {
+        const storedModel = localStorage.getItem("ttsModel");
+        setTtsModel(
+          storedModel === "orpheus" ||
+            storedModel === "cartesia" ||
+            storedModel === "elevenlabs"
+            ? storedModel
+            : "kokoro",
+        );
+      }
       setTtsVolume(parseFloat(localStorage.getItem("ttsVolume") || "1.0"));
       setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
       setShowHiddenMessages(
@@ -415,7 +423,83 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
                     />
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      Used for text-to-speech and image generation.
+                      Used for text-to-speech (Kokoro/Orpheus) and image generation.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Cartesia - TTS only */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-teal-500 to-cyan-600 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">CA</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        Cartesia
+                      </span>
+                      {hasKey("cartesiaKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
+                      <a
+                        href="https://play.cartesia.ai/keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline ml-auto"
+                      >
+                        Get key →
+                      </a>
+                    </div>
+                    <input
+                      type={showKeys ? "text" : "password"}
+                      value={keys.cartesiaKey}
+                      onChange={(e) => setKey("cartesiaKey", e.target.value)}
+                      placeholder="..."
+                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                    />
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Used for low-latency Sonic-2 text-to-speech.
+                    </p>
+                  </div>
+                </div>
+
+                {/* ElevenLabs - TTS only */}
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-gray-700 to-gray-900 flex items-center justify-center">
+                    <span className="text-white text-xs font-bold">EL</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                        ElevenLabs
+                      </span>
+                      {hasKey("elevenlabsKey") && (
+                        <DynamicIcon
+                          name="CheckCircle"
+                          className="w-3.5 h-3.5 text-green-500"
+                        />
+                      )}
+                      <a
+                        href="https://elevenlabs.io/app/settings/api-keys"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-purple-500 hover:underline ml-auto"
+                      >
+                        Get key →
+                      </a>
+                    </div>
+                    <input
+                      type={showKeys ? "text" : "password"}
+                      value={keys.elevenlabsKey}
+                      onChange={(e) => setKey("elevenlabsKey", e.target.value)}
+                      placeholder="..."
+                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                    />
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Used for premium Flash v2.5 text-to-speech.
                     </p>
                   </div>
                 </div>
@@ -489,10 +573,11 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   />
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      Powered by DeepInfra
+                      Bring your own TTS provider
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Choose between fast Kokoro or premium Orpheus voices
+                      Kokoro/Orpheus (DeepInfra), Cartesia Sonic-2, or ElevenLabs Flash -
+                      add the matching key in the Keys tab
                     </p>
                   </div>
                 </div>
@@ -577,30 +662,39 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   <select
                     value={ttsModel}
                     onChange={(e) => {
-                      const newModel = e.target.value as "kokoro" | "orpheus";
+                      const newModel = e.target.value as TTSModelKey;
                       setTtsModel(newModel);
                       localStorage.setItem("ttsModel", newModel);
-                      // Reset voice to default for new model
-                      const defaultVoice =
-                        newModel === "orpheus" ? "tara" : "af_heart";
+                      // Reset voice to a sensible default for the new model
+                      const defaultVoice = {
+                        kokoro: "af_heart",
+                        orpheus: "tara",
+                        cartesia: "a0e99841-438c-4a64-b679-ae501e7d6091",
+                        elevenlabs: "21m00Tcm4TlvDq8ikWAM",
+                      }[newModel];
                       setTtsVoice(defaultVoice);
                       localStorage.setItem("ttsLastVoice", defaultVoice);
-                      addNotification(
-                        `Switched to ${
-                          newModel === "orpheus"
-                            ? "Orpheus (Premium)"
-                            : "Kokoro (Fast)"
-                        }`,
-                        "success",
-                      );
+                      const modelLabel = {
+                        kokoro: "Kokoro (Fast)",
+                        orpheus: "Orpheus (Premium)",
+                        cartesia: "Cartesia Sonic-2",
+                        elevenlabs: "ElevenLabs Flash v2.5",
+                      }[newModel];
+                      addNotification(`Switched to ${modelLabel}`, "success");
                     }}
                     className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="kokoro">
-                      Kokoro - Fast & Affordable ($0.62/1M chars)
+                      Kokoro - Fast & Affordable ($0.62/1M chars, DeepInfra)
                     </option>
                     <option value="orpheus">
-                      Orpheus - Premium Expressive ($7/1M chars)
+                      Orpheus - Premium Expressive ($7/1M chars, DeepInfra)
+                    </option>
+                    <option value="cartesia">
+                      Cartesia Sonic-2 - Ultra Low Latency (Cartesia)
+                    </option>
+                    <option value="elevenlabs">
+                      ElevenLabs Flash v2.5 - Best Quality (ElevenLabs)
                     </option>
                   </select>
                 </div>
@@ -645,7 +739,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                           <option value="bm_daniel">Daniel (Male)</option>
                         </optgroup>
                       </>
-                    ) : (
+                    ) : ttsModel === "orpheus" ? (
                       <>
                         <optgroup label="Female Voices">
                           <option value="tara">Tara</option>
@@ -660,6 +754,21 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                           <option value="zac">Zac</option>
                         </optgroup>
                       </>
+                    ) : ttsModel === "cartesia" ? (
+                      <optgroup label="Sample Voices">
+                        <option value="a0e99841-438c-4a64-b679-ae501e7d6091">
+                          Barbershop Man
+                        </option>
+                        <option value="156fb8d2-335b-4950-9cb3-a2d33befec77">
+                          Helpful Woman
+                        </option>
+                      </optgroup>
+                    ) : (
+                      <optgroup label="Sample Voices">
+                        <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Female)</option>
+                        <option value="EXAVITQu4vr4xnSDxMaL">Bella (Female)</option>
+                        <option value="ErXwobaYiN019PkySvjV">Antoni (Male)</option>
+                      </optgroup>
                     )}
                     {customVoices.map((id) => (
                       <option key={id} value={id}>
@@ -667,12 +776,38 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       </option>
                     ))}
                   </select>
+                  {(ttsModel === "cartesia" || ttsModel === "elevenlabs") && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      Browse more voices at{" "}
+                      {ttsModel === "cartesia" ? (
+                        <a
+                          href="https://play.cartesia.ai"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-purple-500 hover:underline"
+                        >
+                          play.cartesia.ai
+                        </a>
+                      ) : (
+                        <a
+                          href="https://elevenlabs.io/app/voice-library"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-purple-500 hover:underline"
+                        >
+                          elevenlabs.io/app/voice-library
+                        </a>
+                      )}{" "}
+                      and add the voice ID below as a custom voice.
+                    </p>
+                  )}
                 </div>
 
                 {/* Custom Voice Manager */}
                 <CustomVoiceManager
                   addNotification={addNotification}
                   onVoicesChange={setCustomVoices}
+                  ttsModel={ttsModel}
                 />
 
                 {/* Volume Slider */}

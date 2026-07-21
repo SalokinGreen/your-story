@@ -15,6 +15,8 @@ export interface APIKeys {
   mistralKey: string;
   deepinfraKey: string;
   braveSearchKey: string;
+  cartesiaKey: string;
+  elevenlabsKey: string;
 }
 
 export interface APIKeysContextType {
@@ -41,6 +43,8 @@ const defaultKeys: APIKeys = {
   mistralKey: "",
   deepinfraKey: "",
   braveSearchKey: "",
+  cartesiaKey: "",
+  elevenlabsKey: "",
 };
 
 const APIKeysContext = createContext<APIKeysContextType | undefined>(undefined);
@@ -53,6 +57,8 @@ const LOCAL_KEYS = {
   mistralKey: "mistralKey",
   deepinfraKey: "deepinfraKey",
   braveSearchKey: "braveSearchKey",
+  cartesiaKey: "cartesiaKey",
+  elevenlabsKey: "elevenlabsKey",
   oauthCodeVerifier: "openrouter_code_verifier",
 };
 
@@ -70,6 +76,8 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
       mistralKey: localStorage.getItem(LOCAL_KEYS.mistralKey) || "",
       deepinfraKey: localStorage.getItem(LOCAL_KEYS.deepinfraKey) || "",
       braveSearchKey: localStorage.getItem(LOCAL_KEYS.braveSearchKey) || "",
+      cartesiaKey: localStorage.getItem(LOCAL_KEYS.cartesiaKey) || "",
+      elevenlabsKey: localStorage.getItem(LOCAL_KEYS.elevenlabsKey) || "",
     };
 
     setKeys(localKeys);

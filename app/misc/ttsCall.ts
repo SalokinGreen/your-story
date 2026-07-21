@@ -13,6 +13,14 @@ const KOKORO_ENDPOINT = "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-8
 const ORPHEUS_ENDPOINT =
   "https://api.deepinfra.com/v1/inference/canopylabs/orpheus-3b-0.1-ft";
 
+// Cartesia TTS endpoint - see https://docs.cartesia.ai/api-reference/tts/bytes
+const CARTESIA_ENDPOINT = "https://api.cartesia.ai/tts/bytes";
+const CARTESIA_VERSION = "2024-06-10";
+
+// ElevenLabs TTS endpoint - see
+// https://elevenlabs.io/docs/api-reference/text-to-speech/convert
+const ELEVENLABS_ENDPOINT_BASE = "https://api.elevenlabs.io/v1/text-to-speech";
+
 // Kokoro voices (multi-language support)
 export const KOKORO_VOICES = {
   af_heart: "Heart (American Female)",
@@ -41,6 +49,23 @@ export const ORPHEUS_VOICES = {
   zac: "Zac",
 } as const;
 
+// A couple of well-known Cartesia library voice IDs as convenience defaults -
+// Cartesia's voice library is large and UUID-keyed, so most users will pick
+// their own from https://play.cartesia.ai and add it as a custom voice.
+export const CARTESIA_VOICES = {
+  "a0e99841-438c-4a64-b679-ae501e7d6091": "Barbershop Man",
+  "156fb8d2-335b-4950-9cb3-a2d33befec77": "Helpful Woman",
+} as const;
+
+// A couple of well-known ElevenLabs premade voice IDs as convenience defaults
+// - full library at https://elevenlabs.io/app/voice-library, add more as
+// custom voices.
+export const ELEVENLABS_VOICES = {
+  "21m00Tcm4TlvDq8ikWAM": "Rachel (Female)",
+  EXAVITQu4vr4xnSDxMaL: "Bella (Female)",
+  ErXwobaYiN019PkySvjV: "Antoni (Male)",
+} as const;
+
 const MAX_TEXT_LENGTH = 10000;
 
 export interface TTSRequestBody {
@@ -48,6 +73,8 @@ export interface TTSRequestBody {
   voiceId?: string;
   model?: TTSModelKey;
   deepinfraKey?: string;
+  cartesiaKey?: string;
+  elevenlabsKey?: string;
 }
 
 export interface TTSSuccess {
@@ -137,14 +164,129 @@ function base64ToArrayBuffer(base64: string): ArrayBuffer {
   return bytes.buffer;
 }
 
+const PROVIDER_KEY_NAMES: Record<
+  TTSModelKey,
+  { key: "deepinfraKey" | "cartesiaKey" | "elevenlabsKey"; label: string }
+> = {
+  kokoro: { key: "deepinfraKey", label: "DeepInfra" },
+  orpheus: { key: "deepinfraKey", label: "DeepInfra" },
+  cartesia: { key: "cartesiaKey", label: "Cartesia" },
+  elevenlabs: { key: "elevenlabsKey", label: "ElevenLabs" },
+};
+
+// Fetches one chunk of audio from the provider implied by `ttsModel`, both
+// the DeepInfra models (JSON response with base64 `audio`) and Cartesia/
+// ElevenLabs (raw audio bytes as the response body) return a plain
+// ArrayBuffer here so the caller doesn't need to branch on response shape.
+async function fetchChunkAudio(
+  ttsModel: TTSModelKey,
+  chunk: string,
+  voiceId: string,
+  apiKey: string,
+  providerFetch: ReturnType<typeof getProviderFetch>,
+): Promise<ArrayBuffer | null> {
+  if (ttsModel === "cartesia") {
+    const response = await providerFetch(CARTESIA_ENDPOINT, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Cartesia-Version": CARTESIA_VERSION,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model_id: "sonic-2",
+        transcript: chunk,
+        voice: { mode: "id", id: voiceId },
+        output_format: { container: "mp3", sample_rate: 44100, bit_rate: 128000 },
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Cartesia TTS error:", { status: response.status, error: errorText });
+      if (response.status === 429) throw new Error("RATE_LIMIT");
+      if (response.status === 401 || response.status === 403) throw new Error("AUTH_FAILED");
+      throw new Error(`Cartesia API error: ${response.status} - ${errorText}`);
+    }
+
+    return response.arrayBuffer();
+  }
+
+  if (ttsModel === "elevenlabs") {
+    const response = await providerFetch(
+      `${ELEVENLABS_ENDPOINT_BASE}/${voiceId}?output_format=mp3_44100_128`,
+      {
+        method: "POST",
+        headers: {
+          "xi-api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ text: chunk, model_id: "eleven_flash_v2_5" }),
+      },
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("ElevenLabs TTS error:", { status: response.status, error: errorText });
+      if (response.status === 429) throw new Error("RATE_LIMIT");
+      if (response.status === 401 || response.status === 403) throw new Error("AUTH_FAILED");
+      throw new Error(`ElevenLabs API error: ${response.status} - ${errorText}`);
+    }
+
+    return response.arrayBuffer();
+  }
+
+  const isOrpheus = ttsModel === "orpheus";
+  const endpoint = isOrpheus ? ORPHEUS_ENDPOINT : KOKORO_ENDPOINT;
+  const requestBody: Record<string, unknown> = isOrpheus
+    ? { input: chunk, voice: voiceId, response_format: "mp3", max_tokens: 3000 }
+    : { text: chunk, preset: voiceId, output_format: "mp3" };
+
+  const response = await providerFetch(endpoint, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error("DeepInfra TTS error:", { status: response.status, error: errorText });
+    if (response.status === 429) throw new Error("RATE_LIMIT");
+    if (response.status === 401 || response.status === 403) throw new Error("AUTH_FAILED");
+    throw new Error(`DeepInfra API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  if (data.audio) {
+    let base64Data = data.audio;
+    if (base64Data.startsWith("data:")) {
+      base64Data = base64Data.split(",")[1];
+    }
+    return base64ToArrayBuffer(base64Data);
+  }
+  console.error("No audio data in DeepInfra response", {
+    output_format: data.output_format,
+    inference_status: data.inference_status,
+  });
+  return null;
+}
+
 export async function generateTTSAudio(
   body: TTSRequestBody,
 ): Promise<TTSSuccess | TTSError> {
-  const { text, voiceId = "af_heart", model = "kokoro", deepinfraKey } = body;
+  const { text, voiceId = "af_heart", model = "kokoro" } = body;
 
-  if (!deepinfraKey || typeof deepinfraKey !== "string") {
+  const ttsModel: TTSModelKey =
+    model === "orpheus" || model === "cartesia" || model === "elevenlabs" ? model : "kokoro";
+  const { key: apiKeyField, label: providerLabel } = PROVIDER_KEY_NAMES[ttsModel];
+  const apiKey = body[apiKeyField];
+
+  if (!apiKey || typeof apiKey !== "string") {
     return {
-      error: "DeepInfra API key is required. Please add your own key in Settings.",
+      error: `${providerLabel} API key is required. Please add your own key in Settings.`,
       status: 400,
     };
   }
@@ -153,19 +295,27 @@ export async function generateTTSAudio(
     return { error: "Text content is required", status: 400 };
   }
 
-  const ttsModel: TTSModelKey = model === "orpheus" ? "orpheus" : "kokoro";
-  const isOrpheus = ttsModel === "orpheus";
-
   let finalVoiceId = voiceId;
-  if (isOrpheus) {
-    const validOrpheusVoices = Object.keys(ORPHEUS_VOICES);
-    if (!validOrpheusVoices.includes(voiceId)) {
-      finalVoiceId = "tara";
-    }
-  } else {
-    const validKokoroVoices = Object.keys(KOKORO_VOICES);
-    if (!validKokoroVoices.includes(voiceId) && !voiceId.match(/^[a-z]{2}_[a-z]+$/)) {
+  if (ttsModel === "orpheus") {
+    if (!Object.keys(ORPHEUS_VOICES).includes(voiceId)) finalVoiceId = "tara";
+  } else if (ttsModel === "kokoro") {
+    if (
+      !Object.keys(KOKORO_VOICES).includes(voiceId) &&
+      !voiceId.match(/^[a-z]{2}_[a-z]+$/)
+    ) {
       finalVoiceId = "af_heart";
+    }
+  } else if (ttsModel === "cartesia") {
+    // Any UUID is treated as a user-supplied custom Cartesia voice ID (from
+    // their voice library) and passed through as-is; anything else (e.g. a
+    // stale Kokoro/Orpheus voice ID left over from switching models) falls
+    // back to the bundled default.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(voiceId)) {
+      finalVoiceId = "a0e99841-438c-4a64-b679-ae501e7d6091";
+    }
+  } else if (ttsModel === "elevenlabs") {
+    if (!/^[A-Za-z0-9]{15,25}$/.test(voiceId)) {
+      finalVoiceId = "21m00Tcm4TlvDq8ikWAM";
     }
   }
 
@@ -183,51 +333,14 @@ export async function generateTTSAudio(
     return { error: "Text is empty after cleaning", status: 400 };
   }
 
-  const chunkSize = isOrpheus ? 300 : 1500;
+  const chunkSize = ttsModel === "orpheus" ? 300 : 1500;
   const chunks = splitTextIntoChunks(cleanText, chunkSize);
-  const endpoint = isOrpheus ? ORPHEUS_ENDPOINT : KOKORO_ENDPOINT;
   const providerFetch = getProviderFetch();
 
   const chunkPromises = chunks.map(async (chunk, i) => {
     try {
-      const requestBody: Record<string, unknown> = isOrpheus
-        ? { input: chunk, voice: finalVoiceId, response_format: "mp3", max_tokens: 3000 }
-        : { text: chunk, preset: finalVoiceId, output_format: "mp3" };
-
-      const response = await providerFetch(endpoint, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${deepinfraKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(requestBody),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`DeepInfra TTS error on chunk ${i + 1}:`, {
-          status: response.status,
-          error: errorText,
-        });
-        if (response.status === 429) throw new Error("RATE_LIMIT");
-        if (response.status === 401 || response.status === 403) throw new Error("AUTH_FAILED");
-        throw new Error(`DeepInfra API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-
-      if (data.audio) {
-        let base64Data = data.audio;
-        if (base64Data.startsWith("data:")) {
-          base64Data = base64Data.split(",")[1];
-        }
-        return { index: i, buffer: base64ToArrayBuffer(base64Data) };
-      }
-      console.error(`No audio data for chunk ${i + 1}/${chunks.length}`, {
-        output_format: data.output_format,
-        inference_status: data.inference_status,
-      });
-      return { index: i, buffer: null };
+      const buffer = await fetchChunkAudio(ttsModel, chunk, finalVoiceId, apiKey, providerFetch);
+      return { index: i, buffer };
     } catch (chunkError: unknown) {
       console.error(`Error processing chunk ${i + 1}:`, chunkError);
       if (chunkError instanceof Error) {
@@ -251,7 +364,7 @@ export async function generateTTSAudio(
         };
       }
       if (parallelError.message === "AUTH_FAILED") {
-        return { error: "TTS authentication failed.", status: 403 };
+        return { error: `${providerLabel} authentication failed.`, status: 403 };
       }
     }
     throw parallelError;

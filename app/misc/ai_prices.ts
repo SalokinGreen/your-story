@@ -1437,7 +1437,7 @@ export const MARKUP_MULTIPLIER = 2.5; // 150% markup for service
 export const COINS_PER_DOLLAR = 1000; // 1 coin = $0.001
 export const MINIMUM_COST = 1; // Minimum 1 coin per API call
 
-// TTS pricing (DeepInfra)
+// TTS pricing - all BYOK (user supplies their own provider key in Settings)
 export const TTS_MODELS = {
   kokoro: {
     name: "Kokoro-82M",
@@ -1450,6 +1450,18 @@ export const TTS_MODELS = {
     provider: "DeepInfra",
     pricePerMillionChars: 7.0, // $7.00 per 1M characters
     description: "Premium expressive TTS with emotional range",
+  },
+  cartesia: {
+    name: "Cartesia Sonic-2",
+    provider: "Cartesia",
+    pricePerMillionChars: 30.0, // approximate - actual cost depends on your Cartesia plan tier
+    description: "Very low-latency, natural-sounding TTS built for real-time narration",
+  },
+  elevenlabs: {
+    name: "ElevenLabs Flash v2.5",
+    provider: "ElevenLabs",
+    pricePerMillionChars: 50.0, // approximate - actual cost depends on your ElevenLabs plan tier
+    description: "Best-in-class expressiveness and emotional range, still low-latency",
   },
 } as const;
 
