@@ -10,7 +10,6 @@
     "test": "vitest"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.81.1",
     "@tailwindcss/typography": "^0.5.19",
     "@trystero-p2p/mqtt": "^0.25.3",
     "@trystero-p2p/torrent": "^0.25.3",
