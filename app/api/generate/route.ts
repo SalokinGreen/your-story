@@ -72,6 +72,8 @@ interface AIResponse {
       role: string;
       content: string | null;
       reasoning?: string;
+      // DeepSeek's native API returns chain-of-thought here, not `reasoning`.
+      reasoning_content?: string;
       reasoning_details?: any[];
       tool_calls?: ToolCall[];
     };
@@ -590,7 +592,13 @@ export async function POST(req: NextRequest) {
     );
 
     const content = aiResponse.choices[0]?.message?.content || "";
-    const reasoning = aiResponse.choices[0]?.message?.reasoning || "";
+    // DeepSeek-native models put CoT in `reasoning_content`; OpenRouter/others
+    // in `reasoning`. Read whichever is present so reasoning is preserved into
+    // saved history regardless of provider.
+    const reasoning =
+      aiResponse.choices[0]?.message?.reasoning ||
+      aiResponse.choices[0]?.message?.reasoning_content ||
+      "";
     const reasoning_details =
       aiResponse.choices[0]?.message?.reasoning_details || [];
     let toolCalls = aiResponse.choices[0]?.message?.tool_calls;

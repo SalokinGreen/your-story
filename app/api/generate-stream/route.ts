@@ -797,6 +797,26 @@ export async function POST(req: NextRequest) {
                 );
               }
 
+              // DeepSeek's native API (api.deepseek.com) streams chain-of-thought
+              // in `reasoning_content`, not the OpenRouter-normalized `reasoning`
+              // field handled above. Without this, a BYOK DeepSeek user's thinking
+              // is silently dropped and never streamed to the timeline. Emit it as
+              // the same `reasoning` event so the client path is provider-agnostic.
+              if (
+                delta?.reasoning_content !== undefined &&
+                delta?.reasoning_content !== null
+              ) {
+                fullReasoning += delta.reasoning_content;
+                controller.enqueue(
+                  encoder.encode(
+                    `data: ${JSON.stringify({
+                      type: "reasoning",
+                      content: delta.reasoning_content,
+                    })}\n\n`,
+                  ),
+                );
+              }
+
               if (delta?.reasoning_details) {
                 for (const detail of delta.reasoning_details) {
                   const index = detail.index ?? reasoningDetails.length;
