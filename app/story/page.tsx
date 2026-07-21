@@ -213,6 +213,25 @@ function StoryPageContent() {
   const [currentState, setCurrentState] = useState<StoryState>(
     StoryState.STORY,
   );
+  // Set (and switched to) when the player clicks a highlighted note/NPC
+  // mention in the story prose - consumed once by LorePage/NPCsPage's
+  // initial-selection prop, then cleared below so a later manual tab click
+  // doesn't re-trigger the same selection.
+  const [pendingNoteOpen, setPendingNoteOpen] = useState<{
+    kind: "lore" | "npc";
+    id: string;
+  } | null>(null);
+  const handleOpenNote = (kind: "lore" | "npc", id: string) => {
+    setPendingNoteOpen({ kind, id });
+    setCurrentState(kind === "lore" ? StoryState.LORE : StoryState.NPCS);
+  };
+  useEffect(() => {
+    if (pendingNoteOpen) setPendingNoteOpen(null);
+    // Only clear in response to a state change - LorePage/NPCsPage already
+    // captured pendingNoteOpen via their lazy initial-selection state by the
+    // time this effect runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentState]);
   // Real, JS-measured viewport height in px. Some mobile browsers (in
   // particular embedded/in-app webviews) don't support the `dvh` unit and
   // fall back to a stale `100vh` that ignores the address bar/toolbar,
@@ -3610,6 +3629,7 @@ function StoryPageContent() {
             onResetToCurrentPart={resetToCurrentPart}
             syncStatus={syncStatus}
             onOpenJournal={() => setCurrentState(StoryState.GOALS)}
+            onOpenNote={handleOpenNote}
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
             myPlayerId={netSession ? netSession.myLocalPlayerId : undefined}
@@ -3633,6 +3653,9 @@ function StoryPageContent() {
             onUpdateLore={(updatedLore) =>
               updateStoryData({ lore: updatedLore })
             }
+            initialSelectedTitle={
+              pendingNoteOpen?.kind === "lore" ? pendingNoteOpen.id : undefined
+            }
           />
         )}
         {currentState === StoryState.NPCS && (
@@ -3640,6 +3663,9 @@ function StoryPageContent() {
             {...storyData}
             onUpdateNPCs={(updatedNPCs) =>
               updateStoryData({ npcs: updatedNPCs })
+            }
+            initialSelectedId={
+              pendingNoteOpen?.kind === "npc" ? pendingNoteOpen.id : undefined
             }
           />
         )}

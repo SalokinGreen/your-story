@@ -9,6 +9,9 @@ import { preprocessMarkdown } from "../misc/markdownUtils";
 
 interface NPCsPageProps extends StoryData {
   onUpdateNPCs?: (updatedNPCs: NPC[]) => void;
+  // Pre-selects an NPC by id on mount - set when the player clicks a
+  // highlighted mention of this NPC in the story prose (see page.tsx).
+  initialSelectedId?: string;
 }
 
 // Status configuration
@@ -89,13 +92,18 @@ const ATTITUDE_CONFIG: Record<
 type FilterType = "all" | NPCStatus | NPCAttitude;
 
 export default function NPCsPage(props: NPCsPageProps) {
-  const { onUpdateNPCs, ...storyData } = props;
-  const [selectedNPC, setSelectedNPC] = useState<NPC | null>(null);
+  const { onUpdateNPCs, initialSelectedId, ...storyData } = props;
+  const [selectedNPC, setSelectedNPC] = useState<NPC | null>(() =>
+    initialSelectedId
+      ? (storyData.npcs || []).find((n) => n.id === initialSelectedId) || null
+      : null,
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [editNotes, setEditNotes] = useState("");
+  const [editAliases, setEditAliases] = useState("");
   const [isAddingNPC, setIsAddingNPC] = useState(false);
   const [newNPC, setNewNPC] = useState<Partial<NPC>>({
     name: "",
@@ -185,11 +193,15 @@ export default function NPCsPage(props: NPCsPageProps) {
   // Handle save notes
   const handleSaveNotes = () => {
     if (!selectedNPC || !onUpdateNPCs) return;
+    const aliases = editAliases
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean);
     const updatedNPCs = npcs.map((n) =>
-      n.id === selectedNPC.id ? { ...n, notes: editNotes } : n
+      n.id === selectedNPC.id ? { ...n, notes: editNotes, aliases } : n
     );
     onUpdateNPCs(updatedNPCs);
-    setSelectedNPC({ ...selectedNPC, notes: editNotes });
+    setSelectedNPC({ ...selectedNPC, notes: editNotes, aliases });
     setIsEditing(false);
   };
 
@@ -197,6 +209,7 @@ export default function NPCsPage(props: NPCsPageProps) {
   const startEditing = () => {
     if (selectedNPC) {
       setEditNotes(selectedNPC.notes || "");
+      setEditAliases((selectedNPC.aliases || []).join(", "));
       setIsEditing(true);
     }
   };
@@ -628,6 +641,16 @@ export default function NPCsPage(props: NPCsPageProps) {
                           {selectedNPC.faction}
                         </span>
                       )}
+                      {/* Aliases */}
+                      {selectedNPC.aliases?.map((alias, idx) => (
+                        <span
+                          key={idx}
+                          className="text-xs px-2 py-1 rounded-lg bg-pink-500/15 text-pink-300 flex items-center gap-1"
+                        >
+                          <DynamicIcon name="AtSign" className="w-3.5 h-3.5" />
+                          {alias}
+                        </span>
+                      ))}
                     </div>
                   </div>
 
@@ -698,6 +721,21 @@ export default function NPCsPage(props: NPCsPageProps) {
                   </h4>
                   {isEditing ? (
                     <div className="space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-400 mb-1">
+                          Aliases
+                        </label>
+                        <input
+                          type="text"
+                          value={editAliases}
+                          onChange={(e) => setEditAliases(e.target.value)}
+                          placeholder="Comma-separated alternate names, e.g. Bobby, the old man"
+                          className="w-full px-3 py-2 bg-slate-800/40 border border-slate-600/30 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                        />
+                        <p className="text-xs text-slate-500 mt-1">
+                          Also highlighted and clickable in the story text, alongside the name
+                        </p>
+                      </div>
                       <textarea
                         value={editNotes}
                         onChange={(e) => setEditNotes(e.target.value)}
