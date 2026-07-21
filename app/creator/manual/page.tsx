@@ -197,8 +197,8 @@ function VariableEditorCard({
         };
       default:
         return {
-          bg: "bg-blue-900/20",
-          border: "border-blue-800",
+          bg: "bg-white/[0.03]",
+          border: "border-white/10",
           text: "text-blue-400",
           badge: "bg-blue-500/20 text-blue-300",
         };
@@ -261,7 +261,7 @@ function VariableEditorCard({
             value={editData.name}
             onChange={(e) => setEditData({ ...editData, name: e.target.value })}
             placeholder="Variable name"
-            className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white font-semibold"
+            className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded text-white font-semibold"
           />
 
           <textarea
@@ -270,7 +270,7 @@ function VariableEditorCard({
               setEditData({ ...editData, description: e.target.value })
             }
             placeholder="Description (optional)"
-            className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+            className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded text-white resize-none"
             rows={2}
           />
 
@@ -290,7 +290,7 @@ function VariableEditorCard({
                       value: parseFloat(e.target.value) || 0,
                     } as NumberVariable)
                   }
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded text-white"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -311,7 +311,7 @@ function VariableEditorCard({
                       } as NumberVariable)
                     }
                     placeholder="No minimum"
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                    className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded text-white"
                   />
                 </div>
                 <div>
@@ -331,7 +331,7 @@ function VariableEditorCard({
                       } as NumberVariable)
                     }
                     placeholder="No maximum"
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                    className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded text-white"
                   />
                 </div>
               </div>
@@ -377,7 +377,7 @@ function VariableEditorCard({
                     } as StringVariable)
                   }
                   placeholder="Enter default text..."
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded text-white"
                 />
               </div>
               <div>
@@ -398,7 +398,7 @@ function VariableEditorCard({
                     } as StringVariable)
                   }
                   placeholder="Monday&#10;Tuesday&#10;Wednesday&#10;..."
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                  className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded text-white resize-none"
                   rows={4}
                 />
               </div>
@@ -425,7 +425,7 @@ function VariableEditorCard({
                     } as ListVariable)
                   }
                   placeholder="No limit"
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded text-white"
                 />
               </div>
               <div>
@@ -447,7 +447,7 @@ function VariableEditorCard({
                       }
                     }}
                     placeholder="Add item..."
-                    className="flex-1 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                    className="flex-1 px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded text-white"
                   />
                   <button
                     onClick={addListItem}
@@ -490,7 +490,7 @@ function VariableEditorCard({
             </button>
             <button
               onClick={handleCancel}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg"
             >
               Cancel
             </button>
@@ -3011,7 +3011,7 @@ ${description || ""}`;
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g., The Dragon's Quest"
-                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 maxLength={100}
               />
             </div>
@@ -3025,7 +3025,7 @@ ${description || ""}`;
                 value={shortDescription}
                 onChange={(e) => setShortDescription(e.target.value)}
                 placeholder="A brief one-line summary"
-                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                 maxLength={300}
               />
               <p className="text-xs text-blue-300/60 mt-1">
@@ -3042,7 +3042,7 @@ ${description || ""}`;
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Write a compelling description of your adventure..."
                 rows={5}
-                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
                 maxLength={5000}
               />
               <p className="text-xs text-blue-300/60 mt-1">
@@ -3062,7 +3062,7 @@ ${description || ""}`;
                     className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all capitalize ${
                       difficulty === diff
                         ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                        : "bg-white/5 text-blue-200 border-white/10 hover:bg-white/10"
                     }`}
                   >
                     {diff}
@@ -3088,7 +3088,7 @@ ${description || ""}`;
                     className={`px-4 py-3 rounded-lg font-semibold border-2 transition-all capitalize ${
                       visibility === vis
                         ? "bg-purple-600 text-white border-purple-600 ring-2 ring-purple-400"
-                        : "bg-blue-900/30 text-blue-200 border-blue-700/40 hover:bg-blue-800/40"
+                        : "bg-white/5 text-blue-200 border-white/10 hover:bg-white/10"
                     }`}
                   >
                     {vis === "public" ? (
@@ -3124,7 +3124,7 @@ ${description || ""}`;
             {/* Advanced Options Toggle */}
             <button
               onClick={() => setShowAdvancedBasic(!showAdvancedBasic)}
-              className="w-full py-3 text-sm text-blue-300 hover:text-purple-300 border border-blue-700/40 rounded-lg hover:border-purple-500/50 transition-all flex items-center justify-center gap-2"
+              className="w-full py-3 text-sm text-blue-300 hover:text-purple-300 border border-white/10 rounded-lg hover:border-purple-500/50 transition-all flex items-center justify-center gap-2"
             >
               <DynamicIcon
                 name={showAdvancedBasic ? "ChevronUp" : "Settings"}
@@ -3148,7 +3148,7 @@ ${description || ""}`;
 
             {/* Advanced Options (Collapsible) */}
             {showAdvancedBasic && (
-              <div className="space-y-6 animate-in slide-in-from-top-2 duration-200 border-t border-blue-700/40 pt-6">
+              <div className="space-y-6 animate-in slide-in-from-top-2 duration-200 border-t border-white/10 pt-6">
                 <div>
                   <label className="flex items-center gap-3 cursor-pointer">
                     <div className="relative">
@@ -3158,7 +3158,7 @@ ${description || ""}`;
                         onChange={(e) => setNsfw(e.target.checked)}
                         className="sr-only peer"
                       />
-                      <div className="w-11 h-6 bg-blue-900/40 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
+                      <div className="w-11 h-6 bg-white/5 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:border-white/10 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-600"></div>
                     </div>
                     <div>
                       <span className="block text-sm font-semibold text-blue-200">
@@ -3185,7 +3185,7 @@ ${description || ""}`;
                         e.key === "Enter" && (e.preventDefault(), addTag())
                       }
                       placeholder="Add a tag..."
-                      className="flex-1 px-4 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors"
+                      className="flex-1 px-4 py-2 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 transition-colors"
                     />
                     <button
                       onClick={addTag}
@@ -3205,7 +3205,7 @@ ${description || ""}`;
                           <button
                             key={tag}
                             onClick={() => setTags([...tags, tag])}
-                            className="px-3 py-1 bg-blue-900/30 text-blue-200 rounded-full text-sm hover:bg-purple-900/30 transition-colors"
+                            className="px-3 py-1 bg-white/5 text-blue-200 rounded-full text-sm hover:bg-purple-900/30 transition-colors"
                           >
                             + {tag}
                           </button>
@@ -3245,7 +3245,7 @@ ${description || ""}`;
                         <img
                           src={thumbnailUrl}
                           alt="Thumbnail preview"
-                          className="w-32 h-24 object-cover rounded-lg border border-blue-700/40"
+                          className="w-32 h-24 object-cover rounded-lg border border-white/10"
                         />
                         <button
                           onClick={() => setThumbnailUrl("")}
@@ -3329,7 +3329,7 @@ ${description || ""}`;
                         <img
                           src={bannerUrl}
                           alt="Banner preview"
-                          className="w-48 h-16 object-cover rounded-lg border border-blue-700/40"
+                          className="w-48 h-16 object-cover rounded-lg border border-white/10"
                         />
                         <button
                           onClick={() => setBannerUrl("")}
@@ -3404,14 +3404,14 @@ ${description || ""}`;
       case "character-sheet":
         return (
           <div className="space-y-6">
-            <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4 mb-6">
+            <div className="bg-white/[0.03] border border-white/10 rounded-lg p-4 mb-6">
               <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
                 <DynamicIcon name="FileText" className="w-5 h-5" />
                 Character Sheet Template
               </h3>
               <p className="text-sm text-blue-300">
                 Create a template for custom characters. Use the{" "}
-                <code className="bg-blue-800/50 px-1 rounded">
+                <code className="bg-white/10 px-1 rounded">
                   {"{{FieldName | Description | Default}}"}
                 </code>{" "}
                 syntax to create fillable fields. When players pick
@@ -3445,7 +3445,7 @@ ${description || ""}`;
       case "preset":
         return (
           <div className="space-y-6">
-            <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-4 mb-6">
+            <div className="bg-white/[0.03] border border-white/10 rounded-lg p-4 mb-6">
               <h3 className="text-lg font-bold text-blue-200 mb-2 flex items-center gap-2">
                 <DynamicIcon name="Users" className="w-5 h-5" />
                 Character Presets
@@ -3481,7 +3481,7 @@ ${description || ""}`;
 
             {/* Preset Form */}
             {showPresetForm && (
-              <div className="bg-blue-900/20 border border-blue-700/40 rounded-lg p-6 mb-6">
+              <div className="bg-white/[0.03] border border-white/10 rounded-lg p-6 mb-6">
                 <h5 className="text-lg font-bold text-white mb-4">
                   {editingPresetId ? "Edit Preset" : "Create New Preset"}
                 </h5>
@@ -3496,7 +3496,7 @@ ${description || ""}`;
                       value={newPresetName}
                       onChange={(e) => setNewPresetName(e.target.value)}
                       placeholder="e.g., Battle Mage"
-                      className="w-full px-4 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors"
+                      className="w-full px-4 py-2 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 transition-colors"
                     />
                   </div>
 
@@ -3509,7 +3509,7 @@ ${description || ""}`;
                       onChange={(e) => setNewPresetDescription(e.target.value)}
                       placeholder="Describe this character archetype..."
                       rows={2}
-                      className="w-full px-4 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors resize-none"
+                      className="w-full px-4 py-2 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 transition-colors resize-none"
                     />
                   </div>
 
@@ -3533,7 +3533,7 @@ ${description || ""}`;
                         onClick={() =>
                           setCharacterSheet(characterSheetTemplate.template)
                         }
-                        className="text-xs px-2 py-1 bg-blue-700/40 hover:bg-blue-700/60 text-blue-200 rounded transition-colors"
+                        className="text-xs px-2 py-1 bg-white/10 hover:bg-white/10 text-blue-200 rounded transition-colors"
                       >
                         Load Template
                       </button>
@@ -3554,7 +3554,7 @@ ${description || ""}`;
 
 **Personality:** Honorable, protective, sometimes overly proud...`}
                       rows={12}
-                      className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 transition-colors resize-y font-mono text-sm"
+                      className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 transition-colors resize-y font-mono text-sm"
                     />
                   </div>
 
@@ -3645,7 +3645,7 @@ ${description || ""}`;
                         setNewPresetDescription("");
                         setNewPresetIcon("Star");
                       }}
-                      className="px-4 py-2 bg-gray-400 hover:bg-gray-500 text-white font-semibold rounded-lg transition-colors"
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold rounded-lg transition-colors"
                     >
                       Cancel
                     </button>
@@ -3664,7 +3664,7 @@ ${description || ""}`;
                     className={`relative p-5 rounded-xl border-2 transition-all ${
                       isSelected
                         ? "bg-purple-900/30 border-purple-500 ring-2 ring-purple-500/50"
-                        : "bg-blue-900/20 border-blue-700/40"
+                        : "bg-white/[0.03] border-white/10"
                     }`}
                   >
                     <button
@@ -3778,7 +3778,7 @@ ${description || ""}`;
 
                     {/* Edit/Delete buttons for custom presets */}
                     {preset.id !== "custom" && (
-                      <div className="flex gap-2 mt-3 pt-3 border-t border-blue-700/40">
+                      <div className="flex gap-2 mt-3 pt-3 border-t border-white/10">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -3788,7 +3788,7 @@ ${description || ""}`;
                             setNewPresetIcon(preset.icon);
                             setShowPresetForm(true);
                           }}
-                          className="flex-1 px-3 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded transition-colors flex items-center justify-center gap-1"
+                          className="flex-1 px-3 py-1 text-xs bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded shadow-md shadow-blue-950/40 transition-all flex items-center justify-center gap-1"
                         >
                           <DynamicIcon name="Edit2" className="w-3 h-3" /> Edit
                         </button>
@@ -3906,7 +3906,7 @@ ${description || ""}`;
                 onChange={(e) => setPremise(e.target.value)}
                 placeholder="A one-paragraph summary of the story's main conflict or goal..."
                 rows={4}
-                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
               />
             </div>
 
@@ -3919,7 +3919,7 @@ ${description || ""}`;
                 onChange={(e) => setIntro(e.target.value)}
                 placeholder="The opening text that players will see when they start the adventure..."
                 rows={6}
-                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
               />
             </div>
 
@@ -3932,7 +3932,7 @@ ${description || ""}`;
                 onChange={(e) => setAuthorNotes(e.target.value)}
                 placeholder="Notes for yourself about the story direction, themes, etc..."
                 rows={4}
-                className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
+                className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors resize-none"
               />
             </div>
 
@@ -3967,7 +3967,7 @@ ${description || ""}`;
                         ),
                       }))
                     }
-                    className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                    className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                   />
                   <p className="text-xs text-blue-300/60 mt-1">
                     Cost to increase a stat (default: 1)
@@ -3992,7 +3992,7 @@ ${description || ""}`;
                         ),
                       }))
                     }
-                    className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                    className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                   />
                   <p className="text-xs text-blue-300/60 mt-1">
                     How much a stat increases per purchase (default: 1)
@@ -4017,7 +4017,7 @@ ${description || ""}`;
                         ),
                       }))
                     }
-                    className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                    className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                   />
                   <p className="text-xs text-blue-300/60 mt-1">
                     Cost to increase a resource (default: 5)
@@ -4042,7 +4042,7 @@ ${description || ""}`;
                         ),
                       }))
                     }
-                    className="w-full px-4 py-3 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
+                    className="w-full px-4 py-3 border border-white/10 rounded-lg bg-white/5 text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-colors"
                   />
                   <p className="text-xs text-blue-300/60 mt-1">
                     How much a resource increases per purchase (default: 10)
@@ -4050,7 +4050,7 @@ ${description || ""}`;
                 </div>
               </div>
 
-              <div className="mt-4 p-3 bg-blue-900/30 rounded-lg border border-blue-700/30">
+              <div className="mt-4 p-3 bg-white/5 rounded-lg border border-white/10">
                 <p className="text-xs text-blue-300 flex items-center gap-2">
                   <DynamicIcon name="Info" className="w-4 h-4 shrink-0" />
                   <span>
@@ -4086,7 +4086,7 @@ ${description || ""}`;
             </div>
 
             {/* Add New Starting Choice */}
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+            <div className="bg-white/[0.03] rounded-lg border border-white/10 p-6">
               <h3 className="text-lg font-bold mb-4 text-white">
                 Add Starting Choice
               </h3>
@@ -4105,7 +4105,7 @@ ${description || ""}`;
                       })
                     }
                     placeholder="e.g., Sneak in through the back"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                   />
                 </div>
                 <div>
@@ -4122,7 +4122,7 @@ ${description || ""}`;
                     }
                     placeholder="Different intro text for this path (leave empty to use default intro)"
                     rows={3}
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white resize-none"
                   />
                   <p className="text-xs text-blue-300/50 mt-1">
                     If set, this intro will be shown instead of the main intro
@@ -4145,7 +4145,7 @@ ${description || ""}`;
                             : undefined,
                         })
                       }
-                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                     >
                       <option value="">No skill check</option>
                       {stats.map((stat) => (
@@ -4170,7 +4170,7 @@ ${description || ""}`;
                             skill_dc: e.target.value as DCTier,
                           })
                         }
-                        className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                        className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                       >
                         <option value="trivial">
                           Trivial - Almost automatic
@@ -4203,7 +4203,7 @@ ${description || ""}`;
                         })
                       }
                       placeholder="Item name (optional)"
-                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                     />
                     {newStartingChoice.item_used && (
                       <label className="flex items-center gap-2 mt-2 text-sm text-blue-300">
@@ -4234,7 +4234,7 @@ ${description || ""}`;
                           resource_used: e.target.value || undefined,
                         })
                       }
-                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                     >
                       <option value="">No resource cost</option>
                       {resources.map((res) => (
@@ -4247,7 +4247,7 @@ ${description || ""}`;
                 </div>
                 {/* Advanced RPG Tools Section */}
                 {agmtEnabled && (
-                  <div className="border-t border-blue-800/30 pt-4 mt-4">
+                  <div className="border-t border-white/10 pt-4 mt-4">
                     <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
                       <DynamicIcon name="Sparkles" className="w-4 h-4" />
                       Advanced RPG Tools Options
@@ -4267,7 +4267,7 @@ ${description || ""}`;
                             })
                           }
                           placeholder="e.g., Is the door locked? (Likely)"
-                          className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                          className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                         />
                         <p className="text-xs text-blue-300/50 mt-1">
                           Format: &quot;Question (Likelihood)&quot; -
@@ -4309,7 +4309,7 @@ ${description || ""}`;
                                 agmt_table: e.target.value || undefined,
                               })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                           >
                             <option value="">No AGMT table</option>
                             <option value="action">Action</option>
@@ -4352,7 +4352,7 @@ ${description || ""}`;
                                 custom_table: e.target.value || undefined,
                               })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                           >
                             <option value="">No custom table</option>
                             {customTables.map((table) => (
@@ -4424,7 +4424,7 @@ ${description || ""}`;
                 Starting Choices ({startingChoices.length})
               </h3>
               {startingChoices.length === 0 ? (
-                <div className="bg-blue-900/20 rounded-lg p-6 text-center">
+                <div className="bg-white/[0.03] rounded-lg p-6 text-center">
                   <DynamicIcon
                     name="Play"
                     className="w-12 h-12 mx-auto mb-3 text-gray-400"
@@ -4460,7 +4460,7 @@ ${description || ""}`;
                                 text: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                           />
                         </div>
                         <div>
@@ -4476,7 +4476,7 @@ ${description || ""}`;
                               })
                             }
                             rows={3}
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white resize-none"
                           />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -4495,7 +4495,7 @@ ${description || ""}`;
                                     : undefined,
                                 })
                               }
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                              className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                             >
                               <option value="">No skill check</option>
                               {stats.map((stat) => (
@@ -4521,7 +4521,7 @@ ${description || ""}`;
                                     skill_dc: e.target.value as DCTier,
                                   })
                                 }
-                                className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                               >
                                 <option value="trivial">
                                   Trivial - Almost automatic
@@ -4560,7 +4560,7 @@ ${description || ""}`;
                                 })
                               }
                               placeholder="Item name (optional)"
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                              className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                             />
                             {editStartingChoice.item_used && (
                               <label className="flex items-center gap-2 mt-2 text-sm text-blue-300">
@@ -4593,7 +4593,7 @@ ${description || ""}`;
                                   resource_used: e.target.value || undefined,
                                 })
                               }
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                              className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                             >
                               <option value="">No resource cost</option>
                               {resources.map((res) => (
@@ -4606,7 +4606,7 @@ ${description || ""}`;
                         </div>
                         {/* Advanced RPG Tools Section in Edit */}
                         {agmtEnabled && (
-                          <div className="border-t border-blue-800/30 pt-4 mt-4">
+                          <div className="border-t border-white/10 pt-4 mt-4">
                             <h4 className="text-sm font-bold text-purple-400 mb-3 flex items-center gap-2">
                               <DynamicIcon
                                 name="Sparkles"
@@ -4629,7 +4629,7 @@ ${description || ""}`;
                                     })
                                   }
                                   placeholder="e.g., Is the door locked? (Likely)"
-                                  className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                  className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                 />
                               </div>
                               {editStartingChoice.agmt_check &&
@@ -4665,7 +4665,7 @@ ${description || ""}`;
                                         agmt_table: e.target.value || undefined,
                                       })
                                     }
-                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                   >
                                     <option value="">No AGMT table</option>
                                     <option value="action">Action</option>
@@ -4713,7 +4713,7 @@ ${description || ""}`;
                                           e.target.value || undefined,
                                       })
                                     }
-                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                   >
                                     <option value="">No custom table</option>
                                     {customTables.map((table) => (
@@ -4789,7 +4789,7 @@ ${description || ""}`;
                               setEditingStartingChoiceIndex(null);
                               setEditStartingChoice({});
                             }}
-                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors"
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold rounded-lg transition-colors"
                           >
                             Cancel
                           </button>
@@ -4961,7 +4961,7 @@ ${description || ""}`;
               buttonText="Import Notes from PDF"
             />
 
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+            <div className="bg-white/[0.03] rounded-lg border border-white/10 p-6">
               <h3 className="text-lg font-bold mb-4 text-white">Add Note</h3>
               <div className="space-y-4 mb-4">
                 <div className="flex gap-4">
@@ -4976,7 +4976,7 @@ ${description || ""}`;
                         setNewLore({ ...newLore, title: e.target.value })
                       }
                       placeholder="e.g., The Ancient Prophecy"
-                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                     />
                   </div>
                   <div className="w-40">
@@ -4993,7 +4993,7 @@ ${description || ""}`;
                             | undefined,
                         })
                       }
-                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                     >
                       <option value="">📁 World Lore (default)</option>
                       <option value="secret">🔒 Secret</option>
@@ -5027,7 +5027,7 @@ ${description || ""}`;
                     placeholder="Write the note content..."
                     rows={5}
                     maxLength={5000}
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white resize-none"
                   />
                 </div>
                 <div className="flex items-center gap-4">
@@ -5103,7 +5103,7 @@ ${description || ""}`;
                       }
                       placeholder="e.g., Characters, Locations, History..."
                       list="lore-folders-list"
-                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                     />
                     <datalist id="lore-folders-list">
                       {[
@@ -5141,7 +5141,7 @@ ${description || ""}`;
                         }}
                         placeholder="Add tag..."
                         list="lore-tags-list"
-                        className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                        className="flex-1 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                       />
                       <datalist id="lore-tags-list">
                         {[...new Set(lore.flatMap((l) => l.tags || []))].map(
@@ -5220,7 +5220,7 @@ ${description || ""}`;
                         (e.preventDefault(), addLoreOnTrigger())
                       }
                       placeholder="e.g., Ancient Map"
-                      className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      className="flex-1 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                     />
                     <button
                       onClick={addLoreOnTrigger}
@@ -5297,7 +5297,7 @@ ${description || ""}`;
                         (e.preventDefault(), addLoreOffTrigger())
                       }
                       placeholder="e.g., Destroyed the Map"
-                      className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      className="flex-1 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                     />
                     <button
                       onClick={addLoreOffTrigger}
@@ -5357,12 +5357,12 @@ ${description || ""}`;
                 </div>
 
                 {/* Advanced Triggers Section (Expandable) */}
-                <div className="border border-blue-700/40 rounded-lg">
+                <div className="border border-white/10 rounded-lg">
                   <button
                     onClick={() =>
                       setNewLoreAdvancedExpanded(!newLoreAdvancedExpanded)
                     }
-                    className="w-full px-4 py-3 flex items-center justify-between bg-blue-900/20 hover:bg-blue-800/30 rounded-lg transition-colors"
+                    className="w-full px-4 py-3 flex items-center justify-between bg-white/[0.03] hover:bg-white/10 rounded-lg transition-colors"
                   >
                     <span className="text-sm font-semibold text-blue-200 flex items-center gap-2">
                       <DynamicIcon name="Settings" className="w-4 h-4" />{" "}
@@ -5390,7 +5390,7 @@ ${description || ""}`;
                             />{" "}
                             Lores that turn this ON
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                          <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
                             {lore.length === 0 ? (
                               <p className="text-xs text-blue-300/50 italic">
                                 No other lore entries yet.
@@ -5399,7 +5399,7 @@ ${description || ""}`;
                               lore.map((loreEntry, loreIndex) => (
                                 <label
                                   key={loreIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white/10 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -5436,7 +5436,7 @@ ${description || ""}`;
                             />{" "}
                             Lores that turn this OFF
                           </label>
-                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                          <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
                             {lore.length === 0 ? (
                               <p className="text-xs text-blue-300/50 italic">
                                 No other lore entries yet.
@@ -5445,7 +5445,7 @@ ${description || ""}`;
                               lore.map((loreEntry, loreIndex) => (
                                 <label
                                   key={loreIndex}
-                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white/10 rounded cursor-pointer"
                                 >
                                   <input
                                     type="checkbox"
@@ -5492,7 +5492,7 @@ ${description || ""}`;
                                 (e.preventDefault(), addLoreKey())
                               }
                               placeholder="e.g., Dragon Defeated or Ancient Ruins"
-                              className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                              className="flex-1 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                             />
                             <button
                               onClick={addLoreKey}
@@ -5568,13 +5568,13 @@ ${description || ""}`;
                               />{" "}
                               Variables that turn this ON (when true)
                             </label>
-                            <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                            <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
                               {variables
                                 .filter((v) => v.type === "boolean")
                                 .map((variable) => (
                                   <label
                                     key={variable.id}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/10 rounded cursor-pointer"
                                   >
                                     <input
                                       type="checkbox"
@@ -5610,13 +5610,13 @@ ${description || ""}`;
                               />{" "}
                               Variables that turn this OFF (when true)
                             </label>
-                            <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                            <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
                               {variables
                                 .filter((v) => v.type === "boolean")
                                 .map((variable) => (
                                   <label
                                     key={variable.id}
-                                    className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                    className="flex items-center gap-2 px-2 py-1 hover:bg-white/10 rounded cursor-pointer"
                                   >
                                     <input
                                       type="checkbox"
@@ -5679,7 +5679,7 @@ ${description || ""}`;
                         setLorePage(1);
                       }}
                       placeholder="Search lore..."
-                      className="pl-8 pr-3 py-1 text-sm border border-blue-700/40 rounded-lg bg-blue-900/20 text-white focus:ring-2 focus:ring-indigo-500"
+                      className="pl-8 pr-3 py-1 text-sm border border-white/10 rounded-lg bg-white/[0.03] text-white focus:ring-2 focus:ring-indigo-500"
                     />
                     <span className="absolute left-2.5 top-1.5 text-gray-400 text-xs">
                       <DynamicIcon name="Search" className="w-4 h-4" />
@@ -5703,7 +5703,7 @@ ${description || ""}`;
                             setLoreFilterFolder(e.target.value);
                             setLorePage(1);
                           }}
-                          className="px-2 py-1 text-sm border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                          className="px-2 py-1 text-sm border border-white/10 rounded-lg bg-white/[0.03] text-white"
                         >
                           <option value="">All Folders</option>
                           {[
@@ -5766,7 +5766,7 @@ ${description || ""}`;
                               setLoreFilterTags([]);
                               setLorePage(1);
                             }}
-                            className="px-2 py-0.5 rounded-full text-xs bg-gray-600 hover:bg-gray-500 text-white"
+                            className="px-2 py-0.5 rounded-full text-xs bg-white/10 hover:bg-white/15 text-white"
                           >
                             Clear
                           </button>
@@ -5851,7 +5851,7 @@ ${description || ""}`;
                                         title: e.target.value,
                                       })
                                     }
-                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                   />
                                 </div>
                                 <div className="w-40">
@@ -5868,7 +5868,7 @@ ${description || ""}`;
                                           | undefined,
                                       })
                                     }
-                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                   >
                                     <option value="">
                                       📁 World Lore (default)
@@ -5910,7 +5910,7 @@ ${description || ""}`;
                                   }
                                   rows={5}
                                   maxLength={5000}
-                                  className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                                  className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white resize-none"
                                 />
                               </div>
                               <div className="flex items-center gap-4">
@@ -6000,7 +6000,7 @@ ${description || ""}`;
                                     }
                                     placeholder="e.g., Characters, Locations..."
                                     list={`edit-lore-folders-list-${index}`}
-                                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                   />
                                   <datalist
                                     id={`edit-lore-folders-list-${index}`}
@@ -6052,7 +6052,7 @@ ${description || ""}`;
                                       }}
                                       placeholder="Add tag..."
                                       list={`edit-lore-tags-list-${index}`}
-                                      className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                      className="flex-1 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                     />
                                     <datalist
                                       id={`edit-lore-tags-list-${index}`}
@@ -6152,7 +6152,7 @@ ${description || ""}`;
                                       addEditLoreOnTrigger())
                                     }
                                     placeholder="e.g., Ancient Map"
-                                    className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                    className="flex-1 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                   />
                                   <button
                                     onClick={addEditLoreOnTrigger}
@@ -6246,7 +6246,7 @@ ${description || ""}`;
                                       addEditLoreOffTrigger())
                                     }
                                     placeholder="e.g., Destroyed the Map"
-                                    className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                    className="flex-1 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                   />
                                   <button
                                     onClick={addEditLoreOffTrigger}
@@ -6321,14 +6321,14 @@ ${description || ""}`;
                               </div>
 
                               {/* Advanced Triggers Section (Expandable) */}
-                              <div className="border border-blue-700/40 rounded-lg">
+                              <div className="border border-white/10 rounded-lg">
                                 <button
                                   onClick={() =>
                                     setEditLoreAdvancedExpanded(
                                       !editLoreAdvancedExpanded,
                                     )
                                   }
-                                  className="w-full px-4 py-3 flex items-center justify-between bg-blue-900/20 hover:bg-blue-800/30 rounded-lg transition-colors"
+                                  className="w-full px-4 py-3 flex items-center justify-between bg-white/[0.03] hover:bg-white/10 rounded-lg transition-colors"
                                 >
                                   <span className="text-sm font-semibold text-blue-200 flex items-center gap-2">
                                     <DynamicIcon
@@ -6361,7 +6361,7 @@ ${description || ""}`;
                                           />{" "}
                                           Lores that turn this ON
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                                        <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
                                           {lore.filter((_, i) => i !== index)
                                             .length === 0 ? (
                                             <p className="text-xs text-blue-300/50 italic">
@@ -6373,7 +6373,7 @@ ${description || ""}`;
                                               .map((loreEntry, loreIndex) => (
                                                 <label
                                                   key={loreIndex}
-                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white/10 rounded cursor-pointer"
                                                 >
                                                   <input
                                                     type="checkbox"
@@ -6418,7 +6418,7 @@ ${description || ""}`;
                                           />{" "}
                                           Lores that turn this OFF
                                         </label>
-                                        <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                                        <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
                                           {lore.filter((_, i) => i !== index)
                                             .length === 0 ? (
                                             <p className="text-xs text-blue-300/50 italic">
@@ -6430,7 +6430,7 @@ ${description || ""}`;
                                               .map((loreEntry, loreIndex) => (
                                                 <label
                                                   key={loreIndex}
-                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white/10 rounded cursor-pointer"
                                                 >
                                                   <input
                                                     type="checkbox"
@@ -6491,7 +6491,7 @@ ${description || ""}`;
                                               addEditLoreKey())
                                             }
                                             placeholder="e.g., Dragon Defeated"
-                                            className="flex-1 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                                            className="flex-1 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                                           />
                                           <button
                                             onClick={addEditLoreKey}
@@ -6583,7 +6583,7 @@ ${description || ""}`;
                                             Variables that turn this ON (when
                                             true)
                                           </label>
-                                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                                          <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
                                             {variables
                                               .filter(
                                                 (v) => v.type === "boolean",
@@ -6591,7 +6591,7 @@ ${description || ""}`;
                                               .map((variable) => (
                                                 <label
                                                   key={variable.id}
-                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white/10 rounded cursor-pointer"
                                                 >
                                                   <input
                                                     type="checkbox"
@@ -6636,7 +6636,7 @@ ${description || ""}`;
                                             Variables that turn this OFF (when
                                             true)
                                           </label>
-                                          <div className="max-h-40 overflow-y-auto border border-blue-700/40 rounded-lg p-2 bg-blue-900/20">
+                                          <div className="max-h-40 overflow-y-auto border border-white/10 rounded-lg p-2 bg-white/[0.03]">
                                             {variables
                                               .filter(
                                                 (v) => v.type === "boolean",
@@ -6644,7 +6644,7 @@ ${description || ""}`;
                                               .map((variable) => (
                                                 <label
                                                   key={variable.id}
-                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-blue-800/40 rounded cursor-pointer"
+                                                  className="flex items-center gap-2 px-2 py-1 hover:bg-white/10 rounded cursor-pointer"
                                                 >
                                                   <input
                                                     type="checkbox"
@@ -6701,7 +6701,7 @@ ${description || ""}`;
                                 </button>
                                 <button
                                   onClick={cancelEditLore}
-                                  className="flex-1 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg"
+                                  className="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold rounded-lg"
                                 >
                                   Cancel
                                 </button>
@@ -6744,7 +6744,7 @@ ${description || ""}`;
                                     className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${
                                       entry.on
                                         ? "bg-green-600 text-white hover:bg-green-700"
-                                        : "bg-gray-400 text-white hover:bg-gray-500"
+                                        : "bg-white/5 text-white hover:bg-white/10 border border-white/10"
                                     }`}
                                     title={
                                       entry.on
@@ -6828,7 +6828,7 @@ ${description || ""}`;
                                 {/* Folder and Tags display */}
                                 {(entry.folder ||
                                   (entry.tags && entry.tags.length > 0)) && (
-                                  <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-blue-700/30">
+                                  <div className="flex flex-wrap items-center gap-2 mt-2 pt-2 border-t border-white/10">
                                     {entry.folder && (
                                       <span className="px-2 py-0.5 rounded-full text-xs bg-yellow-900/30 text-yellow-300 flex items-center gap-1">
                                         <DynamicIcon
@@ -6887,7 +6887,7 @@ ${description || ""}`;
                               setLorePage((p) => Math.max(1, p - 1))
                             }
                             disabled={lorePage === 1}
-                            className="px-3 py-1 bg-blue-900/30 hover:bg-blue-800/40 rounded disabled:opacity-50 text-sm"
+                            className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded disabled:opacity-50 text-sm"
                           >
                             Previous
                           </button>
@@ -6899,7 +6899,7 @@ ${description || ""}`;
                               setLorePage((p) => Math.min(totalPages, p + 1))
                             }
                             disabled={lorePage === totalPages}
-                            className="px-3 py-1 bg-blue-900/30 hover:bg-blue-800/40 rounded disabled:opacity-50 text-sm"
+                            className="px-3 py-1 bg-white/5 hover:bg-white/10 rounded disabled:opacity-50 text-sm"
                           >
                             Next
                           </button>
@@ -6916,7 +6916,7 @@ ${description || ""}`;
       case "goals":
         return (
           <div className="space-y-6">
-            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+            <div className="bg-white/[0.03] border border-white/10 rounded-lg p-4">
               <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
@@ -6930,7 +6930,7 @@ ${description || ""}`;
               </p>
             </div>
 
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+            <div className="bg-white/[0.03] rounded-lg border border-white/10 p-6">
               <h3 className="text-lg font-bold mb-4 text-white">Add Goal</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div className="sm:col-span-2">
@@ -6947,7 +6947,7 @@ ${description || ""}`;
                       })
                     }
                     placeholder="e.g., Find the Lost Artifact"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -6964,7 +6964,7 @@ ${description || ""}`;
                       })
                     }
                     placeholder="e.g., Recover the ancient relic from the temple"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                   />
                 </div>
                 <div className="sm:col-span-2">
@@ -6981,7 +6981,7 @@ ${description || ""}`;
                     }
                     placeholder="Detailed goal description with context and objectives..."
                     rows={3}
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white resize-none"
                   />
                 </div>
                 <div className="flex items-center gap-4">
@@ -6995,7 +6995,7 @@ ${description || ""}`;
                           active: e.target.checked,
                         })
                       }
-                      className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                      className="w-4 h-4 text-purple-500 bg-white/10 border-white/20 rounded focus:ring-purple-500"
                     />
                     <span className="text-sm font-semibold text-blue-200">
                       Active
@@ -7011,7 +7011,7 @@ ${description || ""}`;
                           fulfilled: e.target.checked,
                         })
                       }
-                      className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500"
+                      className="w-4 h-4 text-emerald-500 bg-white/10 border-white/20 rounded focus:ring-emerald-500"
                     />
                     <span className="text-sm font-semibold text-blue-200">
                       Fulfilled
@@ -7056,7 +7056,7 @@ ${description || ""}`;
                   !newGoal.shortDescription ||
                   !newGoal.description
                 }
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+                className="w-full px-4 py-2 bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-50 disabled:from-white/10 disabled:to-white/10 text-white font-semibold rounded-lg shadow-md shadow-blue-950/40 transition-all"
               >
                 Add Goal
               </button>
@@ -7074,7 +7074,7 @@ ${description || ""}`;
                     // Edit mode
                     <div
                       key={goal.id}
-                      className="p-4 bg-blue-900/40 rounded-lg border-2 border-blue-600"
+                      className="p-4 bg-white/5 rounded-lg border-2 border-blue-600"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                         <div className="sm:col-span-2">
@@ -7090,7 +7090,7 @@ ${description || ""}`;
                                 title: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -7106,7 +7106,7 @@ ${description || ""}`;
                                 shortDescription: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white text-sm"
                           />
                         </div>
                         <div className="sm:col-span-2">
@@ -7122,7 +7122,7 @@ ${description || ""}`;
                               })
                             }
                             rows={3}
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white text-sm resize-none"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white text-sm resize-none"
                           />
                         </div>
                         <div className="flex items-center gap-4">
@@ -7136,7 +7136,7 @@ ${description || ""}`;
                                   active: e.target.checked,
                                 })
                               }
-                              className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                              className="w-4 h-4 text-purple-500 bg-white/10 border-white/20 rounded focus:ring-purple-500"
                             />
                             <span className="text-xs font-semibold text-blue-300">
                               Active
@@ -7152,7 +7152,7 @@ ${description || ""}`;
                                   fulfilled: e.target.checked,
                                 })
                               }
-                              className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500"
+                              className="w-4 h-4 text-emerald-500 bg-white/10 border-white/20 rounded focus:ring-emerald-500"
                             />
                             <span className="text-xs font-semibold text-blue-300">
                               Fulfilled
@@ -7199,7 +7199,7 @@ ${description || ""}`;
                             setEditingGoalIndex(null);
                             setEditGoal({});
                           }}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                          className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold rounded-lg transition-colors text-sm"
                         >
                           Cancel
                         </button>
@@ -7228,7 +7228,7 @@ ${description || ""}`;
                         }
                       }}
                       onDragEnd={() => setDraggedGoalIndex(null)}
-                      className="flex items-start gap-3 p-4 bg-blue-900/20 rounded-lg border border-blue-800/50 cursor-move hover:bg-blue-800/30 transition-colors"
+                      className="flex items-start gap-3 p-4 bg-white/[0.03] rounded-lg border border-white/10 cursor-move hover:bg-white/10 transition-colors"
                       style={{
                         opacity: draggedGoalIndex === index ? 0.5 : 1,
                       }}
@@ -7242,7 +7242,7 @@ ${description || ""}`;
                             {goal.title}
                           </div>
                           {goal.active && (
-                            <span className="px-2 py-0.5 bg-blue-800/50 text-blue-200 rounded-full text-xs font-bold">
+                            <span className="px-2 py-0.5 bg-white/10 text-blue-200 rounded-full text-xs font-bold">
                               Active
                             </span>
                           )}
@@ -7272,7 +7272,7 @@ ${description || ""}`;
                               setGoals(updated);
                             }}
                             disabled={index === 0}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            className="w-8 h-8 flex items-center justify-center bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-50 disabled:from-white/10 disabled:to-white/10 text-white rounded shadow-md shadow-blue-950/40 transition-all text-sm"
                             title="Move up"
                           >
                             <DynamicIcon name="ChevronUp" className="w-5 h-5" />
@@ -7288,7 +7288,7 @@ ${description || ""}`;
                               setGoals(updated);
                             }}
                             disabled={index === goals.length - 1}
-                            className="w-8 h-8 flex items-center justify-center bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white rounded transition-colors text-sm"
+                            className="w-8 h-8 flex items-center justify-center bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-50 disabled:from-white/10 disabled:to-white/10 text-white rounded shadow-md shadow-blue-950/40 transition-all text-sm"
                             title="Move down"
                           >
                             <DynamicIcon
@@ -7346,7 +7346,7 @@ ${description || ""}`;
       case "npcs":
         return (
           <div className="space-y-6">
-            <div className="bg-blue-900/20 border border-blue-800/50 rounded-lg p-4">
+            <div className="bg-white/[0.03] border border-white/10 rounded-lg p-4">
               <p className="text-sm text-blue-300 flex items-start gap-2">
                 <DynamicIcon
                   name="Lightbulb"
@@ -7360,7 +7360,7 @@ ${description || ""}`;
               </p>
             </div>
 
-            <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 p-6">
+            <div className="bg-white/[0.03] rounded-lg border border-white/10 p-6">
               <h3 className="text-lg font-bold mb-4 text-white">Add NPC</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 {/* Name and Icon */}
@@ -7368,7 +7368,7 @@ ${description || ""}`;
                   <div className="shrink-0 relative">
                     <button
                       onClick={() => setShowNPCIconPicker(!showNPCIconPicker)}
-                      className="w-14 h-14 rounded-lg bg-blue-800/50 border border-blue-600/50 flex items-center justify-center hover:bg-blue-700/50 transition-colors"
+                      className="w-14 h-14 rounded-lg bg-white/10 border border-blue-600/50 flex items-center justify-center hover:bg-white/10 transition-colors"
                       title="Change icon"
                     >
                       <DynamicIcon
@@ -7399,7 +7399,7 @@ ${description || ""}`;
                         setNewNPC({ ...newNPC, name: e.target.value })
                       }
                       placeholder="e.g., Captain Thorne"
-                      className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                      className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                     />
                   </div>
                 </div>
@@ -7416,7 +7416,7 @@ ${description || ""}`;
                       setNewNPC({ ...newNPC, role: e.target.value })
                     }
                     placeholder="e.g., Quest Giver, Antagonist, Mentor"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                   />
                 </div>
 
@@ -7433,7 +7433,7 @@ ${description || ""}`;
                         status: e.target.value as NPCStatus,
                       })
                     }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                   >
                     <option value="alive">Alive</option>
                     <option value="dead">Dead</option>
@@ -7454,7 +7454,7 @@ ${description || ""}`;
                         attitude: e.target.value as NPCAttitude,
                       })
                     }
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                   >
                     <option value="hostile">Hostile</option>
                     <option value="unfriendly">Unfriendly</option>
@@ -7479,7 +7479,7 @@ ${description || ""}`;
                       setNewNPC({ ...newNPC, relationship: e.target.value })
                     }
                     placeholder='e.g., "Trusted mentor", "Bitter rival", "Old friend"'
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                   />
                 </div>
 
@@ -7495,7 +7495,7 @@ ${description || ""}`;
                       setNewNPC({ ...newNPC, faction: e.target.value })
                     }
                     placeholder="Organization, guild, or group affiliation"
-                    className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white"
+                    className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white"
                   />
                 </div>
 
@@ -7510,7 +7510,7 @@ ${description || ""}`;
                       setNewNPC({ ...newNPC, description: e.target.value })
                     }
                     placeholder="Physical appearance, personality, motivations..."
-                    className="w-full h-24 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                    className="w-full h-24 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white resize-none"
                   />
                 </div>
 
@@ -7525,7 +7525,7 @@ ${description || ""}`;
                       setNewNPC({ ...newNPC, notes: e.target.value })
                     }
                     placeholder="DM notes, secrets, plot hooks..."
-                    className="w-full h-20 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/30 text-white resize-none"
+                    className="w-full h-20 px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white resize-none"
                   />
                 </div>
               </div>
@@ -7565,7 +7565,7 @@ ${description || ""}`;
                   addNotification(`Added NPC: ${npc.name}`, "success");
                 }}
                 disabled={!newNPC.name?.trim()}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+                className="w-full px-4 py-2 bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-50 disabled:from-white/10 disabled:to-white/10 text-white font-semibold rounded-lg shadow-md shadow-blue-950/40 transition-all"
               >
                 Add NPC
               </button>
@@ -7583,7 +7583,7 @@ ${description || ""}`;
                     // Edit mode
                     <div
                       key={npc.id}
-                      className="p-4 bg-blue-900/40 rounded-lg border-2 border-blue-600"
+                      className="p-4 bg-white/5 rounded-lg border-2 border-blue-600"
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                         {/* Name and Icon */}
@@ -7593,7 +7593,7 @@ ${description || ""}`;
                               onClick={() =>
                                 setShowEditNPCIconPicker(!showEditNPCIconPicker)
                               }
-                              className="w-14 h-14 rounded-lg bg-blue-800/50 border border-blue-600/50 flex items-center justify-center hover:bg-blue-700/50 transition-colors"
+                              className="w-14 h-14 rounded-lg bg-white/10 border border-blue-600/50 flex items-center justify-center hover:bg-white/10 transition-colors"
                               title="Change icon"
                             >
                               <DynamicIcon
@@ -7623,7 +7623,7 @@ ${description || ""}`;
                               onChange={(e) =>
                                 setEditNPC({ ...editNPC, name: e.target.value })
                               }
-                              className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                              className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white"
                             />
                           </div>
                         </div>
@@ -7639,7 +7639,7 @@ ${description || ""}`;
                             onChange={(e) =>
                               setEditNPC({ ...editNPC, role: e.target.value })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white"
                           />
                         </div>
 
@@ -7656,7 +7656,7 @@ ${description || ""}`;
                                 status: e.target.value as NPCStatus,
                               })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white"
                           >
                             <option value="alive">Alive</option>
                             <option value="dead">Dead</option>
@@ -7677,7 +7677,7 @@ ${description || ""}`;
                                 attitude: e.target.value as NPCAttitude,
                               })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white"
                           >
                             <option value="hostile">Hostile</option>
                             <option value="unfriendly">Unfriendly</option>
@@ -7701,7 +7701,7 @@ ${description || ""}`;
                                 relationship: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white"
                           />
                         </div>
 
@@ -7719,7 +7719,7 @@ ${description || ""}`;
                                 faction: e.target.value,
                               })
                             }
-                            className="w-full px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white"
+                            className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white"
                           />
                         </div>
 
@@ -7736,7 +7736,7 @@ ${description || ""}`;
                                 description: e.target.value,
                               })
                             }
-                            className="w-full h-24 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white resize-none"
+                            className="w-full h-24 px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white resize-none"
                           />
                         </div>
 
@@ -7753,7 +7753,7 @@ ${description || ""}`;
                                 notes: e.target.value,
                               })
                             }
-                            className="w-full h-20 px-3 py-2 border border-blue-700/40 rounded-lg bg-blue-900/20 text-white resize-none"
+                            className="w-full h-20 px-3 py-2 border border-white/10 rounded-lg bg-white/[0.03] text-white resize-none"
                           />
                         </div>
                       </div>
@@ -7803,7 +7803,7 @@ ${description || ""}`;
                             setEditNPC({});
                             setShowEditNPCIconPicker(false);
                           }}
-                          className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
+                          className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-colors"
                         >
                           Cancel
                         </button>
@@ -7813,10 +7813,10 @@ ${description || ""}`;
                     // View mode
                     <div
                       key={npc.id}
-                      className="flex items-start gap-3 p-4 bg-blue-900/20 rounded-lg border border-blue-700/40"
+                      className="flex items-start gap-3 p-4 bg-white/[0.03] rounded-lg border border-white/10"
                     >
                       <div className="shrink-0">
-                        <div className="w-12 h-12 rounded-lg bg-blue-800/30 border border-blue-700/30 flex items-center justify-center">
+                        <div className="w-12 h-12 rounded-lg bg-white/10 border border-white/10 flex items-center justify-center">
                           <DynamicIcon
                             name={npc.symbol || "User"}
                             className="w-6 h-6 text-blue-400"
@@ -7835,7 +7835,7 @@ ${description || ""}`;
                                 : npc.attitude === "unfriendly"
                                   ? "text-orange-400 bg-orange-500/20"
                                   : npc.attitude === "neutral"
-                                    ? "text-gray-400 bg-gray-500/20"
+                                    ? "text-blue-300/50 bg-white/5"
                                     : npc.attitude === "friendly"
                                       ? "text-green-400 bg-green-500/20"
                                       : "text-blue-400 bg-blue-500/20"
@@ -7847,7 +7847,7 @@ ${description || ""}`;
                             <span
                               className={`text-xs px-1.5 py-0.5 rounded ${
                                 npc.status === "dead"
-                                  ? "text-gray-400 bg-gray-500/20"
+                                  ? "text-blue-300/50 bg-white/5"
                                   : npc.status === "missing"
                                     ? "text-yellow-400 bg-yellow-500/20"
                                     : "text-purple-400 bg-purple-500/20"
@@ -8026,7 +8026,7 @@ ${description || ""}`;
               ))}
 
               {variables.length === 0 && (
-                <div className="p-8 text-center rounded-lg bg-blue-900/30 border-2 border-dashed border-blue-700/40">
+                <div className="p-8 text-center rounded-lg bg-white/5 border-2 border-dashed border-white/10">
                   <DynamicIcon
                     name="Variable"
                     className="w-12 h-12 mx-auto mb-3 text-blue-400/50"
@@ -8074,15 +8074,15 @@ ${description || ""}`;
                   onChange={(e) => setAGMTEnabled(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-14 h-7 bg-gray-700 peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                <div className="w-14 h-7 bg-white/10 peer-focus:ring-4 peer-focus:ring-purple-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-white/10 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600"></div>
               </label>
             </div>
 
             {agmtEnabled && (
               <div className="space-y-6 animate-in fade-in slide-in-from-top-4 duration-300">
                 {/* Chaos Factor - Enhanced Visual Slider */}
-                <div className="p-6 rounded-lg bg-linear-to-br from-gray-800/50 to-gray-900/50 border border-gray-700">
-                  <label className="block text-sm font-semibold text-gray-300 mb-3">
+                <div className="p-6 rounded-lg bg-white/[0.03] backdrop-blur-md border border-white/10">
+                  <label className="block text-sm font-semibold text-blue-200/80 mb-3">
                     Starting Chaos Factor
                   </label>
                   <div className="space-y-3">
@@ -8097,7 +8097,7 @@ ${description || ""}`;
                           chaosFactor: parseInt(e.target.value),
                         })
                       }
-                      className="w-full h-3 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-linear-to-br [&::-webkit-slider-thumb]:from-purple-500 [&::-webkit-slider-thumb]:to-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-transform"
+                      className="w-full h-3 bg-white/10 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-6 [&::-webkit-slider-thumb]:h-6 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-linear-to-br [&::-webkit-slider-thumb]:from-purple-500 [&::-webkit-slider-thumb]:to-blue-500 [&::-webkit-slider-thumb]:cursor-pointer [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:hover:scale-110 [&::-webkit-slider-thumb]:transition-transform"
                     />
                     <div className="flex justify-between items-center">
                       <div className="text-center">
@@ -8108,7 +8108,7 @@ ${description || ""}`;
                         >
                           {agmtState.chaosFactor}
                         </span>
-                        <span className="text-xs text-gray-400 block mt-1">
+                        <span className="text-xs text-blue-300/50 block mt-1">
                           / 9
                         </span>
                       </div>
@@ -8120,7 +8120,7 @@ ${description || ""}`;
                         >
                           {getChaosLabel(agmtState.chaosFactor)}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-blue-300/50 mt-1">
                           {getChaosDescription(agmtState.chaosFactor)}
                         </p>
                       </div>
@@ -8157,7 +8157,7 @@ ${description || ""}`;
               </div>
             </div>
 
-            <div className="bg-blue-900/20 rounded-xl shadow-lg p-6 border border-blue-800/30">
+            <div className="bg-white/[0.03] rounded-xl shadow-lg p-6 border border-white/10">
               <h3 className="text-xl font-bold mb-4 text-white">Summary</h3>
               <div className="space-y-4 text-sm">
                 <div className="grid grid-cols-2 gap-4">
@@ -8208,11 +8208,11 @@ ${description || ""}`;
             </div>
 
             {intro && (
-              <div className="bg-blue-900/20 rounded-xl shadow-lg p-6 border border-blue-800/30">
+              <div className="bg-white/[0.03] rounded-xl shadow-lg p-6 border border-white/10">
                 <h3 className="text-xl font-bold mb-4 text-white">
                   Opening Scene
                 </h3>
-                <div className="bg-blue-900/20 rounded-lg p-6 border-l-4 border-purple-500">
+                <div className="bg-white/[0.03] rounded-lg p-6 border-l-4 border-purple-500">
                   <p className="text-blue-200 italic">"{intro}"</p>
                 </div>
               </div>
@@ -8279,13 +8279,13 @@ ${description || ""}`;
     >
       <div className="max-w-6xl mx-auto p-3 sm:p-6">
         {/* Compact Header */}
-        <div className="bg-blue-950/50 rounded-xl p-4 border border-blue-800/30 mb-4">
+        <div className="bg-white/[0.03] backdrop-blur-md rounded-xl p-4 border border-white/10 mb-4">
           {/* Top row: Title and action buttons */}
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <button
                 onClick={() => router.push("/library")}
-                className="p-2 text-blue-300/60 hover:text-white hover:bg-blue-800/30 rounded-lg transition-colors"
+                className="p-2 text-blue-300/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
               >
                 <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
               </button>
@@ -8348,7 +8348,7 @@ ${description || ""}`;
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex items-center justify-center gap-2 px-4 py-2 w-full sm:w-auto bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
+                className="flex items-center justify-center gap-2 px-4 py-2 w-full sm:w-auto bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-white/10 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap"
                 title="Save to your device"
               >
                 {saving ? (
@@ -8371,7 +8371,7 @@ ${description || ""}`;
         </div>
 
         {/* Content */}
-        <div className="bg-blue-950/50 rounded-xl p-4 sm:p-6 border border-blue-800/30 mb-4">
+        <div className="bg-white/[0.03] backdrop-blur-md rounded-xl p-4 sm:p-6 border border-white/10 mb-4">
           <h2 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
             <DynamicIcon
               name={steps.find((s) => s.id === currentStep)?.icon || "FileText"}
@@ -8383,14 +8383,14 @@ ${description || ""}`;
         </div>
 
         {/* Navigation */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-blue-950/50 rounded-xl p-3 border border-blue-800/30 mb-5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white/[0.03] backdrop-blur-md rounded-xl p-3 border border-white/10 mb-5">
           <button
             onClick={() => {
               const prevIndex = Math.max(0, currentStepIndex - 1);
               setCurrentStep(steps[prevIndex].id);
             }}
             disabled={currentStepIndex === 0}
-            className="px-4 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 disabled:opacity-50 disabled:cursor-not-allowed text-blue-200 text-sm font-medium rounded-lg transition-colors border border-blue-700/30"
+            className="px-4 py-2.5 bg-white/10 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-blue-200 text-sm font-medium rounded-lg transition-colors border border-white/10"
           >
             ← Previous
           </button>
@@ -8404,7 +8404,7 @@ ${description || ""}`;
               <button
                 onClick={handleSave}
                 disabled={saving}
-                className="flex-1 sm:flex-none px-3 py-3 sm:py-2.5 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap touch-manipulation flex items-center justify-center gap-2"
+                className="flex-1 sm:flex-none px-3 py-3 sm:py-2.5 bg-green-600 hover:bg-green-500 active:bg-green-700 disabled:bg-white/10 disabled:text-blue-300/40 text-white text-sm font-medium rounded-lg transition-all whitespace-nowrap touch-manipulation flex items-center justify-center gap-2"
                 title="Save to your device"
               >
                 {saving ? (
@@ -8469,8 +8469,8 @@ ${description || ""}`;
 
               {/* Dropdown */}
               {showPresetSwitcher && (
-                <div className="absolute bottom-full right-0 mb-2 w-64 bg-blue-950 border border-blue-700/50 rounded-xl shadow-2xl overflow-hidden">
-                  <div className="p-2 border-b border-blue-700/30">
+                <div className="absolute bottom-full right-0 mb-2 w-64 bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl overflow-hidden">
+                  <div className="p-2 border-b border-white/10">
                     <p className="text-xs text-blue-300/60 font-medium">
                       Switch Preset
                     </p>
@@ -8536,7 +8536,7 @@ ${description || ""}`;
                         className={`w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors ${
                           selectedPreset === preset.id
                             ? "bg-purple-600/30 text-white"
-                            : "text-blue-200 hover:bg-blue-800/40"
+                            : "text-blue-200 hover:bg-white/10"
                         }`}
                       >
                         <DynamicIcon
@@ -8558,7 +8558,7 @@ ${description || ""}`;
                       </button>
                     ))}
                   </div>
-                  <div className="p-2 border-t border-blue-700/30">
+                  <div className="p-2 border-t border-white/10">
                     <button
                       onClick={() => {
                         setCurrentStep("preset");
@@ -8591,7 +8591,7 @@ ${description || ""}`;
       {/* Conflict Resolution Modal */}
       {showConflictModal && conflictData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-blue-950 border border-amber-500/50 rounded-xl p-6 max-w-2xl w-full shadow-2xl">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-amber-500/50 rounded-xl p-6 max-w-2xl w-full shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
                 <DynamicIcon
@@ -8616,7 +8616,7 @@ ${description || ""}`;
 
             <div className="grid md:grid-cols-2 gap-4 mb-6">
               {/* Local Version */}
-              <div className="bg-blue-900/30 border border-blue-500/30 rounded-lg p-4">
+              <div className="bg-white/5 border border-blue-500/30 rounded-lg p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <DynamicIcon
                     name="Laptop"
@@ -8716,7 +8716,7 @@ ${description || ""}`;
       {/* AI Image Generation Modal */}
       {showAIImageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-blue-950 border border-blue-700/50 rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold text-white">
                 🎨 AI{" "}
@@ -8745,7 +8745,7 @@ ${description || ""}`;
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     imageProvider === "deepinfra"
                       ? "bg-purple-600 text-white"
-                      : "bg-blue-900/50 text-blue-300 hover:bg-blue-800/50"
+                      : "bg-white/5 text-blue-300 hover:bg-white/10"
                   }`}
                 >
                   🪙 DeepInfra (Coins)
@@ -8758,7 +8758,7 @@ ${description || ""}`;
                   className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                     imageProvider === "openrouter"
                       ? "bg-purple-600 text-white"
-                      : "bg-blue-900/50 text-blue-300 hover:bg-blue-800/50"
+                      : "bg-white/5 text-blue-300 hover:bg-white/10"
                   }`}
                 >
                   🔑 OpenRouter (BYOK)
@@ -8783,7 +8783,7 @@ ${description || ""}`;
                     e.target.value as ImageModelKey | DeepInfraImageModelKey,
                   )
                 }
-                className="w-full px-4 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
               >
                 {imageProvider === "deepinfra"
                   ? Object.entries(DEEPINFRA_IMAGE_MODELS).map(
@@ -8825,7 +8825,7 @@ ${description || ""}`;
                     : setBannerPrompt(e.target.value)
                 }
                 rows={6}
-                className="w-full px-4 py-3 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
                 placeholder="Describe your image..."
               />
               <button
@@ -8844,7 +8844,7 @@ ${description || ""}`;
             </div>
 
             {/* Cost Display */}
-            <div className="mb-4 p-3 bg-blue-900/30 rounded-lg border border-blue-800/50">
+            <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/10">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-blue-300/80">Estimated Cost:</span>
                 <span className="font-medium text-purple-300">
@@ -8869,7 +8869,7 @@ ${description || ""}`;
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowAIImageModal(null)}
-                className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -8883,7 +8883,7 @@ ${description || ""}`;
                   generatingBanner ||
                   (imageProvider === "openrouter" && !apiKeys.openRouterKey)
                 }
-                className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-white/5 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
               >
                 🎨 Generate
               </button>
