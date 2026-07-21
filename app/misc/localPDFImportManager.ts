@@ -9,10 +9,20 @@ import { StoryLore, CustomTable } from "./structs";
 
 const DB_NAME = "YourStoryPDFImportsDB";
 const STORE_NAME = "pdf_imports";
-const DB_VERSION = 1;
+const PROGRESS_STORE_NAME = "pdf_import_progress";
+const DB_VERSION = 2;
 
 // Keep imports for 90 days
 const IMPORT_EXPIRATION_DAYS = 90;
+
+// A stalled in-progress import older than this is treated as abandoned
+// (e.g. the tab was closed and never came back) rather than resumable.
+const IN_PROGRESS_EXPIRATION_DAYS = 7;
+
+// Fixed key: only one chunked PDF import can be actively running at a time
+// (the importer processes files sequentially), so there's never more than
+// one in-progress record to track.
+const PROGRESS_ID = "current";
 
 // A page range that didn't make it into the import (OCR or note-extraction
 // failed for it), recorded so the player knows which pages to rework/retry
@@ -35,6 +45,45 @@ export interface LocalPDFImport {
   failedPages?: FailedPageRange[];
 }
 
+// Per-chunk state persisted for resuming an interrupted chunked import.
+// Only terminal outcomes are tracked ("pending" covers both "not started"
+// and "was mid-flight when we got interrupted" - both simply get redone).
+export interface PersistedChunkStatus {
+  chunkIndex: number;
+  pageStart: number;
+  pageEnd: number;
+  status: "pending" | "complete" | "failed";
+  ocrMarkdown?: string;
+  error?: string;
+  result?: {
+    lore: StoryLore[];
+    mechanicNotes: StoryLore[];
+    customTables: CustomTable[];
+  };
+}
+
+// The importer settings in effect when the interrupted job was started, so
+// resuming reuses the same model/instructions rather than whatever the form
+// happens to default to.
+export interface InProgressPDFImportSettings {
+  aiModel: string;
+  customModelProvider: string;
+  customModelId: string;
+  customInstructions: string;
+  maxOutputTokens: number;
+}
+
+export interface InProgressPDFImport {
+  id: string;
+  timestamp: number;
+  fileName: string;
+  // Original source PDF bytes, kept so a resume can re-run OCR for any
+  // chunk that wasn't finished without asking the user to re-upload.
+  fileBytes: ArrayBuffer;
+  chunkStatuses: PersistedChunkStatus[];
+  settings: InProgressPDFImportSettings;
+}
+
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -54,7 +103,75 @@ function openDB(): Promise<IDBDatabase> {
         const objectStore = db.createObjectStore(STORE_NAME, { keyPath: "id" });
         objectStore.createIndex("timestamp", "timestamp", { unique: false });
       }
+
+      if (!db.objectStoreNames.contains(PROGRESS_STORE_NAME)) {
+        db.createObjectStore(PROGRESS_STORE_NAME, { keyPath: "id" });
+      }
     };
+  });
+}
+
+/**
+ * Save (or overwrite) the current in-progress chunked import, so it can be
+ * recovered if the page reloads or crashes before the import finishes.
+ * Called incrementally as chunks complete, not just once at the end.
+ */
+export async function saveImportInProgress(
+  progress: Omit<InProgressPDFImport, "id" | "timestamp">,
+): Promise<void> {
+  const db = await openDB();
+  const record: InProgressPDFImport = {
+    id: PROGRESS_ID,
+    timestamp: Date.now(),
+    ...progress,
+  };
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([PROGRESS_STORE_NAME], "readwrite");
+    transaction.objectStore(PROGRESS_STORE_NAME).put(record);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+/**
+ * Get the current in-progress import, if any. Automatically discards (and
+ * returns undefined for) a stalled record older than
+ * IN_PROGRESS_EXPIRATION_DAYS, since that's almost certainly an abandoned
+ * job rather than one worth resuming.
+ */
+export async function getImportInProgress(): Promise<
+  InProgressPDFImport | undefined
+> {
+  const db = await openDB();
+  const record = await new Promise<InProgressPDFImport | undefined>(
+    (resolve, reject) => {
+      const transaction = db.transaction([PROGRESS_STORE_NAME], "readonly");
+      const request = transaction.objectStore(PROGRESS_STORE_NAME).get(PROGRESS_ID);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    },
+  );
+
+  if (!record) return undefined;
+
+  const expirationTime =
+    Date.now() - IN_PROGRESS_EXPIRATION_DAYS * 24 * 60 * 60 * 1000;
+  if (record.timestamp < expirationTime) {
+    await clearImportInProgress();
+    return undefined;
+  }
+
+  return record;
+}
+
+/** Discard the in-progress import record (job finished or user cancelled it). */
+export async function clearImportInProgress(): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([PROGRESS_STORE_NAME], "readwrite");
+    transaction.objectStore(PROGRESS_STORE_NAME).delete(PROGRESS_ID);
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
   });
 }
 

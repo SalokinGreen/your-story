@@ -16,10 +16,16 @@ import { PDFDocument } from "pdf-lib";
 import {
   LocalPDFImport,
   FailedPageRange,
+  InProgressPDFImport,
+  PersistedChunkStatus,
+  InProgressPDFImportSettings,
   listPDFImports,
   savePDFImport,
   deletePDFImport,
   migrateFromLocalStorage,
+  saveImportInProgress,
+  getImportInProgress,
+  clearImportInProgress,
 } from "@/app/misc/localPDFImportManager";
 
 // Maximum size per PDF chunk for Mistral OCR (in MB)
@@ -111,6 +117,68 @@ const MODELS_BY_PROVIDER: Record<
   }
   return groups;
 })();
+
+// Persisted "AI Model" + "Advanced Options" form state, so the importer
+// remembers your last choices instead of resetting to these defaults every
+// time the modal is reopened.
+interface PDFImporterSettings {
+  aiModel: string;
+  customModelProvider: BYOKProvider;
+  customModelId: string;
+  customInstructions: string;
+  maxOutputTokens: number;
+}
+
+const DEFAULT_PDF_IMPORTER_SETTINGS: PDFImporterSettings = {
+  aiModel: "ministral-14b-2512",
+  customModelProvider: "openrouter",
+  customModelId: "",
+  customInstructions: "",
+  maxOutputTokens: 16000,
+};
+
+const PDF_IMPORTER_SETTINGS_KEY = "pdfImporterSettings";
+
+function loadPDFImporterSettings(): PDFImporterSettings {
+  if (typeof window === "undefined") return DEFAULT_PDF_IMPORTER_SETTINGS;
+  try {
+    const raw = localStorage.getItem(PDF_IMPORTER_SETTINGS_KEY);
+    if (!raw) return DEFAULT_PDF_IMPORTER_SETTINGS;
+    const parsed = JSON.parse(raw);
+    return { ...DEFAULT_PDF_IMPORTER_SETTINGS, ...parsed };
+  } catch {
+    return DEFAULT_PDF_IMPORTER_SETTINGS;
+  }
+}
+
+/**
+ * Resolve a settings snapshot to the actual (model, provider) pair to call.
+ * Pulled out as a pure function (rather than reading component state
+ * directly) so it can be applied identically to the live form state and to
+ * a settings snapshot recovered from an interrupted/resumed import.
+ */
+function resolveModelSelection(settings: {
+  aiModel: string;
+  // Accepts plain `string` (not just BYOKProvider) so a settings snapshot
+  // deserialized from IndexedDB/localStorage - which can't reference this
+  // component's type - can be passed straight through.
+  customModelProvider: string;
+  customModelId: string;
+}): { model: string; provider: BYOKProvider } {
+  if (settings.aiModel === "custom-model") {
+    return {
+      model: settings.customModelId.trim(),
+      provider: settings.customModelProvider as BYOKProvider,
+    };
+  }
+  const cfg = Object.values(AI_MODELS).find(
+    (m) => m.model === settings.aiModel,
+  );
+  return {
+    model: settings.aiModel,
+    provider: (cfg?.provider as BYOKProvider) || "openrouter",
+  };
+}
 
 /**
  * Create a concurrency-limited task runner ("semaphore"): at most
@@ -387,28 +455,28 @@ interface PDFChunkPlan {
  * request has been sent.
  */
 async function planPDFChunks(
-  file: File,
+  arrayBuffer: ArrayBuffer,
   onProgress?: (message: string) => void,
 ): Promise<PDFChunkPlan> {
   onProgress?.("Loading PDF for splitting...");
 
-  const arrayBuffer = await file.arrayBuffer();
   const pdfDoc = await PDFDocument.load(arrayBuffer, {
     ignoreEncryption: true,
   });
   const totalPages = pdfDoc.getPageCount();
+  const fileSize = arrayBuffer.byteLength;
 
   // On memory-constrained devices (or for very large source files), use
   // smaller chunks so fewer pages (and less base64 data) need to be held
   // in memory at any one time.
-  const lowMemory = needsConservativeMemoryMode(file.size);
+  const lowMemory = needsConservativeMemoryMode(fileSize);
   const maxChunkSizeMB = lowMemory ? MAX_CHUNK_SIZE_MB / 2 : MAX_CHUNK_SIZE_MB;
   const maxPagesPerChunk = lowMemory
     ? Math.max(1, Math.floor(PAGES_PER_CHUNK / 2))
     : PAGES_PER_CHUNK;
 
   // Calculate how many pages per chunk based on file size
-  const avgPageSize = file.size / totalPages;
+  const avgPageSize = fileSize / totalPages;
   const targetChunkSize = maxChunkSizeMB * 1024 * 1024;
   const pagesPerChunk = Math.max(
     1,
@@ -664,16 +732,68 @@ export default function PDFImporter({
   const [importMode, setImportMode] = useState<"file" | "link">("file");
   const [linkUrl, setLinkUrl] = useState("");
 
-  // AI model selection for summarization
-  const [aiModel, setAIModel] = useState("ministral-14b-2512");
+  // AI model selection for summarization - initialized from the last
+  // saved settings (see loadPDFImporterSettings) rather than a hardcoded
+  // default, so the form remembers what you picked last time.
+  const [aiModel, setAIModel] = useState(
+    () => loadPDFImporterSettings().aiModel,
+  );
 
   // Advanced options
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [customModelProvider, setCustomModelProvider] =
-    useState<BYOKProvider>("openrouter");
-  const [customModelId, setCustomModelId] = useState("");
-  const [customInstructions, setCustomInstructions] = useState("");
-  const [maxOutputTokens, setMaxOutputTokens] = useState(16000);
+    useState<BYOKProvider>(() => loadPDFImporterSettings().customModelProvider);
+  const [customModelId, setCustomModelId] = useState(
+    () => loadPDFImporterSettings().customModelId,
+  );
+  const [customInstructions, setCustomInstructions] = useState(
+    () => loadPDFImporterSettings().customInstructions,
+  );
+  const [maxOutputTokens, setMaxOutputTokens] = useState(
+    () => loadPDFImporterSettings().maxOutputTokens,
+  );
+
+  // Persist the AI model + advanced options whenever they change, so they
+  // survive closing/reopening the importer.
+  useEffect(() => {
+    const settings: PDFImporterSettings = {
+      aiModel,
+      customModelProvider,
+      customModelId,
+      customInstructions,
+      maxOutputTokens,
+    };
+    try {
+      localStorage.setItem(
+        PDF_IMPORTER_SETTINGS_KEY,
+        JSON.stringify(settings),
+      );
+    } catch (e) {
+      console.warn("Failed to save PDF importer settings:", e);
+    }
+  }, [
+    aiModel,
+    customModelProvider,
+    customModelId,
+    customInstructions,
+    maxOutputTokens,
+  ]);
+
+  const resetPDFImporterSettings = useCallback(() => {
+    setAIModel(DEFAULT_PDF_IMPORTER_SETTINGS.aiModel);
+    setCustomModelProvider(DEFAULT_PDF_IMPORTER_SETTINGS.customModelProvider);
+    setCustomModelId(DEFAULT_PDF_IMPORTER_SETTINGS.customModelId);
+    setCustomInstructions(DEFAULT_PDF_IMPORTER_SETTINGS.customInstructions);
+    setMaxOutputTokens(DEFAULT_PDF_IMPORTER_SETTINGS.maxOutputTokens);
+    addNotification("Reset to default AI model and settings", "success");
+  }, [addNotification]);
+
+  // Interrupted chunked import recovered from IndexedDB on mount, if any -
+  // offered to the user as a "Resume" / "Discard" banner instead of being
+  // silently lost.
+  const [interruptedImport, setInterruptedImport] =
+    useState<InProgressPDFImport | null>(null);
+  const [isResuming, setIsResuming] = useState(false);
 
   // Saved imports
   const [savedImports, setSavedImports] = useState<SavedPDFImport[]>([]);
@@ -711,19 +831,11 @@ export default function PDFImporter({
 
   // Resolve the currently selected model + provider, whether it's one of the
   // built-in models or a user-entered custom model ID for any provider.
-  const getSelectedModel = useCallback((): {
-    model: string;
-    provider: BYOKProvider;
-  } => {
-    if (aiModel === "custom-model") {
-      return { model: customModelId.trim(), provider: customModelProvider };
-    }
-    const cfg = Object.values(AI_MODELS).find((m) => m.model === aiModel);
-    return {
-      model: aiModel,
-      provider: (cfg?.provider as BYOKProvider) || "openrouter",
-    };
-  }, [aiModel, customModelId, customModelProvider]);
+  const getSelectedModel = useCallback(
+    (): { model: string; provider: BYOKProvider } =>
+      resolveModelSelection({ aiModel, customModelProvider, customModelId }),
+    [aiModel, customModelId, customModelProvider],
+  );
 
   // Load saved imports from IndexedDB on mount
   useEffect(() => {
@@ -739,6 +851,17 @@ export default function PDFImporter({
       }
     };
     loadImports();
+  }, []);
+
+  // Check for an interrupted chunked import (page reloaded/crashed mid-job)
+  // so it can be offered back as a Resume/Discard banner instead of the
+  // completed chunks silently being lost.
+  useEffect(() => {
+    getImportInProgress()
+      .then((progress) => {
+        if (progress) setInterruptedImport(progress);
+      })
+      .catch((e) => console.warn("Failed to check for interrupted import:", e));
   }, []);
 
   // Save imports to IndexedDB
@@ -1104,6 +1227,13 @@ export default function PDFImporter({
     // Call callback
     onImportComplete(importData);
 
+    // This is the concluding action for the in-progress chunked job (the
+    // user is accepting the current partial results), so the recovery
+    // record is no longer needed.
+    clearImportInProgress().catch((e) =>
+      console.warn("Failed to clear in-progress import record:", e),
+    );
+
     const totalItems =
       results.lore.length +
       results.mechanicNotes.length +
@@ -1212,6 +1342,496 @@ export default function PDFImporter({
     e.preventDefault();
   }, []);
 
+  // Run the OCR + summarize pipeline for a chunked PDF's page ranges.
+  // Shared by a fresh import (all ranges "pending") and a resumed one
+  // (some ranges already "complete"/"failed" from a prior interrupted
+  // run) - chunks already marked "complete" are reused as-is rather than
+  // reprocessed. Persists progress to IndexedDB after every chunk settles
+  // so an accidental reload never discards more than the single in-flight
+  // chunk.
+  const processChunkedRanges = useCallback(
+    async (
+      chunkPlan: PDFChunkPlan,
+      fileName: string,
+      sourceBytes: ArrayBuffer,
+      initialStatuses: ChunkStatus[],
+      progressStart: number,
+      progressRange: number,
+      // Explicit settings snapshot rather than reading aiModel/
+      // customInstructions/etc. off component state: a resume calls this
+      // right after setAIModel(...)-ing the recovered settings, and those
+      // setState calls haven't flushed into this closure yet by the time
+      // we'd read them, so passing them in avoids using stale values.
+      settings: InProgressPDFImportSettings,
+    ): Promise<{
+      lore: StoryLore[];
+      mechanicNotes: StoryLore[];
+      customTables: CustomTable[];
+      failedPages: FailedPageRange[];
+      totalPagesProcessed: number;
+    }> => {
+      const { pdfDoc, ranges } = chunkPlan;
+      const totalChunks = ranges.length;
+      const progressEnd = progressStart + progressRange;
+      const { model, provider } = resolveModelSelection(settings);
+      const { customInstructions, maxOutputTokens } = settings;
+
+      // Retain the parsed document so failed chunks can re-run OCR from
+      // the chunk panel after the import finishes.
+      chunkedPdfSourceRef.current = { pdfDoc, fileName };
+      setChunkStatuses(initialStatuses);
+
+      const persistedStatuses: PersistedChunkStatus[] = initialStatuses.map(
+        (cs) => ({
+          chunkIndex: cs.chunkIndex,
+          pageStart: cs.pageStart,
+          pageEnd: cs.pageEnd,
+          status:
+            cs.status === "complete" || cs.status === "failed"
+              ? cs.status
+              : "pending",
+          ocrMarkdown: cs.ocrMarkdown,
+          error: cs.error,
+          result: cs.result,
+        }),
+      );
+      const persistProgress = () => {
+        saveImportInProgress({
+          fileName,
+          fileBytes: sourceBytes,
+          chunkStatuses: persistedStatuses,
+          settings,
+        }).catch((e) =>
+          console.warn("Failed to persist import progress:", e),
+        );
+      };
+      persistProgress();
+
+      const chunkLore: StoryLore[] = [];
+      const chunkMechanics: StoryLore[] = [];
+      const chunkTables: CustomTable[] = [];
+      const failedPages: FailedPageRange[] = [];
+      let totalPagesProcessed = 0;
+
+      // Chunks already complete (resumed from a prior run) contribute
+      // their stored results directly, without being reprocessed.
+      for (const cs of initialStatuses) {
+        if (cs.status === "complete" && cs.result) {
+          chunkLore.push(...cs.result.lore);
+          chunkMechanics.push(...cs.result.mechanicNotes);
+          chunkTables.push(...cs.result.customTables);
+        }
+      }
+
+      const pendingChunkIndices = initialStatuses
+        .filter((cs) => cs.status !== "complete")
+        .map((cs) => cs.chunkIndex);
+
+      if (pendingChunkIndices.length === 0) {
+        setProgress(progressEnd);
+        return {
+          lore: chunkLore,
+          mechanicNotes: chunkMechanics,
+          customTables: chunkTables,
+          failedPages,
+          totalPagesProcessed,
+        };
+      }
+
+      setStep("uploading");
+      setStatusMessage(`Preparing ${fileName}...`);
+      setProgress(progressStart + progressRange * 0.05);
+
+      // Fewer concurrent OCR uploads on memory-constrained devices (or for
+      // very large source files), since each chunk carries its own
+      // multi-MB base64 payload.
+      const ocrConcurrency = needsConservativeMemoryMode(
+        sourceBytes.byteLength,
+      )
+        ? 1
+        : MAX_CONCURRENT_OCR_REQUESTS;
+
+      // OCR + note extraction, pipelined per chunk: each chunk's
+      // summarize call starts the moment *that chunk's* OCR finishes,
+      // instead of waiting for every chunk in the document to clear
+      // OCR first. OCR and summarize each keep their own concurrency
+      // limiter (OCR uploads carry multi-MB payloads and must stay
+      // low for memory reasons; summarize calls are lightweight text
+      // requests and can run much more in parallel) so the two stages
+      // proceed concurrently with each other across the whole batch.
+      //
+      // A failed chunk must not abort the whole import (a single
+      // timed-out request on a large file used to throw here and
+      // discard every other chunk's work). Failed chunks are marked
+      // in the status panel and the rest continue; only bail out if
+      // *every* pending chunk failed OCR on a completely fresh run.
+      setStep("ocr");
+      setStatusMessage(
+        `Processing ${pendingChunkIndices.length}/${totalChunks} chunks...`,
+      );
+      setProgress(progressStart + progressRange * 0.1);
+
+      const ocrLimiter = createLimiter(ocrConcurrency);
+      const summarizeLimiter = createLimiter(MAX_CONCURRENT_REQUESTS);
+
+      const alreadyDoneStages = (totalChunks - pendingChunkIndices.length) * 2;
+      let ocrDone = 0;
+      let summarizeDone = 0;
+      const reportProgress = () => {
+        const stagesDone = alreadyDoneStages + ocrDone + summarizeDone;
+        setProgress(
+          progressStart +
+            progressRange * (0.1 + (stagesDone / (totalChunks * 2)) * 0.85),
+        );
+        setStatusMessage(
+          `OCR: ${alreadyDoneStages / 2 + ocrDone}/${totalChunks} · Notes: ${
+            alreadyDoneStages / 2 + summarizeDone
+          }/${totalChunks}...`,
+        );
+      };
+
+      type ChunkPipelineResult = {
+        chunkIndex: number;
+        pageStart: number;
+        pageEnd: number;
+      } & (
+        | { stage: "ocr"; success: false; error: string }
+        | { stage: "summarize"; success: false; error: string }
+        | {
+            stage: "summarize";
+            success: true;
+            lore: StoryLore[];
+            mechanicNotes: StoryLore[];
+            customTables: CustomTable[];
+          }
+      );
+
+      const chunkPipelines = pendingChunkIndices.map(
+        (chunkIdx) => async (): Promise<ChunkPipelineResult> => {
+          const range = ranges[chunkIdx];
+          setChunkStatuses((prev) =>
+            prev.map((cs) =>
+              cs.chunkIndex === chunkIdx ? { ...cs, status: "ocr" } : cs,
+            ),
+          );
+
+          // Build this chunk's base64 payload just-in-time so at most
+          // `ocrConcurrency` chunk buffers exist in memory at once,
+          // instead of every chunk in the document simultaneously.
+          // ocrPDFRange transparently splits further if the actual
+          // payload exceeds Vercel's body-size limit.
+          let ocrMarkdown: string;
+          try {
+            const chunkResult = await ocrLimiter(() =>
+              ocrPDFRange(pdfDoc, range, fileName, keys.mistralKey),
+            );
+            ocrMarkdown = chunkResult.markdown;
+            totalPagesProcessed += chunkResult.totalPages;
+          } catch (err: unknown) {
+            const message = sanitizeErrorMessage(
+              err instanceof Error ? err.message : "",
+              "OCR processing failed",
+            );
+            console.error(
+              `Pages ${range.pageStart}-${range.pageEnd} OCR failed:`,
+              message,
+            );
+            setChunkStatuses((prev) =>
+              prev.map((cs) =>
+                cs.chunkIndex === chunkIdx
+                  ? { ...cs, status: "failed", error: message }
+                  : cs,
+              ),
+            );
+            persistedStatuses[chunkIdx] = {
+              ...persistedStatuses[chunkIdx],
+              status: "failed",
+              error: message,
+            };
+            persistProgress();
+            ocrDone++;
+            reportProgress();
+            return {
+              chunkIndex: chunkIdx,
+              stage: "ocr",
+              success: false,
+              error: message,
+              pageStart: range.pageStart,
+              pageEnd: range.pageEnd,
+            };
+          }
+
+          setChunkStatuses((prev) =>
+            prev.map((cs) =>
+              cs.chunkIndex === chunkIdx
+                ? { ...cs, ocrMarkdown, status: "summarizing" }
+                : cs,
+            ),
+          );
+          ocrDone++;
+          reportProgress();
+
+          try {
+            const summarizeResponse = await summarizeLimiter(() =>
+              fetchWithRetry(
+                "/api/ocr/summarize",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({
+                    markdown: ocrMarkdown,
+                    focus: ["all"],
+                    customInstructions:
+                      customInstructions +
+                      `\n\nNote: This is pages ${range.pageStart}-${range.pageEnd} of a larger document.`,
+                    model,
+                    provider,
+                    maxTokens: maxOutputTokens,
+                    openRouterKey: keys.openRouterKey,
+                    deepseekKey: keys.deepseekKey,
+                    mistralKey: keys.mistralKey,
+                    googleKey: keys.googleKey,
+                    deepinfraKey: keys.deepinfraKey,
+                  }),
+                },
+                SUMMARIZE_TIMEOUT_MS,
+                MAX_RETRIES,
+              ),
+            );
+
+            if (!summarizeResponse.ok) {
+              const errorMsg = await extractErrorMessage(
+                summarizeResponse,
+                "Note extraction failed",
+              );
+              console.error(
+                `Pages ${range.pageStart}-${range.pageEnd} summarization failed:`,
+                errorMsg,
+              );
+              setChunkStatuses((prev) =>
+                prev.map((cs) =>
+                  cs.chunkIndex === chunkIdx
+                    ? { ...cs, status: "failed", error: errorMsg }
+                    : cs,
+                ),
+              );
+              persistedStatuses[chunkIdx] = {
+                ...persistedStatuses[chunkIdx],
+                status: "failed",
+                error: errorMsg,
+                ocrMarkdown,
+              };
+              persistProgress();
+              summarizeDone++;
+              reportProgress();
+              return {
+                chunkIndex: chunkIdx,
+                stage: "summarize",
+                success: false,
+                error: errorMsg,
+                pageStart: range.pageStart,
+                pageEnd: range.pageEnd,
+              };
+            }
+
+            const resultText = await summarizeResponse.text();
+            let result;
+            try {
+              result = JSON.parse(resultText);
+            } catch {
+              // Store raw output for manual repair
+              setChunkStatuses((prev) =>
+                prev.map((cs) =>
+                  cs.chunkIndex === chunkIdx
+                    ? {
+                        ...cs,
+                        status: "failed",
+                        error: "JSON parse error",
+                        rawSummarizeOutput: resultText,
+                      }
+                    : cs,
+                ),
+              );
+              persistedStatuses[chunkIdx] = {
+                ...persistedStatuses[chunkIdx],
+                status: "failed",
+                error: "JSON parse error",
+                ocrMarkdown,
+              };
+              persistProgress();
+              summarizeDone++;
+              reportProgress();
+              return {
+                chunkIndex: chunkIdx,
+                stage: "summarize",
+                success: false,
+                error: "JSON parse error",
+                pageStart: range.pageStart,
+                pageEnd: range.pageEnd,
+              };
+            }
+
+            setChunkStatuses((prev) =>
+              prev.map((cs) =>
+                cs.chunkIndex === chunkIdx
+                  ? {
+                      ...cs,
+                      status: "complete",
+                      result: {
+                        lore: result.lore || [],
+                        mechanicNotes: result.mechanicNotes || [],
+                        customTables: result.customTables || [],
+                      },
+                    }
+                  : cs,
+              ),
+            );
+            persistedStatuses[chunkIdx] = {
+              ...persistedStatuses[chunkIdx],
+              status: "complete",
+              error: undefined,
+              ocrMarkdown: undefined,
+              result: {
+                lore: result.lore || [],
+                mechanicNotes: result.mechanicNotes || [],
+                customTables: result.customTables || [],
+              },
+            };
+            persistProgress();
+            summarizeDone++;
+            reportProgress();
+            return {
+              chunkIndex: chunkIdx,
+              stage: "summarize",
+              success: true,
+              lore: result.lore || [],
+              mechanicNotes: result.mechanicNotes || [],
+              customTables: result.customTables || [],
+              pageStart: range.pageStart,
+              pageEnd: range.pageEnd,
+            };
+          } catch (err: any) {
+            const message = sanitizeErrorMessage(
+              err?.message || "",
+              "Unknown error",
+            );
+            console.error(
+              `Pages ${range.pageStart}-${range.pageEnd} summarization error:`,
+              err?.message || err,
+            );
+            setChunkStatuses((prev) =>
+              prev.map((cs) =>
+                cs.chunkIndex === chunkIdx
+                  ? { ...cs, status: "failed", error: message }
+                  : cs,
+              ),
+            );
+            persistedStatuses[chunkIdx] = {
+              ...persistedStatuses[chunkIdx],
+              status: "failed",
+              error: message,
+              ocrMarkdown,
+            };
+            persistProgress();
+            summarizeDone++;
+            reportProgress();
+            return {
+              chunkIndex: chunkIdx,
+              stage: "summarize",
+              success: false,
+              error: message,
+              pageStart: range.pageStart,
+              pageEnd: range.pageEnd,
+            };
+          }
+        },
+      );
+
+      const pipelineResults = await Promise.all(
+        chunkPipelines.map((task) => task()),
+      );
+
+      const failedOcr = pipelineResults.filter(
+        (r): r is Extract<ChunkPipelineResult, { stage: "ocr" }> =>
+          r.stage === "ocr" && !r.success,
+      );
+      const succeededOcrCount = pendingChunkIndices.length - failedOcr.length;
+      if (failedOcr.length > 0) {
+        setShowChunkDetails(true);
+        // Only abort the whole thing if this was a completely fresh run
+        // (no chunks already done from a resume) and every single chunk
+        // failed OCR - that's almost certainly a systemic problem (bad
+        // key, network down), not worth partially completing.
+        if (succeededOcrCount === 0 && alreadyDoneStages === 0) {
+          throw new Error(
+            `OCR failed for all ${totalChunks} chunks. First error: ${failedOcr[0].error}`,
+          );
+        }
+      }
+      for (const failed of failedOcr) {
+        failedPages.push({
+          fileName,
+          pageStart: failed.pageStart,
+          pageEnd: failed.pageEnd,
+          reason: failed.error,
+        });
+      }
+
+      const failedSummarize = pipelineResults.filter(
+        (
+          r,
+        ): r is Extract<
+          ChunkPipelineResult,
+          { stage: "summarize"; success: false }
+        > => r.stage === "summarize" && !r.success,
+      );
+      if (failedSummarize.length > 0) {
+        console.warn(
+          `${failedSummarize.length}/${succeededOcrCount} chunks failed to summarize`,
+        );
+        setShowChunkDetails(true);
+      }
+      for (const failed of failedSummarize) {
+        failedPages.push({
+          fileName,
+          pageStart: failed.pageStart,
+          pageEnd: failed.pageEnd,
+          reason: failed.error,
+        });
+      }
+
+      if (failedOcr.length > 0 || failedSummarize.length > 0) {
+        const firstError = failedOcr[0]?.error ?? failedSummarize[0]?.error;
+        const totalFailed = failedOcr.length + failedSummarize.length;
+        addNotification(
+          `${totalFailed}/${totalChunks} chunks failed and were skipped (${firstError})`,
+          "warning",
+        );
+      }
+
+      for (const result of pipelineResults) {
+        if (result.stage === "summarize" && result.success) {
+          chunkLore.push(...result.lore);
+          chunkMechanics.push(...result.mechanicNotes);
+          chunkTables.push(...result.customTables);
+        }
+      }
+
+      setProgress(progressEnd);
+
+      return {
+        lore: chunkLore,
+        mechanicNotes: chunkMechanics,
+        customTables: chunkTables,
+        failedPages,
+        totalPagesProcessed,
+      };
+    },
+    [keys, addNotification],
+  );
+
   const processFiles = async () => {
     if (selectedFiles.length === 0) {
       addNotification("Please select at least one file", "warning");
@@ -1269,22 +1889,19 @@ export default function PDFImporter({
         let combinedMarkdown = "";
         let combinedTotalPages = 0;
 
-        // For chunked processing, we summarize each chunk and merge results
-        const chunkLore: StoryLore[] = [];
-        const chunkMechanics: StoryLore[] = [];
-        const chunkTables: CustomTable[] = [];
-
         if (needsChunking) {
-          // Large PDF: Plan chunk page-ranges, then OCR all (building each
-          // chunk's base64 payload lazily, right before it's uploaded),
-          // then summarize all.
+          // Large PDF: read the bytes once (needed both to plan chunks and
+          // to persist an in-progress record for resuming after a reload),
+          // then run the OCR + summarize pipeline over every chunk.
           setStep("uploading");
           setStatusMessage(`Splitting ${file.name} into chunks...`);
           setProgress(fileProgressStart + fileProgressRange * 0.05);
 
+          let sourceBytes: ArrayBuffer;
           let chunkPlan: PDFChunkPlan;
           try {
-            chunkPlan = await planPDFChunks(file, (msg) =>
+            sourceBytes = await file.arrayBuffer();
+            chunkPlan = await planPDFChunks(sourceBytes, (msg) =>
               setStatusMessage(msg),
             );
           } catch (err: unknown) {
@@ -1295,352 +1912,36 @@ export default function PDFImporter({
             throw new Error(`Failed to read ${file.name}: ${message}`);
           }
 
-          const { pdfDoc, ranges } = chunkPlan;
-          // Retain the parsed document so failed chunks can re-run OCR
-          // from the chunk panel after the import finishes.
-          chunkedPdfSourceRef.current = { pdfDoc, fileName: file.name };
-          const totalChunks = ranges.length;
-          // Fewer concurrent OCR uploads on memory-constrained devices (or
-          // for very large source files), since each chunk carries its
-          // own multi-MB base64 payload.
-          const ocrConcurrency = needsConservativeMemoryMode(file.size)
-            ? 1
-            : MAX_CONCURRENT_OCR_REQUESTS;
-
-          // Initialize chunk statuses for tracking
-          const initialStatuses: ChunkStatus[] = ranges.map((range, idx) => ({
-            chunkIndex: idx,
-            pageStart: range.pageStart,
-            pageEnd: range.pageEnd,
-            status: "pending",
-          }));
-          setChunkStatuses(initialStatuses);
-
-          // OCR + note extraction, pipelined per chunk: each chunk's
-          // summarize call starts the moment *that chunk's* OCR finishes,
-          // instead of waiting for every chunk in the document to clear
-          // OCR first. OCR and summarize each keep their own concurrency
-          // limiter (OCR uploads carry multi-MB payloads and must stay
-          // low for memory reasons; summarize calls are lightweight text
-          // requests and can run much more in parallel) so the two stages
-          // proceed concurrently with each other across the whole batch.
-          //
-          // A failed chunk must not abort the whole import (a single
-          // timed-out request on a large file used to throw here and
-          // discard every other chunk's work). Failed chunks are marked
-          // in the status panel and the rest continue; only bail out if
-          // *every* chunk failed OCR.
-          setStep("ocr");
-          setStatusMessage(`Processing ${totalChunks} chunks...`);
-          setProgress(fileProgressStart + fileProgressRange * 0.1);
-
-          const ocrLimiter = createLimiter(ocrConcurrency);
-          const summarizeLimiter = createLimiter(MAX_CONCURRENT_REQUESTS);
-
-          let ocrDone = 0;
-          let summarizeDone = 0;
-          const reportProgress = () => {
-            const stagesDone = ocrDone + summarizeDone;
-            setProgress(
-              fileProgressStart +
-                fileProgressRange *
-                  (0.1 + (stagesDone / (totalChunks * 2)) * 0.85),
-            );
-            setStatusMessage(
-              `OCR: ${ocrDone}/${totalChunks} · Notes: ${summarizeDone}/${totalChunks}...`,
-            );
-          };
-
-          type ChunkPipelineResult = {
-            chunkIndex: number;
-            pageStart: number;
-            pageEnd: number;
-          } & (
-            | { stage: "ocr"; success: false; error: string }
-            | { stage: "summarize"; success: false; error: string }
-            | {
-                stage: "summarize";
-                success: true;
-                lore: StoryLore[];
-                mechanicNotes: StoryLore[];
-                customTables: CustomTable[];
-              }
+          const initialStatuses: ChunkStatus[] = chunkPlan.ranges.map(
+            (range, idx) => ({
+              chunkIndex: idx,
+              pageStart: range.pageStart,
+              pageEnd: range.pageEnd,
+              status: "pending",
+            }),
           );
 
-          const chunkPipelines = ranges.map(
-            (range, chunkIdx) => async (): Promise<ChunkPipelineResult> => {
-              setChunkStatuses((prev) =>
-                prev.map((cs) =>
-                  cs.chunkIndex === chunkIdx ? { ...cs, status: "ocr" } : cs,
-                ),
-              );
-
-              // Build this chunk's base64 payload just-in-time so at most
-              // `ocrConcurrency` chunk buffers exist in memory at once,
-              // instead of every chunk in the document simultaneously.
-              // ocrPDFRange transparently splits further if the actual
-              // payload exceeds Vercel's body-size limit.
-              let ocrMarkdown: string;
-              try {
-                const chunkResult = await ocrLimiter(() =>
-                  ocrPDFRange(pdfDoc, range, file.name, keys.mistralKey),
-                );
-                ocrMarkdown = chunkResult.markdown;
-                totalPagesProcessed += chunkResult.totalPages;
-              } catch (err: unknown) {
-                const message = sanitizeErrorMessage(
-                  err instanceof Error ? err.message : "",
-                  "OCR processing failed",
-                );
-                console.error(
-                  `Pages ${range.pageStart}-${range.pageEnd} OCR failed:`,
-                  message,
-                );
-                setChunkStatuses((prev) =>
-                  prev.map((cs) =>
-                    cs.chunkIndex === chunkIdx
-                      ? { ...cs, status: "failed", error: message }
-                      : cs,
-                  ),
-                );
-                ocrDone++;
-                reportProgress();
-                return {
-                  chunkIndex: chunkIdx,
-                  stage: "ocr",
-                  success: false,
-                  error: message,
-                  pageStart: range.pageStart,
-                  pageEnd: range.pageEnd,
-                };
-              }
-
-              setChunkStatuses((prev) =>
-                prev.map((cs) =>
-                  cs.chunkIndex === chunkIdx
-                    ? { ...cs, ocrMarkdown, status: "summarizing" }
-                    : cs,
-                ),
-              );
-              ocrDone++;
-              reportProgress();
-
-              try {
-                const summarizeResponse = await summarizeLimiter(() =>
-                  fetchWithRetry(
-                    "/api/ocr/summarize",
-                    {
-                      method: "POST",
-                      headers: {
-                        "Content-Type": "application/json",
-                      },
-                      body: JSON.stringify({
-                        markdown: ocrMarkdown,
-                        focus: ["all"],
-                        customInstructions:
-                          customInstructions +
-                          `\n\nNote: This is pages ${range.pageStart}-${range.pageEnd} of a larger document.`,
-                        model: getSelectedModel().model,
-                        provider: getSelectedModel().provider,
-                        maxTokens: maxOutputTokens,
-                        openRouterKey: keys.openRouterKey,
-                        deepseekKey: keys.deepseekKey,
-                        mistralKey: keys.mistralKey,
-                        googleKey: keys.googleKey,
-                        deepinfraKey: keys.deepinfraKey,
-                      }),
-                    },
-                    SUMMARIZE_TIMEOUT_MS,
-                    MAX_RETRIES,
-                  ),
-                );
-
-                if (!summarizeResponse.ok) {
-                  const errorMsg = await extractErrorMessage(
-                    summarizeResponse,
-                    "Note extraction failed",
-                  );
-                  console.error(
-                    `Pages ${range.pageStart}-${range.pageEnd} summarization failed:`,
-                    errorMsg,
-                  );
-                  setChunkStatuses((prev) =>
-                    prev.map((cs) =>
-                      cs.chunkIndex === chunkIdx
-                        ? { ...cs, status: "failed", error: errorMsg }
-                        : cs,
-                    ),
-                  );
-                  summarizeDone++;
-                  reportProgress();
-                  return {
-                    chunkIndex: chunkIdx,
-                    stage: "summarize",
-                    success: false,
-                    error: errorMsg,
-                    pageStart: range.pageStart,
-                    pageEnd: range.pageEnd,
-                  };
-                }
-
-                const resultText = await summarizeResponse.text();
-                let result;
-                try {
-                  result = JSON.parse(resultText);
-                } catch {
-                  // Store raw output for manual repair
-                  setChunkStatuses((prev) =>
-                    prev.map((cs) =>
-                      cs.chunkIndex === chunkIdx
-                        ? {
-                            ...cs,
-                            status: "failed",
-                            error: "JSON parse error",
-                            rawSummarizeOutput: resultText,
-                          }
-                        : cs,
-                    ),
-                  );
-                  summarizeDone++;
-                  reportProgress();
-                  return {
-                    chunkIndex: chunkIdx,
-                    stage: "summarize",
-                    success: false,
-                    error: "JSON parse error",
-                    pageStart: range.pageStart,
-                    pageEnd: range.pageEnd,
-                  };
-                }
-
-                setChunkStatuses((prev) =>
-                  prev.map((cs) =>
-                    cs.chunkIndex === chunkIdx
-                      ? {
-                          ...cs,
-                          status: "complete",
-                          result: {
-                            lore: result.lore || [],
-                            mechanicNotes: result.mechanicNotes || [],
-                            customTables: result.customTables || [],
-                          },
-                        }
-                      : cs,
-                  ),
-                );
-                summarizeDone++;
-                reportProgress();
-                return {
-                  chunkIndex: chunkIdx,
-                  stage: "summarize",
-                  success: true,
-                  lore: result.lore || [],
-                  mechanicNotes: result.mechanicNotes || [],
-                  customTables: result.customTables || [],
-                  pageStart: range.pageStart,
-                  pageEnd: range.pageEnd,
-                };
-              } catch (err: any) {
-                const message = sanitizeErrorMessage(
-                  err?.message || "",
-                  "Unknown error",
-                );
-                console.error(
-                  `Pages ${range.pageStart}-${range.pageEnd} summarization error:`,
-                  err?.message || err,
-                );
-                setChunkStatuses((prev) =>
-                  prev.map((cs) =>
-                    cs.chunkIndex === chunkIdx
-                      ? { ...cs, status: "failed", error: message }
-                      : cs,
-                  ),
-                );
-                summarizeDone++;
-                reportProgress();
-                return {
-                  chunkIndex: chunkIdx,
-                  stage: "summarize",
-                  success: false,
-                  error: message,
-                  pageStart: range.pageStart,
-                  pageEnd: range.pageEnd,
-                };
-              }
+          const chunkResult = await processChunkedRanges(
+            chunkPlan,
+            file.name,
+            sourceBytes,
+            initialStatuses,
+            fileProgressStart,
+            fileProgressRange,
+            {
+              aiModel,
+              customModelProvider,
+              customModelId,
+              customInstructions,
+              maxOutputTokens,
             },
           );
 
-          const pipelineResults = await Promise.all(
-            chunkPipelines.map((task) => task()),
-          );
-
-          const failedOcr = pipelineResults.filter(
-            (r): r is Extract<ChunkPipelineResult, { stage: "ocr" }> =>
-              r.stage === "ocr" && !r.success,
-          );
-          const succeededOcrCount = totalChunks - failedOcr.length;
-          if (failedOcr.length > 0) {
-            setShowChunkDetails(true);
-            if (succeededOcrCount === 0) {
-              throw new Error(
-                `OCR failed for all ${totalChunks} chunks. First error: ${failedOcr[0].error}`,
-              );
-            }
-          }
-          for (const failed of failedOcr) {
-            allFailedPages.push({
-              fileName: file.name,
-              pageStart: failed.pageStart,
-              pageEnd: failed.pageEnd,
-              reason: failed.error,
-            });
-          }
-
-          const failedSummarize = pipelineResults.filter(
-            (
-              r,
-            ): r is Extract<
-              ChunkPipelineResult,
-              { stage: "summarize"; success: false }
-            > => r.stage === "summarize" && !r.success,
-          );
-          if (failedSummarize.length > 0) {
-            console.warn(
-              `${failedSummarize.length}/${succeededOcrCount} chunks failed to summarize`,
-            );
-            setShowChunkDetails(true);
-          }
-          for (const failed of failedSummarize) {
-            allFailedPages.push({
-              fileName: file.name,
-              pageStart: failed.pageStart,
-              pageEnd: failed.pageEnd,
-              reason: failed.error,
-            });
-          }
-
-          if (failedOcr.length > 0 || failedSummarize.length > 0) {
-            const firstError = failedOcr[0]?.error ?? failedSummarize[0]?.error;
-            const totalFailed = failedOcr.length + failedSummarize.length;
-            addNotification(
-              `${totalFailed}/${totalChunks} chunks failed and were skipped (${firstError})`,
-              "warning",
-            );
-          }
-
-          for (const result of pipelineResults) {
-            if (result.stage === "summarize" && result.success) {
-              chunkLore.push(...result.lore);
-              chunkMechanics.push(...result.mechanicNotes);
-              chunkTables.push(...result.customTables);
-            }
-          }
-
-          // Add chunk results to totals
-          allLore.push(...chunkLore);
-          allMechanicNotes.push(...chunkMechanics);
-          allCustomTables.push(...chunkTables);
-          setProgress(fileProgressEnd);
+          allLore.push(...chunkResult.lore);
+          allMechanicNotes.push(...chunkResult.mechanicNotes);
+          allCustomTables.push(...chunkResult.customTables);
+          allFailedPages.push(...chunkResult.failedPages);
+          totalPagesProcessed += chunkResult.totalPagesProcessed;
         } else {
           // Small file or non-PDF: Use original single-request approach
           if (isTextImportFile(file)) {
@@ -1812,6 +2113,12 @@ export default function PDFImporter({
 
       // Call the callback with merged results from all files
       onImportComplete(importData);
+
+      // The whole import (all files) finished, so any in-progress chunked
+      // job recovery record is no longer needed.
+      clearImportInProgress().catch((e) =>
+        console.warn("Failed to clear in-progress import record:", e),
+      );
 
       // Show success notification
       const totalItems =
@@ -2005,6 +2312,134 @@ export default function PDFImporter({
     }
   };
 
+  // Resume a chunked import that got interrupted (reload/crash) before it
+  // finished - reconstructs the source PDF from the bytes we persisted to
+  // IndexedDB and only reprocesses chunks that weren't already complete.
+  const resumeInterruptedImport = useCallback(async () => {
+    if (!interruptedImport) return;
+
+    const { settings } = interruptedImport;
+    if (settings.aiModel === "custom-model" && !settings.customModelId.trim()) {
+      addNotification(
+        "Cannot resume: the custom model ID used for this import is missing",
+        "warning",
+      );
+      return;
+    }
+    const { provider } = resolveModelSelection(settings);
+    if (!keys[PROVIDER_KEY_FIELD[provider]]) {
+      addNotification(
+        `Please add your ${PROVIDER_LABELS[provider]} API key in Settings to resume this import`,
+        "warning",
+      );
+      return;
+    }
+
+    setIsResuming(true);
+    // Reflect the recovered settings in the form too, so they're visible
+    // and stay in effect if the user reopens the importer later.
+    setAIModel(settings.aiModel);
+    setCustomModelProvider(settings.customModelProvider as BYOKProvider);
+    setCustomModelId(settings.customModelId);
+    setCustomInstructions(settings.customInstructions);
+    setMaxOutputTokens(settings.maxOutputTokens);
+
+    try {
+      const pdfDoc = await PDFDocument.load(interruptedImport.fileBytes, {
+        ignoreEncryption: true,
+      });
+      const ranges: PDFChunkRange[] = interruptedImport.chunkStatuses.map(
+        (cs) => ({
+          pageStart: cs.pageStart,
+          pageEnd: cs.pageEnd,
+          startIndex: cs.pageStart - 1,
+          endIndex: cs.pageEnd - 1,
+        }),
+      );
+      const initialStatuses: ChunkStatus[] = interruptedImport.chunkStatuses.map(
+        (cs) => ({
+          chunkIndex: cs.chunkIndex,
+          pageStart: cs.pageStart,
+          pageEnd: cs.pageEnd,
+          status: cs.status,
+          ocrMarkdown: cs.ocrMarkdown,
+          error: cs.error,
+          result: cs.result,
+        }),
+      );
+
+      const chunkResult = await processChunkedRanges(
+        { pdfDoc, ranges },
+        interruptedImport.fileName,
+        interruptedImport.fileBytes,
+        initialStatuses,
+        0,
+        100,
+        settings,
+      );
+
+      setStep("complete");
+      setStatusMessage("Import complete!");
+      setProgress(100);
+
+      const importData = {
+        lore: chunkResult.lore,
+        mechanicNotes: chunkResult.mechanicNotes,
+        customTables: chunkResult.customTables,
+        summary: `Resumed import from ${interruptedImport.fileName}`,
+        failedPages: chunkResult.failedPages,
+      };
+
+      await saveImport(importData, interruptedImport.fileName);
+      onImportComplete(importData);
+      await clearImportInProgress();
+      setInterruptedImport(null);
+
+      const totalItems =
+        chunkResult.lore.length +
+        chunkResult.mechanicNotes.length +
+        chunkResult.customTables.length;
+      addNotification(
+        `Resumed and imported ${totalItems} items from ${interruptedImport.fileName}`,
+        chunkResult.failedPages.length > 0 ? "warning" : "success",
+      );
+
+      setTimeout(() => {
+        closeModal();
+        resetState();
+      }, 1500);
+    } catch (error: unknown) {
+      console.error("Resume import error:", error);
+      const message = sanitizeErrorMessage(
+        error instanceof Error ? error.message : "",
+        "Resume failed",
+      );
+      setStep("error");
+      setStatusMessage(message);
+      addNotification(message, "failure");
+    } finally {
+      setIsResuming(false);
+    }
+  }, [
+    interruptedImport,
+    keys,
+    addNotification,
+    processChunkedRanges,
+    onImportComplete,
+    saveImport,
+    closeModal,
+  ]);
+
+  // Give up on the interrupted import and discard the recovered progress.
+  const discardInterruptedImport = useCallback(async () => {
+    try {
+      await clearImportInProgress();
+    } catch (e) {
+      console.warn("Failed to discard interrupted import:", e);
+    }
+    setInterruptedImport(null);
+  }, []);
+
   const removeFile = (index: number) => {
     const file = selectedFiles[index];
     const filePages = Math.max(1, Math.ceil(file.size / (100 * 1024)));
@@ -2134,6 +2569,54 @@ export default function PDFImporter({
 
             {/* Content */}
             <div className="p-4 space-y-4">
+              {/* Interrupted Import Recovery Banner */}
+              {interruptedImport && step === "idle" && (
+                <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <DynamicIcon
+                      name="History"
+                      className="w-6 h-6 text-amber-400 shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-amber-200">
+                        Interrupted import found
+                      </p>
+                      <p className="text-sm text-amber-300/70 mt-0.5 break-words">
+                        {interruptedImport.fileName} -{" "}
+                        {
+                          interruptedImport.chunkStatuses.filter(
+                            (cs) => cs.status === "complete",
+                          ).length
+                        }
+                        /{interruptedImport.chunkStatuses.length} chunks
+                        already done. Resume to pick up where it left off
+                        without redoing finished pages.
+                      </p>
+                      <div className="flex gap-2 mt-3">
+                        <button
+                          onClick={resumeInterruptedImport}
+                          disabled={isResuming}
+                          className="px-3 py-1.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
+                        >
+                          <DynamicIcon
+                            name={isResuming ? "Loader2" : "RefreshCw"}
+                            className={`w-4 h-4 ${isResuming ? "animate-spin" : ""}`}
+                          />
+                          {isResuming ? "Resuming..." : "Resume"}
+                        </button>
+                        <button
+                          onClick={discardInterruptedImport}
+                          disabled={isResuming}
+                          className="px-3 py-1.5 bg-amber-900/40 hover:bg-amber-800/50 disabled:opacity-50 disabled:cursor-not-allowed text-amber-200 text-sm rounded-lg transition-colors"
+                        >
+                          Discard
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Processing State */}
               {step !== "idle" && step !== "error" && (
                 <div className="bg-blue-900/30 rounded-lg p-4 border border-blue-700/40">
@@ -2749,12 +3232,22 @@ export default function PDFImporter({
 
                   {/* AI Model Selection */}
                   <div>
-                    <label className="block text-sm font-semibold text-blue-200 mb-1">
-                      AI Model for Summarization
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-sm font-semibold text-blue-200">
+                        AI Model for Summarization
+                      </label>
+                      <button
+                        type="button"
+                        onClick={resetPDFImporterSettings}
+                        className="text-xs text-blue-300/50 hover:text-blue-200 underline"
+                        title="Reset the model and advanced options below back to their defaults"
+                      >
+                        Reset to defaults
+                      </button>
+                    </div>
                     <p className="text-xs text-blue-300/50 mb-1.5">
                       BYOK only - add a provider key in Settings to unlock its
-                      models.
+                      models. Your choice is remembered for next time.
                     </p>
                     <select
                       value={aiModel}
