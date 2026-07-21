@@ -1055,6 +1055,23 @@ export default function Story({
     }
   }, [chatMessages.length, loading, storyText, pendingUserChoice]);
 
+  // The container's actual scrollable height depends on page.tsx's
+  // async viewport measurement (contentAreaHeight), which can resolve a
+  // beat after this component's first paint. If that resize happens after
+  // the effect above already ran, scrollTop is left at 0 even though the
+  // container is now short enough to need scrolling - re-apply bottom
+  // scroll whenever the container's size settles (e.g. on mount/open).
+  useEffect(() => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const scrollToBottom = () => {
+      container.scrollTop = container.scrollHeight;
+    };
+    const resizeObserver = new ResizeObserver(scrollToBottom);
+    resizeObserver.observe(container);
+    return () => resizeObserver.disconnect();
+  }, []);
+
   return (
     <div className="w-full flex-1 min-h-0 flex flex-col px-0 sm:px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
