@@ -1106,9 +1106,37 @@ export default function Story({
     }
   };
 
-  // Auto-scroll to bottom when new messages arrive or during streaming
+  // Whether we should keep pinning the view to the bottom as new content
+  // streams in. True by default (and forced true whenever the player submits
+  // a new action below) but flips off the moment the player scrolls up to
+  // reread earlier text - without this, every streamed chunk (and the
+  // layout shift when suggested choices appear) yanked the view back down
+  // even while someone was mid-scroll reading history.
+  const stickToBottomRef = useRef(true);
+  const NEAR_BOTTOM_THRESHOLD_PX = 80;
+
   useEffect(() => {
-    if (scrollContainerRef.current) {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      stickToBottomRef.current = distanceFromBottom < NEAR_BOTTOM_THRESHOLD_PX;
+    };
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // A fresh submission should always snap back to the bottom, even if the
+  // player had scrolled up to reread something before acting.
+  useEffect(() => {
+    if (pendingUserChoice) stickToBottomRef.current = true;
+  }, [pendingUserChoice]);
+
+  // Auto-scroll to bottom when new messages arrive or during streaming -
+  // but only while the player is already at (or hasn't left) the bottom.
+  useEffect(() => {
+    if (stickToBottomRef.current && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop =
         scrollContainerRef.current.scrollHeight;
     }
@@ -1120,11 +1148,15 @@ export default function Story({
   // the effect above already ran, scrollTop is left at 0 even though the
   // container is now short enough to need scrolling - re-apply bottom
   // scroll whenever the container's size settles (e.g. on mount/open).
+  // Also fires when suggested-choice chips or streamed text change the
+  // content height - gated the same way so it doesn't fight a manual scroll.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     const scrollToBottom = () => {
-      container.scrollTop = container.scrollHeight;
+      if (stickToBottomRef.current) {
+        container.scrollTop = container.scrollHeight;
+      }
     };
     const resizeObserver = new ResizeObserver(scrollToBottom);
     resizeObserver.observe(container);
