@@ -1,4 +1,12 @@
-import { Adventure, CustomTable, DiceMode, StoryData, StoryLore } from "./structs";
+import {
+  Adventure,
+  CustomTable,
+  DiceMode,
+  PlayerArchetype,
+  StoryData,
+  StoryLore,
+} from "./structs";
+import { ARCHETYPE_INFO } from "./gmAdvice";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -186,6 +194,7 @@ export interface FreeformPlayerSetup {
   personality: string[]; // curated personality tags picked in the wizard
   wishTags: string[]; // curated "what do you want from this story" tags
   wishText: string; // freeform addition to the above, not tag-matchable
+  archetype?: PlayerArchetype; // Self-selected Robin Laws player type
 }
 
 // Combines a player's curated wish tags and freeform wish text into one
@@ -210,6 +219,10 @@ function buildPlayerPreferencesNote(
       const wish = combinedWish(p);
       if (wish) {
         lines.push(`- Wants from this story: ${wish}`);
+      }
+      if (p.archetype) {
+        const info = ARCHETYPE_INFO[p.archetype];
+        lines.push(`- Player type: ${info.label} - ${info.facilitation}`);
       }
       return lines.join("\n");
     })
@@ -326,6 +339,7 @@ export async function startFreeformStoryLocally(
             color: p.color,
             personalityTags: p.personality.length ? p.personality : undefined,
             wishTags: p.wishTags.length ? p.wishTags : undefined,
+            archetype: p.archetype,
           })),
         }
       : undefined;
@@ -349,6 +363,7 @@ export async function startFreeformStoryLocally(
     playerWishTags: soloPlayer?.wishTags.length
       ? soloPlayer.wishTags
       : undefined,
+    playerArchetype: soloPlayer?.archetype,
     intro: "",
     memory: [],
     max_chapters: 0,
