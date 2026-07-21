@@ -15,6 +15,7 @@ import { AI_MODELS } from "@/app/misc/ai_prices";
 import { PDFDocument } from "pdf-lib";
 import {
   LocalPDFImport,
+  FailedPageRange,
   listPDFImports,
   savePDFImport,
   deletePDFImport,
@@ -742,6 +743,7 @@ export default function PDFImporter({
         mechanicNotes: StoryLore[];
         customTables: CustomTable[];
         summary: string;
+        failedPages?: FailedPageRange[];
       },
       fileNameOverride?: string,
     ) => {
@@ -1069,15 +1071,25 @@ export default function PDFImporter({
     const completedCount = chunkStatuses.filter(
       (cs) => cs.status === "complete",
     ).length;
-    const failedCount = chunkStatuses.filter(
-      (cs) => cs.status === "failed",
-    ).length;
+    const failedChunks = chunkStatuses.filter((cs) => cs.status === "failed");
+    const failedCount = failedChunks.length;
+    const sourceFileName =
+      chunkedPdfSourceRef.current?.fileName ||
+      selectedFiles[0]?.name ||
+      "document";
+    const failedPages: FailedPageRange[] = failedChunks.map((cs) => ({
+      fileName: sourceFileName,
+      pageStart: cs.pageStart,
+      pageEnd: cs.pageEnd,
+      reason: cs.error || "Unknown error",
+    }));
 
     const importData = {
       lore: results.lore,
       mechanicNotes: results.mechanicNotes,
       customTables: results.customTables,
       summary: `Imported ${completedCount} chunks (${failedCount} failed)`,
+      failedPages,
     };
 
     // Save to IndexedDB
@@ -1101,6 +1113,7 @@ export default function PDFImporter({
   }, [
     collectChunkResults,
     chunkStatuses,
+    selectedFiles,
     saveImport,
     onImportComplete,
     addNotification,
@@ -1215,6 +1228,10 @@ export default function PDFImporter({
     const allLore: StoryLore[] = [];
     const allMechanicNotes: StoryLore[] = [];
     const allCustomTables: CustomTable[] = [];
+    // Page ranges that failed OCR or note extraction, kept alongside the
+    // successfully imported content so the player knows which pages to
+    // rework rather than silently ending up with missing content.
+    const allFailedPages: FailedPageRange[] = [];
     let totalPagesProcessed = 0;
 
     try {
@@ -1402,6 +1419,14 @@ export default function PDFImporter({
               "warning",
             );
           }
+          for (const failed of failedOcr) {
+            allFailedPages.push({
+              fileName: file.name,
+              pageStart: failed.pageStart,
+              pageEnd: failed.pageEnd,
+              reason: failed.error,
+            });
+          }
 
           // Sort by page order and combine results
           ocrResults.sort((a, b) => a.pageStart - b.pageStart);
@@ -1482,6 +1507,8 @@ export default function PDFImporter({
                   chunkIndex: ocr.chunkIndex,
                   success: false,
                   error: errorMsg,
+                  pageStart: ocr.pageStart,
+                  pageEnd: ocr.pageEnd,
                 };
               }
 
@@ -1508,6 +1535,8 @@ export default function PDFImporter({
                   success: false,
                   error: "JSON parse error",
                   rawOutput: resultText,
+                  pageStart: ocr.pageStart,
+                  pageEnd: ocr.pageEnd,
                 };
               }
 
@@ -1534,6 +1563,8 @@ export default function PDFImporter({
                 lore: result.lore || [],
                 mechanicNotes: result.mechanicNotes || [],
                 customTables: result.customTables || [],
+                pageStart: ocr.pageStart,
+                pageEnd: ocr.pageEnd,
               };
             } catch (err: any) {
               const message = sanitizeErrorMessage(
@@ -1560,6 +1591,8 @@ export default function PDFImporter({
                 chunkIndex: ocr.chunkIndex,
                 success: false,
                 error: err.message,
+                pageStart: ocr.pageStart,
+                pageEnd: ocr.pageEnd,
               };
             }
           });
@@ -1588,6 +1621,14 @@ export default function PDFImporter({
             );
             // Show chunk details panel for failed chunks
             setShowChunkDetails(true);
+          }
+          for (const failed of failedResults) {
+            allFailedPages.push({
+              fileName: file.name,
+              pageStart: failed.pageStart,
+              pageEnd: failed.pageEnd,
+              reason: failed.error || "Note extraction failed",
+            });
           }
 
           // Collect results from successful summarizations
@@ -1767,6 +1808,7 @@ export default function PDFImporter({
         mechanicNotes: allMechanicNotes,
         customTables: allCustomTables,
         summary: `Imported from ${totalFiles} file${totalFiles > 1 ? "s" : ""}`,
+        failedPages: allFailedPages,
       };
 
       // Save to localStorage for recovery
@@ -1784,6 +1826,14 @@ export default function PDFImporter({
         } (~$${estimateOCRCostUSD(totalPagesProcessed).toFixed(3)} in OCR costs, paid to your own API key)`,
         "success",
       );
+      if (allFailedPages.length > 0) {
+        addNotification(
+          `${allFailedPages.length} page range${
+            allFailedPages.length > 1 ? "s" : ""
+          } failed to import and were skipped - see Saved Imports for details on which pages to rework`,
+          "warning",
+        );
+      }
 
       // Show reminder about Saved Imports feature
       setTimeout(() => {
@@ -2902,6 +2952,16 @@ export default function PDFImporter({
                                       {imp.customTables.length} tables
                                     </p>
                                   </div>
+                                  {imp.failedPages &&
+                                    imp.failedPages.length > 0 && (
+                                      <span className="px-2 py-0.5 bg-red-900/50 text-red-300 text-xs rounded-full shrink-0">
+                                        {imp.failedPages.length} page
+                                        {imp.failedPages.length > 1
+                                          ? "s"
+                                          : ""}{" "}
+                                        failed
+                                      </span>
+                                    )}
                                   <DynamicIcon
                                     name={
                                       isExpanded ? "ChevronUp" : "ChevronDown"
@@ -2992,6 +3052,35 @@ export default function PDFImporter({
                                         </div>
                                       </div>
                                     )}
+
+                                    {/* Failed Pages - pages that didn't get
+                                        processed, and why, so the player
+                                        knows what to rework/retry */}
+                                    {imp.failedPages &&
+                                      imp.failedPages.length > 0 && (
+                                        <div>
+                                          <p className="text-xs font-semibold text-red-300 mb-1">
+                                            ⚠️ Failed Pages (
+                                            {imp.failedPages.length})
+                                          </p>
+                                          <div className="space-y-1 max-h-32 overflow-y-auto">
+                                            {imp.failedPages.map((fp, i) => (
+                                              <p
+                                                key={i}
+                                                className="text-xs text-red-200/80 break-words"
+                                                title={fp.reason}
+                                              >
+                                                • {fp.fileName} p.
+                                                {fp.pageStart}
+                                                {fp.pageEnd !== fp.pageStart
+                                                  ? `-${fp.pageEnd}`
+                                                  : ""}
+                                                : {fp.reason}
+                                              </p>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
 
                                     {/* Action Buttons */}
                                     <div className="flex gap-2 pt-2 border-t border-blue-700/30">
