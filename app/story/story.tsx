@@ -570,7 +570,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
 
     return (
       <div
-        className="p-3 pt-2 space-y-2"
+        className="shrink-0 p-3 pt-2 space-y-2"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {/* Suggested choices as tappable chips */}
@@ -1193,7 +1193,7 @@ export default function Story({
         {/* Chat Messages Area - Scrollable */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-[200px] sm:min-h-[300px]"
+          className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-0 sm:min-h-[300px]"
           style={{ color: fontSettings.themeColors?.text }}
         >
           {/* Previous exchanges (scrolled history) */}
