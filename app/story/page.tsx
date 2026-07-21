@@ -105,13 +105,9 @@ import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
 import { fillTemplate } from "../misc/characterSheetTemplate";
 import { DynamicIcon } from "../components/DynamicIcon";
-import { DiceVisualizer } from "../components/DiceVisualizer";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn, analyzeAction } from "../misc/generation";
-import {
-  GMNPCReactionResult,
-  GMFormulaRollResult,
-} from "../misc/gmExecutor";
+import { GMNPCReactionResult } from "../misc/gmExecutor";
 import { tickCooldowns } from "../misc/abilitySystem";
 import CharacterCreationForm from "./create-character/form";
 import { NPCReactionContainer } from "./NPCReactionToast";
@@ -548,43 +544,6 @@ function StoryPageContent() {
     // Save the story
     await performSave(updatedStoryData);
   };
-
-  const [diceRoll, setDiceRoll] = useState<{
-    show: boolean;
-    rolls: number[];
-    finalRoll: number;
-    skillName: string;
-    skillBonus: number;
-    dc: number;
-    isSuccess: boolean;
-    isPartial?: boolean; // For PbtA partial success
-    isCritical: boolean;
-    hasAdvantage: boolean;
-    hasDisadvantage: boolean;
-    advantageCount?: number;
-    disadvantageCount?: number;
-    netAdvantage?: number;
-    advantageSources?: string;
-    disadvantageSources?: string;
-    diceRolls?: number[][]; // Individual dice for each roll (for 3d6 system)
-    // Formula-based rolls (generic mode) - when provided, uses simplified display
-    formula?: string; // The formula used (e.g., "1d20+{{STR}}")
-    resolvedFormula?: string; // Formula with variables resolved (e.g., "1d20+5")
-    // Reverse DC mode (Call of Cthulhu style - roll under DC to succeed)
-    reverseDC?: boolean;
-    baseDice?: number[]; // YZE: base dice rolls
-    stressDice?: number[]; // YZE: stress dice rolls
-    successes?: number; // YZE: count of 6s
-    panicTriggered?: boolean; // YZE: if stress dice showed 1s
-    panicEffect?: string; // YZE: panic table result
-    stressLevel?: number; // YZE: current stress (0-10)
-    stressRelief?: boolean; // YZE: strong success (-1 stress)
-    explosions?: number; // Explosive: number of explosions
-    dieSize?: number; // Explosive: die size (d4-d20)
-    conditionAutoFail?: boolean; // Condition caused auto-fail
-    conditionName?: string; // Name of condition that caused auto-fail/penalty
-    conditionPenalty?: number; // Condition penalty modifier (negative number like -2, -4)
-  } | null>(null);
 
   // NPC Reaction notifications (social media style)
   const [pendingNPCReactions, setPendingNPCReactions] = useState<NPCReaction[]>(
@@ -2298,47 +2257,6 @@ function StoryPageContent() {
               partialPart.gmThinking = thinking;
             }
 
-            // Find formula_roll results to show dice - this is the GM's own
-            // freeform dice tool, the only roll path left in the app.
-            const formulaResult = gmResults.find(
-              (r) =>
-                r.toolName === "formula_roll" &&
-                (r.result as GMFormulaRollResult)?.showToPlayer !== false,
-            );
-
-            if (formulaResult && formulaResult.result) {
-              const result = formulaResult.result as GMFormulaRollResult;
-              const dc = typeof result.dc === "number" ? result.dc : 0;
-              setDiceRoll({
-                show: true,
-                rolls: result.rolls || [],
-                finalRoll: result.total,
-                skillName: result.displayName || result.reason || "Roll",
-                skillBonus: 0, // Formula rolls handle bonuses internally
-                dc,
-                isSuccess: result.success ?? true,
-                isPartial: false,
-                isCritical: false,
-                hasAdvantage: false,
-                hasDisadvantage: false,
-                diceRolls: [result.rolls || []],
-                formula: result.formula,
-                resolvedFormula: result.resolvedFormula,
-                reverseDC: result.reverseDC,
-              });
-
-              logger.action(
-                "Dice visualizer triggered from GM formula_roll",
-                {
-                  formula: result.formula,
-                  resolvedFormula: result.resolvedFormula,
-                  total: result.total,
-                  dc: result.dc,
-                  success: result.success,
-                },
-              );
-            }
-
             // Extract NPC reactions from GM results and show as toast notifications
             const npcReactionResults = gmResults.filter(
               (r) => r.toolName === "npc_reaction",
@@ -3885,35 +3803,6 @@ function StoryPageContent() {
             }
             setSyncConflict({ ...syncConflict, isOpen: false });
           }}
-        />
-      )}
-
-      {/*DiceVisualizer*/}
-      {diceRoll && diceRoll.show && (
-        <DiceVisualizer
-          rolls={diceRoll.rolls}
-          finalRoll={diceRoll.finalRoll}
-          skillName={diceRoll.skillName}
-          skillBonus={diceRoll.skillBonus}
-          dc={diceRoll.dc}
-          isSuccess={diceRoll.isSuccess}
-          isCritical={diceRoll.isCritical}
-          hasAdvantage={diceRoll.hasAdvantage}
-          hasDisadvantage={diceRoll.hasDisadvantage}
-          diceRolls={diceRoll.diceRolls}
-          formula={diceRoll.formula}
-          resolvedFormula={diceRoll.resolvedFormula}
-          reverseDC={diceRoll.reverseDC}
-          baseDice={diceRoll.baseDice}
-          stressDice={diceRoll.stressDice}
-          successes={diceRoll.successes}
-          panicTriggered={diceRoll.panicTriggered}
-          panicEffect={diceRoll.panicEffect}
-          stressLevel={diceRoll.stressLevel}
-          stressRelief={diceRoll.stressRelief}
-          conditionPenalty={diceRoll.conditionPenalty}
-          conditionName={diceRoll.conditionName}
-          onComplete={() => setDiceRoll(null)}
         />
       )}
 

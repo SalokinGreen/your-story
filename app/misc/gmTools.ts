@@ -66,7 +66,6 @@ export interface FormulaRollParams {
     success?: string;
     failure?: string;
   };
-  show_to_player?: boolean; // Show dice animation to player (default true)
   // Name of the stat/resource this roll's flat modifier is claimed to be
   // derived from (e.g. "Strength", "Stamina"). Optional; when it matches a
   // structured storyData.stats/resources entry, the executor cross-checks
@@ -110,7 +109,6 @@ export interface OpposedFormulaParams {
     opponent_wins?: string;
     tie?: string;
   };
-  show_to_player?: boolean; // Show dice animation to player (default true)
   // Name of the stat/resource the player's flat modifier is claimed to be
   // derived from. See FormulaRollParams.stat_name (H8 integrity check).
   player_stat_name?: string;
@@ -129,7 +127,6 @@ export interface FormulaChallengeCheckParams {
     success?: string;
     failure?: string;
   };
-  show_to_player?: boolean; // Show dice animation to player (default true)
 }
 
 // ============================================
@@ -329,7 +326,6 @@ export interface NPCRollParams {
   dc?: number; // Optional target number to check success
   reason: string; // What the roll is for
   target?: string; // Optional: who/what is being targeted
-  show_to_player?: boolean; // Show dice animation (default: false for NPC rolls)
 }
 
 /**
@@ -492,7 +488,6 @@ export interface ReactionCheckParams {
   bias?: "hostile" | "neutral" | "favorable"; // Baseline disposition skew before the roll
   modifiers?: number; // Sum of situational/trait bonuses (charisma, reputation, prior favors, an established grudge, etc.) - GM-declared, like formula_roll's formula
   reason: string; // What's being reacted to (e.g., "player asks the guard to look the other way")
-  show_to_player?: boolean; // Show the roll itself to the player (default: false)
   // Force a fresh roll even if this NPC already has a cached reaction this
   // scene (see incidentalReactions in structs.ts / executeReactionCheck) -
   // use only when circumstances have genuinely changed (a bribe paid, a
@@ -532,7 +527,6 @@ export interface NegotiatePriceParams {
   seller_min_price?: number; // Seller's hard floor - the deal can never land below this
   player_target_price?: number; // Optional: what the player is explicitly asking for. If this is below seller_min_price, the negotiation fails outright before any roll - no amount of skill closes a gap neither party's parameters allow
   reason: string; // What's being negotiated and why (haggling over a sword, bribing a guard, etc.)
-  show_to_player?: boolean; // Show dice animation (default true)
 }
 
 // Union type for all GM tool parameters
@@ -780,11 +774,6 @@ Example formulas:
             failure: { type: "string", description: "What happens on failure" },
           },
         },
-        show_to_player: {
-          type: "boolean",
-          description:
-            "Show dice roll animation to player? Default true for player rolls. Set false for DM/enemy/hidden rolls.",
-        },
         stat_name: {
           type: "string",
           description:
@@ -807,7 +796,7 @@ Use this INSTEAD of formula_roll whenever a player character makes a roll:
 - The game pauses until the player types in their total
 - The entered total is compared against \`dc\` if you provide one
 
-Do NOT use this for NPC/enemy/secret rolls - roll those yourself with formula_roll or npc_roll (show_to_player: false for hidden rolls).`,
+Do NOT use this for NPC/enemy/secret rolls - roll those yourself with formula_roll or npc_roll instead.`,
     parameters: {
       type: "object",
       properties: {
@@ -909,11 +898,6 @@ Examples:
             tie: { type: "string" },
           },
         },
-        show_to_player: {
-          type: "boolean",
-          description:
-            "Show dice roll animation to player? Default true for player rolls. Set false for DM/hidden rolls.",
-        },
         player_stat_name: {
           type: "string",
           description:
@@ -971,11 +955,6 @@ This tool updates challenge progress (successes/failures) based on the roll resu
             success: { type: "string" },
             failure: { type: "string" },
           },
-        },
-        show_to_player: {
-          type: "boolean",
-          description:
-            "Show dice roll animation to player? Default true for player rolls. Set false for DM/hidden rolls.",
         },
       },
       required: ["formula", "dc", "description"],
@@ -1594,9 +1573,8 @@ Use for:
 - NPC saving throws
 - NPC ability checks
 
-Similar to formula_roll but specifically for NPCs.
-By default, rolls are NOT shown to the player (GM secret).
-Set show_to_player: true for dramatic rolls.
+Similar to formula_roll but specifically for NPCs. Rolls are always
+resolved silently - never shown to the player as an animation.
 
 The roll result is returned and logged to combat log.
 Use update_combatant_stat to apply damage after calculating.
@@ -1634,10 +1612,6 @@ Example flow:
         target: {
           type: "string",
           description: "Optional: Who or what is being targeted",
-        },
-        show_to_player: {
-          type: "boolean",
-          description: "Show dice animation to player (default: false)",
         },
       },
       required: ["combatant", "formula", "reason"],
@@ -2072,10 +2046,6 @@ Examples:
           description:
             "What's being reacted to, in enough detail to justify your modifiers",
         },
-        show_to_player: {
-          type: "boolean",
-          description: "Show the roll to the player (default: false)",
-        },
         force_reroll: {
           type: "boolean",
           description:
@@ -2149,10 +2119,6 @@ Example:
           type: "string",
           description:
             "What's being negotiated and why, including any economic factors already folded into list_price",
-        },
-        show_to_player: {
-          type: "boolean",
-          description: "Show dice animation to player (default true)",
         },
       },
       required: [
