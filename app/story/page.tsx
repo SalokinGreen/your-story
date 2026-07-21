@@ -299,6 +299,21 @@ function StoryPageContent() {
   const diceThrowResolveRef = useRef<
     ((faces: number[] | null) => void) | null
   >(null);
+  // Networked multiplayer: which local player(s), if known, triggered the
+  // turn currently in flight - set right before generateStoryTurn is called
+  // (see handleCustomInput/handleChoiceWithAction). Read by requestDiceThrow
+  // to decide whether a roll should be relayed to a specific connected
+  // guest instead of thrown on the host's own device. Only freeform/voice
+  // actions carry this attribution today - plain choices don't (see
+  // handleChoiceWithAction), so a choice-triggered roll always stays local,
+  // same as manual dice mode's existing (couch-only) scope.
+  const currentTurnSpeakerIdsRef = useRef<string[] | undefined>(undefined);
+  // Host-only: requestId -> the pending local Promise resolver for a dice
+  // throw relayed to a specific guest, so onDiceThrowResult/onPeerLeft can
+  // complete or abandon it.
+  const diceThrowRelayResolversRef = useRef<
+    Map<string, { forPlayerId: string; resolve: (faces: number[] | null) => void }>
+  >(new Map());
   // Full pre-turn StoryData snapshot, taken right before each turn's GM
   // tool calls can mutate state. Session-only (not persisted) - lets
   // handleUndo actually undo a turn's mechanical state changes (NPC
@@ -335,6 +350,8 @@ function StoryPageContent() {
     sendFreeform: sendNetFreeform,
     sendVoice: sendNetVoice,
     sendActivity: sendNetActivity,
+    sendDiceThrowRequest: sendNetDiceThrowRequest,
+    sendDiceThrowResult: sendNetDiceThrowResult,
   } = useNetSession({
     storyData,
     loading,
@@ -390,6 +407,34 @@ function StoryPageContent() {
         (p) => p.id === localPlayerId,
       );
       addNotification(`${departed?.name ?? "A player"} disconnected`, "warning");
+      // Don't leave the GM loop hanging if the player we relayed a physical
+      // dice throw to just disconnected mid-roll - fall back to digital.
+      for (const [requestId, pending] of diceThrowRelayResolversRef.current) {
+        if (pending.forPlayerId === localPlayerId) {
+          diceThrowRelayResolversRef.current.delete(requestId);
+          pending.resolve(null);
+        }
+      }
+    },
+    // Guest-only: the host asked *me* to throw physically. Reuse the same
+    // requestDiceThrow() used for local rolls (it recognizes it isn't the
+    // host and shows the tray locally rather than trying to relay further),
+    // then report the settled faces back over the wire.
+    onDiceThrowRequest: (request) => {
+      requestDiceThrow({
+        sides: request.sides,
+        count: request.count,
+        formula: request.formula,
+        reason: request.reason,
+        dc: request.dc,
+      }).then((faces) => sendNetDiceThrowResult(request.requestId, faces));
+    },
+    // Host-only: a targeted guest's relayed throw resolved.
+    onDiceThrowResult: (result) => {
+      const pending = diceThrowRelayResolversRef.current.get(result.requestId);
+      if (!pending) return;
+      diceThrowRelayResolversRef.current.delete(result.requestId);
+      pending.resolve(result.faces);
     },
   });
 
@@ -1235,6 +1280,11 @@ function StoryPageContent() {
 
     logger.action("User custom input", { customText });
 
+    // Physical dice mode: record who this turn belongs to, so a
+    // formula_roll during it can be relayed to a specific connected guest
+    // instead of thrown on the host's own device - see requestDiceThrow.
+    currentTurnSpeakerIdsRef.current = speakerIds;
+
     setLoading(true);
     setLoadingStage("story");
 
@@ -1403,7 +1453,8 @@ function StoryPageContent() {
             logger.action("GM stage started (custom input)");
           },
           onAskForRoll: requestManualRoll,
-          onRequestDiceThrow: requestDiceThrow,
+          onRequestDiceThrow:
+            storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
           onCompaction: (summary) => {
             addNotification(
               "Recap: earlier events were condensed into a summary to save space",
@@ -1848,6 +1899,11 @@ function StoryPageContent() {
 
     logger.action("User selected choice", { choice: choice.text, index: key });
 
+    // Plain choices don't carry which connected guest picked them (unlike
+    // freeform/voice - see handleCustomInput), so a roll during this turn
+    // always stays local/host-side rather than guessing who to relay to.
+    currentTurnSpeakerIdsRef.current = undefined;
+
     setLoading(true);
     setLoadingStage("story");
     // Set pending user choice for immediate display in chat
@@ -2170,7 +2226,8 @@ function StoryPageContent() {
             logger.action("GM stage started - determining mechanics");
           },
           onAskForRoll: requestManualRoll,
-          onRequestDiceThrow: requestDiceThrow,
+          onRequestDiceThrow:
+            storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
           onCompaction: (summary) => {
             addNotification(
               "Recap: earlier events were condensed into a summary to save space",
@@ -2438,11 +2495,40 @@ function StoryPageContent() {
   }
 
   // Physical dice mode: called by the GM executor when a formula roll can
-  // be thrown physically. Shows the 3D dice tray and resolves once the
-  // thrown dice settle (or the player skips, falling back to a digital
-  // roll of the whole formula - see rollFormulaMaybePhysical).
+  // be thrown physically. If we're hosting a networked session and the
+  // turn in flight is attributable to exactly one connected guest (not the
+  // host's own action), relay the throw to that guest instead of showing
+  // the tray locally - see currentTurnSpeakerIdsRef. Otherwise (single-
+  // player, couch co-op, the host's own turn, or a guest calling this via
+  // onDiceThrowRequest - always resolves to the "local" branch since a
+  // guest's own netSession.role is never "host") shows the tray here and
+  // resolves once the thrown dice settle or the player skips.
   function requestDiceThrow(request: DiceThrowRequest) {
     return new Promise<number[] | null>((resolve) => {
+      const speakerIds = currentTurnSpeakerIdsRef.current;
+      const remoteTargetId =
+        netSession?.role === "host" &&
+        speakerIds?.length === 1 &&
+        speakerIds[0] !== netSession.myLocalPlayerId
+          ? speakerIds[0]
+          : null;
+
+      if (remoteTargetId) {
+        const requestId = crypto.randomUUID();
+        diceThrowRelayResolversRef.current.set(requestId, {
+          forPlayerId: remoteTargetId,
+          resolve,
+        });
+        sendNetDiceThrowRequest(requestId, remoteTargetId, {
+          sides: request.sides,
+          count: request.count,
+          formula: request.formula,
+          reason: request.reason,
+          dc: request.dc,
+        });
+        return;
+      }
+
       diceThrowResolveRef.current = resolve;
       setDiceThrowRequest(request);
     });
@@ -2454,11 +2540,22 @@ function StoryPageContent() {
     setDiceThrowRequest(null);
   }
 
+  // Abandons any dice throw currently relayed to a guest, falling back to
+  // digital for it - used when generation is stopped entirely (handleStop)
+  // so the GM loop can't hang waiting on a remote player forever.
+  function abandonRelayedDiceThrows() {
+    for (const pending of diceThrowRelayResolversRef.current.values()) {
+      pending.resolve(null);
+    }
+    diceThrowRelayResolversRef.current.clear();
+  }
+
   // Stop generation (abort ongoing requests)
   function handleStop() {
     // Unblock the GM loop if it's paused waiting for a physical roll
     resolveManualRoll(null);
     resolveDiceThrow(null);
+    abandonRelayedDiceThrows();
     if (generationAbortRef.current) {
       generationAbortRef.current.abort();
       generationAbortRef.current = null;

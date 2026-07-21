@@ -349,4 +349,99 @@ describe("NetSession", () => {
 
     expect(leaveSpy).toHaveBeenCalledTimes(1);
   });
+
+  it("delivers a dice_throw_request only to the guest it was sent for", async () => {
+    const [centerTransport, spoke0, spoke1] = createFakeStarHub(2);
+    createTransport
+      .mockImplementationOnce(() => centerTransport)
+      .mockImplementationOnce(() => spoke0)
+      .mockImplementationOnce(() => spoke1);
+
+    setLocalPlayerId("host-1");
+    const host = await NetSession.createHost("manual", "Host", "#111111");
+    setLocalPlayerId("guest-0");
+    const guest0 = await NetSession.joinAsGuest("manual", "TESTROOM", "G0", "#222222");
+    setLocalPlayerId("guest-1");
+    const guest1 = await NetSession.joinAsGuest("manual", "TESTROOM", "G1", "#333333");
+
+    const guest0Heard = vi.fn();
+    const guest1Heard = vi.fn();
+    guest0.onDiceThrowRequest(guest0Heard);
+    guest1.onDiceThrowRequest(guest1Heard);
+
+    host.sendDiceThrowRequest("req-1", "guest-1", {
+      sides: 20,
+      count: 1,
+      formula: "1d20+5",
+      reason: "Climb the wall",
+      dc: 15,
+    });
+
+    expect(guest1Heard).toHaveBeenCalledWith({
+      requestId: "req-1",
+      sides: 20,
+      count: 1,
+      formula: "1d20+5",
+      reason: "Climb the wall",
+      dc: 15,
+    });
+    expect(guest0Heard).not.toHaveBeenCalled();
+  });
+
+  it("delivers a targeted guest's dice_throw_result back to the host", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const result = vi.fn();
+    host.onDiceThrowResult(result);
+
+    host.sendDiceThrowRequest("req-1", "guest-1", {
+      sides: 6,
+      count: 2,
+      formula: "2d6",
+      reason: "Push the door",
+    });
+    guest.sendDiceThrowResult("req-1", [4, 6]);
+
+    expect(result).toHaveBeenCalledWith({ requestId: "req-1", faces: [4, 6] });
+  });
+
+  it("ignores a dice_throw_result from a guest the request wasn't sent to", async () => {
+    const [centerTransport, spoke0, spoke1] = createFakeStarHub(2);
+    createTransport
+      .mockImplementationOnce(() => centerTransport)
+      .mockImplementationOnce(() => spoke0)
+      .mockImplementationOnce(() => spoke1);
+
+    setLocalPlayerId("host-1");
+    const host = await NetSession.createHost("manual", "Host", "#111111");
+    setLocalPlayerId("guest-0");
+    const guest0 = await NetSession.joinAsGuest("manual", "TESTROOM", "G0", "#222222");
+    setLocalPlayerId("guest-1");
+    const guest1 = await NetSession.joinAsGuest("manual", "TESTROOM", "G1", "#333333");
+
+    const result = vi.fn();
+    host.onDiceThrowResult(result);
+
+    // Sent to guest-1, but guest-0 (a different, legitimately-seated peer)
+    // tries to answer it - the host must not accept a result from anyone
+    // other than the guest it actually asked.
+    host.sendDiceThrowRequest("req-1", "guest-1", {
+      sides: 6,
+      count: 1,
+      formula: "1d6",
+      reason: "Test",
+    });
+    guest0.sendDiceThrowResult("req-1", [3]);
+
+    expect(result).not.toHaveBeenCalled();
+  });
+
+  it("ignores an unsolicited dice_throw_result with an unknown requestId", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const result = vi.fn();
+    host.onDiceThrowResult(result);
+
+    guest.sendDiceThrowResult("never-requested", [1]);
+
+    expect(result).not.toHaveBeenCalled();
+  });
 });

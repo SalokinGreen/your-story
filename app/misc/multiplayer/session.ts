@@ -41,6 +41,22 @@ export interface ValidatedGuestAction {
   text: string | null;
 }
 
+// Physical dice mode, relayed over the wire: a host asking *me* (the guest
+// this fired for - NetSession already filtered by forPlayerId) to throw.
+export interface DiceThrowRelayRequest {
+  requestId: string;
+  sides: number;
+  count: number;
+  formula: string;
+  reason: string;
+  dc?: number;
+}
+
+export interface DiceThrowRelayResult {
+  requestId: string;
+  faces: number[] | null;
+}
+
 export interface GuestJoinedInfo {
   localPlayerId: string;
   displayName: string;
@@ -62,6 +78,11 @@ export class NetSession {
   // handleMessage below.
   private readonly seatOwners = new Map<string, string>();
   private nextSeq = 0;
+  // Host-only: requestId -> the localPlayerId a dice_throw_request was sent
+  // to, so an incoming dice_throw_result can be checked against the peer's
+  // proven seat identity before being accepted - same distrust-the-payload
+  // pattern as player_action above.
+  private readonly pendingDiceThrows = new Map<string, string>();
 
   private readonly snapshotListeners = new Set<(data: StoryData) => void>();
   private readonly guestActionListeners = new Set<
@@ -76,6 +97,12 @@ export class NetSession {
   >();
   private readonly hostDisconnectedListeners = new Set<() => void>();
   private readonly backendSwitchListeners = new Set<(to: MPBackend) => void>();
+  private readonly diceThrowRequestListeners = new Set<
+    (request: DiceThrowRelayRequest) => void
+  >();
+  private readonly diceThrowResultListeners = new Set<
+    (result: DiceThrowRelayResult) => void
+  >();
 
   private constructor(
     role: MPRole,
@@ -212,6 +239,21 @@ export class NetSession {
     return () => this.peerLeftListeners.delete(cb);
   }
 
+  // Guest-only in practice (only the host ever sends dice_throw_request,
+  // and never to itself) - fires when a physical dice throw is requested
+  // of this session's own player.
+  onDiceThrowRequest(cb: (request: DiceThrowRelayRequest) => void): () => void {
+    this.diceThrowRequestListeners.add(cb);
+    return () => this.diceThrowRequestListeners.delete(cb);
+  }
+
+  // Host-only: fires once a targeted guest's dice_throw_result has been
+  // checked against their proven seat identity (see handleMessage).
+  onDiceThrowResult(cb: (result: DiceThrowRelayResult) => void): () => void {
+    this.diceThrowResultListeners.add(cb);
+    return () => this.diceThrowResultListeners.delete(cb);
+  }
+
   onActivity(cb: (localPlayerId: string, state: PresenceActivityState) => void): () => void {
     this.activityListeners.add(cb);
     return () => this.activityListeners.delete(cb);
@@ -280,6 +322,28 @@ export class NetSession {
     });
   }
 
+  // Host-only: ask a specific connected guest to physically throw dice.
+  sendDiceThrowRequest(
+    requestId: string,
+    forPlayerId: string,
+    request: Omit<DiceThrowRelayRequest, "requestId">
+  ): void {
+    if (this.role !== "host") return;
+    this.pendingDiceThrows.set(requestId, forPlayerId);
+    this.transport.send({
+      type: "dice_throw_request",
+      requestId,
+      forPlayerId,
+      ...request,
+    });
+  }
+
+  // Called by whichever guest a dice_throw_request targeted, once their
+  // throw settles (or they skip it - faces: null).
+  sendDiceThrowResult(requestId: string, faces: number[] | null): void {
+    this.transport.send({ type: "dice_throw_result", requestId, faces });
+  }
+
   async leave(): Promise<void> {
     await this.transport.leave();
   }
@@ -319,6 +383,25 @@ export class NetSession {
       return;
     }
 
+    if (msg.type === "dice_throw_request") {
+      // Always sent by the host, directly reaching every guest in both
+      // Trystero's mesh and PeerJS's star (the host has a direct link to
+      // each guest) - no relay needed, just filter to the one it's for.
+      if (msg.forPlayerId === this.myLocalPlayerId) {
+        this.diceThrowRequestListeners.forEach((cb) =>
+          cb({
+            requestId: msg.requestId,
+            sides: msg.sides,
+            count: msg.count,
+            formula: msg.formula,
+            reason: msg.reason,
+            dc: msg.dc,
+          }),
+        );
+      }
+      return;
+    }
+
     if (this.role === "host") {
       if (msg.type === "presence_join") {
         this.seatOwners.set(peerId, msg.playerId);
@@ -338,6 +421,18 @@ export class NetSession {
             choiceIndex: msg.choiceIndex,
             text: msg.text,
           }),
+        );
+      } else if (msg.type === "dice_throw_result") {
+        // Only accept a result from whichever guest this specific
+        // requestId was actually sent to (proven via seatOwners, not the
+        // guest's own self-reported identity - there isn't one on this
+        // message anyway, but the principle matches player_action above).
+        const expectedPlayerId = this.pendingDiceThrows.get(msg.requestId);
+        if (!expectedPlayerId) return; // unknown or already-resolved
+        if (this.seatOwners.get(peerId) !== expectedPlayerId) return;
+        this.pendingDiceThrows.delete(msg.requestId);
+        this.diceThrowResultListeners.forEach((cb) =>
+          cb({ requestId: msg.requestId, faces: msg.faces }),
         );
       }
     } else if (msg.type === "state_snapshot") {
