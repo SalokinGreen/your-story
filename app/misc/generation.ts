@@ -49,6 +49,7 @@ import {
   executeGMTools,
   GMToolResult,
   ManualRollRequest,
+  ManualRollAnswer,
   GMExecutionResult,
   resolveCheckPerTurnVisibility,
 } from "@/app/misc/gmExecutor";
@@ -222,7 +223,9 @@ export interface GenerationCallbacks {
   onGMToolResult?: (result: GMToolResult) => void;
   // Manual dice mode: the GM asked the player to roll real dice. The UI
   // shows a roll prompt and resolves with the entered total (null = skipped).
-  onAskForRoll?: (request: ManualRollRequest) => Promise<number | null>;
+  onAskForRoll?: (
+    request: ManualRollRequest
+  ) => Promise<ManualRollAnswer | null>;
   onGMStageComplete?: (
     results: GMToolResult[],
     storyContext: string,

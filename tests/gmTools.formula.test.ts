@@ -161,6 +161,79 @@ describe("Formula Roll Tool", () => {
   });
 });
 
+describe("Check DC Tool", () => {
+  it("succeeds when total meets DC", async () => {
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("check_dc", {
+      total: 20,
+      dc: 15,
+      reason: "Player self-reported a roll",
+    });
+
+    const result = await executeGMTools([toolCall], storyData);
+
+    expect(result.results).toHaveLength(1);
+    expect(result.results[0].toolName).toBe("check_dc");
+    expect(result.results[0].success).toBe(true);
+    const checkResult = result.results[0].result as any;
+    expect(checkResult.type).toBe("check_dc");
+    expect(checkResult.total).toBe(20);
+    expect(checkResult.dc).toBe(15);
+    expect(checkResult.success).toBe(true);
+    expect(checkResult.margin).toBe(5);
+    expect(result.storyContext).toContain("SUCCESS");
+  });
+
+  it("fails when total misses DC", async () => {
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("check_dc", {
+      total: 10,
+      dc: 15,
+      reason: "Player self-reported a roll",
+    });
+
+    const result = await executeGMTools([toolCall], storyData);
+
+    expect(result.results[0].success).toBe(false);
+    const checkResult = result.results[0].result as any;
+    expect(checkResult.margin).toBe(-5);
+    expect(result.storyContext).toContain("FAILURE");
+  });
+
+  it("supports reverse_dc (roll-under) systems", async () => {
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("check_dc", {
+      total: 8,
+      dc: 15,
+      reverse_dc: true,
+      reason: "Roll-under skill check",
+    });
+
+    const result = await executeGMTools([toolCall], storyData);
+
+    expect(result.results[0].success).toBe(true);
+    const checkResult = result.results[0].result as any;
+    expect(checkResult.margin).toBe(7);
+    expect(result.storyContext).toContain("SUCCESS");
+  });
+
+  it("does not roll any dice - total is used exactly as given", async () => {
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("check_dc", {
+      total: 42,
+      dc: 42,
+      reason: "Exact match",
+    });
+
+    const result = await executeGMTools([toolCall], storyData);
+
+    const checkResult = result.results[0].result as any;
+    expect(checkResult.total).toBe(42);
+    expect(checkResult.margin).toBe(0);
+    expect(checkResult.success).toBe(true);
+  });
+});
+
 describe("Opposed Formula Tool", () => {
   it("should roll opposed formulas and determine winner", async () => {
     const storyData = createMockStoryData();

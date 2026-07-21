@@ -13,6 +13,7 @@ import {
   formatRollResult,
   getRollValues,
   getTotalExplosions,
+  extractRollNumber,
 } from "../app/misc/diceFormula";
 
 describe("diceFormula", () => {
@@ -441,6 +442,32 @@ describe("diceFormula", () => {
       expect(result.total).toBe(16);
 
       vi.restoreAllMocks();
+    });
+  });
+
+  describe("extractRollNumber", () => {
+    it("parses a bare number", () => {
+      expect(extractRollNumber("17")).toBe(17);
+    });
+
+    it("extracts a number from a sentence", () => {
+      expect(extractRollNumber("I rolled a 17")).toBe(17);
+      expect(extractRollNumber("natural 20!")).toBe(20);
+      expect(extractRollNumber("17 plus 3 is 20")).toBe(17);
+    });
+
+    it("handles negative numbers", () => {
+      expect(extractRollNumber("-3")).toBe(-3);
+    });
+
+    it("falls back to spelled-out numbers when no digits are present", () => {
+      expect(extractRollNumber("seventeen")).toBe(17);
+      expect(extractRollNumber("I got a natural twenty")).toBe(20);
+    });
+
+    it("returns null when no number can be found", () => {
+      expect(extractRollNumber("I rolled great")).toBeNull();
+      expect(extractRollNumber("")).toBeNull();
     });
   });
 });

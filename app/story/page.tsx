@@ -41,7 +41,7 @@ import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
 import ManualRollModal from "../components/ManualRollModal";
-import type { ManualRollRequest } from "../misc/gmExecutor";
+import type { ManualRollRequest, ManualRollAnswer } from "../misc/gmExecutor";
 import {
   type TimelineBlock,
   updateLiveRoundBlocks,
@@ -284,9 +284,9 @@ function StoryPageContent() {
   // null = player skipped / generation stopped).
   const [manualRollRequest, setManualRollRequest] =
     useState<ManualRollRequest | null>(null);
-  const manualRollResolveRef = useRef<((value: number | null) => void) | null>(
-    null,
-  );
+  const manualRollResolveRef = useRef<
+    ((answer: ManualRollAnswer | null) => void) | null
+  >(null);
   // Full pre-turn StoryData snapshot, taken right before each turn's GM
   // tool calls can mutate state. Session-only (not persisted) - lets
   // handleUndo actually undo a turn's mechanical state changes (NPC
@@ -2387,14 +2387,14 @@ function StoryPageContent() {
   // Manual dice mode: called by the GM executor when ask_for_roll fires.
   // Shows the roll prompt and resolves once the player enters their total.
   function requestManualRoll(request: ManualRollRequest) {
-    return new Promise<number | null>((resolve) => {
+    return new Promise<ManualRollAnswer | null>((resolve) => {
       manualRollResolveRef.current = resolve;
       setManualRollRequest(request);
     });
   }
 
-  function resolveManualRoll(value: number | null) {
-    manualRollResolveRef.current?.(value);
+  function resolveManualRoll(answer: ManualRollAnswer | null) {
+    manualRollResolveRef.current?.(answer);
     manualRollResolveRef.current = null;
     setManualRollRequest(null);
   }
@@ -3656,7 +3656,7 @@ function StoryPageContent() {
       <ManualRollModal
         request={manualRollRequest}
         couchPlayers={storyData?.multiplayer?.couchPlayers}
-        onSubmit={(value) => resolveManualRoll(value)}
+        onSubmit={(value, rawText) => resolveManualRoll({ value, rawText })}
         onSkip={() => resolveManualRoll(null)}
       />
 
