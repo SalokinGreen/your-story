@@ -1450,10 +1450,13 @@ export default function Story({
               )}
             </div>
 
-            {/* Right side: TTS - available as soon as story text is ready */}
+            {/* Right side: TTS - manual press waits for narration to finish;
+                auto-narrate (if enabled) starts reading live as the GM
+                streams instead of waiting - see storyTextReady prop. */}
             <TTSControls
               text={cleanTextForSpeech(storyText)}
               disabled={loading || !storyTextReady}
+              storyTextReady={storyTextReady}
             />
           </div>
         )}

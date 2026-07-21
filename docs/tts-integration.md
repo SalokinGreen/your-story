@@ -21,6 +21,7 @@ multi-language, and provider voice libraries
 ✅ **Markdown stripping** - Automatically cleans formatting for better speech  
 ✅ **Chunked generation** - Handles long text with intelligent splitting  
 ✅ **Streaming playback** - Starts playing as soon as the first chunk is ready, instead of waiting for the whole narration to finish generating  
+✅ **Live auto-narration** - With auto-narrate enabled, starts reading sentence-by-sentence as the GM is still streaming the response, instead of waiting for the whole turn to finish  
 ✅ **Responsive UI** - Works on mobile and desktop
 
 ## TTS Models
@@ -106,10 +107,13 @@ small named voice sets are.
 
 **`app/components/TTSControls.tsx`**
 
-- Main TTS UI component
+- Main TTS UI component - a single toggle button (activate/deactivate/replay)
 - Handles voice/model selection, playback, and audio state
 - Picks the matching BYOK key (`deepinfraKey`/`cartesiaKey`/`elevenlabsKey`) for the selected model
 - Integrates with NotificationContext for user feedback
+- Runs a live, sentence-by-sentence auto-narration pipeline when auto-narrate
+  is enabled and `storyTextReady` is false (narration still streaming) - see
+  "Live Auto-Narration" below
 
 **`app/components/APIKeysModal.tsx`**
 
@@ -183,6 +187,34 @@ API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
 6. The first chunk's audio is awaited, then streamed to the client frame-by-frame as each subsequent chunk finishes (still generated in parallel behind the scenes, just emitted in order)
 7. `TTSControls.tsx` parses frames off the response stream and plays chunk 0 in the `<audio>` element the moment it lands, queuing later chunks to play back-to-back via `onended` as they arrive
 8. Playback finishes once the last chunk has played and the stream has closed
+
+### Live Auto-Narration
+
+When `ttsAutoGenerate` is on, narration doesn't wait for the GM's response to
+finish before starting - it reads along as the response streams in:
+
+1. `app/story/page.tsx` exposes `storyTextReady` (narrower than the older
+   `loadingStage`): `false` from the moment a turn's narration starts
+   streaming, `true` once that narration's own text is final (independent of
+   the tool-execution/choice-generation phase that runs afterward).
+2. `TTSControls.tsx` watches `storyTextReady` flip to `false` and, if
+   auto-narrate is on, starts a live session: as `text` grows with each
+   streamed token, `extractCompleteSentences()` splits off every
+   newly-completed sentence (same `. `/`! `/`? ` boundary heuristic as the
+   server's chunk splitter) and queues each one as its own
+   `/api/tts/generate` request.
+3. Sentence requests are dispatched **sequentially** (not in parallel) so
+   audio always arrives - and therefore plays - in the same order the
+   sentences were written, even though each request can take a different
+   amount of time to complete.
+4. Each request's resulting audio is pushed into the same ordered playback
+   queue the manual, whole-text flow uses, so the button UI (spinner ->
+   Stop -> Replay) behaves identically either way, and pressing the button
+   while a live session is playing always stops it - `disabled` blocks
+   *starting* something new, never stops something already active.
+5. When `storyTextReady` flips back to `true`, whatever trailing partial
+   sentence is left (no closing punctuation yet, since the stream just
+   ended there) is flushed as one final request.
 
 ### Text Processing
 
