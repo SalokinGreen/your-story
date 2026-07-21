@@ -4,7 +4,12 @@
  */
 
 import { describe, it, expect, beforeEach } from "vitest";
-import { executeGMTools } from "@/app/misc/gmExecutor";
+import {
+  executeGMTools,
+  DiceThrowRequest,
+  GMFormulaRollResult,
+  GMOpposedFormulaResult,
+} from "@/app/misc/gmExecutor";
 import { StoryData, SceneChallenge } from "@/app/misc/structs";
 
 // Mock story data with characterData (new schema system)
@@ -448,5 +453,87 @@ describe("Mixed GM Tools", () => {
     expect(result.results).toHaveLength(2);
     expect(result.results[0].toolName).toBe("formula_roll");
     expect(result.results[1].toolName).toBe("formula_roll");
+  });
+});
+
+describe("Physical Dice (requestDiceThrow)", () => {
+  it("uses the thrown face values instead of Math.random when requestDiceThrow is wired up", async () => {
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("formula_roll", {
+      formula: "1d20+5",
+      dc: 15,
+      reason: "Climb the wall",
+    });
+
+    const seen: DiceThrowRequest[] = [];
+    const result = await executeGMTools([toolCall], storyData, {}, {
+      requestDiceThrow: async (request) => {
+        seen.push(request);
+        return [17];
+      },
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]).toMatchObject({ sides: 20, count: 1, formula: "1d20+5" });
+
+    const rollResult = result.results[0].result as GMFormulaRollResult;
+    expect(rollResult.total).toBe(22); // 17 + 5
+    expect(rollResult.success).toBe(true); // 22 >= dc 15
+  });
+
+  it("falls back to a fully digital roll when the player skips the physical throw", async () => {
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("formula_roll", {
+      formula: "1d20+5",
+      reason: "Climb the wall",
+    });
+
+    const result = await executeGMTools([toolCall], storyData, {}, {
+      requestDiceThrow: async () => null, // player skipped
+    });
+
+    expect(result.results[0].success).toBe(true);
+    const rollResult = result.results[0].result as GMFormulaRollResult;
+    expect(rollResult.total).toBeGreaterThanOrEqual(6); // 1+5
+    expect(rollResult.total).toBeLessThanOrEqual(25); // 20+5
+  });
+
+  it("only rolls the player's side physically for opposed_formula, not the opponent's", async () => {
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("opposed_formula", {
+      player_formula: "1d20+5",
+      opponent_formula: "1d20+2",
+      opponent_name: "Guard",
+      reason: "Grapple contest",
+    });
+
+    const seen: DiceThrowRequest[] = [];
+    const result = await executeGMTools([toolCall], storyData, {}, {
+      requestDiceThrow: async (request) => {
+        seen.push(request);
+        return [17]; // only ever called for the player's d20
+      },
+    });
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0].formula).toBe("1d20+5");
+
+    const opposedResult = result.results[0].result as GMOpposedFormulaResult;
+    expect(opposedResult.playerTotal).toBe(22); // 17 + 5, from the throw
+    expect(opposedResult.opponentTotal).toBeGreaterThanOrEqual(3); // 1+2, digital
+    expect(opposedResult.opponentTotal).toBeLessThanOrEqual(22); // 20+2, digital
+  });
+
+  it("behaves exactly like the digital path when requestDiceThrow isn't provided", async () => {
+    const storyData = createMockStoryData();
+    const toolCall = createToolCall("formula_roll", {
+      formula: "1d20+5",
+      reason: "Climb the wall",
+    });
+
+    const result = await executeGMTools([toolCall], storyData);
+    const rollResult = result.results[0].result as GMFormulaRollResult;
+    expect(rollResult.total).toBeGreaterThanOrEqual(6);
+    expect(rollResult.total).toBeLessThanOrEqual(25);
   });
 });

@@ -108,7 +108,12 @@ import {
   findResourceMatch,
 } from "./fuzzyMatch";
 import { getAbilityBonus } from "./abilitySystem";
-import { rollFormula, RollResult } from "./diceFormula";
+import {
+  rollFormula,
+  rollFormulaAsync,
+  RollResult,
+  DiceResolver,
+} from "./diceFormula";
 import { executeTools as executeStateTools } from "./toolExecutor";
 
 // ============================================
@@ -641,12 +646,30 @@ export interface ManualRollAnswer {
   rawText: string;
 }
 
+// A request to physically throw `count` dice of `sides` sides (e.g. via a
+// 3D physics dice UI) and report back the settled face values. Called once
+// per dice group in the formula for the initial throw, then again with
+// count=1 for each additional die needed to resolve an explosion, since the
+// explosion count isn't knowable up front. `formula`/`reason`/`dc` are
+// display-only context about the overall roll this die belongs to.
+export interface DiceThrowRequest {
+  sides: number;
+  count: number;
+  formula: string;
+  reason: string;
+  dc?: number;
+}
+
 // Handlers the frontend injects so interactive GM tools can pause the loop
 // and wait for real player input.
 export interface GMInteractionHandlers {
   requestManualRoll?: (
     request: ManualRollRequest
   ) => Promise<ManualRollAnswer | null>;
+  // Resolves with the thrown dice's face values, or null if the player
+  // skipped/cancelled - the caller then falls back to a fully digital
+  // (Math.random()) roll of the whole formula rather than mixing the two.
+  requestDiceThrow?: (request: DiceThrowRequest) => Promise<number[] | null>;
 }
 
 export interface GMExecutionResult {
@@ -826,10 +849,11 @@ export async function executeGMTools(
           result = executeTakeRest(call.id, params as TakeRestParams, modified);
           break;
         case "formula_roll":
-          result = executeFormulaRoll(
+          result = await executeFormulaRoll(
             call.id,
             params as FormulaRollParams,
-            modified
+            modified,
+            interaction
           );
           break;
         case "ask_for_roll":
@@ -843,17 +867,19 @@ export async function executeGMTools(
           result = executeCheckDC(call.id, params as CheckDCParams);
           break;
         case "opposed_formula":
-          result = executeOpposedFormula(
+          result = await executeOpposedFormula(
             call.id,
             params as OpposedFormulaParams,
-            modified
+            modified,
+            interaction
           );
           break;
         case "formula_challenge_check":
-          result = executeFormulaChallengeCheck(
+          result = await executeFormulaChallengeCheck(
             call.id,
             params as FormulaChallengeCheckParams,
-            modified
+            modified,
+            interaction
           );
           break;
         case "fate_question":
@@ -1707,17 +1733,66 @@ function describeHardness(
   return out;
 }
 
-function executeFormulaRoll(
+// Thrown internally by rollFormulaMaybePhysical when the player
+// skipped/cancelled a physical dice throw mid-formula, to unwind back to a
+// single clean fully-digital reroll rather than mixing partial physical
+// results with digital ones.
+class PhysicalDiceSkipped extends Error {}
+
+/**
+ * Rolls a formula physically (via interaction.requestDiceThrow) when that
+ * handler is wired up, falling back to the standard Math.random() roll
+ * otherwise - or if the player skips/cancels the physical throw partway
+ * through a multi-group formula, in which case the whole formula is
+ * rerolled digitally rather than left half-physical/half-digital.
+ */
+async function rollFormulaMaybePhysical(
+  formula: string,
+  context: { reason: string; dc?: number },
+  interaction: GMInteractionHandlers
+): Promise<RollResult> {
+  if (!interaction.requestDiceThrow) {
+    return rollFormula(formula);
+  }
+
+  const diceResolver: DiceResolver = async (sides, count) => {
+    const thrown = await interaction.requestDiceThrow!({
+      sides,
+      count,
+      formula,
+      reason: context.reason,
+      dc: context.dc,
+    });
+    if (!thrown) throw new PhysicalDiceSkipped();
+    return thrown;
+  };
+
+  try {
+    return await rollFormulaAsync(formula, undefined, diceResolver);
+  } catch (e) {
+    if (e instanceof PhysicalDiceSkipped) {
+      return rollFormula(formula);
+    }
+    throw e;
+  }
+}
+
+async function executeFormulaRoll(
   toolCallId: string,
   params: FormulaRollParams,
-  storyData: StoryData
-): GMToolResult {
+  storyData: StoryData,
+  interaction: GMInteractionHandlers
+): Promise<GMToolResult> {
   // No variable resolver - GM must provide actual numbers
 
   // Roll the formula
   let rollResult: RollResult;
   try {
-    rollResult = rollFormula(params.formula);
+    rollResult = await rollFormulaMaybePhysical(
+      params.formula,
+      { reason: params.reason, dc: params.dc },
+      interaction
+    );
   } catch (e) {
     return {
       toolName: "formula_roll",
@@ -1971,17 +2046,23 @@ function executeCheckDC(
  * Execute an opposed formula roll
  * GM must provide formulas with actual numeric values (no variable substitution)
  */
-function executeOpposedFormula(
+async function executeOpposedFormula(
   toolCallId: string,
   params: OpposedFormulaParams,
-  storyData: StoryData
-): GMToolResult {
+  storyData: StoryData,
+  interaction: GMInteractionHandlers
+): Promise<GMToolResult> {
   // No variable resolver - GM must provide actual numbers
 
-  // Roll player's formula
+  // Roll player's formula (physical dice eligible - it's the human's roll).
+  // The opponent's formula always stays digital.
   let playerResult: RollResult;
   try {
-    playerResult = rollFormula(params.player_formula);
+    playerResult = await rollFormulaMaybePhysical(
+      params.player_formula,
+      { reason: params.reason, dc: undefined },
+      interaction
+    );
   } catch (e) {
     return {
       toolName: "opposed_formula",
@@ -2129,11 +2210,12 @@ function executeOpposedFormula(
 /**
  * Execute a formula-based challenge check
  */
-function executeFormulaChallengeCheck(
+async function executeFormulaChallengeCheck(
   toolCallId: string,
   params: FormulaChallengeCheckParams,
-  storyData: StoryData
-): GMToolResult {
+  storyData: StoryData,
+  interaction: GMInteractionHandlers
+): Promise<GMToolResult> {
   const challenge = storyData.activeChallenge;
   if (!challenge) {
     return {
@@ -2160,7 +2242,11 @@ function executeFormulaChallengeCheck(
   // Roll the formula
   let rollResult: RollResult;
   try {
-    rollResult = rollFormula(params.formula);
+    rollResult = await rollFormulaMaybePhysical(
+      params.formula,
+      { reason: params.description, dc: params.dc },
+      interaction
+    );
   } catch (e) {
     return {
       toolName: "formula_challenge_check",
