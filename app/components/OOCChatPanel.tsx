@@ -47,7 +47,7 @@ export default function OOCChatPanel({
   if (!isOpen) {
     return (
       <button
-        className="fixed top-1/2 -translate-y-1/2 right-0 z-40 bg-blue-600/90 hover:bg-blue-500 text-white p-2 rounded-l-lg shadow-lg transition-all pointer-events-auto"
+        className="fixed top-1/2 -translate-y-1/2 right-0 z-40 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white p-2 rounded-l-lg shadow-md shadow-purple-950/40 transition-all pointer-events-auto"
         onClick={onOpen}
         title="Open OOC Chat"
       >
@@ -64,30 +64,30 @@ export default function OOCChatPanel({
   return (
     <>
       <button
-        className="fixed top-1/2 -translate-y-1/2 z-40 bg-blue-600/90 hover:bg-blue-500 text-white p-1.5 rounded-l-lg shadow-lg transition-all pointer-events-auto right-80 sm:right-[380px] md:right-[420px]"
+        className="fixed top-1/2 -translate-y-1/2 z-40 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white p-1.5 rounded-l-lg shadow-md shadow-purple-950/40 transition-all pointer-events-auto right-80 sm:right-[380px] md:right-[420px]"
         onClick={onClose}
         title="Close OOC Chat"
       >
         <DynamicIcon name="ChevronRight" className="w-4 h-4" />
       </button>
-      <div className="fixed top-14 right-0 z-40 h-[calc(100%-7.5rem)] w-[320px] sm:w-[380px] md:w-[420px] max-w-[85vw] flex flex-col overflow-hidden bg-white/95 dark:bg-gray-900/95 shadow-2xl border-l border-gray-200 dark:border-gray-700 animate-in slide-in-from-right duration-300 pointer-events-auto rounded-bl-xl">
+      <div className="fixed top-14 right-0 z-40 h-[calc(100%-7.5rem)] w-[320px] sm:w-[380px] md:w-[420px] max-w-[85vw] flex flex-col overflow-hidden bg-[#0d1829]/95 backdrop-blur-2xl shadow-2xl shadow-black/50 border-l border-white/10 animate-in slide-in-from-right duration-300 pointer-events-auto rounded-bl-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-4 py-3 backdrop-blur-sm">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.02] px-4 py-3 backdrop-blur-sm">
           <div className="flex items-center gap-2 min-w-0">
             <DynamicIcon
               name="MessageCircle"
-              className="w-4 h-4 text-blue-500 shrink-0"
+              className="w-4 h-4 text-blue-400 shrink-0"
             />
-            <span className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">
+            <span className="text-sm font-semibold text-blue-100 truncate">
               OOC Chat
             </span>
-            <span className="text-[10px] text-gray-400 dark:text-gray-500">
+            <span className="text-[10px] text-blue-300/50">
               (players only, GM can&apos;t see this)
             </span>
           </div>
           <button
             onClick={onClose}
-            className="rounded p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+            className="rounded-lg p-1.5 text-blue-300/60 hover:bg-white/10 hover:text-white transition-colors"
             title="Close"
           >
             <DynamicIcon name="X" className="w-4 h-4" />
@@ -95,14 +95,14 @@ export default function OOCChatPanel({
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-2 bg-linear-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center p-4">
               <DynamicIcon
                 name="MessageCircle"
                 className="w-8 h-8 text-blue-400/50 mb-2"
               />
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-blue-300/60">
                 Chat with your fellow players - the GM never sees this
               </p>
             </div>
@@ -117,8 +117,8 @@ export default function OOCChatPanel({
                   <div
                     className={`max-w-[85%] rounded-xl px-3 py-2 ${
                       isMe
-                        ? "rounded-tr-sm bg-blue-600 text-white"
-                        : "rounded-tl-sm bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-200 border border-gray-200 dark:border-gray-700"
+                        ? "rounded-tr-sm bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                        : "rounded-tl-sm bg-white/5 text-blue-100 border border-white/10"
                     }`}
                   >
                     {!isMe && (
@@ -141,7 +141,7 @@ export default function OOCChatPanel({
         </div>
 
         {/* Input */}
-        <div className="border-t border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 p-3">
+        <div className="border-t border-white/10 bg-white/[0.02] p-3">
           <div className="flex gap-2">
             <textarea
               value={input}
@@ -154,12 +154,12 @@ export default function OOCChatPanel({
               }}
               placeholder="Message the other players..."
               rows={2}
-              className="flex-1 resize-none rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
+              className="flex-1 resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-blue-300/40 focus:border-purple-400/50 focus:ring-1 focus:ring-purple-500 outline-none"
             />
             <button
               onClick={handleSend}
               disabled={!input.trim()}
-              className="self-end px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+              className="self-end px-3 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:bg-white/5 disabled:bg-none disabled:cursor-not-allowed text-white rounded-lg shadow-md shadow-purple-950/40 transition-all"
             >
               <DynamicIcon name="Send" className="w-4 h-4" />
             </button>

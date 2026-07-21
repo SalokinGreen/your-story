@@ -332,10 +332,10 @@ export default function TTSControls({
         <button
           onClick={handlePlay}
           disabled={disabled || isLoading || !text.trim()}
-          className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+          className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
             disabled || isLoading || !text.trim()
-              ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
-              : "bg-purple-600 hover:bg-purple-700 text-white"
+              ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+              : "bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-950/40"
           }`}
           title={isPaused ? "Resume" : canReplay ? "Replay" : "Read aloud"}
         >
@@ -362,14 +362,14 @@ export default function TTSControls({
         <>
           <button
             onClick={handlePause}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-lg shadow-md shadow-amber-950/40 transition-all"
             title="Pause"
           >
             <DynamicIcon name="Pause" className="w-4 h-4" />
           </button>
           <button
             onClick={handleStop}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-red-500/10 hover:bg-red-500/20 border border-red-400/20 text-red-300 rounded-lg transition-colors"
             title="Stop"
           >
             <DynamicIcon name="Square" className="w-4 h-4" />

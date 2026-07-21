@@ -282,15 +282,15 @@ export default function STTButton({
 
   const getButtonStyle = () => {
     if (disabled || !isSupported) {
-      return "bg-blue-950/50 text-blue-500 cursor-not-allowed";
+      return "bg-white/5 text-blue-300/40 cursor-not-allowed";
     }
     switch (state) {
       case "recording":
-        return "bg-red-600 hover:bg-red-500 text-white animate-pulse";
+        return "bg-linear-to-r from-red-600 to-rose-600 text-white shadow-md shadow-red-950/40 animate-pulse";
       case "processing":
-        return "bg-amber-600 text-white cursor-wait";
+        return "bg-linear-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-950/40 cursor-wait";
       default:
-        return "bg-blue-600/30 hover:bg-blue-600/50 text-blue-300";
+        return "bg-blue-500/10 hover:bg-blue-500/20 border border-blue-400/20 text-blue-300";
     }
   };
 
