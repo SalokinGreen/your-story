@@ -1114,64 +1114,6 @@ const cancelChallengeTool: ToolSchema = {
   },
 };
 
-// Rest System Tool
-const takeRestTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "take_rest",
-    description: `Allow the player to rest and recover. Three types available:
-- QUICK (30 min): Brief break. Reduces cooldowns slightly. Limited uses before long rest.
-- SHORT (4-8 hours): Sleep/extended rest. Resets most cooldowns. Limited uses before long rest.
-- LONG (several days): Extended downtime/time skip. All cooldowns reset. Resets quick/short rest counts.
-
-IMPORTANT: Resource recovery is NOT automatic. You must specify which resources to restore using the 'resources' parameter. Only include resources that make sense to recover during rest (e.g., Health, Stamina, Mana). Do NOT include non-regenerating resources like Gold, Coins, Ammo, etc.
-
-Long rests involve a time skip. Use when narratively appropriate (safe haven, end of chapter, travel montage). Cannot rest during active danger/combat.`,
-    parameters: {
-      type: "object",
-      properties: {
-        type: {
-          type: "string",
-          enum: ["quick", "short", "long"],
-          description:
-            "Type of rest: quick (30 min), short (4-8 hours sleep), long (several days)",
-        },
-        narrative_summary: {
-          type: "string",
-          description:
-            "Brief description of how the rest happens narratively (e.g., 'You find a quiet corner to catch your breath', 'The party makes camp for the night', 'Several peaceful days pass at the inn')",
-        },
-        resources: {
-          type: "array",
-          description:
-            "List of resources to restore. Only include regenerating resources (Health, Stamina, Mana, Energy, etc). Do NOT include non-regenerating resources (Gold, Coins, Ammo, Arrows, etc).",
-          items: {
-            type: "object",
-            properties: {
-              name: {
-                type: "string",
-                description: "Resource name (fuzzy matching supported)",
-              },
-              amount: {
-                type: "number",
-                description:
-                  "Amount to restore. Use percentage of max for rest-type scaling (quick: 5-15%, short: 30-50%, long: 100%)",
-              },
-              percentage: {
-                type: "boolean",
-                description:
-                  "If true, 'amount' is treated as a percentage of max value. If false, it's a flat amount. Default: true",
-              },
-            },
-            required: ["name", "amount"],
-          },
-        },
-      },
-      required: ["type", "narrative_summary"],
-    },
-  },
-};
-
 // Export all tools as array
 export const TOOL_SCHEMAS: ToolSchema[] = [
   // Goal Management (5 tools)
@@ -1227,9 +1169,6 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   updateChallengeTool,
   resolveChallengeTool,
   cancelChallengeTool,
-
-  // Rest System (1 tool)
-  takeRestTool,
 
   // No-op Tool (1 tool) - for when no changes are needed
   skipToolsTool,

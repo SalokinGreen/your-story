@@ -611,61 +611,6 @@ export interface Preset {
   authorNotes: string;
 }
 
-// ============================================
-// REST SYSTEM
-// ============================================
-
-// Rest types - from quick breaks to extended downtime
-export type RestType = "quick" | "short" | "long";
-
-// Rest state tracking
-export interface RestState {
-  quickRestsUsed: number; // Quick rests used since last long rest
-  shortRestsUsed: number; // Short rests used since last long rest
-  lastRestType?: RestType; // Type of last rest taken
-  lastRestTimestamp?: number; // When last rest was taken
-}
-
-// Rest configuration per difficulty level
-export interface RestConfig {
-  // Cooldown reduction (turns)
-  cooldownReduction: { quick: number; short: number; long: number };
-  // Stress reduction (YZE only)
-  stressReduction: { quick: number; short: number; long: number };
-  // Max uses before long rest required
-  maxQuickRests: number;
-  maxShortRests: number;
-}
-
-// Default rest configuration scaled by difficulty
-// Harder difficulties = less effective rests, fewer uses
-export const REST_CONFIG: Record<AdventureDifficulty, RestConfig> = {
-  easy: {
-    cooldownReduction: { quick: 2, short: 999, long: 999 }, // 999 = full reset
-    stressReduction: { quick: 2, short: 5, long: 10 },
-    maxQuickRests: 4,
-    maxShortRests: 3,
-  },
-  medium: {
-    cooldownReduction: { quick: 1, short: 3, long: 999 },
-    stressReduction: { quick: 1, short: 3, long: 10 },
-    maxQuickRests: 3,
-    maxShortRests: 2,
-  },
-  hard: {
-    cooldownReduction: { quick: 1, short: 2, long: 999 },
-    stressReduction: { quick: 1, short: 2, long: 8 },
-    maxQuickRests: 2,
-    maxShortRests: 2,
-  },
-  expert: {
-    cooldownReduction: { quick: 1, short: 2, long: 999 },
-    stressReduction: { quick: 0, short: 1, long: 5 },
-    maxQuickRests: 2,
-    maxShortRests: 1,
-  },
-};
-
 // Custom random tables
 export interface CustomTableEntry {
   text: string; // The result text
@@ -886,9 +831,6 @@ export interface StoryData {
 
   // Player action tracking (cleared after AI sees them)
   pendingPlayerActions?: string[]; // Human-readable actions taken between turns (level ups, skill purchases, etc.)
-
-  // Rest System
-  restState?: RestState; // Tracks rest usage and cooldowns
 
   // Character Sheet Template (copied from Adventure for custom character creation)
   characterSheetTemplate?: CharacterSheetTemplate;

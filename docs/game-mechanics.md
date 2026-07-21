@@ -97,13 +97,6 @@ Turn-based tactical combat is tracked via `start_combat`, `add_combatant`,
 allies, or enemies with their own stat blocks (HP, AC, initiative, etc.)
 independent of the player's own character sheet.
 
-## Rest & Recovery
-
-`take_rest` processes a quick (~30 min), short (4-8 hour), or long
-(multi-day) rest: it restores resources per the adventure's rest
-configuration, reduces stress, and ticks down ability cooldowns. It can't
-be used while a challenge is active.
-
 ## Notes, Memory & Goals
 
 - **Notes** (`read_notes`, `search_notes`, `create_note`, `edit_note`,
@@ -164,6 +157,12 @@ the app and have been removed:
   challenge point rewards) have been removed. Objectives are now tracked
   as **Goals** (see above) with no points attached, and Scene Challenges no
   longer award points on victory - only narrative outcomes.
+- **Rest System**: `take_rest` and its structured recovery model
+  (`RestState`/`RestConfig`/`REST_CONFIG`, quick/short/long rest counters,
+  automatic resource/cooldown/stress recovery) have been removed. Downtime
+  and recovery are now purely narrative - the GM describes rest happening
+  and, if mechanics call for it, resolves recovery via `formula_roll`
+  consequences like any other outcome.
 
 If you have an older save that still has these fields, they're preserved
 for backward compatibility but no longer do anything - the GM doesn't read

@@ -3,7 +3,6 @@
   Choice,
   CommandResponse,
   StoryLore,
-  REST_CONFIG,
   getMemoryContent,
   CombatState,
   Combatant,
@@ -2158,7 +2157,6 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "search_memory",
     // Flow control
     "start_challenge",
-    "take_rest",
     // Combat tools
     "start_combat",
     "add_combatant",

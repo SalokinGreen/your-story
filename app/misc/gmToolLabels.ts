@@ -14,7 +14,6 @@ const TOOL_LABELS: Record<string, string> = {
   fate_question: "Consulting fate",
   roll_table: "Rolling on a table",
   start_challenge: "Starting a challenge",
-  take_rest: "Resting",
 
   // Notes / memory lookup
   read_notes: "Reading notes",

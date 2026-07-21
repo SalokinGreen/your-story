@@ -9,7 +9,6 @@ import {
   StoryData,
   SceneChallenge,
   Stat,
-  REST_CONFIG,
   InventoryItem,
   Ability,
   Combatant,
@@ -29,7 +28,6 @@ import {
 import {
   StartChallengeParams,
   CalculateParams,
-  TakeRestParams,
   FormulaRollParams,
   AskForRollParams,
   CheckDCParams,
@@ -127,7 +125,6 @@ export interface GMToolResult {
   result:
     | GMChallengeResult
     | GMCalculateResult
-    | GMRestResult
     | GMFormulaRollResult
     | GMAskForRollResult
     | GMCheckDCResult
@@ -191,19 +188,6 @@ export interface GMCalculateResult {
   result: number;
   reason: string;
   displayName?: string;
-}
-
-export interface GMRestResult {
-  type: "take_rest";
-  restType: "quick" | "short" | "long";
-  recovery: {
-    resources: { name: string; restored: number }[];
-    cooldowns: { name: string; reduced: number }[];
-    items: { name: string; restored: number }[];
-    stress?: { oldValue: number; newValue: number };
-  };
-  narrativeContext?: string;
-  error?: string;
 }
 
 // ============================================
@@ -845,9 +829,6 @@ export async function executeGMTools(
         case "calculate":
           result = executeCalculate(call.id, params as CalculateParams);
           break;
-        case "take_rest":
-          result = executeTakeRest(call.id, params as TakeRestParams, modified);
-          break;
         case "formula_roll":
           result = await executeFormulaRoll(
             call.id,
@@ -1405,214 +1386,6 @@ function executeCalculate(
       reason: params.reason,
       displayName: params.display_name,
     } as GMCalculateResult,
-    contextForStory,
-  };
-}
-
-// ============================================
-// TAKE REST EXECUTOR
-// ============================================
-
-function executeTakeRest(
-  toolCallId: string,
-  params: TakeRestParams,
-  storyData: StoryData
-): GMToolResult {
-  // Check if challenge is active
-  if (storyData.activeChallenge?.active) {
-    return {
-      toolName: "take_rest",
-      toolCallId,
-      success: false,
-      result: {
-        type: "take_rest",
-        restType: params.type,
-        recovery: {
-          resources: [],
-          cooldowns: [],
-          items: [],
-        },
-        error: `Cannot rest during active challenge "${storyData.activeChallenge.name}"`,
-      } as GMRestResult,
-      contextForStory: `[ERROR: Cannot rest during active challenge "${storyData.activeChallenge.name}"]`,
-    };
-  }
-
-  // Get difficulty-based recovery config
-  const difficulty = storyData.difficulty || "medium";
-  const restConfig = REST_CONFIG[difficulty];
-
-  // Initialize rest state if needed
-  if (!storyData.restState) {
-    storyData.restState = {
-      quickRestsUsed: 0,
-      shortRestsUsed: 0,
-    };
-  }
-
-  // Check rest limits
-  const restState = storyData.restState;
-  if (
-    params.type === "quick" &&
-    restState.quickRestsUsed >= restConfig.maxQuickRests
-  ) {
-    return {
-      toolName: "take_rest",
-      toolCallId,
-      success: false,
-      result: {
-        type: "take_rest",
-        restType: params.type,
-        recovery: { resources: [], cooldowns: [], items: [] },
-        error: `No quick rests remaining (${restConfig.maxQuickRests} max)`,
-      } as GMRestResult,
-      contextForStory: `[ERROR: No quick rests remaining (${restConfig.maxQuickRests} max)]`,
-    };
-  }
-  if (
-    params.type === "short" &&
-    restState.shortRestsUsed >= restConfig.maxShortRests
-  ) {
-    return {
-      toolName: "take_rest",
-      toolCallId,
-      success: false,
-      result: {
-        type: "take_rest",
-        restType: params.type,
-        recovery: { resources: [], cooldowns: [], items: [] },
-        error: `No short rests remaining (${restConfig.maxShortRests} max)`,
-      } as GMRestResult,
-      contextForStory: `[ERROR: No short rests remaining (${restConfig.maxShortRests} max)]`,
-    };
-  }
-
-  // Calculate recovery
-  const recovery: GMRestResult["recovery"] = {
-    resources: [],
-    cooldowns: [],
-    items: [],
-  };
-
-  // Get rest type specific config
-  const cooldownReduction = restConfig.cooldownReduction[params.type];
-
-  // Restore resources (custom calculation - RestConfig doesn't have resourceRestore)
-  // We'll use a simple percentage based on rest type
-  const resourceRestorePct =
-    params.type === "long" ? 1.0 : params.type === "short" ? 0.5 : 0.15;
-
-  // Restore resources
-  for (const resource of storyData.resources || []) {
-    if (resource.maxValue !== undefined) {
-      const restoreAmount = Math.floor(resource.maxValue * resourceRestorePct);
-      if (restoreAmount > 0) {
-        const oldValue = resource.value;
-        resource.value = Math.min(
-          resource.maxValue,
-          resource.value + restoreAmount
-        );
-        if (resource.value > oldValue) {
-          recovery.resources.push({
-            name: resource.name,
-            restored: resource.value - oldValue,
-          });
-        }
-      }
-    }
-  }
-
-  // Reduce cooldowns
-  for (const ability of storyData.abilities || []) {
-    if (ability.currentCooldown && ability.currentCooldown > 0) {
-      // 999 means full reset
-      const reduction =
-        cooldownReduction >= 999 ? ability.currentCooldown : cooldownReduction;
-      const oldCooldown = ability.currentCooldown;
-      ability.currentCooldown = Math.max(
-        0,
-        ability.currentCooldown - reduction
-      );
-      if (oldCooldown > ability.currentCooldown) {
-        recovery.cooldowns.push({
-          name: ability.name,
-          reduced: oldCooldown - ability.currentCooldown,
-        });
-      }
-    }
-  }
-
-  // Repair items (short/long rests only)
-  if (params.type !== "quick") {
-    for (const item of storyData.inventory || []) {
-      if (
-        item.durability !== undefined &&
-        item.maxDurability !== undefined &&
-        item.durability < item.maxDurability
-      ) {
-        const repairPct = params.type === "long" ? 0.75 : 0.15;
-        const repairAmount = Math.floor(item.maxDurability * repairPct);
-        const oldDurability = item.durability;
-        item.durability = Math.min(
-          item.maxDurability,
-          item.durability + repairAmount
-        );
-        if (item.durability > oldDurability) {
-          recovery.items.push({
-            name: item.name,
-            restored: item.durability - oldDurability,
-          });
-        }
-      }
-    }
-  }
-
-  // Update rest state
-  if (params.type === "quick") {
-    restState.quickRestsUsed++;
-  } else if (params.type === "short") {
-    restState.shortRestsUsed++;
-  } else {
-    // Long rest resets rest counters
-    restState.quickRestsUsed = 0;
-    restState.shortRestsUsed = 0;
-  }
-  restState.lastRestType = params.type;
-  restState.lastRestTimestamp = Date.now();
-
-  // Build context string
-  let contextForStory = `[Rest: ${params.type}`;
-  if (params.narrative_context) {
-    contextForStory += ` - ${params.narrative_context}`;
-  }
-  contextForStory += `]`;
-
-  if (recovery.resources.length > 0) {
-    contextForStory += `\n[Resources restored: ${recovery.resources
-      .map((r) => `${r.name} +${r.restored}`)
-      .join(", ")}]`;
-  }
-  if (recovery.cooldowns.length > 0) {
-    contextForStory += `\n[Cooldowns reduced: ${recovery.cooldowns
-      .map((c) => `${c.name} -${c.reduced}`)
-      .join(", ")}]`;
-  }
-  if (recovery.items.length > 0) {
-    contextForStory += `\n[Items repaired: ${recovery.items
-      .map((i) => `${i.name} +${i.restored}`)
-      .join(", ")}]`;
-  }
-
-  return {
-    toolName: "take_rest",
-    toolCallId,
-    success: true,
-    result: {
-      type: "take_rest",
-      restType: params.type,
-      recovery,
-      narrativeContext: params.narrative_context,
-    } as GMRestResult,
     contextForStory,
   };
 }

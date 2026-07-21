@@ -33,11 +33,6 @@ export interface CalculateParams {
   display_name?: string;
 }
 
-export interface TakeRestParams {
-  type: "quick" | "short" | "long";
-  narrative_context?: string;
-}
-
 // ============================================
 // FORMULA-BASED GM TOOL INTERFACES
 // ============================================
@@ -546,7 +541,6 @@ export interface NegotiatePriceParams {
 export type GMToolParams =
   | { name: "start_challenge"; params: StartChallengeParams }
   | { name: "calculate"; params: CalculateParams }
-  | { name: "take_rest"; params: TakeRestParams }
   | { name: "formula_roll"; params: FormulaRollParams }
   | { name: "ask_for_roll"; params: AskForRollParams }
   | { name: "check_dc"; params: CheckDCParams }
@@ -681,36 +675,6 @@ Use for:
         },
       },
       required: ["expression", "reason"],
-    },
-  },
-};
-
-const takeRestTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "take_rest",
-    description: `Process a rest period. Handles resource recovery and ability cooldowns.
-
-CANNOT rest during an active challenge.
-
-Types:
-- quick (~30 min): Brief recovery, small resource restore
-- short (4-8 hours): Sleep, significant recovery
-- long (several days): Full recovery`,
-    parameters: {
-      type: "object",
-      properties: {
-        type: {
-          type: "string",
-          enum: ["quick", "short", "long"],
-          description: "Rest type",
-        },
-        narrative_context: {
-          type: "string",
-          description: "How the rest happens narratively",
-        },
-      },
-      required: ["type"],
     },
   },
 };
@@ -2236,7 +2200,6 @@ Each call costs an extra round-trip - use it for jobs worth the wait, not simple
 export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   startChallengeTool,
   calculateTool,
-  takeRestTool,
   // Formula-based tools (primary dice mechanics)
   formulaRollTool,
   askForRollTool,

@@ -3209,10 +3209,6 @@ function StoryPageContent() {
                           customTables:
                             freshTemplate?.customTables ||
                             storyData.customTables,
-                          restState: freshTemplate?.restState || {
-                            quickRestsUsed: 0,
-                            shortRestsUsed: 0,
-                          },
                           unlockedNodes:
                             freshTemplate?.unlockedNodes ||
                             storyData.unlockedNodes,
@@ -3328,7 +3324,6 @@ function StoryPageContent() {
                           customTables:
                             freshTemplate?.customTables ||
                             storyData.customTables,
-                          restState: { quickRestsUsed: 0, shortRestsUsed: 0 },
                           // Keep skill tree progress!
                           skillTrees: storyData.skillTrees,
                           unlockedNodes: storyData.unlockedNodes,

@@ -95,7 +95,6 @@ function sanitizeStoryTemplate(
   // Remove runtime state
   delete sanitized.memory;
   delete sanitized.activeChallenge;
-  delete sanitized.restState;
   delete sanitized.agmtState;
   delete sanitized.gameOver;
 

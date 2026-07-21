@@ -839,10 +839,6 @@ export default function MenuPage({
                         freshTemplate?.agmtState || storyData.agmtState,
                       customTables:
                         freshTemplate?.customTables || storyData.customTables,
-                      restState: freshTemplate?.restState || {
-                        quickRestsUsed: 0,
-                        shortRestsUsed: 0,
-                      },
                       unlockedNodes:
                         freshTemplate?.unlockedNodes || storyData.unlockedNodes,
                       // Always reset these

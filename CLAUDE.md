@@ -105,8 +105,6 @@ stat blocks"), then calls tools such as:
   `toggle_combatant_condition` / `npc_roll` / `advance_turn` / `end_combat` —
   turn-based combat with its own per-combatant stat blocks, independent of the
   player's character sheet.
-- `take_rest` — quick/short/long rest, restores resources per the adventure's
-  rest config; blocked during an active challenge.
 - `create_thread`/`update_thread`/`resolve_thread`/`abandon_thread` (open
   plotlines) and `create_goal`/`update_goal`/`complete_goal`/`fail_goal`/
   `delete_goal` (player-facing objectives) — these are what quests/achievements'
@@ -139,6 +137,10 @@ rationale):
 - `Achievement[]`, `Quest[]`, and the entire XP/leveling economy
   (`points`/`level`/`upgradesSpent`) — gone; replaced by Goals + Story
   Threads with no points attached.
+- `take_rest` and the whole rest system (`RestState`/`RestConfig`/
+  `REST_CONFIG`, `StoryData.restState`) — gone; downtime/recovery is now
+  narrative prose or `formula_roll` consequences the GM improvises per the
+  mechanics note, same as everything else.
 - `Ability[]` — **soft-deprecated**: tools still work for backward
   compatibility, but new adventures should describe abilities in the
   character sheet note; `buildInfoMessage` already treats abilities like
