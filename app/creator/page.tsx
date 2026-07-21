@@ -178,7 +178,6 @@ const quickGenModels = Object.entries(AI_MODELS).filter(([, model]) => {
   return (
     provider === "openrouter" ||
     provider === "deepseek" ||
-    provider === "novelai" ||
     provider === "google"
   );
 });

@@ -4,12 +4,8 @@ import { buildCreatorMessages } from "@/app/misc/creator_ai";
 import { ChatMessage } from "@/app/misc/ai";
 import { createClient } from "@supabase/supabase-js";
 import { getModelConfig } from "@/app/misc/ai_prices";
-import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
 
 export const runtime = "nodejs";
-
-// NovelAI API endpoint
-const NOVELAI_API_URL = "https://text.novelai.net/oa/v1/completions";
 
 interface RequestBody {
   messages: ChatMessage[];
@@ -20,7 +16,6 @@ interface RequestBody {
     description?: string;
   };
   model?: string;
-  novelaiKey?: string;
   openRouterKey?: string;
   deepseekKey?: string;
 }
@@ -88,7 +83,6 @@ export async function POST(req: NextRequest) {
     currentStoryData,
     adventureMetadata,
     model: requestedModel,
-    novelaiKey,
     openRouterKey,
     deepseekKey,
   } = body;
@@ -97,7 +91,6 @@ export async function POST(req: NextRequest) {
   // Use getModelConfig which handles fallback to DeepSeek V4 Flash if model not found
   const modelKey = requestedModel || "DeepSeek V4 Flash";
   const modelConfig = getModelConfig(modelKey);
-  const isNovelAI = modelConfig.provider === "novelai";
 
   console.log(
     "[Creator AI] Model requested:",
@@ -115,21 +108,10 @@ export async function POST(req: NextRequest) {
 
   // All providers now use BYOK - no token billing
 
-  // Validate NovelAI key if using NovelAI
-  if (isNovelAI && !novelaiKey) {
-    return NextResponse.json(
-      { error: "NovelAI API key required for NovelAI models" },
-      { status: 400 },
-    );
-  }
-
   let apiKey: string | undefined;
   let apiUrl: string;
 
-  if (modelConfig.provider === "novelai") {
-    apiKey = novelaiKey;
-    apiUrl = NOVELAI_API_URL;
-  } else if (modelConfig.provider === "openrouter") {
+  if (modelConfig.provider === "openrouter") {
     // Use user-provided key (BYOK)
     apiKey = openRouterKey;
     apiUrl = "https://openrouter.ai/api/v1/chat/completions";
@@ -171,44 +153,8 @@ export async function POST(req: NextRequest) {
     let promptTokens = estimatedInputTokens;
     let completionTokens = 0;
 
-    if (isNovelAI) {
-      // NovelAI uses completions API, not chat
-      const prompt = convertMessagesToPrompt(aiMessages);
-
-      const resp = await fetch(apiUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: NOVELAI_MODEL,
-          prompt: prompt,
-          max_tokens: Math.min(modelConfig.maxOutputTokens, 1000), // NovelAI has 1K limit
-          temperature: 0.7,
-          top_p: 0.95,
-          top_k: 40,
-          stream: false,
-        }),
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-
-      if (!resp.ok) {
-        const text = await resp.text();
-        console.error("NovelAI API error:", text);
-        return NextResponse.json(
-          { error: `NovelAI error: ${resp.status}` },
-          { status: 502 },
-        );
-      }
-
-      const data = await resp.json();
-      content = data.choices?.[0]?.text ?? "";
-      // NovelAI doesn't provide detailed usage, estimate from content
-      completionTokens = Math.ceil(content.length / 4);
-    } else {
-      // Standard chat completions API (DeepSeek, OpenRouter)
+    // Standard chat completions API (DeepSeek, OpenRouter)
+    {
       const headers: Record<string, string> = {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",

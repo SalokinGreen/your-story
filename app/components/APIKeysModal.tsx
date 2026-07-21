@@ -309,27 +309,6 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                 </div>
 
-                {/* NovelAI - DISABLED: Model doesn't support tool calls required for game mechanics */}
-                <div className="flex items-center gap-3 opacity-50">
-                  <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-gray-400 to-gray-500 flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">📖</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-500 dark:text-gray-400 line-through">
-                        NovelAI
-                      </span>
-                      <span className="text-xs text-amber-500 ml-auto">
-                        Disabled
-                      </span>
-                    </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      NovelAI models don&apos;t support tool calling, which is
-                      required for game mechanics.
-                    </p>
-                  </div>
-                </div>
-
                 {/* Google AI Studio */}
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 shrink-0 rounded-lg bg-linear-to-br from-blue-500 to-green-500 flex items-center justify-center">

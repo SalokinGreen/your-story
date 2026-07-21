@@ -21,7 +21,6 @@ import {
   ReasoningDetail,
 } from "@/app/misc/structs";
 import {
-  buildStoryPrompt,
   buildToolPrompt,
   buildChoicesPrompt,
   buildActionAnalysisPrompt,
@@ -34,7 +33,6 @@ import {
   GM_STAGE_AFFIRMATION,
   GM_STAGE_DEFAULT_BUDGET,
   computeGMStageBudget,
-  STORY_STAGE_TOKEN_BUDGET,
   CHOICES_STAGE_TOKEN_BUDGET,
 } from "@/app/misc/ai_staged";
 import { isContextOverflowError } from "@/app/misc/apiErrors";
@@ -158,13 +156,8 @@ export interface GenerationOptions {
   maxToolLoops?: number;
   skipChoices?: boolean;
   customMaxContext?: number; // GM stage context (Memory Size slider)
-  customStoryContext?: number; // Story stage context (Story Context slider)
   customMaxOutput?: number;
-  // NovelAI BYOK support (story stage only)
-  novelaiEnabled?: boolean;
-  novelaiKey?: string;
-  novelaiTemperature?: number;
-  // BYOK API keys (required for non-NovelAI models; all providers are BYOK)
+  // BYOK API keys (all providers are BYOK)
   openRouterKey?: string;
   deepseekKey?: string;
   googleKey?: string;
@@ -181,8 +174,12 @@ export interface GenerationOptions {
   // GM Stage (new architecture: AI determines mechanics via tool calls)
   enableGMStage?: boolean; // Use GM stage instead of ActionAnalysis JSON
   gmStageModel?: string; // Model to use for GM stage (defaults to toolsModel)
-  precomputedGMContext?: string; // GM context from paused generation (retry flow)
-  precomputedGMThinking?: string[]; // GM thinking from paused generation or retry
+  // Retry flow: reuse a previous turn's saved GM conversation (dice rolls,
+  // tool results, reasoning) instead of re-running the GM stage's
+  // tool-calling loop. The GM base prompt is rebuilt fresh (no API call)
+  // and this is replayed as history, same as the normal
+  // "continue GM conversation" narration call.
+  precomputedGMConversation?: GMConversationMessage[];
   // Sampling settings (for story stage only, Coins mode)
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
@@ -199,7 +196,7 @@ export interface GenerationCallbacks {
   // Stream the story stage's native reasoning/CoT field as it generates
   // (only fires for providers that support it, e.g. DeepSeek reasoner,
   // OpenRouter reasoning-enabled models) - same shape as onGMReasoning, but
-  // for the narrator call (continueGMConversation or buildStoryPrompt path;
+  // for the separate narrator call that continues the GM's conversation;
   // never fires when GM's own final round already produced the story with
   // no separate call, since there's nothing new to stream there).
   onStoryReasoning?: (content: string, fullReasoning: string) => void;
@@ -608,7 +605,6 @@ export async function generateStoryTurn(
   userChoice: string,
   options: GenerationOptions,
   callbacks: GenerationCallbacks,
-  commandResponses?: CommandResponse[],
 ): Promise<GenerationResult> {
   const token = await getAuthToken();
 
@@ -647,7 +643,7 @@ export async function generateStoryTurn(
     let gmInterleavedConversation = ""; // NEW: Full interleaved GM conversation for story stage
     let gmFinalStoryContent = ""; // NEW: GM's final prose content (when no tool calls)
     let gmMeta: GenerationMeta | undefined;
-    let gmThinking: string[] = []; // Capture GM's "[GM]" reasoning text
+    const gmThinking: string[] = []; // Capture GM's "[GM]" reasoning text
     let gmBaseMessages: ChatMessage[] = []; // Base GM prompt for story continuation
     let gmConversationHistory: ChatMessage[] = []; // Full GM conversation history for continuation
     let gmModel = ""; // Track which model was used for GM stage
@@ -655,16 +651,39 @@ export async function generateStoryTurn(
     // narration voice to shift inconsistently within a single generation.
     const narrationModel = getEffectiveNarrationModelKey();
 
-    // Use precomputed context if provided (skip GM stage for retry flows)
-    if (options.precomputedGMContext) {
-      gmStoryContext = options.precomputedGMContext;
-      // Also restore precomputed GM thinking if available
-      if (options.precomputedGMThinking) {
-        gmThinking = options.precomputedGMThinking;
+    // Extract user choice - either from parameter or from last user scene
+    // part. Needed by every branch below: the round loop uses it to run
+    // the GM stage, and the precomputed-conversation (retry) / no-choice
+    // branches use it to rebuild the GM base prompt without an API call.
+    let gmUserChoice = userChoice;
+    if (!gmUserChoice) {
+      // Find the last user message in scene parts
+      const lastUserPart = [...storyData.scene.parts]
+        .reverse()
+        .find((p) => p.user && p.content);
+      if (lastUserPart) {
+        // Strip the ">" prefix if present (custom input format)
+        gmUserChoice = lastUserPart.content.replace(/^>\s*/, "");
       }
-      logger.action("Using precomputed GM context (retry flow)", {
-        contextLength: gmStoryContext.length,
-        thinkingCount: gmThinking.length,
+    }
+
+    // Use a precomputed GM conversation if provided (retry flow: reuse the
+    // popped turn's saved gmConversation instead of re-running the GM
+    // stage's tool-calling loop). Rebuilding the base prompt here is cheap
+    // (no API call, just the system/state/tools message) - it lets Stage 1
+    // below treat this exactly like the normal "continue GM conversation"
+    // narration call.
+    if (options.precomputedGMConversation) {
+      gmConversationHistory = options.precomputedGMConversation;
+      const gmPrompt = buildGMStagePrompt({
+        storyData,
+        userChoice: gmUserChoice,
+        customMaxContext: options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
+        modelName: narrationModel,
+      });
+      gmBaseMessages = gmPrompt.messages;
+      logger.action("Using precomputed GM conversation (retry flow)", {
+        historyEntries: gmConversationHistory.length,
       });
     } else {
       // GM Stage is always enabled - legacy tool calling has been removed
@@ -672,22 +691,20 @@ export async function generateStoryTurn(
       callbacks.onGMStageStart?.();
       logger.action("Stage 0.5: Running GM stage for mechanics determination");
 
-      // Extract user choice - either from parameter or from last user scene part
-      let gmUserChoice = userChoice;
       if (!gmUserChoice) {
-        // Find the last user message in scene parts
-        const lastUserPart = [...storyData.scene.parts]
-          .reverse()
-          .find((p) => p.user && p.content);
-        if (lastUserPart) {
-          // Strip the ">" prefix if present (custom input format)
-          gmUserChoice = lastUserPart.content.replace(/^>\s*/, "");
-        }
-      }
-
-      if (!gmUserChoice) {
+        // No prior user choice to adjudicate (e.g. very first turn) - skip
+        // the tool-calling loop, but still build the base prompt so Stage 1
+        // has something to continue.
         logger.action("GM stage skipped - no user choice found");
         gmStoryContext = "";
+        const gmPrompt = buildGMStagePrompt({
+          storyData,
+          userChoice: "",
+          customMaxContext:
+            options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
+          modelName: narrationModel,
+        });
+        gmBaseMessages = gmPrompt.messages;
       } else {
         // Two-Pass Visibility (§2.3): resolve "check_per_turn" lore once per
         // turn, before the round loop starts - the digital equivalent of a
@@ -1662,219 +1679,111 @@ export async function generateStoryTurn(
         contentLength: storyContent.length,
       });
     } else {
-      // No GM content - need separate story API call (legacy path or error recovery)
-      logger.action("Stage 1: Building story prompt (no GM content available)");
+      // No GM content yet - continue the GM's own conversation with a short
+      // prompt asking it to write the narration now. gmBaseMessages is
+      // always populated by this point (the round loop, the
+      // precomputed-conversation/retry branch, or the no-user-choice
+      // branch above all build it), so this is the only remaining way
+      // Stage 1 produces a story - the old standalone buildStoryPrompt()
+      // call (used only for NovelAI, retries, and this fallback) has been
+      // retired in favor of always continuing the same conversation.
+      logger.action("Stage 1: Continuing GM conversation for story generation", {
+        baseMessages: gmBaseMessages.length,
+        historyEntries: gmConversationHistory.length,
+        narrationModel,
+      });
 
-      // When NovelAI is enabled, use its model name for proper context sizing
-      const useNovelAI = options.novelaiEnabled && options.novelaiKey;
-      const storyModelName = useNovelAI ? "NovelAI GLM-4-6" : narrationModel;
-
-      // Calculate actual max output for NovelAI or standard models
-      // Enforce minimum 1000 tokens to account for prefill overhead
-      // (Some providers like OpenRouter count prefill against output limit)
+      // Enforce minimum 1000 tokens to account for prefill/format overhead
+      // (some providers like OpenRouter count it against the output limit)
       const MIN_OUTPUT_TOKENS = 1000;
-      const rawMaxOutput = useNovelAI
-        ? options.customMaxOutput || 2000
-        : options.customMaxOutput || 8000;
-      const storyMaxOutput = Math.max(rawMaxOutput, MIN_OUTPUT_TOKENS);
+      const storyMaxOutput = Math.max(
+        options.customMaxOutput || 8000,
+        MIN_OUTPUT_TOKENS,
+      );
 
-      // Determine if we should continue the GM conversation or build a new prompt
-      // Continue GM conversation when:
-      // 1. GM stage actually ran (gmBaseMessages has content)
-      // 2. NOT using NovelAI (which requires its own API)
-      const continueGMConversation = gmBaseMessages.length > 0 && !useNovelAI;
+      const storyContinuationPrompt = buildStoryContinuationPrompt(
+        options.storytellerMode || "narrator",
+      );
 
-      let storyPromptPrunedParts = 0;
-      // Only the buildStoryPrompt branch below has a budget knob to reduce
-      // on overflow (continueGMConversation just replays the GM's own
-      // already-successful history plus a short prompt, so there's nothing
-      // to shrink there - see the retry loop below).
-      let storyContextBudget = options.customStoryContext;
-      let storyOverflowRetried = false;
+      // Build messages: GM base + conversation history + story prompt
+      const storyMessages: ChatMessage[] = [
+        ...gmBaseMessages,
+        ...gmConversationHistory,
+        {
+          role: "user" as const,
+          content: storyContinuationPrompt,
+        },
+      ];
 
-      let storyResponse: Response;
-      storyFetchLoop: while (true) {
-        let storyMessages: ChatMessage[];
-
-        if (continueGMConversation) {
-          // Continue the GM conversation with a brief story prompt
-          // This is more efficient: same model, single conversation, no context duplication
-          logger.action("Continuing GM conversation for story generation", {
-            baseMessages: gmBaseMessages.length,
-            historyEntries: gmConversationHistory.length,
-            gmAdjudicationModel: gmModel,
-            narrationModel,
-          });
-
-          const storyContinuationPrompt = buildStoryContinuationPrompt(
-            options.storytellerMode || "narrator",
-          );
-
-          // Build messages: GM base + conversation history + story prompt
-          storyMessages = [
-            ...gmBaseMessages,
-            ...gmConversationHistory,
-            {
-              role: "user" as const,
-              content: storyContinuationPrompt,
-            },
-          ];
-        } else {
-          // Fall back to building a separate story prompt
-          // Used for: NovelAI, precomputed GM context, or when GM was skipped
-          const storyPrompt = buildStoryPrompt({
-            storyData,
-            userChoice,
-            commandResponses,
-            modelName: storyModelName,
-            customMaxContext: options.customMaxContext,
-            customStoryContext: storyContextBudget, // Story Context slider (reduced on overflow retry)
-            customMaxOutput: storyMaxOutput,
-            embeddingContext,
-            usePrefill: options.usePrefill !== false, // Default to true
-            gmStoryContext: gmStoryContext || undefined, // DEPRECATED: Use gmInterleavedConversation
-            gmThinking: gmThinking.length > 0 ? gmThinking : undefined, // DEPRECATED: Use gmInterleavedConversation
-            gmInterleavedConversation: gmInterleavedConversation || undefined, // NEW: Full interleaved GM conversation
-            storytellerMode: options.storytellerMode || "narrator", // Default to narrator mode
-          });
-
-          storyMessages = storyPrompt.messages;
-          storyPromptPrunedParts = storyPrompt.prunedParts;
-        }
-
-        // Clear pending player actions after they've been included in the prompt
-        // (they were shown to the AI in the user choice message)
-        if (
-          storyData.pendingPlayerActions &&
-          storyData.pendingPlayerActions.length > 0
-        ) {
-          logger.action(
-            `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`,
-          );
-          storyData.pendingPlayerActions = [];
-        }
-
-        if (storyPromptPrunedParts > 0) {
-          logger.action(
-            `Pruned ${storyPromptPrunedParts} oldest scene parts to fit context`,
-          );
-        }
-
-        // useNovelAI already computed above for model name selection
-
-        if (useNovelAI) {
-          // Use NovelAI for story generation (BYOK)
-          logger.action("Using NovelAI for story generation (BYOK)");
-          storyResponse = await fetch("/api/novelai/generate-stream", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              messages: storyMessages,
-              novelaiKey: options.novelaiKey,
-              maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
-              temperature:
-                (options.novelaiTemperature ?? 1) +
-                chaosFactorTemperatureDelta(storyData.agmtState?.chaosFactor),
-            }),
-            signal: options.abortSignal,
-          });
-        } else {
-          // Use standard API (DeepSeek/OpenRouter/Mistral/DeepInfra)
-          // Build request body with optional sampling settings
-          // Narration always runs on the (user-configurable) narration model,
-          // regardless of which tier adjudication used - this is what keeps
-          // the GM's voice consistent even when a turn escalated to a
-          // heavier reasoning tier.
-          const storyModelToUse: string = narrationModel;
-
-          const storyRequestBody: Record<string, unknown> = {
-            messages: storyMessages,
-            model: storyModelToUse,
-            maxTokens: storyMaxOutput, // Uses calculated value with MIN_OUTPUT_TOKENS enforced
-            temperature:
-              (options.samplingSettings?.temperature ?? 0.7) +
-              chaosFactorTemperatureDelta(storyData.agmtState?.chaosFactor),
-            openRouterKey: options.openRouterKey,
-            deepseekKey: options.deepseekKey,
-            googleKey: options.googleKey,
-            mistralKey: options.mistralKey,
-            deepinfraKey: options.deepinfraKey,
-            customModel: getCustomModelIfUUID(storyModelToUse),
-            // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
-            // Also stop on [STOP] marker for player agency stopping points
-            stop: [
-              "[GAME MASTER State Update]",
-              "[GAME MASTER State",
-              "[STOP]",
-            ],
-          };
-
-          // Add sampling settings for Coins mode (Mistral/DeepInfra)
-          if (options.samplingSettings) {
-            storyRequestBody.samplingSettings = options.samplingSettings;
-          }
-
-          storyResponse = await fetch("/api/generate-stream", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify(storyRequestBody),
-            signal: options.abortSignal,
-          });
-        }
-
-        logger.action("Story stage request sent", {
-          maxTokens: storyMaxOutput,
-          model: continueGMConversation ? gmModel : narrationModel,
-          continueGM: continueGMConversation,
-        });
-
-        if (!storyResponse.ok) {
-          const errorText = await storyResponse.text().catch(() => "");
-          const errMsg = `Story generation failed: ${storyResponse.status} - ${errorText}`;
-          // Only the buildStoryPrompt branch has a budget to reduce - see
-          // the comment on storyContextBudget above.
-          if (
-            !continueGMConversation &&
-            !storyOverflowRetried &&
-            isContextOverflowError(errMsg)
-          ) {
-            storyOverflowRetried = true;
-            storyContextBudget = Math.max(
-              4000,
-              Math.floor((storyContextBudget || STORY_STAGE_TOKEN_BUDGET) / 2),
-            );
-            logger.action(
-              "Story stage hit context overflow, retrying with reduced budget",
-              { newBudget: storyContextBudget },
-            );
-            continue storyFetchLoop;
-          }
-          throw new Error(errMsg);
-        }
-
-        break storyFetchLoop;
+      // Clear pending player actions after they've been included in the prompt
+      // (they were shown to the AI in the user choice message)
+      if (
+        storyData.pendingPlayerActions &&
+        storyData.pendingPlayerActions.length > 0
+      ) {
+        logger.action(
+          `Included ${storyData.pendingPlayerActions.length} pending player actions in prompt`,
+        );
+        storyData.pendingPlayerActions = [];
       }
 
-      // Process story stream with real-time prefill stripping
-      // We buffer content until we find the marker, then stream only the actual story
-      // The prefill now contains <thinking>GM reasoning</thinking> followed by an affirmation
-      // When continuing GM conversation, no prefill is used - skip stripping entirely
-      const usePrefill =
-        options.usePrefill !== false && !continueGMConversation;
-      let prefillStripped = !usePrefill; // If prefill disabled or continuing GM, consider it already "stripped"
+      // Narration always runs on the (user-configurable) narration model,
+      // regardless of which tier adjudication used - this is what keeps
+      // the GM's voice consistent even when a turn escalated to a heavier
+      // reasoning tier.
+      const storyRequestBody: Record<string, unknown> = {
+        messages: storyMessages,
+        model: narrationModel,
+        maxTokens: storyMaxOutput,
+        temperature:
+          (options.samplingSettings?.temperature ?? 0.7) +
+          chaosFactorTemperatureDelta(storyData.agmtState?.chaosFactor),
+        openRouterKey: options.openRouterKey,
+        deepseekKey: options.deepseekKey,
+        googleKey: options.googleKey,
+        mistralKey: options.mistralKey,
+        deepinfraKey: options.deepinfraKey,
+        customModel: getCustomModelIfUUID(narrationModel),
+        // Stop the AI before it generates GAME MASTER state updates (handled by tools stage)
+        // Also stop on [STOP] marker for player agency stopping points
+        stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
+      };
+
+      // Add sampling settings for Coins mode (Mistral/DeepInfra)
+      if (options.samplingSettings) {
+        storyRequestBody.samplingSettings = options.samplingSettings;
+      }
+
+      const storyResponse = await fetch("/api/generate-stream", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(storyRequestBody),
+        signal: options.abortSignal,
+      });
+
+      logger.action("Story stage request sent", {
+        maxTokens: storyMaxOutput,
+        model: narrationModel,
+      });
+
+      if (!storyResponse.ok) {
+        const errorText = await storyResponse.text().catch(() => "");
+        throw new Error(
+          `Story generation failed: ${storyResponse.status} - ${errorText}`,
+        );
+      }
+
+      // Process story stream, stripping any leading divider chars (---,
+      // ***) the model might add before the real narration. Continuing the
+      // GM conversation never uses a prefill (that was a
+      // buildStoryPrompt-only affirmation), so there's no marker to hunt
+      // for - just the leading-divider check below.
       let dividerStripped = false; // Track if we've stripped leading dividers
-      let rawContent = ""; // Buffer for finding the marker
-      let pendingContent = ""; // Buffer for stripping dividers after marker
+      let pendingContent = ""; // Buffer for stripping leading dividers
       let stopMarkerHit = false; // Track if we hit [STOP] during streaming
-      // Look for end of thinking block OR the affirmation line (whichever comes last)
-      const THINKING_END = "</thinking>";
-      const STORY_MARKER = "Now I write the story.";
       const STOP_MARKER = "[STOP]";
 
       for await (const event of parseSSEStream(storyResponse)) {
@@ -1917,8 +1826,8 @@ export async function generateStoryTurn(
           // Skip all content after [STOP] is detected
           if (stopMarkerHit) continue;
 
-          if (prefillStripped && dividerStripped) {
-            // Already past prefill and dividers, stream directly
+          if (dividerStripped) {
+            // Already past leading dividers, stream directly
             // But check for [STOP] in the accumulated content
             const newContent = storyContent + event.content;
             const stopIndex = newContent.indexOf(STOP_MARKER);
@@ -1940,8 +1849,8 @@ export async function generateStoryTurn(
               storyContent += event.content;
               callbacks.onStoryContent?.(event.content, storyContent);
             }
-          } else if (prefillStripped && !dividerStripped) {
-            // Past prefill but still checking for dividers
+          } else {
+            // Still checking for leading dividers
             pendingContent += event.content;
 
             // Check for [STOP] in pending content first
@@ -1971,55 +1880,6 @@ export async function generateStoryTurn(
                 callbacks.onStoryContent?.(storyContent, storyContent);
               }
             }
-          } else {
-            // Still looking for the marker
-            rawContent += event.content;
-
-            // Check for [STOP] in raw content first
-            const stopIndex = rawContent.indexOf(STOP_MARKER);
-            if (stopIndex !== -1) {
-              // Truncate at [STOP]
-              rawContent = rawContent.slice(0, stopIndex);
-              stopMarkerHit = true;
-            }
-
-            // Check if we've found the marker
-            const markerIndex = rawContent.indexOf(STORY_MARKER);
-            if (markerIndex !== -1) {
-              // Found it! Extract content after the marker
-              let contentAfterMarker = rawContent
-                .slice(markerIndex + STORY_MARKER.length)
-                .trimStart();
-              // Strip leading dividers (---, ***, ___)
-              while (/^[-*_]{3,}/.test(contentAfterMarker)) {
-                contentAfterMarker = contentAfterMarker
-                  .replace(/^[-*_]{3,}[\s\n]*/, "")
-                  .trimStart();
-              }
-              prefillStripped = true;
-
-              // Check if we have actual content or need to keep buffering for dividers
-              if (
-                contentAfterMarker.length > 0 &&
-                !/^[-*_]+$/.test(contentAfterMarker)
-              ) {
-                storyContent = contentAfterMarker;
-                dividerStripped = true;
-                callbacks.onStoryContent?.(contentAfterMarker, storyContent);
-              } else {
-                // Content might be empty or just divider chars, buffer it
-                pendingContent = contentAfterMarker;
-              }
-            } else if (rawContent.length > 800 || stopMarkerHit) {
-              // Marker not found after 800 chars or [STOP] hit - stream what we have
-              storyContent = rawContent;
-              prefillStripped = true;
-              dividerStripped = true;
-              if (rawContent) {
-                callbacks.onStoryContent?.(rawContent, storyContent);
-              }
-            }
-            // Otherwise keep buffering
           }
         }
         if (event.type === "done" && event.meta) {
@@ -2030,16 +1890,11 @@ export async function generateStoryTurn(
       }
 
       // Handle any pending content that wasn't emitted
-      if (prefillStripped && !dividerStripped && pendingContent) {
+      if (!dividerStripped && pendingContent) {
         let cleaned = pendingContent
           .replace(/^[\s\n]*([-*_]{3,})[\s\n]*/g, "")
           .trimStart();
         storyContent = cleaned || pendingContent.trimStart();
-      }
-
-      // If we never found the marker but have buffered content, use it as-is
-      if (!prefillStripped && rawContent) {
-        storyContent = rawContent;
       }
 
       // Strip [STOP] marker and partial variants if the model added it
@@ -2111,7 +1966,7 @@ export async function generateStoryTurn(
         },
       );
       logger.action("Stage 1 complete", { contentLength: storyContent.length });
-    } // End of else block (no GM content - fallback to API call)
+    } // End of else block (no GM content - continue GM conversation instead)
 
     // ========================================
     // STAGE 3: Choices

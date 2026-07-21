@@ -70,8 +70,6 @@ const SAFE_SINGLE_UPLOAD_SIZE_MB =
   SAFE_BASE64_PAYLOAD_BYTES / (4 / 3) / (1024 * 1024);
 
 // Providers the OCR summarize endpoint can call directly with a BYOK key.
-// NovelAI is excluded - its API doesn't support the structured JSON
-// extraction this endpoint relies on.
 type BYOKProvider = "openrouter" | "deepseek" | "mistral" | "google" | "deepinfra";
 
 const PROVIDER_KEY_FIELD: Record<BYOKProvider, keyof APIKeys> = {

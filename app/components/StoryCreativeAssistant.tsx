@@ -192,13 +192,6 @@ export default function StoryCreativeAssistant({
     return 8000;
   });
 
-  const [novelaiKey, setNovelaiKey] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("novelaiKey") || "";
-    }
-    return "";
-  });
-  const [showKeyInput, setShowKeyInput] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load custom models from localStorage
@@ -258,9 +251,6 @@ export default function StoryCreativeAssistant({
     return getModelConfig(model);
   }, [model, customModels]);
 
-  // Check if NovelAI is selected
-  const isNovelAISelected = modelConfig.provider === "novelai";
-
   // Filter models based on BYOK mode
   const filteredModels = useMemo(() => {
     const builtInModels = Object.entries(AI_MODELS).filter(([, m]) => {
@@ -269,7 +259,6 @@ export default function StoryCreativeAssistant({
         return (
           provider === "openrouter" ||
           provider === "deepseek" ||
-          provider === "novelai" ||
           provider === "google"
         );
       } else {
@@ -292,10 +281,7 @@ export default function StoryCreativeAssistant({
 
   // Check if user has any BYOK keys configured
   const hasAnyBYOKKey =
-    hasKey("openRouterKey") ||
-    hasKey("deepseekKey") ||
-    hasKey("googleKey") ||
-    novelaiKey.length > 0;
+    hasKey("openRouterKey") || hasKey("deepseekKey") || hasKey("googleKey");
 
   // Calculate estimated cost
   const estimatedCost = useCallback(() => {
@@ -348,7 +334,6 @@ export default function StoryCreativeAssistant({
     const isBYOKProvider =
       currentProvider === "openrouter" ||
       currentProvider === "deepseek" ||
-      currentProvider === "novelai" ||
       currentProvider === "google";
     const isCoinsProvider =
       currentProvider === "mistral" || currentProvider === "deepinfra";
@@ -412,20 +397,7 @@ export default function StoryCreativeAssistant({
       setActiveThreadId(newThread.id);
     }
 
-    if (isNovelAISelected && !novelaiKey.trim()) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content:
-            "Please enter your NovelAI API key to use NovelAI models. Click the key icon next to the model selector.",
-        },
-      ]);
-      setShowKeyInput(true);
-      return;
-    }
-
-    if (byokMode && !isNovelAISelected && !hasAnyBYOKKey) {
+    if (byokMode && !hasAnyBYOKKey) {
       setMessages((prev) => [
         ...prev,
         {
@@ -447,24 +419,11 @@ export default function StoryCreativeAssistant({
       const recentMessages = [...messages, userMsg].slice(-10);
 
       // Check if model supports tool calling
-      const supportsTools =
-        modelConfig.supportsToolCalling !== false && !isNovelAISelected;
+      const supportsTools = modelConfig.supportsToolCalling !== false;
 
       let response: Response;
 
-      if (isNovelAISelected) {
-        // NovelAI doesn't support tool calling - show helpful message
-        setMessages((prev) => [
-          ...prev,
-          {
-            role: "assistant",
-            content:
-              "NovelAI models don't support tool calling which is required for story editing. Please select a different model (DeepSeek, OpenRouter, or Coins models).",
-          },
-        ]);
-        setLoading(false);
-        return;
-      } else if (supportsTools) {
+      if (supportsTools) {
         // Use tool-based prompt
         const { messages: aiMessages, tools } =
           buildStoryCreatorMessagesWithTools(storyData, input, recentMessages);
@@ -1202,9 +1161,7 @@ export default function StoryCreativeAssistant({
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className={`flex-1 min-w-0 bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer truncate ${
-                  isNovelAISelected ? "ring-1 ring-green-500" : ""
-                }`}
+                className="flex-1 min-w-0 bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer truncate"
               >
                 {filteredModels.map(([key, m]) => (
                   <option key={key} value={key}>
@@ -1217,23 +1174,6 @@ export default function StoryCreativeAssistant({
                   </option>
                 ))}
               </select>
-              {isNovelAISelected && (
-                <button
-                  onClick={() => setShowKeyInput(!showKeyInput)}
-                  className={`p-1.5 rounded-md transition-colors ${
-                    novelaiKey
-                      ? "text-green-500 hover:bg-green-100 dark:hover:bg-green-900/30"
-                      : "text-amber-500 hover:bg-amber-100 dark:hover:bg-amber-900/30"
-                  }`}
-                  title={
-                    novelaiKey
-                      ? "NovelAI key configured"
-                      : "Enter NovelAI API key"
-                  }
-                >
-                  <DynamicIcon name="Key" className="w-4 h-4" />
-                </button>
-              )}
             </div>
 
             {/* Output Size */}
@@ -1283,29 +1223,6 @@ export default function StoryCreativeAssistant({
             </div>
           )}
 
-          {showKeyInput && isNovelAISelected && (
-            <div className="mt-2 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 p-3">
-              <div className="flex items-center gap-2 mb-2">
-                <DynamicIcon name="Key" className="w-4 h-4 text-purple-500" />
-                <span className="text-sm font-medium text-gray-900 dark:text-white">
-                  NovelAI API Key
-                </span>
-              </div>
-              <input
-                type="password"
-                value={novelaiKey}
-                onChange={(e) => setNovelaiKey(e.target.value)}
-                placeholder="Enter your NovelAI key..."
-                className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-md focus:ring-2 focus:ring-purple-500 outline-none"
-              />
-              <button
-                onClick={() => setShowKeyInput(false)}
-                className="mt-2 w-full px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded-md transition-colors"
-              >
-                Done
-              </button>
-            </div>
-          )}
         </div>
 
         {/* Messages */}

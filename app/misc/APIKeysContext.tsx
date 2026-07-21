@@ -11,7 +11,6 @@ import React, {
 export interface APIKeys {
   openRouterKey: string;
   deepseekKey: string;
-  novelaiKey: string;
   googleKey: string;
   mistralKey: string;
   deepinfraKey: string;
@@ -38,7 +37,6 @@ export interface APIKeysContextType {
 const defaultKeys: APIKeys = {
   openRouterKey: "",
   deepseekKey: "",
-  novelaiKey: "",
   googleKey: "",
   mistralKey: "",
   deepinfraKey: "",
@@ -51,7 +49,6 @@ const APIKeysContext = createContext<APIKeysContextType | undefined>(undefined);
 const LOCAL_KEYS = {
   openRouterKey: "openRouterKey",
   deepseekKey: "deepseekKey",
-  novelaiKey: "novelaiKey",
   googleKey: "googleKey",
   mistralKey: "mistralKey",
   deepinfraKey: "deepinfraKey",
@@ -69,7 +66,6 @@ export function APIKeysProvider({ children }: { children: React.ReactNode }) {
     const localKeys: APIKeys = {
       openRouterKey: localStorage.getItem(LOCAL_KEYS.openRouterKey) || "",
       deepseekKey: localStorage.getItem(LOCAL_KEYS.deepseekKey) || "",
-      novelaiKey: localStorage.getItem(LOCAL_KEYS.novelaiKey) || "",
       googleKey: localStorage.getItem(LOCAL_KEYS.googleKey) || "",
       mistralKey: localStorage.getItem(LOCAL_KEYS.mistralKey) || "",
       deepinfraKey: localStorage.getItem(LOCAL_KEYS.deepinfraKey) || "",

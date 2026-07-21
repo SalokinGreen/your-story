@@ -54,26 +54,32 @@ quartet (`NEXT_PUBLIC_SUPABASE_URL`/`KEY`, `SUPABASE_URL`/`KEY`,
 ### Generation is frontend-centric; the backend is a thin AI proxy
 
 All prompt construction, context budgeting, and tool execution happens in the
-browser. `app/misc/generation.ts` (`generateStoryTurn()`) drives a **3-stage
-turn**, called from `app/story/page.tsx`:
+browser. `app/misc/generation.ts` (`generateStoryTurn()`) drives the turn,
+called from `app/story/page.tsx`. Despite the "Stage 0.5"/"Stage 1" labels
+left over from an earlier redesign (when narration used to run first), the
+GM/tool stage always runs **before** the story stage now:
 
-1. **Story stage** — `buildStoryPrompt()` (`app/misc/ai_staged.ts`), streamed
-   via `POST /api/generate-stream`. This is the "translator": it writes prose,
-   budgeted by the Story Context slider (localStorage `storyContextSize`,
-   default 16k).
-2. **GM/tool stage** — `buildGMStagePrompt()`, looped via
-   `POST /api/generate`/`/api/generate-stream` + `executeTools()`
+1. **GM/tool stage** — `buildGMStagePrompt()` (`app/misc/ai_staged.ts`),
+   looped via `POST /api/generate`/`/api/generate-stream` + `executeTools()`
    (`app/misc/toolExecutor.ts`) until the model stops calling tools. This is
    the "brain": it reads the character sheet and mechanics notes (see below)
    and decides on rolls/state changes, budgeted by the Memory Size slider
    (localStorage `maxContextSize`, default 128k, 60% history / 40% info).
+2. **Story stage** — the "translator"/narrator. If the GM's own final round
+   already wrote prose (no tool call that round), that content *is* the
+   story and no second API call happens. Otherwise the same conversation is
+   continued with a short prompt (`buildStoryContinuationPrompt()`) asking
+   the model to narrate now, streamed via `POST /api/generate-stream` — same
+   model, same context, no separate prompt built from scratch. There is no
+   standalone story-prompt builder anymore; the old `buildStoryPrompt()`
+   (used only for retries and as a last-resort fallback) was removed.
 3. **Choices stage** — `buildChoicesPrompt()` parses the next set of player
    choices from the model's output.
 
 `app/api/generate/route.ts` and `app/api/generate-stream/route.ts` are dumb
 proxies: they take `{ messages, tools?, model, ... }`, forward to whichever
-provider the model name implies (DeepSeek, OpenRouter, Mistral, DeepInfra,
-NovelAI), and return/​stream the raw result. They do **not** know about
+provider the model name implies (DeepSeek, OpenRouter, Mistral, DeepInfra),
+and return/​stream the raw result. They do **not** know about
 `StoryData`, prompts, or tools — all of that logic lives in `app/misc/`.
 
 Reasoning-tier/model selection per turn is automatic:
@@ -180,7 +186,7 @@ why (e.g. `activate_downside` was reverted for depending on soft-deprecated
 
 - Supabase Auth; `app/misc/AuthContext.tsx` (`useAuth()`), `app/misc/auth.ts`.
 - Two ways to pay for AI generation: **BYOK** (user supplies their own
-  OpenRouter/DeepSeek/NovelAI key, no coin cost, gated to paid subscribers via
+  OpenRouter/DeepSeek key, no coin cost, gated to paid subscribers via
   `hasByokAccess` — currently force-`true` for everyone since Stripe purchase
   flows were removed) and **Coins** (server-side key for Mistral/DeepInfra
   models, deducted via `app/misc/tokens.ts`, 2.5x markup via
@@ -209,7 +215,7 @@ are stale per the "Removed/deprecated systems" list above)
   (`localStoryManager.ts`, `localAdventureManager.ts`, `localFolderManager.ts`,
   `localPDFImportManager.ts`) for offline/optimistic story storage.
 - `app/api/` — thin route handlers: AI proxies (`generate`,
-  `generate-stream`, `novelai/generate-stream`), content CRUD (`stories`,
+  `generate-stream`), content CRUD (`stories`,
   `adventures`, `folders`, `comments`), tokens/subscriptions, `creator/*`
   (multi-stage full-adventure generation with JSON-repair fallback), `tts`,
   `stt`, `ocr`, `embeddings/*`.

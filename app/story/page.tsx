@@ -63,31 +63,10 @@ import { useSearchParams, useRouter } from "next/navigation";
 // for type compatibility with other callers, filled with the narration
 // model as an inert default that's never actually dispatched to.
 function getModelsFromPreset() {
-  if (typeof window === "undefined") {
-    return {
-      storyModel: NARRATION_MODEL_KEY,
-      toolsModel: NARRATION_MODEL_KEY,
-      choicesModel: NARRATION_MODEL_KEY,
-      novelaiEnabled: false,
-      novelaiKey: "",
-      novelaiTemperature: 1,
-    };
-  }
-
-  // NovelAI settings (BYOK for story stage only) - still user-configurable
-  const novelaiEnabled = localStorage.getItem("novelaiEnabled") === "true";
-  const novelaiKey = localStorage.getItem("novelaiKey") || "";
-  const novelaiTemperature = parseFloat(
-    localStorage.getItem("novelaiTemperature") || "1",
-  );
-
   return {
     storyModel: NARRATION_MODEL_KEY,
     toolsModel: NARRATION_MODEL_KEY,
     choicesModel: NARRATION_MODEL_KEY,
-    novelaiEnabled,
-    novelaiKey,
-    novelaiTemperature,
   };
 }
 
@@ -590,11 +569,6 @@ function StoryPageContent() {
   const [pendingNPCReactions, setPendingNPCReactions] = useState<NPCReaction[]>(
     [],
   );
-
-  // Command responses for AI feedback loop
-  const [pendingCommandResponses, setPendingCommandResponses] = useState<
-    CommandResponse[]
-  >([]);
 
   // Story part navigation
   const [viewingPartIndex, setViewingPartIndex] = useState<number | null>(null);
@@ -1354,14 +1328,7 @@ function StoryPageContent() {
     //ProcessLoretriggersafteruserinput
     processLoreTriggers(storyData, addNotification);
 
-    const {
-      storyModel,
-      toolsModel,
-      choicesModel,
-      novelaiEnabled,
-      novelaiKey,
-      novelaiTemperature,
-    } = getModelsFromPreset();
+    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
     const toolCallingEnabled = true;
 
     logger.ai_request("Starting generation (custom input)", {
@@ -1369,7 +1336,6 @@ function StoryPageContent() {
       toolsModel,
       choicesModel,
       toolCallingEnabled,
-      novelaiEnabled,
     });
 
     // Track partial scene part as we stream
@@ -1390,10 +1356,6 @@ function StoryPageContent() {
         typeof window !== "undefined"
           ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
           : 36000;
-      const storyContextSize =
-        typeof window !== "undefined"
-          ? parseInt(localStorage.getItem("storyContextSize") || "16000", 10)
-          : 16000;
       const customMaxOutput =
         typeof window !== "undefined"
           ? parseInt(localStorage.getItem("customMaxOutput") || "8000", 10)
@@ -1445,12 +1407,7 @@ function StoryPageContent() {
           enableTools: toolCallingEnabled,
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
-          customStoryContext:
-            storyContextSize > 0 ? storyContextSize : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
-          novelaiEnabled: novelaiEnabled && !!novelaiKey,
-          novelaiKey,
-          novelaiTemperature,
           openRouterKey,
           deepseekKey,
           googleKey,
@@ -1634,9 +1591,6 @@ function StoryPageContent() {
               };
             }
 
-            // Store tool responses for AI feedback in next turn
-            setPendingCommandResponses(toolResponses);
-
             // Notify player of quest changes
             processQuestNotifications(toolResponses, addNotification);
 
@@ -1726,9 +1680,6 @@ function StoryPageContent() {
             setCanUndo(true);
             setLoadingStage(null);
 
-            // Clear command responses after successful generation
-            setPendingCommandResponses([]);
-
             setStoryData({ ...storyData });
 
             // Save progress
@@ -1755,9 +1706,6 @@ function StoryPageContent() {
             });
           },
         },
-        pendingCommandResponses.length > 0
-          ? pendingCommandResponses
-          : undefined,
       );
     } catch (error: any) {
       addNotification(`Error: ${error.message}`, "failure");
@@ -2126,14 +2074,7 @@ function StoryPageContent() {
 
     processLoreTriggers(storyData, addNotification);
 
-    const {
-      storyModel,
-      toolsModel,
-      choicesModel,
-      novelaiEnabled,
-      novelaiKey,
-      novelaiTemperature,
-    } = getModelsFromPreset();
+    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
     const toolCallingEnabled = true;
 
     logger.ai_request("Starting generation (choice)", {
@@ -2141,7 +2082,6 @@ function StoryPageContent() {
       toolsModel,
       choicesModel,
       toolCallingEnabled,
-      novelaiEnabled,
     });
 
     // Track partial scene part as we stream
@@ -2161,10 +2101,6 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
         : 36000;
-    const storyContextSize =
-      typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("storyContextSize") || "16000", 10)
-        : 16000;
     const customMaxOutput =
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxOutput") || "8000", 10)
@@ -2223,13 +2159,8 @@ function StoryPageContent() {
           enableTools: toolCallingEnabled,
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
-          customStoryContext:
-            storyContextSize > 0 ? storyContextSize : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
           skipChoices: !!actionChoice, // Skip choices generation in freeform action mode
-          novelaiEnabled: novelaiEnabled && !!novelaiKey,
-          novelaiKey,
-          novelaiTemperature,
           openRouterKey,
           deepseekKey,
           googleKey,
@@ -2419,7 +2350,6 @@ function StoryPageContent() {
               };
             }
 
-            setPendingCommandResponses(toolResponses);
             processQuestNotifications(toolResponses, addNotification);
 
             setStoryData({ ...storyData });
@@ -2487,8 +2417,6 @@ function StoryPageContent() {
             setCanUndo(true);
             setLoadingStage(null);
 
-            setPendingCommandResponses([]);
-
             setStoryData({ ...storyData });
 
             saveProgress(storyData, true);
@@ -2513,9 +2441,6 @@ function StoryPageContent() {
             });
           },
         },
-        pendingCommandResponses.length > 0
-          ? pendingCommandResponses
-          : undefined,
       );
     } catch (error: any) {
       addNotification(`Error: ${error.message}`, "failure");
@@ -2595,6 +2520,7 @@ function StoryPageContent() {
     const savedGMThinking = lastAIPart.gmThinking;
     const savedGMStoryContext = lastAIPart.gmStoryContext;
     const savedGMToolCalls = lastAIPart.gmToolCalls;
+    const savedGMConversation = lastAIPart.gmConversation;
 
     // Remove the last AI response
     storyData.scene.parts.pop();
@@ -2625,14 +2551,7 @@ function StoryPageContent() {
       userChoice: userChoiceContent.substring(0, 100),
     });
 
-    const {
-      storyModel,
-      toolsModel,
-      choicesModel,
-      novelaiEnabled,
-      novelaiKey,
-      novelaiTemperature,
-    } = getModelsFromPreset();
+    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
     const toolCallingEnabled = true;
 
     logger.ai_request("Starting generation (retry)", {
@@ -2640,7 +2559,6 @@ function StoryPageContent() {
       toolsModel,
       choicesModel,
       toolCallingEnabled,
-      novelaiEnabled,
     });
 
     // Track partial scene part as we stream
@@ -2664,10 +2582,6 @@ function StoryPageContent() {
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
         : 36000;
-    const storyContextSize =
-      typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("storyContextSize") || "16000", 10)
-        : 16000;
     const customMaxOutput =
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("customMaxOutput") || "8000", 10)
@@ -2735,13 +2649,8 @@ function StoryPageContent() {
           enableTools: toolCallingEnabled,
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
-          customStoryContext:
-            storyContextSize > 0 ? storyContextSize : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
           skipChoices: true, // On retry, we already have choices from the previous generation
-          novelaiEnabled: novelaiEnabled && !!novelaiKey,
-          novelaiKey,
-          novelaiTemperature,
           openRouterKey,
           deepseekKey,
           googleKey,
@@ -2755,10 +2664,10 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
-          // Skip GM stage on retry - use the saved context from the popped part
+          // Skip GM stage on retry - reuse the saved conversation (dice
+          // rolls, tool results, reasoning) from the popped part instead
           enableGMStage: false, // Don't re-run GM stage
-          precomputedGMContext: savedGMStoryContext,
-          precomputedGMThinking: savedGMThinking,
+          precomputedGMConversation: savedGMConversation,
           abortSignal: generationAbortRef.current.signal,
         },
         {
@@ -2816,9 +2725,6 @@ function StoryPageContent() {
                   stateChanges.length > 0 ? stateChanges : undefined,
               };
             }
-
-            // Store tool responses for AI feedback in next turn
-            setPendingCommandResponses(toolResponses);
 
             // Notify player of quest changes
             processQuestNotifications(toolResponses, addNotification);
@@ -2900,9 +2806,6 @@ function StoryPageContent() {
             setCanUndo(true);
             setLoadingStage(null);
 
-            // Clear command responses after successful generation
-            setPendingCommandResponses([]);
-
             setStoryData({ ...storyData });
 
             // Save progress
@@ -2925,9 +2828,6 @@ function StoryPageContent() {
             });
           },
         },
-        pendingCommandResponses.length > 0
-          ? pendingCommandResponses
-          : undefined,
       );
     } catch (error: any) {
       addNotification(`Error: ${error.message}`, "failure");

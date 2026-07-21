@@ -205,25 +205,6 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
 
-  "NovelAI GLM-4-6": {
-    name: "NovelAI GLM-4-6 (BYOK)",
-    original_model: "glm-4-6",
-    model: "glm-4-6",
-    maxTokens: 36864, // Actual limit per NovelAI API
-    maxOutputTokens: 2048,
-    provider: "novelai",
-    supportsToolCalling: false,
-    cost: 0,
-    inputPrice: 0,
-    outputPrice: 0,
-    finetunes: [],
-    strengths: ["creative writing", "storytelling", "nsfw"],
-    weaknesses: ["context size", "no tool calling"],
-    description:
-      "NovelAI's storytelling model. Requires your own NovelAI API key (BYOK). No token cost - uses your subscription.",
-    bannerUrl: undefined,
-  },
-
   "GLM 4.6": {
     name: "GLM 4.6",
     original_model: "GLM 4.6",
@@ -1339,7 +1320,6 @@ export const MODEL_PRESETS: Record<string, ModelPreset> = {
 export interface APIKeysAvailable {
   openRouterKey?: boolean;
   deepseekKey?: boolean;
-  novelaiKey?: boolean;
   coinsEnabled?: boolean; // For Mistral and DeepInfra models that use server-side API
 }
 
@@ -1348,7 +1328,6 @@ export interface APIKeysAvailable {
  * - OpenRouter models: Shown when user has OpenRouter key
  * - DeepSeek models: Shown only when user has DeepSeek API key
  * - DeepInfra models: Shown when coins are enabled (server-side API)
- * - NovelAI models: Shown only when user has NovelAI key
  *
  * @param keys - Object indicating which keys the user has
  * @returns Array of [modelKey, config] entries for available models
@@ -1366,8 +1345,6 @@ export function getAvailableModels(
         return !!keys.deepseekKey;
       case "deepinfra":
         return !!keys.coinsEnabled;
-      case "novelai":
-        return !!keys.novelaiKey;
       case "mistral":
         return !!keys.coinsEnabled;
       default:
@@ -1387,12 +1364,7 @@ export function getAvailableModelKeys(keys: APIKeysAvailable): string[] {
  * Check if user has any API key configured for AI generation
  */
 export function hasAnyAIKey(keys: APIKeysAvailable): boolean {
-  return !!(
-    keys.openRouterKey ||
-    keys.deepseekKey ||
-    keys.novelaiKey ||
-    keys.coinsEnabled
-  );
+  return !!(keys.openRouterKey || keys.deepseekKey || keys.coinsEnabled);
 }
 
 /**
@@ -1411,8 +1383,6 @@ export function getRequiredKeyForModel(
       return "deepseekKey";
     case "deepinfra":
       return "coinsEnabled";
-    case "novelai":
-      return "novelaiKey";
     case "mistral":
       return "coinsEnabled";
     default:
@@ -1441,7 +1411,6 @@ export interface AIModelConfig {
   provider:
     | "openrouter"
     | "deepseek"
-    | "novelai"
     | "mistral"
     | "deepinfra"
     | "google";
@@ -1748,7 +1717,7 @@ export function getPresetEstimatedCost(
 
 /**
  * Get the estimated cost for just the story stage
- * Useful for calculating BYOK savings when using external providers like NovelAI
+ * Useful for calculating BYOK savings when using an external provider
  * @param storyModel - Model key for story stage
  * @param contextSize - Optional custom context size in tokens
  * @returns Estimated cost in coins for story stage only

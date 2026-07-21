@@ -35,7 +35,6 @@ const PROVIDER_KEY_FIELD: Record<string, keyof APIKeys | undefined> = {
   google: "googleKey",
   mistral: "mistralKey",
   deepinfra: "deepinfraKey",
-  novelai: "novelaiKey",
 };
 
 const REASONING_EFFORTS: ReasoningEffort[] = [
@@ -49,11 +48,9 @@ const REASONING_EFFORTS: ReasoningEffort[] = [
 /**
  * Model dropdown grouped by provider, with an extra "Custom" group for
  * user-added OpenRouter models. Used for both reasoning-tier slots and the
- * narration voice. NovelAI is excluded - it has its own dedicated toggle
- * elsewhere in Settings and isn't picked via model key. When
- * `requireToolCalling` is set, models with supportsToolCalling===false are
- * excluded too (the GM stage calls tools mid-turn, so tiers need a model
- * that supports it - narration doesn't).
+ * narration voice. When `requireToolCalling` is set, models with
+ * supportsToolCalling===false are excluded too (the GM stage calls tools
+ * mid-turn, so tiers need a model that supports it - narration doesn't).
  */
 function ModelSelect({
   value,
@@ -70,7 +67,6 @@ function ModelSelect({
 }) {
   const groups = new Map<string, { key: string; name: string }[]>();
   for (const [key, cfg] of Object.entries(AI_MODELS)) {
-    if (cfg.provider === "novelai") continue;
     if (requireToolCalling && !cfg.supportsToolCalling) continue;
     if (!groups.has(cfg.provider)) groups.set(cfg.provider, []);
     groups.get(cfg.provider)!.push({ key, name: cfg.name });
@@ -292,21 +288,6 @@ export default function AIConfigTab() {
     return "";
   });
 
-  // NovelAI settings
-  const [novelaiEnabled, setNovelaiEnabled] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("novelaiEnabled") === "true";
-    }
-    return false;
-  });
-  const [novelaiTemperature, setNovelaiTemperature] = useState(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("novelaiTemperature");
-      return stored ? parseFloat(stored) : 1;
-    }
-    return 1;
-  });
-
   const [isLoadingSettings, setIsLoadingSettings] = useState(false);
   const [hasLoadedSettings, setHasLoadedSettings] = useState(() => {
     // Check if we've already loaded settings this session
@@ -381,19 +362,6 @@ export default function AIConfigTab() {
         .finally(() => setIsLoadingSettings(false));
     }
   }, [hasLoadedSettings]);
-
-  // Persist NovelAI settings
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("novelaiEnabled", novelaiEnabled.toString());
-    }
-  }, [novelaiEnabled]);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      localStorage.setItem("novelaiTemperature", novelaiTemperature.toString());
-    }
-  }, [novelaiTemperature]);
 
   // Auto-save context settings (after initial load)
   useEffect(() => {
@@ -1078,61 +1046,6 @@ export default function AIConfigTab() {
         </div>
       </div>
 
-      {/* NovelAI Section */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-        <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
-            <span>📖</span> NovelAI (Story Stage)
-          </h4>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={novelaiEnabled}
-              onChange={(e) => setNovelaiEnabled(e.target.checked)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
-          </label>
-        </div>
-
-        <p className="text-xs text-gray-500 dark:text-gray-400">
-          Use your NovelAI API key for story generation. Tools and choices will
-          still use the reasoning-tier router.
-        </p>
-
-        {novelaiEnabled && (
-          <>
-            {!hasKey("novelaiKey") && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
-                ⚠️ Enter your NovelAI API key in the AI Models tab to use this
-                feature
-              </p>
-            )}
-
-            <div>
-              <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                Temperature: {novelaiTemperature.toFixed(2)}
-              </label>
-              <input
-                type="range"
-                min="0.1"
-                max="2"
-                step="0.05"
-                value={novelaiTemperature}
-                onChange={(e) =>
-                  setNovelaiTemperature(parseFloat(e.target.value))
-                }
-                className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
-              />
-              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400 mt-1">
-                <span>Focused</span>
-                <span>Balanced</span>
-                <span>Creative</span>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
     </div>
   );
 }

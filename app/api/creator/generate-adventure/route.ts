@@ -22,10 +22,6 @@ import {
   detectIncompleteJSON,
   cleanContinuationContent,
 } from "@/app/misc/big_adventure_ai";
-import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
-
-// NovelAI API endpoint
-const NOVELAI_API_URL = "https://text.novelai.net/oa/v1/completions";
 
 export const runtime = "nodejs";
 export const maxDuration = 300; // Allow up to 5 minutes for full adventure generation
@@ -35,7 +31,6 @@ interface RequestBody {
   model?: string;
   openRouterKey?: string;
   deepseekKey?: string;
-  novelaiKey?: string;
   mistralKey?: string;
   deepinfraKey?: string;
   // Resume support
@@ -44,17 +39,14 @@ interface RequestBody {
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter" | "novelai" | "mistral" | "deepinfra",
+  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra",
   userProvidedOpenRouterKey?: string,
   userProvidedDeepseekKey?: string,
-  novelaiKey?: string,
   mistralKey?: string,
   deepinfraKey?: string,
 ): string | null {
   if (provider === "deepseek") {
     return userProvidedDeepseekKey || null;
-  } else if (provider === "novelai") {
-    return novelaiKey || null;
   } else if (provider === "mistral") {
     return mistralKey || null;
   } else if (provider === "deepinfra") {
@@ -103,19 +95,6 @@ async function streamAIResponse(
   completionTokens: number;
   estimatedCost?: number; // DeepInfra provides this
 }> {
-  // Handle NovelAI separately (uses completions API, not chat)
-  if (modelConfig.provider === "novelai") {
-    return streamNovelAIResponse(
-      messages,
-      apiKey,
-      maxOutputTokens,
-      temperature,
-      controller,
-      encoder,
-      stage,
-    );
-  }
-
   // Check if we have a prefill (trailing assistant message)
   const hasPrefill =
     messages.length > 0 && messages[messages.length - 1].role === "assistant";
@@ -251,109 +230,6 @@ async function streamAIResponse(
   return { content: fullContent, promptTokens, completionTokens };
 }
 
-// NovelAI-specific streaming function (uses completions API)
-async function streamNovelAIResponse(
-  messages: { role: string; content: string }[],
-  apiKey: string,
-  maxOutputTokens: number,
-  temperature: number,
-  controller: ReadableStreamDefaultController,
-  encoder: TextEncoder,
-  stage: GenerationStage,
-): Promise<{
-  content: string;
-  promptTokens: number;
-  completionTokens: number;
-}> {
-  // Convert chat messages to prompt string for completions API
-  const prompt = convertMessagesToPrompt(
-    messages.map((m) => ({
-      role: m.role as "system" | "user" | "assistant" | "tool",
-      content: m.content,
-    })),
-  );
-
-  const requestBody = {
-    model: NOVELAI_MODEL,
-    prompt: prompt,
-    max_tokens: Math.min(maxOutputTokens, 2048), // NovelAI has lower limits
-    temperature: temperature,
-    top_p: 0.95,
-    top_k: 40,
-    stream: true,
-  };
-
-  const response = await fetch(NOVELAI_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      Accept: "text/event-stream",
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`NovelAI API error: ${response.status} - ${errorText}`);
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error("No response body from NovelAI");
-  }
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let fullContent = "";
-  // Estimate tokens (NovelAI doesn't return usage in streaming)
-  const promptTokens = Math.ceil(prompt.length / 4);
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data:")) continue;
-
-      const data = trimmed.slice(5).trim();
-      if (!data || data === "[DONE]") continue;
-
-      try {
-        const parsed = JSON.parse(data);
-        // Completions API format: choices[0].text
-        const textContent =
-          parsed.choices?.[0]?.text ||
-          parsed.choices?.[0]?.delta?.content ||
-          parsed.text ||
-          "";
-        if (textContent) {
-          fullContent += textContent;
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "stage_content",
-                stage,
-                content: textContent,
-              })}\n\n`,
-            ),
-          );
-        }
-      } catch {
-        // Skip malformed JSON
-      }
-    }
-  }
-
-  const completionTokens = Math.ceil(fullContent.length / 4);
-  return { content: fullContent, promptTokens, completionTokens };
-}
-
 async function generateStage(
   config: BigAdventureConfig,
   stage: GenerationStage,
@@ -423,10 +299,7 @@ async function generateStage(
   // Strategy: Try AI continuation first (generates more complete data), then local repair as fallback
   if (incompleteCheck.isIncomplete) {
     // All providers support prefill continuation (OpenRouter, DeepInfra, DeepSeek, Mistral)
-    // NovelAI uses completions API so it doesn't support chat-style prefill
-    const supportsPrefill = modelConfig.provider !== "novelai";
-
-    if (supportsPrefill) {
+    {
       logger.info(
         `Stage ${stage} JSON incomplete, attempting AI continuation first`,
       );
@@ -590,7 +463,6 @@ export async function POST(req: NextRequest) {
           model = "DeepSeek V4 Flash",
           openRouterKey,
           deepseekKey,
-          novelaiKey,
           mistralKey,
           deepinfraKey,
           skipStages = [],
@@ -621,12 +493,10 @@ export async function POST(req: NextRequest) {
           modelConfig.provider as
             | "deepseek"
             | "openrouter"
-            | "novelai"
             | "mistral"
             | "deepinfra",
           openRouterKey,
           deepseekKey,
-          novelaiKey,
           mistralKey,
           deepinfraKey,
         );
@@ -639,9 +509,7 @@ export async function POST(req: NextRequest) {
                 ? "OpenRouter"
                 : modelConfig.provider === "mistral"
                   ? "Mistral"
-                  : modelConfig.provider === "deepinfra"
-                    ? "DeepInfra"
-                    : "NovelAI";
+                  : "DeepInfra";
           const errorMessage = `${providerName} API key required. Please add your API key in Settings.`;
           controller.enqueue(
             encoder.encode(
