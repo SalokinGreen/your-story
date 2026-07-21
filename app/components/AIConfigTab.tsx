@@ -220,6 +220,17 @@ export default function AIConfigTab() {
     }
     return true;
   });
+  const [replyLength, setReplyLength] = useState<"short" | "medium" | "long">(
+    () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("replyLength");
+        if (stored === "short" || stored === "medium" || stored === "long") {
+          return stored;
+        }
+      }
+      return "medium";
+    },
+  );
   // GM stage + GM thinking display are always enabled
   const displayGMThinking = true;
   const [customMaxContext, setCustomMaxContext] = useState(() => {
@@ -994,6 +1005,60 @@ export default function AIConfigTab() {
               turns.
             </span>
           </p>
+        </div>
+      </div>
+
+      {/* Reply Length Section */}
+      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+          <DynamicIcon name="AlignLeft" className="w-4 h-4" />
+          Reply Length
+        </h4>
+
+        <div>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+            How much prose the narrator writes per turn. Shorter keeps the
+            roleplay snappy and back-and-forth; longer writes fuller scenes.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                { value: "short", label: "Short", hint: "1-2 sentences" },
+                { value: "medium", label: "Medium", hint: "~1 paragraph" },
+                { value: "long", label: "Long", hint: "2-4 paragraphs" },
+              ] as const
+            ).map((opt) => {
+              const active = replyLength === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setReplyLength(opt.value);
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("replyLength", opt.value);
+                    }
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-lg border text-sm transition-colors ${
+                    active
+                      ? "bg-purple-600 border-purple-600 text-white"
+                      : "bg-white dark:bg-gray-700 border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:border-purple-400"
+                  }`}
+                >
+                  <span className="font-medium">{opt.label}</span>
+                  <span
+                    className={`text-[10px] ${
+                      active
+                        ? "text-purple-100"
+                        : "text-gray-400 dark:text-gray-500"
+                    }`}
+                  >
+                    {opt.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

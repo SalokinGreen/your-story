@@ -28,6 +28,7 @@ import {
   buildActionAnalysisPrompt,
   buildGMStagePrompt,
   buildStoryContinuationPrompt,
+  ReplyLength,
   ChatMessage,
   EmbeddingContext,
   TOOLS_AFFIRMATION,
@@ -189,6 +190,8 @@ export interface GenerationOptions {
   usePrefill?: boolean; // Default: true
   // Storyteller mode - "narrator" (literary) or "dm" (inline mechanics)
   storytellerMode?: "narrator" | "dm";
+  // Reply Length - controls narration verbosity across GM + story stages
+  replyLength?: ReplyLength;
   // Abort signal for cancelling generation
   abortSignal?: AbortSignal;
 }
@@ -691,6 +694,7 @@ export async function generateStoryTurn(
         userChoice: gmUserChoice,
         customMaxContext: options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
         modelName: narrationModel,
+        replyLength: options.replyLength,
       });
       gmBaseMessages = gmPrompt.messages;
       logger.action("Using precomputed GM conversation (retry flow)", {
@@ -714,6 +718,7 @@ export async function generateStoryTurn(
           customMaxContext:
             options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
           modelName: narrationModel,
+          replyLength: options.replyLength,
         });
         gmBaseMessages = gmPrompt.messages;
       } else {
@@ -941,6 +946,7 @@ export async function generateStoryTurn(
               userChoice: gmUserChoice,
               customMaxContext: currentGMBudget,
               modelName: gmModel,
+              replyLength: options.replyLength,
             });
             gmBaseMessages = [...gmPrompt.messages];
             gmBaseTools = gmPrompt.tools;
@@ -1711,6 +1717,7 @@ export async function generateStoryTurn(
 
       const storyContinuationPrompt = buildStoryContinuationPrompt(
         options.storytellerMode || "narrator",
+        options.replyLength || "medium",
       );
 
       // Build messages: GM base + conversation history + story prompt
