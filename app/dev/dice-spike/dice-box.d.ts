@@ -14,9 +14,16 @@ declare module "@3d-dice/dice-box" {
     scale?: number;
   }
 
+  export interface DiceBoxConfigUpdate {
+    // Patched in via scripts/patchDiceBox.mjs - not part of upstream dice-box.
+    customThrowVelocity?: [number, number, number] | null;
+    customThrowSpin?: [number, number, number] | null;
+  }
+
   export default class DiceBox {
     constructor(options: DiceBoxOptions);
     init(): Promise<void>;
     roll(notation: string): Promise<DieResult[]>;
+    updateConfig(options: DiceBoxConfigUpdate): Promise<this>;
   }
 }
