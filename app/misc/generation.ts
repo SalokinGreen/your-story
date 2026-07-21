@@ -196,6 +196,13 @@ export interface GenerationOptions {
 export interface GenerationCallbacks {
   onStoryStart?: () => void;
   onStoryContent?: (content: string, fullContent: string) => void;
+  // Stream the story stage's native reasoning/CoT field as it generates
+  // (only fires for providers that support it, e.g. DeepSeek reasoner,
+  // OpenRouter reasoning-enabled models) - same shape as onGMReasoning, but
+  // for the narrator call (continueGMConversation or buildStoryPrompt path;
+  // never fires when GM's own final round already produced the story with
+  // no separate call, since there's nothing new to stream there).
+  onStoryReasoning?: (content: string, fullReasoning: string) => void;
   onStoryComplete?: (content: string, usage: TokenUsage) => void;
   onToolsStart?: () => void;
   onToolsComplete?: (
@@ -1876,6 +1883,7 @@ export async function generateStoryTurn(
         }
         if (event.type === "reasoning" && event.content) {
           storyReasoning += event.content;
+          callbacks.onStoryReasoning?.(event.content, storyReasoning);
         }
         if (event.type === "reasoning_details" && event.details) {
           for (const detail of event.details) {

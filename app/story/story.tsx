@@ -214,6 +214,9 @@ interface ChatMessageProps {
     string,
     { success: boolean; contextForStory: string; toolName: string }
   >;
+  // The story stage's own native reasoning (ScenePart.reasoning) - see
+  // turnTimeline.ts:buildSavedTimeline
+  storyReasoning?: string;
   // Live timeline for the turn currently generating - undefined for
   // historical messages (which rebuild their timeline from gmConversation).
   liveTimeline?: TimelineBlock[];
@@ -232,6 +235,7 @@ function ChatMessage({
   messageType = "normal",
   gmConversation,
   toolResults,
+  storyReasoning,
   liveTimeline,
   isStreaming = false,
 }: ChatMessageProps) {
@@ -254,10 +258,15 @@ function ChatMessage({
   );
   const savedTimeline = React.useMemo(
     () =>
-      !isUser && gmConversation
-        ? buildSavedTimeline(gmConversation, toolResults, narrationInline)
+      !isUser && (gmConversation || storyReasoning)
+        ? buildSavedTimeline(
+            gmConversation,
+            toolResults,
+            narrationInline,
+            storyReasoning,
+          )
         : [],
-    [isUser, gmConversation, toolResults, narrationInline],
+    [isUser, gmConversation, toolResults, narrationInline, storyReasoning],
   );
 
   const isLive = !isUser && liveTimeline !== undefined;
@@ -996,7 +1005,12 @@ export default function Story({
   // Helper to get GM conversation and tool results for a scene part
   const getGMDataForPart = (partIndex: number) => {
     const part = storyData.scene.parts[partIndex];
-    if (!part) return { gmConversation: [], toolResults: new Map() };
+    if (!part)
+      return {
+        gmConversation: [],
+        toolResults: new Map(),
+        storyReasoning: undefined,
+      };
 
     // Build toolResults map from gmToolCalls (keyed by toolCallId)
     const toolResults = new Map<
@@ -1018,6 +1032,7 @@ export default function Story({
     return {
       gmConversation: part.gmConversation || [],
       toolResults,
+      storyReasoning: part.reasoning,
     };
   };
 
@@ -1134,6 +1149,9 @@ export default function Story({
                   toolResults={
                     getGMDataForPart(exchange.gmMsg.partIndex).toolResults
                   }
+                  storyReasoning={
+                    getGMDataForPart(exchange.gmMsg.partIndex).storyReasoning
+                  }
                 />
               )}
             </React.Fragment>
@@ -1170,6 +1188,10 @@ export default function Story({
                     }
                     toolResults={
                       getGMDataForPart(exchange.gmMsg.partIndex).toolResults
+                    }
+                    storyReasoning={
+                      getGMDataForPart(exchange.gmMsg.partIndex)
+                        .storyReasoning
                     }
                   />
                 )}

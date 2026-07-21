@@ -1579,6 +1579,11 @@ function StoryPageContent() {
 
             setLoadingStage("story");
           },
+          onStoryReasoning: (delta, fullReasoning) => {
+            setLiveGMEntries((prev) =>
+              updateLiveReasoningBlock(prev, fullReasoning),
+            );
+          },
           onStoryContent: (chunk: string, fullContent: string) => {
             // Update partial part as content streams
             partialPart.content = fullContent;
@@ -2365,6 +2370,11 @@ function StoryPageContent() {
 
             setLoadingStage("story");
           },
+          onStoryReasoning: (delta, fullReasoning) => {
+            setLiveGMEntries((prev) =>
+              updateLiveReasoningBlock(prev, fullReasoning),
+            );
+          },
           onStoryContent: (chunk: string, fullContent: string) => {
             partialPart.content = fullContent;
 
@@ -2752,6 +2762,11 @@ function StoryPageContent() {
           abortSignal: generationAbortRef.current.signal,
         },
         {
+          onStoryReasoning: (delta, fullReasoning) => {
+            setLiveGMEntries((prev) =>
+              updateLiveReasoningBlock(prev, fullReasoning),
+            );
+          },
           onStoryContent: (chunk: string, fullContent: string) => {
             // Update partial part as content streams
             partialPart.content = fullContent;
