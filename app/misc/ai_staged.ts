@@ -13,6 +13,7 @@
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import { MYTHIC_TABLE_NAMES } from "@/app/misc/mythic";
+import { ARCHETYPE_INFO } from "@/app/misc/gmAdvice";
 import { cleanString } from "@/app/misc/textUtils";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
@@ -760,6 +761,35 @@ export function buildInfoMessage(
         }`
       : "";
 
+  // Player archetype(s) - Robin Laws' player-type taxonomy, explicitly
+  // self-selected (GuidedStoryStart wizard / CouchPlayersEditor /
+  // BasicSettings), distinct from the inferred PlayerStyleType signal.
+  // Prompt-only: shapes how the GM engages each player, never feeds
+  // selectDirectorMove. Read fresh every turn so an in-menu edit takes
+  // effect immediately.
+  const archetypeLines: string[] = [];
+  const couchPlayersWithArchetype = (
+    storyData.multiplayer?.couchPlayers || []
+  ).filter((p) => p.archetype);
+  if (couchPlayersWithArchetype.length > 0) {
+    for (const p of couchPlayersWithArchetype) {
+      const info = ARCHETYPE_INFO[p.archetype!];
+      archetypeLines.push(`- ${p.name} (${info.label}): ${info.facilitation}`);
+    }
+  } else if (storyData.playerArchetype) {
+    const info = ARCHETYPE_INFO[storyData.playerArchetype];
+    archetypeLines.push(
+      `- ${cleanString(storyData.player_name || "The player")} (${
+        info.label
+      }): ${info.facilitation}`,
+    );
+  }
+  const archetypeSection = archetypeLines.length
+    ? `## Player Archetypes (self-selected playstyle - lean into this)\n${archetypeLines.join(
+        "\n",
+      )}`
+    : "";
+
   // Build Advanced RPG Tools section if enabled
   const agmtSection = storyData.agmtState
     ? `## Advanced RPG Tools
@@ -870,6 +900,7 @@ ${
         ? ` - ${cleanString(storyData.player_summary)}`
         : ""
     }`,
+    archetypeSection, // Self-selected player archetype(s) - advisory only
     // Pinned notes - always loaded in full
     dmInstructionsSection, // DM Instructions - highest priority, read every turn
     characterSheetSection, // Character sheet - player details

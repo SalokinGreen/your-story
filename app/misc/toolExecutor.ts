@@ -40,6 +40,7 @@ import {
   generateEventFocus,
   generateEventMeaning,
 } from "@/app/misc/mythic";
+import { selectGMAdviceForScene, formatGMAdviceNote } from "@/app/misc/gmAdvice";
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
 import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
@@ -1768,6 +1769,17 @@ export function executeTools(
 
           message += ` - render this as prose without naming it, then call acknowledge_director_move(id: "${directorMove.id}"). It will keep reappearing every turn until resolved.`;
         }
+
+        // GM advice: 1-2 curated facilitation tips for the scene that's
+        // about to start (see gmAdvice.ts). Purely advisory - unlike pending
+        // random events/director moves, there's nothing to acknowledge; it's
+        // delivered once via this tool result and never repeated.
+        const { tips: gmAdviceTips, updatedShownIds } = selectGMAdviceForScene(
+          storyData.shownGMAdviceIds,
+          !!storyData.combatState?.active
+        );
+        storyData.shownGMAdviceIds = updatedShownIds;
+        message += formatGMAdviceNote(gmAdviceTips);
 
         logger.action("Scene count incremented via tool", {
           toolCallId: toolId,
