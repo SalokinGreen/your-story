@@ -245,7 +245,7 @@ export default function LoreImageGenerator({
             />
             <button
               onClick={() => onImageGenerated("")}
-              className="absolute -top-2 -right-2 w-6 h-6 bg-red-600 hover:bg-red-700 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+              className="absolute -top-2 -right-2 w-6 h-6 bg-linear-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-md shadow-red-950/40"
               title="Remove image"
             >
               <DynamicIcon name="X" className="w-4 h-4" />
@@ -263,7 +263,7 @@ export default function LoreImageGenerator({
             <button
               onClick={handleOpenPromptEditor}
               disabled={isGenerating}
-              className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-500 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
+              className="px-3 py-1.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-white/10 disabled:to-white/10 disabled:opacity-50 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 shadow-md shadow-purple-950/40 transition-all"
             >
               <DynamicIcon
                 name={isGenerating ? "Loader2" : "Sparkles"}
@@ -275,7 +275,7 @@ export default function LoreImageGenerator({
               <button
                 onClick={quickGenerate}
                 disabled={isGenerating}
-                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-500 text-white rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
+                className="px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-50 border border-white/10 text-blue-100 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors"
                 title="Generate with auto-prompt"
               >
                 <DynamicIcon
@@ -296,7 +296,7 @@ export default function LoreImageGenerator({
                   e.target.value as "deepinfra" | "openrouter",
                 )
               }
-              className="px-2 py-1 bg-blue-900/50 border border-blue-700/40 rounded text-white"
+              className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white"
             >
               <option value="deepinfra">DeepInfra (Coins)</option>
               <option value="openrouter">OpenRouter (BYOK)</option>
@@ -305,7 +305,7 @@ export default function LoreImageGenerator({
             <select
               value={imageModel}
               onChange={(e) => handleModelChange(e.target.value)}
-              className="px-2 py-1 bg-blue-900/50 border border-blue-700/40 rounded text-white"
+              className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white"
             >
               {imageProvider === "deepinfra"
                 ? Object.entries(DEEPINFRA_IMAGE_MODELS).map(
@@ -343,7 +343,7 @@ export default function LoreImageGenerator({
 
       {/* Prompt Editor (expandable) */}
       {showPromptEditor && (
-        <div className="mt-3 p-3 bg-blue-900/30 rounded-lg border border-blue-700/40 space-y-3">
+        <div className="mt-3 p-3 bg-white/[0.03] backdrop-blur-md rounded-lg border border-white/10 space-y-3">
           <div>
             <label className="block text-sm font-medium text-blue-200 mb-1">
               Image Prompt
@@ -353,7 +353,7 @@ export default function LoreImageGenerator({
               onChange={(e) => setPrompt(e.target.value)}
               placeholder="Describe the image you want to generate..."
               rows={3}
-              className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded-lg text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
           </div>
 
@@ -361,7 +361,7 @@ export default function LoreImageGenerator({
             <button
               onClick={generateImage}
               disabled={isGenerating || !prompt.trim()}
-              className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-500 text-white font-medium rounded-lg flex items-center justify-center gap-2 transition-colors"
+              className="flex-1 px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 text-white font-medium rounded-lg flex items-center justify-center gap-2 shadow-md shadow-purple-950/40 transition-all"
             >
               <DynamicIcon
                 name={isGenerating ? "Loader2" : "Sparkles"}
@@ -371,7 +371,7 @@ export default function LoreImageGenerator({
             </button>
             <button
               onClick={() => setShowPromptEditor(false)}
-              className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-medium rounded-lg transition-colors"
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-medium rounded-lg transition-colors"
             >
               Cancel
             </button>

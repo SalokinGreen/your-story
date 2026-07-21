@@ -10,7 +10,7 @@ interface SkeletonProps {
 export function Skeleton({ className = "" }: SkeletonProps) {
   return (
     <div
-      className={`animate-pulse bg-linear-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-blue-900/50 dark:via-blue-800/50 dark:to-blue-900/50 bg-size-[200%_100%] animate-shimmer rounded ${className}`}
+      className={`animate-pulse bg-linear-to-r from-white/5 via-white/10 to-white/5 bg-size-[200%_100%] animate-shimmer rounded ${className}`}
     />
   );
 }
@@ -18,7 +18,7 @@ export function Skeleton({ className = "" }: SkeletonProps) {
 // Story card skeleton for library
 export function StoryCardSkeleton() {
   return (
-    <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+    <div className="bg-white/[0.03] backdrop-blur-md rounded-xl shadow-lg border border-white/10 p-4 space-y-3">
       {/* Title */}
       <Skeleton className="h-5 w-3/4" />
 
@@ -40,7 +40,7 @@ export function StoryCardSkeleton() {
 // Adventure card skeleton for explorer
 export function AdventureCardSkeleton() {
   return (
-    <div className="bg-white dark:bg-blue-950 rounded-xl shadow-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <div className="bg-white/[0.03] backdrop-blur-md rounded-xl shadow-lg border border-white/10 overflow-hidden">
       {/* Thumbnail */}
       <Skeleton className="h-40 w-full rounded-none" />
 
@@ -75,7 +75,7 @@ export function AdventureCardSkeleton() {
 // Adventure detail page skeleton
 export function AdventureDetailSkeleton() {
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+    <div className="min-h-screen bg-transparent">
       {/* Hero Banner */}
       <Skeleton className="h-64 md:h-80 w-full rounded-none" />
 
@@ -101,7 +101,7 @@ export function AdventureDetailSkeleton() {
         </div>
 
         {/* Description */}
-        <div className="bg-white dark:bg-blue-950 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 space-y-3">
+        <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl p-6 border border-white/10 space-y-3">
           <Skeleton className="h-6 w-40" />
           <div className="space-y-2">
             <Skeleton className="h-4 w-full" />
@@ -113,7 +113,7 @@ export function AdventureDetailSkeleton() {
 
         {/* Stats/Presets section */}
         <div className="grid md:grid-cols-2 gap-6">
-          <div className="bg-white dark:bg-blue-950 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 space-y-4">
+          <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl p-6 border border-white/10 space-y-4">
             <Skeleton className="h-6 w-32" />
             <div className="space-y-3">
               <Skeleton className="h-12 w-full rounded-lg" />
@@ -121,7 +121,7 @@ export function AdventureDetailSkeleton() {
               <Skeleton className="h-12 w-full rounded-lg" />
             </div>
           </div>
-          <div className="bg-white dark:bg-blue-950 rounded-2xl p-6 border border-gray-200 dark:border-gray-700 space-y-4">
+          <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl p-6 border border-white/10 space-y-4">
             <Skeleton className="h-6 w-28" />
             <div className="space-y-3">
               <Skeleton className="h-10 w-full rounded-lg" />
@@ -154,7 +154,7 @@ export function FeaturedCarouselSkeleton() {
 // Folder sidebar skeleton
 export function FolderSidebarSkeleton() {
   return (
-    <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-xl p-4 border border-gray-200 dark:border-gray-700 space-y-3">
+    <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl shadow-xl p-4 border border-white/10 space-y-3">
       <div className="flex items-center justify-between mb-4">
         <Skeleton className="h-5 w-20" />
         <Skeleton className="h-8 w-8 rounded-lg" />

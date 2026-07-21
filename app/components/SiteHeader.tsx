@@ -47,7 +47,7 @@ export default function SiteHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-50 bg-white/95 dark:bg-blue-950/95 backdrop-blur-sm border-b border-gray-200 dark:border-gray-700 shadow-sm">
+      <header className="sticky top-0 z-50 bg-[#0d1829]/95 backdrop-blur-xl border-b border-white/10 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-14">
             {/* Logo/Brand */}
@@ -70,8 +70,8 @@ export default function SiteHeader() {
                 onMouseUp={(e) => handleMouseUp(e, "/library")}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
                   isActive("/library")
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                    : "text-blue-200/70 hover:bg-white/10"
                 }`}
               >
                 <DynamicIcon name="Library" className="w-4 h-4" /> Library
@@ -81,8 +81,8 @@ export default function SiteHeader() {
                 onMouseUp={(e) => handleMouseUp(e, "/creator")}
                 className={`px-3 py-1.5 rounded-lg font-medium transition-all duration-150 flex items-center gap-2 text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2 ${
                   isActive("/creator")
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                    : "text-blue-200/70 hover:bg-white/10"
                 }`}
               >
                 <DynamicIcon name="Sparkles" className="w-4 h-4" /> Creator
@@ -94,12 +94,12 @@ export default function SiteHeader() {
               {/* Settings Button */}
               <button
                 onClick={() => setShowAPIKeysModal(true)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+                className="p-2 rounded-lg hover:bg-white/10 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
                 title="API Keys Settings"
               >
                 <DynamicIcon
                   name="Settings"
-                  className="w-5 h-5 text-gray-600 dark:text-gray-400"
+                  className="w-5 h-5 text-blue-300/70"
                 />
               </button>
 
@@ -111,11 +111,11 @@ export default function SiteHeader() {
                     menu.classList.toggle("hidden");
                   }
                 }}
-                className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
+                className="md:hidden p-2 rounded-lg hover:bg-white/10 transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2"
               >
                 <DynamicIcon
                   name="Menu"
-                  className="w-5 h-5 text-gray-900 dark:text-white"
+                  className="w-5 h-5 text-white"
                 />
               </button>
             </div>
@@ -139,8 +139,8 @@ export default function SiteHeader() {
                 }}
                 className={`px-3 py-2 rounded-lg font-medium text-left transition-all duration-150 flex items-center gap-2 text-sm ${
                   isActive("/library")
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                    : "text-blue-200/70 hover:bg-white/10"
                 }`}
               >
                 <DynamicIcon name="Library" className="w-4 h-4" /> Library
@@ -160,8 +160,8 @@ export default function SiteHeader() {
                 }}
                 className={`px-3 py-2 rounded-lg font-medium text-left transition-all duration-150 flex items-center gap-2 text-sm ${
                   isActive("/creator")
-                    ? "bg-purple-600 text-white shadow-sm"
-                    : "text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+                    ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                    : "text-blue-200/70 hover:bg-white/10"
                 }`}
               >
                 <DynamicIcon name="Sparkles" className="w-4 h-4" /> Creator
