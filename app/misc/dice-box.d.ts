@@ -1,5 +1,6 @@
-// Minimal ambient module declaration for the spike - @3d-dice/dice-box ships
-// no TypeScript types. Only covers the surface this spike actually calls.
+// Minimal ambient module declaration for @3d-dice/dice-box - it ships no
+// TypeScript types. Only covers the surface this app actually calls
+// (app/components/DiceThrowModal.tsx, app/dev/dice-spike).
 declare module "@3d-dice/dice-box" {
   export interface DieResult {
     sides: number | string;

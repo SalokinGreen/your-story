@@ -41,7 +41,12 @@ import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
 import ManualRollModal from "../components/ManualRollModal";
-import type { ManualRollRequest, ManualRollAnswer } from "../misc/gmExecutor";
+import DiceThrowModal from "../components/DiceThrowModal";
+import type {
+  ManualRollRequest,
+  ManualRollAnswer,
+  DiceThrowRequest,
+} from "../misc/gmExecutor";
 import {
   type TimelineBlock,
   updateLiveRoundBlocks,
@@ -286,6 +291,13 @@ function StoryPageContent() {
     useState<ManualRollRequest | null>(null);
   const manualRollResolveRef = useRef<
     ((answer: ManualRollAnswer | null) => void) | null
+  >(null);
+  // Physical dice mode: same pause-and-resolve pattern as manual dice mode
+  // above, but the player throws a 3D die instead of typing a number.
+  const [diceThrowRequest, setDiceThrowRequest] =
+    useState<DiceThrowRequest | null>(null);
+  const diceThrowResolveRef = useRef<
+    ((faces: number[] | null) => void) | null
   >(null);
   // Full pre-turn StoryData snapshot, taken right before each turn's GM
   // tool calls can mutate state. Session-only (not persisted) - lets
@@ -1391,6 +1403,7 @@ function StoryPageContent() {
             logger.action("GM stage started (custom input)");
           },
           onAskForRoll: requestManualRoll,
+          onRequestDiceThrow: requestDiceThrow,
           onCompaction: (summary) => {
             addNotification(
               "Recap: earlier events were condensed into a summary to save space",
@@ -2157,6 +2170,7 @@ function StoryPageContent() {
             logger.action("GM stage started - determining mechanics");
           },
           onAskForRoll: requestManualRoll,
+          onRequestDiceThrow: requestDiceThrow,
           onCompaction: (summary) => {
             addNotification(
               "Recap: earlier events were condensed into a summary to save space",
@@ -2423,10 +2437,28 @@ function StoryPageContent() {
     setManualRollRequest(null);
   }
 
+  // Physical dice mode: called by the GM executor when a formula roll can
+  // be thrown physically. Shows the 3D dice tray and resolves once the
+  // thrown dice settle (or the player skips, falling back to a digital
+  // roll of the whole formula - see rollFormulaMaybePhysical).
+  function requestDiceThrow(request: DiceThrowRequest) {
+    return new Promise<number[] | null>((resolve) => {
+      diceThrowResolveRef.current = resolve;
+      setDiceThrowRequest(request);
+    });
+  }
+
+  function resolveDiceThrow(faces: number[] | null) {
+    diceThrowResolveRef.current?.(faces);
+    diceThrowResolveRef.current = null;
+    setDiceThrowRequest(null);
+  }
+
   // Stop generation (abort ongoing requests)
   function handleStop() {
     // Unblock the GM loop if it's paused waiting for a physical roll
     resolveManualRoll(null);
+    resolveDiceThrow(null);
     if (generationAbortRef.current) {
       generationAbortRef.current.abort();
       generationAbortRef.current = null;
@@ -3694,6 +3726,13 @@ function StoryPageContent() {
         couchPlayers={storyData?.multiplayer?.couchPlayers}
         onSubmit={(value, rawText) => resolveManualRoll({ value, rawText })}
         onSkip={() => resolveManualRoll(null)}
+      />
+
+      {/* Physical dice mode: the GM's roll can be thrown on a 3D dice tray -
+          generation is paused until the dice settle (or the player skips) */}
+      <DiceThrowModal
+        request={diceThrowRequest}
+        onResolve={resolveDiceThrow}
       />
 
       {/*ConfirmDialog*/}
