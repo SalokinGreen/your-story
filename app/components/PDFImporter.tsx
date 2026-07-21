@@ -113,26 +113,39 @@ const MODELS_BY_PROVIDER: Record<
 })();
 
 /**
- * Helper to run promises with limited concurrency
+ * Create a concurrency-limited task runner ("semaphore"): at most
+ * `concurrency` tasks submitted through the returned function are in
+ * flight at once. Unlike batching (waiting for a whole group of N tasks to
+ * finish before starting the next N), a new task is admitted the instant a
+ * slot frees up - a fast task never sits blocked behind a slow sibling
+ * from the same batch. This is what lets independent limiters (e.g. one for
+ * OCR uploads, one for summarize calls) run concurrently with each other
+ * while each still enforces its own cap.
  */
-async function runWithConcurrency<T>(
-  tasks: (() => Promise<T>)[],
-  concurrency: number,
-  onProgress?: (completed: number, total: number) => void,
-): Promise<T[]> {
-  const results: T[] = [];
-  let completed = 0;
+function createLimiter(concurrency: number) {
+  let active = 0;
+  const queue: (() => void)[] = [];
 
-  // Process in batches
-  for (let i = 0; i < tasks.length; i += concurrency) {
-    const batch = tasks.slice(i, i + concurrency);
-    const batchResults = await Promise.all(batch.map((task) => task()));
-    results.push(...batchResults);
-    completed += batch.length;
-    onProgress?.(completed, tasks.length);
+  function schedule() {
+    if (active >= concurrency || queue.length === 0) return;
+    active++;
+    const runNext = queue.shift()!;
+    runNext();
   }
 
-  return results;
+  return function run<T>(task: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+      queue.push(() => {
+        task()
+          .then(resolve, reject)
+          .finally(() => {
+            active--;
+            schedule();
+          });
+      });
+      schedule();
+    });
+  };
 }
 
 /**
@@ -358,23 +371,6 @@ interface PDFChunkPlan {
   pdfDoc: PDFDocument;
   ranges: PDFChunkRange[];
 }
-
-type OCRChunkTaskResult =
-  | {
-      chunkIndex: number;
-      success: true;
-      markdown: string;
-      pageStart: number;
-      pageEnd: number;
-      totalPages: number;
-    }
-  | {
-      chunkIndex: number;
-      success: false;
-      error: string;
-      pageStart: number;
-      pageEnd: number;
-    };
 
 /**
  * Load a large PDF and compute how it should be split into smaller chunks,
@@ -1320,115 +1316,276 @@ export default function PDFImporter({
           }));
           setChunkStatuses(initialStatuses);
 
-          // Phase 1: OCR all chunks with limited concurrency (5% - 45% progress)
-          setStep("ocr");
-          setStatusMessage(
-            `Running OCR on ${totalChunks} chunks (${ocrConcurrency} at a time)...`,
-          );
-          setProgress(fileProgressStart + fileProgressRange * 0.1);
-
-          // One failed chunk must not abort the whole import (a single
+          // OCR + note extraction, pipelined per chunk: each chunk's
+          // summarize call starts the moment *that chunk's* OCR finishes,
+          // instead of waiting for every chunk in the document to clear
+          // OCR first. OCR and summarize each keep their own concurrency
+          // limiter (OCR uploads carry multi-MB payloads and must stay
+          // low for memory reasons; summarize calls are lightweight text
+          // requests and can run much more in parallel) so the two stages
+          // proceed concurrently with each other across the whole batch.
+          //
+          // A failed chunk must not abort the whole import (a single
           // timed-out request on a large file used to throw here and
           // discard every other chunk's work). Failed chunks are marked
           // in the status panel and the rest continue; only bail out if
-          // *every* chunk failed.
-          const ocrTasks = ranges.map((range, chunkIdx) => async () => {
-            // Update status to ocr
-            setChunkStatuses((prev) =>
-              prev.map((cs) =>
-                cs.chunkIndex === chunkIdx ? { ...cs, status: "ocr" } : cs,
-              ),
-            );
+          // *every* chunk failed OCR.
+          setStep("ocr");
+          setStatusMessage(`Processing ${totalChunks} chunks...`);
+          setProgress(fileProgressStart + fileProgressRange * 0.1);
 
-            // Build this chunk's base64 payload just-in-time so at most
-            // `ocrConcurrency` chunk buffers exist in memory at once,
-            // instead of every chunk in the document simultaneously.
-            // ocrPDFRange transparently splits further if the actual
-            // payload exceeds Vercel's body-size limit.
-            let chunkResult: { markdown: string; totalPages: number };
-            try {
-              chunkResult = await ocrPDFRange(
-                pdfDoc,
-                range,
-                file.name,
-                keys.mistralKey,
+          const ocrLimiter = createLimiter(ocrConcurrency);
+          const summarizeLimiter = createLimiter(MAX_CONCURRENT_REQUESTS);
+
+          let ocrDone = 0;
+          let summarizeDone = 0;
+          const reportProgress = () => {
+            const stagesDone = ocrDone + summarizeDone;
+            setProgress(
+              fileProgressStart +
+                fileProgressRange *
+                  (0.1 + (stagesDone / (totalChunks * 2)) * 0.85),
+            );
+            setStatusMessage(
+              `OCR: ${ocrDone}/${totalChunks} · Notes: ${summarizeDone}/${totalChunks}...`,
+            );
+          };
+
+          type ChunkPipelineResult = {
+            chunkIndex: number;
+            pageStart: number;
+            pageEnd: number;
+          } & (
+            | { stage: "ocr"; success: false; error: string }
+            | { stage: "summarize"; success: false; error: string }
+            | {
+                stage: "summarize";
+                success: true;
+                lore: StoryLore[];
+                mechanicNotes: StoryLore[];
+                customTables: CustomTable[];
+              }
+          );
+
+          const chunkPipelines = ranges.map(
+            (range, chunkIdx) => async (): Promise<ChunkPipelineResult> => {
+              setChunkStatuses((prev) =>
+                prev.map((cs) =>
+                  cs.chunkIndex === chunkIdx ? { ...cs, status: "ocr" } : cs,
+                ),
               );
-            } catch (err: unknown) {
-              const message = sanitizeErrorMessage(
-                err instanceof Error ? err.message : "",
-                "OCR processing failed",
-              );
-              console.error(
-                `Pages ${range.pageStart}-${range.pageEnd} OCR failed:`,
-                message,
-              );
+
+              // Build this chunk's base64 payload just-in-time so at most
+              // `ocrConcurrency` chunk buffers exist in memory at once,
+              // instead of every chunk in the document simultaneously.
+              // ocrPDFRange transparently splits further if the actual
+              // payload exceeds Vercel's body-size limit.
+              let ocrMarkdown: string;
+              try {
+                const chunkResult = await ocrLimiter(() =>
+                  ocrPDFRange(pdfDoc, range, file.name, keys.mistralKey),
+                );
+                ocrMarkdown = chunkResult.markdown;
+                totalPagesProcessed += chunkResult.totalPages;
+              } catch (err: unknown) {
+                const message = sanitizeErrorMessage(
+                  err instanceof Error ? err.message : "",
+                  "OCR processing failed",
+                );
+                console.error(
+                  `Pages ${range.pageStart}-${range.pageEnd} OCR failed:`,
+                  message,
+                );
+                setChunkStatuses((prev) =>
+                  prev.map((cs) =>
+                    cs.chunkIndex === chunkIdx
+                      ? { ...cs, status: "failed", error: message }
+                      : cs,
+                  ),
+                );
+                ocrDone++;
+                reportProgress();
+                return {
+                  chunkIndex: chunkIdx,
+                  stage: "ocr",
+                  success: false,
+                  error: message,
+                  pageStart: range.pageStart,
+                  pageEnd: range.pageEnd,
+                };
+              }
+
               setChunkStatuses((prev) =>
                 prev.map((cs) =>
                   cs.chunkIndex === chunkIdx
-                    ? { ...cs, status: "failed", error: message }
+                    ? { ...cs, ocrMarkdown, status: "summarizing" }
                     : cs,
                 ),
               );
-              return {
-                chunkIndex: chunkIdx,
-                success: false as const,
-                error: message,
-                pageStart: range.pageStart,
-                pageEnd: range.pageEnd,
-              };
-            }
+              ocrDone++;
+              reportProgress();
 
-            // Update status with OCR markdown
-            setChunkStatuses((prev) =>
-              prev.map((cs) =>
-                cs.chunkIndex === chunkIdx
-                  ? { ...cs, ocrMarkdown: chunkResult.markdown }
-                  : cs,
-              ),
-            );
+              try {
+                const summarizeResponse = await summarizeLimiter(() =>
+                  fetchWithRetry(
+                    "/api/ocr/summarize",
+                    {
+                      method: "POST",
+                      headers: {
+                        "Content-Type": "application/json",
+                      },
+                      body: JSON.stringify({
+                        markdown: ocrMarkdown,
+                        focus: ["all"],
+                        customInstructions:
+                          customInstructions +
+                          `\n\nNote: This is pages ${range.pageStart}-${range.pageEnd} of a larger document.`,
+                        model: getSelectedModel().model,
+                        provider: getSelectedModel().provider,
+                        maxTokens: maxOutputTokens,
+                        openRouterKey: keys.openRouterKey,
+                        deepseekKey: keys.deepseekKey,
+                        mistralKey: keys.mistralKey,
+                        googleKey: keys.googleKey,
+                        deepinfraKey: keys.deepinfraKey,
+                      }),
+                    },
+                    SUMMARIZE_TIMEOUT_MS,
+                    MAX_RETRIES,
+                  ),
+                );
 
-            return {
-              chunkIndex: chunkIdx,
-              success: true as const,
-              markdown: chunkResult.markdown,
-              pageStart: range.pageStart,
-              pageEnd: range.pageEnd,
-              totalPages: chunkResult.totalPages,
-            };
-          });
+                if (!summarizeResponse.ok) {
+                  const errorMsg = await extractErrorMessage(
+                    summarizeResponse,
+                    "Note extraction failed",
+                  );
+                  console.error(
+                    `Pages ${range.pageStart}-${range.pageEnd} summarization failed:`,
+                    errorMsg,
+                  );
+                  setChunkStatuses((prev) =>
+                    prev.map((cs) =>
+                      cs.chunkIndex === chunkIdx
+                        ? { ...cs, status: "failed", error: errorMsg }
+                        : cs,
+                    ),
+                  );
+                  summarizeDone++;
+                  reportProgress();
+                  return {
+                    chunkIndex: chunkIdx,
+                    stage: "summarize",
+                    success: false,
+                    error: errorMsg,
+                    pageStart: range.pageStart,
+                    pageEnd: range.pageEnd,
+                  };
+                }
 
-          const ocrTaskResults = await runWithConcurrency(
-            ocrTasks,
-            ocrConcurrency,
-            (completed, total) => {
-              const ocrProgress = completed / total;
-              setProgress(
-                fileProgressStart +
-                  fileProgressRange * (0.1 + ocrProgress * 0.35),
-              );
-              setStatusMessage(`OCR: ${completed}/${total} chunks complete...`);
+                const resultText = await summarizeResponse.text();
+                let result;
+                try {
+                  result = JSON.parse(resultText);
+                } catch {
+                  // Store raw output for manual repair
+                  setChunkStatuses((prev) =>
+                    prev.map((cs) =>
+                      cs.chunkIndex === chunkIdx
+                        ? {
+                            ...cs,
+                            status: "failed",
+                            error: "JSON parse error",
+                            rawSummarizeOutput: resultText,
+                          }
+                        : cs,
+                    ),
+                  );
+                  summarizeDone++;
+                  reportProgress();
+                  return {
+                    chunkIndex: chunkIdx,
+                    stage: "summarize",
+                    success: false,
+                    error: "JSON parse error",
+                    pageStart: range.pageStart,
+                    pageEnd: range.pageEnd,
+                  };
+                }
+
+                setChunkStatuses((prev) =>
+                  prev.map((cs) =>
+                    cs.chunkIndex === chunkIdx
+                      ? {
+                          ...cs,
+                          status: "complete",
+                          result: {
+                            lore: result.lore || [],
+                            mechanicNotes: result.mechanicNotes || [],
+                            customTables: result.customTables || [],
+                          },
+                        }
+                      : cs,
+                  ),
+                );
+                summarizeDone++;
+                reportProgress();
+                return {
+                  chunkIndex: chunkIdx,
+                  stage: "summarize",
+                  success: true,
+                  lore: result.lore || [],
+                  mechanicNotes: result.mechanicNotes || [],
+                  customTables: result.customTables || [],
+                  pageStart: range.pageStart,
+                  pageEnd: range.pageEnd,
+                };
+              } catch (err: any) {
+                const message = sanitizeErrorMessage(
+                  err?.message || "",
+                  "Unknown error",
+                );
+                console.error(
+                  `Pages ${range.pageStart}-${range.pageEnd} summarization error:`,
+                  err?.message || err,
+                );
+                setChunkStatuses((prev) =>
+                  prev.map((cs) =>
+                    cs.chunkIndex === chunkIdx
+                      ? { ...cs, status: "failed", error: message }
+                      : cs,
+                  ),
+                );
+                summarizeDone++;
+                reportProgress();
+                return {
+                  chunkIndex: chunkIdx,
+                  stage: "summarize",
+                  success: false,
+                  error: message,
+                  pageStart: range.pageStart,
+                  pageEnd: range.pageEnd,
+                };
+              }
             },
           );
 
-          const ocrResults = ocrTaskResults.filter(
-            (r): r is Extract<OCRChunkTaskResult, { success: true }> =>
-              r.success,
+          const pipelineResults = await Promise.all(
+            chunkPipelines.map((task) => task()),
           );
-          const failedOcr = ocrTaskResults.filter(
-            (r): r is Extract<OCRChunkTaskResult, { success: false }> =>
-              !r.success,
+
+          const failedOcr = pipelineResults.filter(
+            (r): r is Extract<ChunkPipelineResult, { stage: "ocr" }> =>
+              r.stage === "ocr" && !r.success,
           );
+          const succeededOcrCount = totalChunks - failedOcr.length;
           if (failedOcr.length > 0) {
             setShowChunkDetails(true);
-            if (ocrResults.length === 0) {
+            if (succeededOcrCount === 0) {
               throw new Error(
                 `OCR failed for all ${totalChunks} chunks. First error: ${failedOcr[0].error}`,
               );
             }
-            addNotification(
-              `${failedOcr.length}/${totalChunks} chunks failed OCR and were skipped (${failedOcr[0].error})`,
-              "warning",
-            );
           }
           for (const failed of failedOcr) {
             allFailedPages.push({
@@ -1439,215 +1596,43 @@ export default function PDFImporter({
             });
           }
 
-          // Sort by page order and combine results
-          ocrResults.sort((a, b) => a.pageStart - b.pageStart);
-
-          for (const ocr of ocrResults) {
-            combinedMarkdown +=
-              (combinedMarkdown ? "\n\n---\n\n" : "") +
-              `<!-- Pages ${ocr.pageStart}-${ocr.pageEnd} -->\n${ocr.markdown}`;
-            combinedTotalPages += ocr.totalPages;
-          }
-
-          totalPagesProcessed += combinedTotalPages;
-          setProgress(fileProgressStart + fileProgressRange * 0.45);
-
-          // Phase 2: Summarize all chunks with limited concurrency (45% - 95% progress)
-          setStep("summarizing");
-          setStatusMessage(
-            `Extracting notes from ${ocrResults.length} chunks (${MAX_CONCURRENT_REQUESTS} at a time)...`,
+          const failedSummarize = pipelineResults.filter(
+            (
+              r,
+            ): r is Extract<
+              ChunkPipelineResult,
+              { stage: "summarize"; success: false }
+            > => r.stage === "summarize" && !r.success,
           );
-          setProgress(fileProgressStart + fileProgressRange * 0.5);
-
-          const summarizeTasks = ocrResults.map((ocr) => async () => {
-            // Update status to summarizing
-            setChunkStatuses((prev) =>
-              prev.map((cs) =>
-                cs.chunkIndex === ocr.chunkIndex
-                  ? { ...cs, status: "summarizing" }
-                  : cs,
-              ),
-            );
-
-            try {
-              const summarizeResponse = await fetchWithRetry(
-                "/api/ocr/summarize",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    markdown: ocr.markdown,
-                    focus: ["all"],
-                    customInstructions:
-                      customInstructions +
-                      `\n\nNote: This is pages ${ocr.pageStart}-${ocr.pageEnd} of a larger document.`,
-                    model: getSelectedModel().model,
-                    provider: getSelectedModel().provider,
-                    maxTokens: maxOutputTokens,
-                    openRouterKey: keys.openRouterKey,
-                    deepseekKey: keys.deepseekKey,
-                    mistralKey: keys.mistralKey,
-                    googleKey: keys.googleKey,
-                    deepinfraKey: keys.deepinfraKey,
-                  }),
-                },
-                SUMMARIZE_TIMEOUT_MS,
-                MAX_RETRIES,
-              );
-
-              if (!summarizeResponse.ok) {
-                const errorMsg = await extractErrorMessage(
-                  summarizeResponse,
-                  "Note extraction failed",
-                );
-                console.error(
-                  `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization failed:`,
-                  errorMsg,
-                );
-                // Update status to failed
-                setChunkStatuses((prev) =>
-                  prev.map((cs) =>
-                    cs.chunkIndex === ocr.chunkIndex
-                      ? { ...cs, status: "failed", error: errorMsg }
-                      : cs,
-                  ),
-                );
-                return {
-                  chunkIndex: ocr.chunkIndex,
-                  success: false,
-                  error: errorMsg,
-                  pageStart: ocr.pageStart,
-                  pageEnd: ocr.pageEnd,
-                };
-              }
-
-              const resultText = await summarizeResponse.text();
-              let result;
-              try {
-                result = JSON.parse(resultText);
-              } catch (parseError) {
-                // Store raw output for manual repair
-                setChunkStatuses((prev) =>
-                  prev.map((cs) =>
-                    cs.chunkIndex === ocr.chunkIndex
-                      ? {
-                          ...cs,
-                          status: "failed",
-                          error: "JSON parse error",
-                          rawSummarizeOutput: resultText,
-                        }
-                      : cs,
-                  ),
-                );
-                return {
-                  chunkIndex: ocr.chunkIndex,
-                  success: false,
-                  error: "JSON parse error",
-                  rawOutput: resultText,
-                  pageStart: ocr.pageStart,
-                  pageEnd: ocr.pageEnd,
-                };
-              }
-
-              // Update status to complete with results
-              setChunkStatuses((prev) =>
-                prev.map((cs) =>
-                  cs.chunkIndex === ocr.chunkIndex
-                    ? {
-                        ...cs,
-                        status: "complete",
-                        result: {
-                          lore: result.lore || [],
-                          mechanicNotes: result.mechanicNotes || [],
-                          customTables: result.customTables || [],
-                        },
-                      }
-                    : cs,
-                ),
-              );
-
-              return {
-                chunkIndex: ocr.chunkIndex,
-                success: true,
-                lore: result.lore || [],
-                mechanicNotes: result.mechanicNotes || [],
-                customTables: result.customTables || [],
-                pageStart: ocr.pageStart,
-                pageEnd: ocr.pageEnd,
-              };
-            } catch (err: any) {
-              const message = sanitizeErrorMessage(
-                err?.message || "",
-                "Unknown error",
-              );
-              console.error(
-                `Pages ${ocr.pageStart}-${ocr.pageEnd} summarization error:`,
-                err.message || err,
-              );
-              // Update status to failed
-              setChunkStatuses((prev) =>
-                prev.map((cs) =>
-                  cs.chunkIndex === ocr.chunkIndex
-                    ? {
-                        ...cs,
-                        status: "failed",
-                        error: message,
-                      }
-                    : cs,
-                ),
-              );
-              return {
-                chunkIndex: ocr.chunkIndex,
-                success: false,
-                error: err.message,
-                pageStart: ocr.pageStart,
-                pageEnd: ocr.pageEnd,
-              };
-            }
-          });
-
-          const summarizeResults = await runWithConcurrency(
-            summarizeTasks,
-            MAX_CONCURRENT_REQUESTS,
-            (completed, total) => {
-              const sumProgress = completed / total;
-              setProgress(
-                fileProgressStart +
-                  fileProgressRange * (0.5 + sumProgress * 0.45),
-              );
-              setStatusMessage(
-                `Creating notes: ${completed}/${total} chunks complete...`,
-              );
-            },
-          );
-
-          // Count failures and warn user
-          const failedResults = summarizeResults.filter((r) => !r.success);
-          const failedCount = failedResults.length;
-          if (failedCount > 0) {
+          if (failedSummarize.length > 0) {
             console.warn(
-              `${failedCount}/${summarizeResults.length} chunks failed to summarize`,
+              `${failedSummarize.length}/${succeededOcrCount} chunks failed to summarize`,
             );
-            // Show chunk details panel for failed chunks
             setShowChunkDetails(true);
           }
-          for (const failed of failedResults) {
+          for (const failed of failedSummarize) {
             allFailedPages.push({
               fileName: file.name,
               pageStart: failed.pageStart,
               pageEnd: failed.pageEnd,
-              reason: failed.error || "Note extraction failed",
+              reason: failed.error,
             });
           }
 
-          // Collect results from successful summarizations
-          for (const result of summarizeResults) {
-            if (result.success) {
-              chunkLore.push(...(result.lore || []));
-              chunkMechanics.push(...(result.mechanicNotes || []));
-              chunkTables.push(...(result.customTables || []));
+          if (failedOcr.length > 0 || failedSummarize.length > 0) {
+            const firstError = failedOcr[0]?.error ?? failedSummarize[0]?.error;
+            const totalFailed = failedOcr.length + failedSummarize.length;
+            addNotification(
+              `${totalFailed}/${totalChunks} chunks failed and were skipped (${firstError})`,
+              "warning",
+            );
+          }
+
+          for (const result of pipelineResults) {
+            if (result.stage === "summarize" && result.success) {
+              chunkLore.push(...result.lore);
+              chunkMechanics.push(...result.mechanicNotes);
+              chunkTables.push(...result.customTables);
             }
           }
 
