@@ -1,14 +1,22 @@
-# Text-to-Speech (TTS) Integration with DeepInfra
+# Text-to-Speech (TTS) Integration
 
 ## Overview
 
-The Your Story app features text-to-speech capabilities powered by DeepInfra's TTS models. Users can listen to the generated story content with multiple voice options from two models: **Kokoro** (fast & affordable) and **Orpheus** (premium & expressive).
+The Your Story app features text-to-speech capabilities across four BYOK
+providers/models. Users can listen to the generated story content with
+multiple voice options from: **Kokoro** (fast & affordable, DeepInfra),
+**Orpheus** (premium & expressive, DeepInfra), **Cartesia Sonic-3**
+(ultra-low-latency), and **ElevenLabs Flash v2.5** (best-in-class quality).
+All four are BYOK - the user supplies their own provider API key in Settings;
+there is no server-side "Coins" path for TTS.
 
 ## Features
 
 ✅ **Real-time narration** - Listen to AI-generated story content  
-✅ **Two TTS models** - Kokoro ($0.62/1M chars) or Orpheus ($7/1M chars)  
-✅ **20+ voice options** - American, British, and multi-language voices  
+✅ **Four TTS models across four providers** - pick fast/cheap, premium
+DeepInfra, low-latency Cartesia, or best-quality ElevenLabs  
+✅ **20+ built-in voice options plus custom voice IDs** - American, British,
+multi-language, and provider voice libraries  
 ✅ **Playback controls** - Play, pause, and stop audio  
 ✅ **Markdown stripping** - Automatically cleans formatting for better speech  
 ✅ **Chunked generation** - Handles long text with intelligent splitting  
@@ -16,13 +24,28 @@ The Your Story app features text-to-speech capabilities powered by DeepInfra's T
 
 ## TTS Models
 
-### Kokoro-82M ($0.62 per 1M characters)
+### Kokoro-82M ($0.62 per 1M characters, DeepInfra)
 
 Fast, cost-effective TTS with natural voices. Best for everyday use.
 
-### Orpheus 3B ($7.00 per 1M characters)
+### Orpheus 3B ($7.00 per 1M characters, DeepInfra)
 
 Premium Llama-based TTS with exceptional clarity, expressiveness, and emotional range. Best for immersive storytelling.
+
+### Cartesia Sonic-3 (Cartesia, ~1 credit/character - plan-dependent)
+
+Purpose-built for low-latency, real-time narration. Requires a Cartesia API
+key from [play.cartesia.ai](https://play.cartesia.ai/keys). Voice IDs are
+UUIDs from Cartesia's voice library - two samples are bundled, add more via
+the custom voice field.
+
+### ElevenLabs Flash v2.5 (ElevenLabs, ~0.5 credits/character - plan-dependent)
+
+Best-in-class expressiveness and emotional range, still low-latency (~75ms).
+Requires an ElevenLabs API key from
+[elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys).
+Voice IDs come from ElevenLabs' voice library - a few premade voices are
+bundled, add more via the custom voice field.
 
 ## Available Voices
 
@@ -56,6 +79,26 @@ Premium Llama-based TTS with exceptional clarity, expressiveness, and emotional 
 | `dan`    | Dan  | Male   |
 | `zac`    | Zac  | Male   |
 
+### Cartesia Voices (bundled samples - full library at play.cartesia.ai)
+
+| Voice ID                              | Name           |
+| -------------------------------------- | -------------- |
+| `a0e99841-438c-4a64-b679-ae501e7d6091` | Barbershop Man |
+| `156fb8d2-335b-4950-9cb3-a2d33befec77` | Helpful Woman  |
+
+### ElevenLabs Voices (bundled samples - full library at elevenlabs.io/app/voice-library)
+
+| Voice ID               | Name           |
+| ----------------------- | -------------- |
+| `21m00Tcm4TlvDq8ikWAM` | Rachel (Female) |
+| `EXAVITQu4vr4xnSDxMaL` | Bella (Female)  |
+| `ErXwobaYiN019PkySvjV` | Antoni (Male)   |
+
+For Cartesia and ElevenLabs, any other voice ID from the provider's voice
+library can be added via the custom voice field in Settings - both providers
+have large libraries that aren't fully enumerable the way Kokoro/Orpheus's
+small named voice sets are.
+
 ## Implementation
 
 ### Components
@@ -64,51 +107,48 @@ Premium Llama-based TTS with exceptional clarity, expressiveness, and emotional 
 
 - Main TTS UI component
 - Handles voice/model selection, playback, and audio state
+- Picks the matching BYOK key (`deepinfraKey`/`cartesiaKey`/`elevenlabsKey`) for the selected model
 - Integrates with NotificationContext for user feedback
 
 **`app/components/APIKeysModal.tsx`**
 
-- Settings UI for TTS configuration
-- Model selector (Kokoro/Orpheus)
-- Voice dropdown with organized optgroups
+- Settings UI for TTS configuration and all four provider API keys
+- Model selector (Kokoro/Orpheus/Cartesia/ElevenLabs)
+- Voice dropdown with organized optgroups, resets to a sensible default voice on model switch
 - Volume slider and auto-generate toggle
+
+**`app/components/CustomVoiceManager.tsx`**
+
+- Free-form list of extra voice IDs, shared across all four models
+- Shows a model-specific hint (e.g. "Cartesia voice IDs are UUIDs...")
 
 ### API Routes
 
-**`app/api/tts/generate/route.ts`**
+**`app/api/tts/generate/route.ts`** → **`app/misc/ttsCall.ts`**
 
 - POST endpoint to generate speech from text
-- Accepts: `text` (string), `voiceId` (string), `model` ("kokoro" | "orpheus")
-- Returns WAV audio data
+- Accepts: `text` (string), `voiceId` (string), `model` ("kokoro" | "orpheus" | "cartesia" | "elevenlabs"), and the matching BYOK key field
+- Returns MP3 audio data
 - Automatically chunks long text at sentence boundaries
-- Deducts coins based on character count and model
+- Fully BYOK - no server-side coin deduction happens for TTS; the request 400s if the matching provider key is missing
 
 ### Pricing
 
-Defined in `app/misc/ai_prices.ts`:
+Defined in `app/misc/ai_prices.ts` (`TTS_MODELS`). These are cost *estimates*
+only, used for the optional cost-preview UI - since TTS is BYOK, the actual
+amount billed depends on the user's own plan with that provider:
 
-```typescript
-export const TTS_MODELS = {
-  kokoro: {
-    pricePerMillionChars: 0.62, // $0.62 per 1M characters
-  },
-  orpheus: {
-    pricePerMillionChars: 7.0, // $7.00 per 1M characters
-  },
-};
-```
-
-With the 2.5x markup, cost in coins:
-
-- **Kokoro**: ~1.5 coins per 1000 characters
-- **Orpheus**: ~17.5 coins per 1000 characters
+- **Kokoro**: $0.62 / 1M characters (DeepInfra)
+- **Orpheus**: $7.00 / 1M characters (DeepInfra)
+- **Cartesia Sonic-3**: ~$30 / 1M characters (varies by Cartesia plan tier)
+- **ElevenLabs Flash v2.5**: ~$50 / 1M characters (varies by ElevenLabs plan tier)
 
 ## Usage
 
-1. Go to **Settings** (gear icon) → **Voice** tab
-2. Enable TTS
-3. Choose model: Kokoro (fast) or Orpheus (premium)
-4. Select a voice from the dropdown
+1. Go to **Settings** (gear icon) → **API Keys** tab, add the API key for whichever provider(s) you want to use
+2. Go to **Settings** → **Voice** tab, enable TTS
+3. Choose a model: Kokoro/Orpheus (DeepInfra), Cartesia Sonic-3, or ElevenLabs Flash v2.5
+4. Select a voice from the dropdown (or add a custom voice ID)
 5. Adjust volume as needed
 6. Optionally enable auto-generate for automatic narration
 7. On story pages, click "TTS" button to generate and play audio
@@ -126,19 +166,21 @@ TTS settings are stored in localStorage:
 | `ttsAutoGenerate` | Auto-narrate new content      | `false`      |
 | `ttsCustomVoices` | Custom voice IDs (JSON array) | `[]`         |
 
+API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
+`APIKeysContext`, also backed by localStorage.
+
 ## Technical Details
 
 ### Audio Generation Flow
 
 1. User clicks "TTS" button
 2. Component shows loading state
-3. POST request sent to `/api/tts/generate` with text, voiceId, model
-4. API cleans markdown and splits into chunks (1500-2000 chars)
-5. DeepInfra API called for each chunk
-6. Audio chunks concatenated (base64 → ArrayBuffer)
-7. Coins deducted based on character count
-8. WAV audio returned to client
-9. Audio played via HTML5 Audio element
+3. POST request sent to `/api/tts/generate` with text, voiceId, model, and the matching provider key
+4. `generateTTSAudio()` cleans markdown and splits into chunks (300-1500 chars depending on model)
+5. The provider implied by `model` is called in parallel for each chunk - DeepInfra returns JSON with base64 audio, Cartesia/ElevenLabs return raw MP3 bytes directly
+6. Audio chunks concatenated into one MP3 ArrayBuffer
+7. MP3 audio returned to client
+8. Audio played via HTML5 Audio element
 
 ### Text Processing
 
@@ -154,24 +196,22 @@ The API automatically:
 
 ### Chunking Strategy
 
-- **Kokoro**: 1500 character chunks (optimized for speed)
-- **Orpheus**: 2000 character chunks (handles longer text better)
+- **Orpheus**: 300 character chunks (smaller chunks keep this model's higher per-chunk latency down)
+- **Kokoro / Cartesia / ElevenLabs**: 1500 character chunks
 - Splits at sentence boundaries when possible
 - Falls back to paragraph → newline → space boundaries
 
 ## Environment Variables
 
-Required in `.env`:
-
-```bash
-DEEPINFRA_API_KEY=your_deepinfra_api_key
-```
-
-Note: TTS uses the same DeepInfra API key used for LLM inference.
+None required for TTS specifically - all four providers are BYOK, so the
+provider API key comes from the request body (`deepinfraKey`/`cartesiaKey`/
+`elevenlabsKey`, from `APIKeysContext`/localStorage), not a server env var.
+(`DEEPINFRA_API_KEY` does exist as a server env var, but it's used for the
+server-side "Coins" LLM/image-generation path elsewhere in the app, not TTS.)
 
 ## Error Handling
 
-- Missing API key → 500 error with notification
+- Missing API key → 400 error with notification, naming the specific provider
 - Invalid text → 400 error
 - Rate limit → 429 error with retry message
 - Auth failure → 401/403 error
@@ -182,17 +222,16 @@ Note: TTS uses the same DeepInfra API key used for LLM inference.
 To test TTS:
 
 1. Start dev server: `npm run dev`
-2. Navigate to Settings → Voice tab
-3. Enable TTS and select model/voice
+2. Navigate to Settings → API Keys tab, add an API key for the provider(s) you want to test
+3. Navigate to Settings → Voice tab, enable TTS and select model/voice
 4. Go to a story and generate content
 5. Click "TTS" and verify audio plays
 6. Test pause/stop controls
-7. Try both Kokoro and Orpheus models
-8. Verify coin deduction in header balance
+7. Try all four models (Kokoro, Orpheus, Cartesia, ElevenLabs)
 
 ## Credits
 
-- **TTS Provider**: [DeepInfra](https://deepinfra.com)
-- **Kokoro Model**: [hexgrad/Kokoro-82M](https://deepinfra.com/hexgrad/Kokoro-82M)
-- **Orpheus Model**: [canopylabs/orpheus-3b-0.1-ft](https://deepinfra.com/canopylabs/orpheus-3b-0.1-ft)
-- **Integration**: Your Story - Updated December 2025
+- **DeepInfra**: [Kokoro-82M](https://deepinfra.com/hexgrad/Kokoro-82M), [Orpheus 3B](https://deepinfra.com/canopylabs/orpheus-3b-0.1-ft)
+- **Cartesia**: [Sonic-3](https://cartesia.ai)
+- **ElevenLabs**: [Flash v2.5](https://elevenlabs.io)
+- **Integration**: Your Story - Cartesia/ElevenLabs added July 2026

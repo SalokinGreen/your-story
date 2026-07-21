@@ -5,6 +5,7 @@ import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
 import { ttsFetch } from "../misc/ttsFetch";
+import { TTSModelKey } from "../misc/ai_prices";
 
 interface TTSControlsProps {
   text: string;
@@ -16,10 +17,26 @@ const getSelectedVoice = (): string => {
   return localStorage.getItem("ttsLastVoice") || "af_heart";
 };
 
-const getSelectedModel = (): "kokoro" | "orpheus" => {
+const getSelectedModel = (): TTSModelKey => {
   if (typeof window === "undefined") return "kokoro";
   const model = localStorage.getItem("ttsModel");
-  return model === "orpheus" ? "orpheus" : "kokoro";
+  if (model === "orpheus" || model === "cartesia" || model === "elevenlabs") return model;
+  return "kokoro";
+};
+
+const getProviderKeyForModel = (
+  model: TTSModelKey,
+): "deepinfraKey" | "cartesiaKey" | "elevenlabsKey" => {
+  if (model === "cartesia") return "cartesiaKey";
+  if (model === "elevenlabs") return "elevenlabsKey";
+  return "deepinfraKey";
+};
+
+const PROVIDER_LABELS: Record<TTSModelKey, string> = {
+  kokoro: "DeepInfra",
+  orpheus: "DeepInfra",
+  cartesia: "Cartesia",
+  elevenlabs: "ElevenLabs",
 };
 
 const getVolume = (): number => {
@@ -145,9 +162,11 @@ export default function TTSControls({
       isGeneratingRef.current = true;
       setIsLoading(true);
 
-      if (!apiKeys.deepinfraKey) {
+      const providerKey = getProviderKeyForModel(selectedModel);
+      const apiKey = apiKeys[providerKey];
+      if (!apiKey) {
         throw new Error(
-          "DeepInfra API key is required. Please add your own key in Settings."
+          `${PROVIDER_LABELS[selectedModel]} API key is required. Please add your own key in Settings.`
         );
       }
 
@@ -155,7 +174,9 @@ export default function TTSControls({
         text,
         voiceId: selectedVoice,
         model: selectedModel,
-        deepinfraKey: apiKeys.deepinfraKey,
+        deepinfraKey: providerKey === "deepinfraKey" ? apiKey : undefined,
+        cartesiaKey: providerKey === "cartesiaKey" ? apiKey : undefined,
+        elevenlabsKey: providerKey === "elevenlabsKey" ? apiKey : undefined,
       });
 
       if (!response.ok) {
@@ -247,6 +268,8 @@ export default function TTSControls({
     audioUrl,
     addNotification,
     apiKeys.deepinfraKey,
+    apiKeys.cartesiaKey,
+    apiKeys.elevenlabsKey,
     getAudioElement,
   ]);
 
