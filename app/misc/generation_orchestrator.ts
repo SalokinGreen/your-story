@@ -80,13 +80,12 @@ export interface GenerationOptions {
   model: string;
   openRouterKey?: string;
   deepseekKey?: string;
-  novelaiKey?: string;
   sessionId: string;
   skipStages?: GenerationStage[];
   existingResults?: Partial<BigAdventureResult>;
   abortSignal?: AbortSignal;
   finishEarlyRef?: React.RefObject<boolean | null>;
-  /** Enable parallel generation for stages 3-8 (not supported with NovelAI) */
+  /** Enable parallel generation for stages 3-8 */
   parallelMode?: boolean;
 }
 
@@ -132,7 +131,6 @@ async function generateSingleStage(
         model: options.model,
         openRouterKey: options.openRouterKey,
         deepseekKey: options.deepseekKey,
-        novelaiKey: options.novelaiKey,
         continueFrom: continueFrom || undefined,
         finishEarly: options.finishEarlyRef?.current || false,
       }),
@@ -399,7 +397,6 @@ async function generateSingleStageFinishEarly(
         model: options.model,
         openRouterKey: options.openRouterKey,
         deepseekKey: options.deepseekKey,
-        novelaiKey: options.novelaiKey,
         continueFrom: partialContent,
         finishEarly: true,
       }),
@@ -549,11 +546,9 @@ export async function generateAdventureSequential(
     (s) => PARALLELIZABLE_STAGES.includes(s) && !completedStages.includes(s),
   );
 
-  // Check if we should use parallel mode (not for NovelAI)
+  // Check if we should use parallel mode
   const useParallelMode =
-    options.parallelMode &&
-    !options.novelaiKey &&
-    parallelizableStagesToRun.length > 1;
+    options.parallelMode && parallelizableStagesToRun.length > 1;
 
   // Phase 1: Run sequential stages (core, mechanics)
   for (const stage of sequentialStagesToRun) {

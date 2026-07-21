@@ -17,10 +17,6 @@ import {
   parseExtendSectionOutput,
   canExtendSection,
 } from "@/app/misc/big_adventure_ai";
-import { convertMessagesToPrompt, NOVELAI_MODEL } from "@/app/misc/novelai";
-
-// NovelAI API endpoint
-const NOVELAI_API_URL = "https://text.novelai.net/oa/v1/completions";
 
 export const runtime = "nodejs";
 export const maxDuration = 120; // 2 minutes max for single section
@@ -34,23 +30,19 @@ interface RequestBody {
   maxOutputTokens?: number;
   openRouterKey?: string;
   deepseekKey?: string;
-  novelaiKey?: string;
   mistralKey?: string;
   deepinfraKey?: string;
 }
 
 function getApiKey(
-  provider: "deepseek" | "openrouter" | "novelai" | "mistral" | "deepinfra",
+  provider: "deepseek" | "openrouter" | "mistral" | "deepinfra",
   userProvidedOpenRouterKey?: string,
   userProvidedDeepseekKey?: string,
-  novelaiKey?: string,
   mistralKey?: string,
   deepinfraKey?: string,
 ): string | null {
   if (provider === "deepseek") {
     return userProvidedDeepseekKey || null;
-  } else if (provider === "novelai") {
-    return novelaiKey || null;
   } else if (provider === "mistral") {
     return mistralKey || null;
   } else if (provider === "deepinfra") {
@@ -83,112 +75,6 @@ function extractTextContent(content: unknown): string {
   return "";
 }
 
-// NovelAI-specific streaming function
-async function streamNovelAIResponse(
-  messages: { role: string; content: string }[],
-  apiKey: string,
-  maxOutputTokens: number,
-  temperature: number,
-  controller: ReadableStreamDefaultController,
-  encoder: TextEncoder,
-): Promise<{
-  content: string;
-  promptTokens: number;
-  completionTokens: number;
-}> {
-  // Convert chat messages to prompt string for completions API
-  const prompt = convertMessagesToPrompt(
-    messages.map((m) => ({
-      role: m.role as "system" | "user" | "assistant" | "tool",
-      content: m.content,
-    })),
-  );
-
-  const requestBody = {
-    model: NOVELAI_MODEL,
-    prompt: prompt,
-    max_tokens: Math.min(maxOutputTokens, 2048), // NovelAI has lower limits
-    temperature: temperature,
-    top_p: 0.95,
-    top_k: 40,
-    stream: true,
-  };
-
-  const response = await fetch(NOVELAI_API_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-      Accept: "text/event-stream",
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`NovelAI API error: ${response.status} - ${errorText}`);
-  }
-
-  const reader = response.body?.getReader();
-  if (!reader) {
-    throw new Error("No response body from NovelAI");
-  }
-
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let fullContent = "";
-  // Estimate tokens (NovelAI doesn't return usage in streaming)
-  const promptTokens = Math.ceil(prompt.length / 4);
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed || !trimmed.startsWith("data:")) continue;
-
-      const data = trimmed.slice(5).trim();
-      if (!data || data === "[DONE]") continue;
-
-      try {
-        const parsed = JSON.parse(data);
-        // Completions API format: choices[0].text
-        const textContent =
-          parsed.choices?.[0]?.text ||
-          parsed.choices?.[0]?.delta?.content ||
-          parsed.text ||
-          "";
-        if (textContent) {
-          fullContent += textContent;
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "content",
-                content: textContent,
-              })}\n\n`,
-            ),
-          );
-        }
-      } catch {
-        // Skip malformed JSON
-      }
-    }
-  }
-
-  const completionTokens = Math.ceil(fullContent.length / 4);
-
-  return {
-    content: fullContent,
-    promptTokens,
-    completionTokens,
-  };
-}
-
 export async function POST(req: NextRequest) {
   const encoder = new TextEncoder();
 
@@ -206,7 +92,6 @@ export async function POST(req: NextRequest) {
           maxOutputTokens = 4000,
           openRouterKey,
           deepseekKey,
-          novelaiKey,
           mistralKey,
           deepinfraKey,
         } = body;
@@ -253,12 +138,10 @@ export async function POST(req: NextRequest) {
           modelConfig.provider as
             | "deepseek"
             | "openrouter"
-            | "novelai"
             | "mistral"
             | "deepinfra",
           openRouterKey,
           deepseekKey,
-          novelaiKey,
           mistralKey,
           deepinfraKey,
         );
@@ -271,9 +154,7 @@ export async function POST(req: NextRequest) {
                 ? "OpenRouter"
                 : modelConfig.provider === "mistral"
                   ? "Mistral"
-                  : modelConfig.provider === "deepinfra"
-                    ? "DeepInfra"
-                    : "NovelAI";
+                  : "DeepInfra";
           const errorMessage = `${providerName} API key required. Please add your API key in Settings.`;
 
           controller.enqueue(
@@ -312,20 +193,7 @@ export async function POST(req: NextRequest) {
         let completionTokens = 0;
         let estimatedCostDollars: number | undefined;
 
-        // Handle NovelAI separately (uses completions API, not chat)
-        if (modelConfig.provider === "novelai") {
-          const result = await streamNovelAIResponse(
-            messages,
-            apiKey,
-            maxOutputTokens,
-            config.temperature ?? 0.8,
-            controller,
-            encoder,
-          );
-          fullContent = result.content;
-          promptTokens = result.promptTokens;
-          completionTokens = result.completionTokens;
-        } else {
+        {
           // Standard OpenAI-compatible providers (OpenRouter, DeepSeek, Mistral, DeepInfra)
           let endpoint: string;
           if (modelConfig.provider === "deepseek") {

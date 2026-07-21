@@ -16,7 +16,7 @@ const KEY_REQUIREMENTS: KeyRequirement[] = [
     icon: "Key",
     gradient: "from-blue-500 to-purple-600",
     title: "Story Generation",
-    provider: "DeepSeek, OpenRouter, or NovelAI",
+    provider: "DeepSeek or OpenRouter",
     providerUrl: "https://openrouter.ai/keys",
     description:
       "Pick any model you like and configure it in Settings - the story, GM, and choices stages are all yours to tune.",

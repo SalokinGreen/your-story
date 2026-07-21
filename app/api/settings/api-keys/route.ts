@@ -72,7 +72,6 @@ function decrypt(encryptedData: string): string {
 interface APIKeys {
   openRouterKey?: string;
   deepseekKey?: string;
-  novelaiKey?: string;
 }
 
 async function getUser(req: NextRequest) {

@@ -1251,21 +1251,7 @@ function BigAdventureCreatorPage() {
     stylePreset: "default",
   });
   const [selectedModel, setSelectedModel] = useState("DeepSeek V4 Flash");
-  const [novelaiKey, setNovelaiKey] = useState("");
   const [showAdvancedConfig, setShowAdvancedConfig] = useState(false);
-
-  // Load NovelAI key from localStorage on mount
-  useEffect(() => {
-    const storedKey = localStorage.getItem("novelaiKey");
-    if (storedKey) {
-      setNovelaiKey(storedKey);
-    }
-  }, []);
-
-  // Check if selected model is NovelAI
-  const isNovelAISelected =
-    (AI_MODELS as Record<string, { provider?: string }>)[selectedModel]
-      ?.provider === "novelai";
 
   // Parallel generation mode (run stages 3-8 concurrently)
   const [parallelMode, setParallelMode] = useState(() => {
@@ -1281,23 +1267,19 @@ function BigAdventureCreatorPage() {
     localStorage.setItem("bigAdventureParallelMode", parallelMode.toString());
   }, [parallelMode]);
 
-  // BYOK-only: show openrouter, deepseek, novelai, google models
+  // BYOK-only: show openrouter, deepseek, google models
   const filteredModels = Object.entries(AI_MODELS).filter(([, model]) => {
     const provider = (model as { provider?: string }).provider;
     return (
       provider === "openrouter" ||
       provider === "deepseek" ||
-      provider === "novelai" ||
       provider === "google"
     );
   });
 
   // Check if user has any BYOK keys configured
   const hasAnyBYOKKey =
-    hasKey("openRouterKey") ||
-    hasKey("deepseekKey") ||
-    hasKey("googleKey") ||
-    novelaiKey.length > 0;
+    hasKey("openRouterKey") || hasKey("deepseekKey") || hasKey("googleKey");
 
   // Generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -1345,15 +1327,13 @@ function BigAdventureCreatorPage() {
   const [extensionInstructions, setExtensionInstructions] = useState("");
   const [extensionModel, setExtensionModel] = useState("DeepSeek V4 Flash");
 
-  // BYOK-only: show openrouter, deepseek, novelai, google models
-  // Note: NovelAI may not work well for complex JSON sections, but user can try
+  // BYOK-only: show openrouter, deepseek, google models
   const filteredExtensionModels = Object.entries(AI_MODELS).filter(
     ([, model]) => {
       const provider = (model as { provider?: string }).provider;
       return (
         provider === "openrouter" ||
         provider === "deepseek" ||
-        provider === "novelai" ||
         provider === "google"
       );
     },
@@ -1993,15 +1973,6 @@ function BigAdventureCreatorPage() {
       return;
     }
 
-    // Check for NovelAI key if using NovelAI model
-    if (isNovelAISelected && !novelaiKey.trim()) {
-      addNotification(
-        "Please enter your NovelAI API key to use this model",
-        "warning",
-      );
-      return;
-    }
-
     // Get stages to run
     const stagesToRun = getStagesToRun(config);
     const tasks = stagesToRun.length;
@@ -2220,7 +2191,6 @@ function BigAdventureCreatorPage() {
         model: selectedModel,
         openRouterKey: apiKeys.openRouterKey,
         deepseekKey: apiKeys.deepseekKey,
-        novelaiKey: isNovelAISelected ? novelaiKey : undefined,
         sessionId: currentSessionId,
         skipStages: skipStages.length > 0 ? skipStages : undefined,
         existingResults:
@@ -2229,15 +2199,13 @@ function BigAdventureCreatorPage() {
             : undefined,
         abortSignal: abortControllerRef.current.signal,
         finishEarlyRef,
-        parallelMode: parallelMode && !isNovelAISelected, // Disable for NovelAI
+        parallelMode,
       },
       callbacks,
     );
   }, [
     config,
     selectedModel,
-    novelaiKey,
-    isNovelAISelected,
     addNotification,
     sessionId,
     resumeMode,
@@ -2305,7 +2273,6 @@ function BigAdventureCreatorPage() {
             additionalInstructions: customInstructions || undefined,
             openRouterKey: apiKeys.openRouterKey,
             deepseekKey: apiKeys.deepseekKey,
-            novelaiKey,
           }),
         });
 
@@ -2454,7 +2421,6 @@ function BigAdventureCreatorPage() {
             model: extensionModel,
             openRouterKey: apiKeys.openRouterKey,
             deepseekKey: apiKeys.deepseekKey,
-            novelaiKey,
           }),
         });
 
@@ -3887,44 +3853,6 @@ ${result.description || ""}`;
                     </div>
                   )}
 
-                  {isNovelAISelected && (
-                    <div className="mt-3 p-3 bg-amber-900/20 border border-amber-700/30 rounded-lg">
-                      <label className="block text-sm text-amber-300 mb-2">
-                        🔑 NovelAI API Key (BYOK - No token cost)
-                      </label>
-                      <input
-                        type="password"
-                        value={novelaiKey}
-                        onChange={(e) => {
-                          setNovelaiKey(e.target.value);
-                          localStorage.setItem("novelaiKey", e.target.value);
-                        }}
-                        placeholder="Enter your NovelAI API key..."
-                        className="w-full bg-blue-900/50 border border-amber-700/50 rounded-lg px-4 py-2 text-white placeholder-amber-300/50 focus:outline-none focus:border-amber-500/50 transition-all text-sm"
-                      />
-                      <p className="text-xs text-amber-300/60 mt-2">
-                        Your key is stored locally and never sent to our
-                        servers. Get your key from{" "}
-                        <a
-                          href="https://novelai.net/settings"
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-amber-400 hover:underline"
-                        >
-                          NovelAI Settings
-                        </a>
-                        .
-                      </p>
-                      <div className="mt-3 p-2 bg-amber-950/50 rounded border border-amber-800/30">
-                        <p className="text-xs text-amber-400">
-                          ⚠️ <strong>Limited Output:</strong> NovelAI&apos;s low
-                          token limit means only Core &amp; Mechanics stages
-                          will run. Use the result editor to add more content,
-                          or switch to a different model for full generation.
-                        </p>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 {/* Config Templates */}
@@ -4165,31 +4093,17 @@ ${result.description || ""}`;
                           </h4>
                           <p className="text-xs text-blue-300/50 mt-1">
                             Run stages 3-8 simultaneously for faster generation
-                            {isNovelAISelected && (
-                              <span className="text-yellow-400 ml-1">
-                                (Not available with NovelAI)
-                              </span>
-                            )}
                           </p>
                         </div>
                         <button
                           onClick={() => setParallelMode(!parallelMode)}
-                          disabled={isNovelAISelected}
                           className={`relative w-12 h-6 rounded-full transition-colors ${
-                            parallelMode && !isNovelAISelected
-                              ? "bg-purple-600"
-                              : "bg-blue-900/40"
-                          } ${
-                            isNovelAISelected
-                              ? "opacity-50 cursor-not-allowed"
-                              : ""
+                            parallelMode ? "bg-purple-600" : "bg-blue-900/40"
                           }`}
                         >
                           <span
                             className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                              parallelMode && !isNovelAISelected
-                                ? "translate-x-6"
-                                : "translate-x-0"
+                              parallelMode ? "translate-x-6" : "translate-x-0"
                             }`}
                           />
                         </button>

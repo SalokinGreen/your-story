@@ -305,11 +305,21 @@ export function buildSavedTimeline(
   gmConversation: SavedGMConversationMessage[] | undefined,
   toolResults: Map<string, SavedToolResult> | undefined,
   extractNarration: boolean,
+  // The story stage's own native reasoning/CoT (ScenePart.reasoning) - only
+  // ever populated when a genuinely separate narrator call happened
+  // (continueGMConversation or buildStoryPrompt path), so it's appended
+  // after the GM stage's blocks, chronologically where that call occurred.
+  storyReasoning?: string,
 ): TimelineBlock[] {
-  if (!gmConversation || gmConversation.length === 0) return [];
+  if (
+    (!gmConversation || gmConversation.length === 0) &&
+    !storyReasoning?.trim()
+  ) {
+    return [];
+  }
   const blocks: TimelineBlock[] = [];
 
-  for (const msg of gmConversation) {
+  for (const msg of gmConversation || []) {
     if (msg.role !== "assistant") continue;
 
     if (msg.reasoning?.trim()) {
@@ -342,6 +352,15 @@ export function buildSavedTimeline(
         });
       }
     }
+  }
+
+  if (storyReasoning?.trim()) {
+    blocks.push({
+      id: nextId(),
+      kind: "thinking",
+      content: storyReasoning.trim(),
+      isReasoning: true,
+    });
   }
 
   return blocks;
