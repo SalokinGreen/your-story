@@ -39,7 +39,7 @@ import MenuPage from "./menu";
 import { StoryTabBar } from "./StoryTabBar";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
-import StoryCreativeAssistant from "../components/StoryCreativeAssistant";
+import OOCChatPanel from "../components/OOCChatPanel";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
 import type {
@@ -253,7 +253,11 @@ function StoryPageContent() {
     setViewportHeight(vh);
     if (contentWrapperRef.current) {
       const top = contentWrapperRef.current.getBoundingClientRect().top;
-      setContentAreaHeight(Math.max(200, vh - top));
+      // Clamp to the visible viewport: if a mobile browser has scrolled the
+      // document (e.g. to lift the focused composer above the keyboard), `top`
+      // can go negative and `vh - top` would overshoot, making the card taller
+      // than the screen and leaving a scrollable strip of empty background.
+      setContentAreaHeight(Math.max(200, Math.min(vh - top, vh)));
     }
   }, []);
   // A callback ref (rather than a plain useRef + mount-only effect) because
@@ -288,6 +292,29 @@ function StoryPageContent() {
   const fullHeightStyle = viewportHeight
     ? { minHeight: `${viewportHeight}px` }
     : undefined;
+  // While the Story tab is active, lock the document so mobile browsers can't
+  // scroll the whole page under the keyboard. That page-scroll is what desyncs
+  // our card-height measurement (see updateHeights) and strands the composer
+  // below a phantom scrollable strip of empty background. The Story card scrolls
+  // internally instead; other tabs keep normal page scrolling.
+  useEffect(() => {
+    if (currentState !== StoryState.STORY) return;
+    const html = document.documentElement.style;
+    const body = document.body.style;
+    const prev = {
+      htmlOverflow: html.overflow,
+      bodyOverflow: body.overflow,
+      bodyOverscroll: body.overscrollBehavior,
+    };
+    html.overflow = "hidden";
+    body.overflow = "hidden";
+    body.overscrollBehavior = "none";
+    return () => {
+      html.overflow = prev.htmlOverflow;
+      body.overflow = prev.bodyOverflow;
+      body.overscrollBehavior = prev.bodyOverscroll;
+    };
+  }, [currentState]);
   const [storyData, setStoryData] = useState<StoryData | null>(null);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
   const [sourceAdventureId, setSourceAdventureId] = useState<string | null>(
@@ -355,6 +382,7 @@ function StoryPageContent() {
     peers: netPeers,
     activity: netActivity,
     hostDisconnected,
+    oocMessages,
     createRoom: createNetRoom,
     joinRoom: joinNetRoom,
     leaveRoom: leaveNetRoom,
@@ -363,6 +391,7 @@ function StoryPageContent() {
     sendFreeform: sendNetFreeform,
     sendVoice: sendNetVoice,
     sendActivity: sendNetActivity,
+    sendOOCChat: sendNetOOCChat,
     sendDiceThrowRequest: sendNetDiceThrowRequest,
     sendDiceThrowResult: sendNetDiceThrowResult,
   } = useNetSession({
@@ -620,22 +649,13 @@ function StoryPageContent() {
     serverPartCount: 0,
   });
 
-  // AI Story Editor state (lifted from menu so it persists across tabs)
-  const [showAIAssistant, setShowAIAssistant] = useState(false);
-  const [isAIPinned, setIsAIPinned] = useState(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("storyAIPinned") === "true";
-    }
-    return false;
-  });
-
-  const handleAIPinToggle = () => {
-    setIsAIPinned((prev) => {
-      const next = !prev;
-      localStorage.setItem("storyAIPinned", String(next));
-      return next;
-    });
-  };
+  // OOC chat state (lifted from menu so it persists across tabs). Only ever
+  // shown while netSession is active (online co-op) - see render below.
+  const [showOOCChat, setShowOOCChat] = useState(false);
+  const [oocLastSeenCount, setOOCLastSeenCount] = useState(0);
+  useEffect(() => {
+    if (showOOCChat) setOOCLastSeenCount(oocMessages.length);
+  }, [showOOCChat, oocMessages.length]);
 
   // Navigation handlers - only navigate through AI story parts with content
   function handleNavigateLeft() {
@@ -3685,7 +3705,7 @@ function StoryPageContent() {
             onUpdateStoryData={updateStoryData}
             onViewLogs={() => setCurrentState(StoryState.LOGS)}
             onViewContext={() => setCurrentState(StoryState.CONTEXT)}
-            onOpenAIAssistant={() => setShowAIAssistant(true)}
+            onOpenOOCChat={() => setShowOOCChat(true)}
             netSession={netSession}
             netPeers={netPeers}
             onCreateNetRoom={createNetRoom}
@@ -3702,20 +3722,21 @@ function StoryPageContent() {
         </div>
       </main>
 
-      {/* AI Story Editor - Rendered at page level to persist across tabs */}
-      <StoryCreativeAssistant
-        isOpen={showAIAssistant}
-        onClose={() => setShowAIAssistant(false)}
-        onOpen={() => setShowAIAssistant(true)}
-        storyData={storyData}
-        storyId={storyDbId || undefined}
-        onApplyChanges={(updates) => {
-          updateStoryData(updates);
-          addNotification("Changes applied! Don't forget to save.", "success");
-        }}
-        isPinned={isAIPinned}
-        onPinToggle={handleAIPinToggle}
-      />
+      {/* OOC chat - rendered at page level to persist across tabs, only
+          while an online multiplayer session is active. */}
+      {netSession && (
+        <OOCChatPanel
+          isOpen={showOOCChat}
+          onClose={() => setShowOOCChat(false)}
+          onOpen={() => setShowOOCChat(true)}
+          messages={oocMessages}
+          myLocalPlayerId={netSession.myLocalPlayerId}
+          onSend={sendNetOOCChat}
+          unreadCount={
+            showOOCChat ? 0 : Math.max(0, oocMessages.length - oocLastSeenCount)
+          }
+        />
+      )}
 
       {/* Manual dice mode: the GM asked for a physical roll - generation is
           paused until the player enters their total (or skips) */}

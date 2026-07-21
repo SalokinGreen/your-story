@@ -54,7 +54,7 @@ interface MenuProps extends StoryData {
   onUpdateStoryData: (updates: Partial<StoryData>) => void;
   onViewLogs?: () => void;
   onViewContext?: () => void;
-  onOpenAIAssistant?: () => void;
+  onOpenOOCChat?: () => void;
   netSession: NetSessionInfo | null;
   netPeers: GuestJoinedInfo[];
   onCreateNetRoom: (backend: MPBackend, displayName: string, color: string) => Promise<void>;
@@ -93,7 +93,7 @@ export default function MenuPage({
   onUpdateStoryData,
   onViewLogs,
   onViewContext,
-  onOpenAIAssistant,
+  onOpenOOCChat,
   netSession,
   netPeers,
   onCreateNetRoom,
@@ -611,14 +611,14 @@ export default function MenuPage({
         onClose={() => setShowAPIKeysModal(false)}
       />
 
-      {/* AI Editor Button */}
-      {onOpenAIAssistant && (
+      {/* OOC Chat Button - only while online co-op is active */}
+      {onOpenOOCChat && netSession && (
         <button
-          onClick={onOpenAIAssistant}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-purple-600/80 to-pink-600/80 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-xl transition-all border border-purple-500/30"
+          onClick={onOpenOOCChat}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-blue-600/80 to-cyan-600/80 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all border border-blue-500/30"
         >
-          <DynamicIcon name="Wand2" className="w-5 h-5" />
-          <span>AI Editor</span>
+          <DynamicIcon name="MessageCircle" className="w-5 h-5" />
+          <span>OOC Chat</span>
         </button>
       )}
 

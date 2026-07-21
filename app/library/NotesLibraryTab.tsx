@@ -79,12 +79,16 @@ interface NotesLibraryTabProps {
   // so state is lifted to the parent page and kept in sync across tabs.
   folders: LocalFolder[];
   setFolders: React.Dispatch<React.SetStateAction<LocalFolder[]>>;
+  // Folder export modal also lives on the parent page (it needs to reach
+  // across stories/notes/tables), so opening it is just a callback.
+  onExportFolder: (folder: LocalFolder) => void;
 }
 
 export default function NotesLibraryTab({
   onCountChange,
   folders,
   setFolders,
+  onExportFolder,
 }: NotesLibraryTabProps) {
   const { addNotification } = useNotification();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -933,23 +937,34 @@ export default function NotesLibraryTab({
           )
         </button>
         {folders.map((folder) => (
-          <button
-            key={folder.id}
-            onClick={() => setSelectedFolder(folder.id)}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
-              selectedFolder === folder.id
-                ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-                : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
-            }`}
-            style={{ borderLeft: `3px solid ${folder.color}` }}
-          >
-            <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
-            {folder.name} (
-            {subView === "notes"
-              ? notes.filter((n) => n.folderId === folder.id).length
-              : tables.filter((t) => t.folderId === folder.id).length}
-            )
-          </button>
+          <div key={folder.id} className="relative group shrink-0">
+            <button
+              onClick={() => setSelectedFolder(folder.id)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                selectedFolder === folder.id
+                  ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+                  : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+              }`}
+              style={{ borderLeft: `3px solid ${folder.color}` }}
+            >
+              <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
+              {folder.name} (
+              {subView === "notes"
+                ? notes.filter((n) => n.folderId === folder.id).length
+                : tables.filter((t) => t.folderId === folder.id).length}
+              )
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onExportFolder(folder);
+              }}
+              title="Export folder"
+              className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 p-0.5 rounded-full bg-blue-800 hover:bg-purple-600 border border-blue-950 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <DynamicIcon name="Download" className="w-3 h-3" />
+            </button>
+          </div>
         ))}
         <button
           onClick={() => setShowNewFolderDialog(true)}
