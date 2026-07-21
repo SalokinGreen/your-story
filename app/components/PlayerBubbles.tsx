@@ -5,6 +5,7 @@ import { CouchPlayer } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
+import { sttFetch } from "../misc/sttFetch";
 
 interface PendingLine {
   id: string;
@@ -143,10 +144,7 @@ export default function PlayerBubbles({
       formData.append("audio", blob, "recording.webm");
       formData.append("mistralKey", keys.mistralKey);
 
-      const response = await fetch("/api/stt/transcribe", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await sttFetch(formData);
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));

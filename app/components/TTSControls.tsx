@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
+import { ttsFetch } from "../misc/ttsFetch";
 
 interface TTSControlsProps {
   text: string;
@@ -150,17 +151,11 @@ export default function TTSControls({
         );
       }
 
-      const response = await fetch("/api/tts/generate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text,
-          voiceId: selectedVoice,
-          model: selectedModel,
-          deepinfraKey: apiKeys.deepinfraKey,
-        }),
+      const response = await ttsFetch({
+        text,
+        voiceId: selectedVoice,
+        model: selectedModel,
+        deepinfraKey: apiKeys.deepinfraKey,
       });
 
       if (!response.ok) {
