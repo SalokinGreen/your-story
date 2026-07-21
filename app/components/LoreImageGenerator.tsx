@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
+import { creatorImageFetch } from "@/app/misc/creatorFetch";
 import {
   DEEPINFRA_IMAGE_MODELS,
   OPENROUTER_IMAGE_MODELS,
@@ -180,21 +181,15 @@ export default function LoreImageGenerator({
 
     try {
       // Call image generation API
-      const response = await fetch("/api/creator/generate-image", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          prompt: currentPrompt,
-          model: imageModel,
-          imageType: "thumbnail", // Lore images are thumbnail-sized
-          provider: imageProvider,
-          openRouterKey:
-            imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
-          deepInfraKey:
-            imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
-        }),
+      const response = await creatorImageFetch({
+        prompt: currentPrompt,
+        model: imageModel,
+        imageType: "thumbnail", // Lore images are thumbnail-sized
+        provider: imageProvider,
+        openRouterKey:
+          imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
+        deepInfraKey:
+          imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
       });
 
       if (!response.ok) {

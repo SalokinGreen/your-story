@@ -1,0 +1,176 @@
+name: Build Desktop & Mobile Apps
+
+# Manual runs (workflow_dispatch) build and upload artifacts on every
+# platform without touching Releases - good for testing this workflow
+# itself. Pushing a version tag (v1.2.3) does the same builds and then
+# attaches everything to a draft GitHub Release for review before publishing.
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  NODE_VERSION: "22"
+
+permissions:
+  contents: write
+
+jobs:
+  # Gate every platform build on the same checks CLAUDE.md documents for
+  # local dev - no point spending 10+ minutes compiling Rust/Xcode/Gradle
+  # against a build that's already broken.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - run: npm run test
+
+  # Desktop: Tauri, one native build per OS (no cross-compiling). Produces
+  # unsigned installers - functional, but macOS/Windows will show an
+  # unidentified-developer warning until code-signing secrets are added
+  # (see the commented env block below).
+  tauri:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: ubuntu-22.04
+            args: ""
+          - platform: windows-latest
+            args: ""
+          - platform: macos-latest
+            args: "--target universal-apple-darwin"
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev libsoup-3.0-dev libayatana-appindicator3-dev patchelf
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # Uncomment and set these as repo secrets once you have real
+      # certificates - tauri build silently skips signing without them:
+      #   TAURI_SIGNING_PRIVATE_KEY / TAURI_SIGNING_PRIVATE_KEY_PASSWORD (updater)
+      #   APPLE_CERTIFICATE / APPLE_CERTIFICATE_PASSWORD / APPLE_SIGNING_IDENTITY (macOS)
+      #   WINDOWS_CERTIFICATE / WINDOWS_CERTIFICATE_PASSWORD (Windows)
+      - name: Build Tauri app
+        run: npx tauri build ${{ matrix.args }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}
+          path: |
+            src-tauri/target/*/release/bundle/**
+            src-tauri/target/release/bundle/**
+          if-no-files-found: error
+
+  # Mobile: Android via Capacitor + Gradle. Unsigned debug APK - installable
+  # for testing (sideload / adb install), but Play Store distribution needs
+  # a release keystore, see
+  # https://capacitorjs.com/docs/android/deploying-to-google-play#creating-a-keystore
+  android:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+      - run: npm ci
+      - run: NEXT_PUBLIC_STANDALONE=true npm run build
+      - run: npx cap sync android
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew assembleDebug
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-debug-apk
+          path: android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+
+  # Mobile: iOS via Capacitor + Xcode. CODE_SIGNING_ALLOWED=NO produces an
+  # unsigned simulator build - this only proves the project compiles.
+  # Running on a real device or shipping to TestFlight/App Store needs an
+  # Apple Developer account, a signing certificate, and a provisioning
+  # profile as secrets, see
+  # https://capacitorjs.com/docs/ios/deploying-to-app-store
+  ios:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - run: npm ci
+      - run: NEXT_PUBLIC_STANDALONE=true npm run build
+      - run: npx cap sync ios
+      - name: Build unsigned simulator build
+        working-directory: ios/App
+        run: |
+          xcodebuild -workspace App.xcworkspace -scheme App \
+            -configuration Release -sdk iphonesimulator \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ios-simulator-build
+          path: ios/App/build/Build/Products/Release-iphonesimulator/App.app
+          if-no-files-found: error
+
+  # Only on a version-tag push: collect everything built above into one
+  # draft release for review before publishing - nothing goes live
+  # automatically.
+  release:
+    needs: [tauri, android, ios]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+      - name: Flatten bundle files for release upload
+        run: |
+          mkdir -p release-assets
+          find dist -type f \( \
+            -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o \
+            -name "*.msi" -o -name "*.exe" -o \
+            -name "*.dmg" -o -name "*.apk" \
+          \) -exec cp {} release-assets/ \;
+          cd dist/ios-simulator-build && zip -r ../../release-assets/App-iphonesimulator.zip App.app
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: "Your Story ${{ github.ref_name }}"
+          files: release-assets/*
