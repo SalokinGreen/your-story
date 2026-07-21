@@ -52,6 +52,7 @@ import {
   GMToolResult,
   ManualRollRequest,
   ManualRollAnswer,
+  DiceThrowRequest,
   GMExecutionResult,
   resolveCheckPerTurnVisibility,
 } from "@/app/misc/gmExecutor";
@@ -227,6 +228,12 @@ export interface GenerationCallbacks {
   onAskForRoll?: (
     request: ManualRollRequest
   ) => Promise<ManualRollAnswer | null>;
+  // Physical dice mode: the UI shows a throwable 3D dice tray and resolves
+  // with the settled face values (null = player skipped/cancelled the
+  // throw, falls back to a fully digital roll of the whole formula).
+  onRequestDiceThrow?: (
+    request: DiceThrowRequest
+  ) => Promise<number[] | null>;
   onGMStageComplete?: (
     results: GMToolResult[],
     storyContext: string,
@@ -1218,7 +1225,7 @@ export async function generateStoryTurn(
                   : `[GAME MASTER]\n${gmResult.content.trim()}`;
               gmInterleavedParts.push(formattedThinking);
 
-              // NEW: Add raw content to accumulated story (preserve <output> tags)
+              // NEW: Add raw content to accumulated story (preserve <thinking> tags)
               // extractVisibleText() pulls the player-visible narration out below
               const rawContent = gmResult.content.trim();
               if (rawContent) {
@@ -1304,7 +1311,10 @@ export async function generateStoryTurn(
                 storyId: options.storyId,
                 token,
               },
-              { requestManualRoll: callbacks.onAskForRoll },
+              {
+                requestManualRoll: callbacks.onAskForRoll,
+                requestDiceThrow: callbacks.onRequestDiceThrow,
+              },
               {
                 apiKeys: {
                   openRouterKey: options.openRouterKey,
@@ -1595,7 +1605,7 @@ export async function generateStoryTurn(
         // NEW: Combine accumulated story from all rounds as the final story content
         // This allows GM to write prose incrementally while calling tools
         if (gmAccumulatedStory.length > 0) {
-          // Join all accumulated parts - preserve <output> tags for UI to process
+          // Join all accumulated parts - preserve <thinking> tags for UI to process
           gmFinalStoryContent = gmAccumulatedStory.join("\n\n");
           logger.action("Combined accumulated GM story", {
             parts: gmAccumulatedStory.length,
@@ -1644,7 +1654,7 @@ export async function generateStoryTurn(
       rawStoryContent = gmFinalStoryContent;
 
       // Extract only the player-visible narration - robust against a
-      // truncated/dangling <output> tag (unlike the old stripThinkingTags
+      // truncated/dangling <thinking> tag (unlike the old stripThinkingTags
       // call this replaced, which only ran at final-save time and could
       // leak a raw tag fragment if generation was cut off mid-tag).
       storyContent = extractVisibleText(gmFinalStoryContent);

@@ -7,9 +7,11 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest"
+    "test": "vitest",
+    "postinstall": "node scripts/patchDiceBox.mjs"
   },
   "dependencies": {
+    "@3d-dice/dice-box": "^1.1.4",
     "@capacitor/android": "^8.4.2",
     "@capacitor/cli": "^8.4.2",
     "@capacitor/core": "^8.4.2",

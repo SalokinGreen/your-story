@@ -8,15 +8,15 @@
  *
  * A GM-stage completion looks like:
  *   <thinking>private reasoning</thinking>
- *   <output>narration the player sees</output>
+ *   narration the player sees, written directly with no wrapper tag
  *   (tool calls happen between rounds, not inside this text)
- *   <output>more narration</output>
+ *   more narration
  *
- * Untagged text is treated as hidden reasoning (matching the prompt's own
- * "anything outside <output> is hidden" rule) UNLESS no tag appears in the
- * buffer at all, in which case the whole thing is visible text - this
- * covers the tag-free story stage, which no longer asks the model to wrap
- * its prose in <output>.
+ * Claude-style visibility: everything is visible by default EXCEPT text
+ * inside <thinking>...</thinking>. `<output>` is only recognized as a
+ * legacy/defensive tag - old saves used it, and a model that reverts to
+ * old habits and wraps prose in it anyway should still render cleanly - but
+ * it no longer changes what's hidden vs shown; only <thinking> does.
  */
 
 export type TimelineBlockKind = "thinking" | "tool" | "text";
@@ -93,7 +93,7 @@ export function parseTaggedContent(raw: string): Array<Omit<TimelineBlock, "id">
 
   TAG_BOUNDARY.lastIndex = 0;
   const blocks: Array<Omit<TimelineBlock, "id">> = [];
-  let mode: "thinking" | "text" = "thinking"; // untagged runs are hidden by default
+  let mode: "thinking" | "text" = "text"; // untagged runs are visible by default
   let cursor = 0;
   let match: RegExpExecArray | null;
 
@@ -112,9 +112,10 @@ export function parseTaggedContent(raw: string): Array<Omit<TimelineBlock, "id">
     pushSegment(safe.slice(cursor, match.index), mode);
     const isClosing = !!match[1];
     const tagName = match[2].toLowerCase();
-    if (!isClosing && tagName === "thinking") mode = "thinking";
-    else if (!isClosing && tagName === "output") mode = "text";
-    else mode = "thinking"; // any closing tag reverts to hidden-by-default
+    // Only <thinking> toggles visibility - <output> is a legacy no-op kept
+    // around so old saves (and a model that reverts to old habits) still
+    // parse cleanly instead of leaking the literal tag text.
+    if (tagName === "thinking") mode = isClosing ? "text" : "thinking";
     cursor = TAG_BOUNDARY.lastIndex;
   }
   pushSegment(safe.slice(cursor), mode);
@@ -185,19 +186,26 @@ export function updateLiveRoundBlocks(
   // every token and unmounts/remounts the DOM node, which is what caused
   // the text to visibly disappear and re-fade-in while streaming.
   const prevLive = prevBlocks.slice(roundStart);
+  // Native reasoning (see updateLiveReasoningBlock) is tracked separately
+  // from the tagged content buffer parsed below - preserve it instead of
+  // letting this reparse silently drop it the moment content/tool deltas
+  // start arriving for the round.
+  const reasoningBlock = prevLive.find((b) => b.isReasoning);
+  const prevContentLive = prevLive.filter((b) => !b.isReasoning);
   const liveBlocks: TimelineBlock[] = parseTaggedContent(roundBuffer).map(
-    (b, i) => ({ id: prevLive[i]?.id ?? nextId(), ...b }),
+    (b, i) => ({ id: prevContentLive[i]?.id ?? nextId(), ...b }),
   );
   if (liveBlocks.length > 0) {
     liveBlocks[liveBlocks.length - 1].streaming = true;
   }
-  return [...frozen, ...liveBlocks];
+  const merged = reasoningBlock ? [reasoningBlock, ...liveBlocks] : liveBlocks;
+  return [...frozen, ...merged];
 }
 
 /**
  * Live-streaming helper for native provider reasoning (DeepSeek/OpenRouter
  * `reasoning` delta) for the current round - inserted as the first block
- * of the round so it appears before any <thinking>/<output> text.
+ * of the round so it appears before any <thinking>/narration text.
  */
 export function updateLiveReasoningBlock(
   prevBlocks: TimelineBlock[],
@@ -267,11 +275,11 @@ function normalizeForCompare(text: string): string {
 }
 
 /**
- * On the common path, the GM stage's own <output> segments ARE the saved
- * narration (ScenePart.content) - the "separate story stage" only runs
- * when the GM stage produced no narratable text at all. There's no
- * persisted flag recording which happened (no need for one - it's cheap to
- * detect): if concatenating every round's <output> text reproduces
+ * On the common path, the GM stage's own visible (non-<thinking>) segments
+ * ARE the saved narration (ScenePart.content) - the "separate story stage"
+ * only runs when the GM stage produced no narratable text at all. There's
+ * no persisted flag recording which happened (no need for one - it's cheap
+ * to detect): if concatenating every round's visible text reproduces
  * `content` (modulo whitespace), the GM stage wrote the narration itself,
  * so it's safe to render each round's narration inline, interleaved with
  * that round's tool calls, instead of as a separate block after the fact.

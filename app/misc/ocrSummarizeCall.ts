@@ -245,6 +245,7 @@ OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields
       "type": null,  // "lore" (default) = world-building, "mechanics" = rules/systems, "character_sheet" = player character info
       "folder": "Category folder (Characters, Locations, Items, Factions, History, etc.)",
       "tags": ["tag1", "tag2"],
+      "aliases": ["Alternate name 1", "Nickname 2"],  // other names, nicknames, or titles this entry is also called in the text - [] if none
       "secrtet": false  // true if this is secret/hidden information
     }
   ],
@@ -302,6 +303,7 @@ ${
 CONTENT RULES:
 - Each lore entry should be 2-4 paragraphs of rich detail
 - Use descriptive folder names for organization (Characters, Locations, Items, Factions, History, Bestiary, etc.)
+- If a character, place, or thing is referred to by more than one name in the text (a nickname, title, alias, alternate spelling, or shortened form - e.g. "Bob" for "Robert the Blacksmith", or "the Sunken Temple" for "Vashti's Sanctum"), list those other names in "aliases" so mentions of them can also be recognized. Leave "aliases" as [] when there's only the one name.
 - Mark secret/hidden information with "secrtet": true
 - For tables, estimate reasonable min/max ranges if not explicitly stated
 - Be thorough but concise - prioritize quality over quantity
@@ -402,6 +404,14 @@ function tryParseAIResponse(content: string): {
   }
 }
 
+function normalizeAliases(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((a): a is string => typeof a === "string")
+    .map((a) => a.trim())
+    .filter(Boolean);
+}
+
 function processParserResult(parsed: any): {
   summary: string;
   lore: StoryLore[];
@@ -414,6 +424,7 @@ function processParserResult(parsed: any): {
     type: entry.type || undefined,
     folder: entry.folder || "",
     tags: entry.tags || [],
+    aliases: normalizeAliases(entry.aliases),
     secrtet: entry.secrtet || entry.secret || false,
     on: true,
     alwaysOn: false,

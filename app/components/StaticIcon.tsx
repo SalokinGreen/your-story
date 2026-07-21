@@ -55,6 +55,7 @@ import {
   Play,
   FileText,
   Mic,
+  Move3d,
   type LucideProps,
 } from "lucide-react";
 import React from "react";
@@ -115,6 +116,7 @@ const iconMap: Record<string, React.FC<LucideProps>> = {
   Play,
   FileText,
   Mic,
+  Move3d,
 };
 
 interface StaticIconProps extends LucideProps {

@@ -252,27 +252,17 @@ function rollDie(sides: number): number {
 }
 
 /**
- * Roll a dice group (e.g., 2d6kh1!)
+ * Given the already-rolled faces for a dice group (however they were
+ * generated - Math.random() or a physical throw), apply keep-highest/
+ * lowest and build the notation/subtotal. Shared by rollDiceGroup and
+ * rollDiceGroupAsync so the two entropy sources can't drift apart on this
+ * shared math.
  */
-function rollDiceGroup(dice: DiceRoll): DiceGroupResult {
-  const allRolls: number[] = [];
-  let explosions = 0;
-
-  // Roll all dice
-  for (let i = 0; i < dice.count; i++) {
-    let roll = rollDie(dice.sides);
-    allRolls.push(roll);
-
-    // Handle exploding dice
-    if (dice.exploding) {
-      while (roll === dice.sides && explosions < MAX_EXPLOSIONS_PER_DIE) {
-        roll = rollDie(dice.sides);
-        allRolls.push(roll);
-        explosions++;
-      }
-    }
-  }
-
+function buildDiceGroupResult(
+  dice: DiceRoll,
+  allRolls: number[],
+  explosions: number
+): DiceGroupResult {
   // Apply keep highest/lowest
   let keptRolls = [...allRolls];
   let droppedRolls: number[] = [];
@@ -301,6 +291,74 @@ function rollDiceGroup(dice: DiceRoll): DiceGroupResult {
     subtotal: keptRolls.reduce((sum, r) => sum + r, 0),
     explosions,
   };
+}
+
+/**
+ * Roll a dice group (e.g., 2d6kh1!)
+ */
+function rollDiceGroup(dice: DiceRoll): DiceGroupResult {
+  const allRolls: number[] = [];
+  let explosions = 0;
+
+  // Roll all dice
+  for (let i = 0; i < dice.count; i++) {
+    let roll = rollDie(dice.sides);
+    allRolls.push(roll);
+
+    // Handle exploding dice
+    if (dice.exploding) {
+      while (roll === dice.sides && explosions < MAX_EXPLOSIONS_PER_DIE) {
+        roll = rollDie(dice.sides);
+        allRolls.push(roll);
+        explosions++;
+      }
+    }
+  }
+
+  return buildDiceGroupResult(dice, allRolls, explosions);
+}
+
+/**
+ * Resolves real face values for `count` dice of the given `sides` - e.g. a
+ * physical 3D dice throw settling, rather than Math.random(). Called once
+ * per dice group for the initial throw, then again with count=1 for each
+ * additional die needed to resolve an explosion (the explosion count isn't
+ * knowable up front).
+ */
+export type DiceResolver = (
+  sides: number,
+  count: number
+) => Promise<number[]>;
+
+/**
+ * Async counterpart to rollDiceGroup, sourcing face values from an
+ * injected resolver (e.g. a physical dice throw) instead of Math.random().
+ * Keep-highest/lowest/notation math is shared with rollDiceGroup via
+ * buildDiceGroupResult so the two can't diverge.
+ */
+async function rollDiceGroupAsync(
+  dice: DiceRoll,
+  diceResolver: DiceResolver
+): Promise<DiceGroupResult> {
+  const initialRolls = await diceResolver(dice.sides, dice.count);
+  const allRolls: number[] = [];
+  let explosions = 0;
+
+  for (let i = 0; i < dice.count; i++) {
+    let roll = initialRolls[i];
+    allRolls.push(roll);
+
+    if (dice.exploding) {
+      while (roll === dice.sides && explosions < MAX_EXPLOSIONS_PER_DIE) {
+        const [nextRoll] = await diceResolver(dice.sides, 1);
+        roll = nextRoll;
+        allRolls.push(roll);
+        explosions++;
+      }
+    }
+  }
+
+  return buildDiceGroupResult(dice, allRolls, explosions);
 }
 
 /**
@@ -408,6 +466,115 @@ export function rollFormula(
 ): RollResult {
   const parsed = parseFormula(formula);
   return rollParsedFormula(parsed, resolver);
+}
+
+/**
+ * Async counterpart to rollParsedFormula, sourcing dice faces from an
+ * injected DiceResolver (e.g. a physical dice throw) instead of
+ * Math.random(). Mirrors rollParsedFormula's token walk exactly except for
+ * the dice case - variable/operator/modifier handling never needs to be
+ * async, so keep both in sync if formula semantics change.
+ */
+export async function rollParsedFormulaAsync(
+  parsed: ParsedFormula,
+  resolver: VariableResolver,
+  diceResolver: DiceResolver
+): Promise<RollResult> {
+  const rolls: DiceGroupResult[] = [];
+  const substitutedVariables: Record<string, number> = {};
+  let total = 0;
+  let modifiers = 0;
+  let currentOperator = "+";
+  const breakdownParts: string[] = [];
+
+  for (const token of parsed.tokens) {
+    switch (token.type) {
+      case "operator":
+        currentOperator = token.value as string;
+        break;
+
+      case "dice": {
+        const diceRoll = token.value as DiceRoll;
+        const result = await rollDiceGroupAsync(diceRoll, diceResolver);
+        rolls.push(result);
+
+        const value =
+          currentOperator === "-" ? -result.subtotal : result.subtotal;
+        total += value;
+
+        // Build breakdown
+        let rollStr = `[${result.keptRolls.join(", ")}]`;
+        if (result.droppedRolls.length > 0) {
+          rollStr += ` (dropped: ${result.droppedRolls.join(", ")})`;
+        }
+        if (result.explosions > 0) {
+          rollStr += ` 💥×${result.explosions}`;
+        }
+        breakdownParts.push(
+          `${currentOperator === "-" ? "-" : ""}${
+            result.notation
+          }: ${rollStr} = ${result.subtotal}`
+        );
+        break;
+      }
+
+      case "variable": {
+        const varName = token.value as string;
+        const resolved = resolver(varName);
+
+        if (resolved === undefined) {
+          throw new Error(`Unknown variable: {{${varName}}}`);
+        }
+
+        substitutedVariables[varName] = resolved;
+        const value = currentOperator === "-" ? -resolved : resolved;
+        total += value;
+        modifiers += value;
+
+        breakdownParts.push(
+          `${currentOperator === "-" ? "-" : "+"}{{${varName}}} = ${resolved}`
+        );
+        break;
+      }
+
+      case "modifier": {
+        const value = token.value as number;
+        const effectiveValue = currentOperator === "-" ? -value : value;
+        total += effectiveValue;
+        modifiers += effectiveValue;
+
+        if (value !== 0) {
+          breakdownParts.push(
+            `${effectiveValue >= 0 ? "+" : ""}${effectiveValue}`
+          );
+        }
+        break;
+      }
+    }
+  }
+
+  return {
+    total,
+    rolls,
+    modifiers,
+    substitutedVariables,
+    formula: parsed.raw,
+    breakdown: breakdownParts.join(" ") + ` = **${total}**`,
+  };
+}
+
+/**
+ * Parse and roll a formula in one step, sourcing dice faces from an
+ * injected DiceResolver (e.g. a physical dice throw) instead of
+ * Math.random(). See rollFormula for the fully-synchronous default path.
+ */
+export async function rollFormulaAsync(
+  formula: string,
+  resolver: VariableResolver = () => undefined,
+  diceResolver: DiceResolver
+): Promise<RollResult> {
+  const parsed = parseFormula(formula);
+  return rollParsedFormulaAsync(parsed, resolver, diceResolver);
 }
 
 // ============================================
