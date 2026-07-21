@@ -43,6 +43,12 @@ interface StoryProps {
   input: Record<string, boolean>;
   loading: boolean;
   loadingStage?: "gm" | "story" | "choices" | null;
+  // Narrower than loadingStage: true once the current storyText is
+  // finalized, even while loadingStage is still "story" because tools/
+  // choices are generating in the background afterward. Gates TTS
+  // specifically, so it unlocks as soon as there's something to read/listen
+  // to instead of waiting out that whole background phase too.
+  storyTextReady?: boolean;
   handleChoice: (playerComment?: string) => void;
   handleSelect: (index: number) => void;
   onCustomInput?: (
@@ -724,6 +730,7 @@ export default function Story({
   input,
   loading,
   loadingStage,
+  storyTextReady = true,
   handleChoice,
   handleSelect,
   onCustomInput,
@@ -1446,7 +1453,7 @@ export default function Story({
             {/* Right side: TTS - available as soon as story text is ready */}
             <TTSControls
               text={cleanTextForSpeech(storyText)}
-              disabled={loading || loadingStage === "story"}
+              disabled={loading || !storyTextReady}
             />
           </div>
         )}
