@@ -246,9 +246,10 @@ function ChatMessage({
   const rowAlign = isUser ? "justify-end" : "justify-start";
 
   // On the common path the GM stage narrates the story itself, so its
-  // <output> segments ARE `content` - rebuilding the timeline can extract
-  // them inline, interleaved with that round's tool calls, instead of
-  // showing "thinking" first and the narration separately afterward.
+  // visible (non-<thinking>) segments ARE `content` - rebuilding the
+  // timeline can extract them inline, interleaved with that round's tool
+  // calls, instead of showing "thinking" first and the narration
+  // separately afterward.
   const narrationInline = React.useMemo(
     () =>
       !isUser && gmConversation
