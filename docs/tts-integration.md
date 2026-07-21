@@ -20,6 +20,7 @@ multi-language, and provider voice libraries
 ✅ **Playback controls** - Play, pause, and stop audio  
 ✅ **Markdown stripping** - Automatically cleans formatting for better speech  
 ✅ **Chunked generation** - Handles long text with intelligent splitting  
+✅ **Streaming playback** - Starts playing as soon as the first chunk is ready, instead of waiting for the whole narration to finish generating  
 ✅ **Responsive UI** - Works on mobile and desktop
 
 ## TTS Models
@@ -128,8 +129,9 @@ small named voice sets are.
 
 - POST endpoint to generate speech from text
 - Accepts: `text` (string), `voiceId` (string), `model` ("kokoro" | "orpheus" | "cartesia" | "elevenlabs"), and the matching BYOK key field
-- Returns MP3 audio data
 - Automatically chunks long text at sentence boundaries
+- Streams the response body: each chunk's MP3 audio is sent as soon as it's generated, framed as `[4-byte big-endian length][chunk bytes]` (see `frameChunk()`/`generateTTSAudioStream()` in `ttsCall.ts`), instead of waiting for every chunk and concatenating one big buffer. `TTSControls.tsx` reads the frames off the stream and starts playing chunk 0 as soon as it arrives.
+- The very first chunk is still awaited before any bytes are streamed, so a bad/rate-limited key fails with a normal JSON error (400/429/403) exactly as before, rather than a half-streamed response
 - Fully BYOK - no server-side coin deduction happens for TTS; the request 400s if the matching provider key is missing
 
 ### Pricing
@@ -176,11 +178,11 @@ API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
 1. User clicks "TTS" button
 2. Component shows loading state
 3. POST request sent to `/api/tts/generate` with text, voiceId, model, and the matching provider key
-4. `generateTTSAudio()` cleans markdown and splits into chunks (300-1500 chars depending on model)
+4. `generateTTSAudioStream()` cleans markdown and splits into chunks (300-1500 chars depending on model)
 5. The provider implied by `model` is called in parallel for each chunk - DeepInfra returns JSON with base64 audio, Cartesia/ElevenLabs return raw MP3 bytes directly
-6. Audio chunks concatenated into one MP3 ArrayBuffer
-7. MP3 audio returned to client
-8. Audio played via HTML5 Audio element
+6. The first chunk's audio is awaited, then streamed to the client frame-by-frame as each subsequent chunk finishes (still generated in parallel behind the scenes, just emitted in order)
+7. `TTSControls.tsx` parses frames off the response stream and plays chunk 0 in the `<audio>` element the moment it lands, queuing later chunks to play back-to-back via `onended` as they arrive
+8. Playback finishes once the last chunk has played and the stream has closed
 
 ### Text Processing
 

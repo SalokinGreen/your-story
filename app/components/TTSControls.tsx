@@ -58,6 +58,55 @@ const isTTSEnabled = (): boolean => {
 const SILENT_AUDIO_DATA_URI =
   "data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=";
 
+// Reads the framed chunk stream from /api/tts/generate (see frameChunk() in
+// ttsCall.ts: each chunk is a 4-byte big-endian length prefix followed by
+// that many bytes of independently-playable MP3), handing each chunk to
+// onChunk as soon as it's fully received rather than waiting for the whole
+// response. Falls back to treating the whole body as one chunk if the
+// runtime doesn't expose a readable stream. Returns the number of chunks.
+async function streamChunksToPlayer(
+  response: Response,
+  onChunk: (blob: Blob) => void,
+): Promise<number> {
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const buffer = await response.arrayBuffer();
+    if (buffer.byteLength === 0) return 0;
+    onChunk(new Blob([buffer], { type: "audio/mpeg" }));
+    return 1;
+  }
+
+  let buffered = new Uint8Array(0);
+  let count = 0;
+
+  const append = (data: Uint8Array) => {
+    const merged = new Uint8Array(buffered.length + data.length);
+    merged.set(buffered);
+    merged.set(data, buffered.length);
+    buffered = merged;
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (value && value.length > 0) append(value);
+
+    while (buffered.length >= 4) {
+      const view = new DataView(buffered.buffer, buffered.byteOffset, buffered.length);
+      const chunkLength = view.getUint32(0, false);
+      if (buffered.length < 4 + chunkLength) break;
+
+      const chunkBytes = buffered.slice(4, 4 + chunkLength);
+      onChunk(new Blob([chunkBytes], { type: "audio/mpeg" }));
+      count += 1;
+      buffered = buffered.slice(4 + chunkLength);
+    }
+
+    if (done) break;
+  }
+
+  return count;
+}
+
 export default function TTSControls({
   text,
   disabled = false,
@@ -67,9 +116,17 @@ export default function TTSControls({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [hasAudio, setHasAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const savedAudioBlobRef = useRef<Blob | null>(null);
+  // Object URLs for each chunk received so far, in order - populated
+  // progressively as the stream arrives, and replayed from index 0 on
+  // "Replay" without re-fetching.
+  const audioUrlsRef = useRef<string[]>([]);
+  const currentChunkIndexRef = useRef<number>(0);
+  const isStreamingRef = useRef<boolean>(false);
+  // True when playback has caught up to a chunk that hasn't arrived yet -
+  // onChunkArrived plays it immediately once it lands.
+  const waitingForNextRef = useRef<boolean>(false);
   const lastTextRef = useRef<string>("");
   const isGeneratingRef = useRef<boolean>(false);
   const pendingAutoGenerateRef = useRef<boolean>(false);
@@ -83,7 +140,8 @@ export default function TTSControls({
     }
   }, []);
 
-  // Clean up the persistent audio element when this component unmounts.
+  // Clean up the persistent audio element and any buffered chunk URLs when
+  // this component unmounts.
   useEffect(() => {
     return () => {
       if (audioRef.current) {
@@ -91,6 +149,8 @@ export default function TTSControls({
         audioRef.current.removeAttribute("src");
         audioRef.current = null;
       }
+      audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      audioUrlsRef.current = [];
     };
   }, []);
 
@@ -109,6 +169,75 @@ export default function TTSControls({
     return audioRef.current;
   }, []);
 
+  // Forwarding ref so playChunkAt's onended handler can call the latest
+  // advanceToNextChunk without the two useCallbacks needing to reference
+  // each other before they're defined.
+  const advanceToNextChunkRef = useRef<() => void>(() => {});
+
+  const playChunkAt = useCallback(
+    (index: number) => {
+      const url = audioUrlsRef.current[index];
+      if (!url) return;
+
+      const audio = getAudioElement();
+      audio.volume = getVolume();
+      audio.src = url;
+
+      audio.onended = () => advanceToNextChunkRef.current();
+      audio.onerror = () => {
+        addNotification("Failed to play audio", "failure");
+        setIsPlaying(false);
+        setIsPaused(false);
+      };
+
+      audio.play().catch((err) => {
+        console.error("TTS playback error:", err);
+      });
+    },
+    [getAudioElement, addNotification],
+  );
+
+  const advanceToNextChunk = useCallback(() => {
+    currentChunkIndexRef.current += 1;
+    const nextUrl = audioUrlsRef.current[currentChunkIndexRef.current];
+
+    if (nextUrl) {
+      playChunkAt(currentChunkIndexRef.current);
+    } else if (!isStreamingRef.current) {
+      setIsPlaying(false);
+      setIsPaused(false);
+    } else {
+      waitingForNextRef.current = true;
+    }
+  }, [playChunkAt]);
+
+  useEffect(() => {
+    advanceToNextChunkRef.current = advanceToNextChunk;
+  }, [advanceToNextChunk]);
+
+  // Called as each chunk finishes streaming in. Starts playback the moment
+  // the first chunk lands, and auto-plays any later chunk that arrives
+  // while playback is waiting on it.
+  const onChunkArrived = useCallback(
+    (blob: Blob) => {
+      const url = URL.createObjectURL(blob);
+      audioUrlsRef.current.push(url);
+      const idx = audioUrlsRef.current.length - 1;
+
+      if (idx === 0) {
+        setHasAudio(true);
+        setIsPlaying(true);
+        setIsPaused(false);
+        setIsLoading(false);
+        playChunkAt(0);
+      } else if (waitingForNextRef.current && idx === currentChunkIndexRef.current) {
+        waitingForNextRef.current = false;
+        playChunkAt(idx);
+      }
+    },
+    [playChunkAt],
+  );
+
   const handlePlay = useCallback(async () => {
     if (disabled || !text.trim() || isGeneratingRef.current) return;
 
@@ -123,25 +252,12 @@ export default function TTSControls({
       return;
     }
 
-    if (savedAudioBlobRef.current && audioUrl) {
-      const audio = getAudioElement();
-      audio.volume = volume;
-      audio.src = audioUrl;
-
-      audio.onended = () => {
-        setIsPlaying(false);
-        setIsPaused(false);
-      };
-
-      audio.onerror = () => {
-        addNotification("Failed to play audio", "failure");
-        setIsPlaying(false);
-        setIsPaused(false);
-      };
-
-      await audio.play();
+    if (hasAudio && audioUrlsRef.current.length > 0) {
+      currentChunkIndexRef.current = 0;
+      waitingForNextRef.current = false;
       setIsPlaying(true);
       setIsPaused(false);
+      playChunkAt(0);
       return;
     }
 
@@ -189,74 +305,37 @@ export default function TTSControls({
         throw new Error(error.error || "Failed to generate speech");
       }
 
-      const tokenCost = response.headers.get("X-Token-Cost");
-      const tokenBalance = response.headers.get("X-Token-Balance");
-      const contentType = response.headers.get("Content-Type");
-      const ttsModel = response.headers.get("X-TTS-Model");
+      // Reset chunk state and start consuming the framed stream - playback
+      // begins as soon as onChunkArrived sees the first chunk, without
+      // waiting for the rest of the text to finish generating.
+      audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      audioUrlsRef.current = [];
+      currentChunkIndexRef.current = 0;
+      waitingForNextRef.current = false;
+      isStreamingRef.current = true;
 
-      console.log("TTS Response headers:", {
-        contentType,
-        ttsModel,
-        tokenCost,
-      });
+      const chunkCount = await streamChunksToPlayer(response, onChunkArrived);
+      isStreamingRef.current = false;
 
-      // Get the raw array buffer and create blob with correct MIME type
-      const arrayBuffer = await response.arrayBuffer();
-      console.log("TTS Audio buffer size:", arrayBuffer.byteLength);
-
-      // Check first few bytes to identify format
-      const header = new Uint8Array(arrayBuffer.slice(0, 4));
-      console.log(
-        "TTS Audio header bytes:",
-        Array.from(header)
-          .map((b) => b.toString(16).padStart(2, "0"))
-          .join(" ")
-      );
-
-      const audioBlob = new Blob([arrayBuffer], {
-        type: contentType || "audio/mpeg",
-      });
-      savedAudioBlobRef.current = audioBlob;
-
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
+      if (chunkCount === 0) {
+        throw new Error("No audio generated");
       }
 
-      const url = URL.createObjectURL(audioBlob);
-      setAudioUrl(url);
-
-      // Reuse the same (already-primed) <audio> element rather than
-      // constructing a new one, so the earlier gesture-tied play() call
-      // keeps this playback allowed even though we're now past the network
-      // request.
-      const audio = getAudioElement();
-      audio.volume = volume;
-      audio.src = url;
-
-      audio.onended = () => {
+      // If playback already caught up to the end while the last chunk was
+      // still in flight, finish here rather than leaving isPlaying stuck on
+      // an onended that has nothing left to advance to.
+      if (waitingForNextRef.current) {
+        waitingForNextRef.current = false;
         setIsPlaying(false);
         setIsPaused(false);
-      };
-
-      audio.onerror = () => {
-        addNotification("Failed to play audio", "failure");
-        setIsPlaying(false);
-        setIsPaused(false);
-      };
-
-      await audio.play();
-      setIsPlaying(true);
-      setIsPaused(false);
-
-      // Log TTS cost for debugging, no notification needed - audio feedback is sufficient
-      if (tokenCost && tokenBalance) {
-        console.log(`TTS: -${tokenCost} tokens, ${tokenBalance} remaining`);
       }
     } catch (error: unknown) {
       console.error("TTS error:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to generate speech";
       addNotification(errorMessage, "failure");
+      setIsPlaying(false);
+      setIsPaused(false);
     } finally {
       setIsLoading(false);
       isGeneratingRef.current = false;
@@ -265,7 +344,9 @@ export default function TTSControls({
     disabled,
     text,
     isPaused,
-    audioUrl,
+    hasAudio,
+    onChunkArrived,
+    playChunkAt,
     addNotification,
     apiKeys.deepinfraKey,
     apiKeys.cartesiaKey,
@@ -287,11 +368,12 @@ export default function TTSControls({
         audioRef.current.pause();
         audioRef.current.removeAttribute("src");
       }
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-        setAudioUrl(null);
-      }
-      savedAudioBlobRef.current = null;
+      audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      audioUrlsRef.current = [];
+      currentChunkIndexRef.current = 0;
+      isStreamingRef.current = false;
+      waitingForNextRef.current = false;
+      setHasAudio(false);
       setIsPlaying(false);
       setIsPaused(false);
 
@@ -301,7 +383,7 @@ export default function TTSControls({
         pendingAutoGenerateRef.current = true;
       }
     }
-  }, [text, ttsEnabled, audioUrl]);
+  }, [text, ttsEnabled]);
 
   // Trigger auto-generate when not disabled and pending
   useEffect(() => {
@@ -341,7 +423,6 @@ export default function TTSControls({
     return null;
   }
 
-  const hasAudio = savedAudioBlobRef.current !== null;
   const canReplay = !isPlaying && hasAudio;
 
   return (

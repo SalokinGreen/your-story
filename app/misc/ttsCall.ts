@@ -77,8 +77,8 @@ export interface TTSRequestBody {
   elevenlabsKey?: string;
 }
 
-export interface TTSSuccess {
-  audioBuffer: ArrayBuffer;
+export interface TTSStreamResult {
+  stream: ReadableStream<Uint8Array>;
   chunksGenerated: number;
   model: TTSModelKey;
 }
@@ -86,6 +86,32 @@ export interface TTSSuccess {
 export interface TTSError {
   error: string;
   status: number;
+}
+
+// Wire format for the streamed response body: each chunk's audio is
+// prefixed with its 4-byte big-endian length so the client can pull whole
+// chunks off the stream and hand each one to the <audio> element as an
+// independently-playable Blob as soon as it arrives, instead of waiting for
+// every chunk to finish generating before anything can play.
+function frameChunk(buffer: ArrayBuffer): [Uint8Array, Uint8Array] {
+  const lengthPrefix = new Uint8Array(4);
+  new DataView(lengthPrefix.buffer).setUint32(0, buffer.byteLength, false);
+  return [lengthPrefix, new Uint8Array(buffer)];
+}
+
+function toTTSError(err: unknown, providerLabel: string): TTSError {
+  if (err instanceof Error) {
+    if (err.message === "RATE_LIMIT") {
+      return {
+        error: "TTS rate limit reached. Please wait a moment before trying again.",
+        status: 429,
+      };
+    }
+    if (err.message === "AUTH_FAILED") {
+      return { error: `${providerLabel} authentication failed.`, status: 403 };
+    }
+  }
+  throw err;
 }
 
 // Split text into chunks at sentence boundaries
@@ -135,22 +161,6 @@ function splitTextIntoChunks(text: string, maxChunkSize: number): string[] {
   }
 
   return chunks.filter((chunk) => chunk.length > 0);
-}
-
-function concatenateAudioBuffers(buffers: ArrayBuffer[]): ArrayBuffer {
-  if (buffers.length === 0) return new ArrayBuffer(0);
-  if (buffers.length === 1) return buffers[0];
-
-  const totalLength = buffers.reduce((sum, buf) => sum + buf.byteLength, 0);
-  const result = new Uint8Array(totalLength);
-  let offset = 0;
-
-  for (const buffer of buffers) {
-    result.set(new Uint8Array(buffer), offset);
-    offset += buffer.byteLength;
-  }
-
-  return result.buffer;
 }
 
 // atob/btoa-based decode rather than Node's Buffer, so this runs unmodified
@@ -289,9 +299,9 @@ async function fetchChunkAudio(
   return null;
 }
 
-export async function generateTTSAudio(
+export async function generateTTSAudioStream(
   body: TTSRequestBody,
-): Promise<TTSSuccess | TTSError> {
+): Promise<TTSStreamResult | TTSError> {
   const { text, voiceId = "af_heart", model = "kokoro" } = body;
 
   const ttsModel: TTSModelKey =
@@ -352,51 +362,54 @@ export async function generateTTSAudio(
   const chunks = splitTextIntoChunks(cleanText, chunkSize);
   const providerFetch = getProviderFetch();
 
-  const chunkPromises = chunks.map(async (chunk, i) => {
-    try {
-      const buffer = await fetchChunkAudio(ttsModel, chunk, finalVoiceId, apiKey, providerFetch);
-      return { index: i, buffer };
-    } catch (chunkError: unknown) {
-      console.error(`Error processing chunk ${i + 1}:`, chunkError);
-      if (chunkError instanceof Error) {
-        if (chunkError.message === "RATE_LIMIT" || chunkError.message === "AUTH_FAILED") {
-          throw chunkError;
-        }
-      }
-      return { index: i, buffer: null, error: chunkError };
-    }
-  });
+  // Dispatch every chunk to the provider in parallel (as before), but keep
+  // each chunk's own promise instead of collapsing them with Promise.all -
+  // this lets us hand chunk 0's audio to the client as soon as it's ready
+  // rather than waiting for the slowest chunk.
+  const chunkPromises: Promise<ArrayBuffer | null>[] = chunks.map((chunk) =>
+    fetchChunkAudio(ttsModel, chunk, finalVoiceId, apiKey, providerFetch),
+  );
 
-  let results: { index: number; buffer: ArrayBuffer | null; error?: unknown }[];
+  // Await only the first chunk out here, so a bad key/rate limit (which
+  // will fail identically on every chunk) still surfaces as a normal JSON
+  // error before any bytes are streamed to the client - matching the old
+  // buffered behavior for the common failure case.
+  let firstBuffer: ArrayBuffer | null;
   try {
-    results = await Promise.all(chunkPromises);
-  } catch (parallelError: unknown) {
-    if (parallelError instanceof Error) {
-      if (parallelError.message === "RATE_LIMIT") {
-        return {
-          error: "TTS rate limit reached. Please wait a moment before trying again.",
-          status: 429,
-        };
-      }
-      if (parallelError.message === "AUTH_FAILED") {
-        return { error: `${providerLabel} authentication failed.`, status: 403 };
-      }
-    }
-    throw parallelError;
+    firstBuffer = await chunkPromises[0];
+  } catch (err: unknown) {
+    console.error("Error processing chunk 1:", err);
+    return toTTSError(err, providerLabel);
   }
 
-  const audioBuffers: ArrayBuffer[] = results
-    .sort((a, b) => a.index - b.index)
-    .filter((r) => r.buffer !== null)
-    .map((r) => r.buffer as ArrayBuffer);
-
-  if (audioBuffers.length === 0) {
+  if (firstBuffer === null && chunkPromises.length === 1) {
     return { error: "No audio generated", status: 500 };
   }
 
-  return {
-    audioBuffer: concatenateAudioBuffers(audioBuffers),
-    chunksGenerated: chunks.length,
-    model: ttsModel,
-  };
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      if (firstBuffer) {
+        for (const part of frameChunk(firstBuffer)) controller.enqueue(part);
+      }
+
+      for (let i = 1; i < chunkPromises.length; i++) {
+        try {
+          const buffer = await chunkPromises[i];
+          if (buffer) {
+            for (const part of frameChunk(buffer)) controller.enqueue(part);
+          }
+        } catch (err: unknown) {
+          // A later chunk failing (e.g. a transient rate limit) can't be
+          // turned into a JSON error anymore since streaming has already
+          // started - stop early and let the client play what it has.
+          console.error(`Error processing chunk ${i + 1}, stopping stream early:`, err);
+          break;
+        }
+      }
+
+      controller.close();
+    },
+  });
+
+  return { stream, chunksGenerated: chunks.length, model: ttsModel };
 }

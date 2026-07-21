@@ -4,7 +4,7 @@
  */
 
 import { isStandalone } from "./standalone";
-import { generateTTSAudio, TTSRequestBody } from "./ttsCall";
+import { generateTTSAudioStream, TTSRequestBody } from "./ttsCall";
 
 export async function ttsFetch(body: TTSRequestBody): Promise<Response> {
   if (!isStandalone()) {
@@ -15,7 +15,7 @@ export async function ttsFetch(body: TTSRequestBody): Promise<Response> {
     });
   }
 
-  const result = await generateTTSAudio(body);
+  const result = await generateTTSAudioStream(body);
   if ("error" in result) {
     return new Response(JSON.stringify(result), {
       status: result.status,
@@ -23,11 +23,10 @@ export async function ttsFetch(body: TTSRequestBody): Promise<Response> {
     });
   }
 
-  return new Response(result.audioBuffer, {
+  return new Response(result.stream, {
     status: 200,
     headers: {
-      "Content-Type": "audio/mpeg",
-      "Content-Length": result.audioBuffer.byteLength.toString(),
+      "Content-Type": "application/octet-stream",
       "X-Chunks-Generated": result.chunksGenerated.toString(),
       "X-TTS-Model": result.model,
     },
