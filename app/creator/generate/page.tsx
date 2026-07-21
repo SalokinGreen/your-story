@@ -96,7 +96,7 @@ function AutosaveRecoveryModal({
 }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="bg-blue-950 border border-blue-700/50 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
+      <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl p-6 max-w-md w-full mx-4 shadow-2xl">
         <div className="flex items-center gap-3 mb-4">
           <div className="w-12 h-12 rounded-full bg-amber-500/20 flex items-center justify-center">
             <span className="text-2xl">💾</span>
@@ -107,7 +107,7 @@ function AutosaveRecoveryModal({
           </div>
         </div>
 
-        <div className="bg-blue-900/30 rounded-lg p-4 mb-4 border border-blue-700/30">
+        <div className="bg-white/5 rounded-lg p-4 mb-4 border border-white/10">
           <p className="text-sm text-blue-200 mb-2">
             <span className="text-blue-300/60">Prompt:</span>{" "}
             {autosave.config.prompt.slice(0, 100)}
@@ -132,7 +132,7 @@ function AutosaveRecoveryModal({
         <div className="flex gap-3">
           <button
             onClick={onDiscard}
-            className="flex-1 px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+            className="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
           >
             Start Fresh
           </button>
@@ -237,9 +237,9 @@ function JsonRepairModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-blue-950 border border-blue-700/50 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+      <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-blue-700/30">
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
               <span className="text-xl">🔧</span>
@@ -276,7 +276,7 @@ function JsonRepairModal({
             </span>
             <button
               onClick={handleFormat}
-              className="px-3 py-1 text-xs bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+              className="px-3 py-1 text-xs bg-white/10 hover:bg-white/10 text-blue-300 rounded transition-colors"
             >
               Format JSON
             </button>
@@ -287,7 +287,7 @@ function JsonRepairModal({
               setEditedContent(e.target.value);
               setParseError(null);
             }}
-            className="flex-1 w-full min-h-[400px] bg-blue-900/30 border border-blue-700/30 rounded-lg p-3 font-mono text-sm text-blue-100 resize-y focus:outline-none focus:border-blue-500"
+            className="flex-1 w-full min-h-[400px] bg-white/5 border border-white/10 rounded-lg p-3 font-mono text-sm text-blue-100 resize-y focus:outline-none focus:border-blue-500"
             placeholder="Paste or edit JSON content here..."
             spellCheck={false}
           />
@@ -301,7 +301,7 @@ function JsonRepairModal({
         </div>
 
         {/* Footer with actions */}
-        <div className="flex items-center justify-between p-4 border-t border-blue-700/30 bg-blue-900/20">
+        <div className="flex items-center justify-between p-4 border-t border-white/10 bg-white/[0.03]">
           <div className="text-xs text-blue-300/50">
             Tip: Look for missing commas, unclosed brackets, or truncated
             strings
@@ -309,13 +309,13 @@ function JsonRepairModal({
           <div className="flex gap-3">
             <button
               onClick={handleValidate}
-              className="px-4 py-2 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
+              className="px-4 py-2 bg-white/10 hover:bg-white/10 text-blue-200 rounded-lg transition-colors"
             >
               Validate
             </button>
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
             >
               Cancel
             </button>
@@ -368,15 +368,15 @@ function StageToggle({
   return (
     <label
       className={`flex items-center gap-3 p-3 rounded-lg transition-all cursor-pointer ${
-        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-blue-900/30"
-      } ${enabled ? "bg-blue-900/20" : ""}`}
+        disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-white/5"
+      } ${enabled ? "bg-white/[0.03]" : ""}`}
     >
       <input
         type="checkbox"
         checked={enabled}
         onChange={(e) => !disabled && onToggle(e.target.checked)}
         disabled={disabled}
-        className="w-4 h-4 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
+        className="w-4 h-4 rounded bg-white/5 border-white/10 text-purple-500 focus:ring-purple-500"
       />
       <div className="flex-1">
         <span className="text-sm font-medium text-white">
@@ -416,7 +416,7 @@ function ConfigStep({
               ? "bg-green-500 text-white"
               : isActive
                 ? "bg-purple-500 text-white"
-                : "bg-blue-900/50 text-blue-300/50"
+                : "bg-white/5 text-blue-300/50"
           }`}
         >
           {isComplete ? "✓" : step}
@@ -458,7 +458,7 @@ function StageProgress({
                   ? "bg-green-500/10 border border-green-500/30"
                   : isFailed
                     ? "bg-red-500/10 border border-red-500/30"
-                    : "bg-blue-900/30 border border-blue-700/30"
+                    : "bg-white/5 border border-white/10"
             }`}
           >
             <div
@@ -469,7 +469,7 @@ function StageProgress({
                     ? "bg-red-500 text-white"
                     : isActive
                       ? "bg-purple-500 text-white animate-pulse"
-                      : "bg-blue-900/50 text-blue-300/50"
+                      : "bg-white/5 text-blue-300/50"
               }`}
             >
               {isComplete ? "✓" : isFailed ? "✗" : info.number}
@@ -563,7 +563,7 @@ function LiveOutput({
                 className={`px-3 py-1 text-xs rounded-lg transition-all flex items-center gap-1.5 ${
                   isSelected
                     ? "bg-blue-600 text-white"
-                    : "bg-blue-900/40 text-blue-300/70 hover:bg-blue-800/50 hover:text-blue-200"
+                    : "bg-white/5 text-blue-300/70 hover:bg-white/10 hover:text-blue-200"
                 }`}
               >
                 {isActive && (
@@ -583,13 +583,13 @@ function LiveOutput({
               type="checkbox"
               checked={autoScroll}
               onChange={(e) => setAutoScroll(e.target.checked)}
-              className="w-3 h-3 rounded bg-blue-900/50 border-blue-700/50 text-purple-500"
+              className="w-3 h-3 rounded bg-white/5 border-white/10 text-purple-500"
             />
             Auto-scroll
           </label>
           <button
             onClick={scrollToBottom}
-            className="px-2 py-1 text-xs bg-blue-900/40 hover:bg-blue-800/50 text-blue-300/70 rounded transition-colors"
+            className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 text-blue-300/70 rounded transition-colors"
             title="Scroll to bottom"
           >
             ↓ Bottom
@@ -600,7 +600,7 @@ function LiveOutput({
       {/* Content area - larger window */}
       <div
         ref={scrollRef}
-        className="bg-blue-950/50 rounded-lg p-4 h-80 overflow-y-auto font-mono text-sm text-blue-200 whitespace-pre-wrap border border-blue-700/30"
+        className="bg-white/[0.03] backdrop-blur-md rounded-lg p-4 h-80 overflow-y-auto font-mono text-sm text-blue-200 whitespace-pre-wrap border border-white/10"
       >
         {currentContent || (
           <span className="text-blue-400/50 italic">
@@ -839,7 +839,7 @@ function ContentBrowser({
     },
     blue: {
       text: "text-blue-400",
-      bg: "bg-blue-900/30",
+      bg: "bg-white/5",
       border: "border-blue-500/50",
     },
     orange: {
@@ -868,8 +868,8 @@ function ContentBrowser({
   const currentItem = currentSection?.items[selectedItemIndex];
 
   return (
-    <div className="mt-6 bg-blue-950/30 rounded-xl border border-blue-700/30 overflow-hidden">
-      <div className="p-3 bg-blue-900/30 border-b border-blue-700/30">
+    <div className="mt-6 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 overflow-hidden">
+      <div className="p-3 bg-white/5 border-b border-white/10">
         <h4 className="text-sm font-medium text-blue-300 flex items-center gap-2">
           <span>📚</span>
           <span>Browse Generated Content</span>
@@ -880,7 +880,7 @@ function ContentBrowser({
       </div>
 
       {/* Section tabs */}
-      <div className="flex flex-wrap gap-2 p-3 border-b border-blue-800/30">
+      <div className="flex flex-wrap gap-2 p-3 border-b border-white/10">
         {sections.map((section) => {
           const colors = colorClasses[section.color] || colorClasses.blue;
           const isActive = expandedSection === section.key;
@@ -894,14 +894,14 @@ function ContentBrowser({
               className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all flex items-center gap-2 ${
                 isActive
                   ? `${colors.bg} ${colors.text} border ${colors.border}`
-                  : "bg-blue-900/30 text-blue-300/70 hover:bg-blue-800/40 border border-transparent"
+                  : "bg-white/5 text-blue-300/70 hover:bg-white/10 border border-transparent"
               }`}
             >
               <span>{section.icon}</span>
               <span>{section.label}</span>
               <span
                 className={`text-xs px-1.5 py-0.5 rounded ${
-                  isActive ? "bg-black/20" : "bg-blue-800/50"
+                  isActive ? "bg-black/20" : "bg-white/10"
                 }`}
               >
                 {section.items.length}
@@ -921,7 +921,7 @@ function ContentBrowser({
                 setSelectedItemIndex((prev) => Math.max(0, prev - 1))
               }
               disabled={selectedItemIndex === 0}
-              className="p-2 rounded-lg bg-blue-900/40 hover:bg-blue-800/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               ←
             </button>
@@ -937,7 +937,7 @@ function ContentBrowser({
                 )
               }
               disabled={selectedItemIndex === currentSection.items.length - 1}
-              className="p-2 rounded-lg bg-blue-900/40 hover:bg-blue-800/50 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              className="p-2 rounded-lg bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               →
             </button>
@@ -947,7 +947,7 @@ function ContentBrowser({
           {currentItem && (
             <div
               className={`rounded-lg p-4 ${
-                colorClasses[currentSection.color]?.bg || "bg-blue-900/30"
+                colorClasses[currentSection.color]?.bg || "bg-white/5"
               } border ${
                 colorClasses[currentSection.color]?.border ||
                 "border-blue-500/30"
@@ -984,7 +984,7 @@ function ContentBrowser({
                   idx === selectedItemIndex
                     ? `${
                         colorClasses[currentSection.color]?.bg ||
-                        "bg-blue-900/50"
+                        "bg-white/5"
                       } ${
                         colorClasses[currentSection.color]?.text ||
                         "text-blue-300"
@@ -992,7 +992,7 @@ function ContentBrowser({
                         colorClasses[currentSection.color]?.border ||
                         "border-blue-500/30"
                       }`
-                    : "bg-blue-900/20 text-blue-300/60 hover:bg-blue-800/30 border border-transparent"
+                    : "bg-white/[0.03] text-blue-300/60 hover:bg-white/10 border border-transparent"
                 }`}
                 title={item.name}
               >
@@ -1062,8 +1062,8 @@ function ExpandableContentCard({
     },
     blue: {
       text: "text-blue-400",
-      bg: "bg-blue-800/50",
-      hover: "hover:bg-blue-700/50",
+      bg: "bg-white/10",
+      hover: "hover:bg-white/10",
     },
     green: {
       text: "text-green-400",
@@ -1125,13 +1125,13 @@ function ExpandableContentCard({
 
   return (
     <div
-      className={`bg-blue-900/50 rounded-lg border border-blue-700/30 overflow-hidden transition-all ${
+      className={`bg-white/5 rounded-lg border border-white/10 overflow-hidden transition-all ${
         isExpanded ? "col-span-2 md:col-span-4" : ""
       }`}
     >
       {/* Header - always visible */}
       <div
-        className="p-3 group relative cursor-pointer hover:bg-blue-800/30 transition-all"
+        className="p-3 group relative cursor-pointer hover:bg-white/10 transition-all"
         onClick={onToggleExpand}
       >
         {/* Action buttons */}
@@ -1147,7 +1147,7 @@ function ExpandableContentCard({
             disabled={isRegenerating || isExtending}
             className={`text-xs px-1.5 py-0.5 ${colorClass.bg} ${
               colorClass.hover
-            } disabled:bg-blue-900/30 ${colorClass.text.replace(
+            } disabled:bg-white/5 ${colorClass.text.replace(
               "400",
               "300",
             )} rounded transition-all`}
@@ -1162,7 +1162,7 @@ function ExpandableContentCard({
                 onExtend();
               }}
               disabled={isRegenerating || isExtending}
-              className="text-xs px-1.5 py-0.5 bg-green-800/50 hover:bg-green-700/50 disabled:bg-blue-900/30 text-green-300 rounded transition-all"
+              className="text-xs px-1.5 py-0.5 bg-green-800/50 hover:bg-green-700/50 disabled:bg-white/5 text-green-300 rounded transition-all"
               title={`Add more ${label.toLowerCase()}`}
             >
               {isExtending ? "⏳" : "➕"}
@@ -1188,12 +1188,12 @@ function ExpandableContentCard({
 
       {/* Expanded content */}
       {isExpanded && items.length > 0 && (
-        <div className="border-t border-blue-700/30 p-3 max-h-64 overflow-y-auto">
+        <div className="border-t border-white/10 p-3 max-h-64 overflow-y-auto">
           <div className="space-y-2">
             {items.map((item, index) => (
               <div
                 key={index}
-                className="bg-blue-950/50 rounded-lg p-2 border border-blue-800/30"
+                className="bg-white/[0.03] backdrop-blur-md rounded-lg p-2 border border-white/10"
               >
                 {renderItem(item, index)}
               </div>
@@ -1204,7 +1204,7 @@ function ExpandableContentCard({
 
       {/* Empty state when expanded */}
       {isExpanded && items.length === 0 && (
-        <div className="border-t border-blue-700/30 p-4 text-center text-blue-400/50 text-sm">
+        <div className="border-t border-white/10 p-4 text-center text-blue-400/50 text-sm">
           No {label.toLowerCase()} generated yet
         </div>
       )}
@@ -3021,7 +3021,7 @@ ${result.description || ""}`;
                       Array.isArray(
                         previewStageData.partialResult.storyTemplate.lore,
                       ) && (
-                        <div className="bg-blue-900/30 rounded px-3 py-2">
+                        <div className="bg-white/5 rounded px-3 py-2">
                           <span className="text-purple-400 font-bold">
                             {
                               previewStageData.partialResult.storyTemplate.lore
@@ -3037,7 +3037,7 @@ ${result.description || ""}`;
                         previewStageData.partialResult.storyTemplate
                           .relationships,
                       ) && (
-                        <div className="bg-blue-900/30 rounded px-3 py-2">
+                        <div className="bg-white/5 rounded px-3 py-2">
                           <span className="text-pink-400 font-bold">
                             {
                               previewStageData.partialResult.storyTemplate
@@ -3050,7 +3050,7 @@ ${result.description || ""}`;
                         </div>
                       )}
                     {previewStageData.partialResult.storyTemplate.goals && (
-                      <div className="bg-blue-900/30 rounded px-3 py-2">
+                      <div className="bg-white/5 rounded px-3 py-2">
                         <span className="text-yellow-400 font-bold">
                           {
                             previewStageData.partialResult.storyTemplate.goals
@@ -3069,7 +3069,7 @@ ${result.description || ""}`;
                 <h4 className="text-sm font-medium text-blue-300/60 mb-2">
                   Raw Output:
                 </h4>
-                <div className="bg-blue-950/50 rounded-lg p-4 border border-blue-800/30 max-h-64 overflow-auto">
+                <div className="bg-white/[0.03] backdrop-blur-md rounded-lg p-4 border border-white/10 max-h-64 overflow-auto">
                   <pre className="text-sm text-blue-200 whitespace-pre-wrap font-mono">
                     {previewStageData.content.slice(0, 3000)}
                     {previewStageData.content.length > 3000 && (
@@ -3084,7 +3084,7 @@ ${result.description || ""}`;
             </div>
 
             {/* Footer */}
-            <div className="bg-blue-950/50 border-t border-blue-800/30 px-6 py-4">
+            <div className="bg-white/[0.03] backdrop-blur-md border-t border-white/10 px-6 py-4">
               <div className="flex items-center justify-between">
                 <p className="text-xs text-blue-300/50">
                   Generation continues in the background. Close to see progress.
@@ -3130,7 +3130,7 @@ ${result.description || ""}`;
                   value={newTemplateName}
                   onChange={(e) => setNewTemplateName(e.target.value)}
                   placeholder="e.g., High Fantasy Epic"
-                  className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-2 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50"
                   autoFocus
                 />
               </div>
@@ -3144,11 +3144,11 @@ ${result.description || ""}`;
                   onChange={(e) => setNewTemplateDescription(e.target.value)}
                   placeholder="Brief description of when to use this template..."
                   rows={2}
-                  className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-2 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 resize-none"
+                  className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-2 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 resize-none"
                 />
               </div>
 
-              <div className="text-xs text-blue-300/50 bg-blue-900/30 rounded p-3">
+              <div className="text-xs text-blue-300/50 bg-white/5 rounded p-3">
                 <p className="font-medium text-blue-300/70 mb-1">
                   This template will save:
                 </p>
@@ -3160,14 +3160,14 @@ ${result.description || ""}`;
               </div>
             </div>
 
-            <div className="bg-blue-950/50 border-t border-blue-800/30 px-6 py-4 flex gap-3 justify-end">
+            <div className="bg-white/[0.03] backdrop-blur-md border-t border-white/10 px-6 py-4 flex gap-3 justify-end">
               <button
                 onClick={() => {
                   setShowTemplateModal(false);
                   setNewTemplateName("");
                   setNewTemplateDescription("");
                 }}
-                className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -3191,7 +3191,7 @@ ${result.description || ""}`;
             onClick={() => setShowHistoryModal(false)}
           />
           <div className="relative bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 rounded-xl border border-blue-500/30 max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="bg-blue-900/30 border-b border-blue-700/30 px-6 py-4 flex items-center justify-between">
+            <div className="bg-white/5 border-b border-white/10 px-6 py-4 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-white">
                   📜 Generation History
@@ -3216,7 +3216,7 @@ ${result.description || ""}`;
                   {history.map((entry) => (
                     <div
                       key={entry.id}
-                      className="p-4 bg-blue-900/30 rounded-lg border border-blue-800/30 group hover:border-blue-700/50 transition-colors"
+                      className="p-4 bg-white/5 rounded-lg border border-white/10 group hover:border-white/10 transition-colors"
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
@@ -3280,10 +3280,10 @@ ${result.description || ""}`;
               )}
             </div>
 
-            <div className="bg-blue-950/50 border-t border-blue-800/30 px-6 py-4 flex justify-end">
+            <div className="bg-white/[0.03] backdrop-blur-md border-t border-white/10 px-6 py-4 flex justify-end">
               <button
                 onClick={() => setShowHistoryModal(false)}
-                className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
               >
                 Close
               </button>
@@ -3293,7 +3293,7 @@ ${result.description || ""}`;
       )}
 
       {/* Header */}
-      <header className="border-b border-blue-800/30 bg-blue-950/80 backdrop-blur-xl sticky top-0 z-10">
+      <header className="border-b border-white/10 bg-[#0d1829]/90 backdrop-blur-xl backdrop-blur-xl sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
@@ -3302,7 +3302,7 @@ ${result.description || ""}`;
             >
               ← Back to Creator
             </Link>
-            <div className="h-6 w-px bg-blue-800/30" />
+            <div className="h-6 w-px bg-white/10" />
             <h1 className="text-xl font-bold flex items-center gap-2">
               <span className="text-purple-400">✨</span> Big Adventure Creator
             </h1>
@@ -3351,8 +3351,8 @@ ${result.description || ""}`;
                     }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors ${
                       promptMode === "freeform"
-                        ? "bg-purple-600 text-white"
-                        : "bg-blue-900/40 text-blue-300 hover:bg-blue-800/50"
+                        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                        : "bg-white/5 text-blue-300 hover:bg-white/10"
                     }`}
                   >
                     ✏️ Write Your Own
@@ -3364,8 +3364,8 @@ ${result.description || ""}`;
                     }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors ${
                       promptMode === "template"
-                        ? "bg-purple-600 text-white"
-                        : "bg-blue-900/40 text-blue-300 hover:bg-blue-800/50"
+                        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                        : "bg-white/5 text-blue-300 hover:bg-white/10"
                     }`}
                   >
                     📋 Use Template
@@ -3377,8 +3377,8 @@ ${result.description || ""}`;
                     }}
                     className={`flex-1 px-4 py-2 rounded-lg text-sm transition-colors ${
                       promptMode === "guided"
-                        ? "bg-purple-600 text-white"
-                        : "bg-blue-900/40 text-blue-300 hover:bg-blue-800/50"
+                        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                        : "bg-white/5 text-blue-300 hover:bg-white/10"
                     }`}
                   >
                     🧭 Guided Builder
@@ -3398,7 +3398,7 @@ ${result.description || ""}`;
                           updateConfig({ prompt: e.target.value })
                         }
                         placeholder="Describe your adventure concept in detail. For example: 'A dark fantasy adventure where the player is a cursed knight seeking redemption. The world is dying, corrupted by an ancient evil, and only by confronting their own past can the knight hope to save what remains.'"
-                        className="w-full h-32 bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-blue-900/70 resize-none transition-all"
+                        className="w-full h-32 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-white/10 resize-none transition-all"
                       />
                     </div>
                     <div>
@@ -3412,7 +3412,7 @@ ${result.description || ""}`;
                           updateConfig({ genre: e.target.value })
                         }
                         placeholder="e.g., Dark Fantasy, Sci-Fi Horror, Cozy Mystery..."
-                        className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-blue-900/70 transition-all"
+                        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-white/10 transition-all"
                       />
                     </div>
                   </>
@@ -3433,7 +3433,7 @@ ${result.description || ""}`;
                           className={`p-4 rounded-lg border text-left transition-all ${
                             selectedTemplate?.id === template.id
                               ? "bg-purple-900/50 border-purple-500"
-                              : "bg-blue-900/30 border-blue-700/50 hover:bg-blue-800/40 hover:border-blue-600/50"
+                              : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-blue-600/50"
                           }`}
                         >
                           <div className="flex items-center gap-2 mb-1">
@@ -3452,7 +3452,7 @@ ${result.description || ""}`;
                       ))}
                     </div>
                     {selectedTemplate && (
-                      <div className="p-4 bg-blue-900/30 rounded-lg border border-blue-700/30">
+                      <div className="p-4 bg-white/5 rounded-lg border border-white/10">
                         <div className="flex justify-between items-start mb-2">
                           <span className="text-sm text-blue-300/60">
                             Generated Prompt:
@@ -3466,10 +3466,10 @@ ${result.description || ""}`;
                         </div>
                         <p className="text-sm text-white/90">{config.prompt}</p>
                         <div className="mt-3 flex gap-2 flex-wrap text-xs">
-                          <span className="px-2 py-1 bg-blue-800/50 rounded text-blue-300">
+                          <span className="px-2 py-1 bg-white/10 rounded text-blue-300">
                             System: {selectedTemplate.suggestedSystem}
                           </span>
-                          <span className="px-2 py-1 bg-blue-800/50 rounded text-blue-300">
+                          <span className="px-2 py-1 bg-white/10 rounded text-blue-300">
                             Style:{" "}
                             {
                               STYLE_PRESETS[selectedTemplate.suggestedStyle]
@@ -3504,12 +3504,12 @@ ${result.description || ""}`;
                             updateGuidedAnswer(q.id, e.target.value)
                           }
                           placeholder={q.placeholder}
-                          className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-blue-900/70 transition-all"
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500/50 focus:bg-white/10 transition-all"
                         />
                       </div>
                     ))}
                     {Object.keys(guidedAnswers).length > 0 && (
-                      <div className="p-4 bg-blue-900/30 rounded-lg border border-blue-700/30">
+                      <div className="p-4 bg-white/5 rounded-lg border border-white/10">
                         <div className="flex justify-between items-start mb-2">
                           <span className="text-sm text-blue-300/60">
                             Generated Prompt Preview:
@@ -3534,15 +3534,15 @@ ${result.description || ""}`;
 
                 {/* Import Options */}
                 <div className="flex items-center gap-4 pt-2">
-                  <div className="flex-1 h-px bg-blue-800/30" />
+                  <div className="flex-1 h-px bg-white/10" />
                   <span className="text-xs text-blue-300/50">
                     or import from
                   </span>
-                  <div className="flex-1 h-px bg-blue-800/30" />
+                  <div className="flex-1 h-px bg-white/10" />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* JSON Import */}
-                  <div className="text-center p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                  <div className="text-center p-4 bg-white/[0.03] rounded-lg border border-white/10">
                     <input
                       type="file"
                       accept=".json"
@@ -3552,7 +3552,7 @@ ${result.description || ""}`;
                     />
                     <label
                       htmlFor="import-config-input"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-blue-300 rounded-lg transition-colors text-sm cursor-pointer"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 text-blue-300 rounded-lg transition-colors text-sm cursor-pointer"
                     >
                       📥 Import Adventure JSON
                     </label>
@@ -3562,7 +3562,7 @@ ${result.description || ""}`;
                   </div>
 
                   {/* PDF Import */}
-                  <div className="text-center p-4 bg-blue-900/20 rounded-lg border border-blue-800/30">
+                  <div className="text-center p-4 bg-white/[0.03] rounded-lg border border-white/10">
                     <PDFImporter
                       compact
                       buttonText="📄 Import from PDF"
@@ -3681,13 +3681,13 @@ ${result.description || ""}`;
                 </div>
 
                 {/* NSFW Toggle */}
-                <div className="pt-2 border-t border-blue-800/30">
+                <div className="pt-2 border-t border-white/10">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={config.nsfw}
                       onChange={(e) => updateConfig({ nsfw: e.target.checked })}
-                      className="w-5 h-5 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
+                      className="w-5 h-5 rounded bg-white/5 border-white/10 text-purple-500 focus:ring-purple-500"
                     />
                     <span className="text-white">Allow NSFW Content</span>
                   </label>
@@ -3722,14 +3722,14 @@ ${result.description || ""}`;
                 </p>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="flex items-start gap-3 p-4 bg-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/50 transition-colors border border-blue-700/30">
+                  <label className="flex items-start gap-3 p-4 bg-white/5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors border border-white/10">
                     <input
                       type="checkbox"
                       checked={config.includePresets}
                       onChange={(e) =>
                         updateConfig({ includePresets: e.target.checked })
                       }
-                      className="w-5 h-5 mt-0.5 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
+                      className="w-5 h-5 mt-0.5 rounded bg-white/5 border-white/10 text-purple-500 focus:ring-purple-500"
                     />
                     <div>
                       <div className="font-medium text-white">
@@ -3741,14 +3741,14 @@ ${result.description || ""}`;
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 p-4 bg-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/50 transition-colors border border-blue-700/30">
+                  <label className="flex items-start gap-3 p-4 bg-white/5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors border border-white/10">
                     <input
                       type="checkbox"
                       checked={config.includeAGMT}
                       onChange={(e) =>
                         updateConfig({ includeAGMT: e.target.checked })
                       }
-                      className="w-5 h-5 mt-0.5 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
+                      className="w-5 h-5 mt-0.5 rounded bg-white/5 border-white/10 text-purple-500 focus:ring-purple-500"
                     />
                     <div>
                       <div className="font-medium text-white">
@@ -3760,14 +3760,14 @@ ${result.description || ""}`;
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 p-4 bg-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/50 transition-colors border border-blue-700/30">
+                  <label className="flex items-start gap-3 p-4 bg-white/5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors border border-white/10">
                     <input
                       type="checkbox"
                       checked={config.includeCustomTables}
                       onChange={(e) =>
                         updateConfig({ includeCustomTables: e.target.checked })
                       }
-                      className="w-5 h-5 mt-0.5 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
+                      className="w-5 h-5 mt-0.5 rounded bg-white/5 border-white/10 text-purple-500 focus:ring-purple-500"
                     />
                     <div>
                       <div className="font-medium text-white">
@@ -3779,7 +3779,7 @@ ${result.description || ""}`;
                     </div>
                   </label>
 
-                  <label className="flex items-start gap-3 p-4 bg-blue-900/30 rounded-lg cursor-pointer hover:bg-blue-900/50 transition-colors border border-blue-700/30">
+                  <label className="flex items-start gap-3 p-4 bg-white/5 rounded-lg cursor-pointer hover:bg-white/5 transition-colors border border-white/10">
                     <input
                       type="checkbox"
                       checked={config.includeStartingChoices}
@@ -3788,7 +3788,7 @@ ${result.description || ""}`;
                           includeStartingChoices: e.target.checked,
                         })
                       }
-                      className="w-5 h-5 mt-0.5 rounded bg-blue-900/50 border-blue-700/50 text-purple-500 focus:ring-purple-500"
+                      className="w-5 h-5 mt-0.5 rounded bg-white/5 border-white/10 text-purple-500 focus:ring-purple-500"
                     />
                     <div>
                       <div className="font-medium text-white">
@@ -3804,7 +3804,7 @@ ${result.description || ""}`;
                 <div className="flex gap-3 pt-4">
                   <button
                     onClick={() => setConfigStep(1)}
-                    className="px-6 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                    className="px-6 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
                   >
                     ← Back
                   </button>
@@ -3826,7 +3826,7 @@ ${result.description || ""}`;
             >
               <div className="space-y-6">
                 {/* AI Model Selection */}
-                <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-700/30">
+                <div className="bg-white/[0.03] rounded-lg p-4 border border-white/10">
                   <label className="block text-sm text-blue-300/60 mb-2">
                     AI Model (BYOK - Bring Your Own Key)
                   </label>
@@ -3834,7 +3834,7 @@ ${result.description || ""}`;
                   <select
                     value={selectedModel}
                     onChange={(e) => setSelectedModel(e.target.value)}
-                    className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500/50 transition-all"
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-purple-500/50 transition-all"
                   >
                     {filteredModels.map(([key, model]) => (
                       <option key={key} value={key}>
@@ -3872,7 +3872,7 @@ ${result.description || ""}`;
                       {templates.map((template) => (
                         <div
                           key={template.id}
-                          className="flex items-center justify-between p-2 bg-blue-900/30 rounded-lg border border-blue-800/30 group"
+                          className="flex items-center justify-between p-2 bg-white/5 rounded-lg border border-white/10 group"
                         >
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-white text-sm truncate">
@@ -3887,7 +3887,7 @@ ${result.description || ""}`;
                           <div className="flex gap-2 ml-3">
                             <button
                               onClick={() => handleLoadTemplate(template)}
-                              className="text-xs px-2 py-1 bg-blue-700/50 hover:bg-blue-600/50 text-white rounded transition-colors"
+                              className="text-xs px-2 py-1 bg-white/10 hover:bg-blue-600/50 text-white rounded transition-colors"
                             >
                               Load
                             </button>
@@ -3910,7 +3910,7 @@ ${result.description || ""}`;
                 </div>
 
                 {/* Style & Temperature Controls (Phase 4) */}
-                <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-700/30">
+                <div className="bg-white/[0.03] rounded-lg p-4 border border-white/10">
                   <h4 className="font-medium text-white mb-3">Writing Style</h4>
 
                   {/* Style Preset Selector */}
@@ -3936,7 +3936,7 @@ ${result.description || ""}`;
                           className={`p-2 rounded-lg border text-left transition-all ${
                             config.stylePreset === key
                               ? "bg-purple-900/50 border-purple-500"
-                              : "bg-blue-900/30 border-blue-700/50 hover:bg-blue-800/40"
+                              : "bg-white/5 border-white/10 hover:bg-white/10"
                           }`}
                         >
                           <div className="flex items-center gap-1.5">
@@ -3974,7 +3974,7 @@ ${result.description || ""}`;
                           temperature: parseFloat(e.target.value),
                         })
                       }
-                      className="w-full h-2 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                      className="w-full h-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
                     />
                     <div className="flex justify-between text-xs text-blue-300/50 mt-1">
                       <span>🎯 Focused & Consistent</span>
@@ -3988,7 +3988,7 @@ ${result.description || ""}`;
                 </div>
 
                 {/* Basic Output Settings */}
-                <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-700/30">
+                <div className="bg-white/[0.03] rounded-lg p-4 border border-white/10">
                   <h4 className="font-medium text-white mb-3">
                     Output Settings
                   </h4>
@@ -4017,7 +4017,7 @@ ${result.description || ""}`;
                           maxOutputTokens: parseInt(e.target.value),
                         })
                       }
-                      className="w-full h-2 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                      className="w-full h-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
                     />
                     <p className="text-xs text-blue-300/50 mt-1">
                       Higher values = more detailed content but higher cost.
@@ -4069,8 +4069,8 @@ ${result.description || ""}`;
                           }
                           className={`relative w-12 h-6 rounded-full transition-colors ${
                             config.previewBetweenStages
-                              ? "bg-purple-600"
-                              : "bg-blue-900/40"
+                              ? "bg-linear-to-r from-purple-600 to-blue-600"
+                              : "bg-white/5"
                           }`}
                         >
                           <span
@@ -4098,7 +4098,7 @@ ${result.description || ""}`;
                         <button
                           onClick={() => setParallelMode(!parallelMode)}
                           className={`relative w-12 h-6 rounded-full transition-colors ${
-                            parallelMode ? "bg-purple-600" : "bg-blue-900/40"
+                            parallelMode ? "bg-linear-to-r from-purple-600 to-blue-600" : "bg-white/5"
                           }`}
                         >
                           <span
@@ -4111,7 +4111,7 @@ ${result.description || ""}`;
                     </div>
 
                     {/* Stage Toggles */}
-                    <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-700/30">
+                    <div className="bg-white/[0.03] rounded-lg p-4 border border-white/10">
                       <h4 className="font-medium text-white mb-3">
                         Stage Control
                       </h4>
@@ -4158,7 +4158,7 @@ ${result.description || ""}`;
                     </div>
 
                     {/* Per-Stage Token Limits */}
-                    <div className="bg-blue-900/20 rounded-lg p-4 border border-blue-700/30">
+                    <div className="bg-white/[0.03] rounded-lg p-4 border border-white/10">
                       <h4 className="font-medium text-white mb-1">
                         Per-Stage Token Limits
                       </h4>
@@ -4208,7 +4208,7 @@ ${result.description || ""}`;
                                     maxOutputTokens: parseInt(e.target.value),
                                   })
                                 }
-                                className="flex-1 h-1.5 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                                className="flex-1 h-1.5 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
                               />
                               <span className="text-sm font-mono text-purple-400 w-16 text-right">
                                 {stageValue}
@@ -4292,7 +4292,7 @@ ${result.description || ""}`;
                                 }
                                 placeholder={info.instructionHint}
                                 rows={2}
-                                className="w-full px-3 py-2 bg-blue-900/30 border border-purple-700/30 rounded-lg text-white placeholder-purple-300/40 text-sm resize-none focus:outline-none focus:border-purple-500/50"
+                                className="w-full px-3 py-2 bg-white/5 border border-purple-700/30 rounded-lg text-white placeholder-purple-300/40 text-sm resize-none focus:outline-none focus:border-purple-500/50"
                                 disabled={
                                   !config.stageConfigs?.[stage]?.enabled
                                 }
@@ -4360,7 +4360,7 @@ ${result.description || ""}`;
                             className={`px-2 py-1 rounded text-xs ${
                               isCompleted
                                 ? "bg-green-900/40 text-green-300 border border-green-700/30"
-                                : "bg-blue-900/30 text-blue-300/60 border border-blue-700/30"
+                                : "bg-white/5 text-blue-300/60 border border-white/10"
                             }`}
                           >
                             {info.emoji} {info.name} {isCompleted ? "✓" : "○"}
@@ -4397,7 +4397,7 @@ ${result.description || ""}`;
                         setPartialResults({});
                       }
                     }}
-                    className="px-6 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                    className="px-6 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
                   >
                     ← Back
                   </button>
@@ -4444,7 +4444,7 @@ ${result.description || ""}`;
                 )}
               </div>
               {/* Progress bar */}
-              <div className="mt-2 w-full max-w-md mx-auto h-2 bg-blue-900/40 rounded-full overflow-hidden">
+              <div className="mt-2 w-full max-w-md mx-auto h-2 bg-white/5 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-linear-to-r from-purple-500 to-blue-500 transition-all duration-300"
                   style={{
@@ -4513,7 +4513,7 @@ ${result.description || ""}`;
             </div>
 
             {/* Preview */}
-            <div className="bg-blue-950/50 rounded-xl p-6 border border-blue-700/30">
+            <div className="bg-white/[0.03] backdrop-blur-md rounded-xl p-6 border border-white/10">
               <div className="flex items-start justify-between mb-2">
                 <h3 className="text-xl font-bold text-white">
                   {result.title || "Untitled Adventure"}
@@ -4523,7 +4523,7 @@ ${result.description || ""}`;
                     handleRegenerateSection("title", extensionInstructions)
                   }
                   disabled={regeneratingSections.has("title")}
-                  className="text-xs px-2 py-1 bg-blue-800/50 hover:bg-blue-700/50 disabled:bg-blue-900/30 disabled:text-blue-300/30 text-blue-300 rounded transition-colors"
+                  className="text-xs px-2 py-1 bg-white/10 hover:bg-white/10 disabled:bg-white/5 disabled:text-blue-300/30 text-blue-300 rounded transition-colors"
                   title="Regenerate title & descriptions"
                 >
                   {regeneratingSections.has("title") ? "⏳" : "🔄"}
@@ -4539,7 +4539,7 @@ ${result.description || ""}`;
 
               {/* Regenerating overlay */}
               {regeneratingSections.size > 0 && (
-                <div className="mt-6 pt-6 border-t border-blue-800/30">
+                <div className="mt-6 pt-6 border-t border-white/10">
                   <h4 className="text-sm font-medium text-purple-400 mb-3 flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
                     Regenerating{" "}
@@ -4560,7 +4560,7 @@ ${result.description || ""}`;
 
               {/* Stats Summary with Regenerate Buttons */}
               {result.storyTemplate && (
-                <div className="mt-6 pt-6 border-t border-blue-800/30">
+                <div className="mt-6 pt-6 border-t border-white/10">
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-medium text-blue-300/60">
                       Generated Content Summary
@@ -4588,7 +4588,7 @@ ${result.description || ""}`;
                           setExpandedSections(new Set(allSections));
                         }
                       }}
-                      className="text-xs px-2 py-1 bg-blue-900/40 hover:bg-blue-800/50 text-blue-300 rounded transition-all"
+                      className="text-xs px-2 py-1 bg-white/5 hover:bg-white/10 text-blue-300 rounded transition-all"
                     >
                       {expandedSections.size > 6
                         ? "Collapse All"
@@ -4875,7 +4875,7 @@ ${result.description || ""}`;
                           setExtensionOutputSize(newMax);
                         }
                       }}
-                      className="w-full bg-blue-900/50 border border-blue-700/50 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50 transition-all"
+                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/50 transition-all"
                     >
                       {filteredExtensionModels.map(([key, model]) => (
                         <option key={key} value={key}>
@@ -4902,7 +4902,7 @@ ${result.description || ""}`;
                         onChange={(e) =>
                           setExtensionOutputSize(parseInt(e.target.value))
                         }
-                        className="flex-1 max-w-48 h-2 bg-blue-900/40 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                        className="flex-1 max-w-48 h-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
                       />
                       <span className="text-purple-400 font-medium min-w-12 text-center">
                         {(extensionOutputSize / 1000).toFixed(0)}K
@@ -4931,7 +4931,7 @@ ${result.description || ""}`;
                       value={extensionInstructions}
                       onChange={(e) => setExtensionInstructions(e.target.value)}
                       placeholder="Custom instructions (e.g., 'More characters', 'Focus on locations')"
-                      className="w-full px-3 py-2 bg-blue-950/40 border border-blue-800/40 rounded-lg text-sm text-blue-100 placeholder-blue-400/40 focus:outline-none focus:border-purple-500/50"
+                      className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg text-sm text-blue-100 placeholder-blue-400/40 focus:outline-none focus:border-purple-500/50"
                     />
                   </div>
                 </div>
@@ -4939,7 +4939,7 @@ ${result.description || ""}`;
 
               {/* Extension progress overlay */}
               {extendingSections.size > 0 && (
-                <div className="mt-6 pt-6 border-t border-blue-800/30">
+                <div className="mt-6 pt-6 border-t border-white/10">
                   <h4 className="text-sm font-medium text-green-400 mb-3 flex items-center gap-2">
                     <div className="w-4 h-4 border-2 border-green-500 border-t-transparent rounded-full animate-spin" />
                     Adding more{" "}
@@ -4963,7 +4963,7 @@ ${result.description || ""}`;
             <AdventureVisualization result={result} />
 
             {/* AI Cover Generation */}
-            <div className="bg-blue-950/50 rounded-xl p-6 border border-blue-700/30">
+            <div className="bg-white/[0.03] backdrop-blur-md rounded-xl p-6 border border-white/10">
               <h4 className="text-lg font-semibold text-blue-200 mb-4 flex items-center gap-2">
                 🎨 AI Cover Generation
                 <span className="text-xs font-normal text-blue-400/60">
@@ -4984,8 +4984,8 @@ ${result.description || ""}`;
                     }}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       imageProvider === "deepinfra"
-                        ? "bg-purple-600 text-white"
-                        : "bg-blue-900/50 text-blue-300 hover:bg-blue-800/50"
+                        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                        : "bg-white/5 text-blue-300 hover:bg-white/10"
                     }`}
                   >
                     🪙 DeepInfra (Coins)
@@ -4997,8 +4997,8 @@ ${result.description || ""}`;
                     }}
                     className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                       imageProvider === "openrouter"
-                        ? "bg-purple-600 text-white"
-                        : "bg-blue-900/50 text-blue-300 hover:bg-blue-800/50"
+                        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                        : "bg-white/5 text-blue-300 hover:bg-white/10"
                     }`}
                   >
                     🔑 OpenRouter (BYOK)
@@ -5023,7 +5023,7 @@ ${result.description || ""}`;
                       e.target.value as ImageModelKey | DeepInfraImageModelKey,
                     )
                   }
-                  className="w-full md:w-auto px-4 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                  className="w-full md:w-auto px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
                 >
                   {imageProvider === "deepinfra"
                     ? Object.entries(DEEPINFRA_IMAGE_MODELS).map(
@@ -5053,7 +5053,7 @@ ${result.description || ""}`;
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Thumbnail Generation */}
-                <div className="bg-blue-900/30 rounded-lg p-4 border border-blue-800/40">
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
                   <div className="flex items-center justify-between mb-3">
                     <h5 className="text-sm font-semibold text-blue-200">
                       📷 Thumbnail
@@ -5068,7 +5068,7 @@ ${result.description || ""}`;
                       <img
                         src={thumbnailUrl}
                         alt="Thumbnail preview"
-                        className="w-full h-32 object-cover rounded-lg border border-blue-700/40"
+                        className="w-full h-32 object-cover rounded-lg border border-white/10"
                       />
                       <button
                         onClick={() => setThumbnailUrl("")}
@@ -5078,7 +5078,7 @@ ${result.description || ""}`;
                       </button>
                     </div>
                   ) : (
-                    <div className="w-full h-32 bg-blue-950/50 rounded-lg border border-dashed border-blue-700/40 flex items-center justify-center mb-4">
+                    <div className="w-full h-32 bg-white/[0.03] backdrop-blur-md rounded-lg border border-dashed border-white/10 flex items-center justify-center mb-4">
                       <span className="text-blue-400/40 text-sm">
                         No thumbnail yet
                       </span>
@@ -5091,13 +5091,13 @@ ${result.description || ""}`;
                         value={thumbnailPrompt}
                         onChange={(e) => setThumbnailPrompt(e.target.value)}
                         rows={4}
-                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/50 rounded-lg text-white text-sm resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg text-white text-sm resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
                         placeholder="Describe your cover image..."
                       />
                       <div className="flex gap-2">
                         <button
                           onClick={() => setShowThumbnailPromptEditor(false)}
-                          className="text-xs px-3 py-1.5 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                          className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/10 text-blue-300 rounded transition-colors"
                         >
                           Done
                         </button>
@@ -5107,7 +5107,7 @@ ${result.description || ""}`;
                               getDefaultImagePrompt("thumbnail"),
                             )
                           }
-                          className="text-xs px-3 py-1.5 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                          className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/10 text-blue-300 rounded transition-colors"
                         >
                           Reset
                         </button>
@@ -5125,7 +5125,7 @@ ${result.description || ""}`;
                   <button
                     onClick={() => generateImage("thumbnail")}
                     disabled={generatingThumbnail || !thumbnailPrompt.trim()}
-                    className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:bg-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-white/5 disabled:to-white/5 disabled:text-blue-300/50 text-white rounded-lg font-medium shadow-md shadow-purple-950/40 transition-all text-sm flex items-center justify-center gap-2"
                   >
                     {generatingThumbnail ? (
                       <>
@@ -5144,7 +5144,7 @@ ${result.description || ""}`;
                 </div>
 
                 {/* Banner Generation */}
-                <div className="bg-blue-900/30 rounded-lg p-4 border border-blue-800/40">
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
                   <div className="flex items-center justify-between mb-3">
                     <h5 className="text-sm font-semibold text-blue-200">
                       🖼️ Banner
@@ -5159,7 +5159,7 @@ ${result.description || ""}`;
                       <img
                         src={bannerUrl}
                         alt="Banner preview"
-                        className="w-full h-32 object-cover rounded-lg border border-blue-700/40"
+                        className="w-full h-32 object-cover rounded-lg border border-white/10"
                       />
                       <button
                         onClick={() => setBannerUrl("")}
@@ -5169,7 +5169,7 @@ ${result.description || ""}`;
                       </button>
                     </div>
                   ) : (
-                    <div className="w-full h-32 bg-blue-950/50 rounded-lg border border-dashed border-blue-700/40 flex items-center justify-center mb-4">
+                    <div className="w-full h-32 bg-white/[0.03] backdrop-blur-md rounded-lg border border-dashed border-white/10 flex items-center justify-center mb-4">
                       <span className="text-blue-400/40 text-sm">
                         No banner yet
                       </span>
@@ -5182,13 +5182,13 @@ ${result.description || ""}`;
                         value={bannerPrompt}
                         onChange={(e) => setBannerPrompt(e.target.value)}
                         rows={4}
-                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/50 rounded-lg text-white text-sm resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
+                        className="w-full px-3 py-2 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg text-white text-sm resize-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 focus:outline-none"
                         placeholder="Describe your banner image..."
                       />
                       <div className="flex gap-2">
                         <button
                           onClick={() => setShowBannerPromptEditor(false)}
-                          className="text-xs px-3 py-1.5 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                          className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/10 text-blue-300 rounded transition-colors"
                         >
                           Done
                         </button>
@@ -5196,7 +5196,7 @@ ${result.description || ""}`;
                           onClick={() =>
                             setBannerPrompt(getDefaultImagePrompt("banner"))
                           }
-                          className="text-xs px-3 py-1.5 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                          className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/10 text-blue-300 rounded transition-colors"
                         >
                           Reset
                         </button>
@@ -5214,7 +5214,7 @@ ${result.description || ""}`;
                   <button
                     onClick={() => generateImage("banner")}
                     disabled={generatingBanner || !bannerPrompt.trim()}
-                    className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-500 disabled:bg-blue-900/40 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors text-sm flex items-center justify-center gap-2"
+                    className="w-full px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:from-white/5 disabled:to-white/5 disabled:text-blue-300/50 text-white rounded-lg font-medium shadow-md shadow-purple-950/40 transition-all text-sm flex items-center justify-center gap-2"
                   >
                     {generatingBanner ? (
                       <>
@@ -5255,7 +5255,7 @@ ${result.description || ""}`;
                   clearAutosave();
                   setSessionId(generateSessionId());
                 }}
-                className="px-4 py-2.5 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors text-sm"
+                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors text-sm"
               >
                 Start Over
               </button>
@@ -5265,7 +5265,7 @@ ${result.description || ""}`;
                   handleRegenerateSection("icons", extensionInstructions)
                 }
                 disabled={regeneratingSections.has("icons")}
-                className="px-4 py-2.5 bg-blue-900/40 hover:bg-blue-800/50 disabled:bg-blue-900/20 disabled:text-blue-300/50 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
+                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 disabled:bg-white/[0.03] disabled:text-blue-300/50 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
               >
                 {regeneratingSections.has("icons") ? (
                   <>
@@ -5279,14 +5279,14 @@ ${result.description || ""}`;
 
               <button
                 onClick={exportAdventure}
-                className="px-4 py-2.5 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
+                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors text-sm flex items-center gap-2"
               >
                 📤 Export JSON
               </button>
 
               <label
                 htmlFor="import-adventure-input"
-                className="px-4 py-2.5 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors text-sm flex items-center gap-2 cursor-pointer"
+                className="px-4 py-2.5 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors text-sm flex items-center gap-2 cursor-pointer"
               >
                 📥 Import JSON
               </label>
