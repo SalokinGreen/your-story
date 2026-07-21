@@ -606,6 +606,10 @@ interface PDFImporterProps {
   buttonText?: string;
   /** Optional: Compact mode */
   compact?: boolean;
+  /** Optional: mount with the modal already open, skipping the trigger button */
+  startOpen?: boolean;
+  /** Optional: called whenever the modal closes (cancel or completion) */
+  onClose?: () => void;
 }
 
 type ProcessingStep =
@@ -637,12 +641,18 @@ export default function PDFImporter({
   importTypes = ["lore", "mechanics", "tables"],
   buttonText = "Import from PDF",
   compact = false,
+  startOpen = false,
+  onClose,
 }: PDFImporterProps) {
   const { keys } = useAPIKeys();
   const { addNotification } = useNotification();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(startOpen);
+  const closeModal = useCallback(() => {
+    setIsOpen(false);
+    onClose?.();
+  }, [onClose]);
   const [step, setStep] = useState<ProcessingStep>("idle");
   const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
@@ -788,9 +798,9 @@ export default function PDFImporter({
         } tables from saved import`,
         "success",
       );
-      setIsOpen(false);
+      closeModal();
     },
-    [onImportComplete, addNotification],
+    [onImportComplete, addNotification, closeModal],
   );
 
   // Retry a failed chunk
@@ -1108,7 +1118,7 @@ export default function PDFImporter({
     );
 
     // Close modal
-    setIsOpen(false);
+    closeModal();
     resetState();
   }, [
     collectChunkResults,
@@ -1117,6 +1127,7 @@ export default function PDFImporter({
     saveImport,
     onImportComplete,
     addNotification,
+    closeModal,
   ]);
 
   // Get max output limit based on selected model
@@ -1845,7 +1856,7 @@ export default function PDFImporter({
 
       // Close modal after short delay
       setTimeout(() => {
-        setIsOpen(false);
+        closeModal();
         resetState();
       }, 1500);
     } catch (error: any) {
@@ -1994,7 +2005,7 @@ export default function PDFImporter({
       );
 
       setTimeout(() => {
-        setIsOpen(false);
+        closeModal();
         resetState();
       }, 1500);
     } catch (error: unknown) {
@@ -2127,7 +2138,7 @@ export default function PDFImporter({
               </div>
               <button
                 onClick={() => {
-                  setIsOpen(false);
+                  closeModal();
                   resetState();
                 }}
                 className="p-2 hover:bg-blue-800/50 rounded-lg transition-colors"
@@ -3127,7 +3138,7 @@ export default function PDFImporter({
             <div className="flex justify-end gap-3 p-4 border-t border-blue-700/40">
               <button
                 onClick={() => {
-                  setIsOpen(false);
+                  closeModal();
                   resetState();
                 }}
                 className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
