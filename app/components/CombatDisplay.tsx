@@ -54,7 +54,7 @@ function getStatColor(statName: string, _value: number, _max?: number): string {
   }
 
   // Default color
-  return "text-gray-300";
+  return "text-blue-200/70";
 }
 
 /**
@@ -81,15 +81,15 @@ function getCombatantIcon(type: Combatant["type"]): string {
 function getCombatantTypeColor(type: Combatant["type"]): string {
   switch (type) {
     case "player":
-      return "text-green-400 bg-green-900/30 border-green-700/50";
+      return "text-green-300 bg-green-500/10 border-green-400/20";
     case "ally":
-      return "text-blue-400 bg-blue-900/30 border-blue-700/50";
+      return "text-blue-300 bg-blue-500/10 border-blue-400/20";
     case "enemy":
-      return "text-red-400 bg-red-900/30 border-red-700/50";
+      return "text-red-300 bg-red-500/10 border-red-400/20";
     case "neutral":
-      return "text-yellow-400 bg-yellow-900/30 border-yellow-700/50";
+      return "text-yellow-300 bg-yellow-500/10 border-yellow-400/20";
     default:
-      return "text-gray-400 bg-gray-900/30 border-gray-700/50";
+      return "text-blue-200/70 bg-white/5 border-white/10";
   }
 }
 
@@ -98,7 +98,7 @@ function getCombatantTypeColor(type: Combatant["type"]): string {
  */
 function ConditionBadge({ condition }: { condition: CombatCondition }) {
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded bg-amber-900/40 text-amber-300 border border-amber-700/30">
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-xs rounded-md bg-amber-500/10 text-amber-300 border border-amber-400/20">
       <span>{condition.name}</span>
       {condition.duration !== undefined && (
         <span className="text-amber-400/60">({condition.duration})</span>
@@ -122,7 +122,7 @@ function CombatantRow({
 
   return (
     <div
-      className={`flex items-center gap-2 px-2 py-1.5 rounded border transition-all ${typeColor} ${
+      className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all ${typeColor} ${
         isCurrentTurn ? "ring-2 ring-yellow-400/50 scale-[1.02]" : ""
       } ${!combatant.isActive ? "opacity-40" : ""}`}
     >
@@ -170,7 +170,7 @@ function CombatantRow({
 
       {/* Inactive indicator */}
       {!combatant.isActive && (
-        <span className="text-xs text-gray-500 italic">Out</span>
+        <span className="text-xs text-blue-300/50 italic">Out</span>
       )}
     </div>
   );
@@ -208,11 +208,11 @@ export default function CombatDisplay({
   });
 
   return (
-    <div className="border-b border-red-800/30 bg-red-950/20">
+    <div className="border-b border-red-400/20 bg-red-500/[0.06] backdrop-blur-md">
       {/* Combat Header - always visible */}
       <button
         onClick={onToggleExpand}
-        className="w-full flex items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 bg-red-900/30 hover:bg-red-900/40 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-1.5 sm:px-4 sm:py-2 bg-red-500/10 hover:bg-red-500/15 transition-colors"
       >
         <div className="flex items-center gap-2">
           <DynamicIcon name="Swords" className="w-4 h-4 text-red-400" />
@@ -240,7 +240,7 @@ export default function CombatDisplay({
         <div className="px-3 py-2 sm:px-4 sm:py-3 space-y-2 sm:space-y-3 max-h-40 sm:max-h-60 overflow-y-auto">
           {/* Turn Order Bar */}
           <div className="flex items-center gap-1 overflow-x-auto pb-1">
-            <span className="text-xs text-gray-500 mr-1 shrink-0">
+            <span className="text-xs text-blue-300/50 mr-1 shrink-0">
               Turn Order:
             </span>
             {combatState.turnOrder.map((id, index) => {
@@ -277,8 +277,8 @@ export default function CombatDisplay({
 
             {/* Inactive combatants (collapsed) */}
             {inactiveCombatants.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-red-800/20">
-                <span className="text-xs text-gray-500 mb-1 block">
+              <div className="mt-2 pt-2 border-t border-red-400/20">
+                <span className="text-xs text-blue-300/50 mb-1 block">
                   Out of combat ({inactiveCombatants.length}):
                 </span>
                 <div className="space-y-1">
@@ -296,10 +296,10 @@ export default function CombatDisplay({
 
           {/* Combat Log (collapsible) */}
           {combatState.log && combatState.log.length > 0 && (
-            <div className="border-t border-red-800/20 pt-2">
+            <div className="border-t border-red-400/20 pt-2">
               <button
                 onClick={() => setShowLog(!showLog)}
-                className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-400 transition-colors"
+                className="flex items-center gap-1 text-xs text-blue-300/50 hover:text-blue-200/70 transition-colors"
               >
                 <DynamicIcon
                   name={showLog ? "ChevronDown" : "ChevronRight"}
@@ -310,7 +310,7 @@ export default function CombatDisplay({
               {showLog && (
                 <div className="mt-1 max-h-32 overflow-y-auto space-y-0.5">
                   {combatState.log.slice(-10).map((entry, idx) => (
-                    <div key={idx} className="text-xs text-gray-400 font-mono">
+                    <div key={idx} className="text-xs text-blue-200/70 font-mono">
                       {entry}
                     </div>
                   ))}
