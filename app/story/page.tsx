@@ -1616,6 +1616,18 @@ function StoryPageContent() {
               };
             }
 
+            // Copy the story stage's own native reasoning too - it streams
+            // live via onStoryReasoning, but without this it never reaches
+            // the persisted part, so it vanishes once the live timeline
+            // hands off to the saved one (turnTimeline.ts:buildSavedTimeline).
+            if (lastIdx >= 0 && result.scenePart?.reasoning) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                reasoning: result.scenePart.reasoning,
+                reasoning_details: result.scenePart.reasoning_details,
+              };
+            }
+
             // Copy and surface consistency-check warnings (§2.5 state-error
             // path, see docs/research-paper-ttrpg-theory-gap-analysis.md).
             // checkNarrationConsistency runs after streaming completes, so
@@ -2331,6 +2343,18 @@ function StoryPageContent() {
               };
             }
 
+            // Copy the story stage's own native reasoning too - it streams
+            // live via onStoryReasoning, but without this it never reaches
+            // the persisted part, so it vanishes once the live timeline
+            // hands off to the saved one (turnTimeline.ts:buildSavedTimeline).
+            if (lastIdx >= 0 && result.scenePart?.reasoning) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                reasoning: result.scenePart.reasoning,
+                reasoning_details: result.scenePart.reasoning_details,
+              };
+            }
+
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
@@ -2698,6 +2722,18 @@ function StoryPageContent() {
               storyData.scene.parts[lastIdx] = {
                 ...storyData.scene.parts[lastIdx],
                 gmConversation: result.scenePart.gmConversation,
+              };
+            }
+
+            // Copy the story stage's own native reasoning too - it streams
+            // live via onStoryReasoning, but without this it never reaches
+            // the persisted part, so it vanishes once the live timeline
+            // hands off to the saved one (turnTimeline.ts:buildSavedTimeline).
+            if (lastIdx >= 0 && result.scenePart?.reasoning) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                reasoning: result.scenePart.reasoning,
+                reasoning_details: result.scenePart.reasoning_details,
               };
             }
 
