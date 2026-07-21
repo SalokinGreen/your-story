@@ -239,8 +239,10 @@ export default function MenuPage({
   }: {
     tab: { id: MenuTab; label: string; icon: string };
   }) => (
-    <div className="flex items-center gap-2 mb-4 sm:mb-5">
-      <DynamicIcon name={tab.icon} className="w-5 h-5 text-purple-400" />
+    <div className="flex items-center gap-2.5 mb-4 sm:mb-5">
+      <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
+        <DynamicIcon name={tab.icon} className="w-4 h-4 text-purple-300" />
+      </span>
       <h4 className="text-base sm:text-lg font-bold text-white">
         {tab.label}
       </h4>
@@ -479,19 +481,22 @@ export default function MenuPage({
   return (
     <div className="w-full space-y-4">
       {/* Compact Header with Quick Stats */}
-      <div className="bg-[#0f1a2e] rounded-xl p-4 border border-blue-800/30">
-        <div className="flex items-center justify-between mb-3">
+      <div className="relative overflow-hidden bg-white/[0.04] backdrop-blur-xl rounded-2xl p-4 border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
+        <div className="pointer-events-none absolute -top-16 -right-16 w-40 h-40 rounded-full bg-purple-500/20 blur-3xl" />
+        <div className="relative flex items-center justify-between mb-3">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
-            <DynamicIcon name="Settings" className="w-5 h-5 text-purple-400" />{" "}
+            <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
+              <DynamicIcon name="Settings" className="w-4 h-4 text-purple-300" />
+            </span>
             Story Menu
           </h2>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-blue-300/60">
+            <span className="text-xs text-blue-200/50">
               {stats.progress}% complete
             </span>
-            <div className="w-20 h-1.5 bg-blue-900/50 rounded-full overflow-hidden">
+            <div className="w-20 h-1.5 bg-white/10 rounded-full overflow-hidden">
               <div
-                className="h-full bg-linear-to-r from-purple-500 to-pink-500"
+                className="h-full bg-linear-to-r from-purple-500 to-pink-500 shadow-[0_0_8px_rgba(168,85,247,0.6)]"
                 style={{ width: `${stats.progress}%` }}
               />
             </div>
@@ -499,15 +504,15 @@ export default function MenuPage({
         </div>
 
         {/* Quick Stats Row */}
-        <div className="grid grid-cols-2 gap-2 text-center">
-          <div className="bg-blue-900/30 rounded-lg py-2 px-1">
-            <p className="text-lg font-bold text-blue-400">
+        <div className="relative grid grid-cols-2 gap-2 text-center">
+          <div className="bg-white/[0.03] rounded-xl py-2 px-1 border border-white/5">
+            <p className="text-lg font-bold text-blue-300">
               {stats.totalParts}
             </p>
             <p className="text-[10px] text-blue-300/50">Parts</p>
           </div>
-          <div className="bg-purple-900/30 rounded-lg py-2 px-1">
-            <p className="text-lg font-bold text-purple-400">
+          <div className="bg-white/[0.03] rounded-xl py-2 px-1 border border-white/5">
+            <p className="text-lg font-bold text-purple-300">
               {stats.fulfilledCount}/{stats.goalCount}
             </p>
             <p className="text-[10px] text-purple-300/50">Goals</p>
@@ -519,7 +524,7 @@ export default function MenuPage({
       <div className="grid grid-cols-2 gap-2">
         <button
           onClick={() => setShowSettings(true)}
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-lg transition-colors text-sm"
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-xl transition-all shadow-lg shadow-purple-950/40 hover:shadow-purple-500/25 text-sm"
         >
           <DynamicIcon name="Settings" className="w-4 h-4" />
           <span>Story Editor</span>
@@ -528,7 +533,7 @@ export default function MenuPage({
         <button
           onClick={handleSaveProgress}
           disabled={saving || !storyDbId}
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-green-600 hover:bg-green-500 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white font-medium rounded-lg transition-colors text-sm"
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/5 disabled:to-white/5 disabled:text-blue-300/30 text-white font-medium rounded-xl transition-all shadow-lg shadow-emerald-950/40 hover:shadow-emerald-500/20 disabled:shadow-none text-sm"
         >
           {saving ? (
             <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent" />
@@ -541,7 +546,7 @@ export default function MenuPage({
         <button
           onClick={handleSaveAs}
           disabled={savingAs}
-          className="flex items-center justify-center gap-2 px-4 py-3 bg-emerald-700 hover:bg-emerald-600 disabled:bg-blue-800/30 disabled:text-blue-300/40 text-white font-medium rounded-lg transition-colors text-sm"
+          className="flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-teal-600 to-emerald-700 hover:from-teal-500 hover:to-emerald-600 disabled:from-white/5 disabled:to-white/5 disabled:text-blue-300/30 text-white font-medium rounded-xl transition-all shadow-lg shadow-emerald-950/30 hover:shadow-teal-500/20 disabled:shadow-none text-sm"
           title="Create a copy of this story as a save point"
         >
           {savingAs ? (
@@ -555,7 +560,7 @@ export default function MenuPage({
         {onViewContext && (
           <button
             onClick={onViewContext}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-700/50 hover:bg-blue-600/50 text-white font-medium rounded-lg transition-colors text-sm"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 text-white font-medium rounded-xl transition-all text-sm"
           >
             <DynamicIcon name="Eye" className="w-4 h-4" />
             <span>AI Context</span>
@@ -565,7 +570,7 @@ export default function MenuPage({
         {onViewLogs && (
           <button
             onClick={onViewLogs}
-            className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-700/50 hover:bg-blue-600/50 text-white font-medium rounded-lg transition-colors text-sm"
+            className="flex items-center justify-center gap-2 px-4 py-3 bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 text-white font-medium rounded-xl transition-all text-sm"
           >
             <DynamicIcon name="Terminal" className="w-4 h-4" />
             <span>Debug Logs</span>
@@ -578,7 +583,7 @@ export default function MenuPage({
         <button
           onClick={handleExportStory}
           disabled={exporting}
-          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 text-blue-200 font-medium rounded-lg transition-colors text-sm border border-blue-700/30"
+          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-sm text-blue-200 font-medium rounded-xl transition-all text-sm border border-white/10"
         >
           {exporting ? (
             <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-blue-300 border-t-transparent" />
@@ -590,7 +595,7 @@ export default function MenuPage({
 
         <button
           onClick={handleReturnToExplorer}
-          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 text-blue-200 font-medium rounded-lg transition-colors text-sm border border-blue-700/30"
+          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-sm text-blue-200 font-medium rounded-xl transition-all text-sm border border-white/10"
         >
           <DynamicIcon name="ArrowLeft" className="w-3.5 h-3.5" />
           <span>Explorer</span>
@@ -598,7 +603,7 @@ export default function MenuPage({
 
         <button
           onClick={() => setShowAPIKeysModal(true)}
-          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-800/40 hover:bg-blue-700/50 text-blue-200 font-medium rounded-lg transition-colors text-sm border border-blue-700/30"
+          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-sm text-blue-200 font-medium rounded-xl transition-all text-sm border border-white/10"
           title="App-wide settings: API keys, voices, fonts, display"
         >
           <DynamicIcon name="Settings" className="w-3.5 h-3.5" />
@@ -615,7 +620,7 @@ export default function MenuPage({
       {onOpenOOCChat && netSession && (
         <button
           onClick={onOpenOOCChat}
-          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-blue-600/80 to-cyan-600/80 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all border border-blue-500/30"
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-linear-to-r from-blue-600/80 to-cyan-600/80 hover:from-blue-500 hover:to-cyan-500 text-white font-semibold rounded-xl transition-all border border-blue-400/20 shadow-lg shadow-blue-950/30 hover:shadow-cyan-500/20"
         >
           <DynamicIcon name="MessageCircle" className="w-5 h-5" />
           <span>OOC Chat</span>
@@ -623,10 +628,10 @@ export default function MenuPage({
       )}
 
       {/* Player Notes - Collapsible */}
-      <div className="bg-[#0f1a2e] rounded-xl border border-blue-800/30 overflow-hidden">
+      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
         <button
           onClick={() => setEditingNotes(!editingNotes)}
-          className="w-full flex items-center justify-between p-3 hover:bg-blue-900/20 transition-colors"
+          className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
         >
           <span className="text-sm font-medium text-white flex items-center gap-2">
             <DynamicIcon
@@ -647,7 +652,7 @@ export default function MenuPage({
               value={playerNotes}
               onChange={(e) => setPlayerNotes(e.target.value)}
               placeholder="Write your notes, strategies, or thoughts..."
-              className="w-full h-24 px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-1 focus:ring-purple-500 resize-none"
+              className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none"
             />
             <div className="flex gap-2 justify-end">
               <button
@@ -655,13 +660,13 @@ export default function MenuPage({
                   setPlayerNotes(storyData.player_notes || "");
                   setEditingNotes(false);
                 }}
-                className="px-3 py-1.5 text-xs bg-blue-800/50 text-blue-200 rounded-lg hover:bg-blue-700/50"
+                className="px-3 py-1.5 text-xs bg-white/5 text-blue-200 rounded-lg hover:bg-white/10 border border-white/10"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveNotes}
-                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded-lg"
+                className="px-3 py-1.5 text-xs bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40"
               >
                 Save
               </button>
@@ -679,10 +684,10 @@ export default function MenuPage({
       </div>
 
       {/* Chat Display Settings - Collapsible */}
-      <div className="bg-[#0f1a2e] rounded-xl border border-blue-800/30 overflow-hidden">
+      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden">
         <button
           onClick={() => setEditingChatDisplay(!editingChatDisplay)}
-          className="w-full flex items-center justify-between p-3 hover:bg-blue-900/20 transition-colors"
+          className="w-full flex items-center justify-between p-3 hover:bg-white/5 transition-colors"
         >
           <span className="text-sm font-medium text-white flex items-center gap-2">
             <DynamicIcon
@@ -713,7 +718,7 @@ export default function MenuPage({
                   value={chatDisplayName}
                   onChange={(e) => setChatDisplayName(e.target.value)}
                   placeholder={storyData.player_name || "Your name"}
-                  className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40"
                 />
               </div>
               <div>
@@ -725,7 +730,7 @@ export default function MenuPage({
                   value={chatDisplayAvatar}
                   onChange={(e) => setChatDisplayAvatar(e.target.value)}
                   placeholder="https://..."
-                  className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-1 focus:ring-purple-500"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40"
                 />
               </div>
             </div>
@@ -736,7 +741,7 @@ export default function MenuPage({
                 <img
                   src={chatDisplayAvatar}
                   alt="Avatar preview"
-                  className="w-8 h-8 rounded-full object-cover border border-purple-500/40"
+                  className="w-8 h-8 rounded-full object-cover border border-purple-400/40 shadow-[0_0_10px_rgba(168,85,247,0.3)]"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
@@ -751,13 +756,13 @@ export default function MenuPage({
                   setChatDisplayAvatar(storyData.displayAvatar || "");
                   setEditingChatDisplay(false);
                 }}
-                className="px-3 py-1.5 text-xs bg-blue-800/50 text-blue-200 rounded-lg hover:bg-blue-700/50"
+                className="px-3 py-1.5 text-xs bg-white/5 text-blue-200 rounded-lg hover:bg-white/10 border border-white/10"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveChatDisplay}
-                className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded-lg"
+                className="px-3 py-1.5 text-xs bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40"
               >
                 Save
               </button>
@@ -777,8 +782,8 @@ export default function MenuPage({
       </div>
 
       {/* Danger Zone - Compact */}
-      <div className="bg-[#0f1a2e] rounded-xl border border-red-900/30 overflow-hidden">
-        <div className="p-3 border-b border-red-900/20">
+      <div className="bg-red-500/[0.03] backdrop-blur-xl rounded-2xl border border-red-500/20 overflow-hidden">
+        <div className="p-3 border-b border-red-500/10">
           <span className="text-sm font-medium text-red-400 flex items-center gap-2">
             <DynamicIcon name="AlertTriangle" className="w-4 h-4" />
             Danger Zone
@@ -878,7 +883,7 @@ export default function MenuPage({
                 },
               });
             }}
-            className="flex items-center justify-center gap-2 px-3 py-2.5 bg-orange-900/30 hover:bg-orange-800/40 text-orange-300 font-medium rounded-lg transition-colors text-sm border border-orange-800/30"
+            className="flex items-center justify-center gap-2 px-3 py-2.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-300 font-medium rounded-xl transition-all text-sm border border-orange-400/20"
           >
             <DynamicIcon name="RefreshCw" className="w-3.5 h-3.5" />
             <span>Restart</span>
@@ -914,7 +919,7 @@ export default function MenuPage({
               });
             }}
             disabled={deleting || !storyDbId}
-            className="flex items-center justify-center gap-2 px-3 py-2.5 bg-red-900/30 hover:bg-red-800/40 disabled:bg-blue-900/20 disabled:text-blue-300/30 text-red-300 font-medium rounded-lg transition-colors text-sm border border-red-800/30"
+            className="flex items-center justify-center gap-2 px-3 py-2.5 bg-red-500/10 hover:bg-red-500/20 disabled:bg-white/5 disabled:text-blue-300/30 text-red-300 font-medium rounded-xl transition-all text-sm border border-red-400/20"
           >
             {deleting ? (
               <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-red-300 border-t-transparent" />
@@ -927,37 +932,40 @@ export default function MenuPage({
       </div>
 
       {/* Story Info Card */}
-      <div className="bg-blue-950/50 rounded-2xl shadow-xl p-6 border border-blue-800/30">
+      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl shadow-[0_4px_24px_rgba(0,0,0,0.3)] p-6 border border-white/10">
         <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-          <DynamicIcon name="Info" className="w-6 h-6" /> Story Information
+          <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
+            <DynamicIcon name="Info" className="w-4 h-4 text-purple-300" />
+          </span>
+          Story Information
         </h3>
 
-        <div className="space-y-3 text-sm">
-          <div className="flex justify-between py-2 border-b border-blue-800/30">
+        <div className="space-y-1 text-sm">
+          <div className="flex justify-between py-2.5 border-b border-white/5">
             <span className="text-blue-200/60">Story Name:</span>
             <span className="font-semibold text-white">
               {storyData.story_name}
             </span>
           </div>
-          <div className="flex justify-between py-2 border-b border-blue-800/30">
+          <div className="flex justify-between py-2.5 border-b border-white/5">
             <span className="text-blue-200/60">Player Name:</span>
             <span className="font-semibold text-white">
               {storyData.player_name}
             </span>
           </div>
-          <div className="flex justify-between py-2 border-b border-blue-800/30">
+          <div className="flex justify-between py-2.5 border-b border-white/5">
             <span className="text-blue-200/60">Total Memory Entries:</span>
             <span className="font-semibold text-white">
               {storyData.memory.length}
             </span>
           </div>
-          <div className="flex justify-between py-2 border-b border-blue-800/30">
+          <div className="flex justify-between py-2.5 border-b border-white/5">
             <span className="text-blue-200/60">Inventory Items:</span>
             <span className="font-semibold text-white">
               {storyData.inventory.length}
             </span>
           </div>
-          <div className="flex justify-between py-2">
+          <div className="flex justify-between py-2.5">
             <span className="text-blue-200/60">Notes:</span>
             <span className="font-semibold text-white">
               {storyData.lore.length}
@@ -968,21 +976,23 @@ export default function MenuPage({
 
       {/* Comprehensive Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 sm:p-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 sm:p-4">
           {/* Full screen on mobile, constrained on desktop */}
-          <div className="bg-[#0a1628] sm:rounded-2xl shadow-2xl max-w-6xl w-full border-0 sm:border border-blue-800/30 h-full sm:h-[90vh] flex flex-col overflow-hidden">
+          <div className="bg-[#0a1628]/95 backdrop-blur-2xl sm:rounded-2xl shadow-2xl shadow-black/50 max-w-6xl w-full border-0 sm:border border-white/10 h-full sm:h-[90vh] flex flex-col overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-3 sm:p-6 border-b border-blue-800/30">
+            <div className="flex items-center justify-between p-3 sm:p-6 border-b border-white/10">
               <h3 className="text-base sm:text-xl font-bold text-white flex items-center gap-2">
-                <DynamicIcon
-                  name="Settings"
-                  className="w-5 h-5 sm:w-6 sm:h-6"
-                />{" "}
+                <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
+                  <DynamicIcon
+                    name="Settings"
+                    className="w-4 h-4 sm:w-5 sm:h-5 text-purple-300"
+                  />
+                </span>
                 Story Editor
               </h3>
               <button
                 onClick={() => setShowSettings(false)}
-                className="p-2 text-blue-300/60 hover:text-white hover:bg-blue-900/50 rounded-lg transition-colors"
+                className="p-2 text-blue-300/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
               >
                 <svg
                   className="w-6 h-6"
@@ -1003,16 +1013,16 @@ export default function MenuPage({
             {/* Sidebar nav + continuous scrolling content */}
             <div className="flex-1 flex overflow-hidden min-h-0">
               {/* Sidebar Navigation */}
-              <nav className="w-14 sm:w-56 shrink-0 border-r border-blue-800/30 overflow-y-auto scrollbar-thin bg-[#0a1628]">
+              <nav className="w-14 sm:w-56 shrink-0 border-r border-white/10 overflow-y-auto scrollbar-thin bg-white/[0.02]">
                 <div className="py-2 sm:py-4 px-1.5 sm:px-3 space-y-1">
                   {sections.map((tab) => (
                     <button
                       key={tab.id}
                       onClick={() => scrollToSection(tab.id)}
-                      className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2.5 sm:py-3 rounded-lg text-xs sm:text-sm font-semibold transition-colors ${
+                      className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
                         activeTab === tab.id
-                          ? "bg-purple-600 text-white shadow-md"
-                          : "text-blue-200 hover:bg-blue-800/40"
+                          ? "bg-linear-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-950/40"
+                          : "text-blue-200 hover:bg-white/5"
                       }`}
                     >
                       <DynamicIcon
@@ -1039,7 +1049,7 @@ export default function MenuPage({
                   }}
                   data-section-id="basic"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("basic")} />
                   <BasicSettings
@@ -1054,7 +1064,7 @@ export default function MenuPage({
                   }}
                   data-section-id="hotseat"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("hotseat")} />
                   <p className="text-xs text-blue-200/50 -mt-3 mb-4">
@@ -1062,7 +1072,7 @@ export default function MenuPage({
                     player&apos;s action before generating.
                   </p>
                   <div className="space-y-5">
-                  <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
+                  <div className="p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
                     <div className="flex items-center justify-between">
                       <div>
                         <label className="block text-sm font-semibold text-blue-200 mb-1">
@@ -1088,7 +1098,7 @@ export default function MenuPage({
                           }
                           className="sr-only peer"
                         />
-                        <div className="w-14 h-7 bg-blue-800/50 peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                        <div className="w-14 h-7 bg-white/10 peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-white/20 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-500 peer-checked:to-pink-500 peer-checked:shadow-[0_0_12px_rgba(168,85,247,0.5)]"></div>
                       </label>
                     </div>
                   </div>
@@ -1104,7 +1114,7 @@ export default function MenuPage({
                           e.target.value as "host" | "any" | "timer",
                         )
                       }
-                      className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40"
                     >
                       <option value="host">Generate on host command</option>
                       <option value="any">Generate on any command</option>
@@ -1117,7 +1127,7 @@ export default function MenuPage({
 
                   {(multiplayerMode === "host" ||
                     multiplayerMode === "timer") && (
-                    <div className="p-4 bg-blue-950/30 rounded-lg border border-blue-700/30 space-y-2">
+                    <div className="p-4 bg-white/[0.02] backdrop-blur-md rounded-xl border border-white/10 space-y-2">
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <label className="block text-sm font-semibold text-blue-200">
@@ -1134,7 +1144,7 @@ export default function MenuPage({
                           onClick={() => {
                             setMultiplayerHostUserId(localPlayerId);
                           }}
-                          className="px-3 py-2 text-xs font-semibold rounded-lg transition-colors border bg-purple-600/30 hover:bg-purple-600/50 text-purple-200 border-purple-500/30"
+                          className="px-3 py-2 text-xs font-semibold rounded-lg transition-all border bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border-purple-400/20"
                           title="Set the host to this device"
                         >
                           Set me as host
@@ -1161,12 +1171,12 @@ export default function MenuPage({
                             parseInt(e.target.value) || 1,
                           )
                         }
-                        className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                        className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40"
                       />
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-blue-800/20">
+                  <div className="pt-2 border-t border-white/5">
                     <CouchPlayersEditor
                       players={storyData.multiplayer?.couchPlayers || []}
                       onUpdate={(couchPlayers) =>
@@ -1193,7 +1203,7 @@ export default function MenuPage({
                   }}
                   data-section-id="online"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("online")} />
                   <p className="text-xs text-blue-200/50 -mt-3 mb-4">
@@ -1218,7 +1228,7 @@ export default function MenuPage({
                   }}
                   data-section-id="abilities"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("abilities")} />
                   <AbilitiesEditor
@@ -1235,7 +1245,7 @@ export default function MenuPage({
                   }}
                   data-section-id="goals"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("goals")} />
                   <GoalEditor
@@ -1250,7 +1260,7 @@ export default function MenuPage({
                   }}
                   data-section-id="lore"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("lore")} />
                   <LoreEditor
@@ -1275,7 +1285,7 @@ export default function MenuPage({
                   }}
                   data-section-id="npcs"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("npcs")} />
                   <NPCEditor
@@ -1290,7 +1300,7 @@ export default function MenuPage({
                   }}
                   data-section-id="tables"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("tables")} />
                   <CustomTablesEditor
@@ -1307,7 +1317,7 @@ export default function MenuPage({
                   }}
                   data-section-id="variables"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("variables")} />
                   <VariablesEditor
@@ -1322,7 +1332,7 @@ export default function MenuPage({
                   }}
                   data-section-id="relationships"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("relationships")} />
                   <RelationshipsEditor
@@ -1339,7 +1349,7 @@ export default function MenuPage({
                   }}
                   data-section-id="threads"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("threads")} />
                   <ThreadsEditor
@@ -1354,12 +1364,12 @@ export default function MenuPage({
                   }}
                   data-section-id="mythic"
                   style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-blue-800/20"
+                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
                 >
                   <SectionHeading tab={getSection("mythic")} />
                   <div className="space-y-6">
                   {/* Enable/Disable Advanced RPG Tools */}
-                  <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
+                  <div className="p-6 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
                     <div className="flex items-center justify-between">
                       <div>
                         <label className="block text-sm font-semibold text-blue-200 mb-1">
@@ -1395,7 +1405,7 @@ export default function MenuPage({
                           }}
                           className="sr-only peer"
                         />
-                        <div className="w-14 h-7 bg-blue-800/50 peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-blue-700/40 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-purple-600"></div>
+                        <div className="w-14 h-7 bg-white/10 peer-focus:ring-4 peer-focus:ring-purple-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-1 after:bg-white after:border-white/20 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-500 peer-checked:to-pink-500 peer-checked:shadow-[0_0_12px_rgba(168,85,247,0.5)]"></div>
                       </label>
                     </div>
                   </div>
@@ -1403,7 +1413,7 @@ export default function MenuPage({
                   {storyData.agmtState && (
                     <>
                       {/* Chaos Factor */}
-                      <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
+                      <div className="p-6 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
                         <label className="block text-sm font-semibold text-blue-200 mb-3">
                           Chaos Factor: {storyData.agmtState.chaosFactor}
                         </label>
@@ -1420,7 +1430,7 @@ export default function MenuPage({
                               },
                             });
                           }}
-                          className="w-full h-3 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
+                          className="w-full h-2 bg-white/10 rounded-full appearance-none cursor-pointer accent-purple-500"
                         />
                         <p className="text-sm text-blue-200/60 mt-2">
                           {storyData.agmtState.chaosFactor <= 3 &&
@@ -1437,7 +1447,7 @@ export default function MenuPage({
                       </div>
 
                       {/* Scene Count */}
-                      <div className="p-6 bg-blue-950/50 rounded-lg border-2 border-blue-700/40">
+                      <div className="p-6 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
                         <label className="block text-sm font-semibold text-blue-200 mb-3">
                           Scene Count: {storyData.agmtState.sceneCount}
                         </label>
@@ -1454,7 +1464,7 @@ export default function MenuPage({
                                 },
                               });
                             }}
-                            className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-colors"
                           >
                             -1
                           </button>
@@ -1468,7 +1478,7 @@ export default function MenuPage({
                                 },
                               });
                             }}
-                            className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg"
+                            className="px-4 py-2 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all"
                           >
                             +1 Scene
                           </button>
@@ -1481,7 +1491,7 @@ export default function MenuPage({
                                 },
                               });
                             }}
-                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
+                            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-400/20 text-red-300 rounded-lg transition-colors"
                           >
                             Reset
                           </button>
@@ -1490,7 +1500,7 @@ export default function MenuPage({
 
                       {/* Performance Tracking */}
                       {storyData.agmtState && (
-                        <div className="p-6 bg-gradient to-br from-gray-50 to-gray-100 dark:from-gray-800/50 dark:to-gray-900/50 rounded-lg border-2 border-gray-300 dark:border-gray-700">
+                        <div className="p-6 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10">
                           <h4 className="text-sm font-semibold text-blue-200 mb-4 flex items-center gap-2">
                             <DynamicIcon
                               name="TrendingUp"
@@ -1520,12 +1530,12 @@ export default function MenuPage({
                                   3 && " ??"}
                               </span>
                             </div>
-                            <div className="h-2 bg-blue-900/30 rounded-full overflow-hidden">
+                            <div className="h-2 bg-white/10 rounded-full overflow-hidden">
                               <div
                                 className={`h-full transition-all ${
                                   storyData.agmtState.currentStreak > 0
-                                    ? "bg-green-500"
-                                    : "bg-red-500"
+                                    ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]"
+                                    : "bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.6)]"
                                 }`}
                                 style={{
                                   width: `${Math.min(
@@ -1588,7 +1598,7 @@ export default function MenuPage({
                           )}
 
                           {/* Next Adjustment Info */}
-                          <div className="mt-4 pt-4 border-t border-blue-700/40 text-xs text-blue-300/50">
+                          <div className="mt-4 pt-4 border-t border-white/10 text-xs text-blue-300/50">
                             {storyData.agmtState.sceneCount -
                               storyData.agmtState.lastChaosAdjustment <
                             2 ? (
@@ -1641,7 +1651,7 @@ export default function MenuPage({
             </div>
 
             {/* Action Buttons */}
-            <div className="flex gap-2 sm:gap-3 p-3 sm:p-6 border-t border-blue-800/30">
+            <div className="flex gap-2 sm:gap-3 p-3 sm:p-6 border-t border-white/10">
               <button
                 onClick={() => {
                   setSettingsForm({
@@ -1664,13 +1674,13 @@ export default function MenuPage({
                   );
                   setShowSettings(false);
                 }}
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 text-sm sm:text-base font-semibold rounded-lg transition-colors"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 text-sm sm:text-base font-semibold rounded-xl transition-all"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveSettings}
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-purple-600 hover:bg-purple-700 text-white text-sm sm:text-base font-semibold rounded-lg transition-colors flex items-center justify-center gap-1"
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-sm sm:text-base font-semibold rounded-xl transition-all shadow-lg shadow-purple-950/40 hover:shadow-purple-500/25 flex items-center justify-center gap-1"
               >
                 <DynamicIcon name="Save" className="w-4 h-4" />
                 <span className="hidden sm:inline">Save All Changes</span>
@@ -1684,8 +1694,8 @@ export default function MenuPage({
       {/* Save Copy Modal */}
       {showSaveCopyModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-60 p-4">
-          <div className="bg-[#0d1829] rounded-xl border border-blue-700/40 w-full max-w-md shadow-2xl">
-            <div className="p-4 border-b border-blue-800/30">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl border border-white/10 w-full max-w-md shadow-2xl shadow-black/50">
+            <div className="p-4 border-b border-white/10">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <DynamicIcon name="Copy" className="w-5 h-5 text-emerald-400" />
                 Save Copy
@@ -1703,7 +1713,7 @@ export default function MenuPage({
                 value={saveCopyName}
                 onChange={(e) => setSaveCopyName(e.target.value)}
                 placeholder="Enter a name for this save..."
-                className="w-full px-3 py-2 bg-[#1a2744] border border-blue-700/40 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50"
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-xl text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40"
                 autoFocus
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && saveCopyName.trim()) {
@@ -1723,7 +1733,7 @@ export default function MenuPage({
                     onChange={(e) => setJumpToNewSave(e.target.checked)}
                     className="sr-only peer"
                   />
-                  <div className="w-10 h-6 bg-[#1a2744] border border-blue-700/40 rounded-full peer-checked:bg-emerald-600/80 transition-colors"></div>
+                  <div className="w-10 h-6 bg-white/5 border border-white/10 rounded-full peer-checked:bg-emerald-500/80 peer-checked:shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all"></div>
                   <div className="absolute left-1 top-1 w-4 h-4 bg-blue-300/60 rounded-full peer-checked:translate-x-4 peer-checked:bg-white transition-all"></div>
                 </div>
                 <span className="text-sm text-blue-200 group-hover:text-white transition-colors">
@@ -1731,17 +1741,17 @@ export default function MenuPage({
                 </span>
               </label>
             </div>
-            <div className="p-4 border-t border-blue-800/30 flex justify-end gap-3">
+            <div className="p-4 border-t border-white/10 flex justify-end gap-3">
               <button
                 onClick={() => setShowSaveCopyModal(false)}
-                className="px-4 py-2 text-blue-300 hover:text-white hover:bg-blue-800/30 rounded-lg transition-colors"
+                className="px-4 py-2 text-blue-300 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveCopyConfirm}
                 disabled={!saveCopyName.trim()}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800/30 disabled:text-emerald-300/40 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 disabled:from-white/5 disabled:to-white/5 disabled:text-emerald-300/30 text-white font-medium rounded-lg transition-all shadow-md shadow-emerald-950/40 disabled:shadow-none flex items-center gap-2"
               >
                 <DynamicIcon name="Save" className="w-4 h-4" />
                 Save Copy

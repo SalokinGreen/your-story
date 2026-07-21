@@ -67,7 +67,7 @@ export default function CouchPlayersEditor({
           {players.map((p) => (
             <div
               key={p.id}
-              className="flex items-center gap-2 p-2.5 bg-blue-950/40 rounded-lg border border-blue-700/30"
+              className="flex items-center gap-2 p-2.5 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10"
             >
               <input
                 type="color"
@@ -75,7 +75,7 @@ export default function CouchPlayersEditor({
                 onChange={(e) =>
                   updatePlayer(p.id, { color: e.target.value })
                 }
-                className="w-9 h-9 shrink-0 rounded-lg cursor-pointer bg-transparent border border-blue-700/40"
+                className="w-9 h-9 shrink-0 rounded-lg cursor-pointer bg-transparent border border-white/10"
                 title="Bubble color"
               />
               <input
@@ -83,12 +83,12 @@ export default function CouchPlayersEditor({
                 value={p.name}
                 onChange={(e) => updatePlayer(p.id, { name: e.target.value })}
                 placeholder="Player name"
-                className="flex-1 min-w-0 px-3 py-2 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="flex-1 min-w-0 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
               />
               <button
                 type="button"
                 onClick={() => removePlayer(p.id)}
-                className="p-2 text-red-400/70 hover:text-red-300 hover:bg-red-900/30 rounded-lg transition-colors shrink-0"
+                className="p-2 text-red-400/70 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors shrink-0"
                 title="Remove player"
               >
                 <DynamicIcon name="Trash2" className="w-4 h-4" />
@@ -110,13 +110,13 @@ export default function CouchPlayersEditor({
             }
           }}
           placeholder="New player name"
-          className="flex-1 min-w-0 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="flex-1 min-w-0 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
         />
         <button
           type="button"
           onClick={addPlayer}
           disabled={!newName.trim()}
-          className="px-4 py-3 text-sm font-semibold rounded-lg transition-colors bg-purple-600/30 hover:bg-purple-600/50 disabled:opacity-40 disabled:cursor-not-allowed text-purple-200 border border-purple-500/30 flex items-center gap-1.5 shrink-0"
+          className="px-4 py-3 text-sm font-semibold rounded-xl transition-all bg-purple-500/10 hover:bg-purple-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-purple-200 border border-purple-400/20 flex items-center gap-1.5 shrink-0"
         >
           <DynamicIcon name="Plus" className="w-4 h-4" />
           Add

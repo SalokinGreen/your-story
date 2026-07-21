@@ -63,21 +63,23 @@ export default function ThreadsEditor({
   };
 
   const statusColor: Record<StoryThread["status"], string> = {
-    active: "bg-blue-200 dark:bg-blue-800/50 text-blue-800 dark:text-blue-200",
-    resolved:
-      "bg-green-200 dark:bg-green-800/50 text-green-800 dark:text-green-200",
-    abandoned: "bg-blue-800/30 text-blue-300/60",
+    active: "bg-blue-500/10 text-blue-300 border border-blue-400/20",
+    resolved: "bg-green-500/10 text-green-300 border border-green-400/20",
+    abandoned: "bg-white/5 text-blue-300/50 border border-white/10",
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-lg font-bold text-white flex items-center gap-2">
-          <DynamicIcon name="GitBranch" className="w-6 h-6" /> Story Threads
+          <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
+            <DynamicIcon name="GitBranch" className="w-4 h-4 text-purple-300" />
+          </span>
+          Story Threads
         </h4>
         <button
           onClick={addThread}
-          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
+          className="px-3 py-1.5 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white text-sm font-medium rounded-lg shadow-md shadow-emerald-950/40 transition-all"
         >
           + Add Thread
         </button>
@@ -92,7 +94,7 @@ export default function ThreadsEditor({
           editingIndex === index ? (
             <div
               key={thread.id}
-              className="p-4 bg-blue-100 dark:bg-blue-900/40 border-2 border-blue-400 rounded-lg"
+              className="p-4 bg-white/[0.04] backdrop-blur-xl border border-purple-400/30 rounded-2xl shadow-[0_0_20px_rgba(168,85,247,0.1)]"
             >
               <div className="space-y-3">
                 <input
@@ -102,7 +104,7 @@ export default function ThreadsEditor({
                     setEditThread({ ...editThread!, title: e.target.value })
                   }
                   placeholder="Thread Title"
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                 />
                 <textarea
                   value={editThread?.description || ""}
@@ -113,7 +115,7 @@ export default function ThreadsEditor({
                     })
                   }
                   placeholder="Description"
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                   rows={3}
                 />
                 <div className="flex gap-3">
@@ -125,7 +127,7 @@ export default function ThreadsEditor({
                         status: e.target.value as StoryThread["status"],
                       })
                     }
-                    className="flex-1 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                   >
                     <option value="active">Active</option>
                     <option value="resolved">Resolved</option>
@@ -140,7 +142,7 @@ export default function ThreadsEditor({
                           .value as StoryThread["priority"],
                       })
                     }
-                    className="flex-1 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                   >
                     <option value="main">Main</option>
                     <option value="side">Side</option>
@@ -150,13 +152,13 @@ export default function ThreadsEditor({
                 <div className="flex gap-2">
                   <button
                     onClick={saveEdit}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                    className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-lg shadow-md shadow-emerald-950/40 transition-all"
                   >
                     Save
                   </button>
                   <button
                     onClick={cancelEdit}
-                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-all"
                   >
                     Cancel
                   </button>
@@ -166,10 +168,10 @@ export default function ThreadsEditor({
           ) : (
             <div
               key={thread.id}
-              className="p-4 bg-blue-900/20 rounded-lg flex items-center gap-3"
+              className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-xl flex items-center gap-3 hover:bg-white/[0.05] transition-colors"
             >
               <div className="flex-1">
-                <div className="flex items-center gap-2 font-medium text-white">
+                <div className="flex items-center gap-2 font-medium text-white flex-wrap">
                   <DynamicIcon
                     name="GitBranch"
                     className="w-5 h-5 text-purple-400"
@@ -181,7 +183,7 @@ export default function ThreadsEditor({
                     {thread.status[0].toUpperCase() + thread.status.slice(1)}
                   </span>
                   {thread.priority && (
-                    <span className="px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full text-xs font-bold">
+                    <span className="px-2 py-0.5 bg-purple-500/10 text-purple-300 border border-purple-400/20 rounded-full text-xs font-bold">
                       {PRIORITY_LABEL[thread.priority]}
                     </span>
                   )}
@@ -193,14 +195,14 @@ export default function ThreadsEditor({
               <div className="flex gap-0.5">
                 <button
                   onClick={() => startEdit(index)}
-                  className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
+                  className="w-7 h-7 sm:w-8 sm:h-8 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg flex items-center justify-center transition-colors"
                   title="Edit"
                 >
                   <DynamicIcon name="Edit" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </button>
                 <button
                   onClick={() => removeThread(index)}
-                  className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
+                  className="w-7 h-7 sm:w-8 sm:h-8 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg flex items-center justify-center transition-colors"
                   title="Remove"
                 >
                   <DynamicIcon name="Trash2" className="w-3.5 h-3.5 sm:w-4 sm:h-4" />

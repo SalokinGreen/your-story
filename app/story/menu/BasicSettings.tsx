@@ -56,7 +56,7 @@ export default function BasicSettings({
           type="text"
           value={form.story_name}
           onChange={(e) => onChange({ ...form, story_name: e.target.value })}
-          className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
         />
       </div>
 
@@ -68,7 +68,7 @@ export default function BasicSettings({
           type="text"
           value={form.player_name}
           onChange={(e) => onChange({ ...form, player_name: e.target.value })}
-          className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
         />
       </div>
       <div>
@@ -80,7 +80,7 @@ export default function BasicSettings({
           onChange={(e) =>
             onChange({ ...form, player_summary: e.target.value })
           }
-          className="w-full h-32 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          className="w-full h-32 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none transition-colors"
         />
       </div>
       <div>
@@ -90,7 +90,7 @@ export default function BasicSettings({
         <textarea
           value={form.premise}
           onChange={(e) => onChange({ ...form, premise: e.target.value })}
-          className="w-full h-24 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none"
+          className="w-full h-24 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none transition-colors"
         />
       </div>
       <div>
@@ -103,7 +103,7 @@ export default function BasicSettings({
           onChange={(e) =>
             onChange({ ...form, max_chapters: parseInt(e.target.value) || 0 })
           }
-          className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
         />
       </div>
 
@@ -115,10 +115,10 @@ export default function BasicSettings({
           <button
             type="button"
             onClick={() => onChange({ ...form, diceMode: "ai" })}
-            className={`p-3 rounded-lg border text-left transition-all ${
+            className={`p-3 rounded-xl border text-left transition-all ${
               form.diceMode === "ai"
-                ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
-                : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
+                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
             }`}
           >
             <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
@@ -132,10 +132,10 @@ export default function BasicSettings({
           <button
             type="button"
             onClick={() => onChange({ ...form, diceMode: "physical" })}
-            className={`p-3 rounded-lg border text-left transition-all ${
+            className={`p-3 rounded-xl border text-left transition-all ${
               form.diceMode === "physical"
-                ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
-                : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
+                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
             }`}
           >
             <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
@@ -149,10 +149,10 @@ export default function BasicSettings({
           <button
             type="button"
             onClick={() => onChange({ ...form, diceMode: "manual" })}
-            className={`p-3 rounded-lg border text-left transition-all ${
+            className={`p-3 rounded-xl border text-left transition-all ${
               form.diceMode === "manual"
-                ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
-                : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
+                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
             }`}
           >
             <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
