@@ -112,7 +112,17 @@ export default function DiceThrowModal({
     setPhase("loading");
     getDiceBox()
       .then(() => {
-        if (requestTokenRef.current === token) setPhase("aiming");
+        if (requestTokenRef.current !== token) return;
+        // dice-box only reads the container's real size for its physics
+        // worker's bounds during init() - the Babylon camera/canvas itself
+        // stays at whatever size it last measured until dice-box's own
+        // (already correct) window "resize" handler fires. The tray's
+        // layout can differ from that (default 300x150 on the very first
+        // load, or a different height once the header/footer chrome is
+        // back for a later roll), so nudge it every time the tray opens
+        // rather than waiting on an incidental real resize.
+        window.dispatchEvent(new Event("resize"));
+        setPhase("aiming");
       })
       .catch((err) => {
         // WebGL/asset load failure, etc - don't hang the GM loop waiting
@@ -125,8 +135,6 @@ export default function DiceThrowModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [request]);
 
-  if (!request) return null;
-
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (phase !== "aiming") return;
     dragRef.current = { startX: e.clientX, startY: e.clientY, startTime: performance.now() };
@@ -135,7 +143,7 @@ export default function DiceThrowModal({
   const onPointerUp = async (e: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     dragRef.current = null;
-    if (!drag || phase !== "aiming") return;
+    if (!drag || phase !== "aiming" || !request) return;
 
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
@@ -170,27 +178,42 @@ export default function DiceThrowModal({
     onResolve(settledFaces);
   };
 
+  // The tray container below (#dice-throw-canvas) is kept mounted at all
+  // times rather than returning null when there's no request. dice-box
+  // appends its <canvas> into that container once and the DiceBox instance
+  // is reused across requests (see getDiceBox above) - if the container
+  // unmounted between rolls, that canvas would be removed from the DOM and
+  // the reused instance would keep pointing at the detached node, leaving
+  // every roll after the first invisible. Hiding via CSS instead of
+  // unmounting keeps the canvas attached and its measured size stable.
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm">
+    <div
+      className={`fixed inset-0 z-50 flex flex-col bg-black/80 backdrop-blur-sm ${
+        request ? "" : "invisible pointer-events-none"
+      }`}
+      aria-hidden={!request}
+    >
       {/* Header */}
-      <div className="px-5 pt-5 pb-4 bg-linear-to-b from-blue-950 to-transparent text-center pointer-events-none">
-        <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-linear-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-950/50">
-          <DynamicIcon name="Dices" className="w-6 h-6 text-white" />
-        </div>
-        <p className="text-sm text-blue-100 max-w-sm mx-auto">
-          {request.reason}
-        </p>
-        <div className="flex items-center justify-center gap-2 text-sm mt-2">
-          <span className="px-3 py-1.5 rounded-lg bg-purple-900/60 border border-purple-600/40 text-purple-100 font-mono font-semibold">
-            🎲 {request.count}d{request.sides}
-          </span>
-          {request.dc !== undefined && (
-            <span className="px-3 py-1.5 rounded-lg bg-blue-900/60 border border-blue-600/40 text-blue-100 font-semibold">
-              vs DC {request.dc}
+      {request && (
+        <div className="px-5 pt-5 pb-4 bg-linear-to-b from-blue-950 to-transparent text-center pointer-events-none">
+          <div className="w-12 h-12 mx-auto mb-2 rounded-full bg-linear-to-br from-purple-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-purple-950/50">
+            <DynamicIcon name="Dices" className="w-6 h-6 text-white" />
+          </div>
+          <p className="text-sm text-blue-100 max-w-sm mx-auto">
+            {request.reason}
+          </p>
+          <div className="flex items-center justify-center gap-2 text-sm mt-2">
+            <span className="px-3 py-1.5 rounded-lg bg-purple-900/60 border border-purple-600/40 text-purple-100 font-mono font-semibold">
+              🎲 {request.count}d{request.sides}
             </span>
-          )}
+            {request.dc !== undefined && (
+              <span className="px-3 py-1.5 rounded-lg bg-blue-900/60 border border-blue-600/40 text-blue-100 font-semibold">
+                vs DC {request.dc}
+              </span>
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Dice tray */}
       <div
@@ -200,12 +223,12 @@ export default function DiceThrowModal({
         className="flex-1 relative"
         style={{ touchAction: "none", cursor: phase === "aiming" ? "grab" : "default" }}
       >
-        {phase === "loading" && (
+        {request && phase === "loading" && (
           <div className="absolute inset-0 flex items-center justify-center text-blue-200/70 text-sm">
             Loading dice...
           </div>
         )}
-        {phase === "aiming" && (
+        {request && phase === "aiming" && (
           <div className="absolute inset-x-0 bottom-6 text-center text-blue-200/60 text-sm pointer-events-none">
             Drag and release to throw
           </div>
@@ -213,31 +236,33 @@ export default function DiceThrowModal({
       </div>
 
       {/* Footer */}
-      <div className="px-5 pb-5 pt-3 bg-linear-to-t from-blue-950 to-transparent">
-        {phase === "settled" && settledFaces && (
-          <div className="text-center mb-3">
-            <span className="text-white font-bold text-lg">
-              [{settledFaces.join(", ")}]
-            </span>
-          </div>
-        )}
-        {phase === "settled" ? (
-          <button
-            onClick={confirm}
-            className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white font-semibold transition-all flex items-center justify-center gap-2"
-          >
-            <DynamicIcon name="Check" className="w-4 h-4" />
-            Continue
-          </button>
-        ) : (
-          <button
-            onClick={() => onResolve(null)}
-            className="w-full py-2 text-xs text-blue-300/50 hover:text-blue-200 transition-colors"
-          >
-            Skip - let the GM roll for me
-          </button>
-        )}
-      </div>
+      {request && (
+        <div className="px-5 pb-5 pt-3 bg-linear-to-t from-blue-950 to-transparent">
+          {phase === "settled" && settledFaces && (
+            <div className="text-center mb-3">
+              <span className="text-white font-bold text-lg">
+                [{settledFaces.join(", ")}]
+              </span>
+            </div>
+          )}
+          {phase === "settled" ? (
+            <button
+              onClick={confirm}
+              className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white font-semibold transition-all flex items-center justify-center gap-2"
+            >
+              <DynamicIcon name="Check" className="w-4 h-4" />
+              Continue
+            </button>
+          ) : (
+            <button
+              onClick={() => onResolve(null)}
+              className="w-full py-2 text-xs text-blue-300/50 hover:text-blue-200 transition-colors"
+            >
+              Skip - let the GM roll for me
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
