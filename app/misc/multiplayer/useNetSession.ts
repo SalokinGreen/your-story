@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StoryData } from "@/app/misc/structs";
 import {
+  DiceThrowRelayRequest,
+  DiceThrowRelayResult,
   GuestJoinedInfo,
   NetSession,
   NetSessionInfo,
@@ -27,6 +29,10 @@ interface UseNetSessionParams {
   onGuestJoined: (info: GuestJoinedInfo) => void;
   // Host-only: called when a connected guest's link drops.
   onPeerLeft?: (localPlayerId: string) => void;
+  // Guest-only: the host is asking this player to physically throw dice.
+  onDiceThrowRequest?: (request: DiceThrowRelayRequest) => void;
+  // Host-only: a targeted guest's throw settled (or they skipped it).
+  onDiceThrowResult?: (result: DiceThrowRelayResult) => void;
 }
 
 export function useNetSession({
@@ -36,6 +42,8 @@ export function useNetSession({
   onSnapshot,
   onGuestJoined,
   onPeerLeft,
+  onDiceThrowRequest,
+  onDiceThrowResult,
 }: UseNetSessionParams) {
   const sessionRef = useRef<NetSession | null>(null);
   const [netSession, setNetSession] = useState<NetSessionInfo | null>(null);
@@ -57,12 +65,23 @@ export function useNetSession({
   const onSnapshotRef = useRef(onSnapshot);
   const onGuestJoinedRef = useRef(onGuestJoined);
   const onPeerLeftRef = useRef(onPeerLeft);
+  const onDiceThrowRequestRef = useRef(onDiceThrowRequest);
+  const onDiceThrowResultRef = useRef(onDiceThrowResult);
   useEffect(() => {
     onGuestActionRef.current = onGuestAction;
     onSnapshotRef.current = onSnapshot;
     onGuestJoinedRef.current = onGuestJoined;
     onPeerLeftRef.current = onPeerLeft;
-  }, [onGuestAction, onSnapshot, onGuestJoined, onPeerLeft]);
+    onDiceThrowRequestRef.current = onDiceThrowRequest;
+    onDiceThrowResultRef.current = onDiceThrowResult;
+  }, [
+    onGuestAction,
+    onSnapshot,
+    onGuestJoined,
+    onPeerLeft,
+    onDiceThrowRequest,
+    onDiceThrowResult,
+  ]);
 
   // attach() calls itself (indirectly, via this ref) when a guest needs to
   // auto-follow a host's backend switch - going through a ref rather than
@@ -88,6 +107,8 @@ export function useNetSession({
       setActivity((prev) => ({ ...prev, [localPlayerId]: state }));
     });
     session.onHostDisconnected(() => setHostDisconnected(true));
+    session.onDiceThrowRequest((request) => onDiceThrowRequestRef.current?.(request));
+    session.onDiceThrowResult((result) => onDiceThrowResultRef.current?.(result));
     session.onBackendSwitch(async (to) => {
       try {
         const next = await session.switchBackend(to);
@@ -160,6 +181,24 @@ export function useNetSession({
     sessionRef.current?.sendActivity(state);
   }, []);
 
+  const sendDiceThrowRequest = useCallback(
+    (
+      requestId: string,
+      forPlayerId: string,
+      request: Omit<DiceThrowRelayRequest, "requestId">,
+    ) => {
+      sessionRef.current?.sendDiceThrowRequest(requestId, forPlayerId, request);
+    },
+    [],
+  );
+
+  const sendDiceThrowResult = useCallback(
+    (requestId: string, faces: number[] | null) => {
+      sessionRef.current?.sendDiceThrowResult(requestId, faces);
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!netSession || netSession.role !== "host" || loading || !storyData) return;
     sessionRef.current?.broadcastSnapshot(storyData);
@@ -184,5 +223,7 @@ export function useNetSession({
     sendFreeform,
     sendVoice,
     sendActivity,
+    sendDiceThrowRequest,
+    sendDiceThrowResult,
   };
 }

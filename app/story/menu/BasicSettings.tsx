@@ -111,7 +111,7 @@ export default function BasicSettings({
         <label className="block text-sm font-semibold text-blue-200 mb-2">
           Who Rolls the Dice?
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-3 gap-2">
           <button
             type="button"
             onClick={() => onChange({ ...form, diceMode: "ai" })}
@@ -127,6 +127,23 @@ export default function BasicSettings({
             </span>
             <span className="block text-xs text-blue-300/50">
               The AI rolls digitally and narrates the results
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ ...form, diceMode: "physical" })}
+            className={`p-3 rounded-lg border text-left transition-all ${
+              form.diceMode === "physical"
+                ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
+                : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+              <DynamicIcon name="Move3d" className="w-4 h-4 text-purple-300" />
+              Throw 3D dice
+            </span>
+            <span className="block text-xs text-blue-300/50">
+              Drag to throw real physics dice on-screen
             </span>
           </button>
           <button

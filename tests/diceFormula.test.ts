@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   parseFormula,
   rollFormula,
+  rollFormulaAsync,
   rollParsedFormula,
   validateFormula,
   extractVariables,
@@ -14,6 +15,7 @@ import {
   getRollValues,
   getTotalExplosions,
   extractRollNumber,
+  DiceResolver,
 } from "../app/misc/diceFormula";
 
 describe("diceFormula", () => {
@@ -241,6 +243,75 @@ describe("diceFormula", () => {
       expect(result.breakdown).toContain("16");
 
       vi.restoreAllMocks();
+    });
+  });
+
+  describe("rollFormulaAsync", () => {
+    // These never touch Math.random - face values come entirely from the
+    // injected DiceResolver (standing in for a physical dice throw), so
+    // this is what proves the resolver seam actually drives the result
+    // rather than a coincidental Math.random() spy elsewhere still being
+    // active.
+    it("uses the resolver's face values instead of Math.random", async () => {
+      const resolver: DiceResolver = async (sides, count) => {
+        expect(sides).toBe(20);
+        expect(count).toBe(1);
+        return [17];
+      };
+
+      const result = await rollFormulaAsync("1d20+5", undefined, resolver);
+      expect(result.total).toBe(22); // 17 + 5
+      expect(result.rolls[0].allRolls).toEqual([17]);
+    });
+
+    it("resolves variables the same way as the sync path", async () => {
+      const resolver: DiceResolver = async () => [11];
+      const varResolver = (name: string) =>
+        name === "STR_mod" ? 3 : undefined;
+
+      const result = await rollFormulaAsync(
+        "1d20+{{STR_mod}}",
+        varResolver,
+        resolver
+      );
+      expect(result.total).toBe(14); // 11 + 3
+      expect(result.substitutedVariables).toEqual({ STR_mod: 3 });
+    });
+
+    it("applies keep-highest/lowest to resolver-supplied faces", async () => {
+      const resolver: DiceResolver = async (sides, count) => {
+        expect(count).toBe(4);
+        return [1, 2, 4, 6];
+      };
+
+      const result = await rollFormulaAsync("4d6kh3", undefined, resolver);
+      expect(result.rolls[0].keptRolls.sort()).toEqual([2, 4, 6]);
+      expect(result.rolls[0].droppedRolls).toEqual([1]);
+    });
+
+    it("requests one more die at a time to resolve explosions", async () => {
+      const calls: number[] = [];
+      let call = 0;
+      const resolver: DiceResolver = async (sides, count) => {
+        calls.push(count);
+        call++;
+        // First call: the initial die, rolls max (explodes). Second call:
+        // the follow-up single die requested for the explosion, rolls 3.
+        if (call === 1) return [6];
+        return [3];
+      };
+
+      const result = await rollFormulaAsync("1d6!", undefined, resolver);
+      expect(calls).toEqual([1, 1]); // initial die, then one explosion die
+      expect(result.total).toBe(9); // 6 + 3
+      expect(result.rolls[0].explosions).toBe(1);
+    });
+
+    it("falls back to the standard breakdown/total math", async () => {
+      const resolver: DiceResolver = async () => [11];
+      const result = await rollFormulaAsync("1d20+5", undefined, resolver);
+      expect(result.breakdown).toContain("1d20");
+      expect(result.breakdown).toContain("16");
     });
   });
 

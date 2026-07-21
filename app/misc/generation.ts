@@ -50,6 +50,7 @@ import {
   GMToolResult,
   ManualRollRequest,
   ManualRollAnswer,
+  DiceThrowRequest,
   GMExecutionResult,
   resolveCheckPerTurnVisibility,
 } from "@/app/misc/gmExecutor";
@@ -226,6 +227,12 @@ export interface GenerationCallbacks {
   onAskForRoll?: (
     request: ManualRollRequest
   ) => Promise<ManualRollAnswer | null>;
+  // Physical dice mode: the UI shows a throwable 3D dice tray and resolves
+  // with the settled face values (null = player skipped/cancelled the
+  // throw, falls back to a fully digital roll of the whole formula).
+  onRequestDiceThrow?: (
+    request: DiceThrowRequest
+  ) => Promise<number[] | null>;
   onGMStageComplete?: (
     results: GMToolResult[],
     storyContext: string,
@@ -1309,7 +1316,10 @@ export async function generateStoryTurn(
                 storyId: options.storyId,
                 token,
               },
-              { requestManualRoll: callbacks.onAskForRoll },
+              {
+                requestManualRoll: callbacks.onAskForRoll,
+                requestDiceThrow: callbacks.onRequestDiceThrow,
+              },
               {
                 apiKeys: {
                   openRouterKey: options.openRouterKey,

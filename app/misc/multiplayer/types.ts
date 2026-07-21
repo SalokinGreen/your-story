@@ -50,4 +50,23 @@ export type WireMessage =
       state: PresenceActivityState;
     }
   | { type: "presence_join"; playerId: string; name: string; color: string }
-  | { type: "backend_switch"; to: MPBackend };
+  | { type: "backend_switch"; to: MPBackend }
+  // Physical dice mode: host asks a specific guest (the one whose freeform/
+  // voice action triggered this turn) to throw the dice themselves, rather
+  // than the host throwing locally on their behalf.
+  | {
+      type: "dice_throw_request";
+      requestId: string;
+      forPlayerId: string;
+      sides: number;
+      count: number;
+      formula: string;
+      reason: string;
+      dc?: number;
+    }
+  | {
+      type: "dice_throw_result";
+      requestId: string;
+      // null = the targeted guest skipped/cancelled the throw.
+      faces: number[] | null;
+    };

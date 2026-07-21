@@ -46,8 +46,11 @@ export interface Resource {
 // Adventure difficulty setting (affects all tier conversions)
 export type AdventureDifficulty = "easy" | "medium" | "hard" | "expert";
 
-// Who rolls the dice for player-character actions (see StoryData.diceMode)
-export type DiceMode = "ai" | "manual";
+// Who rolls the dice for player-character actions (see StoryData.diceMode):
+// "ai" = the GM rolls digitally; "manual" = the players roll physical dice
+// at the table and type in the result; "physical" = the player throws a 3D
+// die on-screen (drag-and-release), settled by real physics.
+export type DiceMode = "ai" | "manual" | "physical";
 
 export const STARTING_UPGRADES_BY_DIFFICULTY: Record<
   AdventureDifficulty,
@@ -828,7 +831,9 @@ export interface StoryData {
   difficulty?: AdventureDifficulty; // Adventure difficulty (affects DC/points scaling)
   // Who rolls the player's dice: "ai" (default) = the GM rolls digitally via
   // formula_roll etc.; "manual" = the players roll physical dice at the table
-  // and the GM uses ask_for_roll to collect their results.
+  // and the GM uses ask_for_roll to collect their results; "physical" = the
+  // player throws a 3D die on-screen (DiceThrowModal), settled by real
+  // physics, still via formula_roll/opposed_formula/formula_challenge_check.
   diceMode?: DiceMode;
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
