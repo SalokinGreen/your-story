@@ -10,7 +10,6 @@ import React, {
 import ReactMarkdown from "react-markdown";
 import { ChatMessage } from "@/app/misc/ai";
 import { StoryData } from "@/app/misc/structs";
-import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import {
   buildStoryCreatorMessagesWithTools,
   applyCreatorChangesToStoryData,
@@ -428,7 +427,7 @@ export default function StoryCreativeAssistant({
         const { messages: aiMessages, tools } =
           buildStoryCreatorMessagesWithTools(storyData, input, recentMessages);
 
-        response = await authenticatedFetch("/api/generate", {
+        response = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

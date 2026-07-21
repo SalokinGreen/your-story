@@ -74,12 +74,6 @@ import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import SyncConflictModal from "../components/SyncConflictModal";
 import SyncIndicator from "../components/SyncIndicator";
-import { getAuthToken } from "../misc/getAuthToken";
-import {
-  syncLoreEmbeddings,
-  syncNewMemories,
-  getExistingEmbeddingKeys,
-} from "../misc/embeddings";
 import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
 import { fillTemplate } from "../misc/characterSheetTemplate";
@@ -840,125 +834,6 @@ function StoryPageContent() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyData, loadingStory]);
-
-  // Sync lore and memory embeddings when story is first loaded (if embeddings enabled and dirty)
-  useEffect(() => {
-    if (!storyData || !storyDbId || storyDbId.startsWith("local_")) return;
-
-    const embeddingsEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("embeddingsEnabled") === "true"
-        : false;
-
-    if (!embeddingsEnabled) return;
-
-    // Only sync lore if we have enough entries and it's dirty (or first load)
-    const shouldSyncLore =
-      storyData.lore.length >= 5 && storyData.loreEmbeddingsDirty !== false;
-
-    // Always sync memories on load if we have any
-    const shouldSyncMemories = storyData.memory.length > 0;
-
-    if (!shouldSyncLore && !shouldSyncMemories) return;
-
-    // Fire and forget - sync embeddings in background
-    getAuthToken().then(async (token) => {
-      if (!token) return;
-
-      // First, get existing embedding keys to avoid re-generating
-      let existingKeys: { lore: string[]; memory: string[]; scene: string[] } =
-        {
-          lore: [],
-          memory: [],
-          scene: [],
-        };
-
-      try {
-        existingKeys = await getExistingEmbeddingKeys(storyDbId, token);
-        console.log(
-          `[Embeddings] Found existing keys: ${existingKeys.lore.length} lore, ${existingKeys.memory.length} memories`,
-        );
-      } catch (err) {
-        console.warn(
-          "[Embeddings] Failed to get existing keys, will sync all:",
-          err,
-        );
-      }
-
-      // Sync lore if needed
-      if (shouldSyncLore) {
-        syncLoreEmbeddings(
-          storyDbId,
-          storyData.lore.map((l) => ({
-            title: l.title,
-            content: l.content,
-            embedded: l.embedded,
-          })),
-          token,
-        )
-          .then((result) => {
-            if (result.synced > 0 || result.cleaned > 0) {
-              console.log(
-                `[Embeddings] Lore sync: ${result.synced} entries, ${result.cleaned} cleaned`,
-              );
-            }
-            // Mark successfully embedded lore entries and clear dirty flag
-            if (
-              result.embeddedTitles.length > 0 ||
-              storyData.loreEmbeddingsDirty !== false
-            ) {
-              const updatedLore = storyData.lore.map((l) =>
-                result.embeddedTitles.includes(l.title)
-                  ? { ...l, embedded: true }
-                  : l,
-              );
-              setStoryData({
-                ...storyData,
-                lore: updatedLore,
-                loreEmbeddingsDirty: false,
-              });
-            }
-          })
-          .catch((err) => {
-            console.warn("[Embeddings] Lore sync failed:", err.message);
-          });
-      }
-
-      // Sync memories if we have any
-      if (shouldSyncMemories) {
-        syncNewMemories(
-          storyDbId,
-          storyData.memory,
-          new Set(existingKeys.memory), // Pass existing keys to skip already-synced
-          token,
-        )
-          .then((result) => {
-            if (result.synced > 0 || result.cleaned > 0) {
-              console.log(
-                `[Embeddings] Memory sync: ${result.synced} entries, ${result.cleaned} cleaned`,
-              );
-            }
-            // Mark successfully embedded memory entries
-            if (result.embeddedIndices.length > 0) {
-              const updatedMemory = storyData.memory.map((m, i) => {
-                if (result.embeddedIndices.includes(i)) {
-                  // Convert to MemoryEntry format with embedded: true
-                  const content = typeof m === "string" ? m : m.content;
-                  return { content, embedded: true };
-                }
-                return m;
-              });
-              setStoryData({ ...storyData, memory: updatedMemory });
-            }
-          })
-          .catch((err) => {
-            console.warn("[Embeddings] Memory sync failed:", err.message);
-          });
-      }
-    });
-    // Only run when storyDbId or dirty flag changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storyDbId, storyData?.loreEmbeddingsDirty]);
 
   //Applypresetandstartstory
   const handlePresetSelect = async (preset: Preset) => {

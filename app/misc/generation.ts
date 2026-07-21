@@ -54,7 +54,6 @@ import {
   resolveCheckPerTurnVisibility,
 } from "@/app/misc/gmExecutor";
 import { executeTools, ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecutor";
-import { getAuthToken } from "@/app/misc/getAuthToken";
 import { logger } from "@/app/misc/logger";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import {
@@ -609,7 +608,11 @@ export async function generateStoryTurn(
   options: GenerationOptions,
   callbacks: GenerationCallbacks,
 ): Promise<GenerationResult> {
-  const token = await getAuthToken();
+  // The app is fully local/BYOK now - there's no backend auth system, so
+  // this is always null. Kept as a variable (rather than stripped from the
+  // ~9 downstream call sites in this function) since it's threaded through
+  // as an inert Authorization header/option field that nothing reads.
+  const token: string | null = null;
 
   let totalTokenCost = 0;
   let finalBalance = 0;
@@ -2205,7 +2208,8 @@ export async function generateSimple(
   toolCalls: ToolCall[];
   meta: GenerationMeta;
 }> {
-  const token = await getAuthToken();
+  // No backend auth system anymore - see generateStoryTurn's comment above.
+  const token: string | null = null;
 
   const response = await fetch("/api/generate", {
     method: "POST",
@@ -2259,7 +2263,8 @@ export async function* generateSimpleStream(
     deepinfraKey?: string;
   },
 ): AsyncGenerator<StreamEvent> {
-  const token = await getAuthToken();
+  // No backend auth system anymore - see generateStoryTurn's comment above.
+  const token: string | null = null;
 
   const response = await fetch("/api/generate-stream", {
     method: "POST",
@@ -2314,7 +2319,8 @@ export async function analyzeAction(
     deepinfraKey?: string;
   },
 ): Promise<ActionAnalysisResult> {
-  const token = await getAuthToken();
+  // No backend auth system anymore - see generateStoryTurn's comment above.
+  const token: string | null = null;
 
   logger.action("Analyzing freeform action", { userAction, model });
 
@@ -2628,7 +2634,8 @@ export async function generateChoicesOnly(
     deepinfraKey?: string;
   },
 ): Promise<Choice[]> {
-  const token = await getAuthToken();
+  // No backend auth system anymore - see generateStoryTurn's comment above.
+  const token: string | null = null;
 
   // Get the last AI content from scene parts
   const lastAIPart = [...storyData.scene.parts]

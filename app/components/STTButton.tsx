@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { DynamicIcon } from "./DynamicIcon";
-import { authenticatedFetch } from "../misc/getAuthToken";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 
@@ -131,7 +130,7 @@ export default function STTButton({
       formData.append("audio", audioBlob, "recording.webm");
       formData.append("mistralKey", keys.mistralKey);
 
-      const response = await authenticatedFetch("/api/stt/transcribe", {
+      const response = await fetch("/api/stt/transcribe", {
         method: "POST",
         body: formData,
       });

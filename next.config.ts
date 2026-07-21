@@ -15,16 +15,6 @@ const withPWA = withPWAInit({
 const nextConfig: NextConfig = {
   turbopack: {},
   allowedDevOrigins: ["10.0.0.198"],
-  images: {
-    remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "yvnmrtcnwjxavukdvzqc.supabase.co",
-        port: "",
-        pathname: "/storage/v1/object/public/**",
-      },
-    ],
-  },
 };
 
 export default withPWA(nextConfig);

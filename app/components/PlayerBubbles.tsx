@@ -3,7 +3,6 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { CouchPlayer } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
-import { authenticatedFetch } from "../misc/getAuthToken";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 
@@ -144,7 +143,7 @@ export default function PlayerBubbles({
       formData.append("audio", blob, "recording.webm");
       formData.append("mistralKey", keys.mistralKey);
 
-      const response = await authenticatedFetch("/api/stt/transcribe", {
+      const response = await fetch("/api/stt/transcribe", {
         method: "POST",
         body: formData,
       });
