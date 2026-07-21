@@ -72,6 +72,29 @@ function applyReasoningEffort(
   provider: string,
   reasoningEffort?: string,
 ): void {
+  // DeepSeek V4's thinking mode is an explicit toggle (`thinking.type`) that
+  // DEFAULTS to enabled server-side, so it must be handled before the early
+  // return below - including the "none"/undefined case, where we explicitly
+  // DISABLE it. Two reasons to disable at effort "none": it matches the tier
+  // system's intent (cheap turns skip reasoning), and thinking mode silently
+  // rejects temperature/top_p/presence_penalty/frequency_penalty, which the
+  // creative-narration tiers rely on. When we DO enable it, strip those
+  // unsupported sampling params so the request stays valid.
+  if (provider === "deepseek") {
+    const wantsThinking = !!reasoningEffort && reasoningEffort !== "none";
+    requestBody.thinking = { type: wantsThinking ? "enabled" : "disabled" };
+    if (wantsThinking) {
+      // DeepSeek maps low/medium -> high and xhigh -> max in thinking mode.
+      requestBody.reasoning_effort =
+        reasoningEffort === "xhigh" ? "max" : "high";
+      delete requestBody.temperature;
+      delete requestBody.top_p;
+      delete requestBody.presence_penalty;
+      delete requestBody.frequency_penalty;
+    }
+    return;
+  }
+
   if (!reasoningEffort || reasoningEffort === "none") return;
 
   if (provider === "mistral") {
@@ -90,8 +113,8 @@ function applyReasoningEffort(
       requestBody.reasoning = { effort: mapped };
     }
   }
-  // deepseek/deepinfra/google: no confirmed lever for the models this app
-  // targets - left as a no-op rather than guessing at an unverified param.
+  // deepinfra/google: no confirmed lever for the models this app targets -
+  // left as a no-op rather than guessing at an unverified param.
 }
 
 /**
