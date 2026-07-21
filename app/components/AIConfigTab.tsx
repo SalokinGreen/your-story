@@ -78,7 +78,7 @@ function ModelSelect({
       onChange={(e) => onChange(e.target.value)}
       className={
         className ||
-        "text-xs bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 text-gray-900 dark:text-white"
+        "text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white"
       }
     >
       {Array.from(groups.entries()).map(([provider, models]) => (
@@ -432,22 +432,22 @@ export default function AIConfigTab() {
       </div>
 
       {/* Reasoning Tier Ladder */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-3">
+      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+          <h4 className="text-sm font-medium text-white flex items-center gap-2">
             <DynamicIcon name="Brain" className="w-4 h-4" />
             Reasoning Tiers
           </h4>
           {tierOverrides.some((o) => o !== null) && (
             <button
               onClick={handleResetAllTiers}
-              className="text-xs text-purple-500 hover:text-purple-600"
+              className="text-xs text-purple-300 hover:text-purple-200"
             >
               Reset all to defaults
             </button>
           )}
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-blue-300/60">
           The GM automatically escalates through these tiers per turn based on
           what&rsquo;s happening - banter runs cheap, combat and boss fights
           escalate automatically. Pick which model/effort fills each tier below,
@@ -463,14 +463,14 @@ export default function AIConfigTab() {
             return (
               <div
                 key={index}
-                className="p-3 bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 space-y-2"
+                className="p-3 bg-white/5 rounded-lg border border-white/10 space-y-2"
               >
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 text-[11px] font-bold">
+                    <span className="shrink-0 flex items-center justify-center w-5 h-5 rounded-full bg-purple-500/15 text-purple-300 text-[11px] font-bold">
                       {index}
                     </span>
-                    <span className="text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-500 truncate">
+                    <span className="text-[10px] font-medium uppercase tracking-wide text-blue-300/50 truncate">
                       {config.provider}
                     </span>
                   </div>
@@ -478,7 +478,7 @@ export default function AIConfigTab() {
                     {!keyConfigured && (
                       <span
                         title="No API key configured for this provider"
-                        className="flex items-center gap-1 text-[10px] text-amber-600 dark:text-amber-400"
+                        className="flex items-center gap-1 text-[10px] text-amber-300"
                       >
                         <DynamicIcon name="AlertTriangle" className="w-3 h-3" />
                         No key
@@ -487,7 +487,7 @@ export default function AIConfigTab() {
                     {override && (
                       <button
                         onClick={() => handleResetTier(index)}
-                        className="text-[10px] text-purple-500 hover:text-purple-600 hover:underline"
+                        className="text-[10px] text-purple-300 hover:text-purple-200 hover:underline"
                         title="Reset this tier to its default model"
                       >
                         Reset
@@ -495,7 +495,7 @@ export default function AIConfigTab() {
                     )}
                   </div>
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-blue-300/60">
                   {defaultTier.note}
                 </p>
                 <div className="flex items-center gap-2">
@@ -506,7 +506,7 @@ export default function AIConfigTab() {
                     }
                     customModels={customModels}
                     requireToolCalling
-                    className="flex-1 min-w-0 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1.5 text-gray-900 dark:text-white"
+                    className="flex-1 min-w-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white"
                   />
                   <select
                     value={tier.reasoningEffort}
@@ -516,7 +516,7 @@ export default function AIConfigTab() {
                         e.target.value as ReasoningEffort,
                       )
                     }
-                    className="w-24 shrink-0 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md px-2 py-1.5 text-gray-900 dark:text-white capitalize"
+                    className="w-24 shrink-0 text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-white capitalize"
                   >
                     {REASONING_EFFORTS.map((effort) => (
                       <option key={effort} value={effort}>
@@ -529,7 +529,7 @@ export default function AIConfigTab() {
             );
           })}
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-blue-300/60">
           Tiers with &ldquo;no key&rdquo; will automatically fall back to the
           next-lower tier until one has a configured key. Add provider keys in
           the API Keys tab.
@@ -537,20 +537,20 @@ export default function AIConfigTab() {
       </div>
 
       {/* Custom Models */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-3">
+      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+          <h4 className="text-sm font-medium text-white flex items-center gap-2">
             <DynamicIcon name="Plus" className="w-4 h-4" />
             Custom Models
           </h4>
           <button
             onClick={() => setShowAddCustomModel((v) => !v)}
-            className="text-xs text-purple-500 hover:text-purple-600"
+            className="text-xs text-purple-300 hover:text-purple-200"
           >
             {showAddCustomModel ? "Cancel" : "+ Add model"}
           </button>
         </div>
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-blue-300/60">
           Register any OpenRouter model ID to use it for narration or any
           reasoning tier above, in addition to the built-in models. Requires an
           OpenRouter key in the API Keys tab.
@@ -561,19 +561,19 @@ export default function AIConfigTab() {
             {customModels.map((m) => (
               <div
                 key={m.id}
-                className="flex items-center justify-between gap-2 p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700"
+                className="flex items-center justify-between gap-2 p-2 bg-white/5 rounded-lg border border-white/10"
               >
                 <div className="min-w-0">
-                  <div className="text-sm text-gray-900 dark:text-white truncate">
+                  <div className="text-sm text-white truncate">
                     {m.name}
                   </div>
-                  <div className="text-xs text-gray-400 font-mono truncate">
+                  <div className="text-xs text-blue-300/40 font-mono truncate">
                     {m.modelId}
                   </div>
                 </div>
                 <button
                   onClick={() => handleRemoveCustomModel(m.id)}
-                  className="text-gray-400 hover:text-red-500 shrink-0"
+                  className="text-blue-300/50 hover:text-red-400 shrink-0"
                   title="Remove custom model"
                 >
                   <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
@@ -584,23 +584,23 @@ export default function AIConfigTab() {
         )}
 
         {showAddCustomModel && (
-          <div className="space-y-2 p-3 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700">
+          <div className="space-y-2 p-3 bg-white/5 rounded-lg border border-white/10">
             <input
               type="text"
               value={newModelName}
               onChange={(e) => setNewModelName(e.target.value)}
               placeholder="Display name (e.g. Claude Opus)"
-              className="w-full px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <input
               type="text"
               value={newModelId}
               onChange={(e) => setNewModelId(e.target.value)}
               placeholder="OpenRouter model ID (e.g. anthropic/claude-opus-4.1)"
-              className="w-full px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm font-mono focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm font-mono text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
             <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-500 dark:text-gray-400 flex-1">
+              <label className="text-xs text-blue-300/60 flex-1">
                 Context size
                 <input
                   type="number"
@@ -610,10 +610,10 @@ export default function AIConfigTab() {
                   }
                   min="1000"
                   step="1000"
-                  className="w-full mt-0.5 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full mt-0.5 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </label>
-              <label className="text-xs text-gray-500 dark:text-gray-400 flex-1">
+              <label className="text-xs text-blue-300/60 flex-1">
                 Max output tokens
                 <input
                   type="number"
@@ -623,14 +623,14 @@ export default function AIConfigTab() {
                   }
                   min="500"
                   step="500"
-                  className="w-full mt-0.5 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full mt-0.5 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                 />
               </label>
             </div>
             <button
               onClick={handleAddCustomModel}
               disabled={!newModelName.trim() || !newModelId.trim()}
-              className="w-full py-1.5 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-300 disabled:dark:bg-gray-700 disabled:cursor-not-allowed text-white text-sm rounded transition-colors"
+              className="w-full py-1.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:from-white/10 disabled:to-white/10 disabled:cursor-not-allowed text-white text-sm rounded-lg shadow-md shadow-purple-950/40 transition-all"
             >
               Add model
             </button>
@@ -640,8 +640,8 @@ export default function AIConfigTab() {
 
       {/* Recent Reasoning Tier Calls */}
       {recentTierLogs.length > 0 && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-2">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+        <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-2">
+          <h4 className="text-sm font-medium text-white flex items-center gap-2">
             <DynamicIcon name="History" className="w-4 h-4" />
             Recent Tier Calls
           </h4>
@@ -649,7 +649,7 @@ export default function AIConfigTab() {
             {recentTierLogs.map((log, i) => (
               <div
                 key={`${log.timestamp}-${i}`}
-                className="text-xs text-gray-500 dark:text-gray-400 font-mono"
+                className="text-xs text-blue-300/60 font-mono"
               >
                 {log.data?.describe || log.message}
               </div>
@@ -661,10 +661,10 @@ export default function AIConfigTab() {
       {/* Memory Size Slider */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-sm font-medium text-blue-200/80">
             Memory Size
           </label>
-          <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+          <span className="text-sm text-purple-300 font-medium">
             {isCustomContextMode
               ? customMaxContext > 0
                 ? `${(customMaxContext / 1000).toFixed(0)}K tokens`
@@ -673,7 +673,7 @@ export default function AIConfigTab() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
+          <span className="text-xs text-green-400 whitespace-nowrap">
             💰 Cheap
           </span>
           <div className="flex-1 relative">
@@ -702,13 +702,13 @@ export default function AIConfigTab() {
                       !isCustomContextMode &&
                       customMaxContext === val)
                       ? "bg-white border-white scale-125 shadow-lg"
-                      : "bg-gray-800 border-gray-500 hover:border-white hover:scale-110"
+                      : "bg-white/10 border-white/30 hover:border-white hover:scale-110"
                   }`}
                   title={val === -1 ? "Custom" : `${(val / 1000).toFixed(0)}K`}
                 />
               ))}
             </div>
-            <div className="flex justify-between mt-3 text-[10px] text-gray-500 dark:text-gray-400">
+            <div className="flex justify-between mt-3 text-[10px] text-blue-300/50">
               <span>8K</span>
               <span>16K</span>
               <span>36K</span>
@@ -718,7 +718,7 @@ export default function AIConfigTab() {
               <span>⚙️</span>
             </div>
           </div>
-          <span className="text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap">
+          <span className="text-xs text-purple-300 whitespace-nowrap">
             🧠 Memory
           </span>
         </div>
@@ -740,12 +740,12 @@ export default function AIConfigTab() {
               min="1000"
               step="1000"
               placeholder="Enter tokens..."
-              className="w-32 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-32 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
-            <span className="text-xs text-gray-500">tokens</span>
+            <span className="text-xs text-blue-300/50">tokens</span>
           </div>
         )}
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-blue-300/60">
           Lower = cheaper & faster • Higher = better story memory
         </p>
       </div>
@@ -753,10 +753,10 @@ export default function AIConfigTab() {
       {/* Response Length Slider */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+          <label className="text-sm font-medium text-blue-200/80">
             Response Length
           </label>
-          <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+          <span className="text-sm text-purple-300 font-medium">
             {isCustomOutputMode
               ? customMaxOutput > 0
                 ? `${(customMaxOutput / 1000).toFixed(0)}K tokens`
@@ -765,7 +765,7 @@ export default function AIConfigTab() {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
+          <span className="text-xs text-green-400 whitespace-nowrap">
             ⚡ Fast
           </span>
           <div className="flex-1 relative">
@@ -794,13 +794,13 @@ export default function AIConfigTab() {
                       !isCustomOutputMode &&
                       customMaxOutput === val)
                       ? "bg-white border-white scale-125 shadow-lg"
-                      : "bg-gray-800 border-gray-500 hover:border-white hover:scale-110"
+                      : "bg-white/10 border-white/30 hover:border-white hover:scale-110"
                   }`}
                   title={val === -1 ? "Custom" : `${(val / 1000).toFixed(0)}K`}
                 />
               ))}
             </div>
-            <div className="flex justify-between mt-3 text-[10px] text-gray-500 dark:text-gray-400">
+            <div className="flex justify-between mt-3 text-[10px] text-blue-300/50">
               <span>1K</span>
               <span>2K</span>
               <span>4K</span>
@@ -808,7 +808,7 @@ export default function AIConfigTab() {
               <span>⚙️</span>
             </div>
           </div>
-          <span className="text-xs text-purple-600 dark:text-purple-400 whitespace-nowrap">
+          <span className="text-xs text-purple-300 whitespace-nowrap">
             📝 Length
           </span>
         </div>
@@ -830,15 +830,15 @@ export default function AIConfigTab() {
               min="1000"
               step="500"
               placeholder="Enter tokens..."
-              className="w-32 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-sm text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-32 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500"
             />
-            <span className="text-xs text-gray-500">tokens</span>
+            <span className="text-xs text-blue-300/50">tokens</span>
           </div>
         )}
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-blue-300/60">
           Lower = faster responses • Higher = longer story passages
         </p>
-        <p className="text-xs text-amber-500/80 dark:text-amber-400/60 mt-1">
+        <p className="text-xs text-amber-400/70 mt-1">
           ⚠️ Minimum 1000 tokens recommended. Some providers count prefill
           against output limit.
         </p>
@@ -851,30 +851,30 @@ export default function AIConfigTab() {
       />
 
       {/* Tool Calling Settings */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-white flex items-center gap-2">
           <DynamicIcon name="Wrench" className="w-4 h-4" />
           Tool Calling
         </h4>
 
         <div className="space-y-1">
-          <p className="text-sm text-gray-700 dark:text-gray-300">
+          <p className="text-sm text-blue-100">
             Tool calling is always enabled.
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-blue-300/60">
             The AI can modify stats, inventory, and story state.
           </p>
-          <p className="text-xs text-gray-500 dark:text-gray-400">
+          <p className="text-xs text-blue-300/60">
             GM thinking display is always enabled.
           </p>
         </div>
 
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
+            <p className="text-sm text-blue-100">
               Max Tool Rounds
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-blue-300/60">
               Higher = more state changes but slower generation
             </p>
           </div>
@@ -888,11 +888,11 @@ export default function AIConfigTab() {
                 }
               }}
               disabled={maxToolLoops <= 1}
-              className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-blue-200 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               -
             </button>
-            <span className="w-8 text-center font-medium text-gray-900 dark:text-white">
+            <span className="w-8 text-center font-medium text-white">
               {maxToolLoops}
             </span>
             <button
@@ -904,7 +904,7 @@ export default function AIConfigTab() {
                 }
               }}
               disabled={maxToolLoops >= 50}
-              className="w-8 h-8 flex items-center justify-center rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-8 h-8 flex items-center justify-center rounded-lg bg-white/5 text-blue-200 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               +
             </button>
@@ -913,18 +913,18 @@ export default function AIConfigTab() {
       </div>
 
       {/* Semantic Search (Embeddings) Section */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-white flex items-center gap-2">
           <DynamicIcon name="Search" className="w-4 h-4" />
           Semantic Search
         </h4>
 
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
+            <p className="text-sm text-blue-100">
               Enable Embeddings
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-blue-300/60">
               Use AI to find relevant lore and memories contextually
             </p>
           </div>
@@ -941,22 +941,22 @@ export default function AIConfigTab() {
               }}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+            <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
           </label>
         </div>
 
         {embeddingsEnabled && (
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-sm text-gray-700 dark:text-gray-300">
+              <label className="text-sm text-blue-100">
                 Similarity Threshold
               </label>
-              <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+              <span className="text-sm text-purple-300 font-medium">
                 {embeddingThreshold.toFixed(2)}
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-blue-600 dark:text-blue-400 whitespace-nowrap">
+              <span className="text-xs text-blue-300 whitespace-nowrap">
                 🌊 Relaxed
               </span>
               <input
@@ -972,21 +972,21 @@ export default function AIConfigTab() {
                     localStorage.setItem("embeddingThreshold", String(val));
                   }
                 }}
-                className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
               />
-              <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">
+              <span className="text-xs text-green-400 whitespace-nowrap">
                 🎯 Precise
               </span>
             </div>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-blue-300/60">
               Lower = more results (broader matching) • Higher = fewer results
               (stricter matching)
             </p>
           </div>
         )}
 
-        <div className="p-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-          <p className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-1.5">
+        <div className="p-2 bg-blue-500/[0.06] border border-blue-400/20 rounded-lg">
+          <p className="text-xs text-blue-200/80 flex items-start gap-1.5">
             <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span>
               When enabled, uses Mistral embeddings to semantically search lore
@@ -998,18 +998,18 @@ export default function AIConfigTab() {
       </div>
 
       {/* Role Affirmation (Prefill) Section */}
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-white flex items-center gap-2">
           <DynamicIcon name="MessageSquare" className="w-4 h-4" />
           Role Affirmation
         </h4>
 
         <div className="flex items-center justify-between">
           <div className="flex-1">
-            <p className="text-sm text-gray-700 dark:text-gray-300">
+            <p className="text-sm text-blue-100">
               Enable Prefill Messages
             </p>
-            <p className="text-xs text-gray-500 dark:text-gray-400">
+            <p className="text-xs text-blue-300/60">
               Prime AI to follow output format by adding commitment messages
             </p>
           </div>
@@ -1026,12 +1026,12 @@ export default function AIConfigTab() {
               }}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+            <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
           </label>
         </div>
 
-        <div className="p-2 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
-          <p className="text-xs text-purple-700 dark:text-purple-300 flex items-start gap-1.5">
+        <div className="p-2 bg-purple-500/[0.06] border border-purple-400/20 rounded-lg">
+          <p className="text-xs text-purple-200/80 flex items-start gap-1.5">
             <DynamicIcon
               name="Sparkles"
               className="w-3.5 h-3.5 mt-0.5 shrink-0"
