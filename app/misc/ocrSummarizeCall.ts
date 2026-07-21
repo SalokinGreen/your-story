@@ -246,6 +246,9 @@ OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields
       "folder": "Category folder (Characters, Locations, Items, Factions, History, etc.)",
       "tags": ["tag1", "tag2"],
       "aliases": ["Alternate name 1", "Nickname 2"],  // other names, nicknames, or titles this entry is also called in the text - [] if none
+      "relatedCharacters": ["Character name 1"],  // Other NPCs/characters this entry is connected to or mentions by name - [] if none
+      "relatedLocations": ["Location name 1"],  // Places this entry is connected to or mentions by name - [] if none
+      "keys": ["keyword1", "short phrase"],  // A few short words/phrases (not full sentences) that, if they come up later in play, mean this note is relevant - [] if none
       "secrtet": false  // true if this is secret/hidden information
     }
   ],
@@ -304,6 +307,8 @@ CONTENT RULES:
 - Each lore entry should be 2-4 paragraphs of rich detail
 - Use descriptive folder names for organization (Characters, Locations, Items, Factions, History, Bestiary, etc.)
 - If a character, place, or thing is referred to by more than one name in the text (a nickname, title, alias, alternate spelling, or shortened form - e.g. "Bob" for "Robert the Blacksmith", or "the Sunken Temple" for "Vashti's Sanctum"), list those other names in "aliases" so mentions of them can also be recognized. Leave "aliases" as [] when there's only the one name.
+- For each lore entry, list any other named NPCs/characters and locations it's connected to (mentioned in the text, allied/opposed to, located at, etc.) in "relatedCharacters"/"relatedLocations" - use the same name you'd use for that entry's own title elsewhere, so entries can be cross-referenced. Leave either as [] if none apply.
+- Give each lore entry a few short "keys" - single words or short phrases (not sentences) a player or GM would plausibly say that should bring this note to mind later (a name, a place, a distinctive item or event). Leave as [] if nothing stands out.
 - Mark secret/hidden information with "secrtet": true
 - For tables, estimate reasonable min/max ranges if not explicitly stated
 - Be thorough but concise - prioritize quality over quantity
@@ -404,7 +409,7 @@ function tryParseAIResponse(content: string): {
   }
 }
 
-function normalizeAliases(raw: unknown): string[] {
+function normalizeStringArray(raw: unknown): string[] {
   if (!Array.isArray(raw)) return [];
   return raw
     .filter((a): a is string => typeof a === "string")
@@ -412,7 +417,7 @@ function normalizeAliases(raw: unknown): string[] {
     .filter(Boolean);
 }
 
-function processParserResult(parsed: any): {
+export function processParserResult(parsed: any): {
   summary: string;
   lore: StoryLore[];
   mechanicNotes: StoryLore[];
@@ -423,12 +428,14 @@ function processParserResult(parsed: any): {
     content: entry.content || "",
     type: entry.type || undefined,
     folder: entry.folder || "",
-    tags: entry.tags || [],
-    aliases: normalizeAliases(entry.aliases),
+    tags: normalizeStringArray(entry.tags),
+    aliases: normalizeStringArray(entry.aliases),
+    relatedCharacters: normalizeStringArray(entry.relatedCharacters),
+    relatedLocations: normalizeStringArray(entry.relatedLocations),
     secrtet: entry.secrtet || entry.secret || false,
     on: true,
     alwaysOn: false,
-    keys: [],
+    keys: normalizeStringArray(entry.keys),
     on_triggers: [],
     off_triggers: [],
     trigger_lores: [],
@@ -443,7 +450,9 @@ function processParserResult(parsed: any): {
       content: entry.content || "",
       type: "mechanics" as const,
       folder: entry.folder || "Rules",
-      tags: entry.tags || [],
+      tags: normalizeStringArray(entry.tags),
+      relatedCharacters: [],
+      relatedLocations: [],
       secrtet: false,
       on: true,
       alwaysOn: true,
