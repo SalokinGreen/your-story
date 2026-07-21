@@ -461,7 +461,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
                     />
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
-                      Used for low-latency Sonic-2 text-to-speech.
+                      Used for low-latency Sonic-3 text-to-speech.
                     </p>
                   </div>
                 </div>
@@ -576,7 +576,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       Bring your own TTS provider
                     </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      Kokoro/Orpheus (DeepInfra), Cartesia Sonic-2, or ElevenLabs Flash -
+                      Kokoro/Orpheus (DeepInfra), Cartesia Sonic-3, or ElevenLabs Flash -
                       add the matching key in the Keys tab
                     </p>
                   </div>
@@ -677,7 +677,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       const modelLabel = {
                         kokoro: "Kokoro (Fast)",
                         orpheus: "Orpheus (Premium)",
-                        cartesia: "Cartesia Sonic-2",
+                        cartesia: "Cartesia Sonic-3",
                         elevenlabs: "ElevenLabs Flash v2.5",
                       }[newModel];
                       addNotification(`Switched to ${modelLabel}`, "success");
@@ -691,7 +691,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       Orpheus - Premium Expressive ($7/1M chars, DeepInfra)
                     </option>
                     <option value="cartesia">
-                      Cartesia Sonic-2 - Ultra Low Latency (Cartesia)
+                      Cartesia Sonic-3 - Ultra Low Latency (Cartesia)
                     </option>
                     <option value="elevenlabs">
                       ElevenLabs Flash v2.5 - Best Quality (ElevenLabs)

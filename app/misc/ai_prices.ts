@@ -1452,7 +1452,7 @@ export const TTS_MODELS = {
     description: "Premium expressive TTS with emotional range",
   },
   cartesia: {
-    name: "Cartesia Sonic-2",
+    name: "Cartesia Sonic-3",
     provider: "Cartesia",
     pricePerMillionChars: 30.0, // approximate - actual cost depends on your Cartesia plan tier
     description: "Very low-latency, natural-sounding TTS built for real-time narration",

@@ -5,7 +5,7 @@
 The Your Story app features text-to-speech capabilities across four BYOK
 providers/models. Users can listen to the generated story content with
 multiple voice options from: **Kokoro** (fast & affordable, DeepInfra),
-**Orpheus** (premium & expressive, DeepInfra), **Cartesia Sonic-2**
+**Orpheus** (premium & expressive, DeepInfra), **Cartesia Sonic-3**
 (ultra-low-latency), and **ElevenLabs Flash v2.5** (best-in-class quality).
 All four are BYOK - the user supplies their own provider API key in Settings;
 there is no server-side "Coins" path for TTS.
@@ -32,7 +32,7 @@ Fast, cost-effective TTS with natural voices. Best for everyday use.
 
 Premium Llama-based TTS with exceptional clarity, expressiveness, and emotional range. Best for immersive storytelling.
 
-### Cartesia Sonic-2 (Cartesia, ~1 credit/character - plan-dependent)
+### Cartesia Sonic-3 (Cartesia, ~1 credit/character - plan-dependent)
 
 Purpose-built for low-latency, real-time narration. Requires a Cartesia API
 key from [play.cartesia.ai](https://play.cartesia.ai/keys). Voice IDs are
@@ -140,14 +140,14 @@ amount billed depends on the user's own plan with that provider:
 
 - **Kokoro**: $0.62 / 1M characters (DeepInfra)
 - **Orpheus**: $7.00 / 1M characters (DeepInfra)
-- **Cartesia Sonic-2**: ~$30 / 1M characters (varies by Cartesia plan tier)
+- **Cartesia Sonic-3**: ~$30 / 1M characters (varies by Cartesia plan tier)
 - **ElevenLabs Flash v2.5**: ~$50 / 1M characters (varies by ElevenLabs plan tier)
 
 ## Usage
 
 1. Go to **Settings** (gear icon) → **API Keys** tab, add the API key for whichever provider(s) you want to use
 2. Go to **Settings** → **Voice** tab, enable TTS
-3. Choose a model: Kokoro/Orpheus (DeepInfra), Cartesia Sonic-2, or ElevenLabs Flash v2.5
+3. Choose a model: Kokoro/Orpheus (DeepInfra), Cartesia Sonic-3, or ElevenLabs Flash v2.5
 4. Select a voice from the dropdown (or add a custom voice ID)
 5. Adjust volume as needed
 6. Optionally enable auto-generate for automatic narration
@@ -232,6 +232,6 @@ To test TTS:
 ## Credits
 
 - **DeepInfra**: [Kokoro-82M](https://deepinfra.com/hexgrad/Kokoro-82M), [Orpheus 3B](https://deepinfra.com/canopylabs/orpheus-3b-0.1-ft)
-- **Cartesia**: [Sonic-2](https://cartesia.ai)
+- **Cartesia**: [Sonic-3](https://cartesia.ai)
 - **ElevenLabs**: [Flash v2.5](https://elevenlabs.io)
 - **Integration**: Your Story - Cartesia/ElevenLabs added July 2026

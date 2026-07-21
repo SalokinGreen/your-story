@@ -15,7 +15,7 @@ const ORPHEUS_ENDPOINT =
 
 // Cartesia TTS endpoint - see https://docs.cartesia.ai/api-reference/tts/bytes
 const CARTESIA_ENDPOINT = "https://api.cartesia.ai/tts/bytes";
-const CARTESIA_VERSION = "2024-06-10";
+const CARTESIA_VERSION = "2025-11-04";
 
 // ElevenLabs TTS endpoint - see
 // https://elevenlabs.io/docs/api-reference/text-to-speech/convert
@@ -194,9 +194,15 @@ async function fetchChunkAudio(
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model_id: "sonic-2",
+        model_id: "sonic-3",
         transcript: chunk,
         voice: { mode: "id", id: voiceId },
+        language: "en",
+        generation_config: { volume: 1, speed: 1 },
+        // container stays "mp3" (not Cartesia's telephony-oriented raw
+        // pcm_f32le/8kHz example) so each chunk is independently decodable -
+        // we concatenate raw chunk bytes client-side and play the result as
+        // one Blob, which only works for self-delimited formats like MP3.
         output_format: { container: "mp3", sample_rate: 44100, bit_rate: 128000 },
       }),
     });
@@ -221,7 +227,16 @@ async function fetchChunkAudio(
           "xi-api-key": apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ text: chunk, model_id: "eleven_flash_v2_5" }),
+        body: JSON.stringify({
+          text: chunk,
+          model_id: "eleven_flash_v2_5",
+          voice_settings: {
+            stability: 0.5,
+            similarity_boost: 0.75,
+            style: 0.0,
+            use_speaker_boost: true,
+          },
+        }),
       },
     );
 
