@@ -712,7 +712,7 @@ export default function CreatorAIChat({
       <>
         {/* Pull tab on left edge - closes the drawer */}
         <button
-          className="fixed top-1/2 -translate-y-1/2 z-40 bg-purple-500/90 hover:bg-purple-600 text-white p-1.5 rounded-l-lg shadow-lg transition-all pointer-events-auto right-80  sm:right-[380px] md:right-[420px]"
+          className="fixed top-1/2 -translate-y-1/2 z-40 bg-purple-500/90 hover:bg-purple-600 text-white p-1.5 rounded-l-lg shadow-lg transition-all pointer-events-auto right-80 sm:right-[380px] md:right-[420px]"
           style={
             touchDelta > 0
               ? {
@@ -728,7 +728,7 @@ export default function CreatorAIChat({
         </button>
         <div
           ref={drawerRef}
-          className="fixed top-14 right-0 z-40 h-[calc(100%-7.5rem)] w-[320px] sm:w-[380px] md:w-[420px] max-w-[85vw] flex flex-col overflow-hidden bg-white/95 dark:bg-gray-900/95 shadow-2xl border-l border-gray-200 dark:border-gray-700 animate-in slide-in-from-right duration-300 pointer-events-auto rounded-bl-xl"
+          className="fixed top-14 right-0 z-40 h-[calc(100%-7.5rem)] w-[320px] sm:w-[380px] md:w-[420px] max-w-[85vw] flex flex-col overflow-hidden bg-[#0d1829]/95 backdrop-blur-2xl shadow-2xl border-l border-white/10 animate-in slide-in-from-right duration-300 pointer-events-auto rounded-bl-xl"
           style={{
             transform:
               touchDelta > 0 ? `translateX(${touchDelta}px)` : undefined,
@@ -739,13 +739,13 @@ export default function CreatorAIChat({
           onTouchEnd={handleTouchEnd}
         >
           {/* Header - Compact for pinned mode */}
-          <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-4 py-3 backdrop-blur-sm">
+          <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] backdrop-blur-md px-4 py-3 backdrop-blur-sm">
             <div className="flex items-center gap-2 min-w-0">
               <DynamicIcon
                 name="Sparkles"
                 className="w-4 h-4 text-purple-500 shrink-0"
               />
-              <span className="text-sm font-semibold text-gray-700 dark:text-gray-200 truncate">
+              <span className="text-sm font-semibold text-blue-100 truncate">
                 AI Assistant
               </span>
               {/* Thread Selector - Compact */}
@@ -753,7 +753,7 @@ export default function CreatorAIChat({
                 <div className="relative" data-thread-selector>
                   <button
                     onClick={() => setShowThreadSelector(!showThreadSelector)}
-                    className="flex items-center gap-1 px-2 py-1 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-400 transition-colors"
+                    className="flex items-center gap-1 px-2 py-1 bg-white/5 hover:bg-white/10 rounded text-xs text-blue-300/60 transition-colors"
                     title="Switch chat threads"
                   >
                     <span className="max-w-20 truncate">
@@ -767,10 +767,10 @@ export default function CreatorAIChat({
                     />
                   </button>
                   {showThreadSelector && (
-                    <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                    <div className="absolute top-full left-0 mt-1 w-56 bg-white/5 rounded-lg shadow-xl border border-white/10 z-50 overflow-hidden">
                       <button
                         onClick={handleNewThread}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 border-b border-gray-200 dark:border-gray-700 font-medium"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs text-purple-400 hover:bg-purple-900/20 border-b border-white/10 font-medium"
                       >
                         <DynamicIcon name="Plus" className="w-3.5 h-3.5" />
                         New Thread
@@ -783,17 +783,17 @@ export default function CreatorAIChat({
                             <div
                               key={thread.id}
                               onClick={() => handleSwitchThread(thread.id)}
-                              className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 text-xs ${
+                              className={`flex items-center gap-2 px-3 py-1.5 cursor-pointer hover:bg-white/5 text-xs ${
                                 thread.id === activeThreadId
-                                  ? "bg-purple-50 dark:bg-purple-900/20"
+                                  ? "bg-purple-900/20"
                                   : ""
                               }`}
                             >
                               <span
                                 className={`truncate ${
                                   thread.id === activeThreadId
-                                    ? "font-medium text-purple-700 dark:text-purple-300"
-                                    : "text-gray-600 dark:text-gray-400"
+                                    ? "font-medium text-purple-300"
+                                    : "text-blue-300/60"
                                 }`}
                               >
                                 {thread.name}
@@ -810,7 +810,7 @@ export default function CreatorAIChat({
               {onPinToggle && (
                 <button
                   onClick={onPinToggle}
-                  className="rounded p-1.5 text-purple-500 hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors"
+                  className="rounded p-1.5 text-purple-500 hover:bg-purple-900/30 transition-colors"
                   title="Unpin to modal"
                 >
                   <DynamicIcon name="PanelRightClose" className="w-4 h-4" />
@@ -818,7 +818,7 @@ export default function CreatorAIChat({
               )}
               <button
                 onClick={onClose}
-                className="rounded p-1.5 text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+                className="rounded p-1.5 text-blue-300/60 hover:bg-white/5 hover:text-blue-100 transition-colors"
                 title="Close"
               >
                 <DynamicIcon name="X" className="w-4 h-4" />
@@ -827,13 +827,13 @@ export default function CreatorAIChat({
           </div>
 
           {/* Compact Settings Bar */}
-          <div className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80 px-3 py-2">
+          <div className="border-b border-white/10 bg-[#0d1829]/90 backdrop-blur-xl px-3 py-2">
             <div className="flex flex-wrap items-center gap-2">
               {/* BYOK/Coins Toggle - Compact */}
-              <div className="flex items-center gap-1.5 px-2 py-1 bg-white dark:bg-blue-950 rounded border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center gap-1.5 px-2 py-1 bg-[#0d1829]/95 backdrop-blur-2xl rounded border border-white/10">
                 <span
                   className={`text-[10px] font-medium ${
-                    !byokMode ? "text-amber-500" : "text-gray-400"
+                    !byokMode ? "text-amber-500" : "text-blue-300/60"
                   }`}
                 >
                   🪙
@@ -849,7 +849,7 @@ export default function CreatorAIChat({
                 </label>
                 <span
                   className={`text-[10px] font-medium ${
-                    byokMode ? "text-green-500" : "text-gray-400"
+                    byokMode ? "text-green-500" : "text-blue-300/60"
                   }`}
                 >
                   🔑
@@ -860,7 +860,7 @@ export default function CreatorAIChat({
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="flex-1 min-w-0 bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 text-[10px] rounded px-1.5 py-1 text-gray-700 dark:text-gray-300 focus:ring-1 focus:ring-purple-500 outline-none cursor-pointer truncate"
+                className="flex-1 min-w-0 bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 text-[10px] rounded px-1.5 py-1 text-blue-200/80 focus:ring-1 focus:ring-purple-500 outline-none cursor-pointer truncate"
               >
                 {filteredModels.map(([key, m]) => (
                   <option key={key} value={key}>
@@ -880,7 +880,7 @@ export default function CreatorAIChat({
                   onChange={(e) => setMaxOutputTokens(Number(e.target.value))}
                   className="w-12 h-1 accent-purple-500"
                 />
-                <span className="text-[10px] text-gray-500 w-8">
+                <span className="text-[10px] text-blue-300/50 w-8">
                   {maxOutputTokens}
                 </span>
               </div>
@@ -888,14 +888,14 @@ export default function CreatorAIChat({
           </div>
 
           {/* Messages Area */}
-          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-linear-to-b from-gray-50 to-white dark:from-gray-900 dark:to-gray-950">
+          <div className="flex-1 overflow-y-auto p-3 space-y-3 bg-linear-to-b from-gray-900 to-gray-950">
             {messages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-center p-4">
                 <DynamicIcon
                   name="Sparkles"
                   className="w-8 h-8 text-purple-400/50 mb-2"
                 />
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-xs text-blue-300/60">
                   Ask to add, modify, or remove content
                 </p>
               </div>
@@ -910,7 +910,7 @@ export default function CreatorAIChat({
             )}
             {loading && (
               <div className="flex justify-start">
-                <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl px-3 py-2">
+                <div className="bg-white/5 border border-white/10 rounded-xl px-3 py-2">
                   <div className="flex items-center gap-1.5">
                     <div
                       className="w-1.5 h-1.5 rounded-full bg-purple-500 animate-bounce"
@@ -932,7 +932,7 @@ export default function CreatorAIChat({
           </div>
 
           {/* Input Area - Compact */}
-          <div className="border-t border-gray-200 dark:border-gray-800 bg-white/80 dark:bg-gray-900/80 p-3">
+          <div className="border-t border-white/10 bg-[#0d1829]/90 backdrop-blur-xl p-3">
             <div className="flex gap-2">
               <textarea
                 value={input}
@@ -945,12 +945,12 @@ export default function CreatorAIChat({
                 }}
                 placeholder="Ask to edit..."
                 rows={2}
-                className="flex-1 resize-none rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 px-3 py-2 text-xs text-gray-900 dark:text-white placeholder-gray-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
+                className="flex-1 resize-none rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder-gray-400 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
               />
               <button
                 onClick={handleSend}
                 disabled={loading || !input.trim()}
-                className="self-end px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                className="self-end px-3 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-white/10 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
               >
                 <DynamicIcon name="Send" className="w-4 h-4" />
               </button>
@@ -981,9 +981,9 @@ export default function CreatorAIChat({
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-200"
       onClick={handleBackdropClick}
     >
-      <div className="flex h-[95vh] sm:h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-white/95 dark:bg-gray-900/95 shadow-2xl border border-white/20 dark:border-gray-700 ring-1 ring-black/5">
+      <div className="flex h-[95vh] sm:h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[#0d1829]/95 backdrop-blur-2xl shadow-2xl border border-white/10 ring-1 ring-black/5">
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white/50 dark:bg-gray-900/50 px-6 py-4 backdrop-blur-sm">
+        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] backdrop-blur-md px-6 py-4 backdrop-blur-sm">
           <div className="flex items-center gap-3">
             <div>
               <h2 className="text-xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
@@ -993,7 +993,7 @@ export default function CreatorAIChat({
                 />{" "}
                 AI Creative Assistant
               </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+              <p className="text-xs text-blue-300/60 mt-0.5">
                 For your Adventures
               </p>
             </div>
@@ -1002,7 +1002,7 @@ export default function CreatorAIChat({
               <div className="relative ml-2" data-thread-selector>
                 <button
                   onClick={() => setShowThreadSelector(!showThreadSelector)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300 transition-colors border border-gray-200 dark:border-gray-600"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-blue-200/80 transition-colors border border-white/15"
                   title="Switch chat threads"
                 >
                   <DynamicIcon name="MessageSquare" className="w-4 h-4" />
@@ -1017,11 +1017,11 @@ export default function CreatorAIChat({
                   />
                 </button>
                 {showThreadSelector && (
-                  <div className="absolute top-full left-0 mt-1 w-64 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 z-50 overflow-hidden">
+                  <div className="absolute top-full left-0 mt-1 w-64 bg-white/5 rounded-lg shadow-xl border border-white/10 z-50 overflow-hidden">
                     {/* New Thread Button */}
                     <button
                       onClick={handleNewThread}
-                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-purple-600 dark:text-purple-400 hover:bg-purple-50 dark:hover:bg-purple-900/20 border-b border-gray-200 dark:border-gray-700 font-medium"
+                      className="w-full flex items-center gap-2 px-3 py-2.5 text-sm text-purple-400 hover:bg-purple-900/20 border-b border-white/10 font-medium"
                     >
                       <DynamicIcon name="Plus" className="w-4 h-4" />
                       New Chat Thread
@@ -1029,7 +1029,7 @@ export default function CreatorAIChat({
                     {/* Thread List */}
                     <div className="max-h-60 overflow-y-auto">
                       {threads.length === 0 ? (
-                        <p className="px-3 py-4 text-xs text-gray-500 dark:text-gray-400 text-center">
+                        <p className="px-3 py-4 text-xs text-blue-300/60 text-center">
                           No threads yet. Start a new chat!
                         </p>
                       ) : (
@@ -1040,9 +1040,9 @@ export default function CreatorAIChat({
                             <div
                               key={thread.id}
                               onClick={() => handleSwitchThread(thread.id)}
-                              className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 group ${
+                              className={`flex items-center gap-2 px-3 py-2 cursor-pointer hover:bg-white/5 group ${
                                 thread.id === activeThreadId
-                                  ? "bg-purple-50 dark:bg-purple-900/20"
+                                  ? "bg-purple-900/20"
                                   : ""
                               }`}
                             >
@@ -1055,20 +1055,20 @@ export default function CreatorAIChat({
                                 className={`w-4 h-4 ${
                                   thread.id === activeThreadId
                                     ? "text-purple-500"
-                                    : "text-gray-400"
+                                    : "text-blue-300/60"
                                 }`}
                               />
                               <div className="flex-1 min-w-0">
                                 <p
                                   className={`text-sm truncate ${
                                     thread.id === activeThreadId
-                                      ? "font-medium text-purple-700 dark:text-purple-300"
-                                      : "text-gray-700 dark:text-gray-300"
+                                      ? "font-medium text-purple-300"
+                                      : "text-blue-200/80"
                                   }`}
                                 >
                                   {thread.name}
                                 </p>
-                                <p className="text-[10px] text-gray-400 dark:text-gray-500">
+                                <p className="text-[10px] text-blue-300/50">
                                   {thread.messages.length} messages •{" "}
                                   {new Date(
                                     thread.updatedAt,
@@ -1079,7 +1079,7 @@ export default function CreatorAIChat({
                                 onClick={(e) =>
                                   handleDeleteThread(thread.id, e)
                                 }
-                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded text-gray-400 hover:text-red-500 transition-all"
+                                className="opacity-0 group-hover:opacity-100 p-1 hover:bg-red-900/30 rounded text-blue-300/60 hover:text-red-500 transition-all"
                                 title="Delete thread"
                               >
                                 <DynamicIcon name="X" className="w-3.5 h-3.5" />
@@ -1097,7 +1097,7 @@ export default function CreatorAIChat({
             {activeThread && messages.length > 0 && (
               <button
                 onClick={handleClearChat}
-                className="rounded-full p-2 text-gray-400 hover:bg-red-100 dark:hover:bg-red-900/30 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+                className="rounded-full p-2 text-blue-300/60 hover:bg-red-900/30 hover:text-red-400 transition-colors"
                 title="Clear chat history"
               >
                 <DynamicIcon name="Trash2" className="w-5 h-5" />
@@ -1107,7 +1107,7 @@ export default function CreatorAIChat({
             {onPinToggle && (
               <button
                 onClick={onPinToggle}
-                className="rounded-full p-2 text-gray-400 hover:bg-purple-100 dark:hover:bg-purple-900/30 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                className="rounded-full p-2 text-blue-300/60 hover:bg-purple-900/30 hover:text-purple-400 transition-colors"
                 title="Pin as drawer"
               >
                 <DynamicIcon name="PanelRightOpen" className="w-5 h-5" />
@@ -1115,7 +1115,7 @@ export default function CreatorAIChat({
             )}
             <button
               onClick={onClose}
-              className="rounded-full p-2 text-gray-400 hover:bg-gray-800 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              className="rounded-full p-2 text-blue-300/60 hover:bg-white/5 hover:text-blue-100 transition-colors"
             >
               <DynamicIcon name="X" className="w-6 h-6" />
             </button>
@@ -1123,13 +1123,13 @@ export default function CreatorAIChat({
         </div>
 
         {/* Settings Bar */}
-        <div className="border-b border-gray-200 dark:border-gray-800 bg-gray-50/80 dark:bg-gray-900/80 px-4 py-3">
+        <div className="border-b border-white/10 bg-[#0d1829]/90 backdrop-blur-xl px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
             {/* BYOK/Coins Toggle */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-white dark:bg-blue-950 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0d1829]/95 backdrop-blur-2xl rounded-lg border border-white/10">
               <span
                 className={`text-xs font-medium ${
-                  !byokMode ? "text-amber-500" : "text-gray-400"
+                  !byokMode ? "text-amber-500" : "text-blue-300/60"
                 }`}
               >
                 🪙 Coins
@@ -1141,11 +1141,11 @@ export default function CreatorAIChat({
                   onChange={(e) => setByokMode(e.target.checked)}
                   className="sr-only peer"
                 />
-                <div className="w-8 h-4 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-600" />
+                <div className="w-8 h-4 bg-amber-500 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-green-600" />
               </label>
               <span
                 className={`text-xs font-medium ${
-                  byokMode ? "text-green-500" : "text-gray-400"
+                  byokMode ? "text-green-500" : "text-blue-300/60"
                 }`}
               >
                 🔑 BYOK
@@ -1157,7 +1157,7 @@ export default function CreatorAIChat({
               <select
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
-                className="flex-1 min-w-0 bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 text-xs rounded-lg px-2 py-1.5 text-gray-700 dark:text-gray-300 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer truncate"
+                className="flex-1 min-w-0 bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 text-xs rounded-lg px-2 py-1.5 text-blue-200/80 focus:ring-2 focus:ring-purple-500 outline-none cursor-pointer truncate"
                 title="Select AI model"
               >
                 {filteredModels.map(([key, m]) => (
@@ -1174,10 +1174,10 @@ export default function CreatorAIChat({
             </div>
 
             {/* Output Size */}
-            <div className="flex items-center gap-2 px-2 py-1 bg-white dark:bg-blue-950 rounded-lg border border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2 px-2 py-1 bg-[#0d1829]/95 backdrop-blur-2xl rounded-lg border border-white/10">
               <DynamicIcon
                 name="FileText"
-                className="w-3.5 h-3.5 text-gray-500"
+                className="w-3.5 h-3.5 text-blue-300/50"
               />
               <input
                 type="range"
@@ -1191,7 +1191,7 @@ export default function CreatorAIChat({
                 className="w-16 h-1 accent-purple-500 cursor-pointer"
                 title={`Max output: ${maxOutputTokens} tokens`}
               />
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 w-8">
+              <span className="text-[10px] text-blue-300/60 w-8">
                 {maxOutputTokens >= 1000
                   ? `${(maxOutputTokens / 1000).toFixed(1)}k`
                   : maxOutputTokens}
@@ -1199,14 +1199,14 @@ export default function CreatorAIChat({
             </div>
 
             {/* Estimated Cost */}
-            <div className="text-[10px] px-2 py-1 bg-white dark:bg-blue-950 rounded-lg border border-gray-200 dark:border-gray-700">
-              <span className="text-gray-500 dark:text-gray-400">Est: </span>
+            <div className="text-[10px] px-2 py-1 bg-[#0d1829]/95 backdrop-blur-2xl rounded-lg border border-white/10">
+              <span className="text-blue-300/60">Est: </span>
               {byokMode ? (
-                <span className="font-medium text-green-600 dark:text-green-400">
+                <span className="font-medium text-green-400">
                   ~${estimatedCost().dollars.toFixed(4)}
                 </span>
               ) : (
-                <span className="font-medium text-amber-600 dark:text-amber-400">
+                <span className="font-medium text-amber-400">
                   ~{estimatedCost().coins} coins
                 </span>
               )}
@@ -1215,8 +1215,8 @@ export default function CreatorAIChat({
 
           {/* BYOK mode warning if no keys configured */}
           {byokMode && !hasAnyBYOKKey && (
-            <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-700/30 rounded-lg">
-              <p className="text-xs text-red-600 dark:text-red-300">
+            <div className="mt-2 p-2 bg-red-900/20 border border-red-700/30 rounded-lg">
+              <p className="text-xs text-red-300">
                 ⚠️ No API keys configured. Add keys in Settings (gear icon in
                 header).
               </p>
@@ -1226,17 +1226,17 @@ export default function CreatorAIChat({
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gray-50/50 dark:bg-black/20">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-black/20">
           {messages.length === 0 && (
-            <div className="flex flex-col items-center justify-center h-full text-center text-gray-500 dark:text-gray-400 space-y-4 p-8">
-              <div className="w-20 h-20 bg-linear-to-br from-blue-100 to-purple-100 dark:from-blue-900/30 dark:to-purple-900/30 rounded-full flex items-center justify-center text-4xl shadow-inner">
+            <div className="flex flex-col items-center justify-center h-full text-center text-blue-300/60 space-y-4 p-8">
+              <div className="w-20 h-20 bg-linear-to-br from-blue-900/30 to-purple-900/30 rounded-full flex items-center justify-center text-4xl shadow-inner">
                 <DynamicIcon
                   name="Bot"
-                  className="w-10 h-10 text-purple-600 dark:text-purple-400"
+                  className="w-10 h-10 text-purple-400"
                 />
               </div>
               <div className="max-w-sm">
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                <h3 className="text-lg font-semibold text-white mb-2">
                   How can I help you create?
                 </h3>
                 <p className="text-sm mb-4">
@@ -1245,18 +1245,18 @@ export default function CreatorAIChat({
                 </p>
 
                 {/* AI Commands Info Box */}
-                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3 mb-4 text-left">
-                  <h4 className="text-sm font-bold text-blue-900 dark:text-blue-100 mb-2 flex items-center gap-2">
+                <div className="bg-white/[0.03] border border-white/10 rounded-lg p-3 mb-4 text-left">
+                  <h4 className="text-sm font-bold text-blue-100 mb-2 flex items-center gap-2">
                     <DynamicIcon name="Info" className="w-4 h-4" />
                     AI Commands
                   </h4>
-                  <p className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
+                  <p className="text-xs text-blue-200 leading-relaxed">
                     The AI can <strong>merge</strong> (update properties),{" "}
                     <strong>replace</strong> (completely overwrite),
                     <strong>delete</strong> (remove), or <strong>add</strong>{" "}
                     (create new) items in your adventure.
                   </p>
-                  <p className="text-xs text-blue-800 dark:text-blue-200 mt-2 leading-relaxed">
+                  <p className="text-xs text-blue-200 mt-2 leading-relaxed">
                     Examples: "Delete the Rusty Sword", "Replace Strength stat
                     completely", "Add a new healing potion"
                   </p>
@@ -1267,7 +1267,7 @@ export default function CreatorAIChat({
                     onClick={() =>
                       setInput("Create a legendary sword with fire abilities")
                     }
-                    className="px-4 py-2 rounded-lg bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
+                    className="px-4 py-2 rounded-lg bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 hover:border-purple-500 transition-colors text-left shadow-xs"
                   >
                     "Create a legendary sword..."
                   </button>
@@ -1275,7 +1275,7 @@ export default function CreatorAIChat({
                     onClick={() =>
                       setInput("Write a lore entry about the ancient kingdom")
                     }
-                    className="px-4 py-2 rounded-lg bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
+                    className="px-4 py-2 rounded-lg bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 hover:border-purple-500 transition-colors text-left shadow-xs"
                   >
                     "Write a lore entry about..."
                   </button>
@@ -1283,7 +1283,7 @@ export default function CreatorAIChat({
                     onClick={() =>
                       setInput("Delete the Old Weapon and add a Magic Staff")
                     }
-                    className="px-4 py-2 rounded-lg bg-white dark:bg-blue-950 border border-gray-200 dark:border-gray-700 hover:border-purple-500 dark:hover:border-purple-500 transition-colors text-left shadow-xs"
+                    className="px-4 py-2 rounded-lg bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 hover:border-purple-500 transition-colors text-left shadow-xs"
                   >
                     "Delete... and add..."
                   </button>
@@ -1300,13 +1300,13 @@ export default function CreatorAIChat({
           ))}
           {loading && (
             <div className="flex justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <div className="rounded-2xl rounded-tl-none bg-white dark:bg-blue-950 px-5 py-3 shadow-sm border border-gray-100 dark:border-gray-700 flex items-center gap-2">
+              <div className="rounded-2xl rounded-tl-none bg-[#0d1829]/95 backdrop-blur-2xl px-5 py-3 shadow-sm border border-white/10 flex items-center gap-2">
                 <div className="flex gap-1">
                   <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                   <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                   <span className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></span>
                 </div>
-                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                <span className="text-sm text-blue-300/60 font-medium">
                   Thinking...
                 </span>
               </div>
@@ -1316,14 +1316,14 @@ export default function CreatorAIChat({
         </div>
 
         {/* Input */}
-        <div className="border-t border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 sm:p-6">
-          <div className="relative flex items-end gap-2 bg-gray-50 dark:bg-blue-950 p-2 rounded-xl border border-gray-200 dark:border-gray-700 focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-500 transition-all shadow-inner">
+        <div className="border-t border-white/10 bg-[#0d1829]/95 backdrop-blur-2xl p-4 sm:p-6">
+          <div className="relative flex items-end gap-2 bg-[#0d1829]/95 backdrop-blur-2xl p-2 rounded-xl border border-white/10 focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-500 transition-all shadow-inner">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Describe what you want to create..."
-              className="flex-1 resize-none bg-transparent px-3 py-2 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none max-h-32 min-h-11"
+              className="flex-1 resize-none bg-transparent px-3 py-2 text-white placeholder-gray-400 focus:outline-none max-h-32 min-h-11"
               rows={1}
               style={{ height: "auto" }}
               onInput={(e) => {
@@ -1345,7 +1345,7 @@ export default function CreatorAIChat({
             </button>
           </div>
           <div className="text-center mt-2">
-            <span className="text-[10px] text-gray-400 dark:text-gray-500">
+            <span className="text-[10px] text-blue-300/50">
               AI can make mistakes. Review generated content before applying.
             </span>
           </div>
@@ -1448,7 +1448,7 @@ function MessageItem({
         className={`max-w-[90%] sm:max-w-[85%] rounded-2xl px-5 py-4 shadow-sm ${
           isUser
             ? "rounded-tr-sm bg-linear-to-br from-blue-600 to-purple-600 text-white"
-            : "rounded-tl-sm bg-white dark:bg-blue-950 text-gray-800 dark:text-gray-200 border border-gray-100 dark:border-gray-700"
+            : "rounded-tl-sm bg-[#0d1829]/95 backdrop-blur-2xl text-blue-100 border border-white/10"
         }`}
       >
         <div className="leading-relaxed max-w-none">
@@ -1457,7 +1457,7 @@ function MessageItem({
               p: ({ children }) => (
                 <p
                   className={`mb-2 last:mb-0 ${
-                    isUser ? "text-white" : "text-gray-800 dark:text-gray-200"
+                    isUser ? "text-white" : "text-blue-100"
                   }`}
                 >
                   {children}
@@ -1466,7 +1466,7 @@ function MessageItem({
               h1: ({ children }) => (
                 <h1
                   className={`text-xl font-bold mb-2 mt-3 first:mt-0 ${
-                    isUser ? "text-white" : "text-gray-900 dark:text-white"
+                    isUser ? "text-white" : "text-white"
                   }`}
                 >
                   {children}
@@ -1475,7 +1475,7 @@ function MessageItem({
               h2: ({ children }) => (
                 <h2
                   className={`text-lg font-bold mb-2 mt-3 first:mt-0 ${
-                    isUser ? "text-white" : "text-gray-900 dark:text-white"
+                    isUser ? "text-white" : "text-white"
                   }`}
                 >
                   {children}
@@ -1484,7 +1484,7 @@ function MessageItem({
               h3: ({ children }) => (
                 <h3
                   className={`text-base font-bold mb-1.5 mt-2 first:mt-0 ${
-                    isUser ? "text-white" : "text-gray-900 dark:text-white"
+                    isUser ? "text-white" : "text-white"
                   }`}
                 >
                   {children}
@@ -1493,7 +1493,7 @@ function MessageItem({
               strong: ({ children }) => (
                 <strong
                   className={`font-bold ${
-                    isUser ? "text-white" : "text-gray-900 dark:text-white"
+                    isUser ? "text-white" : "text-white"
                   }`}
                 >
                   {children}
@@ -1504,7 +1504,7 @@ function MessageItem({
                   className={`italic ${
                     isUser
                       ? "text-white/90"
-                      : "text-gray-700 dark:text-gray-300"
+                      : "text-blue-200/80"
                   }`}
                 >
                   {children}
@@ -1513,7 +1513,7 @@ function MessageItem({
               ul: ({ children }) => (
                 <ul
                   className={`list-disc ml-4 mb-2 space-y-0.5 last:mb-0 ${
-                    isUser ? "text-white" : "text-gray-800 dark:text-gray-200"
+                    isUser ? "text-white" : "text-blue-100"
                   }`}
                 >
                   {children}
@@ -1522,7 +1522,7 @@ function MessageItem({
               ol: ({ children }) => (
                 <ol
                   className={`list-decimal ml-4 mb-2 space-y-0.5 last:mb-0 ${
-                    isUser ? "text-white" : "text-gray-800 dark:text-gray-200"
+                    isUser ? "text-white" : "text-blue-100"
                   }`}
                 >
                   {children}
@@ -1536,7 +1536,7 @@ function MessageItem({
                   className={`border-l-2 pl-3 italic my-2 ${
                     isUser
                       ? "border-white/50 text-white/80"
-                      : "border-purple-500 text-gray-600 dark:text-gray-400"
+                      : "border-purple-500 text-blue-300/60"
                   }`}
                 >
                   {children}
@@ -1546,8 +1546,8 @@ function MessageItem({
                 const isBlock = className?.includes("language-");
                 if (isBlock) {
                   return (
-                    <pre className="bg-gray-100 dark:bg-gray-800 rounded-lg p-3 overflow-x-auto my-2">
-                      <code className="text-xs font-mono text-gray-800 dark:text-gray-200">
+                    <pre className="bg-white/5 rounded-lg p-3 overflow-x-auto my-2">
+                      <code className="text-xs font-mono text-blue-100">
                         {children}
                       </code>
                     </pre>
@@ -1558,7 +1558,7 @@ function MessageItem({
                     className={`px-1 py-0.5 rounded text-xs font-mono ${
                       isUser
                         ? "bg-white/20 text-blue-200"
-                        : "bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-300"
+                        : "bg-purple-900/30 text-purple-300"
                     }`}
                   >
                     {children}
@@ -1571,7 +1571,7 @@ function MessageItem({
                   className={`my-3 border-t ${
                     isUser
                       ? "border-white/30"
-                      : "border-gray-300 dark:border-gray-600"
+                      : "border-white/15"
                   }`}
                 />
               ),
@@ -1581,18 +1581,18 @@ function MessageItem({
           </ReactMarkdown>
         </div>
         {!isUser && (meta?.tokenCost !== undefined || meta?.isByok) && (
-          <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700/50 flex items-center justify-between text-xs">
-            <span className="text-gray-500 dark:text-gray-400 flex items-center gap-1.5">
+          <div className="mt-3 pt-3 border-t border-white/10 flex items-center justify-between text-xs">
+            <span className="text-blue-300/60 flex items-center gap-1.5">
               <DynamicIcon name="Info" className="w-3 h-3" />
               Generation cost
             </span>
             {meta?.isByok ? (
-              <span className="font-semibold text-green-600 dark:text-green-400">
+              <span className="font-semibold text-green-400">
                 {dollarCost !== null ? `~$${dollarCost.toFixed(4)}` : "Free"}{" "}
                 (BYOK)
               </span>
             ) : (
-              <span className="font-semibold text-amber-600 dark:text-amber-400">
+              <span className="font-semibold text-amber-400">
                 {meta.tokenCost} {meta.tokenCost === 1 ? "coin" : "coins"}
               </span>
             )}
@@ -1824,12 +1824,12 @@ function ChangeSummary({
       {changes.map((change, i) => (
         <div
           key={i}
-          className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-blue-950 overflow-hidden transition-all hover:border-purple-300 dark:hover:border-purple-700"
+          className="border border-white/10 rounded-lg bg-[#0d1829]/95 backdrop-blur-2xl overflow-hidden transition-all hover:border-purple-700"
         >
           <div
             className={`flex items-center gap-3 p-3 ${
               change.details
-                ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                ? "cursor-pointer hover:bg-white/10"
                 : ""
             }`}
             onClick={() =>
@@ -1838,23 +1838,23 @@ function ChangeSummary({
           >
             <DynamicIcon
               name={change.icon as any}
-              className="w-5 h-5 text-gray-600 dark:text-gray-300"
+              className="w-5 h-5 text-blue-200/80"
             />
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                <span className="font-semibold text-sm text-white">
                   {change.label}
                 </span>
-                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-100 dark:bg-gray-900 text-gray-500 dark:text-gray-400 font-medium uppercase tracking-wide">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-[#0d1829]/95 backdrop-blur-2xl text-blue-300/60 font-medium uppercase tracking-wide">
                   {change.type}
                 </span>
               </div>
-              <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+              <p className="text-sm text-blue-300/60 truncate">
                 {change.value}
               </p>
             </div>
             {change.details && (
-              <span className="text-gray-400 transition-transform duration-200">
+              <span className="text-blue-300/60 transition-transform duration-200">
                 {expandedIndex === i ? (
                   <DynamicIcon name="ChevronUp" className="w-4 h-4" />
                 ) : (
@@ -1865,7 +1865,7 @@ function ChangeSummary({
           </div>
 
           {expandedIndex === i && change.details && (
-            <div className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-black/20 text-xs font-mono text-gray-600 dark:text-gray-300 overflow-x-auto">
+            <div className="p-3 border-t border-white/10 bg-black/20 text-xs font-mono text-blue-200/80 overflow-x-auto">
               <pre>{JSON.stringify(change.details, null, 2)}</pre>
             </div>
           )}
@@ -1924,21 +1924,21 @@ function getActionType(toolName: string): {
   if (toolName.startsWith("add_") || toolName.startsWith("create_")) {
     return {
       type: "add",
-      color: "text-green-600 dark:text-green-400",
-      bgColor: "bg-green-100 dark:bg-green-900/30",
+      color: "text-green-400",
+      bgColor: "bg-green-900/30",
     };
   }
   if (toolName.startsWith("remove_") || toolName.startsWith("delete_")) {
     return {
       type: "remove",
-      color: "text-red-600 dark:text-red-400",
-      bgColor: "bg-red-100 dark:bg-red-900/30",
+      color: "text-red-400",
+      bgColor: "bg-red-900/30",
     };
   }
   return {
     type: "modify",
-    color: "text-blue-600 dark:text-blue-400",
-    bgColor: "bg-blue-100 dark:bg-blue-900/30",
+    color: "text-blue-400",
+    bgColor: "bg-white/5",
   };
 }
 
@@ -1982,11 +1982,11 @@ function PropertyDisplay({
 
   return (
     <div className="flex items-start gap-2 py-1">
-      <span className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 w-20 shrink-0 pt-0.5">
+      <span className="text-[10px] uppercase tracking-wide text-blue-300/60 w-20 shrink-0 pt-0.5">
         {label}
       </span>
       <span
-        className={`text-xs text-gray-800 dark:text-gray-200 ${
+        className={`text-xs text-blue-100 ${
           isLongText ? "line-clamp-2" : ""
         }`}
       >
@@ -2023,31 +2023,31 @@ function ToolArgsDisplay({
         {arrayItems.slice(0, 3).map((item, idx) => (
           <div
             key={idx}
-            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            className="bg-white/5 rounded-lg p-2 border border-white/10"
           >
             <div className="flex items-center gap-2 mb-1">
               {has(item.symbol) && (
                 <span className="text-base">{String(item.symbol)}</span>
               )}
-              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+              <span className="font-medium text-sm text-white">
                 {String(item.name || item.new_name || "Unknown")}
               </span>
               {item.value !== undefined && (
-                <span className="ml-auto text-sm font-mono bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded">
+                <span className="ml-auto text-sm font-mono bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded">
                   {String(item.value)}
                   {item.maxValue !== undefined ? `/${item.maxValue}` : ""}
                 </span>
               )}
             </div>
             {has(item.description) && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+              <p className="text-xs text-blue-300/60 line-clamp-2">
                 {String(item.description)}
               </p>
             )}
           </div>
         ))}
         {arrayItems.length > 3 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          <p className="text-xs text-blue-300/60 text-center">
             +{arrayItems.length - 3} more...
           </p>
         )}
@@ -2067,40 +2067,40 @@ function ToolArgsDisplay({
         {arrayItems.slice(0, 3).map((item, idx) => (
           <div
             key={idx}
-            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            className="bg-white/5 rounded-lg p-2 border border-white/10"
           >
             <div className="flex items-center gap-2 mb-1">
               {has(item.symbol) && (
                 <span className="text-base">{String(item.symbol)}</span>
               )}
-              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+              <span className="font-medium text-sm text-white">
                 {String(item.name || "Unknown")}
               </span>
               {has(item.quantity) && (
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-blue-300/50">
                   x{String(item.quantity)}
                 </span>
               )}
               {has(item.grade) && (
-                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-amber-900/50 text-amber-300">
                   {String(item.grade)}
                 </span>
               )}
               {has(item.type) && (
-                <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300">
+                <span className="text-[10px] uppercase px-1.5 py-0.5 rounded bg-white/5 text-blue-300">
                   {String(item.type)}
                 </span>
               )}
             </div>
             {has(item.description) && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+              <p className="text-xs text-blue-300/60 line-clamp-2">
                 {String(item.description)}
               </p>
             )}
           </div>
         ))}
         {arrayItems.length > 3 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          <p className="text-xs text-blue-300/60 text-center">
             +{arrayItems.length - 3} more...
           </p>
         )}
@@ -2120,35 +2120,35 @@ function ToolArgsDisplay({
         {arrayItems.slice(0, 3).map((item, idx) => (
           <div
             key={idx}
-            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            className="bg-white/5 rounded-lg p-2 border border-white/10"
           >
             <div className="flex items-center gap-2 mb-1">
               {has(item.symbol) && (
                 <span className="text-base">{String(item.symbol)}</span>
               )}
-              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+              <span className="font-medium text-sm text-white">
                 {String(item.name || "Unknown")}
               </span>
               {has(item.grade) && (
-                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300">
+                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-purple-900/50 text-purple-300">
                   {String(item.grade)}
                 </span>
               )}
             </div>
             {has(item.description) && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+              <p className="text-xs text-blue-300/60 line-clamp-2">
                 {String(item.description)}
               </p>
             )}
             {(has(item.cost) || has(item.cooldown) || has(item.stat)) && (
               <div className="flex gap-2 mt-1 text-[10px]">
                 {has(item.stat) && (
-                  <span className="text-blue-600 dark:text-blue-400">
+                  <span className="text-blue-400">
                     Stat: {String(item.stat)}
                   </span>
                 )}
                 {has(item.cooldown) && (
-                  <span className="text-amber-600 dark:text-amber-400">
+                  <span className="text-amber-400">
                     CD: {String(item.cooldown)}
                   </span>
                 )}
@@ -2157,7 +2157,7 @@ function ToolArgsDisplay({
           </div>
         ))}
         {arrayItems.length > 3 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          <p className="text-xs text-blue-300/60 text-center">
             +{arrayItems.length - 3} more...
           </p>
         )}
@@ -2175,21 +2175,21 @@ function ToolArgsDisplay({
           {names.slice(0, 5).map((name, idx) => (
             <div
               key={idx}
-              className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+              className="bg-white/5 rounded-lg p-2 border border-white/10"
             >
               <div className="flex items-center gap-2">
                 <DynamicIcon
                   name="Sparkles"
                   className="w-3.5 h-3.5 text-violet-500"
                 />
-                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                <span className="font-medium text-sm text-white">
                   {name}
                 </span>
               </div>
             </div>
           ))}
           {names.length > 5 && (
-            <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+            <p className="text-xs text-blue-300/60 text-center">
               +{names.length - 5} more...
             </p>
           )}
@@ -2209,26 +2209,26 @@ function ToolArgsDisplay({
         {arrayItems.slice(0, 3).map((item, idx) => (
           <div
             key={idx}
-            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            className="bg-white/5 rounded-lg p-2 border border-white/10"
           >
             <div className="flex items-center gap-2 mb-1">
               <DynamicIcon
                 name="Sparkles"
                 className="w-3.5 h-3.5 text-violet-500"
               />
-              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+              <span className="font-medium text-sm text-white">
                 {String(item.name || "Unknown")}
               </span>
             </div>
             {has(item.description) && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+              <p className="text-xs text-blue-300/60 line-clamp-2">
                 {String(item.description)}
               </p>
             )}
           </div>
         ))}
         {arrayItems.length > 3 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          <p className="text-xs text-blue-300/60 text-center">
             +{arrayItems.length - 3} more...
           </p>
         )}
@@ -2248,31 +2248,31 @@ function ToolArgsDisplay({
         {arrayItems.slice(0, 2).map((item, idx) => (
           <div
             key={idx}
-            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            className="bg-white/5 rounded-lg p-2 border border-white/10"
           >
             <div className="flex items-center gap-2 mb-1">
               <DynamicIcon
                 name="Scroll"
                 className="w-3.5 h-3.5 text-amber-500"
               />
-              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+              <span className="font-medium text-sm text-white">
                 {String(item.title || item.name || "Unknown")}
               </span>
               {item.secret === true && (
-                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300">
+                <span className="ml-auto text-[10px] uppercase px-1.5 py-0.5 rounded bg-red-900/50 text-red-300">
                   Secret
                 </span>
               )}
             </div>
             {has(item.content) && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-3">
+              <p className="text-xs text-blue-300/60 line-clamp-3">
                 {String(item.content)}
               </p>
             )}
           </div>
         ))}
         {arrayItems.length > 2 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          <p className="text-xs text-blue-300/60 text-center">
             +{arrayItems.length - 2} more...
           </p>
         )}
@@ -2289,30 +2289,30 @@ function ToolArgsDisplay({
         {arrayItems.slice(0, 3).map((item, idx) => (
           <div
             key={idx}
-            className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+            className="bg-white/5 rounded-lg p-2 border border-white/10"
           >
             <div className="flex items-center gap-2 mb-1">
               <span className="text-base">
                 {has(item.symbol) ? String(item.symbol) : "🏆"}
               </span>
-              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+              <span className="font-medium text-sm text-white">
                 {String(item.name || "Unknown")}
               </span>
               {has(item.xp) && (
-                <span className="ml-auto text-xs font-medium text-green-600 dark:text-green-400">
+                <span className="ml-auto text-xs font-medium text-green-400">
                   +{String(item.xp)} XP
                 </span>
               )}
             </div>
             {has(item.description) && (
-              <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+              <p className="text-xs text-blue-300/60 line-clamp-2">
                 {String(item.description)}
               </p>
             )}
           </div>
         ))}
         {arrayItems.length > 3 && (
-          <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+          <p className="text-xs text-blue-300/60 text-center">
             +{arrayItems.length - 3} more...
           </p>
         )}
@@ -2368,14 +2368,14 @@ function ToolArgsDisplay({
             return (
               <div
                 key={key}
-                className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+                className="bg-white/5 rounded-lg p-2 border border-white/10"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-base">{icon}</span>
-                  <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  <span className="font-medium text-sm text-white">
                     {label}
                   </span>
-                  <span className="ml-auto text-xs text-gray-500 dark:text-gray-400">
+                  <span className="ml-auto text-xs text-blue-300/60">
                     {arr.length} entries
                   </span>
                 </div>
@@ -2383,7 +2383,7 @@ function ToolArgsDisplay({
                   {arr.slice(0, 6).map((item, i) => (
                     <div
                       key={i}
-                      className="text-[10px] bg-gray-100 dark:bg-gray-700/50 rounded px-1.5 py-0.5 text-center"
+                      className="text-[10px] bg-white/10 rounded px-1.5 py-0.5 text-center"
                     >
                       {key === "customCurve" ? (
                         <span>
@@ -2401,7 +2401,7 @@ function ToolArgsDisplay({
                     </div>
                   ))}
                   {arr.length > 6 && (
-                    <div className="text-[10px] text-gray-500 text-center">
+                    <div className="text-[10px] text-blue-300/50 text-center">
                       +{arr.length - 6} more
                     </div>
                   )}
@@ -2416,11 +2416,11 @@ function ToolArgsDisplay({
             return (
               <div
                 key={key}
-                className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700"
+                className="bg-white/5 rounded-lg p-2 border border-white/10"
               >
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-base">{icon}</span>
-                  <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                  <span className="font-medium text-sm text-white">
                     {label}
                   </span>
                 </div>
@@ -2428,12 +2428,12 @@ function ToolArgsDisplay({
                   {Object.entries(obj).map(([k, v]) => (
                     <div
                       key={k}
-                      className="text-[10px] bg-gray-100 dark:bg-gray-700/50 rounded px-2 py-1"
+                      className="text-[10px] bg-white/10 rounded px-2 py-1"
                     >
-                      <span className="text-gray-500 dark:text-gray-400 capitalize">
+                      <span className="text-blue-300/60 capitalize">
                         {k}:
                       </span>
-                      <span className="ml-1 font-medium text-gray-800 dark:text-gray-200">
+                      <span className="ml-1 font-medium text-blue-100">
                         {String(v)}
                       </span>
                     </div>
@@ -2447,13 +2447,13 @@ function ToolArgsDisplay({
           return (
             <div
               key={key}
-              className="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700 flex items-center gap-2"
+              className="bg-white/5 rounded-lg p-2 border border-white/10 flex items-center gap-2"
             >
               <span className="text-base">{icon}</span>
-              <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+              <span className="font-medium text-sm text-white">
                 {label}
               </span>
-              <span className="ml-auto text-sm font-mono bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 px-2 py-0.5 rounded">
+              <span className="ml-auto text-sm font-mono bg-purple-900/50 text-purple-300 px-2 py-0.5 rounded">
                 {typeof value === "boolean"
                   ? value
                     ? "✓ Enabled"
@@ -2474,7 +2474,7 @@ function ToolArgsDisplay({
   if (entries.length === 0) return null;
 
   return (
-    <div className="mt-2 bg-gray-50 dark:bg-gray-800/50 rounded-lg p-2 border border-gray-200 dark:border-gray-700">
+    <div className="mt-2 bg-white/5 rounded-lg p-2 border border-white/10">
       <div className="space-y-1">
         {entries.slice(0, 5).map(([key, value]) => {
           const label = key
@@ -2484,7 +2484,7 @@ function ToolArgsDisplay({
           return <PropertyDisplay key={key} label={label} value={value} />;
         })}
         {entries.length > 5 && (
-          <p className="text-[10px] text-gray-500 dark:text-gray-400 pt-1">
+          <p className="text-[10px] text-blue-300/60 pt-1">
             +{entries.length - 5} more properties...
           </p>
         )}
@@ -2515,27 +2515,27 @@ function ToolResultsDisplay({
   const failCount = toolResults.length - successCount;
 
   return (
-    <div className="mt-4 rounded-xl bg-linear-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border border-purple-200 dark:border-purple-700/50 overflow-hidden shadow-lg">
+    <div className="mt-4 rounded-xl bg-linear-to-br from-purple-900/20 to-indigo-900/20 border border-purple-700/50 overflow-hidden shadow-lg">
       {/* Header */}
-      <div className="bg-linear-to-r from-purple-100/80 to-indigo-100/80 dark:from-purple-900/40 dark:to-indigo-900/40 px-4 py-3 border-b border-purple-200 dark:border-purple-700/50">
+      <div className="bg-linear-to-r from-purple-900/40 to-indigo-900/40 px-4 py-3 border-b border-purple-700/50">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-linear-to-br from-purple-500 to-indigo-500 flex items-center justify-center shadow-md">
               <DynamicIcon name="Wrench" className="w-4 h-4 text-white" />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100">
+              <h4 className="text-sm font-bold text-purple-100">
                 Tool Actions
               </h4>
               <div className="flex items-center gap-2 text-xs">
                 {successCount > 0 && (
-                  <span className="text-green-600 dark:text-green-400 flex items-center gap-1">
+                  <span className="text-green-400 flex items-center gap-1">
                     <DynamicIcon name="CheckCircle" className="w-3 h-3" />
                     {successCount} success
                   </span>
                 )}
                 {failCount > 0 && (
-                  <span className="text-red-600 dark:text-red-400 flex items-center gap-1">
+                  <span className="text-red-400 flex items-center gap-1">
                     <DynamicIcon name="XCircle" className="w-3 h-3" />
                     {failCount} failed
                   </span>
@@ -2558,13 +2558,13 @@ function ToolResultsDisplay({
               key={idx}
               className={`rounded-lg border overflow-hidden transition-all ${
                 result.success
-                  ? "bg-white dark:bg-gray-800/50 border-gray-200 dark:border-gray-700"
-                  : "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-700/30"
+                  ? "bg-white/5 border-white/10"
+                  : "bg-red-900/20 border-red-700/30"
               }`}
             >
               {/* Header Row - Clickable */}
               <div
-                className="flex items-start gap-3 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/30 transition-colors"
+                className="flex items-start gap-3 p-3 cursor-pointer hover:bg-white/10 transition-colors"
                 onClick={() => setExpandedIdx(isExpanded ? null : idx)}
               >
                 {/* Icon */}
@@ -2580,16 +2580,16 @@ function ToolResultsDisplay({
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                    <span className="font-semibold text-sm text-white">
                       {formatToolName(result.toolName)}
                     </span>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
                         action.type === "add"
-                          ? "bg-green-100 dark:bg-green-900/50 text-green-700 dark:text-green-300"
+                          ? "bg-green-900/50 text-green-300"
                           : action.type === "remove"
-                            ? "bg-red-100 dark:bg-red-900/50 text-red-700 dark:text-red-300"
-                            : "bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300"
+                            ? "bg-red-900/50 text-red-300"
+                            : "bg-white/5 text-blue-300"
                       }`}
                     >
                       {action.type}
@@ -2625,9 +2625,9 @@ function ToolResultsDisplay({
                               return (
                                 <span
                                   key={i}
-                                  className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded"
+                                  className="text-xs text-blue-300/60 bg-white/10 px-2 py-0.5 rounded"
                                 >
-                                  <span className="text-gray-500 dark:text-gray-500">
+                                  <span className="text-blue-300/50">
                                     {label}:
                                   </span>{" "}
                                   <span className="font-medium">
@@ -2637,7 +2637,7 @@ function ToolResultsDisplay({
                               );
                             })}
                           {Object.keys(result.args).length > 3 && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                            <span className="text-xs text-blue-300/60">
                               +{Object.keys(result.args).length - 3} more
                             </span>
                           )}
@@ -2647,7 +2647,7 @@ function ToolResultsDisplay({
                           {result.changes.slice(0, 2).map((change, i) => (
                             <span
                               key={i}
-                              className="text-xs text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/50 px-2 py-0.5 rounded"
+                              className="text-xs text-blue-300/60 bg-white/10 px-2 py-0.5 rounded"
                             >
                               {change.length > 40
                                 ? change.substring(0, 40) + "..."
@@ -2655,13 +2655,13 @@ function ToolResultsDisplay({
                             </span>
                           ))}
                           {result.changes.length > 2 && (
-                            <span className="text-xs text-gray-500 dark:text-gray-400">
+                            <span className="text-xs text-blue-300/60">
                               +{result.changes.length - 2} more
                             </span>
                           )}
                         </>
                       ) : (
-                        <span className="text-xs text-gray-500 dark:text-gray-400 italic">
+                        <span className="text-xs text-blue-300/60 italic">
                           Click to see details
                         </span>
                       )}
@@ -2672,37 +2672,37 @@ function ToolResultsDisplay({
                 {/* Status & Expand */}
                 <div className="shrink-0 flex items-center gap-2">
                   {result.success ? (
-                    <div className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/50 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-green-900/50 flex items-center justify-center">
                       <DynamicIcon
                         name="Check"
-                        className="w-3.5 h-3.5 text-green-600 dark:text-green-400"
+                        className="w-3.5 h-3.5 text-green-400"
                       />
                     </div>
                   ) : (
-                    <div className="w-6 h-6 rounded-full bg-red-100 dark:bg-red-900/50 flex items-center justify-center">
+                    <div className="w-6 h-6 rounded-full bg-red-900/50 flex items-center justify-center">
                       <DynamicIcon
                         name="X"
-                        className="w-3.5 h-3.5 text-red-600 dark:text-red-400"
+                        className="w-3.5 h-3.5 text-red-400"
                       />
                     </div>
                   )}
                   <DynamicIcon
                     name={isExpanded ? "ChevronUp" : "ChevronDown"}
-                    className="w-4 h-4 text-gray-400"
+                    className="w-4 h-4 text-blue-300/60"
                   />
                 </div>
               </div>
 
               {/* Expanded Details */}
               {isExpanded && (
-                <div className="px-3 pb-3 border-t border-gray-100 dark:border-gray-700/50 pt-2">
+                <div className="px-3 pb-3 border-t border-white/10 pt-2">
                   {/* Error Message for Failures */}
                   {!result.success && result.message && (
-                    <div className="mb-3 p-2 rounded-lg bg-red-100 dark:bg-red-900/30 border border-red-200 dark:border-red-700/50">
-                      <span className="text-[10px] uppercase tracking-wider text-red-600 dark:text-red-400 font-medium">
+                    <div className="mb-3 p-2 rounded-lg bg-red-900/30 border border-red-700/50">
+                      <span className="text-[10px] uppercase tracking-wider text-red-400 font-medium">
                         Error
                       </span>
-                      <p className="text-xs text-red-700 dark:text-red-300 mt-1">
+                      <p className="text-xs text-red-300 mt-1">
                         {result.message}
                       </p>
                     </div>
@@ -2710,14 +2710,14 @@ function ToolResultsDisplay({
                   {/* Changes List */}
                   {result.changes && result.changes.length > 0 && (
                     <div className="mb-3">
-                      <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+                      <span className="text-[10px] uppercase tracking-wider text-blue-300/60 font-medium">
                         Changes Made
                       </span>
                       <ul className="mt-1 space-y-0.5">
                         {result.changes.map((change, i) => (
                           <li
                             key={i}
-                            className="text-xs text-gray-700 dark:text-gray-300 flex items-start gap-1.5"
+                            className="text-xs text-blue-200/80 flex items-start gap-1.5"
                           >
                             <span className="text-green-500 mt-0.5">•</span>
                             {change}
@@ -2730,7 +2730,7 @@ function ToolResultsDisplay({
                   {/* Detailed Args Display */}
                   {result.args && Object.keys(result.args).length > 0 && (
                     <div>
-                      <span className="text-[10px] uppercase tracking-wider text-gray-500 dark:text-gray-400 font-medium">
+                      <span className="text-[10px] uppercase tracking-wider text-blue-300/60 font-medium">
                         Parameters
                       </span>
                       <ToolArgsDisplay
@@ -2743,7 +2743,7 @@ function ToolResultsDisplay({
                   {/* Raw JSON fallback when no formatted display */}
                   {(!result.changes || result.changes.length === 0) &&
                     (!result.args || Object.keys(result.args).length === 0) && (
-                      <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                      <div className="text-xs text-blue-300/60 italic">
                         Tool executed with default parameters
                       </div>
                     )}
@@ -2751,10 +2751,10 @@ function ToolResultsDisplay({
                   {/* Always show raw data toggle for debugging */}
                   {result.args && Object.keys(result.args).length > 0 && (
                     <details className="mt-3">
-                      <summary className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500 cursor-pointer hover:text-gray-600 dark:hover:text-gray-400">
+                      <summary className="text-[10px] uppercase tracking-wider text-blue-300/50 cursor-pointer hover:text-blue-300/60">
                         Raw Data
                       </summary>
-                      <pre className="mt-1 text-[10px] bg-gray-100 dark:bg-gray-800 p-2 rounded overflow-x-auto text-gray-600 dark:text-gray-400 max-h-40 overflow-y-auto">
+                      <pre className="mt-1 text-[10px] bg-white/5 p-2 rounded overflow-x-auto text-blue-300/60 max-h-40 overflow-y-auto">
                         {JSON.stringify(result.args, null, 2)}
                       </pre>
                     </details>
@@ -2768,7 +2768,7 @@ function ToolResultsDisplay({
 
       {/* Apply Button */}
       {hasToolChanges && (
-        <div className="p-3 bg-linear-to-r from-purple-100/80 to-indigo-100/80 dark:from-purple-900/40 dark:to-indigo-900/40 border-t border-purple-200 dark:border-purple-700/50">
+        <div className="p-3 bg-linear-to-r from-purple-900/40 to-indigo-900/40 border-t border-purple-700/50">
           <button
             onClick={() => {
               console.log(
