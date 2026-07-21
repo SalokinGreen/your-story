@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "enables the default permissions",
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    {
+      "identifier": "http:default",
+      "allow": [
+        { "url": "https://api.deepseek.com/*" },
+        { "url": "https://openrouter.ai/*" },
+        { "url": "https://api.mistral.ai/*" },
+        { "url": "https://api.deepinfra.com/*" },
+        { "url": "https://generativelanguage.googleapis.com/*" },
+        { "url": "https://api.search.brave.com/*" }
+      ]
+    }
+  ]
+}
