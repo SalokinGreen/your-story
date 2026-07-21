@@ -1316,6 +1316,13 @@ function StoryPageContent() {
           ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
             "narrator"
           : "narrator";
+      const replyLength =
+        typeof window !== "undefined"
+          ? (localStorage.getItem("replyLength") as
+              | "short"
+              | "medium"
+              | "long") || "medium"
+          : "medium";
       // GM Stage is always enabled - legacy tool calling is deprecated
       const gmStageEnabled = true;
 
@@ -1356,6 +1363,7 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
+          replyLength,
           enableGMStage: gmStageEnabled,
           gmStageModel: toolsModel, // Use same model as tools stage
           abortSignal: generationAbortRef.current.signal,
@@ -2080,6 +2088,11 @@ function StoryPageContent() {
         ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
           "narrator"
         : "narrator";
+    const replyLength =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("replyLength") as "short" | "medium" | "long") ||
+          "medium"
+        : "medium";
     // GM Stage is always enabled - legacy tool calling is deprecated
     const gmStageEnabled = true;
 
@@ -2129,6 +2142,7 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
+          replyLength,
           enableGMStage: gmStageEnabled,
           gmStageModel: toolsModel, // Use same model as tools stage
         },
@@ -2592,6 +2606,11 @@ function StoryPageContent() {
         ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
           "narrator"
         : "narrator";
+    const replyLength =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("replyLength") as "short" | "medium" | "long") ||
+          "medium"
+        : "medium";
     // GM Stage is always enabled - legacy tool calling is deprecated
     const gmStageEnabled = true;
 
@@ -2649,6 +2668,7 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
+          replyLength,
           // Skip GM stage on retry - reuse the saved conversation (dice
           // rolls, tool results, reasoning) from the popped part instead
           enableGMStage: false, // Don't re-run GM stage
