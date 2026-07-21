@@ -259,7 +259,11 @@ function StoryPageContent() {
     setViewportHeight(vh);
     if (contentWrapperRef.current) {
       const top = contentWrapperRef.current.getBoundingClientRect().top;
-      setContentAreaHeight(Math.max(200, vh - top));
+      // Clamp to the visible viewport: if a mobile browser has scrolled the
+      // document (e.g. to lift the focused composer above the keyboard), `top`
+      // can go negative and `vh - top` would overshoot, making the card taller
+      // than the screen and leaving a scrollable strip of empty background.
+      setContentAreaHeight(Math.max(200, Math.min(vh - top, vh)));
     }
   }, []);
   // A callback ref (rather than a plain useRef + mount-only effect) because
@@ -294,6 +298,29 @@ function StoryPageContent() {
   const fullHeightStyle = viewportHeight
     ? { minHeight: `${viewportHeight}px` }
     : undefined;
+  // While the Story tab is active, lock the document so mobile browsers can't
+  // scroll the whole page under the keyboard. That page-scroll is what desyncs
+  // our card-height measurement (see updateHeights) and strands the composer
+  // below a phantom scrollable strip of empty background. The Story card scrolls
+  // internally instead; other tabs keep normal page scrolling.
+  useEffect(() => {
+    if (currentState !== StoryState.STORY) return;
+    const html = document.documentElement.style;
+    const body = document.body.style;
+    const prev = {
+      htmlOverflow: html.overflow,
+      bodyOverflow: body.overflow,
+      bodyOverscroll: body.overscrollBehavior,
+    };
+    html.overflow = "hidden";
+    body.overflow = "hidden";
+    body.overscrollBehavior = "none";
+    return () => {
+      html.overflow = prev.htmlOverflow;
+      body.overflow = prev.bodyOverflow;
+      body.overscrollBehavior = prev.bodyOverscroll;
+    };
+  }, [currentState]);
   const [storyData, setStoryData] = useState<StoryData | null>(null);
   const [storyDbId, setStoryDbId] = useState<string | null>(null);
   const [sourceAdventureId, setSourceAdventureId] = useState<string | null>(
