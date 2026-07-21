@@ -63,10 +63,13 @@ const SILENT_AUDIO_DATA_URI =
 // that many bytes of independently-playable MP3), handing each chunk to
 // onChunk as soon as it's fully received rather than waiting for the whole
 // response. Falls back to treating the whole body as one chunk if the
-// runtime doesn't expose a readable stream. Returns the number of chunks.
+// runtime doesn't expose a readable stream. Stops early (without treating it
+// as an error) once `signal` is aborted, so deactivating mid-stream doesn't
+// keep pulling and playing further chunks. Returns the number of chunks.
 async function streamChunksToPlayer(
   response: Response,
   onChunk: (blob: Blob) => void,
+  signal?: AbortSignal,
 ): Promise<number> {
   const reader = response.body?.getReader();
   if (!reader) {
@@ -87,7 +90,20 @@ async function streamChunksToPlayer(
   };
 
   while (true) {
-    const { done, value } = await reader.read();
+    if (signal?.aborted) {
+      await reader.cancel().catch(() => {});
+      break;
+    }
+
+    let done: boolean;
+    let value: Uint8Array | undefined;
+    try {
+      ({ done, value } = await reader.read());
+    } catch (err) {
+      if (signal?.aborted) break;
+      throw err;
+    }
+
     if (value && value.length > 0) append(value);
 
     while (buffered.length >= 4) {
@@ -114,7 +130,6 @@ export default function TTSControls({
   const { addNotification } = useNotification();
   const { keys: apiKeys } = useAPIKeys();
   const [isPlaying, setIsPlaying] = useState(false);
-  const [isPaused, setIsPaused] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -127,6 +142,9 @@ export default function TTSControls({
   // True when playback has caught up to a chunk that hasn't arrived yet -
   // onChunkArrived plays it immediately once it lands.
   const waitingForNextRef = useRef<boolean>(false);
+  // Lets a press mid-generation cancel the in-flight request/stream instead
+  // of just stopping playback of whatever's already landed.
+  const abortControllerRef = useRef<AbortController | null>(null);
   const lastTextRef = useRef<string>("");
   const isGeneratingRef = useRef<boolean>(false);
   const pendingAutoGenerateRef = useRef<boolean>(false);
@@ -140,10 +158,11 @@ export default function TTSControls({
     }
   }, []);
 
-  // Clean up the persistent audio element and any buffered chunk URLs when
-  // this component unmounts.
+  // Clean up the persistent audio element, any in-flight request, and any
+  // buffered chunk URLs when this component unmounts.
   useEffect(() => {
     return () => {
+      abortControllerRef.current?.abort();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.removeAttribute("src");
@@ -187,7 +206,6 @@ export default function TTSControls({
       audio.onerror = () => {
         addNotification("Failed to play audio", "failure");
         setIsPlaying(false);
-        setIsPaused(false);
       };
 
       audio.play().catch((err) => {
@@ -205,7 +223,6 @@ export default function TTSControls({
       playChunkAt(currentChunkIndexRef.current);
     } else if (!isStreamingRef.current) {
       setIsPlaying(false);
-      setIsPaused(false);
     } else {
       waitingForNextRef.current = true;
     }
@@ -227,7 +244,6 @@ export default function TTSControls({
       if (idx === 0) {
         setHasAudio(true);
         setIsPlaying(true);
-        setIsPaused(false);
         setIsLoading(false);
         playChunkAt(0);
       } else if (waitingForNextRef.current && idx === currentChunkIndexRef.current) {
@@ -238,17 +254,29 @@ export default function TTSControls({
     [playChunkAt],
   );
 
-  const handlePlay = useCallback(async () => {
-    if (disabled || !text.trim() || isGeneratingRef.current) return;
+  // Single toggle button behavior:
+  // - idle (no cached audio for this text) -> activate: generate + stream +
+  //   play live.
+  // - active (generating and/or playing) -> deactivate: stop playback and
+  //   cancel the in-flight request/stream.
+  // - inactive with cached audio for this text (either deactivated, or
+  //   playback finished naturally) -> replay the cached recording without
+  //   regenerating.
+  const handleToggle = useCallback(async () => {
+    if (disabled || !text.trim()) return;
 
-    const selectedVoice = getSelectedVoice();
-    const selectedModel = getSelectedModel();
-    const volume = getVolume();
-
-    if (audioRef.current && isPaused) {
-      await audioRef.current.play();
-      setIsPlaying(true);
-      setIsPaused(false);
+    if (isPlaying || isLoading) {
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
+      isGeneratingRef.current = false;
+      isStreamingRef.current = false;
+      waitingForNextRef.current = false;
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+      }
+      setIsPlaying(false);
+      setIsLoading(false);
       return;
     }
 
@@ -256,10 +284,13 @@ export default function TTSControls({
       currentChunkIndexRef.current = 0;
       waitingForNextRef.current = false;
       setIsPlaying(true);
-      setIsPaused(false);
       playChunkAt(0);
       return;
     }
+
+    const selectedVoice = getSelectedVoice();
+    const selectedModel = getSelectedModel();
+    const volume = getVolume();
 
     // Prime the persistent <audio> element synchronously, still within the
     // click's user-gesture call stack, before doing any async work (network
@@ -274,6 +305,9 @@ export default function TTSControls({
       });
     }
 
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
       isGeneratingRef.current = true;
       setIsLoading(true);
@@ -286,14 +320,17 @@ export default function TTSControls({
         );
       }
 
-      const response = await ttsFetch({
-        text,
-        voiceId: selectedVoice,
-        model: selectedModel,
-        deepinfraKey: providerKey === "deepinfraKey" ? apiKey : undefined,
-        cartesiaKey: providerKey === "cartesiaKey" ? apiKey : undefined,
-        elevenlabsKey: providerKey === "elevenlabsKey" ? apiKey : undefined,
-      });
+      const response = await ttsFetch(
+        {
+          text,
+          voiceId: selectedVoice,
+          model: selectedModel,
+          deepinfraKey: providerKey === "deepinfraKey" ? apiKey : undefined,
+          cartesiaKey: providerKey === "cartesiaKey" ? apiKey : undefined,
+          elevenlabsKey: providerKey === "elevenlabsKey" ? apiKey : undefined,
+        },
+        controller.signal,
+      );
 
       if (!response.ok) {
         const error = await response.json();
@@ -314,8 +351,14 @@ export default function TTSControls({
       waitingForNextRef.current = false;
       isStreamingRef.current = true;
 
-      const chunkCount = await streamChunksToPlayer(response, onChunkArrived);
+      const chunkCount = await streamChunksToPlayer(response, onChunkArrived, controller.signal);
       isStreamingRef.current = false;
+
+      if (controller.signal.aborted) {
+        // Deactivated mid-stream - playback/loading state was already reset
+        // by the toggle-off branch above.
+        return;
+      }
 
       if (chunkCount === 0) {
         throw new Error("No audio generated");
@@ -327,23 +370,29 @@ export default function TTSControls({
       if (waitingForNextRef.current) {
         waitingForNextRef.current = false;
         setIsPlaying(false);
-        setIsPaused(false);
       }
     } catch (error: unknown) {
+      if (controller.signal.aborted) {
+        // User deactivated - not a real failure, already handled above.
+        return;
+      }
       console.error("TTS error:", error);
       const errorMessage =
         error instanceof Error ? error.message : "Failed to generate speech";
       addNotification(errorMessage, "failure");
       setIsPlaying(false);
-      setIsPaused(false);
     } finally {
       setIsLoading(false);
       isGeneratingRef.current = false;
+      if (abortControllerRef.current === controller) {
+        abortControllerRef.current = null;
+      }
     }
   }, [
     disabled,
     text,
-    isPaused,
+    isPlaying,
+    isLoading,
     hasAudio,
     onChunkArrived,
     playChunkAt,
@@ -354,10 +403,14 @@ export default function TTSControls({
     getAudioElement,
   ]);
 
-  // Handle text changes - clear audio and mark pending auto-generate
+  // Handle text changes - cancel any in-flight generation, clear cached
+  // audio, and mark pending auto-generate
   useEffect(() => {
     if (text !== lastTextRef.current) {
       lastTextRef.current = text;
+
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = null;
 
       // Stop and reset the existing (persistent) audio element. We
       // intentionally keep the same <audio> element around instead of
@@ -373,9 +426,10 @@ export default function TTSControls({
       currentChunkIndexRef.current = 0;
       isStreamingRef.current = false;
       waitingForNextRef.current = false;
+      isGeneratingRef.current = false;
       setHasAudio(false);
       setIsPlaying(false);
-      setIsPaused(false);
+      setIsLoading(false);
 
       // Mark that we should auto-generate when conditions are met
       const autoGenerate = localStorage.getItem("ttsAutoGenerate") === "true";
@@ -396,85 +450,56 @@ export default function TTSControls({
     ) {
       pendingAutoGenerateRef.current = false;
       const timer = setTimeout(() => {
-        handlePlay();
+        handleToggle();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [disabled, text, ttsEnabled, handlePlay]);
-
-  const handlePause = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      setIsPlaying(false);
-      setIsPaused(true);
-    }
-  };
-
-  const handleStop = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setIsPlaying(false);
-      setIsPaused(false);
-    }
-  };
+  }, [disabled, text, ttsEnabled, handleToggle]);
 
   if (!ttsEnabled) {
     return null;
   }
 
-  const canReplay = !isPlaying && hasAudio;
+  const isActive = isPlaying || isLoading;
+  const isGeneratingOnly = isLoading && !isPlaying;
+  const canReplay = !isActive && hasAudio;
 
   return (
     <div className="flex items-center gap-2">
-      {!isPlaying ? (
-        <button
-          onClick={handlePlay}
-          disabled={disabled || isLoading || !text.trim()}
-          className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-            disabled || isLoading || !text.trim()
-              ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+      <button
+        onClick={handleToggle}
+        disabled={disabled || !text.trim()}
+        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+          disabled || !text.trim()
+            ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+            : isActive
+              ? "bg-red-500 hover:bg-red-600 text-white"
               : "bg-purple-600 hover:bg-purple-700 text-white"
-          }`}
-          title={isPaused ? "Resume" : canReplay ? "Replay" : "Read aloud"}
-        >
-          {isLoading ? (
-            <>
-              <DynamicIcon name="Loader2" className="animate-spin h-4 w-4" />
-              <span className="hidden sm:inline">Generating...</span>
-            </>
-          ) : canReplay ? (
-            <>
-              <DynamicIcon name="RotateCcw" className="w-4 h-4" />
-              <span className="hidden sm:inline">Replay</span>
-            </>
-          ) : (
-            <>
-              <DynamicIcon name="Play" className="w-4 h-4" />
-              <span className="hidden sm:inline">
-                {isPaused ? "Resume" : "TTS"}
-              </span>
-            </>
-          )}
-        </button>
-      ) : (
-        <>
-          <button
-            onClick={handlePause}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-amber-500 hover:bg-amber-600 text-white rounded-lg transition-colors"
-            title="Pause"
-          >
-            <DynamicIcon name="Pause" className="w-4 h-4" />
-          </button>
-          <button
-            onClick={handleStop}
-            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors"
-            title="Stop"
-          >
+        }`}
+        title={isActive ? "Stop" : canReplay ? "Replay" : "Read aloud"}
+      >
+        {isGeneratingOnly ? (
+          <>
+            <DynamicIcon name="Loader2" className="animate-spin h-4 w-4" />
+            <span className="hidden sm:inline">Generating...</span>
+          </>
+        ) : isActive ? (
+          <>
             <DynamicIcon name="Square" className="w-4 h-4" />
-          </button>
-        </>
-      )}
+            <span className="hidden sm:inline">Stop</span>
+          </>
+        ) : canReplay ? (
+          <>
+            <DynamicIcon name="RotateCcw" className="w-4 h-4" />
+            <span className="hidden sm:inline">Replay</span>
+          </>
+        ) : (
+          <>
+            <DynamicIcon name="Play" className="w-4 h-4" />
+            <span className="hidden sm:inline">TTS</span>
+          </>
+        )}
+      </button>
     </div>
   );
 }
