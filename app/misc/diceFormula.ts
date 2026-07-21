@@ -589,3 +589,37 @@ export function createSchemaBasedResolver(
     return undefined;
   };
 }
+
+// ============================================
+// FREE-TEXT ROLL INPUT
+// ============================================
+
+const WORD_NUMBERS: Record<string, number> = {
+  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
+  eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13,
+  fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
+  nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
+};
+
+/**
+ * Extract the roll total a player typed or spoke, e.g. "17", "I rolled a 17",
+ * "natural 20!", or (as an STT fallback) "seventeen". Returns null if no
+ * number can be found. Used by manual dice mode, where players answer in
+ * free text/voice instead of a bare numeric field.
+ */
+export function extractRollNumber(text: string): number | null {
+  const digitMatch = text.match(/-?\d+/);
+  if (digitMatch) {
+    const value = parseInt(digitMatch[0], 10);
+    return Number.isFinite(value) ? value : null;
+  }
+
+  const words = text.toLowerCase().match(/[a-z]+/g) || [];
+  for (const word of words) {
+    if (word in WORD_NUMBERS) {
+      return WORD_NUMBERS[word];
+    }
+  }
+
+  return null;
+}

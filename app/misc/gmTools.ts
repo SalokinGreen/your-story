@@ -89,6 +89,19 @@ export interface AskForRollParams {
 }
 
 /**
+ * Pure numeric DC check: the player already reported a total (typed, said
+ * out loud, or volunteered in freeform narration - "I rolled 17, plus 3 is
+ * 20") and the GM needs a deterministic success/failure verdict instead of
+ * judging the number itself. Does not roll any dice.
+ */
+export interface CheckDCParams {
+  total: number; // The final number to check, already computed by the GM/player
+  dc: number; // Target number to compare against
+  reverse_dc?: boolean; // If true, success = total ≤ DC (roll-under systems)
+  reason: string; // What's being checked
+}
+
+/**
  * Opposed roll using formulas for both sides
  * GM should insert actual calculated values
  * Example: player "1d20+4" vs opponent "1d20+5"
@@ -536,6 +549,7 @@ export type GMToolParams =
   | { name: "take_rest"; params: TakeRestParams }
   | { name: "formula_roll"; params: FormulaRollParams }
   | { name: "ask_for_roll"; params: AskForRollParams }
+  | { name: "check_dc"; params: CheckDCParams }
   | { name: "opposed_formula"; params: OpposedFormulaParams }
   | { name: "formula_challenge_check"; params: FormulaChallengeCheckParams }
   | { name: "fate_question"; params: FateQuestionParams }
@@ -830,6 +844,42 @@ Do NOT use this for NPC/enemy/secret rolls - roll those yourself with formula_ro
         },
       },
       required: ["title", "description"],
+    },
+  },
+};
+
+const checkDCTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "check_dc",
+    description: `Check a total the player already reported against a DC. Pure number comparison - does NOT roll any dice.
+
+Use this whenever a player tells you their roll result in freeform text or voice instead of you rolling for them, e.g. they say "I rolled a 17, plus my +3 that's 20." Do the addition yourself if they gave you the pieces, then call this tool with the final total - do NOT judge success/failure yourself in narration, let this tool resolve it deterministically.
+
+Do NOT use this to roll dice - use formula_roll or npc_roll for that. Only use this to check a number that's already been rolled.`,
+    parameters: {
+      type: "object",
+      properties: {
+        total: {
+          type: "number",
+          description:
+            "The final number to check, after any modifiers (compute the arithmetic yourself if the player only gave you the pieces)",
+        },
+        dc: {
+          type: "number",
+          description: "Target number to compare the total against",
+        },
+        reverse_dc: {
+          type: "boolean",
+          description:
+            "If true, success = total ≤ DC (Call of Cthulhu/BRP roll-under). Default: false (total ≥ DC)",
+        },
+        reason: {
+          type: "string",
+          description: "What's being checked",
+        },
+      },
+      required: ["total", "dc", "reason"],
     },
   },
 };
@@ -2190,6 +2240,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Formula-based tools (primary dice mechanics)
   formulaRollTool,
   askForRollTool,
+  checkDCTool,
   opposedFormulaTool,
   formulaChallengeCheckTool,
   // Oracle & utility tools

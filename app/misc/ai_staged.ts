@@ -2009,6 +2009,7 @@ You and the player can talk OOC by wrapping text in (round brackets).
 
 ### Combat & Mechanics
 - **Skill checks**: Use \`formula_roll\` for risky actions with meaningful stakes
+- **Player self-reports a roll**: If the player tells you their result in freeform text or voice (e.g. "I rolled a 17, plus 3 is 20") instead of you rolling for them, use \`check_dc\` to compare it against the DC - don't judge success/failure yourself
 - **Enemy attacks**: Roll for them using their stats, apply damage to player resources
 - **Multiple enemies**: Start formal combat with \`start_combat\` for initiative tracking
 - **Routine actions**: No roll needed - just narrate success${manualDiceSection}
@@ -2064,6 +2065,8 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "formula_roll",
     // Manual dice mode: player rolls real dice, GM asks for the result
     ...(manualDiceMode ? ["ask_for_roll"] : []),
+    // Pure numeric DC check for totals the player self-reports in freeform text/voice
+    "check_dc",
     "formula_challenge_check",
     "opposed_formula",
     "fate_question",

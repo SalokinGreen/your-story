@@ -32,6 +32,7 @@ import {
   TakeRestParams,
   FormulaRollParams,
   AskForRollParams,
+  CheckDCParams,
   OpposedFormulaParams,
   FormulaChallengeCheckParams,
   FateQuestionParams,
@@ -124,6 +125,7 @@ export interface GMToolResult {
     | GMRestResult
     | GMFormulaRollResult
     | GMAskForRollResult
+    | GMCheckDCResult
     | GMOpposedFormulaResult
     | GMFormulaChallengeResult
     | GMFateQuestionResult
@@ -234,11 +236,23 @@ export interface GMAskForRollResult {
   formula?: string;
   dc?: number;
   reverseDC?: boolean;
-  // The total the player typed in; null when they skipped/cancelled
+  // The total extracted from the player's answer; null when they skipped/cancelled
   rollValue: number | null;
+  // The player's raw answer text (may be free text/voice, e.g. "natural 20!")
+  rawText?: string;
   success?: boolean; // vs dc, when both a value and a dc exist
   margin?: number;
   skipped?: boolean;
+}
+
+export interface GMCheckDCResult {
+  type: "check_dc";
+  total: number;
+  dc: number;
+  reverseDC?: boolean;
+  success: boolean;
+  margin: number;
+  reason: string;
 }
 
 export interface GMOpposedFormulaResult {
@@ -619,10 +633,20 @@ export interface ManualRollRequest {
   reverseDC?: boolean;
 }
 
+// What the player answered a manual roll prompt with: the number extracted
+// from their (possibly free-text/voice) answer, plus the raw text itself so
+// the GM can see phrasing like "natural 20" as flavor.
+export interface ManualRollAnswer {
+  value: number;
+  rawText: string;
+}
+
 // Handlers the frontend injects so interactive GM tools can pause the loop
 // and wait for real player input.
 export interface GMInteractionHandlers {
-  requestManualRoll?: (request: ManualRollRequest) => Promise<number | null>;
+  requestManualRoll?: (
+    request: ManualRollRequest
+  ) => Promise<ManualRollAnswer | null>;
 }
 
 export interface GMExecutionResult {
@@ -814,6 +838,9 @@ export async function executeGMTools(
             params as AskForRollParams,
             interaction
           );
+          break;
+        case "check_dc":
+          result = executeCheckDC(call.id, params as CheckDCParams);
           break;
         case "opposed_formula":
           result = executeOpposedFormula(
@@ -1838,7 +1865,7 @@ async function executeAskForRoll(
     };
   }
 
-  const rollValue = await interaction.requestManualRoll({
+  const answer = await interaction.requestManualRoll({
     title: params.title,
     description: params.description,
     playerName: params.player_name,
@@ -1847,7 +1874,7 @@ async function executeAskForRoll(
     reverseDC: params.reverse_dc,
   });
 
-  if (rollValue === null || !Number.isFinite(rollValue)) {
+  if (answer === null || !Number.isFinite(answer.value)) {
     return {
       toolName: "ask_for_roll",
       toolCallId,
@@ -1858,6 +1885,8 @@ async function executeAskForRoll(
       } and continue.]`,
     };
   }
+
+  const rollValue = answer.value;
 
   // Compare against DC if one was given
   let success: boolean | undefined;
@@ -1877,7 +1906,11 @@ async function executeAskForRoll(
   if (params.player_name) {
     contextForStory += ` - ${params.player_name}`;
   }
-  contextForStory += ` rolled${params.formula ? ` ${params.formula}` : ""} = **${rollValue}** (real dice, entered by the player)`;
+  contextForStory += ` rolled${params.formula ? ` ${params.formula}` : ""} = **${rollValue}** (real dice, entered by the player`;
+  if (answer.rawText && answer.rawText !== String(rollValue)) {
+    contextForStory += `: "${answer.rawText}"`;
+  }
+  contextForStory += `)`;
   if (params.dc !== undefined) {
     contextForStory += ` vs DC ${params.dc} → ${success ? "SUCCESS" : "FAILURE"}`;
     if (margin !== undefined) {
@@ -1891,7 +1924,45 @@ async function executeAskForRoll(
     toolName: "ask_for_roll",
     toolCallId,
     success: success ?? true,
-    result: { ...baseResult, rollValue, success, margin },
+    result: { ...baseResult, rollValue, rawText: answer.rawText, success, margin },
+    contextForStory,
+  };
+}
+
+/**
+ * Execute check_dc: a pure numeric DC comparison for a total the player
+ * already reported (typed, spoken, or volunteered in freeform narration),
+ * so the GM doesn't have to judge success/failure itself. Rolls no dice -
+ * same success/margin math as executeFormulaRoll, applied directly to
+ * `params.total`.
+ */
+function executeCheckDC(
+  toolCallId: string,
+  params: CheckDCParams
+): GMToolResult {
+  const reverseDC = params.reverse_dc || false;
+  const success = reverseDC
+    ? params.total <= params.dc
+    : params.total >= params.dc;
+  const margin = reverseDC
+    ? params.dc - params.total
+    : params.total - params.dc;
+
+  const contextForStory = `[DC Check: ${params.total} ${reverseDC ? "≤" : "vs"} DC ${params.dc} → ${success ? "SUCCESS" : "FAILURE"} (margin: ${margin >= 0 ? "+" : ""}${margin})]\n[Reason: ${params.reason}]`;
+
+  return {
+    toolName: "check_dc",
+    toolCallId,
+    success,
+    result: {
+      type: "check_dc",
+      total: params.total,
+      dc: params.dc,
+      reverseDC,
+      success,
+      margin,
+      reason: params.reason,
+    },
     contextForStory,
   };
 }

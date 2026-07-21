@@ -3,14 +3,16 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { ManualRollRequest } from "../misc/gmExecutor";
 import type { CouchPlayer } from "../misc/structs";
+import { extractRollNumber } from "../misc/diceFormula";
 import { DynamicIcon } from "./DynamicIcon";
+import STTButton from "./STTButton";
 
 interface ManualRollModalProps {
   // The pending roll request, or null when nothing is being asked
   request: ManualRollRequest | null;
   // Couch players, used to color the "who rolls" chip when names match
   couchPlayers?: CouchPlayer[];
-  onSubmit: (value: number) => void;
+  onSubmit: (value: number, rawText: string) => void;
   onSkip: () => void;
 }
 
@@ -46,8 +48,8 @@ export default function ManualRollModal({
 
   if (!request) return null;
 
-  const parsed = parseInt(value, 10);
-  const isValid = Number.isFinite(parsed);
+  const parsed = extractRollNumber(value);
+  const isValid = parsed !== null;
 
   const matchedPlayer = request.playerName
     ? couchPlayers.find(
@@ -58,8 +60,8 @@ export default function ManualRollModal({
     : undefined;
 
   const submit = () => {
-    if (!isValid) return;
-    onSubmit(parsed);
+    if (parsed === null) return;
+    onSubmit(parsed, value.trim());
   };
 
   return (
@@ -110,21 +112,32 @@ export default function ManualRollModal({
             <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2 text-center">
               Your total (with modifiers)
             </label>
-            <input
-              ref={inputRef}
-              type="number"
-              inputMode="numeric"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  submit();
-                }
-              }}
-              placeholder="0"
-              className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/40 rounded-xl text-white text-center text-2xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
+            <div className="flex items-center gap-2">
+              <input
+                ref={inputRef}
+                type="text"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    submit();
+                  }
+                }}
+                placeholder='17, or "I rolled a natural 20"'
+                className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/40 rounded-xl text-white text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
+              />
+              <STTButton
+                onTranscript={(text) => setValue(text)}
+                className="shrink-0"
+              />
+            </div>
+            <p className="mt-2 text-center text-xs text-blue-300/60 h-4">
+              {value.trim() &&
+                (isValid
+                  ? `Detected: ${parsed}`
+                  : "Couldn't find a number in that - try again")}
+            </p>
           </div>
 
           <button
