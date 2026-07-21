@@ -1752,14 +1752,17 @@ export function buildGMStagePrompt({
   customMaxContext,
   modelName = "DeepSeek V4 Flash",
   replyLength = "medium",
+  pacingNote,
 }: {
   storyData: StoryData;
   userChoice: string;
   customMaxContext?: number; // Memory Size slider - this is the main context control now
   modelName?: string; // Used to get model's actual context limit
   replyLength?: ReplyLength; // Reply Length setting - controls narration verbosity
+  pacingNote?: string; // Deterministic pacing nudge (see pacingFeedback.ts)
 }): { messages: ChatMessage[]; tools: any[] } {
   const lengthGuidance = getLengthGuidance(replyLength);
+  const pacingFeedbackLine = pacingNote ? `\n${pacingNote}` : "";
   const difficulty = storyData.difficulty || "medium";
 
   // Calculate GM context budget from customMaxContext (Memory Size slider)
@@ -2010,7 +2013,7 @@ A real tabletop GM talks in a few sentences and hands the mic back - they don't 
 - Routine action or quick line of dialogue: ${lengthGuidance.routine}
 - Notable action with an NPC reaction: ${lengthGuidance.notable}
 - Combat beat, big reveal, or emotional climax: ${lengthGuidance.climax}
-These are hard ceilings, not targets to fill. Never pad a turn to hit a length bracket, and never write a second scene/beat "for free" just because you have room left - stop at the decision point even if that's one sentence of NPC dialogue.
+These are hard ceilings, not targets to fill. Never pad a turn to hit a length bracket, and never write a second scene/beat "for free" just because you have room left - stop at the decision point even if that's one sentence of NPC dialogue.${pacingFeedbackLine}
 
 **Cut the flavor, keep the beat.** Don't build out a whole vignette (extra sensory detail, incidental banter with a background character, describing actions no one asked about) around the actual outcome - state the outcome and stop.
 - Bad (too much staging): "You slide your hand into the paint case with the practiced ease of a man who's done this a thousand times. As you lift the tube, you tilt it just so, letting the light catch the crimp. There. A tiny roll of microfilm. 'Saving that blue for the next one, Bob?' calls Danny, the cameraman. 'Oh, you know me,' you say, flashing that gentle smile. 'Phthalo Blue waits for no one.' Danny chuckles and disappears. The microfilm is pressed between your fingers as you hum a tune."
@@ -2527,12 +2530,14 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
 export function buildStoryContinuationPrompt(
   storytellerMode: StorytellerMode = "narrator",
   replyLength: ReplyLength = "medium",
+  pacingNote?: string,
 ): string {
   const { paragraphs } = getLengthGuidance(replyLength);
+  const pacingFeedbackLine = pacingNote ? `\n\n${pacingNote}` : "";
 
   const basePrompt = `Now write the story from the player's perspective. Write only the prose the player should see - no meta-commentary, no notes to yourself.
 
-Keep it tight and hand the mic back - this is a back-and-forth roleplay, not a monologue. ${paragraphs} End the instant the player has something to react to; never write what the player character does next.`;
+Keep it tight and hand the mic back - this is a back-and-forth roleplay, not a monologue. ${paragraphs} End the instant the player has something to react to; never write what the player character does next.${pacingFeedbackLine}`;
 
   const narratorGuidelines = `
 Write immersive prose - show, don't tell. No dice results or mechanical language.

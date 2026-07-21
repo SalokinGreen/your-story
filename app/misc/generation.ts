@@ -38,6 +38,7 @@ import {
   computeGMStageBudget,
   CHOICES_STAGE_TOKEN_BUDGET,
 } from "@/app/misc/ai_staged";
+import { computePacingFeedback } from "@/app/misc/pacingFeedback";
 import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { ensureStoryReflected } from "@/app/misc/reflection";
@@ -665,6 +666,15 @@ export async function generateStoryTurn(
     // narration voice to shift inconsistently within a single generation.
     const narrationModel = getEffectiveNarrationModelKey();
 
+    // Deterministic pacing nudge (Layer 3): measure how much the player has
+    // had to read over recent turns and, if it's trending away from the Reply
+    // Length setting, inject a corrective hint into this turn's prompts. Pure,
+    // non-blocking, computed once per turn.
+    const pacingNote = computePacingFeedback(
+      storyData.scene.parts,
+      options.replyLength || "medium",
+    ).message;
+
     // Extract user choice - either from parameter or from last user scene
     // part. Needed by every branch below: the round loop uses it to run
     // the GM stage, and the precomputed-conversation (retry) / no-choice
@@ -695,6 +705,7 @@ export async function generateStoryTurn(
         customMaxContext: options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
         modelName: narrationModel,
         replyLength: options.replyLength,
+        pacingNote,
       });
       gmBaseMessages = gmPrompt.messages;
       logger.action("Using precomputed GM conversation (retry flow)", {
@@ -719,6 +730,7 @@ export async function generateStoryTurn(
             options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
           modelName: narrationModel,
           replyLength: options.replyLength,
+          pacingNote,
         });
         gmBaseMessages = gmPrompt.messages;
       } else {
@@ -947,6 +959,7 @@ export async function generateStoryTurn(
               customMaxContext: currentGMBudget,
               modelName: gmModel,
               replyLength: options.replyLength,
+              pacingNote,
             });
             gmBaseMessages = [...gmPrompt.messages];
             gmBaseTools = gmPrompt.tools;
@@ -1718,6 +1731,7 @@ export async function generateStoryTurn(
       const storyContinuationPrompt = buildStoryContinuationPrompt(
         options.storytellerMode || "narrator",
         options.replyLength || "medium",
+        pacingNote,
       );
 
       // Build messages: GM base + conversation history + story prompt
