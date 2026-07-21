@@ -651,14 +651,14 @@ const searchNotesTool: ToolSchema = {
   function: {
     name: "search_notes",
     description:
-      "Search through all notes (lore entries) for content matching a query. Returns matching excerpts with context. Use to find information before updating notes.",
+      "Search through all notes (lore entries) for content matching a query. Matches individual words anywhere in a note (title, content, trigger keywords, aliases, tags, related characters/locations) - not just one exact phrase - and returns the strongest matches first with the relevant excerpt. Use to find information before updating notes.",
     parameters: {
       type: "object",
       properties: {
         query: {
           type: "string",
           description:
-            "Text to search for in note titles and content (case-insensitive)",
+            "Text to search for (case-insensitive). Words are matched individually as well as together, so 'tavern owner' will find notes mentioning both words even if not adjacent; an exact phrase match still ranks highest.",
         },
         includeHidden: {
           type: "boolean",
@@ -667,6 +667,16 @@ const searchNotesTool: ToolSchema = {
         maxResults: {
           type: "number",
           description: "Maximum number of matches to return (default: 10)",
+        },
+        type: {
+          type: "string",
+          description:
+            "Optional: restrict results to one note type, e.g. 'lore', 'character_sheet', 'mechanics', 'secret'",
+        },
+        tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional: restrict results to notes with at least one of these tags",
         },
       },
       required: ["query"],
