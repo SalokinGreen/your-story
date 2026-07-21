@@ -22,8 +22,10 @@ import {
 import {
   listLibraryTables,
   createLibraryTable,
+  updateLibraryTable,
   deleteLibraryTable,
   bulkDeleteLibraryTables,
+  bulkMoveLibraryTables,
   unassignFolderFromTables,
   LibraryTable,
 } from "@/app/misc/localTablesLibraryManager";
@@ -37,6 +39,10 @@ import {
   downloadLibraryNotes,
   readLibraryNotesFile,
 } from "@/app/misc/notesLibraryExport";
+import {
+  downloadLibraryTables,
+  readLibraryTablesFile,
+} from "@/app/misc/tablesLibraryExport";
 
 const NOTE_TYPE_OPTIONS: { value: LoreType; label: string }[] = [
   { value: "lore", label: "📜 Lore" },
@@ -103,6 +109,16 @@ export default function NotesLibraryTab({
   const [newFolderColor, setNewFolderColor] = useState("#9333ea");
   const [editingFolder, setEditingFolder] = useState<LocalFolder | null>(null);
   const [movingNote, setMovingNote] = useState<string | null>(null);
+  const [movingTable, setMovingTable] = useState<string | null>(null);
+
+  // OCR/PDF import: ask which folder to save results into before the
+  // PDFImporter modal (and its OCR pipeline) opens.
+  const [showOcrFolderPrompt, setShowOcrFolderPrompt] = useState(false);
+  const [ocrTargetFolder, setOcrTargetFolder] = useState<string | undefined>(
+    undefined,
+  );
+  const [ocrImporterOpen, setOcrImporterOpen] = useState(false);
+  const [ocrImporterKey, setOcrImporterKey] = useState(0);
 
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editNote, setEditNote] = useState<Partial<LibraryNote>>({});
@@ -291,6 +307,21 @@ export default function NotesLibraryTab({
     }
   };
 
+  const handleMoveTable = async (tableId: string, folderId: string | null) => {
+    try {
+      const updated = await updateLibraryTable(tableId, {
+        folderId: folderId || undefined,
+      });
+      if (updated) {
+        setTables((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+      }
+      setMovingTable(null);
+      addNotification("Table moved", "success");
+    } catch (error: any) {
+      addNotification(`Failed to move table: ${error.message}`, "failure");
+    }
+  };
+
   // ============================================
   // Selection / bulk actions
   // ============================================
@@ -312,6 +343,7 @@ export default function NotesLibraryTab({
   };
 
   const selectAllNotes = () => {
+    if (!selectionMode) setSelectionMode(true);
     setSelectedNotes(new Set(filteredNotes.map((n) => n.id)));
   };
 
@@ -502,12 +534,15 @@ export default function NotesLibraryTab({
     );
   };
 
-  const handlePDFImportComplete = async (data: {
-    lore: StoryLore[];
-    mechanicNotes: StoryLore[];
-    customTables: CustomTable[];
-    summary: string;
-  }) => {
+  const handlePDFImportComplete = async (
+    data: {
+      lore: StoryLore[];
+      mechanicNotes: StoryLore[];
+      customTables: CustomTable[];
+      summary: string;
+    },
+    targetFolder?: string,
+  ) => {
     const allNotes = [...data.lore, ...data.mechanicNotes];
     if (allNotes.length === 0 && data.customTables.length === 0) return;
 
@@ -520,7 +555,7 @@ export default function NotesLibraryTab({
               content: note.content,
               type: note.type || "lore",
               tags: note.tags || [],
-              folderId: selectedFolder || undefined,
+              folderId: targetFolder,
               pinned: false,
               source: "ocr",
               relatedCharacters: note.relatedCharacters || [],
@@ -536,7 +571,7 @@ export default function NotesLibraryTab({
               description: table.description,
               entries: table.entries,
               tags: [],
-              folderId: selectedFolder || undefined,
+              folderId: targetFolder,
               pinned: false,
               source: "ocr",
             }),
@@ -620,6 +655,7 @@ export default function NotesLibraryTab({
   };
 
   const selectAllTables = () => {
+    if (!selectionMode) setSelectionMode(true);
     setSelectedTables(new Set(filteredTables.map((t) => t.id)));
   };
 
@@ -676,6 +712,84 @@ export default function NotesLibraryTab({
     });
   };
 
+  const handleMassMoveTables = async (folderId: string | null) => {
+    if (selectedTables.size === 0) return;
+    const ids = Array.from(selectedTables);
+    try {
+      await bulkMoveLibraryTables(ids, folderId || undefined);
+      const idSet = new Set(ids);
+      setTables((prev) =>
+        prev.map((t) =>
+          idSet.has(t.id) ? { ...t, folderId: folderId || undefined } : t,
+        ),
+      );
+      setSelectedTables(new Set());
+      setSelectionMode(false);
+      const folderName = folderId
+        ? folders.find((f) => f.id === folderId)?.name || "folder"
+        : "Uncategorized";
+      addNotification(`${ids.length} table${ids.length === 1 ? "" : "s"} moved to ${folderName}`, "success");
+    } catch (error: any) {
+      addNotification(`Failed to move tables: ${error.message}`, "failure");
+    }
+  };
+
+  const handleExportTables = () => {
+    const toExport =
+      selectedTables.size > 0
+        ? tables.filter((t) => selectedTables.has(t.id))
+        : filteredTables;
+    if (toExport.length === 0) {
+      addNotification("No tables to export", "warning");
+      return;
+    }
+    downloadLibraryTables(toExport);
+    addNotification(
+      `Exported ${toExport.length} table${toExport.length === 1 ? "" : "s"}`,
+      "success",
+    );
+  };
+
+  const handleImportTablesFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    const result = await readLibraryTablesFile(file);
+    if (!result.success || !result.tables) {
+      addNotification(result.error || "Failed to import tables", "failure");
+      return;
+    }
+
+    try {
+      const created = await Promise.all(
+        result.tables.map((t) =>
+          createLibraryTable({
+            name: t.name,
+            description: t.description,
+            entries: t.entries,
+            tags: t.tags,
+            folderId: undefined,
+            pinned: t.pinned,
+            source: t.source,
+            sourceFile: t.sourceFile,
+          }),
+        ),
+      );
+      setTables((prev) => [...created, ...prev]);
+      addNotification(
+        `Imported ${created.length} table${created.length === 1 ? "" : "s"}${
+          result.warnings.length > 0 ? ` (${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"})` : ""
+        }`,
+        "success",
+      );
+    } catch (error: any) {
+      addNotification(`Failed to import tables: ${error.message}`, "failure");
+    }
+  };
+
   if (loading && notes.length === 0) {
     return <LibrarySkeleton />;
   }
@@ -705,11 +819,24 @@ export default function NotesLibraryTab({
             <DynamicIcon name="Plus" className="w-4 h-4" />
             New Note
           </button>
-          <PDFImporter
-            onImportComplete={handlePDFImportComplete}
-            buttonText="Import from PDF"
-            compact
-          />
+          <button
+            onClick={() => setShowOcrFolderPrompt(true)}
+            className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-purple-900/30 to-blue-900/30 hover:from-purple-800/40 hover:to-blue-800/40 border border-purple-700/50 rounded-xl transition-colors text-sm font-medium"
+          >
+            <DynamicIcon name="FileUp" className="w-4 h-4" />
+            Import from PDF
+          </button>
+          {ocrImporterOpen && (
+            <PDFImporter
+              key={ocrImporterKey}
+              startOpen
+              compact
+              onImportComplete={(data) => {
+                handlePDFImportComplete(data, ocrTargetFolder);
+              }}
+              onClose={() => setOcrImporterOpen(false)}
+            />
+          )}
           <button
             onClick={() => fileInputRef.current?.click()}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-xl transition-colors text-sm font-medium"
@@ -720,16 +847,27 @@ export default function NotesLibraryTab({
           <input
             ref={fileInputRef}
             type="file"
-            accept=".notes,.json"
-            onChange={handleImportFileChange}
+            accept={subView === "notes" ? ".notes,.json" : ".tables,.json"}
+            onChange={
+              subView === "notes"
+                ? handleImportFileChange
+                : handleImportTablesFileChange
+            }
             className="hidden"
           />
           <button
-            onClick={handleExport}
+            onClick={subView === "notes" ? handleExport : handleExportTables}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-xl transition-colors text-sm font-medium"
           >
             <DynamicIcon name="Download" className="w-4 h-4" />
-            Export{selectedNotes.size > 0 ? ` (${selectedNotes.size})` : ""}
+            Export
+            {subView === "notes"
+              ? selectedNotes.size > 0
+                ? ` (${selectedNotes.size})`
+                : ""
+              : selectedTables.size > 0
+                ? ` (${selectedTables.size})`
+                : ""}
           </button>
         </div>
       </div>
@@ -826,20 +964,28 @@ export default function NotesLibraryTab({
       <div className="flex items-center gap-2">
         <div className="flex-1" />
         {(subView === "notes" ? filteredNotes.length : filteredTables.length) > 0 && (
-          <button
-            onClick={toggleSelectionMode}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-              selectionMode
-                ? "bg-purple-600 text-white"
-                : "bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
-            }`}
-          >
-            <DynamicIcon
-              name={selectionMode ? "Check" : "CheckSquare"}
-              className="w-3.5 h-3.5"
-            />
-            {selectionMode ? "Done" : "Select"}
-          </button>
+          <>
+            <button
+              onClick={toggleSelectionMode}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                selectionMode
+                  ? "bg-purple-600 text-white"
+                  : "bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
+              }`}
+            >
+              <DynamicIcon
+                name={selectionMode ? "Check" : "CheckSquare"}
+                className="w-3.5 h-3.5"
+              />
+              {selectionMode ? "Done" : "Select"}
+            </button>
+            <button
+              onClick={subView === "notes" ? selectAllNotes : selectAllTables}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
+            >
+              Select All
+            </button>
+          </>
         )}
       </div>
 
@@ -847,12 +993,6 @@ export default function NotesLibraryTab({
         <div className="flex items-center gap-3 p-3 bg-purple-900/30 border border-purple-700/30 rounded-xl flex-wrap">
           <span className="text-sm font-medium">{selectedNotes.size} selected</span>
           <div className="flex-1" />
-          <button
-            onClick={selectAllNotes}
-            className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
-          >
-            Select All
-          </button>
           <div className="relative">
             <button
               onClick={() => setShowMassMoveDropdown(!showMassMoveDropdown)}
@@ -915,11 +1055,47 @@ export default function NotesLibraryTab({
         <div className="flex items-center gap-3 p-3 bg-purple-900/30 border border-purple-700/30 rounded-xl flex-wrap">
           <span className="text-sm font-medium">{selectedTables.size} selected</span>
           <div className="flex-1" />
+          <div className="relative">
+            <button
+              onClick={() => setShowMassMoveDropdown(!showMassMoveDropdown)}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm rounded-lg transition-colors flex items-center gap-2"
+            >
+              <DynamicIcon name="FolderOpen" className="w-4 h-4" />
+              Move
+            </button>
+            {showMassMoveDropdown && (
+              <div className="absolute top-full right-0 mt-1 bg-blue-950 border border-blue-800/50 rounded-lg shadow-xl p-2 min-w-[180px] z-50">
+                <button
+                  onClick={() => {
+                    handleMassMoveTables(null);
+                    setShowMassMoveDropdown(false);
+                  }}
+                  className="w-full text-left px-3 py-2 hover:bg-blue-900/50 rounded-lg text-sm"
+                >
+                  Uncategorized
+                </button>
+                {folders.map((folder) => (
+                  <button
+                    key={folder.id}
+                    onClick={() => {
+                      handleMassMoveTables(folder.id);
+                      setShowMassMoveDropdown(false);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-blue-900/50 rounded-lg text-sm"
+                    style={{ borderLeft: `3px solid ${folder.color}` }}
+                  >
+                    {folder.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button
-            onClick={selectAllTables}
-            className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
+            onClick={handleExportTables}
+            className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors flex items-center gap-2"
           >
-            Select All
+            <DynamicIcon name="Download" className="w-4 h-4" />
+            Export
           </button>
           <button
             onClick={handleMassDeleteTables}
@@ -1140,6 +1316,13 @@ export default function NotesLibraryTab({
                       className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
                       onClick={(e) => e.stopPropagation()}
                     >
+                      <button
+                        onClick={() => setMovingTable(table.id)}
+                        className="p-1.5 hover:bg-blue-800/50 rounded-lg transition-colors"
+                        title="Move"
+                      >
+                        <DynamicIcon name="Folder" className="w-4 h-4" />
+                      </button>
                       <button
                         onClick={() => handleDeleteTable(table.id)}
                         disabled={deleting === table.id}
@@ -1432,6 +1615,95 @@ export default function NotesLibraryTab({
             </div>
             <button
               onClick={() => setMovingNote(null)}
+              className="w-full mt-4 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 font-semibold rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {movingTable && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-4">Move to Folder</h2>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              <button
+                onClick={() => movingTable && handleMoveTable(movingTable, null)}
+                className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <DynamicIcon name="FolderOpen" className="w-5 h-5" />
+                  Uncategorized
+                </span>
+              </button>
+              {folders.map((folder) => (
+                <button
+                  key={folder.id}
+                  onClick={() => movingTable && handleMoveTable(movingTable, folder.id)}
+                  className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+                  style={{ borderLeftColor: folder.color, borderLeftWidth: "4px" }}
+                >
+                  <span className="flex items-center gap-2">
+                    <DynamicIcon name={folder.icon} className="w-5 h-5" />
+                    {folder.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setMovingTable(null)}
+              className="w-full mt-4 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 font-semibold rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showOcrFolderPrompt && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
+            <h2 className="text-xl font-bold mb-1">Import from PDF</h2>
+            <p className="text-sm text-blue-200/60 mb-4">
+              Which folder should the extracted notes and tables be saved to?
+            </p>
+            <div className="space-y-2 max-h-96 overflow-y-auto">
+              <button
+                onClick={() => {
+                  setOcrTargetFolder(undefined);
+                  setShowOcrFolderPrompt(false);
+                  setOcrImporterKey((k) => k + 1);
+                  setOcrImporterOpen(true);
+                }}
+                className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+              >
+                <span className="flex items-center gap-2">
+                  <DynamicIcon name="FolderOpen" className="w-5 h-5" />
+                  Uncategorized
+                </span>
+              </button>
+              {folders.map((folder) => (
+                <button
+                  key={folder.id}
+                  onClick={() => {
+                    setOcrTargetFolder(folder.id);
+                    setShowOcrFolderPrompt(false);
+                    setOcrImporterKey((k) => k + 1);
+                    setOcrImporterOpen(true);
+                  }}
+                  className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
+                  style={{ borderLeftColor: folder.color, borderLeftWidth: "4px" }}
+                >
+                  <span className="flex items-center gap-2">
+                    <DynamicIcon name={folder.icon} className="w-5 h-5" />
+                    {folder.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowOcrFolderPrompt(false)}
               className="w-full mt-4 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 font-semibold rounded-lg transition-colors"
             >
               Cancel

@@ -387,6 +387,7 @@ export default function LibraryPage() {
   };
 
   const selectAllStories = () => {
+    if (!selectionMode) setSelectionMode(true);
     const allIds = new Set(filteredLocalStories.map((s) => s.id));
     setSelectedStories(allIds);
   };
@@ -839,22 +840,30 @@ export default function LibraryPage() {
                 ))}
               </div>
 
-              {/* Select mode button - only show when there are stories */}
+              {/* Select mode + Select All buttons - only show when there are stories */}
               {filteredLocalStories.length > 0 && (
-                <button
-                  onClick={toggleSelectionMode}
-                  className={`ml-auto px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
-                    selectionMode
-                      ? "bg-purple-600 text-white"
-                      : "bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
-                  }`}
-                >
-                  <DynamicIcon
-                    name={selectionMode ? "Check" : "CheckSquare"}
-                    className="w-3.5 h-3.5"
-                  />
-                  {selectionMode ? "Done" : "Select"}
-                </button>
+                <div className="ml-auto flex items-center gap-2">
+                  <button
+                    onClick={toggleSelectionMode}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      selectionMode
+                        ? "bg-purple-600 text-white"
+                        : "bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
+                    }`}
+                  >
+                    <DynamicIcon
+                      name={selectionMode ? "Check" : "CheckSquare"}
+                      className="w-3.5 h-3.5"
+                    />
+                    {selectionMode ? "Done" : "Select"}
+                  </button>
+                  <button
+                    onClick={selectAllStories}
+                    className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
+                  >
+                    Select All
+                  </button>
+                </div>
               )}
             </div>
 
@@ -865,12 +874,6 @@ export default function LibraryPage() {
                   {selectedStories.size} selected
                 </span>
                 <div className="flex-1" />
-                <button
-                  onClick={selectAllStories}
-                  className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
-                >
-                  Select All
-                </button>
                 <div className="relative">
                   <button
                     onClick={() =>
