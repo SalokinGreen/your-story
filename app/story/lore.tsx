@@ -18,6 +18,9 @@ import {
 
 interface LorePageProps extends StoryData {
   onUpdateLore?: (updatedLore: StoryLore[]) => void;
+  // Pre-selects a note by title on mount - set when the player clicks a
+  // highlighted mention of this note in the story prose (see page.tsx).
+  initialSelectedTitle?: string;
 }
 
 // Type configuration with icons and colors
@@ -112,9 +115,13 @@ const TYPE_CONFIG: Record<
 };
 
 export default function LorePage(props: LorePageProps) {
-  const { onUpdateLore, ...storyData } = props;
+  const { onUpdateLore, initialSelectedTitle, ...storyData } = props;
   const { addNotification } = useNotification();
-  const [selectedLore, setSelectedLore] = useState<StoryLore | null>(null);
+  const [selectedLore, setSelectedLore] = useState<StoryLore | null>(() =>
+    initialSelectedTitle
+      ? storyData.lore.find((l) => l.title === initialSelectedTitle) || null
+      : null,
+  );
   const [searchTerm, setSearchTerm] = useState("");
   const [showImageGen, setShowImageGen] = useState(false);
   const [syncingLibrary, setSyncingLibrary] = useState(false);
@@ -124,6 +131,7 @@ export default function LorePage(props: LorePageProps) {
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
   const [editType, setEditType] = useState<LoreType>("lore");
+  const [editAliases, setEditAliases] = useState("");
   const [isTypeDropdownOpen, setIsTypeDropdownOpen] = useState(false);
   const [isAddingNote, setIsAddingNote] = useState(false);
   const [page, setPage] = useState(1);
@@ -343,13 +351,22 @@ export default function LorePage(props: LorePageProps) {
   const handleSaveEdit = () => {
     if (!selectedLore || !onUpdateLore) return;
 
+    const aliases = editAliases
+      .split(",")
+      .map((a) => a.trim())
+      .filter(Boolean);
     const updatedLore = storyData.lore.map((l) =>
       l.title === selectedLore.title
-        ? { ...l, content: editContent, type: editType }
+        ? { ...l, content: editContent, type: editType, aliases }
         : l
     );
     onUpdateLore(updatedLore);
-    setSelectedLore({ ...selectedLore, content: editContent, type: editType });
+    setSelectedLore({
+      ...selectedLore,
+      content: editContent,
+      type: editType,
+      aliases,
+    });
     setIsEditing(false);
   };
 
@@ -358,6 +375,7 @@ export default function LorePage(props: LorePageProps) {
     if (selectedLore) {
       setEditContent(selectedLore.content || "");
       setEditType(selectedLore.type || "lore");
+      setEditAliases((selectedLore.aliases || []).join(", "));
       setIsEditing(true);
     }
   };
@@ -880,6 +898,21 @@ export default function LorePage(props: LorePageProps) {
                         <option value="event">📅 Event</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium text-blue-200/70 mb-1">
+                        Aliases
+                      </label>
+                      <input
+                        type="text"
+                        value={editAliases}
+                        onChange={(e) => setEditAliases(e.target.value)}
+                        placeholder="Comma-separated alternate names, e.g. Bobby, the old man"
+                        className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      />
+                      <p className="text-xs text-blue-300/40 mt-1">
+                        Also highlighted and clickable in the story text, alongside the title
+                      </p>
+                    </div>
                     <textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
@@ -918,6 +951,25 @@ export default function LorePage(props: LorePageProps) {
                 {/* Related Info */}
                 {!isEditing && (
                   <div className="space-y-3 pt-4 border-t border-blue-800/30">
+                    {!!selectedLore.aliases?.length && (
+                      <div>
+                        <h4 className="text-xs font-medium text-blue-200/50 mb-2 flex items-center gap-2">
+                          <DynamicIcon name="AtSign" className="w-3.5 h-3.5" />
+                          Aliases
+                        </h4>
+                        <div className="flex flex-wrap gap-1.5">
+                          {selectedLore.aliases.map((alias, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2.5 py-1 bg-purple-500/15 text-purple-300 rounded-lg text-xs"
+                            >
+                              {alias}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
                     {selectedLore.relatedCharacters?.length > 0 && (
                       <div>
                         <h4 className="text-xs font-medium text-blue-200/50 mb-2 flex items-center gap-2">

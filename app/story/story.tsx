@@ -29,6 +29,12 @@ import {
   extractVisibleText,
 } from "../misc/turnTimeline";
 import { getToolProgressLabel } from "../misc/gmToolLabels";
+import {
+  type MentionMatcher,
+  buildMentionCandidates,
+  buildMentionMatcher,
+  splitTextWithMentions,
+} from "../misc/noteMentions";
 
 interface StoryProps {
   storyData: StoryData;
@@ -71,6 +77,9 @@ interface StoryProps {
   onResetToCurrentPart?: () => void;
   syncStatus?: SyncStatus;
   onOpenJournal?: () => void;
+  // Opens the Notes or NPC page pre-selected on the given entry, e.g. when
+  // the player clicks a highlighted name/note title in the story prose.
+  onOpenNote?: (kind: "lore" | "npc", id: string) => void;
   // The last user choice that was submitted (shown while GM is thinking)
   pendingUserChoice?: string;
   // Chronological thinking/tool/text blocks for the turn currently
@@ -162,18 +171,29 @@ function TimelineView({
   animate,
   showHiddenMessages,
   fontSettings,
+  mentionMatcher,
+  onMentionClick,
 }: {
   blocks: TimelineBlock[];
   animate: boolean;
   showHiddenMessages: boolean;
   fontSettings?: FontSettings;
+  mentionMatcher?: MentionMatcher | null;
+  onMentionClick?: (kind: "lore" | "npc", id: string) => void;
 }) {
   return (
     <>
       {blocks.map((block) =>
         block.kind === "text" ? (
           <React.Fragment key={block.id}>
-            {prettify(block.content || "", animate, showHiddenMessages, fontSettings)}
+            {prettify(
+              block.content || "",
+              animate,
+              showHiddenMessages,
+              fontSettings,
+              mentionMatcher,
+              onMentionClick,
+            )}
             {block.streaming && (
               <span className="animate-pulse text-blue-400">▌</span>
             )}
@@ -221,6 +241,8 @@ interface ChatMessageProps {
   // historical messages (which rebuild their timeline from gmConversation).
   liveTimeline?: TimelineBlock[];
   isStreaming?: boolean;
+  mentionMatcher?: MentionMatcher | null;
+  onMentionClick?: (kind: "lore" | "npc", id: string) => void;
 }
 
 function ChatMessage({
@@ -238,6 +260,8 @@ function ChatMessage({
   storyReasoning,
   liveTimeline,
   isStreaming = false,
+  mentionMatcher,
+  onMentionClick,
 }: ChatMessageProps) {
   const opacity = isPrevious ? "opacity-50" : "opacity-100";
   const isComment = messageType === "comment";
@@ -349,9 +373,18 @@ function ChatMessage({
                   animate={!isPrevious}
                   showHiddenMessages={showHiddenMessages}
                   fontSettings={fontSettings}
+                  mentionMatcher={mentionMatcher}
+                  onMentionClick={onMentionClick}
                 />
                 {showSeparateContent &&
-                  prettify(content, !isPrevious, showHiddenMessages, fontSettings)}
+                  prettify(
+                    content,
+                    !isPrevious,
+                    showHiddenMessages,
+                    fontSettings,
+                    mentionMatcher,
+                    onMentionClick,
+                  )}
               </>
             )}
           </div>
@@ -697,6 +730,7 @@ export default function Story({
   onResetToCurrentPart,
   syncStatus,
   onOpenJournal,
+  onOpenNote,
   pendingUserChoice,
   liveGMEntries,
   myPlayerId,
@@ -735,6 +769,17 @@ export default function Story({
       clearInterval(interval);
     };
   }, []);
+
+  // Lore-title/NPC-name mention highlighting for the story prose - see
+  // noteMentions.ts. Rebuilt only when the underlying notes/NPCs change.
+  const mentionMatcher = React.useMemo(
+    () => buildMentionMatcher(buildMentionCandidates(storyData)),
+    [storyData],
+  );
+  const handleMentionClick = React.useCallback(
+    (kind: "lore" | "npc", id: string) => onOpenNote?.(kind, id),
+    [onOpenNote],
+  );
 
   // Action mode state - persisted to localStorage
   const [actionMode, setActionMode] = React.useState(() => {
@@ -1169,6 +1214,8 @@ export default function Story({
                   storyReasoning={
                     getGMDataForPart(exchange.gmMsg.partIndex).storyReasoning
                   }
+                  mentionMatcher={mentionMatcher}
+                  onMentionClick={handleMentionClick}
                 />
               )}
             </React.Fragment>
@@ -1210,6 +1257,8 @@ export default function Story({
                       getGMDataForPart(exchange.gmMsg.partIndex)
                         .storyReasoning
                     }
+                    mentionMatcher={mentionMatcher}
+                    onMentionClick={handleMentionClick}
                   />
                 )}
               </React.Fragment>
@@ -1242,6 +1291,8 @@ export default function Story({
               fontSettings={fontSettings}
               liveTimeline={liveGMEntries || []}
               isStreaming={true}
+              mentionMatcher={mentionMatcher}
+              onMentionClick={handleMentionClick}
             />
           )}
         </div>
@@ -1428,6 +1479,8 @@ const prettify = (
   animate: boolean = true,
   showHiddenMessages: boolean = false,
   fontSettings?: FontSettings,
+  mentionMatcher?: MentionMatcher | null,
+  onMentionClick?: (kind: "lore" | "npc", id: string) => void,
 ) => {
   // Process tags and hidden text before rendering - defensive against a
   // stray tag even though content is expected to already be clean by the
@@ -1524,13 +1577,50 @@ const prettify = (
               }
             });
 
+            // Second pass: highlight lore-title/NPC-name mentions within the
+            // plain-text segments (leaves hidden-text spans and other
+            // elements from the pass above untouched).
+            const withMentions: React.ReactNode[] = mentionMatcher
+              ? processedChildren.flatMap((node, idx): React.ReactNode[] => {
+                  if (typeof node !== "string" || !node) return [node];
+                  const segments = splitTextWithMentions(node, mentionMatcher);
+                  if (segments.length === 1 && !segments[0].mention) {
+                    return [node];
+                  }
+                  return segments.map((seg, i) =>
+                    seg.mention ? (
+                      <span
+                        key={`mention-${idx}-${i}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() =>
+                          onMentionClick?.(seg.mention!.kind, seg.mention!.id)
+                        }
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            onMentionClick?.(seg.mention!.kind, seg.mention!.id);
+                          }
+                        }}
+                        className={`${seg.mention.colorClass} underline decoration-dotted decoration-1 underline-offset-2 cursor-pointer hover:brightness-125 transition-[filter]`}
+                        title={`Open note: ${seg.mention.label}`}
+                      >
+                        {seg.text}
+                      </span>
+                    ) : (
+                      seg.text
+                    ),
+                  );
+                })
+              : processedChildren;
+
             return (
               <p
                 className="leading-relaxed last:mb-0"
                 style={paragraphStyle}
                 {...props}
               >
-                {processedChildren}
+                {withMentions}
               </p>
             );
           },

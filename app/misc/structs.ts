@@ -201,6 +201,7 @@ export interface StoryLore {
   relatedLocations: string[];
   secrtet: boolean;
   keys: string[];
+  aliases?: string[]; // Alternate names/spellings that should also match this note when highlighted in prose
   type?: LoreType; // Note category - defaults to "lore"
   visibility?: LoreVisibility; // Two-Pass Visibility state - defaults to "always_reveal" when unset
   alwaysOn?: boolean; // If true, lore is always visible regardless of triggers
@@ -460,6 +461,7 @@ export interface NPC {
   symbol?: string; // Emoji icon
   custom_symbol_url?: string; // Custom image URL (for reactions)
   notes?: string; // GM/player notes
+  aliases?: string[]; // Alternate names/spellings that should also match this NPC when highlighted in prose
   createdAt: number; // Timestamp
 }
 
