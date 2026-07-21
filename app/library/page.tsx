@@ -37,11 +37,17 @@ import {
   listLibraryNotes,
   unassignFolderFromNotes,
   libraryNoteToStoryLore,
+  createLibraryNote,
 } from "@/app/misc/localNotesLibraryManager";
-import { libraryTableToCustomTable } from "@/app/misc/localTablesLibraryManager";
+import {
+  libraryTableToCustomTable,
+  createLibraryTable,
+} from "@/app/misc/localTablesLibraryManager";
 import LibraryPickerModal from "@/app/components/LibraryPickerModal";
 import JoinGameModal from "@/app/components/JoinGameModal";
 import HostGameModal from "@/app/components/HostGameModal";
+import ExportFolderModal from "@/app/components/ExportFolderModal";
+import { readFolderLibraryFile } from "@/app/misc/folderLibraryExport";
 import type { CustomTable, StoryLore } from "@/app/misc/structs";
 
 type LibraryView = "stories" | "adventures" | "notes";
@@ -107,6 +113,11 @@ export default function LibraryPage() {
   const [newFolderColor, setNewFolderColor] = useState("#9333ea");
   const [editingFolder, setEditingFolder] = useState<LocalFolder | null>(null);
   const [movingStory, setMovingStory] = useState<string | null>(null);
+  const [exportingFolder, setExportingFolder] = useState<LocalFolder | null>(
+    null,
+  );
+  const [notesTablesRefreshKey, setNotesTablesRefreshKey] = useState(0);
+  const importFolderInputRef = useRef<HTMLInputElement>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -346,6 +357,95 @@ export default function LibraryPage() {
         }
       },
     });
+  };
+
+  const handleImportFolderFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    const result = await readFolderLibraryFile(file);
+    if (!result.success || !result.folder) {
+      addNotification(result.error || "Failed to import folder", "failure");
+      return;
+    }
+
+    try {
+      const newFolder = createLocalFolder(
+        result.folder.name,
+        result.folder.icon,
+        result.folder.color,
+      );
+      setFolders((prev) => [...prev, newFolder]);
+
+      if (result.stories?.length) {
+        await Promise.all(
+          result.stories.map((s, index) => {
+            const id = `local_${Date.now()}_${index}_${Math.random().toString(36).substring(2, 9)}`;
+            return saveLocalStory(id, s.storyData, newFolder.id);
+          }),
+        );
+        setLocalStories(await listLocalStories());
+      }
+
+      if (result.notes?.length) {
+        await Promise.all(
+          result.notes.map((n) =>
+            createLibraryNote({
+              title: n.title,
+              content: n.content,
+              type: n.type,
+              tags: n.tags,
+              folderId: newFolder.id,
+              pinned: n.pinned,
+              source: n.source,
+              sourceFile: n.sourceFile,
+              relatedCharacters: n.relatedCharacters,
+              relatedLocations: n.relatedLocations,
+              keys: n.keys,
+            }),
+          ),
+        );
+      }
+
+      if (result.tables?.length) {
+        await Promise.all(
+          result.tables.map((t) =>
+            createLibraryTable({
+              name: t.name,
+              description: t.description,
+              entries: t.entries,
+              tags: t.tags,
+              folderId: newFolder.id,
+              pinned: t.pinned,
+              source: t.source,
+              sourceFile: t.sourceFile,
+            }),
+          ),
+        );
+      }
+
+      // NotesLibraryTab keeps its own copy of notes/tables; force it to
+      // reload if it's currently mounted so the import shows up right away.
+      setNotesTablesRefreshKey((k) => k + 1);
+
+      const parts = [
+        result.stories?.length ? `${result.stories.length} stor${result.stories.length === 1 ? "y" : "ies"}` : null,
+        result.notes?.length ? `${result.notes.length} note${result.notes.length === 1 ? "" : "s"}` : null,
+        result.tables?.length ? `${result.tables.length} table${result.tables.length === 1 ? "" : "s"}` : null,
+      ].filter(Boolean);
+      addNotification(
+        `Imported folder "${newFolder.name}"${parts.length ? ` (${parts.join(", ")})` : ""}${
+          result.warnings.length > 0 ? ` - ${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"}` : ""
+        }`,
+        "success",
+      );
+    } catch (error: any) {
+      console.error("Error importing folder:", error);
+      addNotification(`Failed to import folder: ${error.message}`, "failure");
+    }
   };
 
   const handleMoveStory = async (storyId: string, folderId: string | null) => {
@@ -703,9 +803,11 @@ export default function LibraryPage() {
         {/* Content */}
         {view === "notes" ? (
           <NotesLibraryTab
+            key={notesTablesRefreshKey}
             onCountChange={setNotesCount}
             folders={folders}
             setFolders={setFolders}
+            onExportFolder={setExportingFolder}
           />
         ) : loading ? (
           view === "stories" ? (
@@ -789,21 +891,32 @@ export default function LibraryPage() {
                 )
               </button>
               {folders.map((folder) => (
-                <button
-                  key={folder.id}
-                  onClick={() => setSelectedFolder(folder.id)}
-                  className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                    selectedFolder === folder.id
-                      ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-                      : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
-                  }`}
-                  style={{ borderLeft: `3px solid ${folder.color}` }}
-                >
-                  <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
-                  {folder.name} (
-                  {localStories.filter((s) => s.folder_id === folder.id).length}
-                  )
-                </button>
+                <div key={folder.id} className="relative group shrink-0">
+                  <button
+                    onClick={() => setSelectedFolder(folder.id)}
+                    className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
+                      selectedFolder === folder.id
+                        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+                        : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+                    }`}
+                    style={{ borderLeft: `3px solid ${folder.color}` }}
+                  >
+                    <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
+                    {folder.name} (
+                    {localStories.filter((s) => s.folder_id === folder.id).length}
+                    )
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExportingFolder(folder);
+                    }}
+                    title="Export folder"
+                    className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 p-0.5 rounded-full bg-blue-800 hover:bg-purple-600 border border-blue-950 opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <DynamicIcon name="Download" className="w-3 h-3" />
+                  </button>
+                </div>
               ))}
               <button
                 onClick={() => setShowNewFolderDialog(true)}
@@ -812,6 +925,20 @@ export default function LibraryPage() {
                 <DynamicIcon name="Plus" className="w-3.5 h-3.5" />
                 New Folder
               </button>
+              <button
+                onClick={() => importFolderInputRef.current?.click()}
+                className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap bg-blue-900/30 text-blue-300/70 hover:bg-blue-800/50 transition-all flex items-center gap-1.5 border border-dashed border-blue-700/50"
+              >
+                <DynamicIcon name="Upload" className="w-3.5 h-3.5" />
+                Import Folder
+              </button>
+              <input
+                ref={importFolderInputRef}
+                type="file"
+                accept=".folder,.json"
+                onChange={handleImportFolderFileChange}
+                className="hidden"
+              />
             </DraggableScroll>
 
             {/* Filter Pills + Select Button */}
@@ -1465,6 +1592,14 @@ export default function LibraryPage() {
         onClose={() => setHostingStoryId(null)}
         storyId={hostingStoryId || ""}
       />
+
+      {exportingFolder && (
+        <ExportFolderModal
+          folder={exportingFolder}
+          stories={localStories}
+          onClose={() => setExportingFolder(null)}
+        />
+      )}
     </div>
   );
 }
