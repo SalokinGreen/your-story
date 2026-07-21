@@ -193,7 +193,6 @@ The GM stage reads mechanics from lore entries and uses formula_roll with custom
 - app/components/NotificationContainer.tsx: Toast notifications display.
 - app/components/TTSControls.tsx: Text-to-speech controls with voice selection, volume, play/pause/stop, and auto-generation support.
 - app/components/CustomVoiceManager.tsx: Manage custom voice IDs for TTS (Kokoro format: [lang][gender]\_[name]).
-- app/components/DiceVisualizer.tsx: Main dice animation component with 4-phase system (rolling→stopped→calculating→result). Supports all 8 RPG systems with visual feedback for advantage/disadvantage, explosions, stress dice, partial success, and Fate ladder outcomes. Click or keyboard (Enter/Space/Escape) to skip animation.
 - app/components/StoryCreativeAssistant.tsx: AI-powered story editing modal for in-game modifications. Features BYOK/Coins toggle, model selection, output size slider, cost estimation, chat history persistence. Uses story_creator_ai.ts to build prompts with recent story history (last 15 scene parts) and memory context, then applies AI-suggested changes to StoryData.
 - app/components/CharacterSheet.tsx: Renders character sheet from CharacterSchema + CharacterData. Supports both default field-based rendering and custom HTML/CSS/JS templates via sandboxed iframe.
 - app/components/CharacterSchemaEditor.tsx: UI for creating/editing character schemas. Three tabs: Fields (add/edit schema fields), Custom Template (HTML/CSS/JS editor with syntax help), Resources (upload images/fonts for templates).

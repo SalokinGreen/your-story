@@ -215,7 +215,6 @@ export interface GMFormulaRollResult {
   margin?: number;
   reason: string;
   displayName?: string;
-  showToPlayer?: boolean; // Show dice animation to player (default true)
   stakes?: string;
   target?: string; // Hardness dimension: who the failure consequence lands on
   forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
@@ -257,7 +256,6 @@ export interface GMOpposedFormulaResult {
   margin: number;
   reason: string;
   displayName?: string;
-  showToPlayer?: boolean; // Show dice animation to player (default true)
   stakes?: string;
   target?: string; // Hardness dimension: who the losing consequence lands on
   forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
@@ -279,7 +277,6 @@ export interface GMFormulaChallengeResult {
   margin: number;
   description: string;
   displayName?: string;
-  showToPlayer?: boolean; // Show dice animation to player (default true)
   consequences?: {
     success?: string;
     failure?: string;
@@ -427,7 +424,6 @@ export interface GMNPCRollResult {
   success?: boolean;
   reason: string;
   target?: string;
-  showToPlayer: boolean;
 }
 
 export interface GMAdvanceTurnResult {
@@ -536,7 +532,6 @@ export interface GMReactionCheckResult {
   category: ReactionCategory;
   mandate: string;
   reason: string;
-  showToPlayer: boolean;
   cached?: boolean; // True if this returned an existing scene-cached reaction instead of rolling fresh
 }
 
@@ -554,7 +549,6 @@ export interface GMNegotiatePriceResult {
   clampedToFloor: boolean;
   failed: boolean; // True if the negotiation failed outright (target below seller's floor)
   reason: string;
-  showToPlayer: boolean;
 }
 
 // ============================================
@@ -1807,7 +1801,6 @@ function executeFormulaRoll(
       forcesChoice: params.forces_choice,
       consequences: params.consequences,
       breakdown: rollResult.breakdown,
-      showToPlayer: params.show_to_player !== false, // Default true
     } as GMFormulaRollResult,
     contextForStory,
   };
@@ -2057,7 +2050,6 @@ function executeOpposedFormula(
       target: params.target,
       forcesChoice: params.forces_choice,
       consequences: params.consequences,
-      showToPlayer: params.show_to_player !== false, // Default true
     } as GMOpposedFormulaResult,
     contextForStory,
   };
@@ -2192,7 +2184,6 @@ function executeFormulaChallengeCheck(
       description: params.description,
       displayName: params.display_name,
       consequences: params.consequences,
-      showToPlayer: params.show_to_player !== false, // Default true
       challengeProgress: {
         name: challenge.name,
         successes: challenge.currentSuccesses,
@@ -3581,7 +3572,6 @@ function executeNPCRoll(
         rolls: [],
         total: 0,
         reason: params.reason,
-        showToPlayer: params.show_to_player ?? false,
       } as GMNPCRollResult,
       contextForStory: `[Combat Error: No active combat]`,
     };
@@ -3600,7 +3590,6 @@ function executeNPCRoll(
         rolls: [],
         total: 0,
         reason: params.reason,
-        showToPlayer: params.show_to_player ?? false,
       } as GMNPCRollResult,
       contextForStory: `[Combat Error: Combatant "${params.combatant}" not found]`,
     };
@@ -3636,7 +3625,6 @@ function executeNPCRoll(
           rolls: [],
           total: 0,
           reason: params.reason,
-          showToPlayer: params.show_to_player ?? false,
         } as GMNPCRollResult,
         contextForStory: `[Combat Error: It is not ${combatant.name}'s turn (current turn: ${
           currentTurnCombatant?.name ?? "unknown"
@@ -3661,7 +3649,6 @@ function executeNPCRoll(
         rolls: [],
         total: 0,
         reason: params.reason,
-        showToPlayer: params.show_to_player ?? false,
       } as GMNPCRollResult,
       contextForStory: `[Combat Error: Invalid dice formula "${params.formula}"]`,
     };
@@ -3683,8 +3670,6 @@ function executeNPCRoll(
     `${combatant.name} rolled ${params.formula}${targetText}: ${rollResult.total}${dcText}${successText} - ${params.reason}`
   );
 
-  const showToPlayer = params.show_to_player ?? false;
-
   return {
     toolName: "npc_roll",
     toolCallId,
@@ -3699,7 +3684,6 @@ function executeNPCRoll(
       success,
       reason: params.reason,
       target: params.target,
-      showToPlayer,
     } as GMNPCRollResult,
     contextForStory: `[NPC Roll: ${combatant.name} rolled ${params.formula}${targetText} = ${rollResult.total}${dcText}${successText} - ${params.reason}]`,
   };
@@ -4874,7 +4858,6 @@ function executeReactionCheck(
           category: cached.category,
           mandate: cached.mandate,
           reason: params.reason,
-          showToPlayer: params.show_to_player ?? false,
           cached: true,
         } as GMReactionCheckResult,
         contextForStory,
@@ -4900,7 +4883,6 @@ function executeReactionCheck(
         category: "Neutral",
         mandate: "",
         reason: params.reason,
-        showToPlayer: params.show_to_player ?? false,
       } as GMReactionCheckResult,
       contextForStory: `[ERROR: reaction_check failed to roll - ${
         e instanceof Error ? e.message : "Unknown error"
@@ -4942,7 +4924,6 @@ function executeReactionCheck(
       category,
       mandate,
       reason: params.reason,
-      showToPlayer: params.show_to_player ?? false,
       cached: false,
     } as GMReactionCheckResult,
     contextForStory,
@@ -4995,7 +4976,6 @@ function executeNegotiatePrice(
         clampedToFloor: false,
         failed: true,
         reason: params.reason,
-        showToPlayer: params.show_to_player !== false,
       } as GMNegotiatePriceResult,
       contextForStory: `[Negotiate Price: ${params.item_name} - FAILED. Player's target (${params.player_target_price}) is below the seller's floor (${params.seller_min_price}) - no roll can close that gap.]\n[Reason: ${params.reason}]`,
     };
@@ -5025,7 +5005,6 @@ function executeNegotiatePrice(
         clampedToFloor: false,
         failed: true,
         reason: params.reason,
-        showToPlayer: params.show_to_player !== false,
       } as GMNegotiatePriceResult,
       contextForStory: `[ERROR: negotiate_price failed to roll - ${
         e instanceof Error ? e.message : "Unknown error"
@@ -5079,7 +5058,6 @@ function executeNegotiatePrice(
       clampedToFloor,
       failed: false,
       reason: params.reason,
-      showToPlayer: params.show_to_player !== false,
     } as GMNegotiatePriceResult,
     contextForStory,
   };
