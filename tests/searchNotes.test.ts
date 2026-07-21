@@ -51,6 +51,7 @@ function loreEntry(overrides: Partial<StoryLore> = {}): StoryLore {
 function searchCall(args: Record<string, unknown>): ToolCall {
   return {
     id: "call_1",
+    type: "function",
     function: { name: "search_notes", arguments: args },
   };
 }
