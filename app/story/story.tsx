@@ -110,15 +110,25 @@ interface FontSettings {
 // tool-use blocks: collapsed by default, inline with the reply, not
 // gated behind one all-or-nothing toggle.
 function TimelineEntryPill({ block }: { block: TimelineBlock }) {
-  const [expanded, setExpanded] = React.useState(false);
+  // A thinking block streams its reasoning live and expanded (Claude-style)
+  // while it's generating, then collapses back to a compact pill once it's
+  // done - unless the player has explicitly toggled it, in which case their
+  // choice wins. `override === null` means "follow the streaming state".
+  const [override, setOverride] = React.useState<boolean | null>(null);
   if (block.kind === "text") return null; // handled by the caller directly
 
   const isTool = block.kind === "tool";
+  const isThinking = block.kind === "thinking";
+  const autoExpanded = isThinking && !!block.streaming;
+  const expanded = override ?? autoExpanded;
+
   const label = isTool
     ? getToolProgressLabel(block.toolName || "")
-    : block.isReasoning
-      ? "Thought"
-      : "Thinking";
+    : block.streaming
+      ? "Thinking"
+      : block.isReasoning
+        ? "Thought"
+        : "Thinking";
   const detail = isTool ? block.contextForStory : block.content;
   const canExpand = !!detail;
 
@@ -126,7 +136,7 @@ function TimelineEntryPill({ block }: { block: TimelineBlock }) {
     <div className="my-1 text-xs">
       <button
         type="button"
-        onClick={() => canExpand && setExpanded((prev) => !prev)}
+        onClick={() => canExpand && setOverride(!expanded)}
         className={`flex items-center gap-1.5 text-gray-400 ${
           canExpand ? "hover:text-gray-300 cursor-pointer" : "cursor-default"
         } transition-colors`}
@@ -156,8 +166,11 @@ function TimelineEntryPill({ block }: { block: TimelineBlock }) {
         )}
       </button>
       {expanded && detail && (
-        <p className="mt-1 ml-5 pl-2 border-l-2 border-gray-700/50 text-gray-500 italic whitespace-pre-wrap">
+        <p className="mt-1 ml-5 pl-2 border-l-2 border-gray-700/50 text-gray-500 italic whitespace-pre-wrap max-h-60 overflow-y-auto">
           {detail}
+          {block.streaming && (
+            <span className="animate-pulse text-blue-400">▌</span>
+          )}
         </p>
       )}
     </div>
