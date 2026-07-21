@@ -10,6 +10,12 @@ import { TTSModelKey } from "../misc/ai_prices";
 interface TTSControlsProps {
   text: string;
   disabled?: boolean;
+  // Narrower than `disabled`: true once `text` reflects the final,
+  // finished narration for this turn, false while it's still streaming in.
+  // Drives the live sentence-by-sentence auto-narration pipeline below -
+  // unset callers just never enter that mode (text is always treated as
+  // already-final).
+  storyTextReady?: boolean;
 }
 
 const getSelectedVoice = (): string => {
@@ -47,6 +53,11 @@ const getVolume = (): number => {
 const isTTSEnabled = (): boolean => {
   if (typeof window === "undefined") return true;
   return localStorage.getItem("ttsEnabled") !== "false";
+};
+
+const isAutoGenerateEnabled = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("ttsAutoGenerate") === "true";
 };
 
 // A tiny (near-silent) WAV data URI used to "unlock" an <audio> element.
@@ -123,9 +134,46 @@ async function streamChunksToPlayer(
   return count;
 }
 
+// Sentence-end markers used to split streaming narration into speakable
+// units as it arrives - mirrors the boundary heuristic ttsCall.ts's
+// splitTextIntoChunks already uses server-side for size-based chunking, so
+// both share the same (imperfect - doesn't special-case abbreviations,
+// decimals, etc.) notion of "sentence."
+const SENTENCE_END_MARKERS = [". ", ".\n", "! ", "!\n", "? ", "?\n"];
+
+// Splits every complete sentence off the front of `pending`, left to right,
+// leaving any trailing incomplete sentence in `remainder` for next time.
+// Exported for direct unit testing (tests/ttsControls.sentences.test.ts).
+export function extractCompleteSentences(
+  pending: string,
+): { sentences: string[]; remainder: string } {
+  const sentences: string[] = [];
+  let remaining = pending;
+
+  while (true) {
+    let cutAt = -1;
+    let markerLength = 0;
+    for (const marker of SENTENCE_END_MARKERS) {
+      const idx = remaining.indexOf(marker);
+      if (idx !== -1 && (cutAt === -1 || idx < cutAt)) {
+        cutAt = idx;
+        markerLength = marker.length;
+      }
+    }
+    if (cutAt === -1) break;
+
+    const sentence = remaining.slice(0, cutAt + 1).trim();
+    if (sentence) sentences.push(sentence);
+    remaining = remaining.slice(cutAt + markerLength);
+  }
+
+  return { sentences, remainder: remaining };
+}
+
 export default function TTSControls({
   text,
   disabled = false,
+  storyTextReady = true,
 }: TTSControlsProps) {
   const { addNotification } = useNotification();
   const { keys: apiKeys } = useAPIKeys();
@@ -149,6 +197,18 @@ export default function TTSControls({
   const isGeneratingRef = useRef<boolean>(false);
   const pendingAutoGenerateRef = useRef<boolean>(false);
 
+  // Live narration (auto-narrate while the GM is still streaming): tracks
+  // how much of `text` has already been dispatched as sentence-sized audio
+  // requests, a queue of sentences waiting to be sent, and whether a
+  // session is currently active - see the effect below and feedLiveText/
+  // processLiveQueue.
+  const liveWasStreamingRef = useRef<boolean>(false);
+  const liveModeActiveRef = useRef<boolean>(false);
+  const liveSentCharsRef = useRef<number>(0);
+  const liveDispatchQueueRef = useRef<string[]>([]);
+  const liveDispatchBusyRef = useRef<boolean>(false);
+  const liveAbortControllerRef = useRef<AbortController | null>(null);
+
   const ttsEnabled = isTTSEnabled();
 
   // Update volume when it changes in localStorage
@@ -163,6 +223,7 @@ export default function TTSControls({
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
+      liveAbortControllerRef.current?.abort();
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.removeAttribute("src");
@@ -232,9 +293,11 @@ export default function TTSControls({
     advanceToNextChunkRef.current = advanceToNextChunk;
   }, [advanceToNextChunk]);
 
-  // Called as each chunk finishes streaming in. Starts playback the moment
-  // the first chunk lands, and auto-plays any later chunk that arrives
-  // while playback is waiting on it.
+  // Called as each chunk finishes streaming in - whether from a single
+  // whole-text generation or one of many live per-sentence requests, both
+  // just append to the same ordered queue. Starts playback the moment the
+  // first chunk lands, and auto-plays any later chunk that arrives while
+  // playback is waiting on it.
   const onChunkArrived = useCallback(
     (blob: Blob) => {
       const url = URL.createObjectURL(blob);
@@ -254,20 +317,165 @@ export default function TTSControls({
     [playChunkAt],
   );
 
+  // Shared by both the manual "activate" path and the live narration
+  // pipeline: resolves the selected voice/model/key, requests audio for
+  // `textToSpeak`, and streams the resulting chunk(s) into the playback
+  // queue via onChunkArrived. Returns the chunk count.
+  const generateAndQueueAudio = useCallback(
+    async (textToSpeak: string, signal?: AbortSignal): Promise<number> => {
+      const selectedVoice = getSelectedVoice();
+      const selectedModel = getSelectedModel();
+      const providerKey = getProviderKeyForModel(selectedModel);
+      const apiKey = apiKeys[providerKey];
+      if (!apiKey) {
+        throw new Error(
+          `${PROVIDER_LABELS[selectedModel]} API key is required. Please add your own key in Settings.`
+        );
+      }
+
+      const response = await ttsFetch(
+        {
+          text: textToSpeak,
+          voiceId: selectedVoice,
+          model: selectedModel,
+          deepinfraKey: providerKey === "deepinfraKey" ? apiKey : undefined,
+          cartesiaKey: providerKey === "cartesiaKey" ? apiKey : undefined,
+          elevenlabsKey: providerKey === "elevenlabsKey" ? apiKey : undefined,
+        },
+        signal,
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || "Failed to generate speech");
+      }
+
+      return streamChunksToPlayer(response, onChunkArrived, signal);
+    },
+    [apiKeys.deepinfraKey, apiKeys.cartesiaKey, apiKeys.elevenlabsKey, onChunkArrived],
+  );
+
+  // Drains liveDispatchQueueRef one sentence at a time (sequential, not
+  // parallel, so audio always arrives - and therefore plays - in the same
+  // order the sentences were written in). Marks isStreamingRef false once
+  // the queue is empty and no more sentences will ever arrive, so the
+  // playback queue's own "waiting for next" logic knows to finish up
+  // instead of waiting forever.
+  const processLiveQueueRef = useRef<() => void>(() => {});
+  processLiveQueueRef.current = () => {
+    if (liveDispatchBusyRef.current) return;
+    const next = liveDispatchQueueRef.current.shift();
+    if (!next) return;
+
+    liveDispatchBusyRef.current = true;
+    generateAndQueueAudio(next, liveAbortControllerRef.current?.signal)
+      .catch((err: unknown) => {
+        if (liveAbortControllerRef.current?.signal.aborted) return;
+        console.error("Live narration error:", err);
+        const message =
+          err instanceof Error ? err.message : "Failed to generate speech";
+        addNotification(message, "failure");
+        // Stop the live session on error rather than retrying every
+        // subsequent sentence and spamming notifications.
+        liveDispatchQueueRef.current = [];
+        liveModeActiveRef.current = false;
+        if (audioUrlsRef.current.length === 0) {
+          setIsLoading(false);
+          setIsPlaying(false);
+        }
+      })
+      .finally(() => {
+        liveDispatchBusyRef.current = false;
+        if (liveDispatchQueueRef.current.length > 0) {
+          processLiveQueueRef.current();
+        } else if (!liveModeActiveRef.current) {
+          isStreamingRef.current = false;
+          if (waitingForNextRef.current) {
+            waitingForNextRef.current = false;
+            setIsPlaying(false);
+          }
+        }
+      });
+  };
+
+  // Consumes newly-arrived streaming text: splits off every complete
+  // sentence since the last call and queues it for audio. `flush` (called
+  // once narration finishes) also queues whatever trailing partial
+  // sentence is left, even without closing punctuation.
+  const feedLiveText = useCallback((fullText: string, flush: boolean) => {
+    const pending = fullText.slice(liveSentCharsRef.current);
+    const { sentences, remainder } = extractCompleteSentences(pending);
+
+    for (const sentence of sentences) {
+      liveDispatchQueueRef.current.push(sentence);
+    }
+    liveSentCharsRef.current = fullText.length - remainder.length;
+
+    if (flush) {
+      const trimmedRemainder = remainder.trim();
+      if (trimmedRemainder) {
+        liveDispatchQueueRef.current.push(trimmedRemainder);
+      }
+      liveSentCharsRef.current = fullText.length;
+    }
+
+    if (liveDispatchQueueRef.current.length > 0) {
+      processLiveQueueRef.current();
+    } else if (flush && !liveDispatchBusyRef.current) {
+      isStreamingRef.current = false;
+      if (waitingForNextRef.current) {
+        waitingForNextRef.current = false;
+        setIsPlaying(false);
+      }
+    }
+  }, []);
+
+  // Stops any playback/generation in progress (manual or live) and clears
+  // cached audio - used whenever `text` is about to represent something
+  // different (a new turn starting, navigation, undo/retry/edit, etc.).
+  const stopAndResetPlayback = useCallback(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    liveAbortControllerRef.current?.abort();
+    liveAbortControllerRef.current = null;
+    liveModeActiveRef.current = false;
+    liveDispatchQueueRef.current = [];
+    liveDispatchBusyRef.current = false;
+
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.removeAttribute("src");
+    }
+    audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    audioUrlsRef.current = [];
+    currentChunkIndexRef.current = 0;
+    isStreamingRef.current = false;
+    waitingForNextRef.current = false;
+    isGeneratingRef.current = false;
+    setHasAudio(false);
+    setIsPlaying(false);
+    setIsLoading(false);
+  }, []);
+
   // Single toggle button behavior:
   // - idle (no cached audio for this text) -> activate: generate + stream +
   //   play live.
-  // - active (generating and/or playing) -> deactivate: stop playback and
-  //   cancel the in-flight request/stream.
+  // - active (generating and/or playing, manually or via live narration) ->
+  //   deactivate: stop playback and cancel the in-flight request/stream.
   // - inactive with cached audio for this text (either deactivated, or
   //   playback finished naturally) -> replay the cached recording without
   //   regenerating.
   const handleToggle = useCallback(async () => {
-    if (disabled || !text.trim()) return;
-
     if (isPlaying || isLoading) {
+      // Always allow stopping, even while `disabled` would otherwise block
+      // starting something new (e.g. narration still streaming) - this is
+      // what lets a live auto-narration session be stopped early.
       abortControllerRef.current?.abort();
       abortControllerRef.current = null;
+      liveAbortControllerRef.current?.abort();
+      liveAbortControllerRef.current = null;
+      liveModeActiveRef.current = false;
+      liveDispatchQueueRef.current = [];
       isGeneratingRef.current = false;
       isStreamingRef.current = false;
       waitingForNextRef.current = false;
@@ -280,6 +488,8 @@ export default function TTSControls({
       return;
     }
 
+    if (disabled || !text.trim()) return;
+
     if (hasAudio && audioUrlsRef.current.length > 0) {
       currentChunkIndexRef.current = 0;
       waitingForNextRef.current = false;
@@ -288,8 +498,6 @@ export default function TTSControls({
       return;
     }
 
-    const selectedVoice = getSelectedVoice();
-    const selectedModel = getSelectedModel();
     const volume = getVolume();
 
     // Prime the persistent <audio> element synchronously, still within the
@@ -312,46 +520,13 @@ export default function TTSControls({
       isGeneratingRef.current = true;
       setIsLoading(true);
 
-      const providerKey = getProviderKeyForModel(selectedModel);
-      const apiKey = apiKeys[providerKey];
-      if (!apiKey) {
-        throw new Error(
-          `${PROVIDER_LABELS[selectedModel]} API key is required. Please add your own key in Settings.`
-        );
-      }
-
-      const response = await ttsFetch(
-        {
-          text,
-          voiceId: selectedVoice,
-          model: selectedModel,
-          deepinfraKey: providerKey === "deepinfraKey" ? apiKey : undefined,
-          cartesiaKey: providerKey === "cartesiaKey" ? apiKey : undefined,
-          elevenlabsKey: providerKey === "elevenlabsKey" ? apiKey : undefined,
-        },
-        controller.signal,
-      );
-
-      if (!response.ok) {
-        const error = await response.json();
-        if (response.status === 402) {
-          throw new Error(
-            error.error || "Insufficient tokens for TTS generation"
-          );
-        }
-        throw new Error(error.error || "Failed to generate speech");
-      }
-
-      // Reset chunk state and start consuming the framed stream - playback
-      // begins as soon as onChunkArrived sees the first chunk, without
-      // waiting for the rest of the text to finish generating.
       audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       audioUrlsRef.current = [];
       currentChunkIndexRef.current = 0;
       waitingForNextRef.current = false;
       isStreamingRef.current = true;
 
-      const chunkCount = await streamChunksToPlayer(response, onChunkArrived, controller.signal);
+      const chunkCount = await generateAndQueueAudio(text, controller.signal);
       isStreamingRef.current = false;
 
       if (controller.signal.aborted) {
@@ -394,52 +569,67 @@ export default function TTSControls({
     isPlaying,
     isLoading,
     hasAudio,
-    onChunkArrived,
+    generateAndQueueAudio,
     playChunkAt,
     addNotification,
-    apiKeys.deepinfraKey,
-    apiKeys.cartesiaKey,
-    apiKeys.elevenlabsKey,
     getAudioElement,
   ]);
 
-  // Handle text changes - cancel any in-flight generation, clear cached
-  // audio, and mark pending auto-generate
+  // Drives four things off changes to `text`/`storyTextReady`:
+  // 1. A new turn's narration just started streaming (storyTextReady flips
+  //    false) - reset everything, and if auto-narrate is on, start a live
+  //    session.
+  // 2. More text arrived mid-stream during an active live session - feed
+  //    newly-completed sentences into the queue.
+  // 3. Narration just finished streaming while a live session was active -
+  //    flush the trailing partial sentence; playback keeps going via the
+  //    existing queue until it drains.
+  // 4. A plain text change with no live session involved (navigation, undo,
+  //    edit, or text that was never streaming to begin with) - the original
+  //    "wait for text to settle, then generate once" behavior.
   useEffect(() => {
-    if (text !== lastTextRef.current) {
-      lastTextRef.current = text;
+    const textChanged = text !== lastTextRef.current;
+    lastTextRef.current = text;
 
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = null;
+    const isStreaming = !storyTextReady;
+    const wasStreaming = liveWasStreamingRef.current;
+    liveWasStreamingRef.current = isStreaming;
 
-      // Stop and reset the existing (persistent) audio element. We
-      // intentionally keep the same <audio> element around instead of
-      // discarding it, since a previously "unlocked" element (one that has
-      // already played as a direct result of a user gesture) can keep
-      // playing new sources later without needing another gesture.
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current.removeAttribute("src");
+    if (isStreaming && !wasStreaming) {
+      stopAndResetPlayback();
+      liveSentCharsRef.current = 0;
+      if (ttsEnabled && isAutoGenerateEnabled()) {
+        liveModeActiveRef.current = true;
+        isStreamingRef.current = true;
+        liveAbortControllerRef.current = new AbortController();
+        setIsLoading(true);
       }
-      audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
-      audioUrlsRef.current = [];
-      currentChunkIndexRef.current = 0;
-      isStreamingRef.current = false;
-      waitingForNextRef.current = false;
-      isGeneratingRef.current = false;
-      setHasAudio(false);
-      setIsPlaying(false);
-      setIsLoading(false);
+      return;
+    }
 
-      // Mark that we should auto-generate when conditions are met
-      const autoGenerate = localStorage.getItem("ttsAutoGenerate") === "true";
-      if (autoGenerate && text.trim() && ttsEnabled) {
+    if (liveModeActiveRef.current && isStreaming) {
+      feedLiveText(text, false);
+      return;
+    }
+
+    if (!isStreaming && wasStreaming && liveModeActiveRef.current) {
+      feedLiveText(text, true);
+      liveModeActiveRef.current = false;
+      return;
+    }
+
+    if (textChanged) {
+      stopAndResetPlayback();
+
+      const autoGenerate = isAutoGenerateEnabled();
+      if (autoGenerate && text.trim() && ttsEnabled && !isStreaming) {
         pendingAutoGenerateRef.current = true;
       }
     }
-  }, [text, ttsEnabled]);
+  }, [text, storyTextReady, ttsEnabled, stopAndResetPlayback, feedLiveText]);
 
-  // Trigger auto-generate when not disabled and pending
+  // Trigger auto-generate (non-live case: text arrived already-finished,
+  // e.g. navigation/undo/edit) when not disabled and pending
   useEffect(() => {
     if (
       !disabled &&
@@ -463,14 +653,18 @@ export default function TTSControls({
   const isActive = isPlaying || isLoading;
   const isGeneratingOnly = isLoading && !isPlaying;
   const canReplay = !isActive && hasAudio;
+  // `disabled` blocks starting something new (text isn't ready yet), but
+  // never blocks stopping something already active - that's what lets a
+  // live auto-narration session be stopped early via this same button.
+  const buttonDisabled = (disabled || !text.trim()) && !isActive;
 
   return (
     <div className="flex items-center gap-2">
       <button
         onClick={handleToggle}
-        disabled={disabled || !text.trim()}
+        disabled={buttonDisabled}
         className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
-          disabled || !text.trim()
+          buttonDisabled
             ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
             : isActive
               ? "bg-red-500 hover:bg-red-600 text-white"

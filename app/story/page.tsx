@@ -369,6 +369,12 @@ function StoryPageContent() {
   const [loadingStage, setLoadingStage] = useState<
     "gm" | "story" | "choices" | null
   >(null);
+  // Narrower than loadingStage: true as soon as the CURRENT storyText is
+  // finalized, even while tools/choices are still generating in the
+  // background afterward. loadingStage stays "story" through that whole
+  // background phase, which used to leave TTS disabled long after the text
+  // was actually ready to read/listen to - see TTSControls' disabled prop.
+  const [storyTextReady, setStoryTextReady] = useState(true);
   // Pending user choice text - shown in chat while GM is generating
   const [pendingUserChoice, setPendingUserChoice] = useState<string>("");
 
@@ -419,6 +425,7 @@ function StoryPageContent() {
       setPendingUserChoice("");
       setLoading(false);
       setLoadingStage(null);
+      setStoryTextReady(true);
     },
     onGuestJoined: (info) => {
       setStoryData((prev) => {
@@ -1184,6 +1191,7 @@ function StoryPageContent() {
       logger.action("Guest custom input, sending to host", { customText });
       setLoading(true);
       setLoadingStage("story");
+      setStoryTextReady(false);
       if (inputKind === "voice") {
         sendNetVoice(customText, speakerIds ?? []);
       } else {
@@ -1201,6 +1209,7 @@ function StoryPageContent() {
 
     setLoading(true);
     setLoadingStage("story");
+    setStoryTextReady(false);
 
     //Adduser'scustominputtoscene
     storyData.scene.parts.push({
@@ -1335,6 +1344,7 @@ function StoryPageContent() {
       const checkBothComplete = () => {
         if (toolsComplete && choicesComplete) {
           setLoadingStage(null);
+          setStoryTextReady(true);
         }
       };
 
@@ -1518,6 +1528,9 @@ function StoryPageContent() {
             partialPart.content = content;
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
+            // Narration itself is done - unlock TTS now rather than waiting
+            // for the tools/choices phase below to also finish.
+            setStoryTextReady(true);
 
             // Tools and choices run in parallel after story - no separate loading stage
             logger.ai_response("Story narration complete (custom input)", {
@@ -1641,6 +1654,7 @@ function StoryPageContent() {
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
+            setStoryTextReady(true);
 
             setStoryData({ ...storyData });
 
@@ -1662,6 +1676,7 @@ function StoryPageContent() {
             addNotification(`Error: ${error.message}`, "failure");
             setLoading(false);
             setLoadingStage(null);
+            setStoryTextReady(true);
 
             logger.error("Generation error (custom input)", {
               message: error.message,
@@ -1673,6 +1688,7 @@ function StoryPageContent() {
       addNotification(`Error: ${error.message}`, "failure");
       setLoading(false);
       setLoadingStage(null);
+      setStoryTextReady(true);
       logger.error("Generation exception (custom input)", {
         message: error.message,
       });
@@ -1819,6 +1835,7 @@ function StoryPageContent() {
       });
       setLoading(true);
       setLoadingStage("story");
+      setStoryTextReady(false);
       setPendingUserChoice(choice.text);
       sendNetChoice(key);
       return;
@@ -1833,6 +1850,7 @@ function StoryPageContent() {
 
     setLoading(true);
     setLoadingStage("story");
+    setStoryTextReady(false);
     // Set pending user choice for immediate display in chat
     setPendingUserChoice(choice.text);
 
@@ -1855,6 +1873,8 @@ function StoryPageContent() {
       setStoryText(choice.intro_override);
       setStoryData({ ...storyData });
       setLoading(false);
+      setLoadingStage(null);
+      setStoryTextReady(true);
 
       // Suggested-action chips are gone - no extra AI call to fetch a
       // starting set of them. The player continues with freeform text.
@@ -2071,6 +2091,7 @@ function StoryPageContent() {
     const checkBothComplete = () => {
       if (toolsComplete && choicesComplete) {
         setLoadingStage(null);
+        setStoryTextReady(true);
       }
     };
 
@@ -2223,6 +2244,9 @@ function StoryPageContent() {
             partialPart.content = content;
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
+            // Narration itself is done - unlock TTS now rather than waiting
+            // for the tools/choices phase below to also finish.
+            setStoryTextReady(true);
 
             logger.ai_response("Story narration complete", {
               length: content.length,
@@ -2327,6 +2351,7 @@ function StoryPageContent() {
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
+            setStoryTextReady(true);
 
             setStoryData({ ...storyData });
 
@@ -2340,6 +2365,7 @@ function StoryPageContent() {
             addNotification(`Error: ${error.message}`, "failure");
             setLoading(false);
             setLoadingStage(null);
+            setStoryTextReady(true);
             setCanRetry(true);
             setChoices({
               choices:
@@ -2357,6 +2383,7 @@ function StoryPageContent() {
       addNotification(`Error: ${error.message}`, "failure");
       setLoading(false);
       setLoadingStage(null);
+      setStoryTextReady(true);
       setCanRetry(true);
       logger.error("Generation exception (choice)", { message: error.message });
     }
@@ -2460,6 +2487,7 @@ function StoryPageContent() {
     }
     setLoading(false);
     setLoadingStage(null);
+    setStoryTextReady(true);
     addNotification("Generation stopped", "warning");
   }
 
@@ -2481,6 +2509,7 @@ function StoryPageContent() {
 
     setLoading(true);
     setLoadingStage("story");
+    setStoryTextReady(false);
     setCanRetry(false);
 
     // Save GM context from the last AI response before popping it
@@ -2591,6 +2620,7 @@ function StoryPageContent() {
     const checkBothComplete = () => {
       if (toolsComplete && choicesComplete) {
         setLoadingStage(null);
+        setStoryTextReady(true);
       }
     };
 
@@ -2678,6 +2708,9 @@ function StoryPageContent() {
             partialPart.content = content;
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
+            // Narration itself is done - unlock TTS now rather than waiting
+            // for the tools/choices phase below to also finish.
+            setStoryTextReady(true);
 
             // Tools and choices run in parallel after story - no separate loading stage
             logger.ai_response("Story narration complete (retry)", {
@@ -2792,6 +2825,7 @@ function StoryPageContent() {
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
+            setStoryTextReady(true);
 
             setStoryData({ ...storyData });
 
@@ -2808,6 +2842,7 @@ function StoryPageContent() {
             addNotification(`Error: ${error.message}`, "failure");
             setLoading(false);
             setLoadingStage(null);
+            setStoryTextReady(true);
             setCanRetry(true);
 
             logger.error("Generation error (retry)", {
@@ -2820,6 +2855,7 @@ function StoryPageContent() {
       addNotification(`Error: ${error.message}`, "failure");
       setLoading(false);
       setLoadingStage(null);
+      setStoryTextReady(true);
       setCanRetry(true);
       logger.error("Generation exception (retry)", { message: error.message });
     }
@@ -3623,6 +3659,7 @@ function StoryPageContent() {
             input={input}
             loading={loading}
             loadingStage={loadingStage}
+            storyTextReady={storyTextReady}
             handleChoice={handleChoice}
             handleSelect={handleSelect}
             onCustomInput={handleCustomInput}
