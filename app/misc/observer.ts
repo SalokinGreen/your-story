@@ -199,6 +199,8 @@ export interface ObserverApiOptions {
   mistralKey?: string;
   deepinfraKey?: string;
   abortSignal?: AbortSignal;
+  /** Optional override from layerSettings.ts's observer model/effort override - unset preserves prior behavior of never sending this field. */
+  reasoningEffort?: string;
 }
 
 /** Strips a ```json ... ``` fence if present and parses the first {...} block. */
@@ -274,6 +276,7 @@ Respond with ONLY a JSON object, no other text:
         mistralKey: apiOptions.mistralKey,
         deepinfraKey: apiOptions.deepinfraKey,
         customModel: getCustomModelIfUUID(apiOptions.model),
+        reasoningEffort: apiOptions.reasoningEffort,
       }),
       signal: apiOptions.abortSignal,
     });
@@ -386,6 +389,7 @@ Respond with ONLY a JSON object, no other text:
         mistralKey: apiOptions.mistralKey,
         deepinfraKey: apiOptions.deepinfraKey,
         customModel: getCustomModelIfUUID(apiOptions.model),
+        reasoningEffort: apiOptions.reasoningEffort,
       }),
       signal: apiOptions.abortSignal,
     });
@@ -516,6 +520,7 @@ Given the GM's narration below, judge only the question(s) above. Respond with O
         mistralKey: apiOptions.mistralKey,
         deepinfraKey: apiOptions.deepinfraKey,
         customModel: getCustomModelIfUUID(apiOptions.model),
+        reasoningEffort: apiOptions.reasoningEffort,
       }),
       signal: apiOptions.abortSignal,
     });

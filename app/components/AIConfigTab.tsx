@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useAPIKeys, APIKeys } from "@/app/misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
-import { AI_MODELS, getModelConfig } from "@/app/misc/ai_prices";
+import { getModelConfig } from "@/app/misc/ai_prices";
 import {
   REASONING_TIERS,
   NARRATION_MODEL_KEY,
@@ -26,6 +26,7 @@ import {
 } from "@/app/misc/user_settings";
 import { logger, LogEntry } from "@/app/misc/logger";
 import SamplingSettingsTab from "./SamplingSettingsTab";
+import ModelSelect from "./ModelSelect";
 
 // Maps an AI_MODELS provider string to the APIKeys field that must be
 // configured for that provider - used to flag tiers with a missing key.
@@ -44,64 +45,6 @@ const REASONING_EFFORTS: ReasoningEffort[] = [
   "high",
   "xhigh",
 ];
-
-/**
- * Model dropdown grouped by provider, with an extra "Custom" group for
- * user-added OpenRouter models. Used for both reasoning-tier slots and the
- * narration voice. When `requireToolCalling` is set, models with
- * supportsToolCalling===false are excluded too (the GM stage calls tools
- * mid-turn, so tiers need a model that supports it - narration doesn't).
- */
-function ModelSelect({
-  value,
-  onChange,
-  customModels,
-  requireToolCalling,
-  className,
-}: {
-  value: string;
-  onChange: (modelKey: string) => void;
-  customModels: CustomModel[];
-  requireToolCalling?: boolean;
-  className?: string;
-}) {
-  const groups = new Map<string, { key: string; name: string }[]>();
-  for (const [key, cfg] of Object.entries(AI_MODELS)) {
-    if (requireToolCalling && !cfg.supportsToolCalling) continue;
-    if (!groups.has(cfg.provider)) groups.set(cfg.provider, []);
-    groups.get(cfg.provider)!.push({ key, name: cfg.name });
-  }
-
-  return (
-    <select
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      className={
-        className ||
-        "text-xs bg-white/5 border border-white/10 rounded-md px-2 py-1 text-white"
-      }
-    >
-      {Array.from(groups.entries()).map(([provider, models]) => (
-        <optgroup key={provider} label={provider}>
-          {models.map((m) => (
-            <option key={m.key} value={m.key}>
-              {m.name}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-      {customModels.length > 0 && (
-        <optgroup label="custom (openrouter)">
-          {customModels.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </optgroup>
-      )}
-    </select>
-  );
-}
 
 export default function AIConfigTab() {
   const { hasKey } = useAPIKeys();

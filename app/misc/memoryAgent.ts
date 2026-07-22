@@ -56,6 +56,8 @@ export interface MemoryAgentApiOptions {
   mistralKey?: string;
   deepinfraKey?: string;
   abortSignal?: AbortSignal;
+  /** Optional override from layerSettings.ts's memory keeper model/effort override - unset preserves prior behavior of never sending this field. */
+  reasoningEffort?: string;
 }
 
 export interface MemoryAgentResult {
@@ -125,6 +127,7 @@ async function callMemoryAgentApi(
         mistralKey: apiOptions.mistralKey,
         deepinfraKey: apiOptions.deepinfraKey,
         customModel: getCustomModelIfUUID(apiOptions.model),
+        reasoningEffort: apiOptions.reasoningEffort,
       }),
       signal: apiOptions.abortSignal,
     });

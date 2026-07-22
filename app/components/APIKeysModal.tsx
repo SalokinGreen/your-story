@@ -6,6 +6,7 @@ import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { DynamicIcon } from "./DynamicIcon";
 import AIConfigTab from "./AIConfigTab";
+import ArchitectureSettingsTab from "./ArchitectureSettingsTab";
 import CustomVoiceManager from "./CustomVoiceManager";
 import FontSettingsTab from "./FontSettingsTab";
 import { TTSModelKey } from "@/app/misc/ai_prices";
@@ -29,7 +30,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
   const [showKeys, setShowKeys] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "config" | "llm" | "services" | "display" | "game"
+    "config" | "llm" | "services" | "display" | "game" | "architecture"
   >("config");
 
   // TTS Settings state (read from localStorage)
@@ -194,6 +195,19 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
               API Keys
             </span>
           </button>
+          <button
+            onClick={() => setActiveTab("architecture")}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === "architecture"
+                ? "border-purple-400 text-purple-300"
+                : "border-transparent text-blue-300/50 hover:text-blue-200"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <DynamicIcon name="Layers" className="w-4 h-4" />
+              Architecture
+            </span>
+          </button>
         </div>
 
         {/* Content */}
@@ -207,6 +221,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             </div>
           ) : activeTab === "config" ? (
             <AIConfigTab />
+          ) : activeTab === "architecture" ? (
+            <ArchitectureSettingsTab />
           ) : activeTab === "llm" ? (
             <>
               {/* Compact API Keys Grid */}

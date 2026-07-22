@@ -124,6 +124,8 @@ export interface ReflectionApiOptions {
   deepseekKey?: string;
   googleKey?: string;
   abortSignal?: AbortSignal;
+  /** Optional override from layerSettings.ts's reflection model/effort override - unset preserves prior behavior of never sending this field. */
+  reasoningEffort?: string;
 }
 
 export interface ReflectionResult {
@@ -149,6 +151,7 @@ async function callReflectionApi(
       openRouterKey: apiOptions.openRouterKey,
       deepseekKey: apiOptions.deepseekKey,
       googleKey: apiOptions.googleKey,
+      reasoningEffort: apiOptions.reasoningEffort,
     }),
     signal: apiOptions.abortSignal,
   });
