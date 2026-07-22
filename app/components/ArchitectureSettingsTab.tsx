@@ -91,7 +91,7 @@ const OBSERVER_FLAG_INFO: Record<
   response_length: {
     label: "Response Length",
     description:
-      "A single turn ran far past the Reply Length setting's usual ceiling. Deterministic (word count), no API call.",
+      "A single turn ran far past the Reply Length setting's usual ceiling (word count, deterministic). If it does, a second AI pass judges whether the length was earned (e.g. a session-zero opening, a big reveal) before flagging it.",
     llmBacked: false,
   },
   player_agency: {

@@ -14,10 +14,16 @@
  * Five checks, two severities:
  *
  * Major (can trigger generateStoryTurn's reset-and-retry):
- * - checkResponseLength: deterministic, free. Catches a single turn blowing
- *   way past the Reply Length setting's ceiling. pacingFeedback.ts already
- *   nudges based on a trailing 3-turn average; this catches one egregious
- *   turn on the spot instead of waiting for the average to drift.
+ * - checkResponseLength: the word-count trip itself is deterministic and
+ *   free - catches a single turn blowing way past the Reply Length setting's
+ *   ceiling. pacingFeedback.ts already nudges based on a trailing 3-turn
+ *   average; this catches one egregious turn on the spot instead of waiting
+ *   for the average to drift. But "too long" isn't automatically a mistake -
+ *   a session-zero opening dump, a big reveal, or a pivotal climax can
+ *   legitimately need the room - so a trip doesn't flag on its own: it's
+ *   followed by an LLM justification pass (same fail-open/API-error posture
+ *   as the checks below) that reads the turn in context and decides whether
+ *   the overage was earned. Only an unjustified overage becomes a flag.
  * - checkPlayerAgencyViolation: an LLM call that judges whether the GM
  *   decided/narrated what the player character says, thinks, or does beyond
  *   what the player declared - the "PLAYER AGENCY (NON-NEGOTIABLE)" rule
@@ -37,7 +43,12 @@
  * All LLM-backed checks use the same fetch("/api/generate") pattern as
  * reflection.ts's callReflectionApi - non-streaming, caller-supplied model,
  * fails open (no flag) on any API error. Regex can't reliably judge any of
- * these; they need actual reading comprehension.
+ * these; they need actual reading comprehension. checkResponseLength's
+ * justification pass is the one exception to "fails open (no flag)": failing
+ * open there means falling back to the deterministic flag its word-count
+ * trip already produced, since that's what shipped before the judge existed
+ * - an infra failure never gets to invent a NEW reset that wouldn't have
+ * happened otherwise, but it also doesn't get to erase one that would have.
  *
  * Configuration (backend only - no settings UI exists yet, but the plumbing
  * is here for one to read/write later, the same way replyLength etc. flow
@@ -168,11 +179,13 @@ function sensitivityInstruction(sensitivity: number): string {
 // triggersReset is also on.
 const TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD = 8;
 
-export function checkResponseLength(
+export async function checkResponseLength(
   narration: string,
+  playerChoice: string = "",
   replyLength: ReplyLength = "medium",
+  apiOptions?: ObserverApiOptions,
   settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.response_length,
-): ObserverFlag | null {
+): Promise<ObserverFlag | null> {
   if (!settings.enabled) return null;
 
   const words = countNarrationWords(narration);
@@ -182,12 +195,107 @@ export function checkResponseLength(
   const ceiling = band.high * overageMultiplierForSensitivity(settings.sensitivity);
   if (words <= ceiling) return null;
 
+  // Give the GM a chance to justify the overage before treating it as a
+  // mistake. If there's no apiOptions to call the judge with, or the judge
+  // call itself fails, fall back to the pre-existing mechanical-only
+  // behavior (flag it) rather than silently dropping a check that used to
+  // always fire - the judge can only ever reduce resets, never add new ones
+  // beyond what shipped before it existed.
+  if (apiOptions) {
+    const judgment = await callLengthJustificationApi(
+      narration,
+      playerChoice,
+      replyLength,
+      words,
+      band.high,
+      apiOptions,
+      settings.sensitivity,
+    );
+    if (judgment?.justified) return null;
+  }
+
   return {
     type: "response_length",
     severity: "major",
     detail: `This turn ran ${words} words, well past the "${replyLength}" reply-length setting's usual ceiling (~${band.high} words).`,
     correctivePrompt: `Your previous attempt at this turn was reset because it was far too long for the "${replyLength}" reply-length setting (${words} words, vs. a usual ceiling of ~${band.high}). Here is what you wrote last time, so you can see what to cut:\n"""\n${narration.trim()}\n"""\nRewrite this turn much shorter - state the outcome and stop, per the LENGTH & PACING rules you were already given.`,
   };
+}
+
+interface LengthJustificationResult {
+  justified: boolean;
+  reason: string;
+}
+
+function extractLengthJustificationJson(
+  content: string,
+): LengthJustificationResult | null {
+  const parsed = extractJsonObject(content);
+  if (!parsed || typeof parsed.justified !== "boolean") return null;
+  return {
+    justified: parsed.justified,
+    reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
+  };
+}
+
+async function callLengthJustificationApi(
+  narration: string,
+  playerChoice: string,
+  replyLength: ReplyLength,
+  words: number,
+  ceilingWords: number,
+  apiOptions: ObserverApiOptions,
+  sensitivity: number,
+): Promise<LengthJustificationResult | null> {
+  const system = `You are a strict but fair reviewer for a tabletop-style interactive fiction game. The Game Master AI you're reviewing was given a "${replyLength}" reply-length setting with a usual ceiling of ~${ceilingWords} words for a turn, and this turn ran to ${words} words - well past that ceiling.
+
+Running long isn't automatically wrong: some turns genuinely need the room - an opening/"session zero" scene establishing the setting, character, and premise; a major reveal; dense but necessary exposition; a pivotal climax. Others are just unfocused padding, restating the same beat, or over-describing a routine action - exactly what the ceiling exists to catch.
+
+Given the player's declared action and the GM's narration, decide whether running this long was narratively justified by what the turn was actually doing, or whether it should have been trimmed.
+
+${sensitivityInstruction(sensitivity)}
+
+Respond with ONLY a JSON object, no other text:
+{"justified": true|false, "reason": "<one sentence, empty string if not justified>"}`;
+
+  const user = `Player's declared action:\n"""\n${playerChoice.trim() || "(none - opening scene)"}\n"""\n\nGM's narration (${words} words, vs. a ~${ceilingWords} word ceiling):\n"""\n${narration.trim()}\n"""`;
+
+  try {
+    const response = await fetch("/api/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiOptions.token}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        model: apiOptions.model,
+        maxTokens: 200,
+        temperature: 0,
+        openRouterKey: apiOptions.openRouterKey,
+        deepseekKey: apiOptions.deepseekKey,
+        googleKey: apiOptions.googleKey,
+        mistralKey: apiOptions.mistralKey,
+        deepinfraKey: apiOptions.deepinfraKey,
+        customModel: getCustomModelIfUUID(apiOptions.model),
+        reasoningEffort: apiOptions.reasoningEffort,
+      }),
+      signal: apiOptions.abortSignal,
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const content = (data.content || "").trim();
+    if (!content) return null;
+
+    return extractLengthJustificationJson(content);
+  } catch {
+    return null;
+  }
 }
 
 export interface ObserverApiOptions {
@@ -634,9 +742,11 @@ export interface ObserverParams {
 export async function runObserver(params: ObserverParams): Promise<ObserverFlag[]> {
   const flags: ObserverFlag[] = [];
 
-  const lengthFlag = checkResponseLength(
+  const lengthFlag = await checkResponseLength(
     params.narration,
+    params.playerChoice,
     params.replyLength,
+    params.apiOptions,
     settingsFor(params.settings, "response_length"),
   );
   if (lengthFlag) flags.push(lengthFlag);
