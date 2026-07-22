@@ -46,11 +46,13 @@ import {
   ObserverSettings,
 } from "@/app/misc/observer";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
+import { runDirectorAssistant } from "@/app/misc/directorAssistant";
 import {
   getObserverSettings,
   getObserverModelOverride,
   getMemoryKeeperModelOverride,
   getReflectionModelOverride,
+  getDirectorAssistantModelOverride,
   resolveSideCallModel,
 } from "@/app/misc/layerSettings";
 import {
@@ -833,6 +835,36 @@ export async function generateStoryTurn(
             ? memoryAgentError.message
             : String(memoryAgentError),
       });
+    }
+
+    // Layer 3: the Director Assistant (directorAssistant.ts) updates the
+    // thread/NPC spotlight ledger selectDirectorMove reads, gated to only
+    // run on scene increments - the same cadence AGMTState.tension/
+    // chaosFactor already update at, rather than every single turn.
+    // Best-effort, same fail-open posture as the observer/memory agent above.
+    if ((result.gmResults || []).some((r) => r.toolName === "increment_scene")) {
+      try {
+        const directorAssistantApiOptions = {
+          ...sideCallApiOptions,
+          ...resolveSideCallModel(
+            getDirectorAssistantModelOverride(),
+            sideCallApiOptions.model,
+          ),
+        };
+        await runDirectorAssistant(
+          storyData,
+          result.content,
+          userChoice,
+          directorAssistantApiOptions,
+        );
+      } catch (directorAssistantError) {
+        logger.action("Director assistant failed, skipping (fail open)", {
+          error:
+            directorAssistantError instanceof Error
+              ? directorAssistantError.message
+              : String(directorAssistantError),
+        });
+      }
     }
 
     return result;

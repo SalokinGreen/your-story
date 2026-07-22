@@ -62,6 +62,7 @@ function setOverride(key: string, override: ModelEffortOverride | null): void {
 const OBSERVER_MODEL_KEY = "observerModelOverride";
 const MEMORY_KEEPER_MODEL_KEY = "memoryKeeperModelOverride";
 const REFLECTION_MODEL_KEY = "reflectionModelOverride";
+const DIRECTOR_ASSISTANT_MODEL_KEY = "directorAssistantModelOverride";
 
 export const getObserverModelOverride = (): ModelEffortOverride | null =>
   getOverride(OBSERVER_MODEL_KEY);
@@ -80,6 +81,14 @@ export const getReflectionModelOverride = (): ModelEffortOverride | null =>
 export const setReflectionModelOverride = (
   override: ModelEffortOverride | null,
 ): void => setOverride(REFLECTION_MODEL_KEY, override);
+
+// Director Assistant (directorAssistant.ts, Layer 3 spotlight tracking) -
+// same override shape/precedent as the Memory Keeper above.
+export const getDirectorAssistantModelOverride = (): ModelEffortOverride | null =>
+  getOverride(DIRECTOR_ASSISTANT_MODEL_KEY);
+export const setDirectorAssistantModelOverride = (
+  override: ModelEffortOverride | null,
+): void => setOverride(DIRECTOR_ASSISTANT_MODEL_KEY, override);
 
 /**
  * Resolves a stage's { model, reasoningEffort } for its API call: the

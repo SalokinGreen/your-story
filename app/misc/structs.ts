@@ -935,6 +935,21 @@ export interface StoryData {
   // selectGMAdviceForScene to avoid repeating the same tip within its
   // rotation window before the pool cycles back around.
   shownGMAdviceIds?: number[];
+
+  // Director-layer spotlight ledger for narrative threads/NPCs (see
+  // directorAssistant.ts) - the thread/character equivalent of
+  // multiplayer.couchPlayerFocus above, but tracking narrative spotlight
+  // instead of couch-player turn order. Populated post-turn by
+  // runDirectorAssistant (an LLM side-call, same fail-open posture as
+  // memoryAgent.ts/observer.ts), gated to only run on scene increments.
+  // Read by selectDirectorMove to prefer the most-neglected active thread/
+  // NPC wherever it previously picked one arbitrarily (e.g. activeThreads[0])
+  // - never used to pick a move itself, preserving the "engine decides,
+  // model narrates" split every other move already follows.
+  directorAssistant?: {
+    threadSpotlight?: Record<string, number>; // StoryThread.id -> turns since spotlighted
+    npcSpotlight?: Record<string, number>; // NPC.name -> turns since spotlighted
+  };
 }
 
 // Advanced RPG Tools state tracking
