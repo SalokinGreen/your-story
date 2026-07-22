@@ -23,7 +23,6 @@ import {
   ReasoningDetail,
 } from "@/app/misc/structs";
 import {
-  buildToolPrompt,
   buildChoicesPrompt,
   buildActionAnalysisPrompt,
   buildGMStagePrompt,
@@ -31,9 +30,7 @@ import {
   ReplyLength,
   ChatMessage,
   EmbeddingContext,
-  TOOLS_AFFIRMATION,
   CHOICES_AFFIRMATION,
-  GM_STAGE_AFFIRMATION,
   GM_STAGE_DEFAULT_BUDGET,
   computeGMStageBudget,
   CHOICES_STAGE_TOKEN_BUDGET,
@@ -655,10 +652,9 @@ export async function generateStoryTurn(
     // ========================================
     let gmResults: GMToolResult[] = [];
     let gmStoryContext = "";
-    let gmInterleavedConversation = ""; // NEW: Full interleaved GM conversation for story stage
     let gmFinalStoryContent = ""; // NEW: GM's final prose content (when no tool calls)
     let gmMeta: GenerationMeta | undefined;
-    const gmThinking: string[] = []; // Capture GM's "[GM]" reasoning text
+    const gmThinking: string[] = []; // Capture GM's private <thinking> reasoning text
     let gmBaseMessages: ChatMessage[] = []; // Base GM prompt for story continuation
     let gmConversationHistory: ChatMessage[] = []; // Full GM conversation history for continuation
     let gmModel = ""; // Track which model was used for GM stage
@@ -888,9 +884,6 @@ export async function generateStoryTurn(
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         let gmRound = 0;
         let allGMContextParts: string[] = [];
-        // NEW: Build interleaved conversation log for story stage
-        // This preserves the exact order: thinking -> tool results -> thinking -> tool results
-        let gmInterleavedParts: string[] = [];
         // NEW: Accumulate visible prose from ALL rounds (not just the final one)
         // This allows GM to narrate while calling tools, building up the story incrementally
         let gmAccumulatedStory: string[] = [];
@@ -1236,13 +1229,6 @@ export async function generateStoryTurn(
 
             if (!isDuplicate) {
               gmThinking.push(gmResult.content);
-              // Add to interleaved parts with proper formatting
-              const formattedThinking =
-                gmResult.content.trim().startsWith("[GAME MASTER]") ||
-                gmResult.content.trim().startsWith("[GM]")
-                  ? gmResult.content.trim().replace(/^\[GM\]/, "[GAME MASTER]")
-                  : `[GAME MASTER]\n${gmResult.content.trim()}`;
-              gmInterleavedParts.push(formattedThinking);
 
               // NEW: Add raw content to accumulated story (preserve <thinking> tags)
               // extractVisibleText() pulls the player-visible narration out below
@@ -1352,10 +1338,6 @@ export async function generateStoryTurn(
             gmResults.push(...gmExecution.results);
             if (gmExecution.storyContext) {
               allGMContextParts.push(gmExecution.storyContext);
-              // Add tool results to interleaved parts
-              gmInterleavedParts.push(
-                `[GAME MASTER]\n${gmExecution.storyContext}`,
-              );
             }
 
             // Notify callback for each tool result (for real-time interleaved display)
@@ -1455,20 +1437,16 @@ export async function generateStoryTurn(
                   gmExecution.finalOutcome || "neutral"
                 }]`;
                 allGMContextParts.push(finalOutcomePart);
-                gmInterleavedParts.push(finalOutcomePart);
 
                 const summaryPart = `[GAME MASTER Summary: ${gmExecution.finalSummary}]`;
                 allGMContextParts.push(summaryPart);
-                gmInterleavedParts.push(summaryPart);
 
                 if (gmExecution.narrativeHints) {
                   const hintsPart = `[Narrative Hints: ${gmExecution.narrativeHints}]`;
                   allGMContextParts.push(hintsPart);
-                  gmInterleavedParts.push(hintsPart);
                 }
                 if (gmExecution.dramaticMoment) {
                   allGMContextParts.push(`[DRAMATIC MOMENT]`);
-                  gmInterleavedParts.push(`[DRAMATIC MOMENT]`);
                 }
               }
               logger.action("GM stage complete - end_gm_thinking called", {
@@ -1522,7 +1500,6 @@ export async function generateStoryTurn(
               // Add raw content to context parts (with thinking) for backward compat
               // (Prose extraction already happened earlier - don't duplicate)
               allGMContextParts.push(content);
-              // Don't add to gmInterleavedParts - already added in thinking capture block
 
               logger.action(
                 "GM stage complete - no tool calls, prose already captured",
@@ -1603,8 +1580,6 @@ export async function generateStoryTurn(
 
         // Combine all context parts from all rounds (for backward compat/logging)
         gmStoryContext = allGMContextParts.join("\n\n");
-        // Build interleaved conversation string for story stage
-        gmInterleavedConversation = gmInterleavedParts.join("\n\n");
         // Copy conversation history to outer scope for story continuation
         gmConversationHistory = conversationHistory.map((entry) => ({
           role: entry.role as "user" | "assistant" | "tool",
