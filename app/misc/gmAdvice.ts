@@ -5,10 +5,21 @@
  * static "GM guidance" data with no dependency on live StoryData beyond a
  * couple of flags.
  *
+ * These tips are tuned for the actual medium: an AI GM running text-based
+ * interactive fiction, solo-first but co-op-aware. So advice that only makes
+ * sense at a physical multi-human table (managing a big group's spotlight) is
+ * reframed for a single protagonist (or a small co-op group), and advice that
+ * assumes a human GM prepping between sessions (keeping name lists / stat
+ * blocks "ready") is reframed for a GM that generates on the fly. The `craft`
+ * category collects the AI-GM-specific guardrails that most determine whether
+ * an LLM game master feels good to play with (not speaking for the player, not
+ * yes-manning, continuity, anti-repetition, real consequences, decision points).
+ *
  * Session-Zero and pre-session-prep advice is deliberately excluded from
- * GM_ADVICE_TIPS - it isn't actionable once a scene has already loaded, which
- * is the only place this module's advice gets surfaced (increment_scene, see
- * toolExecutor.ts).
+ * GM_ADVICE_TIPS - it isn't actionable once a scene is underway, which is where
+ * this module's advice gets surfaced: per turn in the live GM prompt
+ * (selectGMAdviceForTurn, see ai_staged.ts) and at scene boundaries
+ * (increment_scene, see toolExecutor.ts).
  */
 
 import type { PlayerArchetype } from "@/app/misc/structs";
@@ -78,7 +89,7 @@ export interface GMAdviceTip {
 export const GM_ADVICE_TIPS: GMAdviceTip[] = [
   // --- Narrative Improvisation & Flow State ---
   { id: 1, category: "improv", context: "any", text: "Accept player declarations as true and build the world's logical reaction on top of them." },
-  { id: 2, category: "improv", context: "any", text: "Don't feel pressured for an instant answer - pause, check your notes, or ask players for a moment." },
+  { id: 2, category: "improv", context: "any", text: "Don't feel pressured to resolve everything at once - reason it through privately, check your notes, or ask the player one quick clarifying question first." },
   { id: 3, category: "improv", context: "any", text: "Use \"No, but...\" to deny an impossible action while offering a viable alternative." },
   { id: 4, category: "improv", context: "any", text: "Treat player speculation as free plot material - if they guess a secret, consider making it true." },
   { id: 5, category: "improv", context: "any", text: "Keep improvisation consistent with what's already established about the world." },
@@ -94,7 +105,7 @@ export const GM_ADVICE_TIPS: GMAdviceTip[] = [
   { id: 15, category: "improv", context: "any", text: "Use the environment itself as an active participant - wind, a candle, a passing cart." },
   { id: 16, category: "improv", context: "any", text: "An NPC doesn't need a funny voice - posture and word choice carry the personality." },
   { id: 17, category: "improv", context: "any", text: "If a scene stalls, introduce a sudden, logical disruption to force a decision." },
-  { id: 18, category: "improv", context: "any", text: "Keep a few plug-and-play encounters ready for when players go off the mapped territory." },
+  { id: 18, category: "improv", context: "any", text: "When the player heads somewhere unprepared, improvise a fitting encounter on the spot rather than nudging them back on track." },
   { id: 19, category: "improv", context: "any", text: "Limit improvised descriptions to two or three striking details and let imagination fill the rest." },
   { id: 20, category: "improv", context: "any", text: "Commit fully to improvised rulings - consistency matters more than perfection." },
   { id: 21, category: "improv", context: "any", text: "Use a beat of silence after a threat or revelation to let its weight land." },
@@ -148,13 +159,13 @@ export const GM_ADVICE_TIPS: GMAdviceTip[] = [
   { id: 65, category: "npc", context: "any", text: "Show attitude through posture or action before the NPC even speaks." },
   { id: 66, category: "npc", context: "any", text: "Give major villains a self-justifying, coherent point of view." },
   { id: 67, category: "npc", context: "any", text: "Let NPCs react to the party's reputation and past deeds." },
-  { id: 68, category: "npc", context: "any", text: "Keep a few signature NPCs with strong, conflicting opinions ready to present." },
+  { id: 68, category: "npc", context: "any", text: "Populate a location with NPCs who hold strong, conflicting opinions, so any scene there can strike a spark." },
   { id: 69, category: "npc", context: "any", text: "Give NPCs blind spots and biases - nobody should know everything." },
   { id: 70, category: "npc", context: "any", text: "Give an enemy group's leader a distinct trait to separate them from the rank and file." },
   { id: 71, category: "npc", context: "any", text: "Use a side character's fears or values as a mirror for the region's culture." },
   { id: 72, category: "npc", context: "any", text: "Let NPCs make mistakes, fall for lies, and feel real emotions." },
   { id: 73, category: "npc", context: "any", text: "Give NPCs simple, divisive relationships with each other for living local politics." },
-  { id: 74, category: "npc", context: "any", text: "Keep a list of quick, setting-appropriate names ready for unplanned NPCs." },
+  { id: 74, category: "npc", context: "any", text: "Give every unplanned NPC a specific, setting-appropriate name the moment they matter - never 'the guard' or 'the merchant' twice." },
   { id: 75, category: "npc", context: "any", text: "Never let a major NPC speak without purpose - reveal a secret, offer a hook, or build atmosphere." },
   { id: 76, category: "npc", context: "any", text: "Friendly NPCs should offer context and options, never dictate the player's choice." },
   { id: 77, category: "npc", context: "any", text: "Let NPCs change their stance over time based on the party's actions." },
@@ -266,39 +277,65 @@ export const GM_ADVICE_TIPS: GMAdviceTip[] = [
   { id: 177, category: "rules", context: "any", text: "Let an earned narrative payoff win over a one-point-short technicality." },
   { id: 178, category: "rules", context: "any", text: "Stay a host and storyteller first, not a rules-policing referee." },
   { id: 179, category: "rules", context: "any", text: "Clearly telegraph when a decision carries severe, lasting consequences before it's made." },
-  { id: 180, category: "rules", context: "any", text: "Keep a quick mental note of DCs and conditions you've already set to stay consistent." },
+  { id: 180, category: "rules", context: "any", text: "Stay consistent with the DCs, difficulties, and rulings you've already made this session - don't quietly move the goalposts." },
 
   // --- Player Engagement & Spotlight Sharing ---
-  { id: 181, category: "spotlight", context: "any", text: "Actively invite quiet players in - ask what their character is doing during a lull." },
+  { id: 181, category: "spotlight", context: "any", text: "During a lull, ask the player what their character is doing, noticing, or feeling - invite them to steer rather than steering for them." },
   { id: 182, category: "spotlight", context: "any", text: "Mine what players have said or theorized for your next plot twist." },
   { id: 183, category: "spotlight", context: "any", text: "Weave character backstories into the main arc, not just isolated side quests." },
   { id: 184, category: "spotlight", context: "any", text: "Root for the players' wins - you're their biggest fan, not their opponent." },
   { id: 185, category: "spotlight", context: "any", text: "Ask open questions that surface a character's fears and relationships." },
   { id: 186, category: "spotlight", context: "any", text: "Invite players to define minor setting details for a sense of ownership." },
-  { id: 187, category: "spotlight", context: "any", text: "Gently redirect the floor if one or two players dominate every decision." },
+  { id: 187, category: "spotlight", context: "any", text: "In co-op, make room for every character - don't let one player's plan quietly run every scene." },
   { id: 188, category: "spotlight", context: "any", text: "Reward great roleplay and clever plans with real narrative benefits." },
   { id: 189, category: "spotlight", context: "any", text: "Create quiet scenes (a campfire, a long ride) for characters to bond without NPC interference." },
   { id: 190, category: "spotlight", context: "any", text: "Over-clue mysteries - it's better to give too much information than too little." },
   { id: 191, category: "spotlight", context: "any", text: "Present complex situations without suggesting a single \"correct\" answer." },
   { id: 192, category: "spotlight", context: "any", text: "Use character names, not player names, to keep the focus on the fiction." },
-  { id: 193, category: "spotlight", context: "any", text: "Keep a solo scout's spotlight brief; cut back to the party at a tense beat." },
+  { id: 193, category: "spotlight", context: "any", text: "Keep any side-thread away from the main action brief; cut back at a tense beat rather than lingering off to the side." },
   { id: 194, category: "spotlight", context: "any", text: "Design a challenge around a specific character's niche skill, language, or trope." },
   { id: 195, category: "spotlight", context: "any", text: "Let the players enjoy piecing together a reveal - don't over-explain it." },
   { id: 196, category: "spotlight", context: "any", text: "Clarify what a character would actually perceive before they act on incomplete information." },
   { id: 197, category: "spotlight", context: "any", text: "Let a clever non-combat solution (stealth, diplomacy) succeed as well as a fight would." },
   { id: 198, category: "spotlight", context: "any", text: "Build milestones around party goals rather than only individual actions." },
   { id: 199, category: "spotlight", context: "any", text: "Vary session focus across combat, roleplay, and lore to fit different players' tastes." },
-  { id: 200, category: "spotlight", context: "any", text: "Offer a struggling or distracted player a low-pressure role rather than pushing the spotlight on them." },
+  { id: 200, category: "spotlight", context: "any", text: "If the player seems stuck or overwhelmed, offer a clear, low-pressure next step rather than piling on more complications." },
   { id: 201, category: "spotlight", context: "any", text: "Avoid mind-control or loss-of-agency effects on player characters without prior buy-in." },
   { id: 202, category: "spotlight", context: "any", text: "Use tangible details (a letter, a token) to make information-gathering feel real." },
   { id: 203, category: "spotlight", context: "any", text: "Give characters peaceful downtime beats so high-stakes moments hit harder by contrast." },
   { id: 204, category: "spotlight", context: "any", text: "Validate players' emotional reactions to big story beats." },
   { id: 205, category: "spotlight", context: "any", text: "Judge a scene's success by whether the players are engaged and enjoying it." },
   { id: 206, category: "spotlight", context: "any", text: "Let a player's declared intent, not just their literal words, guide how you narrate the outcome." },
-  { id: 207, category: "spotlight", context: "any", text: "Give a shy player's character a moment where their specific trait is the one that matters." },
-  { id: 208, category: "spotlight", context: "any", text: "Don't let a single dominant character's plan run unchallenged every scene - make room for others." },
-  { id: 209, category: "spotlight", context: "any", text: "Treat a player going quiet as a cue to check in, not a cue to talk over them." },
-  { id: 210, category: "spotlight", context: "any", text: "Close a satisfying arc with a beat that lets every present character react to it." },
+  { id: 207, category: "spotlight", context: "any", text: "Give the character a moment where their specific trait, skill, or background is the exact thing the situation needs." },
+  { id: 208, category: "spotlight", context: "any", text: "Let the player's plans meet real obstacles - a scheme that works flawlessly every time gets dull fast." },
+  { id: 209, category: "spotlight", context: "any", text: "If the player's replies turn terse or passive, check in on what they want instead of narrating on over them." },
+  { id: 210, category: "spotlight", context: "any", text: "Close a satisfying arc with a quiet beat that lets the character react and the change actually land." },
+
+  // --- AI Game Master Craft (medium-specific guardrails) ---
+  { id: 211, category: "craft", context: "any", text: "Never speak, choose, or narrate the player character's dialogue, thoughts, feelings, or next action - resolve what they declared, then hand every in-character decision back to them." },
+  { id: 212, category: "craft", context: "any", text: "Let actions genuinely fail - don't smooth every outcome into success. Real stakes need the real possibility of a setback." },
+  { id: 213, category: "craft", context: "any", text: "Don't be a yes-man: when the world, an NPC, or plain physics would resist the player's plan, let it resist, and show the friction." },
+  { id: 214, category: "craft", context: "any", text: "Treat the player's declarations as canon - build on what they establish instead of overwriting or quietly ignoring it." },
+  { id: 215, category: "craft", context: "any", text: "Stay consistent with names, facts, wounds, and promises already established - a contradiction breaks immersion faster than any pacing slip." },
+  { id: 216, category: "craft", context: "any", text: "Vary your language - avoid reusing the same stock phrases, sentence openers, and images turn after turn." },
+  { id: 217, category: "craft", context: "any", text: "End the turn on a live decision point or open question, never a closed loop that leaves the player nothing to push against." },
+  { id: 218, category: "craft", context: "any", text: "Don't railroad - when the player takes an unexpected path, follow it and reshape the world around their choice instead of herding them back." },
+  { id: 219, category: "craft", context: "any", text: "Give choices diverging consequences - a decision that changes nothing was never really a decision." },
+  { id: 220, category: "craft", context: "any", text: "Let consequences persist across scenes - a wound, a lie, or a debt should echo later, not silently reset next turn." },
+  { id: 221, category: "craft", context: "any", text: "Plant a small detail now that a later reveal can pay off - foreshadow before you deliver." },
+  { id: 222, category: "craft", context: "any", text: "Reincorporate earlier NPCs, objects, and throwaway lines so the world feels authored, not generated scene by scene." },
+  { id: 223, category: "craft", context: "any", text: "Give NPCs agendas that advance off-screen, so the world keeps moving even where the player isn't looking." },
+  { id: 224, category: "craft", context: "any", text: "Raise stakes gradually across the arc - don't open at maximum intensity or hold one flat pitch the whole way." },
+  { id: 225, category: "craft", context: "any", text: "Trust the player to infer - don't over-explain the world, the subtext, or the character's own emotions back to them." },
+  { id: 226, category: "craft", context: "any", text: "When the player tries something clever the rules don't cover, answer 'yes' or 'yes, but' rather than blocking on a technicality." },
+  { id: 227, category: "craft", context: "any", text: "Keep the machinery invisible - never mention being an AI, a GM, tools, dice math, or the meta-structure in player-facing prose." },
+  { id: 228, category: "craft", context: "any", text: "Hold the established genre and tone - don't drift into a different mood without an in-fiction reason for the shift." },
+  { id: 229, category: "craft", context: "any", text: "Ask a short OOC clarifying question when the player's intent is genuinely ambiguous, instead of guessing and steering them somewhere they didn't choose." },
+  { id: 230, category: "craft", context: "any", text: "Leave the player room to be competent - don't let an NPC swoop in and solve the problem for them." },
+  { id: 231, category: "craft", context: "any", text: "Prefer one concrete, specific detail over three vague ones - specificity is what makes a world feel real." },
+  { id: 232, category: "craft", context: "any", text: "Reward clever play and roleplay with tangible story payoff, not just a line of acknowledgment." },
+  { id: 233, category: "craft", context: "any", text: "Deliver exposition only as the player pulls on it - answer what they ask, not everything you happen to know." },
+  { id: 234, category: "craft", context: "any", text: "When in doubt, make the player's last action matter - react to it visibly rather than moving on as if it never happened." },
 ];
 
 // How many of the most recently shown tip ids to avoid repeating. Comfortably

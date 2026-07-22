@@ -41,6 +41,13 @@ describe("GM_ADVICE_TIPS", () => {
     expect(categories.has("safety")).toBe(false);
     expect(categories.has("prep")).toBe(false);
   });
+
+  it("includes AI-GM craft guardrails", () => {
+    const craft = GM_ADVICE_TIPS.filter((t) => t.category === "craft");
+    expect(craft.length).toBeGreaterThan(0);
+    // Craft guardrails are medium-general - none are combat-gated.
+    expect(craft.every((t) => t.context === "any")).toBe(true);
+  });
 });
 
 describe("selectGMAdviceForScene", () => {
