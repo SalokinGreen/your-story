@@ -17,6 +17,7 @@ import {
   NPCReaction,
   Adventure,
   CouchPlayer,
+  ObserverFlag,
 } from "../misc/structs";
 import { useNetSession } from "../misc/multiplayer/useNetSession";
 import type { MPBackend } from "../misc/multiplayer/types";
@@ -42,10 +43,13 @@ import ContextViewer from "./ContextViewer";
 import OOCChatPanel from "../components/OOCChatPanel";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
+import AskQuestionModal from "../components/AskQuestionModal";
 import type {
   ManualRollRequest,
   ManualRollAnswer,
   DiceThrowRequest,
+  AskQuestionRequest,
+  AskQuestionAnswer,
 } from "../misc/gmExecutor";
 import {
   type TimelineBlock,
@@ -174,6 +178,53 @@ function processQuestNotifications(
       }
     }
   }
+}
+
+// Layer 5 hardening (see app/misc/observer.ts and generation.ts's
+// generateStoryTurn): fired via GenerationCallbacks.onObserverReset when the
+// observer flags a turn as a major violation (GM spoke/acted for the
+// player, or blew way past the reply-length ceiling) and generateStoryTurn
+// discards it and forces a fresh attempt. storyData has already been rolled
+// back to its pre-turn snapshot by the time this fires. partialPart is the
+// same object reference onStoryContent has been streaming into and pushing
+// onto storyData.scene.parts - blank it out so nothing from the discarded
+// attempt survives into the retry's streaming, and reset the live view so
+// the player sees a clean restart rather than a stale/garbled part.
+function handleObserverReset(
+  partialPart: ScenePart,
+  flags: ObserverFlag[],
+  triggeringFlag: ObserverFlag,
+  setStoryText: (text: string) => void,
+  setLiveGMEntries: (entries: TimelineBlock[]) => void,
+  setLoadingStage: (stage: "gm" | "story" | "choices" | null) => void,
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "info" | "warning",
+  ) => void,
+) {
+  partialPart.content = "";
+  partialPart.gmToolCalls = undefined;
+  partialPart.gmStoryContext = undefined;
+  partialPart.gmThinking = undefined;
+  partialPart.npcReactions = undefined;
+  partialPart.toolCalls = undefined;
+  partialPart.toolResponses = undefined;
+  partialPart.stateChanges = undefined;
+
+  setStoryText("");
+  setLiveGMEntries([]);
+  setLoadingStage("gm");
+
+  logger.action("Observer flagged turn, state reset and retrying", {
+    type: triggeringFlag.type,
+    detail: triggeringFlag.detail,
+    totalFlags: flags.length,
+  });
+
+  addNotification(
+    `GM response was reset: ${triggeringFlag.detail} Retrying...`,
+    "warning",
+  );
 }
 
 enum StoryState {
@@ -338,6 +389,13 @@ function StoryPageContent() {
     useState<DiceThrowRequest | null>(null);
   const diceThrowResolveRef = useRef<
     ((faces: number[] | null) => void) | null
+  >(null);
+  // Ask-question tool: the GM is asking one or more predefined-choice +
+  // free-text questions. Same pause-and-resolve pattern as manual dice mode.
+  const [askQuestionRequest, setAskQuestionRequest] =
+    useState<AskQuestionRequest | null>(null);
+  const askQuestionResolveRef = useRef<
+    ((answer: AskQuestionAnswer | null) => void) | null
   >(null);
   // Networked multiplayer: which local player(s), if known, triggered the
   // turn currently in flight - set right before generateStoryTurn is called
@@ -1390,6 +1448,7 @@ function StoryPageContent() {
             logger.action("GM stage started (custom input)");
           },
           onAskForRoll: requestManualRoll,
+          onAskQuestion: requestPlayerAnswer,
           onRequestDiceThrow:
             storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
           onCompaction: (summary) => {
@@ -1591,6 +1650,17 @@ function StoryPageContent() {
               usage,
             });
           },
+          onObserverReset: (flags, triggeringFlag) => {
+            handleObserverReset(
+              partialPart,
+              flags,
+              triggeringFlag,
+              setStoryText,
+              setLiveGMEntries,
+              setLoadingStage,
+              addNotification,
+            );
+          },
           onComplete: (result) => {
             if (result.meta.totalTokenCost) {
               addNotification(
@@ -1647,6 +1717,22 @@ function StoryPageContent() {
               };
               addNotification(
                 `Possible inconsistency: ${result.scenePart.consistencyWarnings[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+                "warning",
+              );
+            }
+
+            // Layer 5 observer flags (see observer.ts) that survived to this
+            // accepted turn - either minor, or major but the automatic reset
+            // budget was already spent (onObserverReset fired earlier this
+            // turn for those attempts). Same posture as consistencyWarnings
+            // above: surface it, let the player Edit/Retry manually.
+            if (lastIdx >= 0 && result.scenePart?.observerFlags?.length) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                observerFlags: result.scenePart.observerFlags,
+              };
+              addNotification(
+                `GM response flagged: ${result.scenePart.observerFlags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
                 "warning",
               );
             }
@@ -2085,6 +2171,7 @@ function StoryPageContent() {
             logger.action("GM stage started - determining mechanics");
           },
           onAskForRoll: requestManualRoll,
+          onAskQuestion: requestPlayerAnswer,
           onRequestDiceThrow:
             storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
           onCompaction: (summary) => {
@@ -2248,6 +2335,17 @@ function StoryPageContent() {
               usage,
             });
           },
+          onObserverReset: (flags, triggeringFlag) => {
+            handleObserverReset(
+              partialPart,
+              flags,
+              triggeringFlag,
+              setStoryText,
+              setLiveGMEntries,
+              setLoadingStage,
+              addNotification,
+            );
+          },
           onComplete: (result) => {
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
               const currentChapter = storyData.chapters.length;
@@ -2359,6 +2457,21 @@ function StoryPageContent() {
     setManualRollRequest(null);
   }
 
+  // Ask-question tool: called by the GM executor when ask_question fires.
+  // Shows the question prompt and resolves once the player(s) answer.
+  function requestPlayerAnswer(request: AskQuestionRequest) {
+    return new Promise<AskQuestionAnswer | null>((resolve) => {
+      askQuestionResolveRef.current = resolve;
+      setAskQuestionRequest(request);
+    });
+  }
+
+  function resolveAskQuestion(answer: AskQuestionAnswer | null) {
+    askQuestionResolveRef.current?.(answer);
+    askQuestionResolveRef.current = null;
+    setAskQuestionRequest(null);
+  }
+
   // Physical dice mode: called by the GM executor when a formula roll can
   // be thrown physically. If we're hosting a networked session and the
   // turn in flight is attributable to exactly one connected guest (not the
@@ -2420,6 +2533,7 @@ function StoryPageContent() {
     // Unblock the GM loop if it's paused waiting for a physical roll
     resolveManualRoll(null);
     resolveDiceThrow(null);
+    resolveAskQuestion(null);
     abandonRelayedDiceThrows();
     if (generationAbortRef.current) {
       generationAbortRef.current.abort();
@@ -2711,6 +2825,17 @@ function StoryPageContent() {
               usage,
             });
           },
+          onObserverReset: (flags, triggeringFlag) => {
+            handleObserverReset(
+              partialPart,
+              flags,
+              triggeringFlag,
+              setStoryText,
+              setLiveGMEntries,
+              setLoadingStage,
+              addNotification,
+            );
+          },
           onComplete: (result) => {
             // Check for chapter completion
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
@@ -2758,6 +2883,22 @@ function StoryPageContent() {
               };
               addNotification(
                 `Possible inconsistency: ${result.scenePart.consistencyWarnings[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+                "warning",
+              );
+            }
+
+            // Layer 5 observer flags (see observer.ts) that survived to this
+            // accepted turn - either minor, or major but the automatic reset
+            // budget was already spent (onObserverReset fired earlier this
+            // turn for those attempts). Same posture as consistencyWarnings
+            // above: surface it, let the player Edit/Retry manually.
+            if (lastIdx >= 0 && result.scenePart?.observerFlags?.length) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                observerFlags: result.scenePart.observerFlags,
+              };
+              addNotification(
+                `GM response flagged: ${result.scenePart.observerFlags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
                 "warning",
               );
             }
@@ -3015,7 +3156,7 @@ function StoryPageContent() {
         style={fullHeightStyle}
       >
         <div className="flex items-center justify-center min-h-dvh">
-          <div className="text-center bg-blue-950/50 rounded-xl p-6 border border-blue-800/30">
+          <div className="text-center bg-white/[0.04] backdrop-blur-xl rounded-2xl p-6 border border-white/10">
             <DynamicIcon
               name="FileQuestion"
               className="w-12 h-12 text-blue-200/30 mx-auto mb-3"
@@ -3023,7 +3164,7 @@ function StoryPageContent() {
             <p className="text-blue-200/60 mb-4">Story not found</p>
             <button
               onClick={() => router.push("/library")}
-              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+              className="px-4 py-2 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-lg shadow-md shadow-purple-950/40 transition-all"
             >
               Browse Adventures
             </button>
@@ -3046,7 +3187,7 @@ function StoryPageContent() {
       >
         <div className="w-full px-2 sm:max-w-3xl mx-auto">
           {/* Game Over Header */}
-          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-6 mb-4 text-center">
+          <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-6 mb-4 text-center">
             <div className="flex items-center justify-center gap-3 text-red-400 mb-3">
               <DynamicIcon name="Skull" className="w-8 h-8" />
               <h1 className="text-3xl font-bold">Game Over</h1>
@@ -3061,13 +3202,13 @@ function StoryPageContent() {
           </div>
 
           {/* Stats Summary */}
-          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
+          <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 mb-4">
             <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
               <DynamicIcon name="BarChart2" className="w-5 h-5 text-blue-400" />
               Final Statistics
             </h3>
             <div className="grid grid-cols-2 gap-3">
-              <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+              <div className="p-3 bg-green-500/10 rounded-lg border border-green-400/20">
                 <div className="flex items-center gap-2 mb-1">
                   <DynamicIcon
                     name="Target"
@@ -3090,7 +3231,7 @@ function StoryPageContent() {
 
           {/* Goals Completed */}
           {completedGoals > 0 && (
-            <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
+            <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 mb-4">
               <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <DynamicIcon name="Target" className="w-5 h-5 text-green-400" />
                 Goals Completed
@@ -3101,7 +3242,7 @@ function StoryPageContent() {
                   .map((goal, idx) => (
                     <div
                       key={idx}
-                      className="p-3 bg-green-500/10 rounded-lg border border-green-500/30"
+                      className="p-3 bg-green-500/10 rounded-lg border border-green-400/20"
                     >
                       <div className="flex items-start gap-2">
                         <DynamicIcon
@@ -3124,7 +3265,7 @@ function StoryPageContent() {
           )}
 
           {/* Action Buttons */}
-          <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4">
+          <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4">
             <h3 className="text-lg font-semibold text-white mb-4 text-center">
               What&apos;s Next?
             </h3>
@@ -3235,7 +3376,7 @@ function StoryPageContent() {
                     },
                   });
                 }}
-                className="p-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                className="p-3 bg-linear-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-medium rounded-lg shadow-md shadow-blue-950/40 transition-all flex items-center gap-2"
               >
                 <DynamicIcon name="RotateCcw" className="w-5 h-5" />
                 <div className="text-left text-sm">
@@ -3352,7 +3493,7 @@ function StoryPageContent() {
                     },
                   });
                 }}
-                className="p-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                className="p-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-medium rounded-lg shadow-md shadow-purple-950/40 transition-all flex items-center gap-2"
               >
                 <DynamicIcon name="Star" className="w-5 h-5" />
                 <div className="text-left text-sm">
@@ -3363,7 +3504,7 @@ function StoryPageContent() {
 
               <button
                 onClick={() => router.push("/library")}
-                className="p-3 bg-blue-900/50 hover:bg-blue-900/70 text-white font-medium rounded-lg border border-blue-800/30 transition-colors flex items-center gap-2"
+                className="p-3 bg-white/5 hover:bg-white/10 text-white font-medium rounded-lg border border-white/10 transition-all flex items-center gap-2"
               >
                 <DynamicIcon name="Library" className="w-5 h-5" />
                 <div className="text-left text-sm">
@@ -3374,7 +3515,7 @@ function StoryPageContent() {
 
               <button
                 onClick={() => router.push("/creator")}
-                className="p-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                className="p-3 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-medium rounded-lg shadow-md shadow-emerald-950/40 transition-all flex items-center gap-2"
               >
                 <DynamicIcon name="Map" className="w-5 h-5" />
                 <div className="text-left text-sm">
@@ -3385,7 +3526,7 @@ function StoryPageContent() {
             </div>
 
             {storyData.newGamePlusCount && storyData.newGamePlusCount > 0 && (
-              <div className="mt-4 p-3 bg-amber-500/10 rounded-lg border border-amber-500/30 text-center">
+              <div className="mt-4 p-3 bg-amber-500/10 rounded-lg border border-amber-400/20 text-center">
                 <div className="font-medium text-sm text-amber-300 flex items-center justify-center gap-2">
                   <DynamicIcon name="Star" className="w-4 h-4" />
                   New Game Plus: Run #{storyData.newGamePlusCount}
@@ -3429,7 +3570,7 @@ function StoryPageContent() {
             </div>
 
             {/* Preset Selection */}
-            <div className="bg-blue-950/50 rounded-xl border border-blue-800/30 p-4 mb-4">
+            <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 mb-4">
               <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
                 <DynamicIcon name="Users" className="w-5 h-5 text-blue-400" />
                 Select Character
@@ -3440,10 +3581,10 @@ function StoryPageContent() {
                   <button
                     key={preset.id}
                     onClick={() => handlePresetSelect(preset)}
-                    className={`rounded-lg p-4 text-left transition-all border ${
+                    className={`rounded-xl p-4 text-left transition-all border backdrop-blur-md ${
                       preset.id === "custom"
-                        ? "bg-purple-500/10 border-purple-500/30 hover:border-purple-500/60"
-                        : "bg-blue-900/30 border-blue-800/30 hover:border-blue-600/50"
+                        ? "bg-purple-500/[0.06] border-purple-400/20 hover:border-purple-400/40"
+                        : "bg-white/[0.03] border-white/10 hover:border-white/20"
                     }`}
                   >
                     <div className="flex items-start gap-3 mb-2">
@@ -3511,7 +3652,7 @@ function StoryPageContent() {
             {/* Back Button */}
             <button
               onClick={() => router.push("/library")}
-              className="px-4 py-2 bg-blue-950/50 hover:bg-blue-900/50 text-blue-200 text-sm font-medium rounded-lg border border-blue-800/30 transition-colors flex items-center gap-2"
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-blue-200 text-sm font-medium rounded-lg border border-white/10 transition-colors flex items-center gap-2"
             >
               <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
               Back to Library
@@ -3539,7 +3680,7 @@ function StoryPageContent() {
           <button
             type="button"
             onClick={() => router.push("/library")}
-            className="focus-ring shrink-0 rounded-lg p-1.5 text-blue-300 hover:bg-blue-900/50 hover:text-white transition-colors"
+            className="focus-ring shrink-0 rounded-lg p-1.5 text-blue-300 hover:bg-white/10 hover:text-white transition-colors"
             title="Leave to Library"
             aria-label="Leave to Library"
           >
@@ -3569,8 +3710,8 @@ function StoryPageContent() {
             title="Menu"
             className={`focus-ring shrink-0 rounded-lg p-1.5 transition-colors ${
               currentState === StoryState.MENU
-                ? "bg-purple-600/20 text-purple-300 ring-1 ring-purple-400/40 shadow-[0_0_10px_rgba(147,51,234,0.4)]"
-                : "text-blue-300 hover:bg-blue-900/50 hover:text-white"
+                ? "bg-purple-500/15 text-purple-300 ring-1 ring-purple-400/40 shadow-[0_0_10px_rgba(147,51,234,0.4)]"
+                : "text-blue-300 hover:bg-white/10 hover:text-white"
             }`}
           >
             <DynamicIcon name="Settings" className="w-5 h-5" />
@@ -3713,6 +3854,15 @@ function StoryPageContent() {
         onSkip={() => resolveManualRoll(null)}
       />
 
+      {/* Ask-question tool: the GM asked one or more predefined-choice +
+          free-text questions - generation is paused until answered/skipped */}
+      <AskQuestionModal
+        request={askQuestionRequest}
+        couchPlayers={storyData?.multiplayer?.couchPlayers}
+        onAnswer={resolveAskQuestion}
+        onSkipAll={() => resolveAskQuestion(null)}
+      />
+
       {/* Physical dice mode: the GM's roll can be thrown on a 3D dice tray -
           generation is paused until the dice settle (or the player skips) */}
       <DiceThrowModal
@@ -3796,8 +3946,8 @@ export default function StoryPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-dvh bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
+        <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
         </div>
       }
     >

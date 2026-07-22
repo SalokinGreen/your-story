@@ -355,6 +355,12 @@ export interface ScenePart {
   // - narration streams to the client before this can run, so it's recorded
   // for display/debugging and eval-harness metrics, not a live gate.
   consistencyWarnings?: ConsistencyWarning[];
+  // Layer-5 observer flags (see observer.ts) that survived to the final,
+  // accepted turn - i.e. minor flags, or major flags left in place because
+  // the automatic reset retry budget was exhausted (fail open). A major flag
+  // that triggered a reset does NOT appear here, since that turn was
+  // discarded entirely - see GenerationCallbacks.onObserverReset instead.
+  observerFlags?: ObserverFlag[];
   npcReactions?: NPCReaction[]; // NPC reactions to show as notifications (e.g., "Lisa liked this")
   endChapter?: boolean;
   endStory?: boolean;
@@ -367,6 +373,21 @@ export interface ConsistencyWarning {
   type: ConsistencyWarningType;
   entity: string;
   detail: string;
+}
+
+// Layer-5 hardening, active variant (see observer.ts): an LLM "observer"
+// call reviews each completed GM turn for violations of rules already
+// stated in the GM's own system prompt. A "major" flag can trigger a full
+// StoryData rollback + forced retry (generation.ts); "minor" flags are
+// logged/surfaced only, same posture as ConsistencyWarning.
+export type ObserverFlagType = "player_agency" | "response_length";
+export type ObserverSeverity = "minor" | "major";
+
+export interface ObserverFlag {
+  type: ObserverFlagType;
+  severity: ObserverSeverity;
+  detail: string; // Human-readable explanation, for logging/notification display
+  correctivePrompt: string; // Instruction injected into the GM's retry prompt when this flag triggers a reset
 }
 
 export interface Choice {

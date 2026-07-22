@@ -114,7 +114,7 @@ export default function RelationshipsEditor({
         </h4>
         <button
           onClick={addRelationship}
-          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
+          className="px-3 py-1.5 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white text-sm font-medium rounded-lg shadow-md shadow-emerald-950/40 transition-all"
         >
           + Add Relationship
         </button>
@@ -124,7 +124,7 @@ export default function RelationshipsEditor({
           editingIndex === index ? (
             <div
               key={index}
-              className="p-4 bg-pink-100 dark:bg-pink-900/40 border-2 border-pink-400 rounded-lg"
+              className="p-4 bg-white/[0.04] backdrop-blur-xl border border-pink-400/30 rounded-2xl shadow-[0_0_20px_rgba(236,72,153,0.1)]"
             >
               <div className="space-y-3">
                 <input
@@ -137,7 +137,7 @@ export default function RelationshipsEditor({
                     })
                   }
                   placeholder="Character/Faction/Organization Name"
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white font-semibold"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-semibold focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                 />
                 <div>
                   <label className="flex text-sm font-semibold text-blue-200 mb-2 items-center justify-between">
@@ -159,13 +159,13 @@ export default function RelationshipsEditor({
                         value: parseInt(e.target.value),
                       })
                     }
-                    className="w-full h-2 bg-blue-900/30 rounded-lg appearance-none cursor-pointer"
+                    className="w-full h-2 rounded-full appearance-none cursor-pointer"
                     style={{
-                      background: `linear-gradient(to right, 
-                        #ef4444 0%, 
-                        #f59e0b 25%, 
-                        #84cc16 50%, 
-                        #10b981 75%, 
+                      background: `linear-gradient(to right,
+                        #ef4444 0%,
+                        #f59e0b 25%,
+                        #84cc16 50%,
+                        #10b981 75%,
                         #06b6d4 100%)`,
                     }}
                   />
@@ -184,7 +184,7 @@ export default function RelationshipsEditor({
                     })
                   }
                   placeholder="Describe the relationship..."
-                  className="w-full h-24 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                  className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                 />
                 <div className="flex gap-2">
                   <button
@@ -192,7 +192,7 @@ export default function RelationshipsEditor({
                     disabled={
                       !editRelationship.name || !editRelationship.description
                     }
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded"
+                    className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-emerald-950/40 disabled:shadow-none transition-all"
                   >
                     <DynamicIcon
                       name="Save"
@@ -202,7 +202,7 @@ export default function RelationshipsEditor({
                   </button>
                   <button
                     onClick={cancelEdit}
-                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-all"
                   >
                     Cancel
                   </button>
@@ -212,7 +212,7 @@ export default function RelationshipsEditor({
           ) : (
             <div
               key={index}
-              className="flex items-start gap-3 p-4 bg-pink-50 dark:bg-pink-900/20 rounded-lg border border-pink-200 dark:border-pink-800"
+              className="flex items-start gap-3 p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 hover:border-pink-400/20 hover:bg-white/[0.05] transition-colors"
             >
               <div className="shrink-0">
                 <DynamicIcon name={rel.symbol} className="w-8 h-8" />
@@ -221,14 +221,14 @@ export default function RelationshipsEditor({
                 <div className="font-bold text-white flex items-center gap-2 flex-wrap mb-1">
                   <span>{rel.name}</span>
                   <span
-                    className={`text-sm px-2 py-0.5 rounded-full ${
+                    className={`text-sm px-2 py-0.5 rounded-full border ${
                       rel.value >= 50
-                        ? "bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200"
+                        ? "bg-green-500/10 text-green-300 border-green-400/20"
                         : rel.value >= 0
-                          ? "bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200"
+                          ? "bg-blue-500/10 text-blue-300 border-blue-400/20"
                           : rel.value >= -50
-                            ? "bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200"
-                            : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
+                            ? "bg-orange-500/10 text-orange-300 border-orange-400/20"
+                            : "bg-red-500/10 text-red-300 border-red-400/20"
                     }`}
                   >
                     {rel.value > 0 ? "+" : ""}
@@ -240,13 +240,13 @@ export default function RelationshipsEditor({
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => startEdit(index)}
-                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+                  className="px-3 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg transition-colors"
                 >
                   <DynamicIcon name="Edit" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => removeRelationship(index)}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+                  className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg transition-colors"
                 >
                   <DynamicIcon name="Trash2" className="w-4 h-4" />
                 </button>
@@ -255,7 +255,7 @@ export default function RelationshipsEditor({
           ),
         )}
         {localRelationships.length === 0 && (
-          <div className="p-8 text-center rounded-lg bg-blue-900/30 border-2 border-dashed border-blue-700/40">
+          <div className="p-8 text-center rounded-2xl bg-white/[0.02] border-2 border-dashed border-white/10">
             <p className="text-sm text-blue-300/50">
               No relationships yet. Add relationships to track your standing
               with characters, factions, and organizations.

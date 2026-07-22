@@ -247,9 +247,9 @@ export default function GuidedStoryStart() {
       {/* Setup wizard modal */}
       {open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-blue-950 border border-blue-700/50 rounded-2xl w-full max-w-lg shadow-2xl max-h-[90vh] flex flex-col">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/50 max-h-[90vh] flex flex-col">
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-blue-800/40">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
               <div className="flex items-center gap-2 min-w-0">
                 {step !== "count" && (
                   <button
@@ -261,7 +261,7 @@ export default function GuidedStoryStart() {
                         setStep(players.length > 0 ? "player" : "count");
                       }
                     }}
-                    className="p-1.5 -ml-1.5 text-blue-300 hover:text-white hover:bg-blue-900/50 rounded-lg transition-colors"
+                    className="p-1.5 -ml-1.5 text-blue-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                     title="Back"
                   >
                     <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
@@ -278,7 +278,7 @@ export default function GuidedStoryStart() {
               </div>
               <button
                 onClick={() => setOpen(false)}
-                className="p-1.5 text-blue-300/60 hover:text-white hover:bg-blue-900/50 rounded-lg transition-colors"
+                className="p-1.5 text-blue-300/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                 title="Close"
               >
                 <DynamicIcon name="X" className="w-4 h-4" />
@@ -289,7 +289,7 @@ export default function GuidedStoryStart() {
             <div className="flex items-center justify-center gap-1.5 pt-3">
               <span
                 className={`h-1.5 rounded-full transition-all ${
-                  step === "count" ? "w-5 bg-purple-400" : "w-1.5 bg-blue-700"
+                  step === "count" ? "w-5 bg-purple-400" : "w-1.5 bg-white/15"
                 }`}
               />
               {players.length > 0
@@ -305,14 +305,14 @@ export default function GuidedStoryStart() {
                         backgroundColor:
                           step === "player" && i === playerIndex
                             ? p.color
-                            : "#1d4ed8",
+                            : "rgba(255,255,255,0.15)",
                       }}
                     />
                   ))
-                : [<span key="p" className="w-1.5 h-1.5 rounded-full bg-blue-700" />]}
+                : [<span key="p" className="w-1.5 h-1.5 rounded-full bg-white/15" />]}
               <span
                 className={`h-1.5 rounded-full transition-all ${
-                  step === "ready" ? "w-5 bg-purple-400" : "w-1.5 bg-blue-700"
+                  step === "ready" ? "w-5 bg-purple-400" : "w-1.5 bg-white/15"
                 }`}
               />
             </div>
@@ -331,13 +331,13 @@ export default function GuidedStoryStart() {
                         <button
                           key={count}
                           onClick={() => chooseCount(count)}
-                          className="group p-4 rounded-xl bg-blue-900/30 hover:bg-purple-900/40 border border-blue-700/40 hover:border-purple-500/50 transition-all text-center"
+                          className="group p-4 rounded-xl bg-white/5 hover:bg-purple-500/10 border border-white/10 hover:border-purple-400/40 transition-all text-center"
                         >
                           <div className="flex items-center justify-center gap-1 mb-2">
                             {Array.from({ length: count }, (_, i) => (
                               <span
                                 key={i}
-                                className="w-7 h-7 rounded-full flex items-center justify-center border-2 border-blue-950 -ml-2 first:ml-0"
+                                className="w-7 h-7 rounded-full flex items-center justify-center border-2 border-[#0d1829] -ml-2 first:ml-0"
                                 style={{ backgroundColor: PALETTE[i] }}
                               >
                                 <DynamicIcon
@@ -388,7 +388,7 @@ export default function GuidedStoryStart() {
                       }}
                       placeholder={`Player ${playerIndex + 1} name`}
                       maxLength={24}
-                      className="flex-1 min-w-0 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="flex-1 min-w-0 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-base focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
 
@@ -411,7 +411,7 @@ export default function GuidedStoryStart() {
                             disabled={taken}
                             className={`w-9 h-9 rounded-full transition-all ${
                               selected
-                                ? "ring-2 ring-white ring-offset-2 ring-offset-blue-950 scale-110"
+                                ? "ring-2 ring-white ring-offset-2 ring-offset-[#0d1829] scale-110"
                                 : taken
                                   ? "opacity-25 cursor-not-allowed"
                                   : "hover:scale-110"
@@ -457,8 +457,8 @@ export default function GuidedStoryStart() {
                               selected
                                 ? "text-white border-transparent shadow-md"
                                 : full
-                                  ? "bg-blue-900/20 border-blue-800/30 text-blue-300/30 cursor-not-allowed"
-                                  : "bg-blue-900/20 border-blue-700/40 text-blue-200/70 hover:border-purple-500/50 hover:text-white"
+                                  ? "bg-white/[0.03] border-white/10 text-blue-300/30 cursor-not-allowed"
+                                  : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40 hover:text-white"
                             }`}
                             style={
                               selected
@@ -539,8 +539,8 @@ export default function GuidedStoryStart() {
                             }
                             className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
                               selected
-                                ? "bg-purple-600 border-transparent text-white shadow-md"
-                                : "bg-blue-900/20 border-blue-700/40 text-blue-200/70 hover:border-purple-500/50 hover:text-white"
+                                ? "bg-linear-to-r from-purple-600 to-blue-600 border-transparent text-white shadow-md shadow-purple-950/40"
+                                : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40 hover:text-white"
                             }`}
                           >
                             {tag}
@@ -558,7 +558,7 @@ export default function GuidedStoryStart() {
                       }
                       placeholder="Anything else? (optional)"
                       maxLength={200}
-                      className="w-full px-4 py-2.5 bg-blue-900/20 border border-blue-700/40 rounded-xl text-white text-sm placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
+                      className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500"
                     />
                   </div>
 
@@ -592,7 +592,7 @@ export default function GuidedStoryStart() {
                           setPlayerIndex(i);
                           setStep("player");
                         }}
-                        className="w-full flex items-center gap-3 p-3 bg-blue-900/20 hover:bg-blue-900/40 border border-blue-700/30 rounded-xl transition-colors text-left"
+                        className="w-full flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-colors text-left"
                         title="Edit this player"
                       >
                         <span
@@ -633,8 +633,8 @@ export default function GuidedStoryStart() {
                         onClick={() => setDiceMode("ai")}
                         className={`p-3 rounded-xl border text-left transition-all ${
                           diceMode === "ai"
-                            ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
-                            : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                            ? "bg-purple-500/15 border-purple-400/40 ring-1 ring-purple-400/30"
+                            : "bg-white/5 border-white/10 hover:border-purple-400/40"
                         }`}
                       >
                         <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
@@ -652,8 +652,8 @@ export default function GuidedStoryStart() {
                         onClick={() => setDiceMode("physical")}
                         className={`p-3 rounded-xl border text-left transition-all ${
                           diceMode === "physical"
-                            ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
-                            : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                            ? "bg-purple-500/15 border-purple-400/40 ring-1 ring-purple-400/30"
+                            : "bg-white/5 border-white/10 hover:border-purple-400/40"
                         }`}
                       >
                         <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
@@ -671,8 +671,8 @@ export default function GuidedStoryStart() {
                         onClick={() => setDiceMode("manual")}
                         className={`p-3 rounded-xl border text-left transition-all ${
                           diceMode === "manual"
-                            ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
-                            : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                            ? "bg-purple-500/15 border-purple-400/40 ring-1 ring-purple-400/30"
+                            : "bg-white/5 border-white/10 hover:border-purple-400/40"
                         }`}
                       >
                         <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
@@ -696,8 +696,8 @@ export default function GuidedStoryStart() {
                         onClick={() => setPickerMode("character")}
                         className={`flex-1 px-3 py-2.5 rounded-xl border text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                           characterAttached
-                            ? "bg-purple-900/40 border-purple-600/50 text-purple-200"
-                            : "bg-blue-900/20 hover:bg-blue-900/40 border-blue-700/40 text-blue-200/70"
+                            ? "bg-purple-500/15 border-purple-400/40 text-purple-200"
+                            : "bg-white/5 hover:bg-white/10 border-white/10 text-blue-200/70"
                         }`}
                       >
                         <DynamicIcon name="User" className="w-4 h-4" />
@@ -708,7 +708,7 @@ export default function GuidedStoryStart() {
                     )}
                     <button
                       onClick={() => setPickerMode("notes")}
-                      className="flex-1 px-3 py-2.5 rounded-xl border bg-blue-900/20 hover:bg-blue-900/40 border-blue-700/40 text-blue-200/70 text-xs font-medium transition-all flex items-center justify-center gap-1.5"
+                      className="flex-1 px-3 py-2.5 rounded-xl border bg-white/5 hover:bg-white/10 border-white/10 text-blue-200/70 text-xs font-medium transition-all flex items-center justify-center gap-1.5"
                     >
                       <DynamicIcon name="Library" className="w-4 h-4" />
                       {noteCount > 0 || attachedTables.length > 0
@@ -737,7 +737,7 @@ export default function GuidedStoryStart() {
                   <button
                     onClick={() => beginStory(true)}
                     disabled={starting}
-                    className="w-full py-2.5 rounded-xl bg-blue-900/30 hover:bg-blue-900/50 border border-blue-700/40 active:scale-[0.99] text-blue-200 text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                    className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 active:scale-[0.99] text-blue-200 text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
                     title="Start this story and immediately open it as an online room others can join"
                   >
                     <DynamicIcon name="Wifi" className="w-4 h-4" />

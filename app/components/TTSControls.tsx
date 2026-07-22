@@ -663,12 +663,12 @@ export default function TTSControls({
       <button
         onClick={handleToggle}
         disabled={buttonDisabled}
-        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
           buttonDisabled
-            ? "bg-gray-200 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+            ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
             : isActive
-              ? "bg-red-500 hover:bg-red-600 text-white"
-              : "bg-purple-600 hover:bg-purple-700 text-white"
+              ? "bg-linear-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-md shadow-red-950/40"
+              : "bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-950/40"
         }`}
         title={isActive ? "Stop" : canReplay ? "Replay" : "Read aloud"}
       >

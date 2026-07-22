@@ -298,15 +298,18 @@ export default function ChoicesModal({
       const matchResult = findStatMatch(choice.skill_used, storyData.stats);
       const skill = matchResult?.item;
       details.push(
-        <div key="skill" className="flex items-center gap-2 text-purple-400">
+        <div
+          key="skill"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-400/20 text-purple-300"
+        >
           <DynamicIcon
             name={skill?.symbol || "BarChart2"}
-            className="w-4 h-4"
+            className="w-3.5 h-3.5"
           />
-          <span className="text-sm">
+          <span className="text-xs">
             {choice.skill_used} Check
             {skill && (
-              <span className="text-gray-400 ml-1">(+{skill.value})</span>
+              <span className="text-purple-300/60 ml-1">(+{skill.value})</span>
             )}
           </span>
         </div>,
@@ -321,12 +324,15 @@ export default function ChoicesModal({
       );
       const resource = matchResult?.item;
       details.push(
-        <div key="resource" className="flex items-center gap-2 text-amber-400">
-          <DynamicIcon name={resource?.symbol || "Gem"} className="w-4 h-4" />
-          <span className="text-sm">
+        <div
+          key="resource"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-400/20 text-amber-300"
+        >
+          <DynamicIcon name={resource?.symbol || "Gem"} className="w-3.5 h-3.5" />
+          <span className="text-xs">
             Uses {choice.resource_used}
             {resource && (
-              <span className="text-gray-400 ml-1">
+              <span className="text-amber-300/60 ml-1">
                 ({resource.value}/{resource.maxValue})
               </span>
             )}
@@ -340,12 +346,15 @@ export default function ChoicesModal({
       const matchResult = findItemMatch(choice.item_used, storyData.inventory);
       const item = matchResult?.item;
       details.push(
-        <div key="item" className="flex items-center gap-2 text-green-400">
-          <DynamicIcon name={item?.symbol || "Package"} className="w-4 h-4" />
-          <span className="text-sm">
+        <div
+          key="item"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-green-500/10 border border-green-400/20 text-green-300"
+        >
+          <DynamicIcon name={item?.symbol || "Package"} className="w-3.5 h-3.5" />
+          <span className="text-xs">
             Uses {choice.item_used}
             {item && (
-              <span className="text-gray-400 ml-1">
+              <span className="text-green-300/60 ml-1">
                 ({item.quantity} remaining)
               </span>
             )}
@@ -357,9 +366,12 @@ export default function ChoicesModal({
     // AGMT check
     if (choice.agmt_check) {
       details.push(
-        <div key="mythic" className="flex items-center gap-2 text-purple-400">
-          <DynamicIcon name="Sparkles" className="w-4 h-4" />
-          <span className="text-sm">Fate Check</span>
+        <div
+          key="mythic"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-purple-500/10 border border-purple-400/20 text-purple-300"
+        >
+          <DynamicIcon name="Sparkles" className="w-3.5 h-3.5" />
+          <span className="text-xs">Fate Check</span>
         </div>,
       );
     }
@@ -369,9 +381,12 @@ export default function ChoicesModal({
       choice.table || choice.agmt_table || choice.custom_table;
     if (tableToShow) {
       details.push(
-        <div key="table" className="flex items-center gap-2 text-indigo-400">
-          <DynamicIcon name="Dices" className="w-4 h-4" />
-          <span className="text-sm">Table: {tableToShow}</span>
+        <div
+          key="table"
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-indigo-500/10 border border-indigo-400/20 text-indigo-300"
+        >
+          <DynamicIcon name="Dices" className="w-3.5 h-3.5" />
+          <span className="text-xs">Table: {tableToShow}</span>
         </div>,
       );
     }
@@ -394,9 +409,9 @@ export default function ChoicesModal({
       />
 
       {/* Modal */}
-      <div className="relative bg-linear-to-b from-gray-900 via-blue-950 to-purple-950 rounded-xl shadow-2xl border border-blue-800/30 max-w-2xl w-full mx-4 max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="relative bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 border border-white/10 max-w-2xl w-full mx-4 max-h-[85vh] flex flex-col overflow-hidden">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-blue-800/30">
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
           <h2 className="text-lg font-semibold text-white flex items-center gap-2">
             <DynamicIcon
               name={actionMode ? "PenLine" : "Compass"}
@@ -411,8 +426,8 @@ export default function ChoicesModal({
                 onClick={() => onActionModeChange(!actionMode)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
                   actionMode
-                    ? "bg-purple-600/30 text-purple-300 hover:bg-purple-600/50"
-                    : "bg-blue-600/30 text-blue-300 hover:bg-blue-600/50"
+                    ? "bg-purple-500/10 text-purple-300 border border-purple-400/20 hover:bg-purple-500/20"
+                    : "bg-blue-500/10 text-blue-300 border border-blue-400/20 hover:bg-blue-500/20"
                 }`}
                 title={
                   actionMode
@@ -429,7 +444,7 @@ export default function ChoicesModal({
             )}
             <button
               onClick={onClose}
-              className="p-2.5 sm:p-2 text-blue-200/60 hover:text-white hover:bg-blue-900/50 rounded-lg transition-colors touch-manipulation"
+              className="p-2.5 sm:p-2 text-blue-200/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors touch-manipulation"
             >
               <DynamicIcon name="X" className="w-5 h-5 sm:w-4 sm:h-4" />
             </button>
@@ -452,14 +467,14 @@ export default function ChoicesModal({
                         value={multiplayerName}
                         onChange={(e) => setMultiplayerName(e.target.value)}
                         placeholder={storyData.player_name || "Your name"}
-                        className="w-full px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                       />
                     </div>
                     <div className="sm:w-56">
                       <label className="block text-xs font-medium text-blue-200/70 mb-1">
                         Turn status
                       </label>
-                      <div className="px-3 py-2 bg-blue-950/30 border border-blue-800/20 rounded-lg text-xs text-blue-200/60">
+                      <div className="px-3 py-2 bg-white/[0.03] border border-white/10 rounded-lg text-xs text-blue-200/60">
                         {pendingMultiplayer.length} queued
                         {multiplayerMode === "timer" &&
                           multiplayerTimerStart && (
@@ -493,14 +508,14 @@ export default function ChoicesModal({
                   </div>
 
                   {pendingMultiplayer.length > 0 && (
-                    <div className="bg-blue-950/30 border border-blue-800/20 rounded-lg p-3 space-y-2">
+                    <div className="bg-white/[0.03] border border-white/10 rounded-lg p-3 space-y-2">
                       <div className="text-xs font-medium text-blue-200/70">
                         Pending actions
                       </div>
                       {pendingMultiplayer.map((p) => (
                         <div
                           key={p.name}
-                          className="flex items-start justify-between gap-2 bg-blue-900/20 border border-blue-800/20 rounded-lg px-3 py-2"
+                          className="flex items-start justify-between gap-2 bg-white/[0.03] border border-white/10 rounded-lg px-3 py-2"
                         >
                           <div className="min-w-0">
                             <div className="text-xs text-blue-200/80 font-semibold">
@@ -520,7 +535,7 @@ export default function ChoicesModal({
                                 ),
                               )
                             }
-                            className="px-2 py-1 text-xs bg-red-600/70 hover:bg-red-600 text-white rounded"
+                            className="px-2 py-1 text-xs bg-red-500/10 hover:bg-red-500/20 border border-red-400/20 text-red-300 rounded-lg transition-colors"
                             title="Remove"
                           >
                             Remove
@@ -543,8 +558,8 @@ export default function ChoicesModal({
                     onClick={() => setCommentMode((prev) => !prev)}
                     className={`px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-colors ${
                       commentMode
-                        ? "bg-emerald-600/40 border-emerald-400/40 text-emerald-100"
-                        : "bg-blue-950/30 border-blue-800/20 text-blue-200/60 hover:bg-blue-950/50"
+                        ? "bg-emerald-500/20 border-emerald-400/40 text-emerald-100"
+                        : "bg-white/[0.03] border-white/10 text-blue-200/60 hover:bg-white/5"
                     }`}
                     disabled={loading}
                     title="When enabled, anything you submit is posted as a player-visible comment and is not sent to the AI."
@@ -565,7 +580,7 @@ export default function ChoicesModal({
                     }
                     rows={3}
                     disabled={loading}
-                    className="flex-1 px-3 py-2 bg-blue-950/50 border border-blue-800/30 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm"
+                    className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none text-sm"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && e.ctrlKey) {
                         e.preventDefault();
@@ -586,153 +601,153 @@ export default function ChoicesModal({
               {/* Act / Multiplayer buttons */}
               <>
                 {multiplayerEnabled ? (
-                    <div className="space-y-2">
-                      {commentMode ? (
+                  <div className="space-y-2">
+                    {commentMode ? (
+                      <button
+                        onClick={() => handleActionAnalyze()}
+                        disabled={
+                          loading || (commentMode && !actionText.trim())
+                        }
+                        className={`w-full py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                          loading || (commentMode && !actionText.trim())
+                            ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                            : "bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-950/40"
+                        }`}
+                      >
+                        <DynamicIcon
+                          name="MessageSquare"
+                          className="w-4 h-4"
+                        />
+                        Send Comment
+                      </button>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            onClick={handleMultiplayerAdd}
+                            disabled={loading || !multiplayerName.trim()}
+                            className={`py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                              loading || !multiplayerName.trim()
+                                ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                                : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-md shadow-purple-950/40"
+                            }`}
+                            title={
+                              actionText.trim()
+                                ? "Submit your action for this turn"
+                                : "Submit a skip (continue) for this turn"
+                            }
+                          >
+                            <DynamicIcon name="Plus" className="w-4 h-4" />
+                            Add To Turn
+                          </button>
+                          <button
+                            onClick={handleMultiplayerSkip}
+                            disabled={loading || !multiplayerName.trim()}
+                            className={`py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                              loading || !multiplayerName.trim()
+                                ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                                : "bg-white/5 hover:bg-white/10 border border-white/10 text-blue-100"
+                            }`}
+                            title="Skip your turn (submit continue)"
+                          >
+                            <DynamicIcon
+                              name="FastForward"
+                              className="w-4 h-4"
+                            />
+                            Skip Turn
+                          </button>
+                        </div>
+
                         <button
-                          onClick={() => handleActionAnalyze()}
+                          onClick={handleMultiplayerSend}
                           disabled={
-                            loading || (commentMode && !actionText.trim())
+                            loading ||
+                            pendingMultiplayer.length === 0 ||
+                            !canManageTurn
                           }
-                          className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                            loading || (commentMode && !actionText.trim())
-                              ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                              : "bg-emerald-600 hover:bg-emerald-500 text-white"
+                          className={`w-full py-3 rounded-lg font-medium transition-all ${
+                            loading ||
+                            pendingMultiplayer.length === 0 ||
+                            !canManageTurn
+                              ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                              : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-md shadow-purple-950/40"
                           }`}
+                          title={
+                            !canManageTurn
+                              ? "Only the host can generate"
+                              : undefined
+                          }
                         >
-                          <DynamicIcon
-                            name="MessageSquare"
-                            className="w-4 h-4"
-                          />
-                          Send Comment
+                          {multiplayerMode === "timer"
+                            ? "Generate Now"
+                            : "Generate"}
                         </button>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              onClick={handleMultiplayerAdd}
-                              disabled={loading || !multiplayerName.trim()}
-                              className={`py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                                loading || !multiplayerName.trim()
-                                  ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                                  : "bg-blue-600 hover:bg-blue-500 text-white"
-                              }`}
-                              title={
-                                actionText.trim()
-                                  ? "Submit your action for this turn"
-                                  : "Submit a skip (continue) for this turn"
-                              }
-                            >
-                              <DynamicIcon name="Plus" className="w-4 h-4" />
-                              Add To Turn
-                            </button>
-                            <button
-                              onClick={handleMultiplayerSkip}
-                              disabled={loading || !multiplayerName.trim()}
-                              className={`py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                                loading || !multiplayerName.trim()
-                                  ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                                  : "bg-blue-900/50 hover:bg-blue-900/70 text-blue-100"
-                              }`}
-                              title="Skip your turn (submit continue)"
-                            >
-                              <DynamicIcon
-                                name="FastForward"
-                                className="w-4 h-4"
-                              />
-                              Skip Turn
-                            </button>
-                          </div>
 
-                          <button
-                            onClick={handleMultiplayerSend}
-                            disabled={
-                              loading ||
-                              pendingMultiplayer.length === 0 ||
-                              !canManageTurn
-                            }
-                            className={`w-full py-3 rounded-lg font-medium transition-colors ${
-                              loading ||
-                              pendingMultiplayer.length === 0 ||
-                              !canManageTurn
-                                ? "bg-purple-800/30 text-purple-300/40 cursor-not-allowed"
-                                : "bg-purple-600 hover:bg-purple-500 text-white"
-                            }`}
-                            title={
-                              !canManageTurn
-                                ? "Only the host can generate"
-                                : undefined
-                            }
-                          >
-                            {multiplayerMode === "timer"
-                              ? "Generate Now"
-                              : "Generate"}
-                          </button>
-
-                          <button
-                            onClick={handleMultiplayerClear}
-                            disabled={
-                              loading ||
-                              pendingMultiplayer.length === 0 ||
-                              !canManageTurn
-                            }
-                            className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                              loading ||
-                              pendingMultiplayer.length === 0 ||
-                              !canManageTurn
-                                ? "bg-red-950/30 text-red-200/30 cursor-not-allowed"
-                                : "bg-red-600/60 hover:bg-red-600 text-white"
-                            }`}
-                            title={
-                              !canManageTurn
-                                ? "Only the host can clear the turn"
-                                : undefined
-                            }
-                          >
-                            Clear Turn
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleActionAnalyze()}
-                      disabled={loading || (commentMode && !actionText.trim())}
-                      className={`w-full py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                        loading || (commentMode && !actionText.trim())
-                          ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                          : "bg-blue-600 hover:bg-blue-500 text-white"
-                      }`}
-                    >
-                      {loading ? (
-                        <>
-                          <DynamicIcon
-                            name="Loader2"
-                            className="w-4 h-4 animate-spin"
-                          />
-                          Generating...
-                        </>
-                      ) : commentMode ? (
-                        <>
-                          <DynamicIcon
-                            name="MessageSquare"
-                            className="w-4 h-4"
-                          />
-                          Send Comment
-                        </>
-                      ) : actionText.trim() ? (
-                        <>
-                          <DynamicIcon name="Play" className="w-4 h-4" />
-                          Act
-                        </>
-                      ) : (
-                        <>
-                          <DynamicIcon name="FastForward" className="w-4 h-4" />
-                          Continue
-                        </>
-                      )}
-                    </button>
-                  )}
-                </>
+                        <button
+                          onClick={handleMultiplayerClear}
+                          disabled={
+                            loading ||
+                            pendingMultiplayer.length === 0 ||
+                            !canManageTurn
+                          }
+                          className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            loading ||
+                            pendingMultiplayer.length === 0 ||
+                            !canManageTurn
+                              ? "bg-white/5 text-red-300/30 cursor-not-allowed"
+                              : "bg-red-500/10 hover:bg-red-500/20 border border-red-400/20 text-red-300"
+                          }`}
+                          title={
+                            !canManageTurn
+                              ? "Only the host can clear the turn"
+                              : undefined
+                          }
+                        >
+                          Clear Turn
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleActionAnalyze()}
+                    disabled={loading || (commentMode && !actionText.trim())}
+                    className={`w-full py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                      loading || (commentMode && !actionText.trim())
+                        ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                        : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-md shadow-purple-950/40"
+                    }`}
+                  >
+                    {loading ? (
+                      <>
+                        <DynamicIcon
+                          name="Loader2"
+                          className="w-4 h-4 animate-spin"
+                        />
+                        Generating...
+                      </>
+                    ) : commentMode ? (
+                      <>
+                        <DynamicIcon
+                          name="MessageSquare"
+                          className="w-4 h-4"
+                        />
+                        Send Comment
+                      </>
+                    ) : actionText.trim() ? (
+                      <>
+                        <DynamicIcon name="Play" className="w-4 h-4" />
+                        Act
+                      </>
+                    ) : (
+                      <>
+                        <DynamicIcon name="FastForward" className="w-4 h-4" />
+                        Continue
+                      </>
+                    )}
+                  </button>
+                )}
+              </>
             </div>
           ) : (
             /* CHOICE MODE */
@@ -745,18 +760,18 @@ export default function ChoicesModal({
                   <button
                     key={index}
                     onClick={() => onSelectChoice(choice)}
-                    className={`w-full text-left p-4 sm:p-3 rounded-lg transition-all border touch-manipulation ${
+                    className={`w-full text-left p-4 sm:p-3 rounded-xl transition-all border touch-manipulation ${
                       isSelected
-                        ? "bg-blue-600/20 border-blue-500/50"
-                        : "bg-blue-900/30 border-blue-800/30 hover:border-blue-600/50 active:bg-blue-800/40"
+                        ? "bg-purple-500/10 border-purple-400/40"
+                        : "bg-white/[0.03] border-white/10 hover:border-white/20 hover:bg-white/5 active:bg-white/[0.07]"
                     }`}
                   >
                     <div className="flex items-start gap-2.5">
                       <div
                         className={`mt-0.5 w-4 h-4 rounded-full border-2 flex items-center justify-center shrink-0 ${
                           isSelected
-                            ? "border-blue-400 bg-blue-500"
-                            : "border-blue-700"
+                            ? "border-purple-400 bg-linear-to-br from-purple-500 to-blue-500"
+                            : "border-white/20"
                         }`}
                       >
                         {isSelected && (
@@ -784,10 +799,10 @@ export default function ChoicesModal({
                 <button
                   onClick={onRerollChoices}
                   disabled={loading}
-                  className={`w-full text-left p-4 sm:p-3 rounded-lg transition-all border border-dashed touch-manipulation ${
+                  className={`w-full text-left p-4 sm:p-3 rounded-xl transition-all border border-dashed touch-manipulation ${
                     loading
-                      ? "bg-blue-900/10 border-blue-800/20 cursor-not-allowed"
-                      : "bg-blue-900/20 border-blue-800/30 hover:border-purple-500/50 hover:bg-purple-900/20 active:bg-purple-800/30"
+                      ? "bg-white/[0.02] border-white/10 cursor-not-allowed"
+                      : "bg-white/[0.03] border-white/10 hover:border-purple-400/40 hover:bg-purple-500/10 active:bg-purple-500/20"
                   }`}
                 >
                   <div className="flex items-center gap-2.5">
@@ -812,7 +827,7 @@ export default function ChoicesModal({
         </div>
 
         {/* Footer with Confirm */}
-        <div className="p-3 border-t border-blue-800/30 bg-blue-900/30 space-y-2">
+        <div className="p-3 border-t border-white/10 bg-white/[0.02] space-y-2">
           {/* Confirm Button - only for choice mode */}
           {!actionMode && (
             <button
@@ -823,8 +838,8 @@ export default function ChoicesModal({
               disabled={!selectedChoice || loading}
               className={`w-full py-3.5 sm:py-2.5 rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation ${
                 !selectedChoice || loading
-                  ? "bg-blue-800/50 text-blue-400 cursor-not-allowed"
-                  : "bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white"
+                  ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                  : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 active:scale-[0.99] text-white shadow-md shadow-purple-950/40"
               }`}
             >
               {loading ? (

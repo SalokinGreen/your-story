@@ -32,7 +32,7 @@ export function StoryTabBar({ tabs, currentState, onSelect }: StoryTabBarProps) 
   return (
     <nav
       aria-label="Story sections"
-      className="relative z-30 bg-blue-950/50 rounded-none sm:rounded-xl border-x-0 sm:border border-blue-800/30 p-2"
+      className="relative z-30 bg-white/[0.04] backdrop-blur-xl rounded-none sm:rounded-xl border-x-0 sm:border border-white/10 p-2"
     >
       <div className="flex items-center justify-center gap-1 sm:gap-1.5">
         {tabs.map((tab) => {
@@ -47,14 +47,14 @@ export function StoryTabBar({ tabs, currentState, onSelect }: StoryTabBarProps) 
               className={`focus-ring relative flex items-center justify-center gap-1.5 rounded-lg px-3 py-2.5 sm:px-3.5 sm:py-2 min-h-[44px] text-sm font-medium touch-manipulation transition-colors duration-200 ${
                 active
                   ? "text-white"
-                  : "text-blue-200/70 hover:text-white hover:bg-blue-900/40 active:bg-blue-800/50"
+                  : "text-blue-200/70 hover:text-white hover:bg-white/5 active:bg-white/10"
               }`}
             >
               {/* Morphing active pill - shared layoutId animates across tabs */}
               {active && (
                 <motion.span
                   layoutId="activeTabPill"
-                  className="absolute inset-0 -z-10 rounded-lg bg-linear-to-b from-purple-600 to-purple-700 shadow-[0_2px_12px_rgba(147,51,234,0.45)] ring-1 ring-purple-400/40"
+                  className="absolute inset-0 -z-10 rounded-lg bg-linear-to-r from-purple-600 to-pink-600 shadow-[0_2px_12px_rgba(147,51,234,0.45)] ring-1 ring-purple-400/40"
                   transition={pillTransition}
                 />
               )}

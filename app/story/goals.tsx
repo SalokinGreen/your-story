@@ -23,12 +23,12 @@ export default function GoalsPage(storyData: StoryData) {
   if (!hasGoals && !hasThreads) {
     return (
       <div className="w-full">
-        <div className="bg-blue-950/50 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-blue-800/30">
+        <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl p-6 sm:p-8 border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
           <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent flex items-center gap-2">
             <DynamicIcon name="Scroll" className="w-8 h-8 text-purple-400" />{" "}
             Journal
           </h2>
-          <div className="p-8 text-center rounded-lg bg-blue-900/20 border-2 border-dashed border-blue-700/40">
+          <div className="p-8 text-center rounded-2xl bg-white/[0.02] border-2 border-dashed border-white/10">
             <p className="text-sm sm:text-base text-blue-200/60">
               No goals or story threads yet
             </p>
@@ -60,7 +60,7 @@ export default function GoalsPage(storyData: StoryData) {
     <div className="w-full">
       {/* Goals Section */}
       {hasGoals && (
-        <div className="bg-blue-950/50 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-blue-800/30">
+        <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl p-6 sm:p-8 border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
           <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent flex items-center gap-2">
             <DynamicIcon name="Scroll" className="w-8 h-8 text-purple-400" />{" "}
             Goals
@@ -82,7 +82,7 @@ export default function GoalsPage(storyData: StoryData) {
                   return (
                     <div
                       key={goal.id || `goal-${goal.title}-${Math.random()}`}
-                      className="flex flex-col gap-3 p-4 rounded-xl border-2 border-blue-500/50 bg-blue-900/30 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(59,130,246,0.15)]"
+                      className="flex flex-col gap-3 p-4 rounded-xl border border-blue-400/30 bg-blue-500/[0.06] backdrop-blur-md transition-all card-interactive hover:shadow-[0_4px_16px_rgba(59,130,246,0.15)]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -96,17 +96,17 @@ export default function GoalsPage(storyData: StoryData) {
                           </p>
                           {expandedGoalId === goal.id &&
                             goal.description !== goal.shortDescription && (
-                              <p className="text-xs sm:text-sm text-blue-200/60 italic mt-2 p-3 bg-blue-950/50 rounded border border-blue-700/40">
+                              <p className="text-xs sm:text-sm text-blue-200/60 italic mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
                                 {goal.description}
                               </p>
                             )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 pt-2 border-t border-blue-700/40">
+                      <div className="flex items-center gap-2 pt-2 border-t border-white/10">
                         {goal.description !== goal.shortDescription && (
                           <button
                             onClick={() => toggleExpanded(goal.id)}
-                            className="px-3 py-1 text-sm bg-blue-700/50 hover:bg-blue-600/50 text-blue-100 rounded-lg transition-colors"
+                            className="px-3 py-1 text-sm bg-white/5 hover:bg-white/10 border border-white/10 text-blue-100 rounded-lg transition-colors"
                           >
                             {expandedGoalId === goal.id
                               ? "Show Less"
@@ -115,7 +115,7 @@ export default function GoalsPage(storyData: StoryData) {
                         )}
                         <button
                           onClick={() => toggleGoalActive(goal.id)}
-                          className="px-3 py-1 text-sm bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
+                          className="px-3 py-1 text-sm bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-colors"
                         >
                           <span className="flex items-center gap-1">
                             <DynamicIcon name="EyeOff" className="w-4 h-4" />{" "}
@@ -151,7 +151,7 @@ export default function GoalsPage(storyData: StoryData) {
                         goal.id ||
                         `goal-completed-${goal.title}-${Math.random()}`
                       }
-                      className="flex flex-col gap-3 p-4 rounded-xl border-2 border-green-500/50 bg-green-900/20 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(34,197,94,0.15)]"
+                      className="flex flex-col gap-3 p-4 rounded-xl border border-green-400/30 bg-green-500/[0.06] backdrop-blur-md transition-all card-interactive hover:shadow-[0_4px_16px_rgba(34,197,94,0.15)]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -169,17 +169,17 @@ export default function GoalsPage(storyData: StoryData) {
                           </p>
                           {expandedGoalId === goal.id &&
                             goal.description !== goal.shortDescription && (
-                              <p className="text-xs sm:text-sm text-green-200/60 italic mt-2 p-3 bg-green-950/50 rounded border border-green-700/40">
+                              <p className="text-xs sm:text-sm text-green-200/60 italic mt-2 p-3 bg-white/5 rounded-lg border border-green-400/15">
                                 {goal.description}
                               </p>
                             )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 pt-2 border-t border-green-700/40">
+                      <div className="flex items-center gap-2 pt-2 border-t border-green-400/15">
                         {goal.description !== goal.shortDescription && (
                           <button
                             onClick={() => toggleExpanded(goal.id)}
-                            className="px-3 py-1 text-sm bg-green-700/50 hover:bg-green-600/50 text-green-100 rounded-lg transition-colors"
+                            className="px-3 py-1 text-sm bg-green-500/10 hover:bg-green-500/20 border border-green-400/20 text-green-100 rounded-lg transition-colors"
                           >
                             {expandedGoalId === goal.id
                               ? "Show Less"
@@ -188,7 +188,7 @@ export default function GoalsPage(storyData: StoryData) {
                         )}
                         <button
                           onClick={() => toggleGoalActive(goal.id)}
-                          className="px-3 py-1 text-sm bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
+                          className="px-3 py-1 text-sm bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-colors"
                         >
                           <span className="flex items-center gap-1">
                             <DynamicIcon name="EyeOff" className="w-4 h-4" />{" "}
@@ -224,7 +224,7 @@ export default function GoalsPage(storyData: StoryData) {
                         goal.id ||
                         `goal-inactive-${goal.title}-${Math.random()}`
                       }
-                      className="flex flex-col gap-3 p-4 rounded-xl border-2 border-blue-800/30 bg-blue-900/20 opacity-70 transition-all card-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.08)]"
+                      className="flex flex-col gap-3 p-4 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-md opacity-70 transition-all card-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.08)]"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex-1 min-w-0">
@@ -248,17 +248,17 @@ export default function GoalsPage(storyData: StoryData) {
                           </p>
                           {expandedGoalId === goal.id &&
                             goal.description !== goal.shortDescription && (
-                              <p className="text-xs sm:text-sm text-blue-200/50 italic mt-2 p-3 bg-blue-950/50 rounded border border-blue-800/30">
+                              <p className="text-xs sm:text-sm text-blue-200/50 italic mt-2 p-3 bg-white/5 rounded-lg border border-white/10">
                                 {goal.description}
                               </p>
                             )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 pt-2 border-t border-blue-800/30">
+                      <div className="flex items-center gap-2 pt-2 border-t border-white/10">
                         {goal.description !== goal.shortDescription && (
                           <button
                             onClick={() => toggleExpanded(goal.id)}
-                            className="px-3 py-1 text-sm bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
+                            className="px-3 py-1 text-sm bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-colors"
                           >
                             {expandedGoalId === goal.id
                               ? "Show Less"
@@ -267,7 +267,7 @@ export default function GoalsPage(storyData: StoryData) {
                         )}
                         <button
                           onClick={() => toggleGoalActive(goal.id)}
-                          className="px-3 py-1 text-sm bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
+                          className="px-3 py-1 text-sm bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all"
                         >
                           <span className="flex items-center gap-1">
                             <DynamicIcon name="Eye" className="w-4 h-4" /> Show
@@ -286,7 +286,7 @@ export default function GoalsPage(storyData: StoryData) {
 
       {/* Story Threads Section */}
       {hasThreads && (
-        <div className="bg-purple-950/50 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-purple-800/30 mt-6">
+        <div className="bg-purple-500/[0.03] backdrop-blur-xl rounded-2xl p-6 sm:p-8 border border-purple-400/15 shadow-[0_4px_24px_rgba(0,0,0,0.3)] mt-6">
           <h2 className="text-2xl sm:text-3xl font-bold mb-6 bg-linear-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent flex items-center gap-2">
             <DynamicIcon name="GitBranch" className="w-8 h-8 text-purple-400" />{" "}
             Story Threads
@@ -306,7 +306,7 @@ export default function GoalsPage(storyData: StoryData) {
                 {activeThreads.map((thread) => (
                   <div
                     key={thread.id}
-                    className="flex flex-col gap-3 p-4 rounded-xl border-2 border-purple-500/50 bg-purple-900/30 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(168,85,247,0.15)]"
+                    className="flex flex-col gap-3 p-4 rounded-xl border border-purple-400/30 bg-purple-500/[0.06] backdrop-blur-md transition-all card-interactive hover:shadow-[0_4px_16px_rgba(168,85,247,0.15)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -317,10 +317,10 @@ export default function GoalsPage(storyData: StoryData) {
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
                               thread.priority === "main"
-                                ? "bg-red-800/50 text-red-200"
+                                ? "bg-red-500/15 text-red-300 border border-red-400/20"
                                 : thread.priority === "side"
-                                ? "bg-blue-800/50 text-blue-200"
-                                : "bg-gray-800/50 text-gray-200"
+                                ? "bg-blue-500/15 text-blue-300 border border-blue-400/20"
+                                : "bg-white/10 text-blue-200/70 border border-white/10"
                             }`}
                           >
                             {thread.priority || "side"}
@@ -342,7 +342,7 @@ export default function GoalsPage(storyData: StoryData) {
                             expandedThreadId === thread.id ? null : thread.id
                           )
                         }
-                        className="self-start px-3 py-1 text-sm bg-purple-700/50 hover:bg-purple-600/50 text-purple-100 rounded-lg transition-colors"
+                        className="self-start px-3 py-1 text-sm bg-purple-500/10 hover:bg-purple-500/20 border border-purple-400/20 text-purple-100 rounded-lg transition-colors"
                       >
                         {expandedThreadId === thread.id
                           ? "Show Less"
@@ -369,7 +369,7 @@ export default function GoalsPage(storyData: StoryData) {
                 {resolvedThreads.map((thread) => (
                   <div
                     key={thread.id}
-                    className="flex flex-col gap-3 p-4 rounded-xl border-2 border-green-500/40 bg-green-900/20 opacity-80 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(34,197,94,0.12)]"
+                    className="flex flex-col gap-3 p-4 rounded-xl border border-green-400/20 bg-green-500/[0.04] backdrop-blur-md opacity-80 transition-all card-interactive hover:shadow-[0_4px_16px_rgba(34,197,94,0.12)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -384,10 +384,10 @@ export default function GoalsPage(storyData: StoryData) {
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs font-bold shrink-0 ${
                               thread.priority === "main"
-                                ? "bg-red-800/30 text-red-200/60"
+                                ? "bg-red-500/10 text-red-300/60 border border-red-400/10"
                                 : thread.priority === "side"
-                                ? "bg-blue-800/30 text-blue-200/60"
-                                : "bg-gray-800/30 text-gray-200/60"
+                                ? "bg-blue-500/10 text-blue-300/60 border border-blue-400/10"
+                                : "bg-white/5 text-blue-200/40 border border-white/10"
                             }`}
                           >
                             {thread.priority || "side"}
@@ -409,7 +409,7 @@ export default function GoalsPage(storyData: StoryData) {
                             expandedThreadId === thread.id ? null : thread.id
                           )
                         }
-                        className="self-start px-3 py-1 text-sm bg-green-800/50 hover:bg-green-700/50 text-green-100 rounded-lg transition-colors"
+                        className="self-start px-3 py-1 text-sm bg-green-500/10 hover:bg-green-500/20 border border-green-400/20 text-green-100 rounded-lg transition-colors"
                       >
                         {expandedThreadId === thread.id
                           ? "Show Less"
@@ -436,7 +436,7 @@ export default function GoalsPage(storyData: StoryData) {
                 {abandonedThreads.map((thread) => (
                   <div
                     key={thread.id}
-                    className="flex flex-col gap-3 p-4 rounded-xl border-2 border-red-800/30 bg-red-900/10 opacity-60 transition-all card-interactive hover:shadow-[0_4px_12px_rgba(239,68,68,0.08)]"
+                    className="flex flex-col gap-3 p-4 rounded-xl border border-red-400/15 bg-red-500/[0.03] backdrop-blur-md opacity-60 transition-all card-interactive hover:shadow-[0_4px_12px_rgba(239,68,68,0.08)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex-1 min-w-0">
@@ -465,7 +465,7 @@ export default function GoalsPage(storyData: StoryData) {
                             expandedThreadId === thread.id ? null : thread.id
                           )
                         }
-                        className="self-start px-3 py-1 text-sm bg-red-800/50 hover:bg-red-700/50 text-red-100 rounded-lg transition-colors"
+                        className="self-start px-3 py-1 text-sm bg-red-500/10 hover:bg-red-500/20 border border-red-400/20 text-red-100 rounded-lg transition-colors"
                       >
                         {expandedThreadId === thread.id
                           ? "Show Less"

@@ -101,10 +101,10 @@ export default function CharacterSheetTemplateEditor({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowHelp(!showHelp)}
-            className={`p-2 rounded-lg transition-colors ${
+            className={`p-2 rounded-lg transition-all ${
               showHelp
-                ? "bg-amber-600 text-white"
-                : "bg-blue-900/50 text-blue-300 hover:bg-blue-800/50"
+                ? "bg-linear-to-r from-amber-600 to-orange-600 text-white shadow-md shadow-amber-950/40"
+                : "bg-white/5 text-blue-300 hover:bg-white/10 border border-white/10"
             }`}
             title="Syntax Help"
           >
@@ -112,10 +112,10 @@ export default function CharacterSheetTemplateEditor({
           </button>
           <button
             onClick={() => setShowPreview(!showPreview)}
-            className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 text-sm rounded-lg transition-all flex items-center gap-1.5 ${
               showPreview
-                ? "bg-purple-600 text-white"
-                : "bg-blue-900/50 text-blue-300 hover:bg-blue-800/50"
+                ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                : "bg-white/5 text-blue-300 hover:bg-white/10 border border-white/10"
             }`}
           >
             <DynamicIcon
@@ -129,14 +129,14 @@ export default function CharacterSheetTemplateEditor({
 
       {/* Help Panel */}
       {showHelp && (
-        <div className="bg-amber-950/30 border border-amber-700/30 rounded-xl p-4 text-sm">
+        <div className="bg-amber-500/[0.06] backdrop-blur-md border border-amber-400/20 rounded-xl p-4 text-sm">
           <h4 className="font-medium text-amber-300 mb-2 flex items-center gap-2">
             <DynamicIcon name="Info" className="w-4 h-4" />
             Template Syntax
           </h4>
           <p className="text-amber-100/80 mb-3">
             Use{" "}
-            <code className="bg-amber-900/50 px-1.5 py-0.5 rounded text-amber-200">
+            <code className="bg-amber-500/10 px-1.5 py-0.5 rounded text-amber-200">
               {"{{FieldName | Description | DefaultValue}}"}
             </code>{" "}
             to create fillable fields.
@@ -153,17 +153,17 @@ export default function CharacterSheetTemplateEditor({
               change it
             </p>
           </div>
-          <div className="mt-3 p-2 bg-amber-900/30 rounded-lg">
+          <div className="mt-3 p-2 bg-amber-500/10 rounded-lg">
             <p className="text-xs text-amber-200/60 mb-1">Example:</p>
             <code className="text-xs text-amber-100">
               {"# {{Name | Your character's name | Hero}}"}
             </code>
           </div>
-          <div className="mt-3 p-2 bg-purple-900/30 rounded-lg border border-purple-700/30">
+          <div className="mt-3 p-2 bg-purple-500/10 rounded-lg border border-purple-400/20">
             <p className="text-xs text-purple-200/60 mb-1">Category Syntax:</p>
             <p className="text-xs text-purple-100/80 mb-2">
               Add{" "}
-              <code className="bg-purple-900/50 px-1 rounded">(Category)</code>{" "}
+              <code className="bg-purple-500/10 px-1 rounded">(Category)</code>{" "}
               to group fields:
             </p>
             <code className="text-xs text-purple-100">
@@ -179,7 +179,7 @@ export default function CharacterSheetTemplateEditor({
           <button
             key={preset.id}
             onClick={() => handlePresetSelect(preset.id)}
-            className="px-3 py-1.5 text-xs bg-blue-900/40 hover:bg-blue-800/50 border border-blue-700/30 rounded-lg text-blue-200 transition-colors"
+            className="px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-blue-200 transition-colors"
             title={preset.description}
           >
             {preset.name}
@@ -187,7 +187,7 @@ export default function CharacterSheetTemplateEditor({
         ))}
         <button
           onClick={insertField}
-          className="px-3 py-1.5 text-xs bg-emerald-900/40 hover:bg-emerald-800/50 border border-emerald-700/30 rounded-lg text-emerald-200 transition-colors flex items-center gap-1"
+          className="px-3 py-1.5 text-xs bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-400/20 rounded-lg text-emerald-200 transition-colors flex items-center gap-1"
         >
           <DynamicIcon name="Plus" className="w-3 h-3" />
           Add Field
@@ -196,7 +196,7 @@ export default function CharacterSheetTemplateEditor({
 
       {/* Errors */}
       {errors.length > 0 && (
-        <div className="bg-red-950/30 border border-red-700/30 rounded-xl p-3">
+        <div className="bg-red-500/[0.06] backdrop-blur-md border border-red-400/20 rounded-xl p-3">
           <p className="text-red-300 text-sm font-medium mb-1">
             Template Errors:
           </p>
@@ -210,7 +210,7 @@ export default function CharacterSheetTemplateEditor({
 
       {/* Editor / Preview */}
       {showPreview ? (
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 p-6">
+        <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/10 p-6">
           <p className="text-xs text-blue-300/50 mb-3">
             Preview with default values:
           </p>
@@ -226,7 +226,7 @@ export default function CharacterSheetTemplateEditor({
             value={templateText}
             onChange={(e) => handleTemplateChange(e.target.value)}
             placeholder="Enter your character sheet template..."
-            className="w-full h-64 px-4 py-3 bg-blue-900/40 border border-blue-700/30 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 font-mono resize-none"
+            className="w-full h-64 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 font-mono resize-none"
           />
           <p className="text-xs text-blue-300/50">
             Supports Markdown formatting. Use{" "}
@@ -237,7 +237,7 @@ export default function CharacterSheetTemplateEditor({
 
       {/* Extracted Fields Summary - Grouped by Category */}
       {fields.length > 0 && (
-        <div className="bg-blue-950/40 rounded-xl border border-blue-800/30 p-4">
+        <div className="bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 p-4">
           <h4 className="text-sm font-medium text-blue-200 mb-3 flex items-center gap-2">
             <DynamicIcon name="List" className="w-4 h-4" />
             Detected Fields ({fields.length})
@@ -273,7 +273,7 @@ export default function CharacterSheetTemplateEditor({
                       {grouped[category].map((field) => (
                         <div
                           key={field.name}
-                          className="flex items-start gap-2 p-2 bg-blue-900/30 rounded-lg"
+                          className="flex items-start gap-2 p-2 bg-white/5 rounded-lg"
                         >
                           <span className="text-emerald-400 font-medium text-sm">
                             {field.name}

@@ -2491,9 +2491,9 @@ export default function PDFImporter({
       {/* Modal */}
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-blue-950 border border-blue-700/50 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-blue-700/40">
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-purple-600/30 flex items-center justify-center">
                   <DynamicIcon
@@ -2515,9 +2515,9 @@ export default function PDFImporter({
                   closeModal();
                   resetState();
                 }}
-                className="p-2 hover:bg-blue-800/50 rounded-lg transition-colors"
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
               >
-                <DynamicIcon name="X" className="w-5 h-5 text-gray-400" />
+                <DynamicIcon name="X" className="w-5 h-5 text-blue-300/60" />
               </button>
             </div>
 
@@ -2573,7 +2573,7 @@ export default function PDFImporter({
 
               {/* Processing State */}
               {step !== "idle" && step !== "error" && (
-                <div className="bg-blue-900/30 rounded-lg p-4 border border-blue-700/40">
+                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
                   <div className="flex items-center gap-3 mb-3">
                     <div className={`animate-pulse ${getStepColor()}`}>
                       <DynamicIcon name={getStepIcon()} className="w-6 h-6" />
@@ -2607,7 +2607,7 @@ export default function PDFImporter({
                       </p>
                     </div>
                   </div>
-                  <div className="w-full bg-blue-900/50 rounded-full h-2.5">
+                  <div className="w-full bg-white/5 rounded-full h-2.5">
                     <div
                       className="bg-linear-to-r from-purple-500 to-blue-500 h-2.5 rounded-full transition-all duration-300"
                       style={{ width: `${progress}%` }}
@@ -2623,10 +2623,10 @@ export default function PDFImporter({
 
               {/* Chunk Details Panel - Shows status of individual chunks */}
               {chunkStatuses.length > 0 && (
-                <div className="bg-blue-900/20 rounded-lg border border-blue-700/40 overflow-hidden">
+                <div className="bg-white/[0.03] rounded-lg border border-white/10 overflow-hidden">
                   <button
                     onClick={() => setShowChunkDetails(!showChunkDetails)}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-900/30 transition-colors"
+                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
                   >
                       <div className="flex items-center gap-2">
                         <DynamicIcon
@@ -2678,8 +2678,8 @@ export default function PDFImporter({
                                     ? "bg-red-900/20 border border-red-700/30"
                                     : chunk.status === "summarizing" ||
                                         chunk.status === "ocr"
-                                      ? "bg-blue-900/30 border border-blue-700/30"
-                                      : "bg-gray-900/20 border border-gray-700/30"
+                                      ? "bg-white/5 border border-white/10"
+                                      : "bg-white/[0.03] border border-white/10"
                               }`}
                             >
                               <div className="flex items-center gap-3 p-2">
@@ -2706,7 +2706,7 @@ export default function PDFImporter({
                                   {chunk.status === "pending" && (
                                     <DynamicIcon
                                       name="Clock"
-                                      className="w-5 h-5 text-gray-400"
+                                      className="w-5 h-5 text-blue-300/60"
                                     />
                                   )}
                                 </div>
@@ -2746,7 +2746,7 @@ export default function PDFImporter({
                                     </p>
                                   )}
                                   {chunk.status === "pending" && (
-                                    <p className="text-xs text-gray-400/70">
+                                    <p className="text-xs text-blue-300/50">
                                       Waiting...
                                     </p>
                                   )}
@@ -2765,7 +2765,7 @@ export default function PDFImporter({
                                         canPreviewNotes ? "notes" : "text",
                                       );
                                     }}
-                                    className="px-2 py-1 text-xs bg-blue-900/40 hover:bg-blue-800/50 text-blue-200 rounded transition-colors flex items-center gap-1 shrink-0"
+                                    className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 text-blue-200 rounded transition-colors flex items-center gap-1 shrink-0"
                                     title="Preview extracted content"
                                   >
                                     <DynamicIcon
@@ -2824,7 +2824,7 @@ export default function PDFImporter({
                                         className={`px-2 py-1 text-xs rounded transition-colors ${
                                           chunkPreviewTab === "notes"
                                             ? "bg-purple-600/80 text-white"
-                                            : "bg-blue-900/40 text-blue-300/70 hover:bg-blue-900/60"
+                                            : "bg-white/5 text-blue-300/70 hover:bg-white/10"
                                         }`}
                                       >
                                         Notes
@@ -2838,7 +2838,7 @@ export default function PDFImporter({
                                         className={`px-2 py-1 text-xs rounded transition-colors ${
                                           chunkPreviewTab === "text"
                                             ? "bg-purple-600/80 text-white"
-                                            : "bg-blue-900/40 text-blue-300/70 hover:bg-blue-900/60"
+                                            : "bg-white/5 text-blue-300/70 hover:bg-white/10"
                                         }`}
                                       >
                                         Raw Text
@@ -2943,7 +2943,7 @@ export default function PDFImporter({
                           chunkStatuses.some(
                             (cs) => cs.status === "complete",
                           ) && (
-                            <div className="pt-2 border-t border-blue-700/30">
+                            <div className="pt-2 border-t border-white/10">
                               <button
                                 onClick={completeWithCurrentResults}
                                 className="w-full px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
@@ -3008,7 +3008,7 @@ export default function PDFImporter({
               {step === "idle" && (
                 <>
                   {/* Import Mode Toggle */}
-                  <div className="flex gap-2 p-1 bg-blue-900/30 rounded-lg">
+                  <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
                     <button
                       onClick={() => setImportMode("file")}
                       className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -3041,7 +3041,7 @@ export default function PDFImporter({
                         value={linkUrl}
                         onChange={(e) => setLinkUrl(e.target.value)}
                         placeholder="https://drive.google.com/file/d/.../view"
-                        className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white placeholder-blue-300/50"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/50"
                       />
                       <p className="text-xs text-blue-300/60">
                         The file must be shared as &quot;Anyone with the
@@ -3062,7 +3062,7 @@ export default function PDFImporter({
                         className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
                           selectedFiles.length > 0
                             ? "border-green-500/50 bg-green-900/20"
-                            : "border-blue-700/50 hover:border-purple-500/50 hover:bg-purple-900/20"
+                            : "border-white/10 hover:border-purple-500/50 hover:bg-purple-900/20"
                         }`}
                       >
                         <input
@@ -3128,7 +3128,7 @@ export default function PDFImporter({
                           return (
                             <div
                               key={`${file.name}-${index}`}
-                              className="flex items-center gap-2 p-2 bg-blue-900/30 rounded-lg group"
+                              className="flex items-center gap-2 p-2 bg-white/5 rounded-lg group"
                             >
                               <DynamicIcon
                                 name="FileText"
@@ -3206,7 +3206,7 @@ export default function PDFImporter({
                     <select
                       value={aiModel}
                       onChange={(e) => setAIModel(e.target.value)}
-                      className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
                     >
                       {(Object.keys(PROVIDER_LABELS) as BYOKProvider[]).map(
                         (provider) => {
@@ -3250,7 +3250,7 @@ export default function PDFImporter({
                               e.target.value as BYOKProvider,
                             )
                           }
-                          className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
                         >
                           {(
                             Object.keys(PROVIDER_LABELS) as BYOKProvider[]
@@ -3268,17 +3268,17 @@ export default function PDFImporter({
                           value={customModelId}
                           onChange={(e) => setCustomModelId(e.target.value)}
                           placeholder="Model ID, e.g. anthropic/claude-opus-4.1"
-                          className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white placeholder-blue-300/50"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/50"
                         />
                       </div>
                     )}
                   </div>
 
                   {/* Advanced Options */}
-                  <div className="border border-blue-700/40 rounded-lg">
+                  <div className="border border-white/10 rounded-lg">
                     <button
                       onClick={() => setShowAdvanced(!showAdvanced)}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-900/20 rounded-lg transition-colors"
+                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/[0.03] rounded-lg transition-colors"
                     >
                       <span className="text-sm font-medium text-blue-200">
                         Advanced Options
@@ -3305,7 +3305,7 @@ export default function PDFImporter({
                             onChange={(e) =>
                               setMaxOutputTokens(Number(e.target.value))
                             }
-                            className="w-full h-2 bg-blue-900/50 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                            className="w-full h-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
                           />
                           <div className="flex justify-between text-xs text-blue-300/60 mt-1">
                             <span>4K (Fast)</span>
@@ -3331,7 +3331,7 @@ export default function PDFImporter({
                             }
                             placeholder="e.g., Focus on monster stat blocks, ignore fluff text..."
                             rows={3}
-                            className="w-full px-3 py-2 bg-blue-900/30 border border-blue-700/40 rounded-lg text-white resize-none"
+                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none"
                           />
                         </div>
                       </div>
@@ -3368,7 +3368,7 @@ export default function PDFImporter({
                             return (
                               <div
                                 key={imp.id}
-                                className="bg-blue-900/30 rounded-lg border border-blue-700/40 overflow-hidden"
+                                className="bg-white/5 rounded-lg border border-white/10 overflow-hidden"
                               >
                                 {/* Import Header */}
                                 <div
@@ -3377,7 +3377,7 @@ export default function PDFImporter({
                                       isExpanded ? null : imp.id,
                                     )
                                   }
-                                  className="flex items-center gap-3 p-3 cursor-pointer hover:bg-blue-800/30 transition-colors"
+                                  className="flex items-center gap-3 p-3 cursor-pointer hover:bg-white/10 transition-colors"
                                 >
                                   <DynamicIcon
                                     name="FileText"
@@ -3415,7 +3415,7 @@ export default function PDFImporter({
 
                                 {/* Expanded Content */}
                                 {isExpanded && (
-                                  <div className="px-3 pb-3 space-y-3 border-t border-blue-700/30">
+                                  <div className="px-3 pb-3 space-y-3 border-t border-white/10">
                                     {/* Lore Preview */}
                                     {imp.lore.length > 0 && (
                                       <div className="mt-3">
@@ -3526,7 +3526,7 @@ export default function PDFImporter({
                                       )}
 
                                     {/* Action Buttons */}
-                                    <div className="flex gap-2 pt-2 border-t border-blue-700/30">
+                                    <div className="flex gap-2 pt-2 border-t border-white/10">
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
@@ -3567,13 +3567,13 @@ export default function PDFImporter({
             </div>
 
             {/* Footer */}
-            <div className="flex justify-end gap-3 p-4 border-t border-blue-700/40">
+            <div className="flex justify-end gap-3 p-4 border-t border-white/10">
               <button
                 onClick={() => {
                   closeModal();
                   resetState();
                 }}
-                className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
               >
                 Cancel
               </button>
@@ -3601,9 +3601,9 @@ export default function PDFImporter({
       {/* JSON Repair Modal - for manually fixing broken chunk output */}
       {repairModalOpen && repairChunkIndex !== null && (
         <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-blue-950 border border-blue-700/50 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
             {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-blue-700/30">
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
                   <DynamicIcon
@@ -3694,7 +3694,7 @@ export default function PDFImporter({
                       );
                     }
                   }}
-                  className="px-3 py-1 text-xs bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 rounded transition-colors"
+                  className="px-3 py-1 text-xs bg-white/10 hover:bg-white/10 text-blue-300 rounded transition-colors"
                 >
                   Format JSON
                 </button>
@@ -3702,14 +3702,14 @@ export default function PDFImporter({
               <textarea
                 value={repairContent}
                 onChange={(e) => setRepairContent(e.target.value)}
-                className="flex-1 w-full min-h-[400px] bg-blue-900/30 border border-blue-700/30 rounded-lg p-3 font-mono text-sm text-blue-100 resize-y focus:outline-none focus:border-blue-500"
+                className="flex-1 w-full min-h-[400px] bg-white/5 border border-white/10 rounded-lg p-3 font-mono text-sm text-blue-100 resize-y focus:outline-none focus:border-blue-500"
                 placeholder="Paste or edit JSON content here..."
                 spellCheck={false}
               />
             </div>
 
             {/* Footer with actions */}
-            <div className="flex items-center justify-between p-4 border-t border-blue-700/30 bg-blue-900/20">
+            <div className="flex items-center justify-between p-4 border-t border-white/10 bg-white/[0.03]">
               <div className="text-xs text-blue-300/50">
                 Tip: Look for missing commas, unclosed brackets, or truncated
                 strings
@@ -3729,7 +3729,7 @@ export default function PDFImporter({
                       );
                     }
                   }}
-                  className="px-4 py-2 bg-blue-800/50 hover:bg-blue-700/50 text-blue-200 rounded-lg transition-colors"
+                  className="px-4 py-2 bg-white/10 hover:bg-white/10 text-blue-200 rounded-lg transition-colors"
                 >
                   Validate
                 </button>
@@ -3740,7 +3740,7 @@ export default function PDFImporter({
                     setRepairContent("");
                     setRepairError("");
                   }}
-                  className="px-4 py-2 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
                 >
                   Cancel
                 </button>

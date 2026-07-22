@@ -81,7 +81,7 @@ export default function CharacterSheetEditor({
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <div className="p-2 bg-emerald-500/20 rounded-lg">
+          <div className="p-2 bg-emerald-500/10 ring-1 ring-emerald-400/20 rounded-lg">
             <DynamicIcon name="User" className="w-5 h-5 text-emerald-400" />
           </div>
           Create Your Character
@@ -89,10 +89,10 @@ export default function CharacterSheetEditor({
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowPreview(!showPreview)}
-            className={`px-3 py-1.5 text-sm rounded-lg transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 text-sm rounded-lg transition-all flex items-center gap-1.5 ${
               showPreview
-                ? "bg-purple-600 text-white"
-                : "bg-blue-900/50 text-blue-300 hover:bg-blue-800/50"
+                ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                : "bg-white/5 text-blue-300 hover:bg-white/10 border border-white/10"
             }`}
           >
             <DynamicIcon
@@ -103,7 +103,7 @@ export default function CharacterSheetEditor({
           </button>
           <button
             onClick={handleReset}
-            className="px-3 py-1.5 text-sm bg-blue-900/50 text-blue-300 hover:bg-blue-800/50 rounded-lg transition-colors flex items-center gap-1.5"
+            className="px-3 py-1.5 text-sm bg-white/5 text-blue-300 hover:bg-white/10 border border-white/10 rounded-lg transition-colors flex items-center gap-1.5"
           >
             <DynamicIcon name="RotateCcw" className="w-4 h-4" />
             Reset
@@ -113,7 +113,7 @@ export default function CharacterSheetEditor({
 
       {showPreview ? (
         /* Preview Mode */
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 p-6">
+        <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/10 p-6">
           <div className="prose prose-sm prose-invert max-w-none text-blue-50/90 prose-headings:text-white prose-strong:text-white">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
               {preprocessMarkdown(preview)}
@@ -126,7 +126,7 @@ export default function CharacterSheetEditor({
           {template.fields.map((field, index) => (
             <div
               key={field.name}
-              className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 p-4"
+              className="bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/10 p-4"
             >
               <label className="block mb-2">
                 <span className="text-white font-medium">{field.name}</span>
@@ -152,7 +152,7 @@ export default function CharacterSheetEditor({
                   placeholder={
                     field.defaultValue || `Enter ${field.name.toLowerCase()}...`
                   }
-                  className="w-full px-4 py-3 bg-blue-900/40 border border-blue-700/30 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none min-h-[100px]"
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none min-h-[100px]"
                   rows={3}
                 />
               ) : (
@@ -165,7 +165,7 @@ export default function CharacterSheetEditor({
                   placeholder={
                     field.defaultValue || `Enter ${field.name.toLowerCase()}...`
                   }
-                  className="w-full px-4 py-2.5 bg-blue-900/40 border border-blue-700/30 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
                 />
               )}
             </div>
@@ -174,7 +174,7 @@ export default function CharacterSheetEditor({
       )}
 
       {/* Actions */}
-      <div className="flex items-center justify-between pt-4 border-t border-blue-800/30">
+      <div className="flex items-center justify-between pt-4 border-t border-white/10">
         <p className="text-xs text-blue-300/50">
           {template.fields.length} field
           {template.fields.length !== 1 ? "s" : ""} • Fill in your character
@@ -184,14 +184,14 @@ export default function CharacterSheetEditor({
           {onCancel && (
             <button
               onClick={onCancel}
-              className="px-4 py-2 text-sm text-blue-300 hover:bg-blue-800/50 rounded-lg transition-colors"
+              className="px-4 py-2 text-sm text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
             >
               Cancel
             </button>
           )}
           <button
             onClick={handleSave}
-            className="px-6 py-2 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg transition-colors flex items-center gap-2 font-medium"
+            className="px-6 py-2 text-sm bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg shadow-md shadow-emerald-950/40 transition-all flex items-center gap-2 font-medium"
           >
             <DynamicIcon name="Check" className="w-4 h-4" />
             Save Character

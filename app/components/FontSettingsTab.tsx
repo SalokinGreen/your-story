@@ -462,7 +462,7 @@ export default function FontSettingsTab({
     <div className="space-y-6">
       {/* Theme Selection */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+        <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
           <DynamicIcon name="Palette" className="w-4 h-4" />
           Color Theme
         </label>
@@ -474,8 +474,8 @@ export default function FontSettingsTab({
               onClick={() => handleThemeChange(themeOption.id)}
               className={`relative p-1 rounded-lg transition-all ${
                 theme === themeOption.id
-                  ? "ring-2 ring-purple-500 ring-offset-2 ring-offset-gray-900"
-                  : "hover:ring-1 hover:ring-gray-500"
+                  ? "ring-2 ring-purple-500 ring-offset-2 ring-offset-[#0d1829]"
+                  : "hover:ring-1 hover:ring-white/20"
               }`}
               title={themeOption.name}
             >
@@ -490,7 +490,7 @@ export default function FontSettingsTab({
                   Aa
                 </span>
               </div>
-              <span className="text-[10px] text-gray-500 dark:text-gray-400 block text-center mt-1 truncate">
+              <span className="text-[10px] text-blue-300/50 block text-center mt-1 truncate">
                 {themeOption.name}
               </span>
             </button>
@@ -501,11 +501,11 @@ export default function FontSettingsTab({
       {/* Font Size */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
             <DynamicIcon name="Type" className="w-4 h-4" />
             Font Size
           </label>
-          <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+          <span className="text-sm text-purple-300 font-medium">
             {fontSize}px
           </span>
         </div>
@@ -517,8 +517,8 @@ export default function FontSettingsTab({
               onClick={() => handleFontSizeChange(preset.value)}
               className={`flex-1 py-2 px-2 text-xs font-medium rounded-lg transition-colors ${
                 fontSize === preset.value
-                  ? "bg-purple-600 text-white"
-                  : "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700"
+                  ? "bg-linear-to-r from-purple-600 to-blue-600 text-white shadow-md shadow-purple-950/40"
+                  : "bg-white/5 text-blue-200/70 hover:bg-white/10"
               }`}
             >
               {preset.name}
@@ -532,18 +532,18 @@ export default function FontSettingsTab({
           max="32"
           value={fontSize}
           onChange={(e) => handleFontSizeChange(parseInt(e.target.value, 10))}
-          className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
         />
       </div>
 
       {/* Line Height */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
             <DynamicIcon name="AlignJustify" className="w-4 h-4" />
             Line Spacing
           </label>
-          <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+          <span className="text-sm text-purple-300 font-medium">
             {lineHeight.toFixed(1)}
           </span>
         </div>
@@ -555,9 +555,9 @@ export default function FontSettingsTab({
           step="0.1"
           value={lineHeight}
           onChange={(e) => handleLineHeightChange(parseFloat(e.target.value))}
-          className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
         />
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex justify-between text-xs text-blue-300/50">
           <span>Compact</span>
           <span>Normal</span>
           <span>Spacious</span>
@@ -567,11 +567,11 @@ export default function FontSettingsTab({
       {/* Paragraph Spacing */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
             <DynamicIcon name="SeparatorHorizontal" className="w-4 h-4" />
             Paragraph Spacing
           </label>
-          <span className="text-sm text-purple-600 dark:text-purple-400 font-medium">
+          <span className="text-sm text-purple-300 font-medium">
             {paragraphSpacing.toFixed(1)}em
           </span>
         </div>
@@ -585,9 +585,9 @@ export default function FontSettingsTab({
           onChange={(e) =>
             handleParagraphSpacingChange(parseFloat(e.target.value))
           }
-          className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+          className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
         />
-        <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+        <div className="flex justify-between text-xs text-blue-300/50">
           <span>None</span>
           <span>Normal</span>
           <span>Wide</span>
@@ -596,7 +596,7 @@ export default function FontSettingsTab({
 
       {/* Font Family */}
       <div className="space-y-3">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+        <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
           <DynamicIcon name="TextCursorInput" className="w-4 h-4" />
           Font Family
         </label>
@@ -604,7 +604,7 @@ export default function FontSettingsTab({
         <select
           value={fontFamily}
           onChange={(e) => handleFontFamilyChange(e.target.value)}
-          className="w-full px-3 py-2.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+          className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
         >
           <optgroup label="Built-in Fonts">
             {DEFAULT_FONTS.map((font) => (
@@ -627,10 +627,10 @@ export default function FontSettingsTab({
 
       {/* Font Preview */}
       <div
-        className="p-4 rounded-lg border border-gray-700"
+        className="p-4 rounded-lg border border-white/10"
         style={{ backgroundColor: currentTheme.background }}
       >
-        <p className="text-xs text-gray-400 mb-2">Preview</p>
+        <p className="text-xs text-blue-300/50 mb-2">Preview</p>
         <div
           style={{
             fontFamily: fontFamily,
@@ -654,13 +654,13 @@ export default function FontSettingsTab({
       </div>
 
       {/* Custom Font Upload */}
-      <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div className="space-y-3 pt-4 border-t border-white/10">
         <div className="flex items-center justify-between">
-          <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+          <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
             <DynamicIcon name="Upload" className="w-4 h-4" />
             Custom Fonts
           </label>
-          <span className="text-xs text-gray-500 dark:text-gray-400">
+          <span className="text-xs text-blue-300/50">
             .woff2, .woff, .ttf, .otf
           </span>
         </div>
@@ -676,7 +676,7 @@ export default function FontSettingsTab({
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
-          className="w-full py-3 px-4 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:border-purple-500 hover:text-purple-500 dark:hover:border-purple-400 dark:hover:text-purple-400 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+          className="w-full py-3 px-4 border-2 border-dashed border-white/15 rounded-lg text-sm text-blue-300/60 hover:border-purple-400 hover:text-purple-300 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
         >
           {isUploading ? (
             <>
@@ -697,26 +697,26 @@ export default function FontSettingsTab({
             {customFonts.map((font) => (
               <div
                 key={font.id}
-                className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-lg"
+                className="flex items-center justify-between p-2 bg-white/5 rounded-lg"
               >
                 <div className="flex items-center gap-2">
                   <DynamicIcon
                     name="FileText"
-                    className="w-4 h-4 text-gray-500"
+                    className="w-4 h-4 text-blue-300/50"
                   />
                   <span
-                    className="text-sm text-gray-700 dark:text-gray-300"
+                    className="text-sm text-blue-200/80"
                     style={{ fontFamily: `"${font.name}"` }}
                   >
                     {font.name}
                   </span>
-                  <span className="text-xs text-gray-400 uppercase">
+                  <span className="text-xs text-blue-300/40 uppercase">
                     .{font.format}
                   </span>
                 </div>
                 <button
                   onClick={() => handleDeleteFont(font)}
-                  className="p-1.5 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                  className="p-1.5 text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
                   title="Remove font"
                 >
                   <DynamicIcon name="Trash2" className="w-4 h-4" />
@@ -726,7 +726,7 @@ export default function FontSettingsTab({
           </div>
         )}
 
-        <p className="text-xs text-gray-500 dark:text-gray-400">
+        <p className="text-xs text-blue-300/50">
           Fonts are stored locally on your device. Max file size: 5MB.
         </p>
       </div>

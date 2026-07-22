@@ -182,34 +182,36 @@ export default function VariablesEditor({
     <div className="space-y-4">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h4 className="text-lg font-bold text-white flex items-center gap-2">
-          <DynamicIcon name="Variable" className="w-6 h-6" /> Variables (
-          {localVariables.length})
+          <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
+            <DynamicIcon name="Variable" className="w-4 h-4 text-purple-300" />
+          </span>
+          Variables ({localVariables.length})
         </h4>
         <div className="flex gap-2">
           <button
             onClick={() => addVariable("number")}
-            className="px-3 py-1 bg-cyan-600 hover:bg-cyan-700 text-white text-sm rounded-lg flex items-center gap-1"
+            className="px-3 py-1.5 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300 border border-cyan-400/20 text-sm font-medium rounded-lg transition-colors flex items-center gap-1"
           >
             <DynamicIcon name="Hash" className="w-4 h-4" />
             Number
           </button>
           <button
             onClick={() => addVariable("boolean")}
-            className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm rounded-lg flex items-center gap-1"
+            className="px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-400/20 text-sm font-medium rounded-lg transition-colors flex items-center gap-1"
           >
             <DynamicIcon name="ToggleLeft" className="w-4 h-4" />
             Boolean
           </button>
           <button
             onClick={() => addVariable("string")}
-            className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-sm rounded-lg flex items-center gap-1"
+            className="px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-400/20 text-sm font-medium rounded-lg transition-colors flex items-center gap-1"
           >
             <DynamicIcon name="Type" className="w-4 h-4" />
             String
           </button>
           <button
             onClick={() => addVariable("list")}
-            className="px-3 py-1 bg-violet-600 hover:bg-violet-700 text-white text-sm rounded-lg flex items-center gap-1"
+            className="px-3 py-1.5 bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border border-violet-400/20 text-sm font-medium rounded-lg transition-colors flex items-center gap-1"
           >
             <DynamicIcon name="List" className="w-4 h-4" />
             List
@@ -223,14 +225,16 @@ export default function VariablesEditor({
           const isEditing = editingIndex === index;
 
           if (isEditing) {
+            const editBorderClass: Record<string, string> = {
+              cyan: "border-cyan-400/30 shadow-[0_0_20px_rgba(34,211,238,0.1)]",
+              emerald: "border-emerald-400/30 shadow-[0_0_20px_rgba(52,211,153,0.1)]",
+              amber: "border-amber-400/30 shadow-[0_0_20px_rgba(251,191,36,0.1)]",
+              violet: "border-violet-400/30 shadow-[0_0_20px_rgba(167,139,250,0.1)]",
+            };
             return (
               <div
                 key={variable.id}
-                className={`p-4 bg-${color}-100 dark:bg-${color}-900/40 border-2 border-${color}-400 rounded-lg`}
-                style={{
-                  backgroundColor: `rgb(var(--${color}-900) / 0.4)`,
-                  borderColor: `rgb(var(--${color}-400))`,
-                }}
+                className={`p-4 bg-white/[0.04] backdrop-blur-xl border rounded-2xl ${editBorderClass[color] || "border-white/10"}`}
               >
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 mb-2">
@@ -253,7 +257,7 @@ export default function VariablesEditor({
                       })
                     }
                     placeholder="Variable name"
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white font-semibold"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-semibold focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                   />
 
                   <textarea
@@ -265,7 +269,7 @@ export default function VariablesEditor({
                       })
                     }
                     placeholder="Description (optional)"
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                     rows={2}
                   />
 
@@ -287,7 +291,7 @@ export default function VariablesEditor({
                               value: parseFloat(e.target.value) || 0,
                             })
                           }
-                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -311,7 +315,7 @@ export default function VariablesEditor({
                               })
                             }
                             placeholder="No minimum"
-                            className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                           />
                         </div>
                         <div>
@@ -334,7 +338,7 @@ export default function VariablesEditor({
                               })
                             }
                             placeholder="No maximum"
-                            className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                           />
                         </div>
                       </div>
@@ -354,10 +358,10 @@ export default function VariablesEditor({
                               .value,
                           })
                         }
-                        className={`px-4 py-2 rounded-lg font-semibold transition-colors ${
+                        className={`px-4 py-2 rounded-lg font-semibold transition-all shadow-md ${
                           (editVariable as Partial<BooleanVariable>).value
-                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                            : "bg-red-600 hover:bg-red-700 text-white"
+                            ? "bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white shadow-emerald-950/40"
+                            : "bg-linear-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-red-950/40"
                         }`}
                       >
                         {(editVariable as Partial<BooleanVariable>).value
@@ -386,7 +390,7 @@ export default function VariablesEditor({
                             })
                           }
                           placeholder="Enter text value..."
-                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                         />
                       </div>
                       <div>
@@ -413,7 +417,7 @@ export default function VariablesEditor({
                             })
                           }
                           placeholder="Monday&#10;Tuesday&#10;Wednesday&#10;..."
-                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                           rows={4}
                         />
                       </div>
@@ -443,7 +447,7 @@ export default function VariablesEditor({
                             })
                           }
                           placeholder="No limit"
-                          className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                         />
                       </div>
                       <div>
@@ -470,12 +474,12 @@ export default function VariablesEditor({
                               }
                             }}
                             placeholder="Add item..."
-                            className="flex-1 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                            className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                           />
                           <button
                             onClick={addListItem}
                             disabled={!newItemInput.trim()}
-                            className="px-3 py-2 bg-violet-600 hover:bg-violet-700 disabled:bg-gray-600 text-white rounded"
+                            className="px-3 py-2 bg-violet-500/10 hover:bg-violet-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-violet-200 border border-violet-400/20 rounded-lg transition-colors"
                           >
                             <DynamicIcon name="Plus" className="w-4 h-4" />
                           </button>
@@ -489,7 +493,7 @@ export default function VariablesEditor({
                             ).map((item, itemIndex) => (
                               <span
                                 key={itemIndex}
-                                className="px-2 py-1 bg-violet-500/30 text-violet-200 rounded flex items-center gap-1"
+                                className="px-2 py-1 bg-violet-500/15 text-violet-200 border border-violet-400/20 rounded-lg flex items-center gap-1"
                               >
                                 {item}
                                 <button
@@ -510,7 +514,7 @@ export default function VariablesEditor({
                     <button
                       onClick={saveEdit}
                       disabled={!editVariable.name}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded"
+                      className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-emerald-950/40 disabled:shadow-none transition-all"
                     >
                       <DynamicIcon
                         name="Save"
@@ -520,7 +524,7 @@ export default function VariablesEditor({
                     </button>
                     <button
                       onClick={cancelEdit}
-                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-all"
                     >
                       Cancel
                     </button>
@@ -534,14 +538,14 @@ export default function VariablesEditor({
           return (
             <div
               key={variable.id}
-              className={`flex items-start gap-3 p-4 rounded-lg border ${
+              className={`flex items-start gap-3 p-4 rounded-xl border backdrop-blur-md transition-colors ${
                 variable.type === "number"
-                  ? "bg-cyan-50 dark:bg-cyan-900/20 border-cyan-200 dark:border-cyan-800"
+                  ? "bg-cyan-500/[0.05] border-cyan-400/20 hover:bg-cyan-500/[0.08]"
                   : variable.type === "boolean"
-                    ? "bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"
+                    ? "bg-emerald-500/[0.05] border-emerald-400/20 hover:bg-emerald-500/[0.08]"
                     : variable.type === "string"
-                      ? "bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800"
-                      : "bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-800"
+                      ? "bg-amber-500/[0.05] border-amber-400/20 hover:bg-amber-500/[0.08]"
+                      : "bg-violet-500/[0.05] border-violet-400/20 hover:bg-violet-500/[0.08]"
               }`}
             >
               <div className="shrink-0">
@@ -562,29 +566,29 @@ export default function VariablesEditor({
                 <div className="font-bold text-white flex items-center gap-2 flex-wrap mb-1">
                   <span>{variable.name}</span>
                   {variable.type === "number" && (
-                    <span className="text-sm px-2 py-0.5 rounded-full bg-cyan-100 dark:bg-cyan-900/30 text-cyan-800 dark:text-cyan-200">
+                    <span className="text-sm px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-400/20">
                       {(variable as NumberVariable).value}
                     </span>
                   )}
                   {variable.type === "boolean" && (
                     <span
-                      className={`text-sm px-2 py-0.5 rounded-full ${
+                      className={`text-sm px-2 py-0.5 rounded-full border ${
                         (variable as BooleanVariable).value
-                          ? "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-800 dark:text-emerald-200"
-                          : "bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200"
+                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-400/20"
+                          : "bg-red-500/15 text-red-300 border-red-400/20"
                       }`}
                     >
                       {(variable as BooleanVariable).value ? "TRUE" : "FALSE"}
                     </span>
                   )}
                   {variable.type === "string" && (
-                    <span className="text-sm px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">
+                    <span className="text-sm px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-400/20">
                       &quot;{(variable as StringVariable).value || "(empty)"}
                       &quot;
                     </span>
                   )}
                   {variable.type === "list" && (
-                    <span className="text-sm px-2 py-0.5 rounded-full bg-violet-100 dark:bg-violet-900/30 text-violet-800 dark:text-violet-200">
+                    <span className="text-sm px-2 py-0.5 rounded-full bg-violet-500/15 text-violet-300 border border-violet-400/20">
                       {(variable as ListVariable).items.length} items
                       {(variable as ListVariable).maxSize &&
                         ` / ${(variable as ListVariable).maxSize} max`}
@@ -613,10 +617,10 @@ export default function VariablesEditor({
                       {(variable as StringVariable).options!.map((opt, i) => (
                         <span
                           key={i}
-                          className={`px-2 py-0.5 text-xs rounded ${
+                          className={`px-2 py-0.5 text-xs rounded-full border ${
                             opt === (variable as StringVariable).value
-                              ? "bg-amber-500/40 text-amber-200 font-semibold"
-                              : "bg-amber-500/20 text-amber-300"
+                              ? "bg-amber-500/25 text-amber-200 border-amber-400/30 font-semibold"
+                              : "bg-amber-500/10 text-amber-300 border-amber-400/20"
                           }`}
                         >
                           {opt}
@@ -633,13 +637,13 @@ export default function VariablesEditor({
                         .map((item, i) => (
                           <span
                             key={i}
-                            className="px-2 py-0.5 text-xs rounded bg-violet-500/20 text-violet-300"
+                            className="px-2 py-0.5 text-xs rounded-full bg-violet-500/10 text-violet-300 border border-violet-400/20"
                           >
                             {item}
                           </span>
                         ))}
                       {(variable as ListVariable).items.length > 5 && (
-                        <span className="px-2 py-0.5 text-xs rounded bg-violet-500/10 text-violet-400">
+                        <span className="px-2 py-0.5 text-xs rounded-full bg-violet-500/5 text-violet-400 border border-violet-400/10">
                           +{(variable as ListVariable).items.length - 5} more
                         </span>
                       )}
@@ -649,13 +653,13 @@ export default function VariablesEditor({
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => startEdit(index)}
-                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+                  className="px-3 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg transition-colors"
                 >
                   <DynamicIcon name="Edit" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => removeVariable(index)}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+                  className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg transition-colors"
                 >
                   <DynamicIcon name="Trash2" className="w-4 h-4" />
                 </button>
@@ -665,7 +669,7 @@ export default function VariablesEditor({
         })}
 
         {localVariables.length === 0 && (
-          <div className="p-8 text-center rounded-lg bg-blue-900/30 border-2 border-dashed border-blue-700/40">
+          <div className="p-8 text-center rounded-2xl bg-white/[0.02] border-2 border-dashed border-white/10">
             <p className="text-sm text-blue-300/50">
               No variables yet. Add variables to track custom values in your
               story - numbers, flags, or lists of items.

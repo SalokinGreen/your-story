@@ -173,17 +173,17 @@ export function CustomTablesEditor({
       />
 
       {/* Info Card */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <p className="text-sm text-gray-700 dark:text-gray-300 flex items-start gap-2">
+      <div className="bg-blue-500/5 backdrop-blur-md border border-blue-400/20 rounded-xl p-4">
+        <p className="text-sm text-blue-200/80 flex items-start gap-2">
           <DynamicIcon
             name="Lightbulb"
-            className="w-5 h-5 text-blue-600 shrink-0 mt-0.5"
+            className="w-5 h-5 text-blue-400 shrink-0 mt-0.5"
           />
           <span>
             <strong>Tip:</strong> Create weighted random tables that the AI can
             use in choices. For example, a "Random Events" table with various
             outcomes weighted by probability. Use the{" "}
-            <code className="px-1 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-xs">
+            <code className="px-1 py-0.5 bg-white/10 rounded text-xs">
               custom_table
             </code>{" "}
             parameter in choices to trigger these rolls.
@@ -192,8 +192,8 @@ export function CustomTablesEditor({
       </div>
 
       {/* Add New Table */}
-      <div className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-6">
-        <h3 className="text-lg font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
+      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.3)] p-6">
+        <h3 className="text-lg font-bold mb-4 text-white flex items-center gap-2">
           <DynamicIcon name="Plus" className="w-5 h-5" />
           Create New Table
         </h3>
@@ -201,7 +201,7 @@ export function CustomTablesEditor({
         <div className="space-y-4">
           {/* Table Name */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-semibold text-blue-200 mb-1">
               Table Name *
             </label>
             <input
@@ -211,13 +211,13 @@ export function CustomTablesEditor({
                 setNewTable({ ...newTable, name: e.target.value })
               }
               placeholder="e.g., Random Events"
-              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-sm font-semibold text-blue-200 mb-1">
               Description *
             </label>
             <textarea
@@ -227,18 +227,18 @@ export function CustomTablesEditor({
               }
               placeholder="Describe what this table is for and when the AI should use it..."
               rows={2}
-              className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+              className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
             />
           </div>
 
           {/* Add Entry Form */}
-          <div className="border-t border-gray-300 dark:border-gray-700 pt-4">
-            <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">
+          <div className="border-t border-white/10 pt-4">
+            <h4 className="text-sm font-bold text-blue-200 mb-3">
               Table Entries
             </h4>
             <div className="flex gap-2 items-end">
               <div className="flex-1">
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                <label className="block text-xs font-semibold text-blue-300/70 mb-1">
                   Entry Text *
                 </label>
                 <input
@@ -248,11 +248,11 @@ export function CustomTablesEditor({
                     setNewEntry({ ...newEntry, text: e.target.value })
                   }
                   placeholder="e.g., A mysterious stranger appears"
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+                  className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                 />
               </div>
               <div className="w-24">
-                <label className="block text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                <label className="block text-xs font-semibold text-blue-300/70 mb-1">
                   Weight *
                 </label>
                 <input
@@ -266,12 +266,12 @@ export function CustomTablesEditor({
                       weight: parseFloat(e.target.value) || 1,
                     })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+                  className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                 />
               </div>
               <button
                 onClick={() => handleAddEntry(false)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                className="px-4 py-2 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-lg shadow-md shadow-purple-950/40 transition-all text-sm"
               >
                 <DynamicIcon name="Plus" className="w-4 h-4" />
               </button>
@@ -285,13 +285,13 @@ export function CustomTablesEditor({
                 (entry, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+                    className="flex items-center justify-between p-3 bg-white/[0.03] rounded-lg border border-white/10"
                   >
                     <div className="flex-1">
-                      <span className="text-sm text-gray-900 dark:text-white">
+                      <span className="text-sm text-white">
                         {entry.text}
                       </span>
-                      <span className="ml-3 text-xs text-gray-500 dark:text-gray-400">
+                      <span className="ml-3 text-xs text-blue-300/50">
                         ({entry.percentage}%)
                       </span>
                     </div>
@@ -299,7 +299,7 @@ export function CustomTablesEditor({
                       onClick={() =>
                         handleRemoveEntry(index, false, entry.text)
                       }
-                      className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors text-xs"
+                      className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg transition-colors text-xs"
                     >
                       <DynamicIcon name="X" className="w-3 h-3" />
                     </button>
@@ -312,7 +312,7 @@ export function CustomTablesEditor({
                   setNewTable({ ...newTable, entries: normalized });
                   addNotification("Weights normalized to 100%", "success");
                 }}
-                className="w-full py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 font-semibold rounded-lg transition-all text-sm"
               >
                 <DynamicIcon
                   name="Calculator"
@@ -332,7 +332,7 @@ export function CustomTablesEditor({
               !newTable.entries ||
               newTable.entries.length === 0
             }
-            className="w-full px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white font-semibold rounded-lg transition-colors"
+            className="w-full px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white font-semibold rounded-lg shadow-md shadow-emerald-950/40 disabled:shadow-none transition-all"
           >
             <DynamicIcon name="Plus" className="inline-block w-5 h-5 mr-2" />
             Add Table
@@ -343,19 +343,19 @@ export function CustomTablesEditor({
       {/* Existing Tables */}
       {tables.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+          <h3 className="text-lg font-bold text-white">
             Your Tables ({tables.length})
           </h3>
           {tables.map((table, tableIndex) => (
             <div
               key={table.id}
-              className="bg-white dark:bg-blue-950 rounded-lg border-2 border-gray-300 dark:border-gray-600 p-4"
+              className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.3)] p-4"
             >
               {editingTableIndex === tableIndex ? (
                 // Edit Mode
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
                       Table Name *
                     </label>
                     <input
@@ -364,12 +364,12 @@ export function CustomTablesEditor({
                       onChange={(e) =>
                         setEditTable({ ...editTable, name: e.target.value })
                       }
-                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    <label className="block text-sm font-semibold text-blue-200 mb-1">
                       Description *
                     </label>
                     <textarea
@@ -381,13 +381,13 @@ export function CustomTablesEditor({
                         })
                       }
                       rows={2}
-                      className="w-full px-3 py-2 border-2 border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white"
+                      className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                     />
                   </div>
 
                   {/* Add Entry Form in Edit Mode */}
-                  <div className="border-t border-gray-300 dark:border-gray-700 pt-4">
-                    <h4 className="text-sm font-bold text-gray-700 dark:text-gray-300 mb-3">
+                  <div className="border-t border-white/10 pt-4">
+                    <h4 className="text-sm font-bold text-blue-200 mb-3">
                       Entries
                     </h4>
                     <div className="flex gap-2 items-end mb-3">
@@ -399,7 +399,7 @@ export function CustomTablesEditor({
                             setNewEntry({ ...newEntry, text: e.target.value })
                           }
                           placeholder="Entry text"
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+                          className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                         />
                       </div>
                       <div className="w-24">
@@ -414,12 +414,12 @@ export function CustomTablesEditor({
                               weight: parseFloat(e.target.value) || 1,
                             })
                           }
-                          className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-900 text-gray-900 dark:text-white text-sm"
+                          className="w-full px-3 py-2 border border-white/10 rounded-lg bg-white/5 text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                         />
                       </div>
                       <button
                         onClick={() => handleAddEntry(true)}
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                        className="px-4 py-2 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-semibold rounded-lg shadow-md shadow-purple-950/40 transition-all text-sm"
                       >
                         <DynamicIcon name="Plus" className="w-4 h-4" />
                       </button>
@@ -431,13 +431,13 @@ export function CustomTablesEditor({
                           (entry, index) => (
                             <div
                               key={index}
-                              className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700"
+                              className="flex items-center justify-between p-3 bg-white/[0.03] rounded-lg border border-white/10"
                             >
                               <div className="flex-1">
-                                <span className="text-sm text-gray-900 dark:text-white">
+                                <span className="text-sm text-white">
                                   {entry.text}
                                 </span>
-                                <span className="ml-3 text-xs text-gray-500 dark:text-gray-400">
+                                <span className="ml-3 text-xs text-blue-300/50">
                                   ({entry.percentage}%)
                                 </span>
                               </div>
@@ -445,7 +445,7 @@ export function CustomTablesEditor({
                                 onClick={() =>
                                   handleRemoveEntry(index, true, entry.text)
                                 }
-                                className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded transition-colors text-xs"
+                                className="px-2 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg transition-colors text-xs"
                               >
                                 <DynamicIcon name="X" className="w-3 h-3" />
                               </button>
@@ -463,7 +463,7 @@ export function CustomTablesEditor({
                               "success"
                             );
                           }}
-                          className="w-full py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                          className="w-full py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 font-semibold rounded-lg transition-all text-sm"
                         >
                           <DynamicIcon
                             name="Calculator"
@@ -498,7 +498,7 @@ export function CustomTablesEditor({
                         setNewEntry({ text: "", weight: 1 });
                         addNotification("Table updated!", "success");
                       }}
-                      className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                      className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white font-semibold rounded-lg shadow-md shadow-emerald-950/40 transition-all text-sm"
                     >
                       <DynamicIcon
                         name="Save"
@@ -512,7 +512,7 @@ export function CustomTablesEditor({
                         setEditTable({});
                         setNewEntry({ text: "", weight: 1 });
                       }}
-                      className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition-colors text-sm"
+                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 font-semibold rounded-lg transition-all text-sm"
                     >
                       Cancel
                     </button>
@@ -523,17 +523,17 @@ export function CustomTablesEditor({
                 <div>
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
-                      <h4 className="font-bold text-gray-900 dark:text-white mb-1">
+                      <h4 className="font-bold text-white mb-1">
                         {table.name}
                       </h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-400">
+                      <p className="text-sm text-blue-300/60">
                         {table.description}
                       </p>
                     </div>
                     <div className="flex gap-2 ml-4">
                       <button
                         onClick={() => testRoll(table.id)}
-                        className="px-3 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors text-sm"
+                        className="px-3 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg transition-colors text-sm"
                         title="Test Roll"
                       >
                         <DynamicIcon name="Dices" className="w-4 h-4" />
@@ -543,7 +543,7 @@ export function CustomTablesEditor({
                           setEditingTableIndex(tableIndex);
                           setEditTable({ ...table });
                         }}
-                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm"
+                        className="px-3 py-1 bg-blue-500/10 hover:bg-blue-500/20 text-blue-200 border border-blue-400/20 rounded-lg transition-colors text-sm"
                       >
                         <DynamicIcon name="Edit" className="w-4 h-4" />
                       </button>
@@ -568,7 +568,7 @@ export function CustomTablesEditor({
                             },
                           });
                         }}
-                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors text-sm"
+                        className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg transition-colors text-sm"
                       >
                         <DynamicIcon name="Trash2" className="w-4 h-4" />
                       </button>
@@ -576,16 +576,16 @@ export function CustomTablesEditor({
                   </div>
 
                   <div className="space-y-1">
-                    <div className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-2">
+                    <div className="text-xs font-semibold text-blue-300/60 mb-2">
                       Entries ({table.entries.length}):
                     </div>
                     {calculatePercentages(table.entries).map((entry, index) => (
                       <div
                         key={index}
-                        className="text-sm text-gray-700 dark:text-gray-300 pl-3"
+                        className="text-sm text-blue-200/80 pl-3"
                       >
                         • {entry.text}{" "}
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-blue-300/50">
                           ({entry.percentage}%)
                         </span>
                       </div>
