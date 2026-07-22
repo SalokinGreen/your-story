@@ -35,6 +35,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
   // TTS Settings state (read from localStorage)
   const [ttsEnabled, setTtsEnabled] = useState(true);
+  const [ttsAutoGenerate, setTtsAutoGenerate] = useState(false);
   const [ttsVoice, setTtsVoice] = useState("af_heart");
   const [ttsModel, setTtsModel] = useState<TTSModelKey>("kokoro");
   const [ttsVolume, setTtsVolume] = useState(1.0);
@@ -48,6 +49,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
   useEffect(() => {
     if (typeof window !== "undefined") {
       setTtsEnabled(localStorage.getItem("ttsEnabled") !== "false");
+      setTtsAutoGenerate(localStorage.getItem("ttsAutoGenerate") === "true");
       setTtsVoice(localStorage.getItem("ttsLastVoice") || "af_heart");
       {
         const storedModel = localStorage.getItem("ttsModel");
@@ -611,7 +613,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       Enable TTS
                     </p>
                     <p className="text-xs text-blue-300/60">
-                      Automatically read new story narration aloud
+                      Show audio controls for story narration
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
@@ -626,6 +628,39 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                         );
                         addNotification(
                           e.target.checked ? "TTS Enabled" : "TTS Disabled",
+                          "success",
+                        );
+                      }}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+                  </label>
+                </div>
+
+                {/* Auto-Generate Toggle */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-blue-100">
+                      Auto-Generate Audio
+                    </p>
+                    <p className="text-xs text-blue-300/60">
+                      Automatically narrate new story content
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={ttsAutoGenerate}
+                      onChange={(e) => {
+                        setTtsAutoGenerate(e.target.checked);
+                        localStorage.setItem(
+                          "ttsAutoGenerate",
+                          e.target.checked.toString(),
+                        );
+                        addNotification(
+                          e.target.checked
+                            ? "Auto-generate enabled"
+                            : "Auto-generate disabled",
                           "success",
                         );
                       }}
