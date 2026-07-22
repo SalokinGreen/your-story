@@ -346,10 +346,12 @@ function buildRevisionUserMessage(
 }
 
 /**
- * Check whether compaction is needed for the given history budget and, if
- * so, run one summarization call and fold it into storyData in place.
- * Safe to call every turn - it's a no-op unless enough new history has
- * aged out of the budget since the last summary.
+ * Run the summarize/validate/revise/apply pipeline for an already-built
+ * CompactionPlan. Shared by `ensureStoryCompacted` (per-turn, budget-driven
+ * plan) and `storyCompaction.ts`'s manual/user-triggered full compaction
+ * (count-driven plan via `planManualCompaction`) - the two differ only in
+ * how the plan's cutoff is decided, not in how a plan gets turned into a
+ * validated summary.
  *
  * The summary is validated against canonical StoryData
  * (`validateCompactionSummary`, H3 fix) before being accepted: if it dropped
@@ -361,14 +363,11 @@ function buildRevisionUserMessage(
  * but the remaining warnings are persisted onto `scene.summaryWarnings`
  * instead of disappearing, so the drift is at least visible somewhere.
  */
-export async function ensureStoryCompacted(
+export async function runCompactionPlan(
   storyData: StoryData,
-  historyBudget: number,
+  plan: CompactionPlan,
   apiOptions: CompactionApiOptions
 ): Promise<CompactionResult> {
-  const plan = planCompaction(storyData, historyBudget);
-  if (!plan) return { ran: false };
-
   const { system, user } = buildCompactionPrompt(plan);
   const messages = [
     { role: "system", content: system },
@@ -406,4 +405,53 @@ export async function ensureStoryCompacted(
 
   applyCompaction(storyData, plan, finalSummary, warnings);
   return { ran: true, summary: finalSummary, warnings };
+}
+
+/**
+ * Check whether compaction is needed for the given history budget and, if
+ * so, run one summarization call and fold it into storyData in place.
+ * Safe to call every turn - it's a no-op unless enough new history has
+ * aged out of the budget since the last summary.
+ */
+export async function ensureStoryCompacted(
+  storyData: StoryData,
+  historyBudget: number,
+  apiOptions: CompactionApiOptions
+): Promise<CompactionResult> {
+  const plan = planCompaction(storyData, historyBudget);
+  if (!plan) return { ran: false };
+  return runCompactionPlan(storyData, plan, apiOptions);
+}
+
+/**
+ * Build a CompactionPlan for a manual, user-triggered full-story compaction
+ * (see storyCompaction.ts) rather than the per-turn token-budget-driven one
+ * above: the cutoff is "everything except the most recent `keepRecentParts`
+ * parts", regardless of whether it currently fits the AI's context budget,
+ * and there's no minimum-uncovered-tokens threshold - a manual action should
+ * do something even if only a little has accumulated since the last pass.
+ */
+export function planManualCompaction(
+  storyData: StoryData,
+  keepRecentParts: number
+): CompactionPlan | null {
+  const parts = storyData.scene.parts;
+  if (!parts || parts.length === 0) return null;
+
+  const alreadyCovered = storyData.scene.summarizedThroughIndex || 0;
+  const cutoffIndex = Math.max(0, parts.length - Math.max(0, keepRecentParts));
+
+  if (cutoffIndex <= alreadyCovered) {
+    return null; // nothing beyond what's already summarized falls outside the kept tail
+  }
+
+  const newlyDroppedParts = parts.slice(alreadyCovered, cutoffIndex);
+  const textToSummarize = newlyDroppedParts.map(partToText).join("\n\n");
+  if (!textToSummarize.trim()) return null;
+
+  return {
+    cutoffIndex,
+    textToSummarize,
+    priorSummary: storyData.scene.summary,
+  };
 }

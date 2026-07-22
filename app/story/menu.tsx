@@ -44,6 +44,8 @@ import StoryMetaEditor from "./menu/StoryMetaEditor";
 import CouchPlayersEditor from "./menu/CouchPlayersEditor";
 import OnlinePlayEditor from "./menu/OnlinePlayEditor";
 import APIKeysModal from "../components/APIKeysModal";
+import CompactStoryModal from "./menu/CompactStoryModal";
+import { useAPIKeys } from "../misc/APIKeysContext";
 import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
 import type { MPBackend } from "../misc/multiplayer/types";
 
@@ -106,9 +108,11 @@ export default function MenuPage({
   const router = useRouter();
   const { addNotification } = useNotification();
   const localPlayerId = getLocalPlayerId();
+  const { keys: apiKeys } = useAPIKeys();
   const [saving, setSaving] = useState(false);
   const [savingAs, setSavingAs] = useState(false);
   const [showSaveCopyModal, setShowSaveCopyModal] = useState(false);
+  const [showCompactModal, setShowCompactModal] = useState(false);
   const [saveCopyName, setSaveCopyName] = useState("");
   const [jumpToNewSave, setJumpToNewSave] = useState(true);
   const [exporting, setExporting] = useState(false);
@@ -359,6 +363,31 @@ export default function MenuPage({
     }
   };
 
+  const compactionApiOptions = {
+    model:
+      typeof window !== "undefined"
+        ? localStorage.getItem("aiModel") || "DeepSeek V4 Flash"
+        : "DeepSeek V4 Flash",
+    token: null,
+    openRouterKey: apiKeys.openRouterKey,
+    deepseekKey: apiKeys.deepseekKey,
+    googleKey: apiKeys.googleKey,
+  };
+
+  const handleStoryCompacted = async (updated: StoryData) => {
+    onUpdateStoryData(updated);
+    await onSaveProgress(updated);
+  };
+
+  const handleStorySpinOff = async (seed: StoryData) => {
+    const { saveLocalStory } = await import("../misc/localStoryManager");
+    const newLocalId = `local_${Date.now()}_${Math.random()
+      .toString(36)
+      .substr(2, 9)}`;
+    await saveLocalStory(newLocalId, seed);
+    router.push(`/story?storyId=${newLocalId}`);
+  };
+
   const handleSaveSettings = async () => {
     try {
       const resolvedHostUserId =
@@ -581,7 +610,16 @@ export default function MenuPage({
       </div>
 
       {/* Secondary Actions Row */}
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => setShowCompactModal(true)}
+          className="flex items-center justify-center gap-2 px-3 py-2.5 bg-white/[0.03] hover:bg-white/[0.07] backdrop-blur-sm text-blue-200 font-medium rounded-xl transition-all text-sm border border-white/10"
+          title="Shrink this story's storage, or spin off a lighter continuation"
+        >
+          <DynamicIcon name="Minimize2" className="w-3.5 h-3.5" />
+          <span>Compact Story</span>
+        </button>
+
         <button
           onClick={handleExportStory}
           disabled={exporting}
@@ -1691,6 +1729,17 @@ export default function MenuPage({
             </div>
           </div>
         </div>
+      )}
+
+      {/* Compact Story Modal */}
+      {showCompactModal && (
+        <CompactStoryModal
+          storyData={storyData}
+          apiOptions={compactionApiOptions}
+          onClose={() => setShowCompactModal(false)}
+          onCompacted={handleStoryCompacted}
+          onSpinOff={handleStorySpinOff}
+        />
       )}
 
       {/* Save Copy Modal */}
