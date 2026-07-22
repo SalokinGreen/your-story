@@ -220,6 +220,13 @@ export default function AIConfigTab() {
     }
     return true;
   });
+  const [deAiifyWords, setDeAiifyWords] = useState(() => {
+    if (typeof window !== "undefined") {
+      // Default to true (enabled)
+      return localStorage.getItem("deAiifyWords") !== "false";
+    }
+    return true;
+  });
   const [replyLength, setReplyLength] = useState<"short" | "medium" | "long">(
     () => {
       if (typeof window !== "undefined") {
@@ -1104,6 +1111,54 @@ export default function AIConfigTab() {
               rules...&rdquo; before generation. This technique improves output
               consistency by making the AI &ldquo;commit&rdquo; to constraints.
               Disable for A/B testing.
+            </span>
+          </p>
+        </div>
+      </div>
+
+      {/* De-AI-ify Prose Section */}
+      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+          <DynamicIcon name="Wand2" className="w-4 h-4" />
+          De-AI-ify Prose
+        </h4>
+
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <p className="text-sm text-blue-100">
+              Swap Out AI Vocabulary Tics
+            </p>
+            <p className="text-xs text-blue-300/60">
+              Randomly replaces words the AI overuses (ozone, palpable,
+              tapestry, testament, ...) with plainer synonyms
+            </p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={deAiifyWords}
+              onChange={(e) => {
+                const newValue = e.target.checked;
+                setDeAiifyWords(newValue);
+                if (typeof window !== "undefined") {
+                  localStorage.setItem("deAiifyWords", String(newValue));
+                }
+              }}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
+          </label>
+        </div>
+
+        <div className="p-2 bg-purple-500/[0.06] border border-purple-400/20 rounded-lg">
+          <p className="text-xs text-purple-200/80 flex items-start gap-1.5">
+            <DynamicIcon
+              name="Sparkles"
+              className="w-3.5 h-3.5 mt-0.5 shrink-0"
+            />
+            <span>
+              Each flagged word has a chance to stay as-is, so the swap
+              doesn&rsquo;t read as a mechanical find-and-replace.
             </span>
           </p>
         </div>

@@ -17,24 +17,19 @@ import {
   CommandResponse,
   Choice,
   ScenePart,
-  ActionAnalysis,
   MemoryEntry,
   GMConversationMessage,
   ReasoningDetail,
   ObserverFlag,
 } from "@/app/misc/structs";
 import {
-  buildToolPrompt,
   buildChoicesPrompt,
-  buildActionAnalysisPrompt,
   buildGMStagePrompt,
   buildStoryContinuationPrompt,
   ReplyLength,
   ChatMessage,
   EmbeddingContext,
-  TOOLS_AFFIRMATION,
   CHOICES_AFFIRMATION,
-  GM_STAGE_AFFIRMATION,
   GM_STAGE_DEFAULT_BUDGET,
   computeGMStageBudget,
   CHOICES_STAGE_TOKEN_BUDGET,
@@ -57,6 +52,7 @@ import {
   detectRepetition,
 } from "@/app/misc/ai";
 import { extractVisibleText } from "@/app/misc/turnTimeline";
+import { deAiifyText } from "@/app/misc/deAiify";
 import {
   executeGMTools,
   GMToolResult,
@@ -72,12 +68,6 @@ import { executeTools, ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecu
 import { logger } from "@/app/misc/logger";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import {
-  findStatMatch,
-  findResourceMatch,
-  findItemMatch,
-  findAbilityMatch,
-} from "@/app/misc/fuzzyMatch";
-import {
   syncNewMemories,
 } from "@/app/misc/embeddings";
 import {
@@ -85,10 +75,7 @@ import {
   getSamplingSettings,
   filterSettingsForProvider,
 } from "@/app/misc/samplingSettings";
-import {
-  MYTHIC_TABLE_NAMES,
-  chaosFactorTemperatureDelta,
-} from "@/app/misc/mythic";
+import { chaosFactorTemperatureDelta } from "@/app/misc/mythic";
 import {
   SCENE_BASELINE_TIER,
   ReasoningEffort,
@@ -187,7 +174,7 @@ export interface GenerationOptions {
   webResearchEnabled?: boolean;
   braveSearchKey?: string;
   // GM Stage (new architecture: AI determines mechanics via tool calls)
-  enableGMStage?: boolean; // Use GM stage instead of ActionAnalysis JSON
+  enableGMStage?: boolean;
   gmStageModel?: string; // Model to use for GM stage (defaults to toolsModel)
   // Retry flow: reuse a previous turn's saved GM conversation (dice rolls,
   // tool results, reasoning) instead of re-running the GM stage's
@@ -201,6 +188,9 @@ export interface GenerationOptions {
   usePrefill?: boolean; // Default: true
   // Storyteller mode - "narrator" (literary) or "dm" (inline mechanics)
   storytellerMode?: "narrator" | "dm";
+  // Swap out common AI vocabulary tics (ozone, palpable, tapestry, ...) for
+  // plainer synonyms in the finalized narration. Default: enabled.
+  deAiifyWords?: boolean;
   // Reply Length - controls narration verbosity across GM + story stages
   replyLength?: ReplyLength;
   // Abort signal for cancelling generation
@@ -867,10 +857,9 @@ async function generateStoryTurnOnce(
     // ========================================
     let gmResults: GMToolResult[] = [];
     let gmStoryContext = "";
-    let gmInterleavedConversation = ""; // NEW: Full interleaved GM conversation for story stage
     let gmFinalStoryContent = ""; // NEW: GM's final prose content (when no tool calls)
     let gmMeta: GenerationMeta | undefined;
-    const gmThinking: string[] = []; // Capture GM's "[GM]" reasoning text
+    const gmThinking: string[] = []; // Capture GM's private <thinking> reasoning text
     let gmBaseMessages: ChatMessage[] = []; // Base GM prompt for story continuation
     let gmConversationHistory: ChatMessage[] = []; // Full GM conversation history for continuation
     let gmModel = ""; // Track which model was used for GM stage
@@ -1102,9 +1091,6 @@ async function generateStoryTurnOnce(
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         let gmRound = 0;
         let allGMContextParts: string[] = [];
-        // NEW: Build interleaved conversation log for story stage
-        // This preserves the exact order: thinking -> tool results -> thinking -> tool results
-        let gmInterleavedParts: string[] = [];
         // NEW: Accumulate visible prose from ALL rounds (not just the final one)
         // This allows GM to narrate while calling tools, building up the story incrementally
         let gmAccumulatedStory: string[] = [];
@@ -1451,13 +1437,6 @@ async function generateStoryTurnOnce(
 
             if (!isDuplicate) {
               gmThinking.push(gmResult.content);
-              // Add to interleaved parts with proper formatting
-              const formattedThinking =
-                gmResult.content.trim().startsWith("[GAME MASTER]") ||
-                gmResult.content.trim().startsWith("[GM]")
-                  ? gmResult.content.trim().replace(/^\[GM\]/, "[GAME MASTER]")
-                  : `[GAME MASTER]\n${gmResult.content.trim()}`;
-              gmInterleavedParts.push(formattedThinking);
 
               // NEW: Add raw content to accumulated story (preserve <thinking> tags)
               // extractVisibleText() pulls the player-visible narration out below
@@ -1568,10 +1547,6 @@ async function generateStoryTurnOnce(
             gmResults.push(...gmExecution.results);
             if (gmExecution.storyContext) {
               allGMContextParts.push(gmExecution.storyContext);
-              // Add tool results to interleaved parts
-              gmInterleavedParts.push(
-                `[GAME MASTER]\n${gmExecution.storyContext}`,
-              );
             }
 
             // Notify callback for each tool result (for real-time interleaved display)
@@ -1671,20 +1646,16 @@ async function generateStoryTurnOnce(
                   gmExecution.finalOutcome || "neutral"
                 }]`;
                 allGMContextParts.push(finalOutcomePart);
-                gmInterleavedParts.push(finalOutcomePart);
 
                 const summaryPart = `[GAME MASTER Summary: ${gmExecution.finalSummary}]`;
                 allGMContextParts.push(summaryPart);
-                gmInterleavedParts.push(summaryPart);
 
                 if (gmExecution.narrativeHints) {
                   const hintsPart = `[Narrative Hints: ${gmExecution.narrativeHints}]`;
                   allGMContextParts.push(hintsPart);
-                  gmInterleavedParts.push(hintsPart);
                 }
                 if (gmExecution.dramaticMoment) {
                   allGMContextParts.push(`[DRAMATIC MOMENT]`);
-                  gmInterleavedParts.push(`[DRAMATIC MOMENT]`);
                 }
               }
               logger.action("GM stage complete - end_gm_thinking called", {
@@ -1738,7 +1709,6 @@ async function generateStoryTurnOnce(
               // Add raw content to context parts (with thinking) for backward compat
               // (Prose extraction already happened earlier - don't duplicate)
               allGMContextParts.push(content);
-              // Don't add to gmInterleavedParts - already added in thinking capture block
 
               logger.action(
                 "GM stage complete - no tool calls, prose already captured",
@@ -1819,8 +1789,6 @@ async function generateStoryTurnOnce(
 
         // Combine all context parts from all rounds (for backward compat/logging)
         gmStoryContext = allGMContextParts.join("\n\n");
-        // Build interleaved conversation string for story stage
-        gmInterleavedConversation = gmInterleavedParts.join("\n\n");
         // Copy conversation history to outer scope for story continuation
         gmConversationHistory = conversationHistory.map((entry) => ({
           role: entry.role as "user" | "assistant" | "tool",
@@ -1905,6 +1873,10 @@ async function generateStoryTurnOnce(
         storyContent = storyContent.replace(/\n?[-*_]{3,}[\s\n]*$/, "");
       }
       storyContent = storyContent.trimEnd();
+
+      if (options.deAiifyWords !== false) {
+        storyContent = deAiifyText(storyContent);
+      }
 
       // Stream the content to the UI in one chunk
       callbacks.onStoryContent?.(storyContent, storyContent);
@@ -2197,6 +2169,10 @@ async function generateStoryTurnOnce(
       // against a dangling tag even though the prompt no longer asks for
       // <output> wrapping (defends against a model that adds one anyway).
       storyContent = extractVisibleText(storyContent);
+
+      if (options.deAiifyWords !== false) {
+        storyContent = deAiifyText(storyContent);
+      }
 
       callbacks.onStoryComplete?.(
         storyContent,
@@ -2507,322 +2483,6 @@ export async function* generateSimpleStream(
   }
 
   yield* parseSSEStream(response);
-}
-
-// ============================================================
-// ACTION ANALYSIS (for freeform action mode)
-// ============================================================
-
-export interface ActionAnalysisResult {
-  analysis: ActionAnalysis;
-  meta: GenerationMeta;
-  validationWarnings: string[];
-}
-
-/**
- * Analyze a freeform player action and extract game mechanics
- */
-export async function analyzeAction(
-  storyData: StoryData,
-  userAction: string,
-  model: string,
-  apiKeys?: {
-    openRouterKey?: string;
-    deepseekKey?: string;
-    googleKey?: string;
-    mistralKey?: string;
-    deepinfraKey?: string;
-  },
-): Promise<ActionAnalysisResult> {
-  logger.action("Analyzing freeform action", { userAction, model });
-
-  const prompt = buildActionAnalysisPrompt({ storyData, userAction });
-
-  // Log the context being sent to AI for debugging (goes to the in-app
-  // LogViewer via sessionStorage, not the browser console)
-  logger.action("Action analysis prompt built", {
-    systemPrompt: prompt.messages[0].content,
-    userMessage: prompt.messages[1].content,
-  });
-
-  const response = await providerFetch("/api/generate", {
-    messages: prompt.messages,
-    model,
-    maxTokens: 500,
-    temperature: 0.3, // Low temperature for structured output
-    openRouterKey: apiKeys?.openRouterKey,
-    deepseekKey: apiKeys?.deepseekKey,
-    googleKey: apiKeys?.googleKey,
-    mistralKey: apiKeys?.mistralKey,
-    deepinfraKey: apiKeys?.deepinfraKey,
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.error || `Analysis failed: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const content = data.content;
-  const meta = data.meta;
-
-  // Log raw AI response
-  logger.action("Action analysis raw AI response", { content });
-
-  // Parse JSON from response
-  let analysis: ActionAnalysis;
-  try {
-    // Try to extract JSON from the response (handle markdown code blocks)
-    let jsonStr = content;
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1];
-    }
-    // Also try to find raw JSON object
-    const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
-    if (objectMatch) {
-      jsonStr = objectMatch[0];
-    }
-
-    analysis = JSON.parse(jsonStr);
-  } catch (e) {
-    logger.error("Failed to parse action analysis JSON", { content, error: e });
-    // Return a plain action as fallback
-    analysis = {
-      action_summary: userAction,
-      skill_used: null,
-      skill_dc: null,
-      item_used: null,
-      ability_used: null,
-      resource_used: null,
-      agmt_check: null,
-      table: null,
-      is_plain_action: true,
-      stat_bonus: null,
-      rolls: undefined,
-    };
-  }
-
-  // Validate and fuzzy match the analysis against actual game state
-  const validationWarnings: string[] = [];
-
-  // Validate skill_used and skill_dc
-  if (analysis.skill_used) {
-    const matchResult = findStatMatch(analysis.skill_used, storyData.stats);
-    if (matchResult) {
-      if (!matchResult.isExact) {
-        validationWarnings.push(
-          `Matched skill "${analysis.skill_used}" → "${matchResult.name}"`,
-        );
-      }
-      analysis.skill_used = matchResult.name;
-    } else {
-      validationWarnings.push(
-        `Skill "${analysis.skill_used}" not found, removing skill check`,
-      );
-      analysis.skill_used = null;
-      analysis.skill_dc = null;
-    }
-  }
-
-  // Validate skill_dc - ensure it's a number, not a tier string
-  // If AI returned a tier name (e.g., "easy"), convert it to a number
-  if (analysis.skill_dc !== null && analysis.skill_dc !== undefined) {
-    if (typeof analysis.skill_dc === "string") {
-      const tierNames = [
-        "trivial",
-        "easy",
-        "average",
-        "hard",
-        "very_hard",
-        "impossible",
-      ];
-      const lowerDc = (analysis.skill_dc as string).toLowerCase();
-      if (tierNames.includes(lowerDc)) {
-        // Import parseDCValue for tier conversion
-        const { parseDCValue } = await import("./rpgSystems");
-        const difficulty = storyData.difficulty || "medium";
-        analysis.skill_dc = parseDCValue(lowerDc, "3d6", difficulty);
-        validationWarnings.push(
-          `Converted DC tier "${lowerDc}" → ${analysis.skill_dc} (${difficulty} difficulty)`,
-        );
-      } else {
-        // Try parsing as number
-        const parsed = parseInt(analysis.skill_dc as string, 10);
-        if (!isNaN(parsed)) {
-          analysis.skill_dc = parsed;
-        } else {
-          validationWarnings.push(
-            `Invalid skill_dc "${analysis.skill_dc}", defaulting to null`,
-          );
-          analysis.skill_dc = null;
-        }
-      }
-    }
-  }
-
-  // Validate resource_used
-  if (analysis.resource_used) {
-    const matchResult = findResourceMatch(
-      analysis.resource_used,
-      storyData.resources,
-    );
-    if (matchResult) {
-      if (!matchResult.isExact) {
-        validationWarnings.push(
-          `Matched resource "${analysis.resource_used}" → "${matchResult.name}"`,
-        );
-      }
-      analysis.resource_used = matchResult.name;
-    } else {
-      validationWarnings.push(
-        `Resource "${analysis.resource_used}" not found, removing`,
-      );
-      analysis.resource_used = null;
-    }
-  }
-
-  // Validate item_used
-  if (analysis.item_used) {
-    const matchResult = findItemMatch(analysis.item_used, storyData.inventory);
-    if (matchResult) {
-      if (!matchResult.isExact) {
-        validationWarnings.push(
-          `Matched item "${analysis.item_used}" → "${matchResult.name}"`,
-        );
-      }
-      analysis.item_used = matchResult.name;
-    } else {
-      validationWarnings.push(
-        `Item "${analysis.item_used}" not found, removing`,
-      );
-      analysis.item_used = null;
-    }
-  }
-
-  // Validate ability_used
-  if (analysis.ability_used) {
-    const matchResult = findAbilityMatch(
-      analysis.ability_used,
-      storyData.abilities || [],
-    );
-    if (matchResult) {
-      if (!matchResult.isExact) {
-        validationWarnings.push(
-          `Matched ability "${analysis.ability_used}" → "${matchResult.name}"`,
-        );
-      }
-      // Also check if ability is on cooldown
-      const ability = storyData.abilities?.find(
-        (a) => a.name === matchResult.name,
-      );
-      if (ability && (ability.currentCooldown || 0) > 0) {
-        validationWarnings.push(
-          `Ability "${matchResult.name}" is on cooldown (${ability.currentCooldown} turns remaining), removing`,
-        );
-        analysis.ability_used = null;
-      } else {
-        analysis.ability_used = matchResult.name;
-      }
-    } else {
-      validationWarnings.push(
-        `Ability "${analysis.ability_used}" not found, removing`,
-      );
-      analysis.ability_used = null;
-    }
-  }
-
-  // Handle legacy agmt_table/custom_table fields - migrate to unified table field
-  if (analysis.agmt_table && !analysis.table) {
-    analysis.table = analysis.agmt_table;
-  }
-  if (analysis.custom_table && !analysis.table) {
-    analysis.table = analysis.custom_table;
-  }
-
-  // Validate unified table field - check both custom tables AND agmt element tables
-  if (analysis.table) {
-    const tableName = analysis.table;
-
-    // First, check custom tables
-    if (storyData.customTables && storyData.customTables.length > 0) {
-      const customTable = storyData.customTables.find(
-        (t) => t.name.toLowerCase() === tableName.toLowerCase(),
-      );
-      if (customTable) {
-        analysis.table = customTable.name; // Use exact name
-      }
-    }
-
-    // If not found in custom tables, check if it's a valid agmt table
-    // (single source of truth: MYTHIC_TABLE_NAMES, derived from mythic.ts's
-    // ELEMENT_TABLES so it can't drift from the tables that actually exist)
-    const isAGMTTable = MYTHIC_TABLE_NAMES.some(
-      (name) => name.toLowerCase() === tableName.toLowerCase(),
-    );
-    const isCustomTable = storyData.customTables?.some(
-      (t) => t.name.toLowerCase() === tableName.toLowerCase(),
-    );
-
-    if (!isAGMTTable && !isCustomTable) {
-      validationWarnings.push(
-        `Table "${tableName}" not found in custom or agmt tables, removing`,
-      );
-      analysis.table = null;
-    }
-  }
-
-  // Ensure is_plain_action is consistent
-  if (
-    !analysis.skill_used &&
-    !analysis.item_used &&
-    !analysis.resource_used &&
-    !analysis.agmt_check &&
-    !analysis.table
-  ) {
-    analysis.is_plain_action = true;
-  }
-
-  logger.action("Action analysis complete", {
-    analysis,
-    validationWarnings,
-  });
-
-  // Log final parsed analysis
-  console.log(
-    "\n[analyzeAction] Parsed analysis:",
-    JSON.stringify(analysis, null, 2),
-  );
-  if (validationWarnings.length > 0) {
-    console.log("[analyzeAction] Validation warnings:", validationWarnings);
-  }
-
-  return {
-    analysis,
-    meta,
-    validationWarnings,
-  };
-}
-
-/**
- * Convert ActionAnalysis to Choice format for use with existing handleChoice logic
- */
-export function analysisToChoice(
-  analysis: ActionAnalysis,
-  originalAction: string,
-): Choice {
-  // Since the GM stage now handles all dice mechanics via formula_roll,
-  // we only need to copy the plain text. The deprecated fields are
-  // kept in the Choice interface for backward compatibility with
-  // existing stories, but we don't populate them for new choices.
-  return {
-    text: originalAction,
-    // Only copy skill_used/skill_dc if they exist, for backward compat
-    skill_used: analysis.skill_used || undefined,
-    skill_dc: analysis.skill_dc || undefined,
-    item_used: analysis.item_used || undefined,
-    resource_used: analysis.resource_used || undefined,
-  };
 }
 
 /**
