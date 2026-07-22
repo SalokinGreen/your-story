@@ -279,6 +279,41 @@ export default function TTSControls({
     return audioRef.current;
   }, []);
 
+  // Auto-narrate's first playback attempt for a turn is never itself inside
+  // a click handler (it's kicked off by the streaming-text effect below, or
+  // by onChunkArrived once network audio lands) - without ever having played
+  // as a direct result of a gesture, that first `play()` call is exactly the
+  // case browsers block. Unlock the persistent element on the very first
+  // pointer/key interaction anywhere on the page, so by the time a turn's
+  // audio is ready to play (the player necessarily had to click a choice or
+  // type something to trigger that turn in the first place) it's already
+  // eligible - without requiring a manual press of this button first.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const unlock = () => {
+      const audio = getAudioElement();
+      // Only stomp the element's src if nothing real has ever been queued
+      // on it yet - avoids clobbering an actual TTS chunk in the (very
+      // unlikely) case this first-ever page interaction lands in the brief
+      // async window between playChunkAt setting a real src and playback
+      // actually starting (audio.paused stays true until then).
+      if (audio.paused && audioUrlsRef.current.length === 0) {
+        audio.src = SILENT_AUDIO_DATA_URI;
+        audio.play().catch(() => {
+          // Ignore - this is just a best-effort unlock attempt.
+        });
+      }
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, [getAudioElement]);
+
   // Forwarding ref so playChunkAt's onended handler can call the latest
   // advanceToNextChunk without the two useCallbacks needing to reference
   // each other before they're defined.
@@ -301,6 +336,13 @@ export default function TTSControls({
 
       audio.play().catch((err) => {
         console.error("TTS playback error:", err);
+        // A rejected play() (e.g. the browser's autoplay policy blocking a
+        // call that isn't tied to a user gesture) leaves nothing actually
+        // audible - don't leave the button showing "Stop" for playback that
+        // never started. The audio is still cached (hasAudio/audioUrlsRef),
+        // so the next real click (canReplay) will play it as a genuine
+        // gesture instead.
+        setIsPlaying(false);
       });
     },
     [getAudioElement, addNotification],
