@@ -12,7 +12,9 @@ import {
   checkOutcomeMismatch,
   checkToolUsageGaps,
   runObserver,
+  buildObserverWarningNote,
 } from "../app/misc/observer";
+import type { ObserverFlag } from "../app/misc/structs";
 
 describe("checkResponseLength", () => {
   it("does not flag narration within the reply-length ceiling", () => {
@@ -526,5 +528,37 @@ describe("runObserver", () => {
 
     expect(flags.some((f) => f.type === "missing_oracle_or_table")).toBe(true);
     expect(flags.some((f) => f.type === "missing_scene_increment")).toBe(false);
+  });
+});
+
+describe("buildObserverWarningNote", () => {
+  function flag(overrides: Partial<ObserverFlag> = {}): ObserverFlag {
+    return {
+      type: "missing_scene_increment",
+      severity: "minor",
+      detail: "Narrated a time skip without calling increment_scene.",
+      correctivePrompt: "unused for this note",
+      ...overrides,
+    };
+  }
+
+  it("returns undefined when there are no flags", () => {
+    expect(buildObserverWarningNote(undefined)).toBeUndefined();
+    expect(buildObserverWarningNote([])).toBeUndefined();
+  });
+
+  it("builds a warning from a single surviving flag's detail", () => {
+    const note = buildObserverWarningNote([flag()]);
+    expect(note).toContain("flagged by the observer");
+    expect(note).toContain("Narrated a time skip without calling increment_scene.");
+  });
+
+  it("lists every surviving flag's detail, not just the first", () => {
+    const note = buildObserverWarningNote([
+      flag({ detail: "First issue." }),
+      flag({ type: "missing_oracle_or_table", detail: "Second issue." }),
+    ]);
+    expect(note).toContain("First issue.");
+    expect(note).toContain("Second issue.");
   });
 });

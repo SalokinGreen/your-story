@@ -44,7 +44,7 @@ import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { ensureStoryReflected } from "@/app/misc/reflection";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
-import { runObserver } from "@/app/misc/observer";
+import { runObserver, buildObserverWarningNote } from "@/app/misc/observer";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
 import {
   outputToScenePart,
@@ -668,7 +668,18 @@ export async function generateStoryTurn(
     );
   }
 
-  let observerNote: string | undefined;
+  // Carry forward any flags that survived the PRIOR turn (minor flags never
+  // trigger a reset, and a major flag can still survive if the reset budget
+  // ran out) - otherwise a flagged mistake reaches the player via the
+  // ScenePart.observerFlags toast but the GM itself never learns it did
+  // anything wrong. Overridden below the moment a same-turn reset fires,
+  // since that corrective note is about THIS turn and takes priority.
+  const lastAssistantPart = [...storyData.scene.parts]
+    .reverse()
+    .find((p) => !p.user && p.role === "assistant");
+  let observerNote: string | undefined = buildObserverWarningNote(
+    lastAssistantPart?.observerFlags,
+  );
   let resetAttempts = 0;
 
   while (true) {

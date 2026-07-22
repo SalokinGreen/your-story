@@ -500,3 +500,25 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
 
   return flags;
 }
+
+/**
+ * Builds a next-turn warning from a turn's SURVIVING observer flags - ones
+ * that reached the final, accepted result rather than being corrected via a
+ * same-turn reset. That covers two cases: minor flags (which never trigger
+ * a reset at all) and major flags where the reset budget ran out (fail
+ * open). Both cases mean the GM was never actually told what it did wrong -
+ * generateStoryTurn's reset-and-retry note only ever reaches the model
+ * mid-turn, while it's still trying to fix THIS turn. Without this, a
+ * flagged mistake reaches the player (via the ScenePart.observerFlags
+ * toast) but silently evaporates for the GM the moment the turn is
+ * accepted. Called once per turn, in generation.ts, using the PRIOR turn's
+ * surviving flags to warn the GM before it writes the next one.
+ */
+export function buildObserverWarningNote(
+  flags: ObserverFlag[] | undefined,
+): string | undefined {
+  if (!flags || flags.length === 0) return undefined;
+
+  const lines = flags.map((f) => `- ${f.detail}`);
+  return `Your previous turn was flagged by the observer for the following - keep this in mind and avoid repeating it:\n${lines.join("\n")}`;
+}

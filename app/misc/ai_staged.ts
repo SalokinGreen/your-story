@@ -1826,16 +1826,21 @@ export function buildGMStagePrompt({
   modelName?: string; // Used to get model's actual context limit
   replyLength?: ReplyLength; // Reply Length setting - controls narration verbosity
   pacingNote?: string; // Deterministic pacing nudge (see pacingFeedback.ts)
-  // Layer 5 hardening (see observer.ts): set only when generateStoryTurn is
-  // retrying after the observer flagged the previous attempt at this same
-  // turn as a major violation - explains exactly what was flagged so the GM
-  // doesn't just repeat the mistake.
+  // Layer 5 hardening (see observer.ts): explains an observer flag so the
+  // GM doesn't just repeat the mistake. Two sources, mutually exclusive per
+  // call - generateStoryTurn (generation.ts) picks whichever applies: a
+  // same-turn reset's corrective note (this exact attempt was just
+  // discarded for THIS reason) while a retry is in progress, or the PRIOR
+  // turn's surviving flags (buildObserverWarningNote) carried forward as a
+  // warning otherwise - without the latter, a minor flag (which never
+  // triggers a reset) or a major flag whose reset budget ran out would
+  // reach the player via a toast but never reach the GM at all.
   observerNote?: string;
 }): { messages: ChatMessage[]; tools: any[] } {
   const lengthGuidance = getLengthGuidance(replyLength);
   const pacingFeedbackLine = pacingNote ? `\n${pacingNote}` : "";
   const observerNoteBlock = observerNote
-    ? `\n\n## PREVIOUS ATTEMPT RESET\n${observerNote}`
+    ? `\n\n## OBSERVER FEEDBACK\n${observerNote}`
     : "";
   const difficulty = storyData.difficulty || "medium";
 
