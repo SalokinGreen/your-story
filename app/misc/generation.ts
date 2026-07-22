@@ -46,6 +46,7 @@ import {
   detectRepetition,
 } from "@/app/misc/ai";
 import { extractVisibleText } from "@/app/misc/turnTimeline";
+import { deAiifyText } from "@/app/misc/deAiify";
 import {
   executeGMTools,
   GMToolResult,
@@ -181,6 +182,9 @@ export interface GenerationOptions {
   usePrefill?: boolean; // Default: true
   // Storyteller mode - "narrator" (literary) or "dm" (inline mechanics)
   storytellerMode?: "narrator" | "dm";
+  // Swap out common AI vocabulary tics (ozone, palpable, tapestry, ...) for
+  // plainer synonyms in the finalized narration. Default: enabled.
+  deAiifyWords?: boolean;
   // Reply Length - controls narration verbosity across GM + story stages
   replyLength?: ReplyLength;
   // Abort signal for cancelling generation
@@ -1804,6 +1808,10 @@ async function generateStoryTurnOnce(
       }
       storyContent = storyContent.trimEnd();
 
+      if (options.deAiifyWords !== false) {
+        storyContent = deAiifyText(storyContent);
+      }
+
       // Stream the content to the UI in one chunk
       callbacks.onStoryContent?.(storyContent, storyContent);
 
@@ -2095,6 +2103,10 @@ async function generateStoryTurnOnce(
       // against a dangling tag even though the prompt no longer asks for
       // <output> wrapping (defends against a model that adds one anyway).
       storyContent = extractVisibleText(storyContent);
+
+      if (options.deAiifyWords !== false) {
+        storyContent = deAiifyText(storyContent);
+      }
 
       callbacks.onStoryComplete?.(
         storyContent,

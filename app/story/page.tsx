@@ -1385,6 +1385,10 @@ function StoryPageContent() {
           ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
             "narrator"
           : "narrator";
+      const deAiifyWords =
+        typeof window !== "undefined"
+          ? localStorage.getItem("deAiifyWords") !== "false"
+          : true;
       const replyLength =
         typeof window !== "undefined"
           ? (localStorage.getItem("replyLength") as
@@ -1436,6 +1440,7 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
+          deAiifyWords,
           replyLength,
           enableGMStage: gmStageEnabled,
           gmStageModel: toolsModel, // Use same model as tools stage
@@ -2102,6 +2107,10 @@ function StoryPageContent() {
         ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
           "narrator"
         : "narrator";
+    const deAiifyWords =
+      typeof window !== "undefined"
+        ? localStorage.getItem("deAiifyWords") !== "false"
+        : true;
     const replyLength =
       typeof window !== "undefined"
         ? (localStorage.getItem("replyLength") as "short" | "medium" | "long") ||
@@ -2159,6 +2168,7 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
+          deAiifyWords,
           replyLength,
           enableGMStage: gmStageEnabled,
           gmStageModel: toolsModel, // Use same model as tools stage
@@ -2659,6 +2669,10 @@ function StoryPageContent() {
         ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
           "narrator"
         : "narrator";
+    const deAiifyWords =
+      typeof window !== "undefined"
+        ? localStorage.getItem("deAiifyWords") !== "false"
+        : true;
     const replyLength =
       typeof window !== "undefined"
         ? (localStorage.getItem("replyLength") as "short" | "medium" | "long") ||
@@ -2722,6 +2736,7 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
+          deAiifyWords,
           replyLength,
           // Skip GM stage on retry - reuse the saved conversation (dice
           // rolls, tool results, reasoning) from the popped part instead
