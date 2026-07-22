@@ -2145,6 +2145,8 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "formula_roll",
     // Manual dice mode: player rolls real dice, GM asks for the result
     ...(manualDiceMode ? ["ask_for_roll"] : []),
+    // Pause and ask the player(s) a predefined-choice + free-text question
+    "ask_question",
     // Pure numeric DC check for totals the player self-reports in freeform text/voice
     "check_dc",
     "formula_challenge_check",

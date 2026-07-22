@@ -42,10 +42,13 @@ import ContextViewer from "./ContextViewer";
 import OOCChatPanel from "../components/OOCChatPanel";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
+import AskQuestionModal from "../components/AskQuestionModal";
 import type {
   ManualRollRequest,
   ManualRollAnswer,
   DiceThrowRequest,
+  AskQuestionRequest,
+  AskQuestionAnswer,
 } from "../misc/gmExecutor";
 import {
   type TimelineBlock,
@@ -338,6 +341,13 @@ function StoryPageContent() {
     useState<DiceThrowRequest | null>(null);
   const diceThrowResolveRef = useRef<
     ((faces: number[] | null) => void) | null
+  >(null);
+  // Ask-question tool: the GM is asking one or more predefined-choice +
+  // free-text questions. Same pause-and-resolve pattern as manual dice mode.
+  const [askQuestionRequest, setAskQuestionRequest] =
+    useState<AskQuestionRequest | null>(null);
+  const askQuestionResolveRef = useRef<
+    ((answer: AskQuestionAnswer | null) => void) | null
   >(null);
   // Networked multiplayer: which local player(s), if known, triggered the
   // turn currently in flight - set right before generateStoryTurn is called
@@ -1390,6 +1400,7 @@ function StoryPageContent() {
             logger.action("GM stage started (custom input)");
           },
           onAskForRoll: requestManualRoll,
+          onAskQuestion: requestPlayerAnswer,
           onRequestDiceThrow:
             storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
           onCompaction: (summary) => {
@@ -2145,6 +2156,7 @@ function StoryPageContent() {
             logger.action("GM stage started - determining mechanics");
           },
           onAskForRoll: requestManualRoll,
+          onAskQuestion: requestPlayerAnswer,
           onRequestDiceThrow:
             storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
           onCompaction: (summary) => {
@@ -2419,6 +2431,21 @@ function StoryPageContent() {
     setManualRollRequest(null);
   }
 
+  // Ask-question tool: called by the GM executor when ask_question fires.
+  // Shows the question prompt and resolves once the player(s) answer.
+  function requestPlayerAnswer(request: AskQuestionRequest) {
+    return new Promise<AskQuestionAnswer | null>((resolve) => {
+      askQuestionResolveRef.current = resolve;
+      setAskQuestionRequest(request);
+    });
+  }
+
+  function resolveAskQuestion(answer: AskQuestionAnswer | null) {
+    askQuestionResolveRef.current?.(answer);
+    askQuestionResolveRef.current = null;
+    setAskQuestionRequest(null);
+  }
+
   // Physical dice mode: called by the GM executor when a formula roll can
   // be thrown physically. If we're hosting a networked session and the
   // turn in flight is attributable to exactly one connected guest (not the
@@ -2480,6 +2507,7 @@ function StoryPageContent() {
     // Unblock the GM loop if it's paused waiting for a physical roll
     resolveManualRoll(null);
     resolveDiceThrow(null);
+    resolveAskQuestion(null);
     abandonRelayedDiceThrows();
     if (generationAbortRef.current) {
       generationAbortRef.current.abort();
@@ -3772,6 +3800,15 @@ function StoryPageContent() {
         couchPlayers={storyData?.multiplayer?.couchPlayers}
         onSubmit={(value, rawText) => resolveManualRoll({ value, rawText })}
         onSkip={() => resolveManualRoll(null)}
+      />
+
+      {/* Ask-question tool: the GM asked one or more predefined-choice +
+          free-text questions - generation is paused until answered/skipped */}
+      <AskQuestionModal
+        request={askQuestionRequest}
+        couchPlayers={storyData?.multiplayer?.couchPlayers}
+        onAnswer={resolveAskQuestion}
+        onSkipAll={() => resolveAskQuestion(null)}
       />
 
       {/* Physical dice mode: the GM's roll can be thrown on a 3D dice tray -
