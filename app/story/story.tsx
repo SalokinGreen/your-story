@@ -14,7 +14,6 @@ import CombatDisplay from "../components/CombatDisplay";
 import { ChapterNav } from "../components/ChapterNav";
 import { ObjectivesStrip } from "../components/ObjectivesStrip";
 import type { SyncStatus } from "../misc/localStoryManager";
-import { cleanTextForSpeech } from "../misc/ai";
 import {
   type TimelineBlock,
   buildSavedTimeline,
@@ -1392,7 +1391,7 @@ export default function Story({
                 auto-narrate (if enabled) starts reading live as the GM
                 streams instead of waiting - see storyTextReady prop. */}
             <TTSControls
-              text={cleanTextForSpeech(storyText)}
+              text={storyText}
               disabled={loading || !storyTextReady}
               storyTextReady={storyTextReady}
             />
