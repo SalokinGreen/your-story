@@ -17,6 +17,7 @@ import {
   NPCReaction,
   Adventure,
   CouchPlayer,
+  ObserverFlag,
 } from "../misc/structs";
 import { useNetSession } from "../misc/multiplayer/useNetSession";
 import type { MPBackend } from "../misc/multiplayer/types";
@@ -177,6 +178,53 @@ function processQuestNotifications(
       }
     }
   }
+}
+
+// Layer 5 hardening (see app/misc/observer.ts and generation.ts's
+// generateStoryTurn): fired via GenerationCallbacks.onObserverReset when the
+// observer flags a turn as a major violation (GM spoke/acted for the
+// player, or blew way past the reply-length ceiling) and generateStoryTurn
+// discards it and forces a fresh attempt. storyData has already been rolled
+// back to its pre-turn snapshot by the time this fires. partialPart is the
+// same object reference onStoryContent has been streaming into and pushing
+// onto storyData.scene.parts - blank it out so nothing from the discarded
+// attempt survives into the retry's streaming, and reset the live view so
+// the player sees a clean restart rather than a stale/garbled part.
+function handleObserverReset(
+  partialPart: ScenePart,
+  flags: ObserverFlag[],
+  triggeringFlag: ObserverFlag,
+  setStoryText: (text: string) => void,
+  setLiveGMEntries: (entries: TimelineBlock[]) => void,
+  setLoadingStage: (stage: "gm" | "story" | "choices" | null) => void,
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "info" | "warning",
+  ) => void,
+) {
+  partialPart.content = "";
+  partialPart.gmToolCalls = undefined;
+  partialPart.gmStoryContext = undefined;
+  partialPart.gmThinking = undefined;
+  partialPart.npcReactions = undefined;
+  partialPart.toolCalls = undefined;
+  partialPart.toolResponses = undefined;
+  partialPart.stateChanges = undefined;
+
+  setStoryText("");
+  setLiveGMEntries([]);
+  setLoadingStage("gm");
+
+  logger.action("Observer flagged turn, state reset and retrying", {
+    type: triggeringFlag.type,
+    detail: triggeringFlag.detail,
+    totalFlags: flags.length,
+  });
+
+  addNotification(
+    `GM response was reset: ${triggeringFlag.detail} Retrying...`,
+    "warning",
+  );
 }
 
 enum StoryState {
@@ -1602,6 +1650,17 @@ function StoryPageContent() {
               usage,
             });
           },
+          onObserverReset: (flags, triggeringFlag) => {
+            handleObserverReset(
+              partialPart,
+              flags,
+              triggeringFlag,
+              setStoryText,
+              setLiveGMEntries,
+              setLoadingStage,
+              addNotification,
+            );
+          },
           onComplete: (result) => {
             if (result.meta.totalTokenCost) {
               addNotification(
@@ -1658,6 +1717,22 @@ function StoryPageContent() {
               };
               addNotification(
                 `Possible inconsistency: ${result.scenePart.consistencyWarnings[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+                "warning",
+              );
+            }
+
+            // Layer 5 observer flags (see observer.ts) that survived to this
+            // accepted turn - either minor, or major but the automatic reset
+            // budget was already spent (onObserverReset fired earlier this
+            // turn for those attempts). Same posture as consistencyWarnings
+            // above: surface it, let the player Edit/Retry manually.
+            if (lastIdx >= 0 && result.scenePart?.observerFlags?.length) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                observerFlags: result.scenePart.observerFlags,
+              };
+              addNotification(
+                `GM response flagged: ${result.scenePart.observerFlags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
                 "warning",
               );
             }
@@ -2320,6 +2395,17 @@ function StoryPageContent() {
               usage,
             });
           },
+          onObserverReset: (flags, triggeringFlag) => {
+            handleObserverReset(
+              partialPart,
+              flags,
+              triggeringFlag,
+              setStoryText,
+              setLiveGMEntries,
+              setLoadingStage,
+              addNotification,
+            );
+          },
           onComplete: (result) => {
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
               const currentChapter = storyData.chapters.length;
@@ -2799,6 +2885,17 @@ function StoryPageContent() {
               usage,
             });
           },
+          onObserverReset: (flags, triggeringFlag) => {
+            handleObserverReset(
+              partialPart,
+              flags,
+              triggeringFlag,
+              setStoryText,
+              setLiveGMEntries,
+              setLoadingStage,
+              addNotification,
+            );
+          },
           onComplete: (result) => {
             // Check for chapter completion
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
@@ -2846,6 +2943,22 @@ function StoryPageContent() {
               };
               addNotification(
                 `Possible inconsistency: ${result.scenePart.consistencyWarnings[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+                "warning",
+              );
+            }
+
+            // Layer 5 observer flags (see observer.ts) that survived to this
+            // accepted turn - either minor, or major but the automatic reset
+            // budget was already spent (onObserverReset fired earlier this
+            // turn for those attempts). Same posture as consistencyWarnings
+            // above: surface it, let the player Edit/Retry manually.
+            if (lastIdx >= 0 && result.scenePart?.observerFlags?.length) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                observerFlags: result.scenePart.observerFlags,
+              };
+              addNotification(
+                `GM response flagged: ${result.scenePart.observerFlags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
                 "warning",
               );
             }

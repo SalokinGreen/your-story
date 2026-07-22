@@ -21,6 +21,7 @@ import {
   MemoryEntry,
   GMConversationMessage,
   ReasoningDetail,
+  ObserverFlag,
 } from "@/app/misc/structs";
 import {
   buildToolPrompt,
@@ -43,6 +44,7 @@ import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { ensureStoryReflected } from "@/app/misc/reflection";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
+import { runObserver } from "@/app/misc/observer";
 import {
   outputToScenePart,
   extractThinkingTags,
@@ -197,6 +199,10 @@ export interface GenerationOptions {
   replyLength?: ReplyLength;
   // Abort signal for cancelling generation
   abortSignal?: AbortSignal;
+  // Layer 5 hardening (see observer.ts): set internally by generateStoryTurn's
+  // observer retry loop, not meant to be passed in by callers. Injected into
+  // the GM prompt to explain why the previous attempt at this turn was reset.
+  observerNote?: string;
 }
 
 export interface GenerationCallbacks {
@@ -256,6 +262,13 @@ export interface GenerationCallbacks {
   // (see compaction.ts) - lets the UI show a "recap" notice instead of
   // silently condensing history the player can no longer scroll back to.
   onCompaction?: (summary: string) => void;
+  // Layer 5 hardening (see observer.ts): fired when the observer flagged the
+  // just-completed turn as a major violation (GM spoke/acted for the player,
+  // or blew way past the reply-length ceiling) and generateStoryTurn is
+  // discarding it and forcing a fresh attempt. storyData has already been
+  // rolled back to its pre-turn snapshot by the time this fires - the UI
+  // should clear anything it displayed/streamed for the discarded attempt.
+  onObserverReset?: (flags: ObserverFlag[], triggeringFlag: ObserverFlag) => void;
   onComplete?: (result: GenerationResult) => void;
   onError?: (error: Error) => void;
 }
@@ -619,7 +632,132 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
 // MAIN GENERATION FUNCTION
 // ============================================================
 
+// A whole-turn redo (fresh GM + story + choices calls) is much costlier
+// than the M2 gate's per-round retry, so the observer's automatic reset is
+// capped much lower - one retry, then fail open (accept the turn, keep the
+// flag attached for display) rather than risk looping the player forever.
+const MAX_OBSERVER_RESETS = 1;
+
+/**
+ * Executes a complete story turn, then runs the Layer-5 observer (see
+ * observer.ts) against the result. A "major" flag (the GM spoke/acted for
+ * the player, or blew way past the reply-length ceiling) rolls storyData
+ * back to its pre-turn snapshot and retries the whole turn with a corrective
+ * note telling the GM exactly what it was flagged for - same fail-open
+ * posture as the M2 roll-invariant gate below: never blocks play forever.
+ */
 export async function generateStoryTurn(
+  storyData: StoryData,
+  userChoice: string,
+  options: GenerationOptions,
+  callbacks: GenerationCallbacks,
+): Promise<GenerationResult> {
+  let preTurnSnapshot: StoryData | null = null;
+  try {
+    preTurnSnapshot = structuredClone(storyData);
+  } catch (snapshotError) {
+    logger.action(
+      "Observer: failed to snapshot pre-turn state, automatic reset disabled for this turn",
+      {
+        error:
+          snapshotError instanceof Error
+            ? snapshotError.message
+            : String(snapshotError),
+      },
+    );
+  }
+
+  let observerNote: string | undefined;
+  let resetAttempts = 0;
+
+  while (true) {
+    const result = await generateStoryTurnOnce(
+      storyData,
+      userChoice,
+      {
+        ...options,
+        observerNote,
+        // A reset discards the previous attempt's tool calls/narration - if
+        // it also came with a precomputedGMConversation (manual Retry flow),
+        // replaying that would just replay the flagged content, so force a
+        // fresh GM stage on every retry attempt past the first.
+        precomputedGMConversation:
+          resetAttempts === 0 ? options.precomputedGMConversation : undefined,
+      },
+      callbacks,
+    );
+
+    // Only a turn with actual narration is worth reviewing - an empty
+    // result (e.g. a no-op tool-only round) has nothing for the observer to
+    // judge. generateStoryTurnOnce throws rather than returning on failure,
+    // so a successfully-returned result always has success: true here.
+    if (!result.content.trim()) {
+      return result;
+    }
+
+    let flags: ObserverFlag[] = [];
+    try {
+      flags = await runObserver({
+        narration: result.content,
+        playerChoice: userChoice,
+        replyLength: options.replyLength,
+        apiOptions: {
+          model:
+            result.meta.storyMeta?.model ||
+            result.meta.gmMeta?.model ||
+            options.storyModel,
+          token: null,
+          openRouterKey: options.openRouterKey,
+          deepseekKey: options.deepseekKey,
+          googleKey: options.googleKey,
+          mistralKey: options.mistralKey,
+          deepinfraKey: options.deepinfraKey,
+          abortSignal: options.abortSignal,
+        },
+      });
+    } catch (observerError) {
+      // Fail open - an observer infra failure should never block the turn.
+      logger.action("Observer check failed, treating as pass (fail open)", {
+        error:
+          observerError instanceof Error
+            ? observerError.message
+            : String(observerError),
+      });
+      flags = [];
+    }
+
+    const majorFlag = flags.find((f) => f.severity === "major");
+
+    if (majorFlag && preTurnSnapshot && resetAttempts < MAX_OBSERVER_RESETS) {
+      resetAttempts++;
+      logger.action("Observer flagged turn for automatic reset", {
+        type: majorFlag.type,
+        detail: majorFlag.detail,
+        attempt: resetAttempts,
+      });
+
+      // Full state rollback, restored in place (delete-all-keys +
+      // Object.assign) so every closure over storyData (the caller, other
+      // callbacks already fired this turn) keeps seeing the same object -
+      // same idiom as page.tsx's handleUndo.
+      for (const key of Object.keys(storyData)) {
+        delete (storyData as unknown as Record<string, unknown>)[key];
+      }
+      Object.assign(storyData, preTurnSnapshot);
+
+      observerNote = majorFlag.correctivePrompt;
+      callbacks.onObserverReset?.(flags, majorFlag);
+      continue;
+    }
+
+    if (flags.length > 0) {
+      result.scenePart = { ...result.scenePart, observerFlags: flags };
+    }
+    return result;
+  }
+}
+
+async function generateStoryTurnOnce(
   storyData: StoryData,
   userChoice: string,
   options: GenerationOptions,
@@ -714,6 +852,7 @@ export async function generateStoryTurn(
         modelName: narrationModel,
         replyLength: options.replyLength,
         pacingNote,
+        observerNote: options.observerNote,
       });
       gmBaseMessages = gmPrompt.messages;
       logger.action("Using precomputed GM conversation (retry flow)", {
@@ -739,6 +878,7 @@ export async function generateStoryTurn(
           modelName: narrationModel,
           replyLength: options.replyLength,
           pacingNote,
+          observerNote: options.observerNote,
         });
         gmBaseMessages = gmPrompt.messages;
       } else {
@@ -968,6 +1108,7 @@ export async function generateStoryTurn(
               modelName: gmModel,
               replyLength: options.replyLength,
               pacingNote,
+              observerNote: options.observerNote,
             });
             gmBaseMessages = [...gmPrompt.messages];
             gmBaseTools = gmPrompt.tools;
