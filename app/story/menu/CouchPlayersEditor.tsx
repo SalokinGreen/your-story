@@ -1,8 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { CouchPlayer } from "../../misc/structs";
+import { CouchPlayer, PlayerArchetype } from "../../misc/structs";
 import { DynamicIcon } from "../../components/DynamicIcon";
+import { ARCHETYPE_INFO } from "../../misc/gmAdvice";
+
+const ARCHETYPE_OPTIONS = Object.entries(ARCHETYPE_INFO) as [
+  PlayerArchetype,
+  (typeof ARCHETYPE_INFO)[PlayerArchetype],
+][];
 
 export const PALETTE = [
   "#22c55e", // green
@@ -85,6 +91,25 @@ export default function CouchPlayersEditor({
                 placeholder="Player name"
                 className="flex-1 min-w-0 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
               />
+              <select
+                value={p.archetype || ""}
+                onChange={(e) =>
+                  updatePlayer(p.id, {
+                    archetype: (e.target.value || undefined) as
+                      | PlayerArchetype
+                      | undefined,
+                  })
+                }
+                title="Player type - tells the GM how to engage them"
+                className="w-36 shrink-0 px-2 py-2 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white text-xs focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">No player type</option>
+                {ARCHETYPE_OPTIONS.map(([key, info]) => (
+                  <option key={key} value={key}>
+                    {info.label}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => removePlayer(p.id)}

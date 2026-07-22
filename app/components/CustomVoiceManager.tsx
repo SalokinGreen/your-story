@@ -9,11 +9,21 @@ interface CustomVoiceManagerProps {
     message: string,
     type: "success" | "failure" | "warning"
   ) => void;
+  ttsModel?: string;
 }
+
+const VOICE_ID_HINTS: Record<string, string> = {
+  kokoro: "Kokoro voices follow pattern: af_name, am_name, bf_name, bm_name",
+  orpheus: "Orpheus voice IDs are short first names, e.g. tara, leo",
+  cartesia: "Cartesia voice IDs are UUIDs, copy one from play.cartesia.ai",
+  elevenlabs:
+    "ElevenLabs voice IDs are ~20-character IDs from your voice library",
+};
 
 export default function CustomVoiceManager({
   onVoicesChange,
   addNotification,
+  ttsModel = "kokoro",
 }: CustomVoiceManagerProps) {
   const [customVoices, setCustomVoices] = useState<string[]>([]);
   const [newVoiceInput, setNewVoiceInput] = useState("");
@@ -101,7 +111,7 @@ export default function CustomVoiceManager({
         )}
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1">
           <DynamicIcon name="Lightbulb" className="w-3 h-3" /> Add custom voice
-          IDs. Kokoro voices follow pattern: af_name, am_name, bf_name, bm_name
+          IDs. {VOICE_ID_HINTS[ttsModel] ?? VOICE_ID_HINTS.kokoro}
         </p>
       </div>
     </div>

@@ -24,8 +24,15 @@ import {
   NPCAttitude,
   Adventure,
   DiceMode,
+  PlayerArchetype,
 } from "../../misc/structs";
 import { DynamicIcon } from "../../components/DynamicIcon";
+import { ARCHETYPE_INFO } from "../../misc/gmAdvice";
+
+const ARCHETYPE_OPTIONS = Object.entries(ARCHETYPE_INFO) as [
+  PlayerArchetype,
+  (typeof ARCHETYPE_INFO)[PlayerArchetype],
+][];
 
 export interface BasicSettingsForm {
   story_name: string;
@@ -36,6 +43,7 @@ export interface BasicSettingsForm {
   displayName: string;
   displayAvatar: string;
   diceMode: DiceMode;
+  playerArchetype?: PlayerArchetype;
 }
 
 
@@ -163,6 +171,45 @@ export default function BasicSettings({
               Roll real dice - the GM pauses and asks for your results
             </span>
           </button>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
+          Your Player Type{" "}
+          <span className="text-xs font-normal text-blue-300/50">
+            (used for solo play - tells the GM how to engage you)
+          </span>
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          {ARCHETYPE_OPTIONS.map(([key, info]) => {
+            const selected = form.playerArchetype === key;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() =>
+                  onChange({
+                    ...form,
+                    playerArchetype: selected ? undefined : key,
+                  })
+                }
+                title={info.description}
+                className={`p-2.5 rounded-lg border text-left transition-all ${
+                  selected
+                    ? "bg-purple-900/40 border-purple-500/60 ring-1 ring-purple-500/40"
+                    : "bg-blue-900/20 border-blue-700/40 hover:border-purple-500/40"
+                }`}
+              >
+                <span className="block text-sm font-semibold text-white">
+                  {info.label}
+                </span>
+                <span className="block text-xs text-blue-300/50">
+                  {info.description}
+                </span>
+              </button>
+            );
+          })}
         </div>
       </div>
 

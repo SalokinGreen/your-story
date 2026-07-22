@@ -2,9 +2,9 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { DynamicIcon } from "./DynamicIcon";
-import { authenticatedFetch } from "../misc/getAuthToken";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
+import { sttFetch } from "../misc/sttFetch";
 
 interface STTButtonProps {
   onTranscript: (text: string) => void;
@@ -131,10 +131,7 @@ export default function STTButton({
       formData.append("audio", audioBlob, "recording.webm");
       formData.append("mistralKey", keys.mistralKey);
 
-      const response = await authenticatedFetch("/api/stt/transcribe", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await sttFetch(formData);
 
       if (!response.ok) {
         const errorData = await response.json();

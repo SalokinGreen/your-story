@@ -220,6 +220,17 @@ export default function AIConfigTab() {
     }
     return true;
   });
+  const [replyLength, setReplyLength] = useState<"short" | "medium" | "long">(
+    () => {
+      if (typeof window !== "undefined") {
+        const stored = localStorage.getItem("replyLength");
+        if (stored === "short" || stored === "medium" || stored === "long") {
+          return stored;
+        }
+      }
+      return "medium";
+    },
+  );
   // GM stage + GM thinking display are always enabled
   const displayGMThinking = true;
   const [customMaxContext, setCustomMaxContext] = useState(() => {
@@ -994,6 +1005,58 @@ export default function AIConfigTab() {
               turns.
             </span>
           </p>
+        </div>
+      </div>
+
+      {/* Reply Length Section */}
+      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
+        <h4 className="text-sm font-medium text-white flex items-center gap-2">
+          <DynamicIcon name="AlignLeft" className="w-4 h-4" />
+          Reply Length
+        </h4>
+
+        <div>
+          <p className="text-xs text-blue-300/60 mb-2">
+            How much prose the narrator writes per turn. Shorter keeps the
+            roleplay snappy and back-and-forth; longer writes fuller scenes.
+          </p>
+          <div className="grid grid-cols-3 gap-2">
+            {(
+              [
+                { value: "short", label: "Short", hint: "1-2 sentences" },
+                { value: "medium", label: "Medium", hint: "~1 paragraph" },
+                { value: "long", label: "Long", hint: "2-4 paragraphs" },
+              ] as const
+            ).map((opt) => {
+              const active = replyLength === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    setReplyLength(opt.value);
+                    if (typeof window !== "undefined") {
+                      localStorage.setItem("replyLength", opt.value);
+                    }
+                  }}
+                  className={`flex flex-col items-center justify-center gap-0.5 py-2 px-1 rounded-lg border text-sm transition-all ${
+                    active
+                      ? "bg-linear-to-r from-purple-600 to-blue-600 border-transparent text-white shadow-md shadow-purple-950/40"
+                      : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40"
+                  }`}
+                >
+                  <span className="font-medium">{opt.label}</span>
+                  <span
+                    className={`text-[10px] ${
+                      active ? "text-purple-100" : "text-blue-300/50"
+                    }`}
+                  >
+                    {opt.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

@@ -8,8 +8,9 @@ import LibraryPickerModal from "./LibraryPickerModal";
 import JoinGameModal from "./JoinGameModal";
 import { libraryNoteToStoryLore } from "../misc/localNotesLibraryManager";
 import { libraryTableToCustomTable } from "../misc/localTablesLibraryManager";
-import type { CustomTable, DiceMode, StoryLore } from "../misc/structs";
+import type { CustomTable, DiceMode, PlayerArchetype, StoryLore } from "../misc/structs";
 import type { FreeformPlayerSetup } from "../misc/localStoryManager";
+import { ARCHETYPE_INFO } from "../misc/gmAdvice";
 
 // Same palette as CouchPlayersEditor so colors stay consistent across the app
 const PALETTE = [
@@ -67,6 +68,7 @@ interface WizardPlayer {
   personality: string[];
   wishTags: string[];
   wishText: string;
+  archetype?: PlayerArchetype;
 }
 
 function makePlayer(index: number): WizardPlayer {
@@ -77,8 +79,14 @@ function makePlayer(index: number): WizardPlayer {
     personality: [],
     wishTags: [],
     wishText: "",
+    archetype: undefined,
   };
 }
+
+const ARCHETYPE_OPTIONS = Object.entries(ARCHETYPE_INFO) as [
+  PlayerArchetype,
+  (typeof ARCHETYPE_INFO)[PlayerArchetype],
+][];
 
 type WizardStep = "count" | "player" | "ready";
 
@@ -169,6 +177,7 @@ export default function GuidedStoryStart() {
         personality: p.personality,
         wishTags: p.wishTags,
         wishText: p.wishText.trim(),
+        archetype: p.archetype,
       }));
       const { startFreeformStoryLocally } = await import(
         "../misc/localStoryManager"
@@ -464,6 +473,50 @@ export default function GuidedStoryStart() {
                     </div>
                   </div>
 
+                  {/* Player archetype (Robin Laws' player-type taxonomy) */}
+                  <div>
+                    <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
+                      What kind of player are you?{" "}
+                      <span className="text-blue-300/40 normal-case font-normal">
+                        (optional)
+                      </span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {ARCHETYPE_OPTIONS.map(([key, info]) => {
+                        const selected = currentPlayer.archetype === key;
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() =>
+                              updatePlayer(playerIndex, {
+                                archetype: selected ? undefined : key,
+                              })
+                            }
+                            title={info.description}
+                            className={`px-3 py-2 rounded-lg text-left text-xs font-medium border transition-all ${
+                              selected
+                                ? "text-white border-transparent shadow-md"
+                                : "bg-blue-900/20 border-blue-700/40 text-blue-200/70 hover:border-purple-500/50 hover:text-white"
+                            }`}
+                            style={
+                              selected
+                                ? { backgroundColor: currentPlayer.color }
+                                : undefined
+                            }
+                          >
+                            <span className="block font-semibold">
+                              {info.label}
+                            </span>
+                            <span className="block text-[10px] opacity-70 truncate">
+                              {info.description}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
                   {/* Story wishes */}
                   <div>
                     <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
@@ -554,6 +607,7 @@ export default function GuidedStoryStart() {
                           </span>
                           <span className="block text-xs text-blue-300/50 truncate">
                             {[
+                              p.archetype ? ARCHETYPE_INFO[p.archetype].label : "",
                               p.personality.join(", "),
                               p.wishTags.slice(0, 3).join(", "),
                             ]

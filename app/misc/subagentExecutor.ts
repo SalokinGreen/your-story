@@ -14,6 +14,7 @@ import { StoryData, StoryLore } from "./structs";
 import { DelegateTaskParams } from "./gmTools";
 import { AnyModelKey, ReasoningEffort, resolveTier, fallbackTier } from "./reasoningTiers";
 import { logger } from "./logger";
+import { webSearchFetch } from "./webSearchFetch";
 
 export interface SubagentApiKeys {
   openRouterKey?: string;
@@ -227,16 +228,8 @@ interface BraveSearchResult {
 async function runWebSearch(
   query: string,
   braveSearchKey: string,
-  token: string | null | undefined,
 ): Promise<BraveSearchResult[]> {
-  const response = await fetch("/api/web-search", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ query, searchApiKey: braveSearchKey }),
-  });
+  const response = await webSearchFetch({ query, searchApiKey: braveSearchKey });
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
@@ -269,11 +262,7 @@ async function runWebResearch(
   }
 
   try {
-    const results = await runWebSearch(
-      params.brief,
-      context.braveSearchKey,
-      context.token,
-    );
+    const results = await runWebSearch(params.brief, context.braveSearchKey);
 
     if (results.length === 0) {
       return {

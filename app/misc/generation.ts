@@ -10,6 +10,8 @@
  * The backend is now just a thin AI proxy.
  */
 
+import { providerFetch } from "@/app/misc/providerFetch";
+import { GenerateRequestBody } from "@/app/misc/providerCall";
 import {
   StoryData,
   CommandResponse,
@@ -26,6 +28,7 @@ import {
   buildActionAnalysisPrompt,
   buildGMStagePrompt,
   buildStoryContinuationPrompt,
+  ReplyLength,
   ChatMessage,
   EmbeddingContext,
   TOOLS_AFFIRMATION,
@@ -35,6 +38,7 @@ import {
   computeGMStageBudget,
   CHOICES_STAGE_TOKEN_BUDGET,
 } from "@/app/misc/ai_staged";
+import { computePacingFeedback } from "@/app/misc/pacingFeedback";
 import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { ensureStoryReflected } from "@/app/misc/reflection";
@@ -55,7 +59,6 @@ import {
   resolveCheckPerTurnVisibility,
 } from "@/app/misc/gmExecutor";
 import { executeTools, ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecutor";
-import { getAuthToken } from "@/app/misc/getAuthToken";
 import { logger } from "@/app/misc/logger";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import {
@@ -188,6 +191,8 @@ export interface GenerationOptions {
   usePrefill?: boolean; // Default: true
   // Storyteller mode - "narrator" (literary) or "dm" (inline mechanics)
   storytellerMode?: "narrator" | "dm";
+  // Reply Length - controls narration verbosity across GM + story stages
+  replyLength?: ReplyLength;
   // Abort signal for cancelling generation
   abortSignal?: AbortSignal;
 }
@@ -407,13 +412,9 @@ async function generateChoicesWithRetry(
       customBudget: budget,
     });
 
-    const response = await fetch("/api/generate-stream", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${fetchOptions.token}`,
-      },
-      body: JSON.stringify({
+    const response = await providerFetch(
+      "/api/generate-stream",
+      {
         messages: choicesPrompt.messages,
         model: fetchOptions.model,
         maxTokens: 1500,
@@ -424,9 +425,9 @@ async function generateChoicesWithRetry(
         mistralKey: fetchOptions.mistralKey,
         deepinfraKey: fetchOptions.deepinfraKey,
         customModel: getCustomModelIfUUID(fetchOptions.model),
-      }),
-      signal: fetchOptions.abortSignal,
-    });
+      },
+      fetchOptions.abortSignal,
+    );
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
@@ -616,7 +617,11 @@ export async function generateStoryTurn(
   options: GenerationOptions,
   callbacks: GenerationCallbacks,
 ): Promise<GenerationResult> {
-  const token = await getAuthToken();
+  // The app is fully local/BYOK now - there's no backend auth system, so
+  // this is always null. Kept as a variable (rather than stripped from the
+  // ~9 downstream call sites in this function) since it's threaded through
+  // as an inert Authorization header/option field that nothing reads.
+  const token: string | null = null;
 
   let totalTokenCost = 0;
   let finalBalance = 0;
@@ -661,6 +666,15 @@ export async function generateStoryTurn(
     // narration voice to shift inconsistently within a single generation.
     const narrationModel = getEffectiveNarrationModelKey();
 
+    // Deterministic pacing nudge (Layer 3): measure how much the player has
+    // had to read over recent turns and, if it's trending away from the Reply
+    // Length setting, inject a corrective hint into this turn's prompts. Pure,
+    // non-blocking, computed once per turn.
+    const pacingNote = computePacingFeedback(
+      storyData.scene.parts,
+      options.replyLength || "medium",
+    ).message;
+
     // Extract user choice - either from parameter or from last user scene
     // part. Needed by every branch below: the round loop uses it to run
     // the GM stage, and the precomputed-conversation (retry) / no-choice
@@ -690,6 +704,8 @@ export async function generateStoryTurn(
         userChoice: gmUserChoice,
         customMaxContext: options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
         modelName: narrationModel,
+        replyLength: options.replyLength,
+        pacingNote,
       });
       gmBaseMessages = gmPrompt.messages;
       logger.action("Using precomputed GM conversation (retry flow)", {
@@ -713,6 +729,8 @@ export async function generateStoryTurn(
           customMaxContext:
             options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
           modelName: narrationModel,
+          replyLength: options.replyLength,
+          pacingNote,
         });
         gmBaseMessages = gmPrompt.messages;
       } else {
@@ -940,6 +958,8 @@ export async function generateStoryTurn(
               userChoice: gmUserChoice,
               customMaxContext: currentGMBudget,
               modelName: gmModel,
+              replyLength: options.replyLength,
+              pacingNote,
             });
             gmBaseMessages = [...gmPrompt.messages];
             gmBaseTools = gmPrompt.tools;
@@ -990,8 +1010,10 @@ export async function generateStoryTurn(
           }
 
           // Use streaming for GM stage so user can see thinking in real-time
-          const buildGmRequestBody = (model: string, effort: ReasoningEffort) =>
-            JSON.stringify({
+          const buildGmRequestBody = (
+            model: string,
+            effort: ReasoningEffort,
+          ): GenerateRequestBody => ({
               messages: messagesWithHistory,
               tools: gmBaseTools,
               model,
@@ -1026,15 +1048,11 @@ export async function generateStoryTurn(
                 : {}),
             });
 
-          let gmResponse = await fetch("/api/generate-stream", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`,
-            },
-            body: buildGmRequestBody(gmModel, gmReasoningEffort),
-            signal: options.abortSignal,
-          });
+          let gmResponse = await providerFetch(
+            "/api/generate-stream",
+            buildGmRequestBody(gmModel, gmReasoningEffort),
+            options.abortSignal,
+          );
 
           // Model unavailable - fall back to the next-lower tier instead of crashing.
           if (!gmResponse.ok) {
@@ -1057,15 +1075,11 @@ export async function generateStoryTurn(
                 ...getTierState(storyData),
                 currentTier: fallbackResolved.tier,
               };
-              gmResponse = await fetch("/api/generate-stream", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: buildGmRequestBody(gmModel, gmReasoningEffort),
-                signal: options.abortSignal,
-              });
+              gmResponse = await providerFetch(
+                "/api/generate-stream",
+                buildGmRequestBody(gmModel, gmReasoningEffort),
+                options.abortSignal,
+              );
             }
           }
 
@@ -1716,6 +1730,8 @@ export async function generateStoryTurn(
 
       const storyContinuationPrompt = buildStoryContinuationPrompt(
         options.storytellerMode || "narrator",
+        options.replyLength || "medium",
+        pacingNote,
       );
 
       // Build messages: GM base + conversation history + story prompt
@@ -1744,7 +1760,7 @@ export async function generateStoryTurn(
       // regardless of which tier adjudication used - this is what keeps
       // the GM's voice consistent even when a turn escalated to a heavier
       // reasoning tier.
-      const storyRequestBody: Record<string, unknown> = {
+      const storyRequestBody: GenerateRequestBody = {
         messages: storyMessages,
         model: narrationModel,
         maxTokens: storyMaxOutput,
@@ -1767,15 +1783,11 @@ export async function generateStoryTurn(
         storyRequestBody.samplingSettings = options.samplingSettings;
       }
 
-      const storyResponse = await fetch("/api/generate-stream", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(storyRequestBody),
-        signal: options.abortSignal,
-      });
+      const storyResponse = await providerFetch(
+        "/api/generate-stream",
+        storyRequestBody,
+        options.abortSignal,
+      );
 
       logger.action("Story stage request sent", {
         maxTokens: storyMaxOutput,
@@ -2215,27 +2227,18 @@ export async function generateSimple(
   toolCalls: ToolCall[];
   meta: GenerationMeta;
 }> {
-  const token = await getAuthToken();
-
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      messages,
-      tools: options.tools,
-      model: options.model,
-      maxTokens: options.maxTokens || 4000,
-      temperature: options.temperature || 0.7,
-      openRouterKey: options.openRouterKey,
-      deepseekKey: options.deepseekKey,
-      googleKey: options.googleKey,
-      mistralKey: options.mistralKey,
-      deepinfraKey: options.deepinfraKey,
-      customModel: options.customModel,
-    }),
+  const response = await providerFetch("/api/generate", {
+    messages,
+    tools: options.tools,
+    model: options.model,
+    maxTokens: options.maxTokens || 4000,
+    temperature: options.temperature || 0.7,
+    openRouterKey: options.openRouterKey,
+    deepseekKey: options.deepseekKey,
+    googleKey: options.googleKey,
+    mistralKey: options.mistralKey,
+    deepinfraKey: options.deepinfraKey,
+    customModel: options.customModel,
   });
 
   if (!response.ok) {
@@ -2269,26 +2272,17 @@ export async function* generateSimpleStream(
     deepinfraKey?: string;
   },
 ): AsyncGenerator<StreamEvent> {
-  const token = await getAuthToken();
-
-  const response = await fetch("/api/generate-stream", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      messages,
-      tools: options.tools,
-      model: options.model,
-      maxTokens: options.maxTokens || 4000,
-      temperature: options.temperature || 0.7,
-      openRouterKey: options.openRouterKey,
-      deepseekKey: options.deepseekKey,
-      googleKey: options.googleKey,
-      mistralKey: options.mistralKey,
-      deepinfraKey: options.deepinfraKey,
-    }),
+  const response = await providerFetch("/api/generate-stream", {
+    messages,
+    tools: options.tools,
+    model: options.model,
+    maxTokens: options.maxTokens || 4000,
+    temperature: options.temperature || 0.7,
+    openRouterKey: options.openRouterKey,
+    deepseekKey: options.deepseekKey,
+    googleKey: options.googleKey,
+    mistralKey: options.mistralKey,
+    deepinfraKey: options.deepinfraKey,
   });
 
   if (!response.ok) {
@@ -2324,8 +2318,6 @@ export async function analyzeAction(
     deepinfraKey?: string;
   },
 ): Promise<ActionAnalysisResult> {
-  const token = await getAuthToken();
-
   logger.action("Analyzing freeform action", { userAction, model });
 
   const prompt = buildActionAnalysisPrompt({ storyData, userAction });
@@ -2337,23 +2329,16 @@ export async function analyzeAction(
     userMessage: prompt.messages[1].content,
   });
 
-  const response = await fetch("/api/generate", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`,
-    },
-    body: JSON.stringify({
-      messages: prompt.messages,
-      model,
-      maxTokens: 500,
-      temperature: 0.3, // Low temperature for structured output
-      openRouterKey: apiKeys?.openRouterKey,
-      deepseekKey: apiKeys?.deepseekKey,
-      googleKey: apiKeys?.googleKey,
-      mistralKey: apiKeys?.mistralKey,
-      deepinfraKey: apiKeys?.deepinfraKey,
-    }),
+  const response = await providerFetch("/api/generate", {
+    messages: prompt.messages,
+    model,
+    maxTokens: 500,
+    temperature: 0.3, // Low temperature for structured output
+    openRouterKey: apiKeys?.openRouterKey,
+    deepseekKey: apiKeys?.deepseekKey,
+    googleKey: apiKeys?.googleKey,
+    mistralKey: apiKeys?.mistralKey,
+    deepinfraKey: apiKeys?.deepinfraKey,
   });
 
   if (!response.ok) {
@@ -2638,7 +2623,8 @@ export async function generateChoicesOnly(
     deepinfraKey?: string;
   },
 ): Promise<Choice[]> {
-  const token = await getAuthToken();
+  // No backend auth system anymore - see generateStoryTurn's comment above.
+  const token: string | null = null;
 
   // Get the last AI content from scene parts
   const lastAIPart = [...storyData.scene.parts]

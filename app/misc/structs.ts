@@ -733,6 +733,20 @@ export type MultiplayerMode = "host" | "any" | "timer";
 // GM's own narration - it only ever looks at what the player typed/said.
 export type PlayerStyleType = "action" | "social" | "tactical";
 
+// Robin D. Laws' player-type taxonomy (see docs/gm-advice research), picked
+// explicitly by the player themselves - distinct from PlayerStyleType above,
+// which is a behavioral signal inferred from what they actually type. Purely
+// advisory: read by ai_staged.ts's buildInfoMessage to tell the GM how to
+// engage this player, never fed into selectDirectorMove's move selection.
+export type PlayerArchetype =
+  | "power_gamer"
+  | "butt_kicker"
+  | "tactician"
+  | "specialist"
+  | "method_actor"
+  | "storyteller"
+  | "casual_gamer";
+
 // A couch co-op player: a colored, named "bubble" a person at the table taps
 // to speak their turn. Distinct from the legacy typed-name hot-seat flow.
 export interface CouchPlayer {
@@ -747,6 +761,8 @@ export interface CouchPlayer {
   // for that case.
   personalityTags?: string[];
   wishTags?: string[];
+  // Self-selected Robin Laws player type - see PlayerArchetype above.
+  archetype?: PlayerArchetype;
 }
 
 export interface StoryData {
@@ -793,6 +809,8 @@ export interface StoryData {
   // (an older save, or they skipped the wizard step) and the move is a no-op.
   playerPersonalityTags?: string[];
   playerWishTags?: string[];
+  // Solo equivalent of CouchPlayer.archetype - see PlayerArchetype above.
+  playerArchetype?: PlayerArchetype;
   characterSheet?: string; // Filled character sheet markdown (from template)
   intro: string;
   memory: (string | MemoryEntry)[]; // Supports both legacy string[] and new MemoryEntry[] format
@@ -877,6 +895,12 @@ export interface StoryData {
 
   // Filled character data from custom character creation
   characterData?: Record<string, string>;
+
+  // Ids of GM-advice tips (see gmAdvice.ts's GM_ADVICE_TIPS) already surfaced
+  // to the GM via increment_scene, most-recent-last. Read by
+  // selectGMAdviceForScene to avoid repeating the same tip within its
+  // rotation window before the pool cycles back around.
+  shownGMAdviceIds?: number[];
 }
 
 // Advanced RPG Tools state tracking

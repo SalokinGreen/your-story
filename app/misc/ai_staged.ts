@@ -13,6 +13,7 @@
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import { MYTHIC_TABLE_NAMES } from "@/app/misc/mythic";
+import { ARCHETYPE_INFO } from "@/app/misc/gmAdvice";
 import { cleanString } from "@/app/misc/textUtils";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
@@ -760,6 +761,35 @@ export function buildInfoMessage(
         }`
       : "";
 
+  // Player archetype(s) - Robin Laws' player-type taxonomy, explicitly
+  // self-selected (GuidedStoryStart wizard / CouchPlayersEditor /
+  // BasicSettings), distinct from the inferred PlayerStyleType signal.
+  // Prompt-only: shapes how the GM engages each player, never feeds
+  // selectDirectorMove. Read fresh every turn so an in-menu edit takes
+  // effect immediately.
+  const archetypeLines: string[] = [];
+  const couchPlayersWithArchetype = (
+    storyData.multiplayer?.couchPlayers || []
+  ).filter((p) => p.archetype);
+  if (couchPlayersWithArchetype.length > 0) {
+    for (const p of couchPlayersWithArchetype) {
+      const info = ARCHETYPE_INFO[p.archetype!];
+      archetypeLines.push(`- ${p.name} (${info.label}): ${info.facilitation}`);
+    }
+  } else if (storyData.playerArchetype) {
+    const info = ARCHETYPE_INFO[storyData.playerArchetype];
+    archetypeLines.push(
+      `- ${cleanString(storyData.player_name || "The player")} (${
+        info.label
+      }): ${info.facilitation}`,
+    );
+  }
+  const archetypeSection = archetypeLines.length
+    ? `## Player Archetypes (self-selected playstyle - lean into this)\n${archetypeLines.join(
+        "\n",
+      )}`
+    : "";
+
   // Build Advanced RPG Tools section if enabled
   const agmtSection = storyData.agmtState
     ? `## Advanced RPG Tools
@@ -870,6 +900,7 @@ ${
         ? ` - ${cleanString(storyData.player_summary)}`
         : ""
     }`,
+    archetypeSection, // Self-selected player archetype(s) - advisory only
     // Pinned notes - always loaded in full
     dmInstructionsSection, // DM Instructions - highest priority, read every turn
     characterSheetSection, // Character sheet - player details
@@ -1703,17 +1734,66 @@ Alright, let me think through this...`;
  * The GM Stage is the "brain" - it gets the Memory Size slider context (customMaxContext)
  * because it needs to read mechanics notes, character sheets, lore, and understand the story.
  */
+/** User-facing "Reply Length" setting controlling narration verbosity. */
+export type ReplyLength = "short" | "medium" | "long";
+
+/**
+ * Central source of truth for how long narration should run. Shared by the GM
+ * stage prompt (word ceilings) and the story-continuation prompt (paragraph
+ * guidance) so the two stages never contradict each other. Default is
+ * "medium": 1 paragraph typical, 2 when the moment needs it, 3 for big beats.
+ */
+export function getLengthGuidance(replyLength: ReplyLength = "medium"): {
+  routine: string;
+  notable: string;
+  climax: string;
+  paragraphs: string;
+} {
+  switch (replyLength) {
+    case "short":
+      return {
+        routine: "1-2 sentences (roughly 15-45 words)",
+        notable: "a short paragraph (up to ~90 words)",
+        climax: "1-2 tight paragraphs (up to ~130 words)",
+        paragraphs:
+          "Keep it to a single short paragraph - a sentence or two is often enough. Use a second paragraph only for a genuinely big moment.",
+      };
+    case "long":
+      return {
+        routine: "1-2 paragraphs (40-100 words)",
+        notable: "2-3 paragraphs (100-200 words)",
+        climax: "3-4 paragraphs (200-320 words)",
+        paragraphs: "2-4 paragraphs.",
+      };
+    case "medium":
+    default:
+      return {
+        routine: "1 paragraph (roughly 40-90 words)",
+        notable: "up to 2 paragraphs (90-160 words)",
+        climax: "up to 3 paragraphs (160-260 words)",
+        paragraphs:
+          "Write 1 paragraph by default. Use a second only if the moment really needs it, and a third only for a big beat like a combat climax or major reveal.",
+      };
+  }
+}
+
 export function buildGMStagePrompt({
   storyData,
   userChoice,
   customMaxContext,
   modelName = "DeepSeek V4 Flash",
+  replyLength = "medium",
+  pacingNote,
 }: {
   storyData: StoryData;
   userChoice: string;
   customMaxContext?: number; // Memory Size slider - this is the main context control now
   modelName?: string; // Used to get model's actual context limit
+  replyLength?: ReplyLength; // Reply Length setting - controls narration verbosity
+  pacingNote?: string; // Deterministic pacing nudge (see pacingFeedback.ts)
 }): { messages: ChatMessage[]; tools: any[] } {
+  const lengthGuidance = getLengthGuidance(replyLength);
+  const pacingFeedbackLine = pacingNote ? `\n${pacingNote}` : "";
   const difficulty = storyData.difficulty || "medium";
 
   // Calculate GM context budget from customMaxContext (Memory Size slider)
@@ -1961,10 +2041,10 @@ ${freshStorySetupBlock}
 
 ## LENGTH & PACING
 A real tabletop GM talks in a few sentences and hands the mic back - they don't narrate a mini scene around every action. Match your narration length to the moment, and end the instant the player has something to react to:
-- Routine action or quick line of dialogue: 20-60 words
-- Notable action with an NPC reaction: 60-150 words
-- Combat beat, big reveal, or emotional climax: 120-250 words
-These are hard ceilings, not targets to fill. Never pad a turn to hit a length bracket, and never write a second scene/beat "for free" just because you have room left - stop at the decision point even if that's one sentence of NPC dialogue.
+- Routine action or quick line of dialogue: ${lengthGuidance.routine}
+- Notable action with an NPC reaction: ${lengthGuidance.notable}
+- Combat beat, big reveal, or emotional climax: ${lengthGuidance.climax}
+These are hard ceilings, not targets to fill. Never pad a turn to hit a length bracket, and never write a second scene/beat "for free" just because you have room left - stop at the decision point even if that's one sentence of NPC dialogue.${pacingFeedbackLine}
 
 **Cut the flavor, keep the beat.** Don't build out a whole vignette (extra sensory detail, incidental banter with a background character, describing actions no one asked about) around the actual outcome - state the outcome and stop.
 - Bad (too much staging): "You slide your hand into the paint case with the practiced ease of a man who's done this a thousand times. As you lift the tube, you tilt it just so, letting the light catch the crimp. There. A tiny roll of microfilm. 'Saving that blue for the next one, Bob?' calls Danny, the cameraman. 'Oh, you know me,' you say, flashing that gentle smile. 'Phthalo Blue waits for no one.' Danny chuckles and disappears. The microfilm is pressed between your fingers as you hum a tune."
@@ -2480,16 +2560,23 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
  */
 export function buildStoryContinuationPrompt(
   storytellerMode: StorytellerMode = "narrator",
+  replyLength: ReplyLength = "medium",
+  pacingNote?: string,
 ): string {
-  const basePrompt = `Now write the story from the player's perspective. Write only the prose the player should see - no meta-commentary, no notes to yourself.`;
+  const { paragraphs } = getLengthGuidance(replyLength);
+  const pacingFeedbackLine = pacingNote ? `\n\n${pacingNote}` : "";
+
+  const basePrompt = `Now write the story from the player's perspective. Write only the prose the player should see - no meta-commentary, no notes to yourself.
+
+Keep it tight and hand the mic back - this is a back-and-forth roleplay, not a monologue. ${paragraphs} End the instant the player has something to react to; never write what the player character does next.${pacingFeedbackLine}`;
 
   const narratorGuidelines = `
 Write immersive prose - show, don't tell. No dice results or mechanical language.
-Use vivid sensory details. 2-4 paragraphs.`;
+Use vivid sensory details, but stay within the length above.`;
 
   const dmGuidelines = `
 Write as a Dungeon Master narrating to the player. You may reference dice results naturally.
-Use second person ("You swing your sword..."). 2-4 paragraphs.`;
+Use second person ("You swing your sword..."), but stay within the length above.`;
 
   return (
     basePrompt + (storytellerMode === "dm" ? dmGuidelines : narratorGuidelines)

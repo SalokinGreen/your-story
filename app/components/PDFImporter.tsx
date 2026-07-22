@@ -10,6 +10,9 @@ import {
   MAX_PDF_SIZE_MB,
   OCRProcessResult,
 } from "@/app/misc/ocr";
+import { ocrFetch } from "@/app/misc/ocrFetch";
+import { OCRProcessRequestBody } from "@/app/misc/ocrCall";
+import { OCRSummarizeRequestBody } from "@/app/misc/ocrSummarizeCall";
 import { StoryLore, CustomTable } from "@/app/misc/structs";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 import { PDFDocument } from "pdf-lib";
@@ -217,11 +220,13 @@ function createLimiter(concurrency: number) {
 }
 
 /**
- * Fetch with timeout and retry support
+ * OCR fetch (via ocrFetch - web build proxies through our API routes,
+ * standalone build calls the provider directly) with timeout and retry
+ * support.
  */
 async function fetchWithRetry(
-  url: string,
-  options: RequestInit,
+  path: "/api/ocr/process" | "/api/ocr/summarize",
+  body: OCRProcessRequestBody | OCRSummarizeRequestBody,
   timeoutMs: number = SUMMARIZE_TIMEOUT_MS,
   maxRetries: number = MAX_RETRIES,
 ): Promise<Response> {
@@ -236,10 +241,7 @@ async function fetchWithRetry(
     }, timeoutMs);
 
     try {
-      return await fetch(url, {
-        ...options,
-        signal: controller.signal,
-      });
+      return await ocrFetch(path, body, controller.signal);
     } catch (error: any) {
       if (error.name === "AbortError") {
         // Only aborts fired by our own timeout timer are retryable; any
@@ -620,17 +622,11 @@ async function ocrPDFRange(
     response = await fetchWithRetry(
       "/api/ocr/process",
       {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          base64Data: base64,
-          fileName: `${fileNameBase}_pages_${range.pageStart}-${range.pageEnd}.pdf`,
-          mimeType: "application/pdf",
-          includeImages: false,
-          mistralKey,
-        }),
+        base64Data: base64,
+        fileName: `${fileNameBase}_pages_${range.pageStart}-${range.pageEnd}.pdf`,
+        mimeType: "application/pdf",
+        includeImages: false,
+        mistralKey,
       },
       OCR_TIMEOUT_MS,
     );
@@ -998,25 +994,19 @@ export default function PDFImporter({
         const summarizeResponse = await fetchWithRetry(
           "/api/ocr/summarize",
           {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              markdown: ocrMarkdown,
-              focus: ["all"],
-              customInstructions:
-                customInstructions +
-                `\n\nNote: This is pages ${chunk.pageStart}-${chunk.pageEnd} of a larger document.`,
-              model: getSelectedModel().model,
-              provider: getSelectedModel().provider,
-              maxTokens: maxOutputTokens,
-              openRouterKey: keys.openRouterKey,
-              deepseekKey: keys.deepseekKey,
-              mistralKey: keys.mistralKey,
-              googleKey: keys.googleKey,
-              deepinfraKey: keys.deepinfraKey,
-            }),
+            markdown: ocrMarkdown,
+            focus: ["all"],
+            customInstructions:
+              customInstructions +
+              `\n\nNote: This is pages ${chunk.pageStart}-${chunk.pageEnd} of a larger document.`,
+            model: getSelectedModel().model,
+            provider: getSelectedModel().provider,
+            maxTokens: maxOutputTokens,
+            openRouterKey: keys.openRouterKey,
+            deepseekKey: keys.deepseekKey,
+            mistralKey: keys.mistralKey,
+            googleKey: keys.googleKey,
+            deepinfraKey: keys.deepinfraKey,
           },
           SUMMARIZE_TIMEOUT_MS,
           MAX_RETRIES,
@@ -1576,25 +1566,19 @@ export default function PDFImporter({
               fetchWithRetry(
                 "/api/ocr/summarize",
                 {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                  body: JSON.stringify({
-                    markdown: ocrMarkdown,
-                    focus: ["all"],
-                    customInstructions:
-                      customInstructions +
-                      `\n\nNote: This is pages ${range.pageStart}-${range.pageEnd} of a larger document.`,
-                    model,
-                    provider,
-                    maxTokens: maxOutputTokens,
-                    openRouterKey: keys.openRouterKey,
-                    deepseekKey: keys.deepseekKey,
-                    mistralKey: keys.mistralKey,
-                    googleKey: keys.googleKey,
-                    deepinfraKey: keys.deepinfraKey,
-                  }),
+                  markdown: ocrMarkdown,
+                  focus: ["all"],
+                  customInstructions:
+                    customInstructions +
+                    `\n\nNote: This is pages ${range.pageStart}-${range.pageEnd} of a larger document.`,
+                  model,
+                  provider,
+                  maxTokens: maxOutputTokens,
+                  openRouterKey: keys.openRouterKey,
+                  deepseekKey: keys.deepseekKey,
+                  mistralKey: keys.mistralKey,
+                  googleKey: keys.googleKey,
+                  deepinfraKey: keys.deepinfraKey,
                 },
                 SUMMARIZE_TIMEOUT_MS,
                 MAX_RETRIES,
@@ -1958,25 +1942,19 @@ export default function PDFImporter({
             const summarizeResponse = await fetchWithRetry(
               "/api/ocr/summarize",
               {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  markdown: combinedMarkdown,
-                  focus: ["all"],
-                  customInstructions:
-                    (customInstructions || "") +
-                    `\n\nNote: This content was imported from a text file (${file.name}).`,
-                  model: getSelectedModel().model,
-                  provider: getSelectedModel().provider,
-                  maxTokens: maxOutputTokens,
-                  openRouterKey: keys.openRouterKey,
-                  deepseekKey: keys.deepseekKey,
-                  mistralKey: keys.mistralKey,
-                  googleKey: keys.googleKey,
-                  deepinfraKey: keys.deepinfraKey,
-                }),
+                markdown: combinedMarkdown,
+                focus: ["all"],
+                customInstructions:
+                  (customInstructions || "") +
+                  `\n\nNote: This content was imported from a text file (${file.name}).`,
+                model: getSelectedModel().model,
+                provider: getSelectedModel().provider,
+                maxTokens: maxOutputTokens,
+                openRouterKey: keys.openRouterKey,
+                deepseekKey: keys.deepseekKey,
+                mistralKey: keys.mistralKey,
+                googleKey: keys.googleKey,
+                deepinfraKey: keys.deepinfraKey,
               },
               SUMMARIZE_TIMEOUT_MS,
               MAX_RETRIES,
@@ -2024,16 +2002,10 @@ export default function PDFImporter({
             `Extracting text from ${file.name} (${i + 1}/${totalFiles})...`,
           );
 
-          const ocrResponse = await fetch("/api/ocr/process", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              ...ocrPayload,
-              includeImages: false,
-              mistralKey: keys.mistralKey,
-            }),
+          const ocrResponse = await ocrFetch("/api/ocr/process", {
+            ...ocrPayload,
+            includeImages: false,
+            mistralKey: keys.mistralKey,
           });
 
           if (!ocrResponse.ok) {
@@ -2058,12 +2030,7 @@ export default function PDFImporter({
             `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`,
           );
 
-          const summarizeResponse = await fetch("/api/ocr/summarize", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
+          const summarizeResponse = await ocrFetch("/api/ocr/summarize", {
               markdown: combinedMarkdown,
               focus: ["all"],
               customInstructions,
@@ -2075,7 +2042,6 @@ export default function PDFImporter({
               mistralKey: keys.mistralKey,
               googleKey: keys.googleKey,
               deepinfraKey: keys.deepinfraKey,
-            }),
           });
 
           if (!summarizeResponse.ok) {
@@ -2206,15 +2172,9 @@ export default function PDFImporter({
       const ocrResponse = await fetchWithRetry(
         "/api/ocr/process",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            signedUrl: documentUrl,
-            includeImages: false,
-            mistralKey: keys.mistralKey,
-          }),
+          signedUrl: documentUrl,
+          includeImages: false,
+          mistralKey: keys.mistralKey,
         },
         OCR_TIMEOUT_MS,
         MAX_RETRIES,
@@ -2239,23 +2199,17 @@ export default function PDFImporter({
       const summarizeResponse = await fetchWithRetry(
         "/api/ocr/summarize",
         {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            markdown: ocrResult.markdown,
-            focus: ["all"],
-            customInstructions,
-            model: selectedModel.model,
-            provider: selectedModel.provider,
-            maxTokens: maxOutputTokens,
-            openRouterKey: keys.openRouterKey,
-            deepseekKey: keys.deepseekKey,
-            mistralKey: keys.mistralKey,
-            googleKey: keys.googleKey,
-            deepinfraKey: keys.deepinfraKey,
-          }),
+          markdown: ocrResult.markdown,
+          focus: ["all"],
+          customInstructions,
+          model: selectedModel.model,
+          provider: selectedModel.provider,
+          maxTokens: maxOutputTokens,
+          openRouterKey: keys.openRouterKey,
+          deepseekKey: keys.deepseekKey,
+          mistralKey: keys.mistralKey,
+          googleKey: keys.googleKey,
+          deepinfraKey: keys.deepinfraKey,
         },
         SUMMARIZE_TIMEOUT_MS,
         MAX_RETRIES,

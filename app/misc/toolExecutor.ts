@@ -40,6 +40,7 @@ import {
   generateEventFocus,
   generateEventMeaning,
 } from "@/app/misc/mythic";
+import { selectGMAdviceForScene, formatGMAdviceNote } from "@/app/misc/gmAdvice";
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
 import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
@@ -276,6 +277,216 @@ function parseDiceNotation(
   const notation = `${negative ? "-" : ""}(${rollsStr}${modStr}) = ${total}`;
 
   return { value: total, notation };
+}
+
+// --- search_notes: tokenized, relevance-ranked note search ---
+//
+// Splits the query into tokens so multi-word queries ("tavern owner") match
+// notes containing those words anywhere, not just as one literal phrase.
+// Every note is scored (title/keys/aliases weighted above tags/related-*,
+// content lowest) and results are ranked globally by score before slicing to
+// maxResults, so the strongest matches win regardless of which note they're
+// in. A literal whole-phrase hit still gets a large bonus over scattered
+// token hits so exact matches keep priority.
+
+const NOTE_SEARCH_FIELD_WEIGHTS = {
+  title: 10,
+  keys: 8,
+  aliases: 8,
+  tags: 5,
+  relatedCharacters: 5,
+  relatedLocations: 5,
+  content: 1,
+} as const;
+
+type NoteSearchMatchField = keyof typeof NOTE_SEARCH_FIELD_WEIGHTS;
+
+function tokenizeSearchQuery(query: string): string[] {
+  return query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/i)
+    .filter(Boolean);
+}
+
+// Builds an excerpt around the match position instead of always truncating
+// from the start of the line - a line whose match falls past character 77
+// used to produce an excerpt that didn't contain the match at all.
+function centeredExcerpt(
+  line: string,
+  matchIndex: number,
+  matchLength: number,
+  windowSize = 80
+): string {
+  const trimmed = line.trim();
+  if (trimmed.length <= windowSize) return trimmed;
+
+  const halfWindow = Math.max(0, Math.floor((windowSize - matchLength) / 2));
+  let start = Math.max(0, matchIndex - halfWindow);
+  const end = Math.min(line.length, start + windowSize);
+  start = Math.max(0, end - windowSize);
+
+  let excerpt = line.slice(start, end).trim();
+  if (start > 0) excerpt = "..." + excerpt;
+  if (end < line.length) excerpt = excerpt + "...";
+  return excerpt;
+}
+
+function noteSearchFieldLabel(field: NoteSearchMatchField): string {
+  switch (field) {
+    case "keys":
+      return "trigger keyword";
+    case "aliases":
+      return "alias";
+    case "tags":
+      return "tag";
+    case "relatedCharacters":
+      return "related character";
+    case "relatedLocations":
+      return "related location";
+    default:
+      return field;
+  }
+}
+
+interface NoteSearchResult {
+  title: string;
+  excerpt: string;
+  lineNum: number;
+}
+
+function searchLoreEntries(
+  lore: StoryLore[],
+  query: string,
+  options: {
+    includeHidden: boolean;
+    maxResults: number;
+    type?: string;
+    tags?: string[];
+  }
+): NoteSearchResult[] {
+  const tokens = tokenizeSearchQuery(query);
+  if (tokens.length === 0) return [];
+
+  const phrase = query.toLowerCase().trim();
+  const filterTags = options.tags?.map((t) => t.toLowerCase());
+
+  const candidates: {
+    title: string;
+    excerpt: string;
+    lineNum: number;
+    score: number;
+    matchedVia?: NoteSearchMatchField;
+  }[] = [];
+
+  for (const entry of lore) {
+    if (!entry.title) continue;
+    if (!options.includeHidden && entry.on === false) continue;
+    if (options.type && (entry.type || "lore") !== options.type) continue;
+    if (filterTags && filterTags.length > 0) {
+      const entryTags = (entry.tags || []).map((t) => t.toLowerCase());
+      if (!filterTags.some((t) => entryTags.includes(t))) continue;
+    }
+
+    let score = 0;
+    let matchedVia: NoteSearchMatchField | undefined;
+    const titleLower = entry.title.toLowerCase();
+
+    if (phrase && titleLower.includes(phrase)) {
+      score += NOTE_SEARCH_FIELD_WEIGHTS.title * 2;
+      matchedVia = "title";
+    }
+    for (const token of tokens) {
+      if (titleLower.includes(token)) {
+        score += NOTE_SEARCH_FIELD_WEIGHTS.title;
+        matchedVia = matchedVia || "title";
+      }
+    }
+
+    const checkFieldList = (
+      values: string[] | undefined,
+      field: NoteSearchMatchField
+    ) => {
+      if (!values || values.length === 0) return;
+      const lowerValues = values.map((v) => v.toLowerCase());
+      for (const token of tokens) {
+        if (lowerValues.some((v) => v.includes(token))) {
+          score += NOTE_SEARCH_FIELD_WEIGHTS[field];
+          matchedVia = matchedVia || field;
+        }
+      }
+    };
+
+    checkFieldList(entry.keys, "keys");
+    checkFieldList(entry.aliases, "aliases");
+    checkFieldList(entry.tags, "tags");
+    checkFieldList(entry.relatedCharacters, "relatedCharacters");
+    checkFieldList(entry.relatedLocations, "relatedLocations");
+
+    let bestLine:
+      | { text: string; index: number; score: number; matchIndex: number; matchLength: number }
+      | null = null;
+
+    if (entry.content) {
+      const lines = entry.content.split("\n");
+      for (let i = 0; i < lines.length; i++) {
+        const lineLower = lines[i].toLowerCase();
+        let lineScore = 0;
+        let matchIndex = -1;
+        let matchLength = 0;
+
+        const phraseIndex = phrase ? lineLower.indexOf(phrase) : -1;
+        if (phraseIndex !== -1) {
+          lineScore += NOTE_SEARCH_FIELD_WEIGHTS.content * 3;
+          matchIndex = phraseIndex;
+          matchLength = phrase.length;
+        }
+
+        for (const token of tokens) {
+          const idx = lineLower.indexOf(token);
+          if (idx !== -1) {
+            lineScore += NOTE_SEARCH_FIELD_WEIGHTS.content;
+            if (matchIndex === -1) {
+              matchIndex = idx;
+              matchLength = token.length;
+            }
+          }
+        }
+
+        if (lineScore > 0 && (!bestLine || lineScore > bestLine.score)) {
+          bestLine = { text: lines[i], index: i, score: lineScore, matchIndex, matchLength };
+        }
+      }
+    }
+
+    if (bestLine) {
+      score += bestLine.score;
+      matchedVia = matchedVia || "content";
+    }
+
+    if (score <= 0) continue;
+
+    let excerpt: string;
+    if (bestLine) {
+      excerpt = centeredExcerpt(bestLine.text, bestLine.matchIndex, bestLine.matchLength);
+    } else if (matchedVia === "title") {
+      excerpt = "[Title match]";
+    } else {
+      excerpt = `[Matched via ${noteSearchFieldLabel(matchedVia as NoteSearchMatchField)}, no literal text match]`;
+    }
+
+    candidates.push({
+      title: entry.title,
+      excerpt,
+      lineNum: bestLine ? bestLine.index + 1 : 0,
+      score,
+      matchedVia,
+    });
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates
+    .slice(0, options.maxResults)
+    .map(({ title, excerpt, lineNum }) => ({ title, excerpt, lineNum }));
 }
 
 /**
@@ -1379,60 +1590,30 @@ export function executeTools(
           continue;
         }
 
-        const query = args.query.toLowerCase();
         const includeHidden = args.includeHidden !== false; // Default true
         const maxResults = (args.maxResults as number) || 10;
+        const type = typeof args.type === "string" ? args.type : undefined;
+        const tags = Array.isArray(args.tags)
+          ? (args.tags as unknown[]).filter((t): t is string => typeof t === "string")
+          : undefined;
 
-        const results: { title: string; excerpt: string; lineNum: number }[] =
-          [];
-
-        for (const lore of storyData.lore) {
-          // Skip hidden lore if not including hidden
-          if (!includeHidden && lore.on === false) continue;
-          // Skip lore with no title
-          if (!lore.title) continue;
-
-          // First check if title matches
-          if (lore.title.toLowerCase().includes(query)) {
-            results.push({
-              title: lore.title,
-              excerpt: `[Title match]`,
-              lineNum: 0,
-            });
-            if (results.length >= maxResults) break;
-          }
-
-          // Skip lore with no content for content search
-          if (!lore.content) continue;
-
-          const lines = lore.content.split("\n");
-
-          for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].toLowerCase();
-            if (line.includes(query)) {
-              // Get context (the matching line)
-              const excerpt =
-                lines[i].length > 80
-                  ? lines[i].substring(0, 77) + "..."
-                  : lines[i];
-              results.push({
-                title: lore.title,
-                excerpt: excerpt.trim(),
-                lineNum: i + 1,
-              });
-
-              if (results.length >= maxResults) break;
-            }
-          }
-          if (results.length >= maxResults) break;
-        }
+        const results = searchLoreEntries(storyData.lore, args.query, {
+          includeHidden,
+          maxResults,
+          type,
+          tags,
+        });
 
         const message =
           results.length > 0
             ? `Found ${results.length} match${
                 results.length === 1 ? "" : "es"
               }:\n${results
-                .map((r) => `• "${r.title}" (L${r.lineNum}): ${r.excerpt}`)
+                .map((r) =>
+                  r.lineNum > 0
+                    ? `• "${r.title}" (L${r.lineNum}): ${r.excerpt}`
+                    : `• "${r.title}": ${r.excerpt}`
+                )
                 .join("\n")}`
             : `No matches found for "${args.query}"`;
 
@@ -1588,6 +1769,17 @@ export function executeTools(
 
           message += ` - render this as prose without naming it, then call acknowledge_director_move(id: "${directorMove.id}"). It will keep reappearing every turn until resolved.`;
         }
+
+        // GM advice: 1-2 curated facilitation tips for the scene that's
+        // about to start (see gmAdvice.ts). Purely advisory - unlike pending
+        // random events/director moves, there's nothing to acknowledge; it's
+        // delivered once via this tool result and never repeated.
+        const { tips: gmAdviceTips, updatedShownIds } = selectGMAdviceForScene(
+          storyData.shownGMAdviceIds,
+          !!storyData.combatState?.active
+        );
+        storyData.shownGMAdviceIds = updatedShownIds;
+        message += formatGMAdviceNote(gmAdviceTips);
 
         logger.action("Scene count incremented via tool", {
           toolCallId: toolId,

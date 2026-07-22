@@ -79,12 +79,6 @@ import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import SyncConflictModal from "../components/SyncConflictModal";
 import SyncIndicator from "../components/SyncIndicator";
-import { getAuthToken } from "../misc/getAuthToken";
-import {
-  syncLoreEmbeddings,
-  syncNewMemories,
-  getExistingEmbeddingKeys,
-} from "../misc/embeddings";
 import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
 import { fillTemplate } from "../misc/characterSheetTemplate";
@@ -375,6 +369,12 @@ function StoryPageContent() {
   const [loadingStage, setLoadingStage] = useState<
     "gm" | "story" | "choices" | null
   >(null);
+  // Narrower than loadingStage: true as soon as the CURRENT storyText is
+  // finalized, even while tools/choices are still generating in the
+  // background afterward. loadingStage stays "story" through that whole
+  // background phase, which used to leave TTS disabled long after the text
+  // was actually ready to read/listen to - see TTSControls' disabled prop.
+  const [storyTextReady, setStoryTextReady] = useState(true);
   // Pending user choice text - shown in chat while GM is generating
   const [pendingUserChoice, setPendingUserChoice] = useState<string>("");
 
@@ -425,6 +425,7 @@ function StoryPageContent() {
       setPendingUserChoice("");
       setLoading(false);
       setLoadingStage(null);
+      setStoryTextReady(true);
     },
     onGuestJoined: (info) => {
       setStoryData((prev) => {
@@ -937,125 +938,6 @@ function StoryPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyData, loadingStory]);
 
-  // Sync lore and memory embeddings when story is first loaded (if embeddings enabled and dirty)
-  useEffect(() => {
-    if (!storyData || !storyDbId || storyDbId.startsWith("local_")) return;
-
-    const embeddingsEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("embeddingsEnabled") === "true"
-        : false;
-
-    if (!embeddingsEnabled) return;
-
-    // Only sync lore if we have enough entries and it's dirty (or first load)
-    const shouldSyncLore =
-      storyData.lore.length >= 5 && storyData.loreEmbeddingsDirty !== false;
-
-    // Always sync memories on load if we have any
-    const shouldSyncMemories = storyData.memory.length > 0;
-
-    if (!shouldSyncLore && !shouldSyncMemories) return;
-
-    // Fire and forget - sync embeddings in background
-    getAuthToken().then(async (token) => {
-      if (!token) return;
-
-      // First, get existing embedding keys to avoid re-generating
-      let existingKeys: { lore: string[]; memory: string[]; scene: string[] } =
-        {
-          lore: [],
-          memory: [],
-          scene: [],
-        };
-
-      try {
-        existingKeys = await getExistingEmbeddingKeys(storyDbId, token);
-        console.log(
-          `[Embeddings] Found existing keys: ${existingKeys.lore.length} lore, ${existingKeys.memory.length} memories`,
-        );
-      } catch (err) {
-        console.warn(
-          "[Embeddings] Failed to get existing keys, will sync all:",
-          err,
-        );
-      }
-
-      // Sync lore if needed
-      if (shouldSyncLore) {
-        syncLoreEmbeddings(
-          storyDbId,
-          storyData.lore.map((l) => ({
-            title: l.title,
-            content: l.content,
-            embedded: l.embedded,
-          })),
-          token,
-        )
-          .then((result) => {
-            if (result.synced > 0 || result.cleaned > 0) {
-              console.log(
-                `[Embeddings] Lore sync: ${result.synced} entries, ${result.cleaned} cleaned`,
-              );
-            }
-            // Mark successfully embedded lore entries and clear dirty flag
-            if (
-              result.embeddedTitles.length > 0 ||
-              storyData.loreEmbeddingsDirty !== false
-            ) {
-              const updatedLore = storyData.lore.map((l) =>
-                result.embeddedTitles.includes(l.title)
-                  ? { ...l, embedded: true }
-                  : l,
-              );
-              setStoryData({
-                ...storyData,
-                lore: updatedLore,
-                loreEmbeddingsDirty: false,
-              });
-            }
-          })
-          .catch((err) => {
-            console.warn("[Embeddings] Lore sync failed:", err.message);
-          });
-      }
-
-      // Sync memories if we have any
-      if (shouldSyncMemories) {
-        syncNewMemories(
-          storyDbId,
-          storyData.memory,
-          new Set(existingKeys.memory), // Pass existing keys to skip already-synced
-          token,
-        )
-          .then((result) => {
-            if (result.synced > 0 || result.cleaned > 0) {
-              console.log(
-                `[Embeddings] Memory sync: ${result.synced} entries, ${result.cleaned} cleaned`,
-              );
-            }
-            // Mark successfully embedded memory entries
-            if (result.embeddedIndices.length > 0) {
-              const updatedMemory = storyData.memory.map((m, i) => {
-                if (result.embeddedIndices.includes(i)) {
-                  // Convert to MemoryEntry format with embedded: true
-                  const content = typeof m === "string" ? m : m.content;
-                  return { content, embedded: true };
-                }
-                return m;
-              });
-              setStoryData({ ...storyData, memory: updatedMemory });
-            }
-          })
-          .catch((err) => {
-            console.warn("[Embeddings] Memory sync failed:", err.message);
-          });
-      }
-    });
-    // Only run when storyDbId or dirty flag changes
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [storyDbId, storyData?.loreEmbeddingsDirty]);
-
   //Applypresetandstartstory
   const handlePresetSelect = async (preset: Preset) => {
     if (!storyData) return;
@@ -1309,6 +1191,7 @@ function StoryPageContent() {
       logger.action("Guest custom input, sending to host", { customText });
       setLoading(true);
       setLoadingStage("story");
+      setStoryTextReady(false);
       if (inputKind === "voice") {
         sendNetVoice(customText, speakerIds ?? []);
       } else {
@@ -1326,6 +1209,7 @@ function StoryPageContent() {
 
     setLoading(true);
     setLoadingStage("story");
+    setStoryTextReady(false);
 
     //Adduser'scustominputtoscene
     storyData.scene.parts.push({
@@ -1337,6 +1221,8 @@ function StoryPageContent() {
       speakerIds: speakerIds && speakerIds.length > 0 ? speakerIds : undefined,
       choices: [],
     });
+
+    setChoices({ choices: [] });
 
     // Director-layer spotlight tracking: reset the speaking player(s)'
     // turns-since-spoken counter to 0, tick everyone else's up. No-op for
@@ -1441,16 +1327,24 @@ function StoryPageContent() {
           ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
             "narrator"
           : "narrator";
+      const replyLength =
+        typeof window !== "undefined"
+          ? (localStorage.getItem("replyLength") as
+              | "short"
+              | "medium"
+              | "long") || "medium"
+          : "medium";
       // GM Stage is always enabled - legacy tool calling is deprecated
       const gmStageEnabled = true;
 
       // Track parallel completion of tools and choices
       let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
-      let choicesComplete = false;
+      let choicesComplete = true; // Choices stage is disabled - see skipChoices below
 
       const checkBothComplete = () => {
         if (toolsComplete && choicesComplete) {
           setLoadingStage(null);
+          setStoryTextReady(true);
         }
       };
 
@@ -1468,6 +1362,9 @@ function StoryPageContent() {
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
+          // Suggested-action chips are gone - never spend an extra AI call
+          // generating them (see also handleChoiceWithAction below).
+          skipChoices: true,
           openRouterKey,
           deepseekKey,
           googleKey,
@@ -1481,6 +1378,7 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
+          replyLength,
           enableGMStage: gmStageEnabled,
           gmStageModel: toolsModel, // Use same model as tools stage
           abortSignal: generationAbortRef.current.signal,
@@ -1630,6 +1528,9 @@ function StoryPageContent() {
             partialPart.content = content;
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
+            // Narration itself is done - unlock TTS now rather than waiting
+            // for the tools/choices phase below to also finish.
+            setStoryTextReady(true);
 
             // Tools and choices run in parallel after story - no separate loading stage
             logger.ai_response("Story narration complete (custom input)", {
@@ -1753,6 +1654,7 @@ function StoryPageContent() {
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
+            setStoryTextReady(true);
 
             setStoryData({ ...storyData });
 
@@ -1774,6 +1676,7 @@ function StoryPageContent() {
             addNotification(`Error: ${error.message}`, "failure");
             setLoading(false);
             setLoadingStage(null);
+            setStoryTextReady(true);
 
             logger.error("Generation error (custom input)", {
               message: error.message,
@@ -1785,6 +1688,7 @@ function StoryPageContent() {
       addNotification(`Error: ${error.message}`, "failure");
       setLoading(false);
       setLoadingStage(null);
+      setStoryTextReady(true);
       logger.error("Generation exception (custom input)", {
         message: error.message,
       });
@@ -1931,6 +1835,7 @@ function StoryPageContent() {
       });
       setLoading(true);
       setLoadingStage("story");
+      setStoryTextReady(false);
       setPendingUserChoice(choice.text);
       sendNetChoice(key);
       return;
@@ -1945,6 +1850,7 @@ function StoryPageContent() {
 
     setLoading(true);
     setLoadingStage("story");
+    setStoryTextReady(false);
     // Set pending user choice for immediate display in chat
     setPendingUserChoice(choice.text);
 
@@ -1967,49 +1873,14 @@ function StoryPageContent() {
       setStoryText(choice.intro_override);
       setStoryData({ ...storyData });
       setLoading(false);
-      setLoadingStage("choices");
+      setLoadingStage(null);
+      setStoryTextReady(true);
 
-      try {
-        const { choicesModel } = getModelsFromPreset();
-        const { generateChoicesOnly } = await import("../misc/generation");
-        const newChoices = await generateChoicesOnly(storyData, {
-          choicesModel,
-          openRouterKey,
-          deepseekKey,
-          googleKey,
-          mistralKey,
-          deepinfraKey,
-        });
-
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            choices: newChoices,
-          };
-        }
-
-        setChoices({ choices: newChoices });
-        setStoryData({ ...storyData });
-        setLoadingStage(null);
-
-        saveProgress(storyData);
-        addNotification("Story continues...", "success");
-      } catch (error) {
-        console.error("Error generating choices:", error);
-        const fallbackChoices = [{ text: "Continue" }];
-        const lastPartIndex = storyData.scene.parts.length - 1;
-        if (lastPartIndex >= 0) {
-          storyData.scene.parts[lastPartIndex] = {
-            ...storyData.scene.parts[lastPartIndex],
-            choices: fallbackChoices,
-          };
-        }
-        setChoices({ choices: fallbackChoices });
-        setStoryData({ ...storyData });
-        setLoadingStage(null);
-        saveProgress(storyData);
-      }
+      // Suggested-action chips are gone - no extra AI call to fetch a
+      // starting set of them. The player continues with freeform text.
+      setChoices({ choices: [] });
+      saveProgress(storyData);
+      addNotification("Story continues...", "success");
       return;
     }
 
@@ -2205,16 +2076,22 @@ function StoryPageContent() {
         ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
           "narrator"
         : "narrator";
+    const replyLength =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("replyLength") as "short" | "medium" | "long") ||
+          "medium"
+        : "medium";
     // GM Stage is always enabled - legacy tool calling is deprecated
     const gmStageEnabled = true;
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
-    let choicesComplete = !!actionChoice; // If freeform action, choices will be skipped
+    let choicesComplete = true; // Choices stage is disabled - see skipChoices below
 
     const checkBothComplete = () => {
       if (toolsComplete && choicesComplete) {
         setLoadingStage(null);
+        setStoryTextReady(true);
       }
     };
 
@@ -2239,7 +2116,9 @@ function StoryPageContent() {
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
-          skipChoices: !!actionChoice, // Skip choices generation in freeform action mode
+          // Suggested-action chips are gone - never spend an extra AI call
+          // generating them, regardless of how this turn was triggered.
+          skipChoices: true,
           openRouterKey,
           deepseekKey,
           googleKey,
@@ -2254,6 +2133,7 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
+          replyLength,
           enableGMStage: gmStageEnabled,
           gmStageModel: toolsModel, // Use same model as tools stage
         },
@@ -2364,6 +2244,9 @@ function StoryPageContent() {
             partialPart.content = content;
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
+            // Narration itself is done - unlock TTS now rather than waiting
+            // for the tools/choices phase below to also finish.
+            setStoryTextReady(true);
 
             logger.ai_response("Story narration complete", {
               length: content.length,
@@ -2468,6 +2351,7 @@ function StoryPageContent() {
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
+            setStoryTextReady(true);
 
             setStoryData({ ...storyData });
 
@@ -2481,6 +2365,7 @@ function StoryPageContent() {
             addNotification(`Error: ${error.message}`, "failure");
             setLoading(false);
             setLoadingStage(null);
+            setStoryTextReady(true);
             setCanRetry(true);
             setChoices({
               choices:
@@ -2498,6 +2383,7 @@ function StoryPageContent() {
       addNotification(`Error: ${error.message}`, "failure");
       setLoading(false);
       setLoadingStage(null);
+      setStoryTextReady(true);
       setCanRetry(true);
       logger.error("Generation exception (choice)", { message: error.message });
     }
@@ -2601,6 +2487,7 @@ function StoryPageContent() {
     }
     setLoading(false);
     setLoadingStage(null);
+    setStoryTextReady(true);
     addNotification("Generation stopped", "warning");
   }
 
@@ -2622,6 +2509,7 @@ function StoryPageContent() {
 
     setLoading(true);
     setLoadingStage("story");
+    setStoryTextReady(false);
     setCanRetry(false);
 
     // Save GM context from the last AI response before popping it
@@ -2717,6 +2605,11 @@ function StoryPageContent() {
         ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
           "narrator"
         : "narrator";
+    const replyLength =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("replyLength") as "short" | "medium" | "long") ||
+          "medium"
+        : "medium";
     // GM Stage is always enabled - legacy tool calling is deprecated
     const gmStageEnabled = true;
 
@@ -2727,6 +2620,7 @@ function StoryPageContent() {
     const checkBothComplete = () => {
       if (toolsComplete && choicesComplete) {
         setLoadingStage(null);
+        setStoryTextReady(true);
       }
     };
 
@@ -2774,6 +2668,7 @@ function StoryPageContent() {
           samplingSettings: getSamplingSettings(),
           usePrefill,
           storytellerMode,
+          replyLength,
           // Skip GM stage on retry - reuse the saved conversation (dice
           // rolls, tool results, reasoning) from the popped part instead
           enableGMStage: false, // Don't re-run GM stage
@@ -2813,6 +2708,9 @@ function StoryPageContent() {
             partialPart.content = content;
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
+            // Narration itself is done - unlock TTS now rather than waiting
+            // for the tools/choices phase below to also finish.
+            setStoryTextReady(true);
 
             // Tools and choices run in parallel after story - no separate loading stage
             logger.ai_response("Story narration complete (retry)", {
@@ -2927,6 +2825,7 @@ function StoryPageContent() {
             setCanRetry(true);
             setCanUndo(true);
             setLoadingStage(null);
+            setStoryTextReady(true);
 
             setStoryData({ ...storyData });
 
@@ -2943,6 +2842,7 @@ function StoryPageContent() {
             addNotification(`Error: ${error.message}`, "failure");
             setLoading(false);
             setLoadingStage(null);
+            setStoryTextReady(true);
             setCanRetry(true);
 
             logger.error("Generation error (retry)", {
@@ -2955,6 +2855,7 @@ function StoryPageContent() {
       addNotification(`Error: ${error.message}`, "failure");
       setLoading(false);
       setLoadingStage(null);
+      setStoryTextReady(true);
       setCanRetry(true);
       logger.error("Generation exception (retry)", { message: error.message });
     }
@@ -3758,6 +3659,7 @@ function StoryPageContent() {
             input={input}
             loading={loading}
             loadingStage={loadingStage}
+            storyTextReady={storyTextReady}
             handleChoice={handleChoice}
             handleSelect={handleSelect}
             onCustomInput={handleCustomInput}
@@ -3955,8 +3857,8 @@ export default function StoryPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-dvh bg-linear-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-gray-900 dark:via-purple-900 dark:to-blue-900 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 dark:border-purple-400"></div>
+        <div className="min-h-dvh bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-400"></div>
         </div>
       }
     >

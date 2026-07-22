@@ -193,6 +193,7 @@ export default function MenuPage({
     displayName: storyData.displayName || "",
     displayAvatar: storyData.displayAvatar || "",
     diceMode: storyData.diceMode || "ai",
+    playerArchetype: storyData.playerArchetype,
   });
 
   // Advanced editing states
@@ -379,6 +380,7 @@ export default function MenuPage({
         displayName: settingsForm.displayName || undefined,
         displayAvatar: settingsForm.displayAvatar || undefined,
         diceMode: settingsForm.diceMode,
+        playerArchetype: settingsForm.playerArchetype,
         multiplayer: {
           enabled: multiplayerEnabled,
           mode: multiplayerMode,

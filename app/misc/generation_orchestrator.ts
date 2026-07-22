@@ -20,6 +20,7 @@ import {
   saveAutosave,
   BigAdventureAutosave,
 } from "@/app/misc/big_adventure_ai";
+import { creatorStreamFetch } from "@/app/misc/creatorFetch";
 
 // Configuration for timeout detection
 const TIMEOUT_THRESHOLD_MS = 280000; // 4 min 40 sec - slightly less than Vercel's 5 min limit
@@ -119,12 +120,9 @@ async function generateSingleStage(
   let completionTokens = 0;
 
   try {
-    const response = await fetch("/api/creator/generate-stage", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
+    const response = await creatorStreamFetch(
+      "/api/creator/generate-stage",
+      {
         config,
         stage,
         previousResults,
@@ -133,9 +131,9 @@ async function generateSingleStage(
         deepseekKey: options.deepseekKey,
         continueFrom: continueFrom || undefined,
         finishEarly: options.finishEarlyRef?.current || false,
-      }),
-      signal: options.abortSignal,
-    });
+      },
+      options.abortSignal,
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
@@ -385,21 +383,15 @@ async function generateSingleStageFinishEarly(
   try {
     // Make a request with finishEarly=true to wrap up the JSON
     // Note: We don't use the abortSignal here since we want this to complete
-    const response = await fetch("/api/creator/generate-stage", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        config,
-        stage,
-        previousResults,
-        model: options.model,
-        openRouterKey: options.openRouterKey,
-        deepseekKey: options.deepseekKey,
-        continueFrom: partialContent,
-        finishEarly: true,
-      }),
+    const response = await creatorStreamFetch("/api/creator/generate-stage", {
+      config,
+      stage,
+      previousResults,
+      model: options.model,
+      openRouterKey: options.openRouterKey,
+      deepseekKey: options.deepseekKey,
+      continueFrom: partialContent,
+      finishEarly: true,
     });
 
     if (!response.ok) {

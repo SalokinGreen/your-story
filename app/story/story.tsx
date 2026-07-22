@@ -43,6 +43,12 @@ interface StoryProps {
   input: Record<string, boolean>;
   loading: boolean;
   loadingStage?: "gm" | "story" | "choices" | null;
+  // Narrower than loadingStage: true once the current storyText is
+  // finalized, even while loadingStage is still "story" because tools/
+  // choices are generating in the background afterward. Gates TTS
+  // specifically, so it unlocks as soon as there's something to read/listen
+  // to instead of waiting out that whole background phase too.
+  storyTextReady?: boolean;
   handleChoice: (playerComment?: string) => void;
   handleSelect: (index: number) => void;
   onCustomInput?: (
@@ -570,7 +576,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
 
     return (
       <div
-        className="p-3 pt-2 space-y-2"
+        className="shrink-0 p-3 pt-2 space-y-2"
         style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}
       >
         {/* Suggested choices as tappable chips */}
@@ -724,6 +730,7 @@ export default function Story({
   input,
   loading,
   loadingStage,
+  storyTextReady = true,
   handleChoice,
   handleSelect,
   onCustomInput,
@@ -1106,9 +1113,37 @@ export default function Story({
     }
   };
 
-  // Auto-scroll to bottom when new messages arrive or during streaming
+  // Whether we should keep pinning the view to the bottom as new content
+  // streams in. True by default (and forced true whenever the player submits
+  // a new action below) but flips off the moment the player scrolls up to
+  // reread earlier text - without this, every streamed chunk (and the
+  // layout shift when suggested choices appear) yanked the view back down
+  // even while someone was mid-scroll reading history.
+  const stickToBottomRef = useRef(true);
+  const NEAR_BOTTOM_THRESHOLD_PX = 80;
+
   useEffect(() => {
-    if (scrollContainerRef.current) {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const distanceFromBottom =
+        container.scrollHeight - container.scrollTop - container.clientHeight;
+      stickToBottomRef.current = distanceFromBottom < NEAR_BOTTOM_THRESHOLD_PX;
+    };
+    container.addEventListener("scroll", handleScroll, { passive: true });
+    return () => container.removeEventListener("scroll", handleScroll);
+  }, []);
+
+  // A fresh submission should always snap back to the bottom, even if the
+  // player had scrolled up to reread something before acting.
+  useEffect(() => {
+    if (pendingUserChoice) stickToBottomRef.current = true;
+  }, [pendingUserChoice]);
+
+  // Auto-scroll to bottom when new messages arrive or during streaming -
+  // but only while the player is already at (or hasn't left) the bottom.
+  useEffect(() => {
+    if (stickToBottomRef.current && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop =
         scrollContainerRef.current.scrollHeight;
     }
@@ -1120,11 +1155,15 @@ export default function Story({
   // the effect above already ran, scrollTop is left at 0 even though the
   // container is now short enough to need scrolling - re-apply bottom
   // scroll whenever the container's size settles (e.g. on mount/open).
+  // Also fires when suggested-choice chips or streamed text change the
+  // content height - gated the same way so it doesn't fight a manual scroll.
   useEffect(() => {
     const container = scrollContainerRef.current;
     if (!container) return;
     const scrollToBottom = () => {
-      container.scrollTop = container.scrollHeight;
+      if (stickToBottomRef.current) {
+        container.scrollTop = container.scrollHeight;
+      }
     };
     const resizeObserver = new ResizeObserver(scrollToBottom);
     resizeObserver.observe(container);
@@ -1193,7 +1232,7 @@ export default function Story({
         {/* Chat Messages Area - Scrollable */}
         <div
           ref={scrollContainerRef}
-          className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-[200px] sm:min-h-[300px]"
+          className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-3 sm:space-y-4 min-h-0 sm:min-h-[300px]"
           style={{ color: fontSettings.themeColors?.text }}
         >
           {/* Previous exchanges (scrolled history) */}
@@ -1411,10 +1450,13 @@ export default function Story({
               )}
             </div>
 
-            {/* Right side: TTS - available as soon as story text is ready */}
+            {/* Right side: TTS - manual press waits for narration to finish;
+                auto-narrate (if enabled) starts reading live as the GM
+                streams instead of waiting - see storyTextReady prop. */}
             <TTSControls
               text={cleanTextForSpeech(storyText)}
-              disabled={loading || loadingStage === "story"}
+              disabled={loading || !storyTextReady}
+              storyTextReady={storyTextReady}
             />
           </div>
         )}

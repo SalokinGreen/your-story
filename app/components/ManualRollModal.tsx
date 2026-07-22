@@ -64,6 +64,18 @@ export default function ManualRollModal({
     onSubmit(parsed, value.trim());
   };
 
+  // Voice input should feel hands-free: once the player stops talking and a
+  // number comes back, submit immediately instead of making them also tap
+  // Confirm. If nothing parseable was said, just fill the box so they can
+  // fix it up and confirm manually.
+  const handleVoiceTranscript = (text: string) => {
+    setValue(text);
+    const parsedNumber = extractRollNumber(text);
+    if (parsedNumber !== null) {
+      onSubmit(parsedNumber, text.trim());
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
       <div className="bg-blue-950 border border-purple-500/40 rounded-2xl w-full max-w-sm shadow-2xl shadow-purple-950/50 overflow-hidden">
@@ -112,7 +124,7 @@ export default function ManualRollModal({
             <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2 text-center">
               Your total (with modifiers)
             </label>
-            <div className="flex items-center gap-2">
+            <div className="flex items-stretch gap-2">
               <input
                 ref={inputRef}
                 type="text"
@@ -127,10 +139,7 @@ export default function ManualRollModal({
                 placeholder='17, or "I rolled a natural 20"'
                 className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/40 rounded-xl text-white text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
-              <STTButton
-                onTranscript={(text) => setValue(text)}
-                className="shrink-0"
-              />
+              <STTButton onTranscript={handleVoiceTranscript} className="shrink-0" />
             </div>
             <p className="mt-2 text-center text-xs text-blue-300/60 h-4">
               {value.trim() &&

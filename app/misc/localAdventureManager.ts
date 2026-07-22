@@ -1,4 +1,4 @@
-import { Adventure, StoryData } from "./structs";
+import { Adventure } from "./structs";
 
 const ADVENTURE_DB_NAME = "YourStoryAdventuresDB";
 const ADVENTURE_STORE_NAME = "local_adventures";
@@ -153,86 +153,4 @@ export async function deleteLocalAdventure(adventureId: string): Promise<void> {
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
   });
-}
-
-/**
- * Cache multiple adventures from the server for offline access
- * Only updates adventures that are newer on the server or don't exist locally
- */
-export async function cacheAdventuresFromServer(
-  adventures: Adventure[]
-): Promise<void> {
-  if (adventures.length === 0) return;
-
-  const db = await openDB();
-  const transaction = db.transaction([ADVENTURE_STORE_NAME], "readwrite");
-  const store = transaction.objectStore(ADVENTURE_STORE_NAME);
-
-  // Get all existing local adventures first
-  const existingMap = new Map<string, LocalAdventure>();
-  const getAllRequest = store.getAll();
-
-  await new Promise<void>((resolve) => {
-    getAllRequest.onsuccess = () => {
-      const existing = getAllRequest.result as LocalAdventure[];
-      for (const adv of existing) {
-        existingMap.set(adv.id, adv);
-      }
-      resolve();
-    };
-    getAllRequest.onerror = () => resolve();
-  });
-
-  // Process each adventure
-  const now = new Date();
-  const putPromises: Promise<void>[] = [];
-
-  for (const adventure of adventures) {
-    const existing = existingMap.get(adventure.id);
-    const serverUpdatedAt =
-      adventure.updatedAt instanceof Date
-        ? adventure.updatedAt.toISOString()
-        : adventure.updatedAt;
-
-    // Skip if local version is newer or same (and not local-only)
-    if (existing && existing.syncStatus !== "local-only") {
-      const existingServerTime = existing.serverUpdatedAt
-        ? new Date(existing.serverUpdatedAt).getTime()
-        : 0;
-      const newServerTime = serverUpdatedAt
-        ? new Date(serverUpdatedAt).getTime()
-        : 0;
-
-      // Skip if server version is same or older
-      if (existingServerTime >= newServerTime) {
-        continue;
-      }
-    }
-
-    // Don't overwrite local-only adventures with server data
-    if (existing?.syncStatus === "local-only") {
-      continue;
-    }
-
-    const localAdventure: LocalAdventure = {
-      id: adventure.id,
-      title: adventure.title || "Untitled Adventure",
-      description: adventure.shortDescription || "",
-      updatedAt: now,
-      adventureData: adventure,
-      syncStatus: "synced",
-      serverUpdatedAt,
-      lastSyncedAt: now,
-    };
-
-    putPromises.push(
-      new Promise<void>((resolve, reject) => {
-        const putRequest = store.put(localAdventure);
-        putRequest.onsuccess = () => resolve();
-        putRequest.onerror = () => reject(putRequest.error);
-      })
-    );
-  }
-
-  await Promise.all(putPromises);
 }

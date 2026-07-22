@@ -10,7 +10,6 @@ import React, {
 import ReactMarkdown from "react-markdown";
 import { ChatMessage } from "@/app/misc/ai";
 import { StoryData, StartingChoice } from "@/app/misc/structs";
-import { authenticatedFetch } from "@/app/misc/getAuthToken";
 import { buildCreatorMessagesWithTools } from "@/app/misc/creator_ai";
 import {
   executeCreatorTools,
@@ -457,7 +456,7 @@ export default function CreatorAIChat({
           adventureMetadata,
         });
 
-        response = await authenticatedFetch("/api/generate", {
+        response = await fetch("/api/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -1,4 +1,12 @@
-import { Adventure, CustomTable, DiceMode, StoryData, StoryLore } from "./structs";
+import {
+  Adventure,
+  CustomTable,
+  DiceMode,
+  PlayerArchetype,
+  StoryData,
+  StoryLore,
+} from "./structs";
+import { ARCHETYPE_INFO } from "./gmAdvice";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -186,6 +194,7 @@ export interface FreeformPlayerSetup {
   personality: string[]; // curated personality tags picked in the wizard
   wishTags: string[]; // curated "what do you want from this story" tags
   wishText: string; // freeform addition to the above, not tag-matchable
+  archetype?: PlayerArchetype; // Self-selected Robin Laws player type
 }
 
 // Combines a player's curated wish tags and freeform wish text into one
@@ -210,6 +219,10 @@ function buildPlayerPreferencesNote(
       const wish = combinedWish(p);
       if (wish) {
         lines.push(`- Wants from this story: ${wish}`);
+      }
+      if (p.archetype) {
+        const info = ARCHETYPE_INFO[p.archetype];
+        lines.push(`- Player type: ${info.label} - ${info.facilitation}`);
       }
       return lines.join("\n");
     })
@@ -326,6 +339,7 @@ export async function startFreeformStoryLocally(
             color: p.color,
             personalityTags: p.personality.length ? p.personality : undefined,
             wishTags: p.wishTags.length ? p.wishTags : undefined,
+            archetype: p.archetype,
           })),
         }
       : undefined;
@@ -349,6 +363,7 @@ export async function startFreeformStoryLocally(
     playerWishTags: soloPlayer?.wishTags.length
       ? soloPlayer.wishTags
       : undefined,
+    playerArchetype: soloPlayer?.archetype,
     intro: "",
     memory: [],
     max_chapters: 0,
@@ -484,113 +499,3 @@ export async function deleteLocalStory(storyId: string): Promise<void> {
   });
 }
 
-// Check if local story was recently edited on this device (within last 30 seconds)
-// Used to determine if auto-sync should overwrite local data
-export function wasRecentlyEditedLocally(localStory: LocalStory): boolean {
-  if (!localStory.lastLocalEditAt) return false;
-  const thirtySecondsAgo = Date.now() - 30 * 1000;
-  return new Date(localStory.lastLocalEditAt).getTime() > thirtySecondsAgo;
-}
-
-// Check if local story was edited on this device
-export function wasEditedOnThisDevice(localStory: LocalStory): boolean {
-  return localStory.deviceId === getDeviceId();
-}
-
-// Determine sync action based on local and server timestamps
-export type SyncAction = "none" | "download" | "upload" | "conflict";
-
-export function determineSyncAction(
-  localStory: LocalStory | undefined,
-  serverUpdatedAt: string | undefined,
-): SyncAction {
-  // No local copy - download from server
-  if (!localStory) return "download";
-
-  // Local-only story - no sync needed
-  if (localStory.syncStatus === "local-only") return "none";
-
-  // No server timestamp to compare
-  if (!serverUpdatedAt) return "none";
-
-  const localTime = new Date(localStory.updatedAt).getTime();
-  const serverTime = new Date(serverUpdatedAt).getTime();
-
-  // Already synced and times match (within 1 second tolerance)
-  if (Math.abs(localTime - serverTime) < 1000) return "none";
-
-  // Server is newer
-  if (serverTime > localTime) {
-    // But if we just edited locally on this device, it's a conflict
-    if (
-      wasRecentlyEditedLocally(localStory) &&
-      wasEditedOnThisDevice(localStory)
-    ) {
-      return "conflict";
-    }
-    return "download";
-  }
-
-  // Local is newer - check if it was us who edited
-  if (wasEditedOnThisDevice(localStory)) {
-    // We made the edit, safe to upload (auto-sync)
-    return "upload";
-  }
-
-  // Local is newer but different device - conflict
-  return "conflict";
-}
-
-// Update sync status for a story
-export async function updateSyncStatus(
-  storyId: string,
-  syncStatus: SyncStatus,
-  serverUpdatedAt?: string,
-): Promise<void> {
-  const db = await openDB();
-  return new Promise(async (resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-
-    const getRequest = store.get(storyId);
-    getRequest.onsuccess = () => {
-      const story = getRequest.result as LocalStory | undefined;
-      if (!story) {
-        resolve();
-        return;
-      }
-
-      story.syncStatus = syncStatus;
-      if (serverUpdatedAt) {
-        story.serverUpdatedAt = serverUpdatedAt;
-      }
-      if (syncStatus === "synced") {
-        story.lastSyncedAt = new Date();
-      }
-
-      const putRequest = store.put(story);
-      putRequest.onsuccess = () => resolve();
-      putRequest.onerror = () => reject(putRequest.error);
-    };
-    getRequest.onerror = () => reject(getRequest.error);
-  });
-}
-
-// Get stories that need syncing
-export async function getStoriesNeedingSync(): Promise<LocalStory[]> {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], "readonly");
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.getAll();
-
-    request.onsuccess = () => {
-      const stories = request.result as LocalStory[];
-      const needingSync = stories.filter(
-        (s) => s.syncStatus === "pending" || s.syncStatus === "conflict",
-      );
-      resolve(needingSync);
-    };
-    request.onerror = () => reject(request.error);
-  });
-}

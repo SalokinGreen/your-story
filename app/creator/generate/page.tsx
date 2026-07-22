@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import PDFImporter from "@/app/components/PDFImporter";
+import { creatorStreamFetch, creatorImageFetch } from "@/app/misc/creatorFetch";
 import {
   BigAdventureConfig,
   ComplexityLevel,
@@ -2259,21 +2260,15 @@ function BigAdventureCreatorPage() {
       setRegenerationContent("");
 
       try {
-        const response = await fetch("/api/creator/regenerate-section", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            section,
-            config,
-            existingResult: result,
-            model: extensionModel,
-            maxOutputTokens: extensionOutputSize,
-            additionalInstructions: customInstructions || undefined,
-            openRouterKey: apiKeys.openRouterKey,
-            deepseekKey: apiKeys.deepseekKey,
-          }),
+        const response = await creatorStreamFetch("/api/creator/regenerate-section", {
+          section,
+          config,
+          existingResult: result,
+          model: extensionModel,
+          maxOutputTokens: extensionOutputSize,
+          additionalInstructions: customInstructions || undefined,
+          openRouterKey: apiKeys.openRouterKey,
+          deepseekKey: apiKeys.deepseekKey,
         });
 
         if (!response.ok) {
@@ -2407,21 +2402,15 @@ function BigAdventureCreatorPage() {
       setExtensionContent("");
 
       try {
-        const response = await fetch("/api/creator/extend-section", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            section,
-            config,
-            existingResult: result,
-            maxOutputTokens,
-            customInstructions: customInstructions || undefined,
-            model: extensionModel,
-            openRouterKey: apiKeys.openRouterKey,
-            deepseekKey: apiKeys.deepseekKey,
-          }),
+        const response = await creatorStreamFetch("/api/creator/extend-section", {
+          section,
+          config,
+          existingResult: result,
+          maxOutputTokens,
+          customInstructions: customInstructions || undefined,
+          model: extensionModel,
+          openRouterKey: apiKeys.openRouterKey,
+          deepseekKey: apiKeys.deepseekKey,
         });
 
         if (!response.ok) {
@@ -2746,23 +2735,15 @@ ${result.description || ""}`;
 
       try {
         // Call image generation API
-        const response = await fetch("/api/creator/generate-image", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            prompt,
-            model: imageModel,
-            imageType: type,
-            provider: imageProvider,
-            openRouterKey:
-              imageProvider === "openrouter"
-                ? apiKeys.openRouterKey
-                : undefined,
-            deepInfraKey:
-              imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
-          }),
+        const response = await creatorImageFetch({
+          prompt,
+          model: imageModel,
+          imageType: type,
+          provider: imageProvider,
+          openRouterKey:
+            imageProvider === "openrouter" ? apiKeys.openRouterKey : undefined,
+          deepInfraKey:
+            imageProvider === "deepinfra" ? apiKeys.deepinfraKey : undefined,
         });
 
         if (!response.ok) {
