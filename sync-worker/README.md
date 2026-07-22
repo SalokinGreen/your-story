@@ -18,6 +18,17 @@ npx wrangler kv namespace create SYNC_KV
 Edit `wrangler.toml`'s `ALLOWED_ORIGINS` to a comma-separated list including
 your deployed app's origin (and `http://localhost:3000` for local dev).
 
+**Note on the native builds (Tauri/Capacitor):** `ALLOWED_ORIGINS` only
+matters for requests that actually go through a browser's CORS-enforcing
+fetch - i.e. the Vercel testing deployment and local dev in an ordinary
+browser tab. The compiled desktop (Tauri) and mobile (Capacitor) apps both
+route their HTTP through a native client instead of the WebView's `fetch`
+(see `app/misc/platformFetch.ts` / `capacitor.config.ts`'s `CapacitorHttp`),
+which isn't subject to CORS at all, so no origin entry is needed for those.
+You still need `NEXT_PUBLIC_SYNC_API_URL` baked in at build time for each
+target, since it's a `NEXT_PUBLIC_` var inlined at build, not read at
+runtime.
+
 ## Local dev
 
 ```bash

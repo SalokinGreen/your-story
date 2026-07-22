@@ -22,6 +22,7 @@ import {
   replaceLocalFolders,
 } from "./localFolderManager";
 import { SYNCABLE_SETTINGS_KEYS } from "./syncableSettingsKeys";
+import { getProviderFetch } from "./platformFetch";
 
 export type SyncBucket = "stories" | "adventures" | "folders" | "settings";
 const BUCKETS: SyncBucket[] = ["stories", "adventures", "folders", "settings"];
@@ -177,7 +178,12 @@ async function apiFetch(
       "Sync API URL not configured (NEXT_PUBLIC_SYNC_API_URL is unset)",
     );
   }
-  return fetch(`${base}${path}`, {
+  // The Tauri desktop build's WebView enforces CORS against the browser
+  // fetch, same as providerCall.ts's calls to AI providers - route through
+  // the same native-HTTP seam so this keeps working once compiled to a
+  // local app, not just in the Vercel testing deployment.
+  const platformFetch = getProviderFetch();
+  return platformFetch(`${base}${path}`, {
     ...init,
     headers: {
       ...(init?.headers || {}),
