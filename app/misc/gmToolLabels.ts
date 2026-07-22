@@ -1,7 +1,8 @@
 /**
- * Human-friendly, present-tense labels for GM tool calls - used by the
- * live GM progress indicator (GMProgressPanel) so players see "Rolling
- * dice" instead of a raw tool name like "formula_roll".
+ * Human-friendly, present-tense labels for GM tool calls - used by
+ * story.tsx's TimelineEntryPill (the per-step tool/thinking checklist shown
+ * inline in every AI message) so players see "Rolling dice" instead of a
+ * raw tool name like "formula_roll".
  */
 const TOOL_LABELS: Record<string, string> = {
   // Dice / checks

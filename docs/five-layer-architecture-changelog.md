@@ -151,6 +151,113 @@ the code — including a full 7-turn scripted-campaign regression test
 proving contradiction detection doesn't degrade as a session gets longer.
 Test count grew from roughly 550 to 644 over the course of this phase.
 
+## Phase 3 (later session): an architecture re-audit, active adjudication, and a memory agent
+
+A follow-up pass re-verified this document's and `architecture-frontier.md`'s
+claims directly against the code (some had drifted — see the corrections
+in `architecture-frontier.md`) and used the findings to drive a further
+round of changes, split across Layers 2, 4, and 5.
+
+### Layer 5 (Adjudication) — from diagnostic to active, and widened
+
+`checkNarrationConsistency` is unchanged and still diagnostic-only. New
+alongside it: **`observer.ts`**, the first *active* adjudication mechanism —
+it can roll `StoryData` back to a pre-turn snapshot and force a retry, not
+just record a warning after the fact. `architecture-frontier.md` had
+explicitly left this kind of move as an open, undecided question ("worth
+reconsidering only if warnings start firing often enough in practice"); this
+phase made that call. Five checks, two severities:
+
+- **Major (can trigger a reset-and-retry, capped, fails open — same posture
+  as the M2 gate):** a response-length blowout past the Reply Length
+  setting's ceiling; a player-agency violation (the GM deciding what the
+  player character says/thinks/does, an LLM-judged check against the
+  existing "PLAYER AGENCY (NON-NEGOTIABLE)" prompt rule); and an
+  **outcome/narration mismatch** — an LLM-judged check for whether the
+  finished narration contradicts the mechanical `SUCCESS`/`FAILURE` result
+  of the last roll made that turn. The roll result being ground truth
+  narration can't override is the core "LLM proposes, deterministic engine
+  disposes" thesis this whole app is built on — this is the first place
+  that's checked directly rather than just hoped for.
+- **Minor (log-only, surfaced as a warning, never triggers a reset — neither
+  rule was ever stated to the GM as a hard requirement the way PLAYER
+  AGENCY was):** two tool-usage-gap checks — narration that invented an
+  uncertain outcome instead of consulting `fate_question`/`roll_table`, and
+  narration that described a scene transition without calling
+  `increment_scene`.
+
+### Layer 4 (Memory) — a dedicated write-side agent, and reflection made visible
+
+- **A dedicated memory agent (`memoryAgent.ts`)** now decides what from each
+  turn is worth persisting to `storyData.memory`, running once per accepted
+  turn (after `observer.ts` has settled on a final result, so memory is
+  never written about narration that gets reset). `add_memory` was removed
+  from the GM's own live tool set — the GM no longer makes this judgment
+  call mid-generation at all. Retrieval is unchanged: the GM still calls
+  `search_memory` on demand, preserving the existing "agentic retrieval, not
+  automatic pre-fetch" decision.
+- **Reflection insights are now guarantee-surfaced.** This closes
+  `architecture-frontier.md`'s Frontier 2, item 1, which had flagged that a
+  `reflection.ts` insight could be synthesized (spending a real API call)
+  and then never seen for the rest of the campaign if the model never
+  happened to search for the right query. `formatMemorySection` (shared by
+  the GM-stage and Choices-stage prompts) now injects the most recent
+  reflection entries unconditionally, the same treatment `character_sheet`
+  lore already gets, alongside the existing entry count.
+
+### Layer 2 (Oracle/Entropy) — challenge-system bugs, and a reopened DoS gap closed twice
+
+Four defects found by re-reading this layer's code directly rather than
+trusting its "mostly solid" reputation:
+
+- **A challenge could get stuck active forever.** The live (model-reachable)
+  challenge tool set had no cancel path — if a challenge stopped mattering
+  narratively before either side reached its threshold, it stayed active
+  indefinitely, blocking both new challenges and resting. Added
+  `cancel_challenge` to the live tool set.
+- **Asymmetric challenge thresholds were silently collapsed to symmetric.**
+  `start_challenge`'s declared `required_successes`/`max_failures` were
+  discarded in favor of one majority number derived from `rounds`; a
+  deliberately lenient/harsh asymmetric declaration got the wrong threshold
+  on one side. Both are now stored and honored independently (with a
+  fallback to the old derived-majority behavior for challenges already
+  in-flight from before this fix).
+- **`formula_challenge_check` brought to parity** with
+  `formula_roll`/`opposed_formula`: `reverse_dc`, `stakes` escalation
+  (feeding the same reasoning-tier floor and M2-gate signal), the
+  `target`/`forces_choice` hardness dimensions, and stat-integrity checking
+  all now apply to challenge checks too — previously missing entirely,
+  despite challenges being reserved for the biggest scenes by the tool's own
+  description.
+- **A DoS-shaped unbounded-dice-roll gap, reopened through a second path,
+  closed in two places.** The changelog above credits `diceFormula.ts`'s
+  `MAX_DICE_COUNT`/`MAX_DICE_SIDES` bound with closing this defect class —
+  but two other, independent dice-rolling code paths bypassed
+  `diceFormula.ts` entirely and had no cap at all: `page.tsx`'s
+  "context roll" flavor-dice parser (fed by the `analyzeAction` pre-pass),
+  and the `calculate` GM tool's own embedded `NdM` parser (fed directly by
+  the model's `expression` param — the more exposed of the two). Both now
+  enforce the same bound.
+
+### Cleanup
+
+- **`GMProgressPanel.tsx` deleted.** It was fully built (a collapsible tool-
+  call checklist) but never imported anywhere — confirmed dead by grep, and
+  confirmed *why* it stayed dead: `story.tsx`'s `TimelineEntryPill`/
+  `TimelineView` already renders an unconditional, always-visible per-step
+  checklist (check/X icons, expandable `contextForStory`) inline in every AI
+  message, built later and fully superseding it. Wiring the old component in
+  would have just duplicated that UI.
+
+### New known gap (found, not yet closed)
+
+- **`ask_question` doesn't feed couch-coop spotlight tracking.** The
+  recently-added `ask_question` tool can target a specific player, but
+  that's cosmetic only — answering a targeted question doesn't reset that
+  player's neglect counter (`couchPlayerFocus`) or contribute to the
+  PaSSAGE-style play-style classifier the way every other form of player
+  input does. Not fixed in this phase — flagged for a future one.
+
 ## Deliberately not done
 
 - **H6 (content-safety layer):** explicitly skipped by product decision —

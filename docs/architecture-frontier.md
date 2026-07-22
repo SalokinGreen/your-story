@@ -5,10 +5,15 @@
 `docs/five-layer-architecture-changelog.md` is the retrospective record - what
 the five-layer papers changed, and what it looked like before. This document
 is the prospective companion: given everything that's actually been built
-(two full phases, most recently memory reflection, director macro-arc
-pacing, a widened leniency audit, multi-character-sheet ownership, and a
-second player-style signal), where does the *research* - and the honest
-experience of having now implemented most of it - say to go next?
+(three phases now - memory reflection and director macro-arc pacing, then a
+widened leniency audit/multi-character-sheet ownership/second player-style
+signal, then most recently an architecture re-audit that closed several of
+this document's own items and turned up new bugs along the way - see the
+changelog's Phase 3), where does the *research* - and the honest experience
+of having now implemented most of it - say to go next? This document is
+also, itself, occasionally stale relative to the code (its own Phase 3
+corrections above are an example) - when in doubt, verify a claim here
+against the code directly rather than trusting it at face value.
 
 Everything below is graded for effort and risk, and ordered by layer. None
 of it is a commitment or a plan someone approved; it's a map of the
@@ -25,23 +30,53 @@ otherwise defers to that doc rather than re-litigating it.
 
 Quick anchor, not a restatement - see the changelog for the full picture:
 
-- **State, oracle, adjudication**: solid, tool-call-mediated, validated.
-- **Director/pacing**: tension scalar, a 4-move bounded menu
+- **State**: solid, tool-call-mediated, validated.
+- **Oracle/entropy**: the fate-chart/chaos-factor/scene-check core is solid,
+  but a later re-audit (see the changelog's Phase 3) found the challenge
+  subsystem underneath it had real bugs - asymmetric win/loss thresholds
+  silently collapsing to one symmetric majority, no model-reachable cancel
+  path (a challenge could get stuck active forever), and
+  `formula_challenge_check` missing `reverse_dc`/`stakes`/hardness/
+  stat-integrity that its `formula_roll`/`opposed_formula` siblings have -
+  all now fixed. Two independent unbounded-dice-roll gaps (bypassing
+  `diceFormula.ts`'s DoS bound entirely) were also found and closed.
+- **Director/pacing**: tension scalar, a 7-move bounded menu
   (`announce_future_badness`, `tick_a_clock`, `put_someone_in_a_spot`,
-  `spotlight_couch_player`), a Freytag-shaped macro-arc target
+  `spotlight_couch_player`, `offer_opportunity`, `reveal_unwelcome_truth`,
+  `spotlight_tag`), a Freytag-shaped macro-arc target
   (`storyProgress`/`targetTensionForProgress` in `mythic.ts`) the director
   compares live tension against, couch-player spotlight fairness with a
-  style-based tiebreaker.
+  style-based tiebreaker, and a live (if minimal) read-only pacing view in
+  `ContextViewer.tsx`'s "Layer 3 · Director & Pacing" panel (current
+  tension, a progress bar, pending moves) - see Frontier 3's correction
+  below on what that panel does and doesn't cover.
 - **Memory**: `MemoryEntry` carries timestamp/sceneIndex/entityIds/importance;
-  semantic search reranks by a bounded recency/importance/entity boost;
-  `reflection.ts` periodically synthesizes higher-level insights from memory
-  clusters once cumulative importance crosses a threshold (Generative
-  Agents' actual differentiator, not just its scoring formula).
+  semantic search reranks by a bounded recency/importance/entity boost (only
+  actually fires when embeddings are configured, which is off by default -
+  worth knowing before treating it as universally live); `reflection.ts`
+  periodically synthesizes higher-level insights from memory clusters once
+  cumulative importance crosses a threshold (Generative Agents' actual
+  differentiator, not just its scoring formula), and those insights are now
+  guarantee-surfaced in the GM/Choices-stage prompts rather than sitting
+  invisible behind `search_memory` (closes Frontier 2, item 1, below). A
+  dedicated write-side memory agent (`memoryAgent.ts`) now decides what's
+  worth persisting after each turn, in place of the GM's own `add_memory`
+  tool call - retrieval is unchanged, the GM still calls `search_memory` on
+  demand.
+- **Adjudication**: `checkNarrationConsistency` is still diagnostic-only
+  (one contradiction class, non-blocking). Alongside it, `observer.ts` is
+  now a second, *active* mechanism: response-length blowouts, player-agency
+  violations, and roll-outcome/narration mismatches can roll `StoryData`
+  back and force a retry (capped, fails open); missing oracle/table use and
+  missing `increment_scene` on a scene transition are logged as advisory
+  warnings instead. See Frontier 4's correction below.
 - **Multiplayer**: couch co-op (same-device, named speaker bubbles),
   spotlight-neglect tracking, a lightweight PaSSAGE-style player model fed
   by *two* independent signals (freeform-text keywords and actual GM
   tool-call activity), and `StoryLore.ownerCouchPlayerId` linking a
-  `character_sheet` entry to a specific player.
+  `character_sheet` entry to a specific player. One integration gap found
+  and not yet closed: the `ask_question` tool's per-player targeting doesn't
+  feed spotlight tracking or the style classifier at all - see Frontier 6.
 - **Testing**: a leniency-audit log widened past the M2 hard gate, litmus-
   checked coverage for every non-obvious mechanism above.
 
@@ -110,33 +145,21 @@ how they're allowed to affect state.
 
 ## Frontier 2: reflection's next layer - insights that get *retrieved*, not just stored
 
-Reflection is real now, but its output enters the exact same pool as every
-other memory, gated behind the model choosing to call `search_memory` with a
-query that happens to match. Nothing about `ai_staged.ts`'s prompt
-construction treats a reflection entry (`isReflection: true`) as more
-important to surface than an ordinary fact - the info message only ever
-shows a memory *count* ("🧠 Memory (N entries) - use search_memory to find
-specific facts"), never memory content directly. A synthesized insight the
-system just spent an API call producing can sit unseen for the rest of the
-campaign if the model never happens to search for it.
+**Item 1 (guarantee-surface reflection insights) is now done** - see the
+changelog's Phase 3. `formatMemorySection` (`ai_staged.ts`, shared by the
+GM-stage and Choices-stage prompts) now injects the most recent reflection
+entries unconditionally alongside the entry count, the same
+"unconditionally injected, not trigger-gated" treatment `character_sheet`
+lore already gets. What remains open:
 
-Two concrete next steps, ordered by risk:
-
-1. **Guarantee-surface the N most recent (or highest-importance) reflection
-   entries** directly in `buildInfoMessage`'s summary section - the same
-   "unconditionally injected, not trigger-gated" treatment `character_sheet`
-   lore already gets, for the same reason (this is exactly the kind of
-   thing that should never depend on the model guessing the right search
-   query). Low risk, small, boundable prompt-budget cost, and it directly
-   closes a real gap in a mechanism that was *just* built.
 2. **A second-order reflection pass** (reflections about reflections, once
    enough reflection entries accumulate) - Generative Agents' actual
    "reflection tree," where higher-level insights can themselves become
    source material for still-higher-level ones. This is real prior art, but
-   genuine scope creep for this app right now. Only worth it if, after (1)
-   ships and reflection insights are actually being seen by the model in
-   practice, single-pass reflection is observed producing shallow or
-   repetitive output. Don't build ahead of that observation.
+   genuine scope creep for this app right now. Only worth it if, now that
+   item 1 has shipped and reflection insights are actually being seen by the
+   model in practice, single-pass reflection is observed producing shallow
+   or repetitive output. Don't build ahead of that observation.
 
 ## Frontier 3: director layer - from one curve to nested arcs, plus a dashboard
 
@@ -155,18 +178,21 @@ problem.
   while the campaign macro-arc is elsewhere. Moderate effort (new progress
   function, careful blending so it doesn't just replace the existing
   signal), low risk.
-- **A pacing dashboard, for humans, not the model**: `agmtState.tension`,
-  the macro-arc target, and `pendingDirectorMoves` history already exist as
-  state - none of it is currently visible anywhere except through gameplay
-  effects. A simple sparkline in the existing AI Config/debug panel (tension
-  vs. target over scene count) would give a creator debugging "this
-  campaign feels flat" an actual signal instead of vibes. This is the
-  cheapest, safest item in this entire document - it's a read-only view of
-  state that already exists, with zero model-facing changes.
+- **A pacing dashboard, for humans, not the model - partially built
+  already.** A previous version of this document claimed none of
+  `agmtState.tension`/the macro-arc target/`pendingDirectorMoves` was
+  visible anywhere - that was inaccurate even at the time it was written:
+  `ContextViewer.tsx`'s "Layer 3 · Director & Pacing" panel already shows
+  live tension (with a progress bar) and the pending-move list, predating
+  this document. What's still genuinely missing is the *historical* view
+  this item actually asks for: a sparkline (tension vs. target over scene
+  count) in that same panel, so a creator debugging "this campaign feels
+  flat" gets a trend instead of one live number. Still cheap, safe, and
+  read-only - just narrower in scope than originally stated.
 - **Expanding the GM-move menu**: PbtA's own move vocabulary is much larger
   than what's implemented, though the menu has grown past the original 4
   (`announce_future_badness`, `tick_a_clock`, `put_someone_in_a_spot`,
-  `spotlight_couch_player`):
+  `spotlight_couch_player`) to 7:
   - `offer_opportunity` - a non-escalating soft move that fires as the
     fallback for an otherwise-calm, on-pace scene with an open thread to
     hang the opportunity on, replacing what used to just be `null`.
@@ -177,6 +203,11 @@ problem.
     so a pending secret backlog takes priority over pure flavor. The
     model still does the actual reveal (prose + flipping visibility via
     `edit_lore`); this only supplies deterministic timing.
+  - `spotlight_tag` - surfaces a player-picked personality/wish tag from
+    the `GuidedStoryStart` wizard (couch-player-scoped or solo-story
+    fields) as inspiration for the next beat, sampled via
+    `pickTagFocusExamples`. A no-op for older saves or players who skipped
+    the wizard.
 
   "Show a downside of their gear/ability" was tried (`activate_downside`,
   keyed off a tracked `Ability`'s cost/cooldown) and reverted: `Ability[]`
@@ -202,24 +233,41 @@ problem.
 
 `checkNarrationConsistency` (C2) deliberately covers exactly one
 contradiction class: a dead/departed NPC narrated with an active-presence
-phrase. Two honest directions from here:
+phrase, and remains diagnostic-only (see below on why that's still correct
+for this particular check).
 
-- **Widen entity coverage** using the identical pattern (exact name/title
-  match + a small active-presence-phrase window, reusing
-  `compaction.ts`'s exported `escapeRegExp`/`countNameMentions`/
-  `ACTIVE_PRESENCE_PHRASES`): a `StoryThread` marked `resolved`/`abandoned`
-  narrated as still open, or a `Condition` that's been removed narrated as
-  still active. Same low-risk, narrow, deterministic shape - just more
-  `TrackedEntity` kinds, not a new mechanism.
-- **The streaming-vs-blocking tradeoff remains genuinely unsolved.**
-  Narration streams token-by-token before the checker can run, so a
-  contradiction warning is always after-the-fact - it can flag, never
-  prevent. The real fix (buffer narration, check, then release) is a
-  legitimate UX regression (added perceived latency) for a benefit that's
-  so far been purely diagnostic. Worth reconsidering only if warnings start
-  firing often enough in practice that "the player already read the
-  contradiction" becomes a recurring, demonstrated complaint - not
-  preemptively.
+**Update (changelog Phase 3): the streaming-vs-blocking question got a real
+answer, in a new, separate mechanism - `observer.ts`.** Rather than making
+`checkNarrationConsistency` itself blocking (still not attempted, see
+below), a second, *active* Layer-5 mechanism now exists alongside it: an LLM
+review of the finished turn that can roll `StoryData` back to its pre-turn
+snapshot and force a retry when it finds a major violation (a player-agency
+violation, a response-length blowout, or a roll/narration outcome mismatch),
+capped and fail-open like the M2 gate. This accepts the same "player may
+have already seen the streamed text once" cost this frontier flagged as a
+tradeoff, in exchange for actually being able to correct the turn rather
+than just flag it. Two softer checks (missing oracle/table use, missing
+`increment_scene` on a scene transition) stay diagnostic-only - log a
+warning, never reset - since neither was ever a hard rule stated to the GM
+the way player agency was.
+
+Remaining honest directions:
+
+- **Widen `checkNarrationConsistency`'s entity coverage** using the
+  identical pattern (exact name/title match + a small active-presence-
+  phrase window, reusing `compaction.ts`'s exported `escapeRegExp`/
+  `countNameMentions`/`ACTIVE_PRESENCE_PHRASES`): a `StoryThread` marked
+  `resolved`/`abandoned` narrated as still open, or a `Condition` that's
+  been removed narrated as still active. Same low-risk, narrow,
+  deterministic shape - just more `TrackedEntity` kinds, not a new
+  mechanism. Still open - `observer.ts`'s new checks didn't touch this.
+- **`checkNarrationConsistency` itself staying diagnostic-only remains the
+  right call**, separate from `observer.ts` existing. It's a single narrow,
+  high-precision regex check; making *it* specifically block/retry would
+  add reset overhead to a mechanism that's cheap and rarely fires, for a
+  contradiction class that's already low-risk to just flag. `observer.ts`'s
+  LLM-judged checks are the ones actually worth the reset cost, since they
+  catch classes of error a regex fundamentally can't.
 
 ## Frontier 5: an eval harness at real scale
 
@@ -254,6 +302,17 @@ tracking, a two-signal style model, multi-character-sheet ownership). Two
 structurally different directions exist beyond it - and they are not the
 same project, so they shouldn't be planned as one:
 
+- **`ask_question` doesn't feed spotlight tracking (found, not yet fixed)**:
+  the tool's `target_player_name` only renders a cosmetic banner chip in
+  `AskQuestionModal.tsx` - answering a targeted question never touches
+  `couchPlayerFocus` (the spotlight-neglect counter) or the PaSSAGE-style
+  classifier's tool-call-activity signal, both of which are only ever
+  updated from `handleCustomInput`'s normal-turn path. A player who is
+  repeatedly targeted with questions and dutifully answers them still
+  accrues neglect as if they'd said nothing all session, and their answers
+  contribute zero signal to how the director reads their play style. Low
+  effort to close (the answer-resolution path in `page.tsx` already knows
+  which player answered) - just hasn't been done yet.
 - **Per-PC mechanical independence**: each couch player gets their *own*
   stats/resources/abilities instead of sharing one `character_sheet`. This
   is a data-model change (`Stat`/`Resource`/`Ability` arrays would each
@@ -318,15 +377,20 @@ degrading gracefully instead of silently consuming the whole budget.
 
 ## If you only do three things next
 
-Ranked by (value ÷ (effort × risk)), given everything above:
+Updated after changelog Phase 3 closed the previous list's #1 (reflection
+surfacing) and shipped `observer.ts`/the memory agent beyond what this list
+originally asked for. Ranked by (value ÷ (effort × risk)), given everything
+above:
 
-1. **Guarantee-surface reflection insights** (Frontier 2, item 1). Small,
-   safe, and closes a real gap in a mechanism that was *just* built - right
-   now it risks being invisible in practice without this.
-2. **Per-chapter tension target + a read-only pacing dashboard**
-   (Frontier 3, items 1-2). Cheap, safe, immediately useful for creators
-   debugging pacing complaints, and zero model-facing risk on the dashboard
-   half.
+1. **Fix `ask_question`'s spotlight-tracking gap** (Frontier 6). Low effort
+   - the answer-resolution path already knows which player answered - and
+   closes a real, demonstrated inconsistency between a very recently
+   shipped feature and the pre-existing director layer.
+2. **Per-chapter tension target + the historical pacing sparkline**
+   (Frontier 3, items 1-2 - the live dashboard panel itself already
+   shipped, see the Orientation correction above). Cheap, safe, immediately
+   useful for creators debugging pacing complaints, and zero model-facing
+   risk.
 3. **NPC-scoped reflection only** (Frontier 1, item 2 - not the full
    goal/intent NPC-agent scaffolding, and not the private-memory-write
    tool). Reuses shipped machinery, stays narrowly scoped, and meaningfully
@@ -334,3 +398,11 @@ Ranked by (value ÷ (effort × risk)), given everything above:
    agents with goals" project, which should stay a distinct, later, and
    explicitly product-owner-approved decision - the same way H6 and
    networked multiplayer are already flagged as needing one.
+
+Also worth a look, found during the same re-audit but not ranked above
+since they're housekeeping rather than new capability: a small dead-code
+cleanup pass (`mythic.ts`'s unused local `AGMTState`/`createAGMTState()`
+shadowing the real struct; `toolSchemas.ts`/`toolExecutor.ts`'s
+unreachable-from-the-model "challenge system B"; `gmExecutor.ts`'s
+never-called `parseDifficulty`) - none of it is harmful as-is, it's just
+dead weight a future edit could touch by mistake.
