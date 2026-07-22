@@ -1784,6 +1784,7 @@ export function buildGMStagePrompt({
   modelName = "DeepSeek V4 Flash",
   replyLength = "medium",
   pacingNote,
+  observerNote,
 }: {
   storyData: StoryData;
   userChoice: string;
@@ -1791,9 +1792,17 @@ export function buildGMStagePrompt({
   modelName?: string; // Used to get model's actual context limit
   replyLength?: ReplyLength; // Reply Length setting - controls narration verbosity
   pacingNote?: string; // Deterministic pacing nudge (see pacingFeedback.ts)
+  // Layer 5 hardening (see observer.ts): set only when generateStoryTurn is
+  // retrying after the observer flagged the previous attempt at this same
+  // turn as a major violation - explains exactly what was flagged so the GM
+  // doesn't just repeat the mistake.
+  observerNote?: string;
 }): { messages: ChatMessage[]; tools: any[] } {
   const lengthGuidance = getLengthGuidance(replyLength);
   const pacingFeedbackLine = pacingNote ? `\n${pacingNote}` : "";
+  const observerNoteBlock = observerNote
+    ? `\n\n## PREVIOUS ATTEMPT RESET\n${observerNote}`
+    : "";
   const difficulty = storyData.difficulty || "medium";
 
   // Calculate GM context budget from customMaxContext (Memory Size slider)
@@ -2037,7 +2046,7 @@ ${freshStorySetupBlock}
 - NEVER decide what the player character says, thinks, feels, or does next. You resolve outcomes for the action they already declared - you don't invent their next action.
 - You control NPCs, monsters, the environment, and dice/table results. Everything about the player character's choices belongs to the player.
 - Resolve ONE beat at a time: the current action and its immediate consequence. Don't chain a second unrequested event, enemy turn, or complication onto the same turn "for free" - stop and hand control back at the next decision point.
-- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.
+- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.${observerNoteBlock}
 
 ## LENGTH & PACING
 A real tabletop GM talks in a few sentences and hands the mic back - they don't narrate a mini scene around every action. Match your narration length to the moment, and end the instant the player has something to react to:
