@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
+import { DynamicIcon } from "./DynamicIcon";
 import { ttsFetch } from "../misc/ttsFetch";
 import { TTSModelKey } from "../misc/ai_prices";
 
@@ -52,6 +53,11 @@ const getVolume = (): number => {
 const isTTSEnabled = (): boolean => {
   if (typeof window === "undefined") return true;
   return localStorage.getItem("ttsEnabled") !== "false";
+};
+
+const isAutoGenerateEnabled = (): boolean => {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem("ttsAutoGenerate") === "true";
 };
 
 // A tiny (near-silent) WAV data URI used to "unlock" an <audio> element.
@@ -174,6 +180,13 @@ export default function TTSControls({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
+  // True after the user presses Stop while audio was still being generated
+  // (manual whole-text stream or a live auto-narration session) - playback
+  // is silenced but the underlying generation keeps running in the
+  // background so all of it is ready the moment the user presses the button
+  // again, rather than throwing away work just because they wanted a
+  // moment of quiet. See handleToggle and onChunkArrived.
+  const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Object URLs for each chunk received so far, in order - populated
   // progressively as the stream arrives, and replayed from index 0 on
@@ -185,8 +198,10 @@ export default function TTSControls({
   // onChunkArrived plays it immediately once it lands.
   const waitingForNextRef = useRef<boolean>(false);
   const playbackMutedRef = useRef<boolean>(false);
-  // Aborts the in-flight request/stream when `text` itself is about to
-  // change (new turn, navigation, undo/edit).
+  // Lets a press mid-generation cancel the in-flight request/stream instead
+  // of just stopping playback of whatever's already landed. Only used when
+  // `text` itself is about to change (new turn, navigation, undo/edit) -
+  // the user pressing Stop no longer aborts anything, see handleToggle.
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastTextRef = useRef<string>("");
   const isGeneratingRef = useRef<boolean>(false);
@@ -385,7 +400,11 @@ export default function TTSControls({
         if (audioUrlsRef.current.length === 0) {
           setIsLoading(false);
           setIsPlaying(false);
+          // Nothing came through and nothing more is coming - don't leave
+          // the button stuck offering to "Resume" a session that has
+          // nothing left to generate.
           playbackMutedRef.current = false;
+          setIsMuted(false);
         }
       })
       .finally(() => {
@@ -460,17 +479,26 @@ export default function TTSControls({
     setHasAudio(false);
     setIsPlaying(false);
     setIsLoading(false);
+    setIsMuted(false);
   }, []);
 
-  // Starts narration for the current text. There's no manual button anymore
-  // - this only fires automatically (see the pending-auto-generate effect
-  //   below), so in practice only the "fresh activation" branch at the
-  //   bottom ever runs. The earlier branches (stop-while-active,
-  //   resume-while-muted, replay-when-cached) are defensive leftovers from
-  //   when this was reachable from a click at any playback state; harmless
-  //   since generateAndQueueAudio's own callback (onChunkArrived) is what
-  //   actually drives playback.
-  const startNarration = useCallback(async () => {
+  // Single toggle button behavior:
+  // - idle, nothing cached -> activate: turn on auto-narrate (so future
+  //   streamed turns start reading themselves too) and generate + stream +
+  //   play the current text live.
+  // - active (generating and/or playing, manually or via live narration) ->
+  //   stop: pause playback immediately, but if audio is still being
+  //   generated in the background (manual stream or live narration mid
+  //   GM-response), let it keep generating rather than aborting it - the
+  //   user may just have wanted a moment of quiet, not to throw the work
+  //   away. `isMuted` tracks this "generating quietly" state.
+  // - muted (stopped mid-generation) -> resume: unmute and either play what
+  //   is already cached, or, if nothing has arrived yet, wait for the first
+  //   chunk and play it when it lands.
+  // - inactive with cached audio for this text (deactivated after
+  //   generation finished, or playback finished naturally) -> replay the
+  //   cached recording without regenerating.
+  const handleToggle = useCallback(async () => {
     if (isPlaying || isLoading) {
       if (audioRef.current) {
         audioRef.current.pause();
@@ -484,6 +512,7 @@ export default function TTSControls({
         // auto-narration) - mute instead of aborting so it all finishes
         // generating in the background.
         playbackMutedRef.current = true;
+        setIsMuted(true);
       }
       return;
     }
@@ -495,6 +524,7 @@ export default function TTSControls({
       // checked against audioUrlsRef directly (not the `hasAudio` state)
       // since this can fire before a render has caught up with it.
       playbackMutedRef.current = false;
+      setIsMuted(false);
       if (audioUrlsRef.current.length === 0) {
         // Nothing has arrived yet - wait for onChunkArrived to play chunk 0
         // once it lands, now that we're unmuted.
@@ -514,6 +544,12 @@ export default function TTSControls({
       setIsPlaying(true);
       playChunkAt(0);
       return;
+    }
+
+    // Fresh activation: turn on auto-narrate so future streamed turns start
+    // reading themselves too, in addition to reading the current text now.
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ttsAutoGenerate", "true");
     }
 
     const volume = getVolume();
@@ -575,7 +611,11 @@ export default function TTSControls({
       addNotification(errorMessage, "failure");
       setIsPlaying(false);
       if (audioUrlsRef.current.length === 0) {
+        // Nothing came through and nothing more is coming - don't leave the
+        // button stuck offering to "Resume" a session that has nothing left
+        // to generate.
         playbackMutedRef.current = false;
+        setIsMuted(false);
       }
     } finally {
       setIsLoading(false);
@@ -619,7 +659,7 @@ export default function TTSControls({
     if (isStreaming && !wasStreaming) {
       stopAndResetPlayback();
       liveSentCharsRef.current = 0;
-      if (ttsEnabled) {
+      if (ttsEnabled && isAutoGenerateEnabled()) {
         liveModeActiveRef.current = true;
         isStreamingRef.current = true;
         liveAbortControllerRef.current = new AbortController();
@@ -642,7 +682,8 @@ export default function TTSControls({
     if (textChanged) {
       stopAndResetPlayback();
 
-      if (text.trim() && ttsEnabled && !isStreaming) {
+      const autoGenerate = isAutoGenerateEnabled();
+      if (autoGenerate && text.trim() && ttsEnabled && !isStreaming) {
         pendingAutoGenerateRef.current = true;
       }
     }
@@ -660,14 +701,66 @@ export default function TTSControls({
     ) {
       pendingAutoGenerateRef.current = false;
       const timer = setTimeout(() => {
-        startNarration();
+        handleToggle();
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [disabled, text, ttsEnabled, startNarration]);
+  }, [disabled, text, ttsEnabled, handleToggle]);
 
-  // No visible UI - narration just plays automatically per the effects
-  // above, the same way the couch co-op/multiplayer bubbles need no on/off
-  // control of their own.
-  return null;
+  if (!ttsEnabled) {
+    return null;
+  }
+
+  const isActive = isPlaying || isLoading;
+  const isGeneratingOnly = isLoading && !isPlaying && !isMuted;
+  const canReplay = !isActive && !isMuted && hasAudio;
+  // `disabled` blocks starting something new (text isn't ready yet), but
+  // never blocks stopping something already active, and never blocks
+  // resuming a muted session - both must stay clickable even while
+  // narration is still streaming, since that's exactly when they apply.
+  const buttonDisabled = (disabled || !text.trim()) && !isActive && !isMuted;
+
+  return (
+    <div className="flex items-center gap-2">
+      <button
+        onClick={handleToggle}
+        disabled={buttonDisabled}
+        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+          buttonDisabled
+            ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+            : isActive
+              ? "bg-linear-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-md shadow-red-950/40"
+              : "bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-950/40"
+        }`}
+        title={isActive ? "Stop" : isMuted ? "Resume playback" : canReplay ? "Replay" : "Read aloud"}
+      >
+        {isGeneratingOnly ? (
+          <>
+            <DynamicIcon name="Loader2" className="animate-spin h-4 w-4" />
+            <span className="hidden sm:inline">Generating...</span>
+          </>
+        ) : isActive ? (
+          <>
+            <DynamicIcon name="Square" className="w-4 h-4" />
+            <span className="hidden sm:inline">Stop</span>
+          </>
+        ) : isMuted ? (
+          <>
+            <DynamicIcon name="Play" className="w-4 h-4" />
+            <span className="hidden sm:inline">Resume</span>
+          </>
+        ) : canReplay ? (
+          <>
+            <DynamicIcon name="RotateCcw" className="w-4 h-4" />
+            <span className="hidden sm:inline">Replay</span>
+          </>
+        ) : (
+          <>
+            <DynamicIcon name="Play" className="w-4 h-4" />
+            <span className="hidden sm:inline">TTS</span>
+          </>
+        )}
+      </button>
+    </div>
+  );
 }

@@ -12,20 +12,20 @@ there is no server-side "Coins" path for TTS.
 
 ## Features
 
-✅ **Automatic narration** - No button to press; new story content just
-reads itself aloud by default, the same way couch co-op/multiplayer voice
-bubbles need no on/off control of their own  
+✅ **Real-time narration** - Listen to AI-generated story content  
 ✅ **Four TTS models across four providers** - pick fast/cheap, premium
 DeepInfra, low-latency Cartesia, or best-quality ElevenLabs  
 ✅ **20+ built-in voice options plus custom voice IDs** - American, British,
 multi-language, and provider voice libraries  
+✅ **Playback controls** - Play, pause/resume, and stop audio  
 ✅ **TTS-friendly text cleaning** - Strips markdown formatting, emoji, and
 misc Unicode symbols, and converts markdown tables into short spoken
 sentences instead of leaving raw `| a | b |` syntax for the engine to
 stumble over  
 ✅ **Chunked generation** - Handles long text with intelligent, sentence-boundary-aware splitting into small chunks for fast time-to-first-audio  
 ✅ **Streaming playback** - Starts playing as soon as the first chunk is ready, instead of waiting for the whole narration to finish generating  
-✅ **Live auto-narration** - Starts reading sentence-by-sentence as the GM is still streaming the response, instead of waiting for the whole turn to finish  
+✅ **Live auto-narration** - The TTS button doubles as the auto-narrate switch: activating it starts reading sentence-by-sentence as the GM is still streaming the response (in addition to reading whatever's already on screen), instead of waiting for the whole turn to finish  
+✅ **Non-destructive stop** - Stopping playback mid-generation only silences it; the remaining audio keeps generating in the background so a later press resumes right where you left off, instead of throwing away work in progress  
 ✅ **Responsive UI** - Works on mobile and desktop
 
 ## TTS Models
@@ -111,24 +111,29 @@ small named voice sets are.
 
 **`app/components/TTSControls.tsx`**
 
-- No UI of its own - renders nothing. It's a logic-only component mounted
-  alongside the story text that automatically starts narration whenever
-  `ttsEnabled` is on, with no button or manual activation step
-- Runs a live, sentence-by-sentence auto-narration pipeline while
-  `storyTextReady` is false (narration still streaming) - see
-  "Live Auto-Narration" below - and falls back to generating once, on
-  settle, for text that arrives already-finished (navigation/undo/edit)
+- Main TTS UI component - a single toggle button (activate/stop/resume/replay)
+- Activating the button turns on the persistent `ttsAutoGenerate` setting
+  (so future streamed turns start reading themselves too) *and* starts
+  reading whatever text is on screen right now - see "Live Auto-Narration"
+  below
+- Stopping playback mid-generation doesn't cancel the in-flight
+  request/stream - it mutes playback while letting the remaining audio keep
+  generating in the background, so a later press resumes immediately with
+  everything that's ready instead of regenerating from scratch - see
+  "Stop vs. Mute" below
 - Handles voice/model selection, playback, and audio state
 - Picks the matching BYOK key (`deepinfraKey`/`cartesiaKey`/`elevenlabsKey`) for the selected model
 - Integrates with NotificationContext for user feedback
+- Runs a live, sentence-by-sentence auto-narration pipeline when auto-narrate
+  is enabled and `storyTextReady` is false (narration still streaming) - see
+  "Live Auto-Narration" below
 
 **`app/components/APIKeysModal.tsx`**
 
 - Settings UI for TTS configuration and all four provider API keys
 - Model selector (Kokoro/Orpheus/Cartesia/ElevenLabs)
 - Voice dropdown with organized optgroups, resets to a sensible default voice on model switch
-- Volume slider, and a single "Enable TTS" toggle (on by default) to turn
-  automatic narration off entirely
+- Volume slider and auto-generate toggle
 
 **`app/components/CustomVoiceManager.tsx`**
 
@@ -160,11 +165,12 @@ amount billed depends on the user's own plan with that provider:
 ## Usage
 
 1. Go to **Settings** (gear icon) → **API Keys** tab, add the API key for whichever provider(s) you want to use
-2. Go to **Settings** → **Voice** tab - TTS is enabled by default
+2. Go to **Settings** → **Voice** tab, enable TTS
 3. Choose a model: Kokoro/Orpheus (DeepInfra), Cartesia Sonic-3, or ElevenLabs Flash v2.5
 4. Select a voice from the dropdown (or add a custom voice ID)
 5. Adjust volume as needed
-6. On story pages, new narration reads itself aloud automatically - no button to press. Turn "Enable TTS" off in Settings to disable it
+6. Optionally enable auto-generate for automatic narration
+7. On story pages, click "TTS" button to generate and play audio
 
 ## Configuration
 
@@ -172,10 +178,11 @@ TTS settings are stored in localStorage:
 
 | Key               | Description                   | Default      |
 | ----------------- | ----------------------------- | ------------ |
-| `ttsEnabled`      | TTS feature toggle - automatically narrates new content when on | `true` |
+| `ttsEnabled`      | TTS feature toggle            | `true`       |
 | `ttsModel`        | Selected model                | `"kokoro"`   |
 | `ttsLastVoice`    | Selected voice ID             | `"af_heart"` |
 | `ttsVolume`       | Playback volume (0-1)         | `1.0`        |
+| `ttsAutoGenerate` | Auto-narrate new content - also flipped to `true` by activating the TTS button | `false`      |
 | `ttsCustomVoices` | Custom voice IDs (JSON array) | `[]`         |
 
 API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
@@ -185,7 +192,7 @@ API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
 
 ### Audio Generation Flow
 
-1. New narration text arrives (or the GM starts streaming it) with `ttsEnabled` on - narration starts automatically, no user action needed
+1. User clicks "TTS" button - this also flips the persistent `ttsAutoGenerate` setting on
 2. Component shows loading state
 3. POST request sent to `/api/tts/generate` with text, voiceId, model, and the matching provider key
 4. `generateTTSAudioStream()` runs `cleanTextForTTS()` (strips markdown, emoji/symbols, converts tables) and splits the result into small chunks (200-500 chars depending on model) so the first request comes back fast
@@ -194,40 +201,53 @@ API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
 7. `TTSControls.tsx` parses frames off the response stream and plays chunk 0 in the `<audio>` element the moment it lands, queuing later chunks to play back-to-back via `onended` as they arrive
 8. Playback finishes once the last chunk has played and the stream has closed
 
-### Mute (internal, not user-facing)
+### Stop vs. Mute
 
-There's no Stop/Pause control anymore, but `startNarration()` still carries
-the mute machinery it had when it was reachable from a button at any
-playback state: if it were ever invoked while already playing/loading, it
-would mute rather than abort (`playbackMutedRef` true, `onChunkArrived` keeps
-appending arriving chunks to the cached queue without auto-playing them,
-while the underlying fetch/stream keeps running to completion in the
-background) rather than throwing away in-flight work. In current usage
-`startNarration()` is only ever called while nothing is already playing, so
-this path is dead in practice - kept because `generateAndQueueAudio`/
-`onChunkArrived` still rely on the same `playbackMutedRef` check either way.
+Pressing the button while it's active (playing or loading) always stops
+*playback* immediately, but only cancels the underlying generation if
+nothing was left to generate anyway:
+
+- If audio is still being generated (a manual whole-text stream mid-flight,
+  or a live auto-narration session while the GM is still streaming), the
+  press **mutes** rather than aborts: `playbackMutedRef`/`isMuted` go true,
+  `onChunkArrived` keeps appending arriving chunks to the cached queue but
+  stops auto-playing them, and the underlying fetch/stream keeps running to
+  completion in the background.
+- Pressing the button again while muted **resumes**: if audio has already
+  arrived it starts playing from chunk 0 immediately (same as Replay);
+  otherwise it shows the loading state and plays chunk 0 the moment
+  `onChunkArrived` delivers it.
+- This means a mid-stream Stop never throws away in-flight work - the
+  common case is a player wanting a moment of quiet, not to cancel
+  narration outright.
 
 ### Live Auto-Narration
 
-When `ttsEnabled` is on, narration doesn't wait for the GM's response to
+When `ttsAutoGenerate` is on, narration doesn't wait for the GM's response to
 finish before starting - it reads along as the response streams in:
 
 1. `app/story/page.tsx` exposes `storyTextReady` (narrower than the older
    `loadingStage`): `false` from the moment a turn's narration starts
    streaming, `true` once that narration's own text is final (independent of
    the tool-execution/choice-generation phase that runs afterward).
-2. `TTSControls.tsx` watches `storyTextReady` flip to `false` and, if TTS is
-   enabled, starts a live session: as `text` grows with each streamed
-   token, `extractCompleteSentences()` splits off every newly-completed
-   sentence (same `. `/`! `/`? ` boundary heuristic as the server's chunk
-   splitter) and queues each one as its own `/api/tts/generate` request.
+2. `TTSControls.tsx` watches `storyTextReady` flip to `false` and, if
+   auto-narrate is on, starts a live session: as `text` grows with each
+   streamed token, `extractCompleteSentences()` splits off every
+   newly-completed sentence (same `. `/`! `/`? ` boundary heuristic as the
+   server's chunk splitter) and queues each one as its own
+   `/api/tts/generate` request.
 3. Sentence requests are dispatched **sequentially** (not in parallel) so
    audio always arrives - and therefore plays - in the same order the
    sentences were written, even though each request can take a different
    amount of time to complete.
 4. Each request's resulting audio is pushed into the same ordered playback
-   queue the whole-text (non-streaming) flow uses, so both paths drive the
-   same `<audio>` element identically.
+   queue the manual, whole-text flow uses, so the button UI (spinner ->
+   Stop -> Replay) behaves identically either way, and pressing the button
+   while a live session is playing always stops (mutes) it - `disabled`
+   blocks *starting* something new, never stops/mutes/resumes something
+   already active. See "Stop vs. Mute" above - muting a live session lets
+   the remaining sentences keep generating in the background exactly like
+   the manual flow does.
 5. When `storyTextReady` flips back to `true`, whatever trailing partial
    sentence is left (no closing punctuation yet, since the stream just
    ended there) is flushed as one final request.
@@ -286,10 +306,11 @@ To test TTS:
 
 1. Start dev server: `npm run dev`
 2. Navigate to Settings → API Keys tab, add an API key for the provider(s) you want to test
-3. Navigate to Settings → Voice tab, confirm TTS is enabled and select model/voice
+3. Navigate to Settings → Voice tab, enable TTS and select model/voice
 4. Go to a story and generate content
-5. Verify audio starts playing automatically, with no button press
-6. Try all four models (Kokoro, Orpheus, Cartesia, ElevenLabs)
+5. Click "TTS" and verify audio plays
+6. Test pause/stop controls
+7. Try all four models (Kokoro, Orpheus, Cartesia, ElevenLabs)
 
 ## Credits
 
