@@ -50,6 +50,7 @@
     "baseline-browser-mapping": "^2.8.32",
     "eslint": "^9",
     "eslint-config-next": "^16.2.10",
+    "fake-indexeddb": "^6.2.5",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.10"

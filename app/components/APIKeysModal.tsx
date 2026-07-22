@@ -9,6 +9,7 @@ import AIConfigTab from "./AIConfigTab";
 import ArchitectureSettingsTab from "./ArchitectureSettingsTab";
 import CustomVoiceManager from "./CustomVoiceManager";
 import FontSettingsTab from "./FontSettingsTab";
+import SyncTab from "./SyncTab";
 import { TTSModelKey } from "@/app/misc/ai_prices";
 
 interface APIKeysModalProps {
@@ -30,7 +31,13 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
   const [showKeys, setShowKeys] = useState(false);
   const [activeTab, setActiveTab] = useState<
-    "config" | "llm" | "services" | "display" | "game" | "architecture"
+    | "config"
+    | "llm"
+    | "services"
+    | "display"
+    | "game"
+    | "architecture"
+    | "sync"
   >("config");
 
   // TTS Settings state (read from localStorage)
@@ -202,6 +209,19 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
               Architecture
             </span>
           </button>
+          <button
+            onClick={() => setActiveTab("sync")}
+            className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === "sync"
+                ? "border-purple-400 text-purple-300"
+                : "border-transparent text-blue-300/50 hover:text-blue-200"
+            }`}
+          >
+            <span className="flex items-center gap-2">
+              <DynamicIcon name="RefreshCw" className="w-4 h-4" />
+              Sync
+            </span>
+          </button>
         </div>
 
         {/* Content */}
@@ -217,6 +237,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <AIConfigTab />
           ) : activeTab === "architecture" ? (
             <ArchitectureSettingsTab />
+          ) : activeTab === "sync" ? (
+            <SyncTab addNotification={addNotification} />
           ) : activeTab === "llm" ? (
             <>
               {/* Compact API Keys Grid */}
