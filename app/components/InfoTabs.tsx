@@ -34,10 +34,10 @@ const KEY_REQUIREMENTS: KeyRequirement[] = [
     icon: "Volume2",
     gradient: "from-emerald-500 to-teal-600",
     title: "Voice Narration",
-    provider: "DeepInfra",
-    providerUrl: "https://deepinfra.com/dash/api_keys",
+    provider: "Cartesia or ElevenLabs",
+    providerUrl: "https://elevenlabs.io/app/settings/api-keys",
     description:
-      "Text-to-speech narration is powered by DeepInfra's Kokoro and Orpheus voice models.",
+      "Text-to-speech narration is powered by Cartesia Sonic-3 or ElevenLabs voice models.",
   },
 ];
 

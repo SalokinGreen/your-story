@@ -27,28 +27,25 @@ interface TTSControlsProps {
 }
 
 const getSelectedVoice = (): string => {
-  if (typeof window === "undefined") return "af_heart";
-  return localStorage.getItem("ttsLastVoice") || "af_heart";
+  if (typeof window === "undefined") return "21m00Tcm4TlvDq8ikWAM";
+  return localStorage.getItem("ttsLastVoice") || "21m00Tcm4TlvDq8ikWAM";
 };
 
 const getSelectedModel = (): TTSModelKey => {
-  if (typeof window === "undefined") return "kokoro";
+  if (typeof window === "undefined") return "elevenlabs";
   const model = localStorage.getItem("ttsModel");
-  if (model === "orpheus" || model === "cartesia" || model === "elevenlabs") return model;
-  return "kokoro";
+  if (model === "cartesia") return "cartesia";
+  return "elevenlabs";
 };
 
 const getProviderKeyForModel = (
   model: TTSModelKey,
-): "deepinfraKey" | "cartesiaKey" | "elevenlabsKey" => {
+): "cartesiaKey" | "elevenlabsKey" => {
   if (model === "cartesia") return "cartesiaKey";
-  if (model === "elevenlabs") return "elevenlabsKey";
-  return "deepinfraKey";
+  return "elevenlabsKey";
 };
 
 const PROVIDER_LABELS: Record<TTSModelKey, string> = {
-  kokoro: "DeepInfra",
-  orpheus: "DeepInfra",
   cartesia: "Cartesia",
   elevenlabs: "ElevenLabs",
 };
@@ -418,7 +415,6 @@ export default function TTSControls({
           text: textToSpeak,
           voiceId: selectedVoice,
           model: selectedModel,
-          deepinfraKey: providerKey === "deepinfraKey" ? apiKey : undefined,
           cartesiaKey: providerKey === "cartesiaKey" ? apiKey : undefined,
           elevenlabsKey: providerKey === "elevenlabsKey" ? apiKey : undefined,
         },
@@ -432,7 +428,7 @@ export default function TTSControls({
 
       return streamChunksToPlayer(response, onChunkArrived, signal);
     },
-    [apiKeys.deepinfraKey, apiKeys.cartesiaKey, apiKeys.elevenlabsKey, onChunkArrived],
+    [apiKeys.cartesiaKey, apiKeys.elevenlabsKey, onChunkArrived],
   );
 
   // Drains liveDispatchQueueRef one sentence at a time (sequential, not

@@ -1439,18 +1439,6 @@ export const MINIMUM_COST = 1; // Minimum 1 coin per API call
 
 // TTS pricing - all BYOK (user supplies their own provider key in Settings)
 export const TTS_MODELS = {
-  kokoro: {
-    name: "Kokoro-82M",
-    provider: "DeepInfra",
-    pricePerMillionChars: 0.62, // $0.62 per 1M characters
-    description: "Fast, cost-effective TTS with natural voices",
-  },
-  orpheus: {
-    name: "Orpheus 3B",
-    provider: "DeepInfra",
-    pricePerMillionChars: 7.0, // $7.00 per 1M characters
-    description: "Premium expressive TTS with emotional range",
-  },
   cartesia: {
     name: "Cartesia Sonic-3",
     provider: "Cartesia",
@@ -1470,14 +1458,14 @@ export type TTSModelKey = keyof typeof TTS_MODELS;
 /**
  * Calculate the cost in coins for TTS generation
  * @param characterCount - Number of characters to convert to speech
- * @param model - TTS model to use (kokoro or orpheus)
+ * @param model - TTS model to use (cartesia or elevenlabs)
  * @returns Cost in coins (minimum 1)
  */
 export function calculateTTSCost(
   characterCount: number,
-  model: TTSModelKey = "kokoro",
+  model: TTSModelKey = "elevenlabs",
 ): number {
-  const ttsModel = TTS_MODELS[model] || TTS_MODELS.kokoro;
+  const ttsModel = TTS_MODELS[model] || TTS_MODELS.elevenlabs;
 
   // Calculate raw cost in dollars
   const rawCost = (characterCount / 1_000_000) * ttsModel.pricePerMillionChars;
