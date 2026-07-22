@@ -32,6 +32,8 @@ import {
   TakeRestParams,
   FormulaRollParams,
   AskForRollParams,
+  AskQuestionParams,
+  AskQuestionItem,
   CheckDCParams,
   OpposedFormulaParams,
   FormulaChallengeCheckParams,
@@ -40,7 +42,6 @@ import {
   ReadNotesParams,
   SearchMemoryParams,
   RequestContinuationParams,
-  AskPlayerParams,
   RespondToPlayerParams,
   // Timer tools
   CreateTimerParams,
@@ -130,6 +131,7 @@ export interface GMToolResult {
     | GMRestResult
     | GMFormulaRollResult
     | GMAskForRollResult
+    | GMAskQuestionResult
     | GMCheckDCResult
     | GMOpposedFormulaResult
     | GMFormulaChallengeResult
@@ -248,6 +250,16 @@ export interface GMAskForRollResult {
   success?: boolean; // vs dc, when both a value and a dc exist
   margin?: number;
   skipped?: boolean;
+}
+
+export interface GMAskQuestionResult {
+  type: "ask_question";
+  answers: {
+    question: string;
+    targetPlayerName?: string;
+    answer: string;
+    skipped: boolean;
+  }[];
 }
 
 export interface GMCheckDCResult {
@@ -646,6 +658,23 @@ export interface ManualRollAnswer {
   rawText: string;
 }
 
+// A pending "answer these questions" prompt shown to the player(s). Produced
+// by the ask_question tool; the UI answers with one item per question, in
+// the same order, or null if the whole batch was skipped/cancelled.
+export interface AskQuestionRequest {
+  questions: AskQuestionItem[];
+}
+
+export interface AskQuestionAnswerItem {
+  selectedLabel?: string; // Which predefined option was picked, if any
+  customText?: string; // Free-text answer, if that's what was given instead
+  skipped: boolean;
+}
+
+export interface AskQuestionAnswer {
+  answers: AskQuestionAnswerItem[]; // Same length/order as request.questions
+}
+
 // A request to physically throw `count` dice of `sides` sides (e.g. via a
 // 3D physics dice UI) and report back the settled face values. Called once
 // per dice group in the formula for the initial throw, then again with
@@ -670,6 +699,11 @@ export interface GMInteractionHandlers {
   // skipped/cancelled - the caller then falls back to a fully digital
   // (Math.random()) roll of the whole formula rather than mixing the two.
   requestDiceThrow?: (request: DiceThrowRequest) => Promise<number[] | null>;
+  // Resolves with one answer per question (same order), or null if the
+  // whole batch was skipped/cancelled (e.g. generation was stopped).
+  requestPlayerAnswer?: (
+    request: AskQuestionRequest
+  ) => Promise<AskQuestionAnswer | null>;
 }
 
 export interface GMExecutionResult {
@@ -860,6 +894,13 @@ export async function executeGMTools(
           result = await executeAskForRoll(
             call.id,
             params as AskForRollParams,
+            interaction
+          );
+          break;
+        case "ask_question":
+          result = await executeAskQuestion(
+            call.id,
+            params as AskQuestionParams,
             interaction
           );
           break;
@@ -2000,6 +2041,84 @@ async function executeAskForRoll(
     toolCallId,
     success: success ?? true,
     result: { ...baseResult, rollValue, rawText: answer.rawText, success, margin },
+    contextForStory,
+  };
+}
+
+/**
+ * Execute ask_question: pause the GM loop and wait for the player(s) to
+ * answer one or more questions (predefined option, free text, or skipped).
+ * The injected `interaction.requestPlayerAnswer` handler resolves with one
+ * answer per question, or null if the whole batch was skipped/cancelled.
+ */
+async function executeAskQuestion(
+  toolCallId: string,
+  params: AskQuestionParams,
+  interaction: GMInteractionHandlers
+): Promise<GMToolResult> {
+  const emptyResult: GMAskQuestionResult = {
+    type: "ask_question",
+    answers: params.questions.map((q) => ({
+      question: q.question,
+      targetPlayerName: q.target_player_name,
+      answer: "",
+      skipped: true,
+    })),
+  };
+
+  if (!interaction.requestPlayerAnswer) {
+    return {
+      toolName: "ask_question",
+      toolCallId,
+      success: false,
+      result: emptyResult,
+      contextForStory:
+        "[ERROR: Can't ask the player questions right now - proceed and narrate your best judgment instead.]",
+    };
+  }
+
+  const answer = await interaction.requestPlayerAnswer({
+    questions: params.questions,
+  });
+
+  if (answer === null) {
+    return {
+      toolName: "ask_question",
+      toolCallId,
+      success: false,
+      result: emptyResult,
+      contextForStory:
+        "[Player skipped answering. Proceed using your best judgment.]",
+    };
+  }
+
+  const answers = params.questions.map((q, i) => {
+    const item = answer.answers[i];
+    const text = item?.skipped
+      ? ""
+      : item?.selectedLabel || item?.customText || "";
+    return {
+      question: q.question,
+      targetPlayerName: q.target_player_name,
+      answer: text,
+      skipped: !text,
+    };
+  });
+
+  const contextForStory = [
+    "[Asked the player:",
+    ...answers.map(
+      (a) =>
+        `Q: "${a.question}"${a.targetPlayerName ? ` (for ${a.targetPlayerName})` : ""} → ${a.skipped ? "Skipped" : `"${a.answer}"`}`
+    ),
+    "]",
+  ].join("\n");
+
+  return {
+    toolName: "ask_question",
+    toolCallId,
+    success: answers.some((a) => !a.skipped),
+    result: { type: "ask_question", answers },
     contextForStory,
   };
 }

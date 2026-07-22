@@ -188,14 +188,25 @@ export interface RequestContinuationParams {
 }
 
 /**
- * Ask Player - Pause and ask the player a question
- * The player's answer will be included in the next GM round
+ * Ask Question - Pause and ask the player(s) one or more questions, each
+ * with predefined answer choices plus an always-available free-text
+ * fallback. The game pauses until answered (or skipped); answers come back
+ * in this same GM round so you can continue narrating with them.
  */
-export interface AskPlayerParams {
-  question: string; // Question to ask the player
-  context: string; // Why you need this information
-  options?: string[]; // Optional: suggested answers
-  allow_custom?: boolean; // Whether player can give custom answer (default true)
+export interface AskQuestionOption {
+  label: string; // Short answer label (shown bold)
+  description?: string; // Optional one-line elaboration of this option
+}
+
+export interface AskQuestionItem {
+  question: string; // The question text
+  options: AskQuestionOption[]; // 2-4 predefined answers
+  allow_custom?: boolean; // Allow a free-text answer too (default true)
+  target_player_name?: string; // Couch co-op only: which player this question is directed at
+}
+
+export interface AskQuestionParams {
+  questions: AskQuestionItem[]; // 1-3 questions asked together
 }
 
 /**
@@ -549,6 +560,7 @@ export type GMToolParams =
   | { name: "take_rest"; params: TakeRestParams }
   | { name: "formula_roll"; params: FormulaRollParams }
   | { name: "ask_for_roll"; params: AskForRollParams }
+  | { name: "ask_question"; params: AskQuestionParams }
   | { name: "check_dc"; params: CheckDCParams }
   | { name: "opposed_formula"; params: OpposedFormulaParams }
   | { name: "formula_challenge_check"; params: FormulaChallengeCheckParams }
@@ -844,6 +856,68 @@ Do NOT use this for NPC/enemy/secret rolls - roll those yourself with formula_ro
         },
       },
       required: ["title", "description"],
+    },
+  },
+};
+
+const askQuestionTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "ask_question",
+    description: `Pause and ask the player(s) one or more questions with predefined answer choices (the player can also always type/say something else instead). Use for meaningful decisions where a clear set of choices helps - which path to take, how to react to an NPC, a name or detail you need from them. Don't use this for every input; the player can already type freely at any time, so reserve it for moments where offering concrete options adds value.
+
+You can ask up to 3 questions in one call (e.g. two independent decisions at once). In couch co-op, set \`target_player_name\` on a question to direct it at a specific player by name - the UI will show who it's for, though anyone at the table can still answer.`,
+    parameters: {
+      type: "object",
+      properties: {
+        questions: {
+          type: "array",
+          minItems: 1,
+          maxItems: 3,
+          items: {
+            type: "object",
+            properties: {
+              question: {
+                type: "string",
+                description: "The question text shown to the player",
+              },
+              options: {
+                type: "array",
+                minItems: 2,
+                maxItems: 4,
+                items: {
+                  type: "object",
+                  properties: {
+                    label: {
+                      type: "string",
+                      description: "Short answer label (shown bold)",
+                    },
+                    description: {
+                      type: "string",
+                      description:
+                        "Optional one-line elaboration of what picking this means",
+                    },
+                  },
+                  required: ["label"],
+                },
+                description: "2-4 predefined answers",
+              },
+              allow_custom: {
+                type: "boolean",
+                description:
+                  "Whether to also offer a free-text 'type something else' answer (default true)",
+              },
+              target_player_name: {
+                type: "string",
+                description:
+                  "Couch co-op only: name of the player this question is directed at",
+              },
+            },
+            required: ["question", "options"],
+          },
+        },
+      },
+      required: ["questions"],
     },
   },
 };
@@ -2240,6 +2314,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Formula-based tools (primary dice mechanics)
   formulaRollTool,
   askForRollTool,
+  askQuestionTool,
   checkDCTool,
   opposedFormulaTool,
   formulaChallengeCheckTool,

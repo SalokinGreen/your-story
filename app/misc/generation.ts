@@ -55,6 +55,8 @@ import {
   ManualRollRequest,
   ManualRollAnswer,
   DiceThrowRequest,
+  AskQuestionRequest,
+  AskQuestionAnswer,
   GMExecutionResult,
   resolveCheckPerTurnVisibility,
 } from "@/app/misc/gmExecutor";
@@ -238,6 +240,12 @@ export interface GenerationCallbacks {
   onRequestDiceThrow?: (
     request: DiceThrowRequest
   ) => Promise<number[] | null>;
+  // The GM asked the player(s) one or more predefined-choice + free-text
+  // questions. The UI shows a prompt and resolves with one answer per
+  // question, or null if the whole batch was skipped/cancelled.
+  onAskQuestion?: (
+    request: AskQuestionRequest
+  ) => Promise<AskQuestionAnswer | null>;
   onGMStageComplete?: (
     results: GMToolResult[],
     storyContext: string,
@@ -1333,6 +1341,7 @@ export async function generateStoryTurn(
               {
                 requestManualRoll: callbacks.onAskForRoll,
                 requestDiceThrow: callbacks.onRequestDiceThrow,
+                requestPlayerAnswer: callbacks.onAskQuestion,
               },
               {
                 apiKeys: {
