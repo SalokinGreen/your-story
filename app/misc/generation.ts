@@ -1227,6 +1227,9 @@ async function generateStoryTurnOnce(
               replyLength: options.replyLength,
               pacingNote,
               observerNote: options.observerNote,
+              // Skip the literal <thinking> prefill for reasoning-tier models
+              // (they emit CoT natively); keep it for effort:"none" models.
+              usesNativeReasoning: gmReasoningEffort !== "none",
             });
             gmBaseMessages = [...gmPrompt.messages];
             gmBaseTools = gmPrompt.tools;

@@ -348,6 +348,34 @@ export function selectGMAdviceForScene(
 }
 
 /**
+ * Deterministic per-turn advice picker for the live GM stage prompt.
+ *
+ * Distinct from selectGMAdviceForScene above (stateful, RNG-driven, fires
+ * only at scene boundaries via increment_scene). This variant is PURE - no
+ * Math.random, no shownIds persistence - so buildGMStagePrompt can call it
+ * every round without mutating StoryData and stay deterministic under test.
+ * Rotation comes from the `seed` (turn count), which advances naturally as
+ * the story grows, so the tip pair changes turn to turn without needing to
+ * track history. Combat-context tips are only eligible while combat is
+ * active, matching selectGMAdviceForScene's filtering.
+ */
+export function selectGMAdviceForTurn(
+  seed: number,
+  combatActive: boolean,
+): GMAdviceTip[] {
+  const pool = combatActive
+    ? GM_ADVICE_TIPS
+    : GM_ADVICE_TIPS.filter((t) => t.context === "any");
+  if (pool.length === 0) return [];
+  const s = Math.abs(Math.floor(seed));
+  const first = pool[s % pool.length];
+  // Second index uses a coprime stride so it lands on a different tip than
+  // `first` for essentially every seed, giving two distinct tips per turn.
+  const second = pool[(s * 7 + 13) % pool.length];
+  return first.id === second.id ? [first] : [first, second];
+}
+
+/**
  * Formats picked tips as an internal-only note for the GM tool-response
  * message (see increment_scene in toolExecutor.ts) - never quoted verbatim
  * to the player, same "render it, don't name it" convention as director

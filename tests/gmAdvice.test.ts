@@ -9,6 +9,7 @@ import {
   ARCHETYPE_INFO,
   GM_ADVICE_TIPS,
   selectGMAdviceForScene,
+  selectGMAdviceForTurn,
   formatGMAdviceNote,
 } from "../app/misc/gmAdvice";
 
@@ -100,6 +101,54 @@ describe("selectGMAdviceForScene", () => {
     mockRandom(0);
     const { tips } = selectGMAdviceForScene(allAnyIds, false);
     expect(tips).toHaveLength(2);
+  });
+});
+
+describe("selectGMAdviceForTurn", () => {
+  it("is deterministic for a given seed + combat flag", () => {
+    const a = selectGMAdviceForTurn(42, false);
+    const b = selectGMAdviceForTurn(42, false);
+    expect(a.map((t) => t.id)).toEqual(b.map((t) => t.id));
+  });
+
+  it("returns two distinct tips for most seeds", () => {
+    const tips = selectGMAdviceForTurn(5, false);
+    expect(tips).toHaveLength(2);
+    expect(tips[0].id).not.toBe(tips[1].id);
+  });
+
+  it("never surfaces a combat-only tip outside combat", () => {
+    // Sweep many seeds; none may yield a combat-context tip when not in combat.
+    for (let seed = 0; seed < 300; seed++) {
+      const tips = selectGMAdviceForTurn(seed, false);
+      expect(tips.every((t) => t.context === "any")).toBe(true);
+    }
+  });
+
+  it("can surface combat-only tips while combat is active", () => {
+    // The combat pool is a strict superset, so at least one seed lands a
+    // combat-context tip.
+    let sawCombatTip = false;
+    for (let seed = 0; seed < 300 && !sawCombatTip; seed++) {
+      sawCombatTip = selectGMAdviceForTurn(seed, true).some(
+        (t) => t.context === "combat",
+      );
+    }
+    expect(sawCombatTip).toBe(true);
+  });
+
+  it("rotates as the seed advances", () => {
+    // Consecutive turns should not all show the identical pair.
+    const first = selectGMAdviceForTurn(10, false).map((t) => t.id);
+    const next = selectGMAdviceForTurn(11, false).map((t) => t.id);
+    expect(first).not.toEqual(next);
+  });
+
+  it("tolerates a zero / negative / fractional seed without throwing", () => {
+    expect(() => selectGMAdviceForTurn(0, false)).not.toThrow();
+    expect(() => selectGMAdviceForTurn(-7, true)).not.toThrow();
+    expect(() => selectGMAdviceForTurn(3.9, false)).not.toThrow();
+    expect(selectGMAdviceForTurn(0, false).length).toBeGreaterThan(0);
   });
 });
 
