@@ -17,11 +17,15 @@ there is no server-side "Coins" path for TTS.
 DeepInfra, low-latency Cartesia, or best-quality ElevenLabs  
 ✅ **20+ built-in voice options plus custom voice IDs** - American, British,
 multi-language, and provider voice libraries  
-✅ **Playback controls** - Play, pause, and stop audio  
-✅ **Markdown stripping** - Automatically cleans formatting for better speech  
-✅ **Chunked generation** - Handles long text with intelligent splitting  
+✅ **Playback controls** - Play, pause/resume, and stop audio  
+✅ **TTS-friendly text cleaning** - Strips markdown formatting, emoji, and
+misc Unicode symbols, and converts markdown tables into short spoken
+sentences instead of leaving raw `| a | b |` syntax for the engine to
+stumble over  
+✅ **Chunked generation** - Handles long text with intelligent, sentence-boundary-aware splitting into small chunks for fast time-to-first-audio  
 ✅ **Streaming playback** - Starts playing as soon as the first chunk is ready, instead of waiting for the whole narration to finish generating  
-✅ **Live auto-narration** - With auto-narrate enabled, starts reading sentence-by-sentence as the GM is still streaming the response, instead of waiting for the whole turn to finish  
+✅ **Live auto-narration** - The TTS button doubles as the auto-narrate switch: activating it starts reading sentence-by-sentence as the GM is still streaming the response (in addition to reading whatever's already on screen), instead of waiting for the whole turn to finish  
+✅ **Non-destructive stop** - Stopping playback mid-generation only silences it; the remaining audio keeps generating in the background so a later press resumes right where you left off, instead of throwing away work in progress  
 ✅ **Responsive UI** - Works on mobile and desktop
 
 ## TTS Models
@@ -107,7 +111,16 @@ small named voice sets are.
 
 **`app/components/TTSControls.tsx`**
 
-- Main TTS UI component - a single toggle button (activate/deactivate/replay)
+- Main TTS UI component - a single toggle button (activate/stop/resume/replay)
+- Activating the button turns on the persistent `ttsAutoGenerate` setting
+  (so future streamed turns start reading themselves too) *and* starts
+  reading whatever text is on screen right now - see "Live Auto-Narration"
+  below
+- Stopping playback mid-generation doesn't cancel the in-flight
+  request/stream - it mutes playback while letting the remaining audio keep
+  generating in the background, so a later press resumes immediately with
+  everything that's ready instead of regenerating from scratch - see
+  "Stop vs. Mute" below
 - Handles voice/model selection, playback, and audio state
 - Picks the matching BYOK key (`deepinfraKey`/`cartesiaKey`/`elevenlabsKey`) for the selected model
 - Integrates with NotificationContext for user feedback
@@ -169,7 +182,7 @@ TTS settings are stored in localStorage:
 | `ttsModel`        | Selected model                | `"kokoro"`   |
 | `ttsLastVoice`    | Selected voice ID             | `"af_heart"` |
 | `ttsVolume`       | Playback volume (0-1)         | `1.0`        |
-| `ttsAutoGenerate` | Auto-narrate new content      | `false`      |
+| `ttsAutoGenerate` | Auto-narrate new content - also flipped to `true` by activating the TTS button | `false`      |
 | `ttsCustomVoices` | Custom voice IDs (JSON array) | `[]`         |
 
 API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
@@ -179,14 +192,34 @@ API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
 
 ### Audio Generation Flow
 
-1. User clicks "TTS" button
+1. User clicks "TTS" button - this also flips the persistent `ttsAutoGenerate` setting on
 2. Component shows loading state
 3. POST request sent to `/api/tts/generate` with text, voiceId, model, and the matching provider key
-4. `generateTTSAudioStream()` cleans markdown and splits into chunks (300-1500 chars depending on model)
+4. `generateTTSAudioStream()` runs `cleanTextForTTS()` (strips markdown, emoji/symbols, converts tables) and splits the result into small chunks (200-500 chars depending on model) so the first request comes back fast
 5. The provider implied by `model` is called in parallel for each chunk - DeepInfra returns JSON with base64 audio, Cartesia/ElevenLabs return raw MP3 bytes directly
 6. The first chunk's audio is awaited, then streamed to the client frame-by-frame as each subsequent chunk finishes (still generated in parallel behind the scenes, just emitted in order)
 7. `TTSControls.tsx` parses frames off the response stream and plays chunk 0 in the `<audio>` element the moment it lands, queuing later chunks to play back-to-back via `onended` as they arrive
 8. Playback finishes once the last chunk has played and the stream has closed
+
+### Stop vs. Mute
+
+Pressing the button while it's active (playing or loading) always stops
+*playback* immediately, but only cancels the underlying generation if
+nothing was left to generate anyway:
+
+- If audio is still being generated (a manual whole-text stream mid-flight,
+  or a live auto-narration session while the GM is still streaming), the
+  press **mutes** rather than aborts: `playbackMutedRef`/`isMuted` go true,
+  `onChunkArrived` keeps appending arriving chunks to the cached queue but
+  stops auto-playing them, and the underlying fetch/stream keeps running to
+  completion in the background.
+- Pressing the button again while muted **resumes**: if audio has already
+  arrived it starts playing from chunk 0 immediately (same as Replay);
+  otherwise it shows the loading state and plays chunk 0 the moment
+  `onChunkArrived` delivers it.
+- This means a mid-stream Stop never throws away in-flight work - the
+  common case is a player wanting a moment of quiet, not to cancel
+  narration outright.
 
 ### Live Auto-Narration
 
@@ -210,28 +243,44 @@ finish before starting - it reads along as the response streams in:
 4. Each request's resulting audio is pushed into the same ordered playback
    queue the manual, whole-text flow uses, so the button UI (spinner ->
    Stop -> Replay) behaves identically either way, and pressing the button
-   while a live session is playing always stops it - `disabled` blocks
-   *starting* something new, never stops something already active.
+   while a live session is playing always stops (mutes) it - `disabled`
+   blocks *starting* something new, never stops/mutes/resumes something
+   already active. See "Stop vs. Mute" above - muting a live session lets
+   the remaining sentences keep generating in the background exactly like
+   the manual flow does.
 5. When `storyTextReady` flips back to `true`, whatever trailing partial
    sentence is left (no closing punctuation yet, since the stream just
    ended there) is flushed as one final request.
 
 ### Text Processing
 
-The API automatically:
+`cleanTextForTTS()` in `app/misc/ttsCall.ts` automatically:
 
 - Removes markdown symbols (`#`, `*`, `_`, `~`, `` ` ``)
+- Removes horizontal rules (`---`, `***`, `___`) and blockquote (`>`) markers
 - Converts links `[text](url)` to just `text`
 - Removes hidden text (`||spoilers||`)
+- Converts GFM pipe tables into short spoken sentences (`| Name | HP |` /
+  `| Goblin | 7 |` becomes "Name: Goblin, HP: 7."), and neutralizes any
+  other stray `|` characters
+- Strips emoji and pictographic symbols (`\p{Extended_Pictographic}`, flag
+  sequences, skin-tone modifiers) plus arrows, geometric shapes, dingbats,
+  and enclosed-alphanumeric symbol blocks that read aloud as garbage
 - Reduces multiple newlines to double newlines
 - Removes brackets that may confuse TTS
 - Trims whitespace
-- Limits to 10,000 characters total
+- Limits to 10,000 characters total (truncated before cleaning)
+
+Covered by `tests/ttsTextCleaning.test.ts`.
 
 ### Chunking Strategy
 
-- **Orpheus**: 300 character chunks (smaller chunks keep this model's higher per-chunk latency down)
-- **Kokoro / Cartesia / ElevenLabs**: 1500 character chunks
+- **Orpheus**: 200 character chunks (smaller chunks keep this model's higher per-chunk latency down)
+- **Kokoro / Cartesia / ElevenLabs**: 500 character chunks
+- Small chunk sizes are deliberate: only the *first* chunk gates
+  time-to-first-audio (the rest generate in parallel behind it), so keeping
+  it short is what makes both the manual and live-narration paths start
+  playing quickly instead of waiting on one large request
 - Splits at sentence boundaries when possible
 - Falls back to paragraph → newline → space boundaries
 
