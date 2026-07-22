@@ -44,7 +44,12 @@ import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { ensureStoryReflected } from "@/app/misc/reflection";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
-import { runObserver, buildObserverWarningNote } from "@/app/misc/observer";
+import {
+  runObserver,
+  buildObserverWarningNote,
+  settingsFor,
+  ObserverSettings,
+} from "@/app/misc/observer";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
 import {
   outputToScenePart,
@@ -204,6 +209,13 @@ export interface GenerationOptions {
   // observer retry loop, not meant to be passed in by callers. Injected into
   // the GM prompt to explain why the previous attempt at this turn was reset.
   observerNote?: string;
+  // Per-flag-type observer configuration (which flag types are enabled,
+  // whether a "major" instance of each is allowed to trigger a reset, and
+  // how sensitive each check is) - backend for a settings UI that doesn't
+  // exist yet. Omit (or leave individual types unset) to get
+  // DEFAULT_OBSERVER_SETTINGS' behavior, which reproduces exactly what
+  // shipped before this option existed.
+  observerSettings?: ObserverSettings;
 }
 
 export interface GenerationCallbacks {
@@ -736,6 +748,7 @@ export async function generateStoryTurn(
           success: r.success,
           contextForStory: r.contextForStory,
         })),
+        settings: options.observerSettings,
         apiOptions: sideCallApiOptions,
       });
     } catch (observerError) {
@@ -749,7 +762,16 @@ export async function generateStoryTurn(
       flags = [];
     }
 
-    const majorFlag = flags.find((f) => f.severity === "major");
+    // A flag only resets when it's both "major" severity (decided per-
+    // instance by the check itself) AND that flag type's triggersReset is
+    // on (decided by config - defaults to true for the three checks that
+    // can naturally be major, false for the two tool-usage-gap checks,
+    // reproducing exactly what shipped before this setting existed).
+    const majorFlag = flags.find(
+      (f) =>
+        f.severity === "major" &&
+        settingsFor(options.observerSettings, f.type).triggersReset,
+    );
 
     if (majorFlag && preTurnSnapshot && resetAttempts < MAX_OBSERVER_RESETS) {
       resetAttempts++;

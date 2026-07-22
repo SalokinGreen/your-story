@@ -28,10 +28,8 @@
  *   is the same "LLM proposes, deterministic engine disposes" thesis the
  *   whole app is built on, just checked directly for the first time.
  *
- * Minor (log-only, surfaced as a warning, never triggers a reset - neither
- * rule below was ever stated to the GM as a hard requirement the way
- * PLAYER AGENCY was, so treating a miss as reset-worthy would be too
- * aggressive for what's really a best-practice nudge):
+ * Minor by default (log-only, surfaced as a warning - see below on how that
+ * default can be changed):
  * - checkToolUsageGaps: an LLM call that judges whether the turn invented an
  *   uncertain outcome instead of consulting fate_question/roll_table, or
  *   narrated a scene transition without calling increment_scene.
@@ -40,27 +38,148 @@
  * reflection.ts's callReflectionApi - non-streaming, caller-supplied model,
  * fails open (no flag) on any API error. Regex can't reliably judge any of
  * these; they need actual reading comprehension.
+ *
+ * Configuration (backend only - no settings UI exists yet, but the plumbing
+ * is here for one to read/write later, the same way replyLength etc. flow
+ * from localStorage through GenerationOptions): each of the five
+ * ObserverFlagTypes has its own independent { enabled, triggersReset,
+ * sensitivity } (see ObserverCheckSettings). `enabled` skips the check
+ * entirely; `triggersReset` gates whether a "major" instance of that type
+ * is ever allowed to reset (independent of the type's own severity logic);
+ * `sensitivity` (0-10, default 5) scales how readily each check fires - the
+ * overage multiplier for checkResponseLength, a strictness instruction for
+ * every LLM-backed check, and (for the two tool-usage-gap checks
+ * specifically, which have no severity gradient of their own) whether a hit
+ * is reported as "minor" or "major" in the first place.
+ * DEFAULT_OBSERVER_SETTINGS reproduces exactly what shipped before this
+ * config existed.
  */
 
-import { ObserverFlag } from "./structs";
+import { ObserverFlag, ObserverFlagType } from "./structs";
 import { ReplyLength } from "./ai_staged";
 import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
 import { getCustomModelIfUUID } from "./user_settings";
 
+// ============================================================
+// PER-FLAG-TYPE CONFIGURATION
+// ============================================================
+// Backend for a future settings UI (not built yet - this just needs to
+// exist and be threaded through so a UI can read/write it later, the same
+// way replyLength/storytellerMode/etc. already flow from localStorage
+// through GenerationOptions). Each of the five ObserverFlagTypes gets its
+// own independent { enabled, triggersReset, sensitivity } - "which flags
+// call for a reset, and how sensitive each one is."
+
+export interface ObserverCheckSettings {
+  /** Skip this check entirely (no API call for LLM-backed checks). */
+  enabled: boolean;
+  /**
+   * Whether a "major"-severity instance of this flag type is allowed to
+   * trigger generateStoryTurn's reset-and-retry. Independent of `enabled` -
+   * a check can stay on (still logged/surfaced to the player) while never
+   * being allowed to reset. Independent of severity, too: player_agency and
+   * the tool-usage-gap checks decide "major" vs "minor" per-instance (see
+   * `sensitivity` below); this only gates whether a "major" verdict is
+   * ever acted on.
+   */
+  triggersReset: boolean;
+  /**
+   * 0-10, default 5. Meaning depends on the check:
+   * - checkResponseLength: scales the single-turn overage multiplier
+   *   (higher sensitivity = fires on a smaller overage).
+   * - LLM-backed checks: becomes a strictness instruction in the judge
+   *   prompt (lenient/balanced/strict), biasing how readily it flags a
+   *   violation at all.
+   * - checkToolUsageGaps specifically: also raises severity to "major"
+   *   (making it reset-eligible if triggersReset is also on) once
+   *   sensitivity crosses TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD - these
+   *   two checks otherwise have no natural major/minor gradient of their
+   *   own the way player_agency/outcome_narration_mismatch do.
+   */
+  sensitivity: number;
+}
+
+export type ObserverSettings = Record<ObserverFlagType, ObserverCheckSettings>;
+
+const DEFAULT_CHECK_SETTINGS: ObserverCheckSettings = {
+  enabled: true,
+  triggersReset: true,
+  sensitivity: 5,
+};
+
+/**
+ * Current shipped behavior, reproduced exactly as the default config:
+ * response_length/player_agency/outcome_narration_mismatch can reset (as
+ * they always could), the two tool-usage-gap checks stay log-only (as they
+ * always were) unless a future UI cranks their sensitivity up.
+ */
+export const DEFAULT_OBSERVER_SETTINGS: ObserverSettings = {
+  response_length: { ...DEFAULT_CHECK_SETTINGS },
+  player_agency: { ...DEFAULT_CHECK_SETTINGS },
+  outcome_narration_mismatch: { ...DEFAULT_CHECK_SETTINGS },
+  missing_oracle_or_table: { ...DEFAULT_CHECK_SETTINGS, triggersReset: false },
+  missing_scene_increment: { ...DEFAULT_CHECK_SETTINGS, triggersReset: false },
+};
+
+/** Settings for one flag type, falling back to its default for any field a partial/future config omits. */
+export function settingsFor(
+  settings: ObserverSettings | undefined,
+  type: ObserverFlagType,
+): ObserverCheckSettings {
+  const defaults = DEFAULT_OBSERVER_SETTINGS[type];
+  const override = settings?.[type];
+  return override ? { ...defaults, ...override } : defaults;
+}
+
+function clampSensitivity(sensitivity: number): number {
+  return Math.max(0, Math.min(10, sensitivity));
+}
+
 // A single turn has to run at least this multiple of the trailing-average
 // "high" band before it's flagged as a standalone blowout, not just a
-// legitimately long climax beat.
-const SINGLE_TURN_OVERAGE_MULTIPLIER = 2;
+// legitimately long climax beat. Sensitivity 5 (default) reproduces the
+// original fixed 2x; 0 is the most lenient (3x), 10 the strictest (1x).
+function overageMultiplierForSensitivity(sensitivity: number): number {
+  return 3 - (clampSensitivity(sensitivity) / 10) * 2;
+}
+
+/** Strictness instruction appended to an LLM-judged check's system prompt. */
+function sensitivityInstruction(sensitivity: number): string {
+  const s = clampSensitivity(sensitivity);
+  if (s <= 2) {
+    return "Sensitivity: VERY LENIENT - only flag flagrant, unambiguous violations. Give the benefit of the doubt on anything borderline.";
+  }
+  if (s <= 4) {
+    return "Sensitivity: LENIENT - only flag clear violations. Let ambiguous or borderline cases pass.";
+  }
+  if (s <= 6) {
+    return "Sensitivity: BALANCED - flag clear violations and reasonably confident borderline cases.";
+  }
+  if (s <= 8) {
+    return "Sensitivity: STRICT - flag violations readily, including many borderline or ambiguous cases.";
+  }
+  return "Sensitivity: VERY STRICT - flag anything that could plausibly be read as a violation, even if ambiguous.";
+}
+
+// checkToolUsageGaps has no natural major/minor gradient of its own (unlike
+// player_agency's LLM-decided severity, or outcome_narration_mismatch's
+// always-major nature) - past this sensitivity, a hit is reported as
+// "major" instead of "minor", making it eligible to reset if the type's
+// triggersReset is also on.
+const TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD = 8;
 
 export function checkResponseLength(
   narration: string,
   replyLength: ReplyLength = "medium",
+  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.response_length,
 ): ObserverFlag | null {
+  if (!settings.enabled) return null;
+
   const words = countNarrationWords(narration);
   if (words === 0) return null;
 
   const band = PACING_BANDS[replyLength] ?? PACING_BANDS.medium;
-  const ceiling = band.high * SINGLE_TURN_OVERAGE_MULTIPLIER;
+  const ceiling = band.high * overageMultiplierForSensitivity(settings.sensitivity);
   if (words <= ceiling) return null;
 
   return {
@@ -117,12 +236,15 @@ async function callAgencyCheckApi(
   playerChoice: string,
   narration: string,
   apiOptions: ObserverApiOptions,
+  sensitivity: number,
 ): Promise<AgencyCheckResult | null> {
   const system = `You are a strict but fair reviewer for a tabletop-style interactive fiction game. The Game Master AI you're reviewing was given this non-negotiable rule:
 
 "NEVER decide what the player character says, thinks, feels, or does next. You resolve outcomes for the action they already declared - you don't invent their next action."
 
 Given the player's declared action and the GM's narration written in response, decide whether the GM violated this rule by putting new dialogue, thoughts, feelings, or actions into the player character that the player didn't declare. Resolving the CONSEQUENCES of the player's stated action (what happens around them, how NPCs react, dice outcomes) is fine and expected - that is not a violation.
+
+${sensitivityInstruction(sensitivity)}
 
 Respond with ONLY a JSON object, no other text:
 {"violation": true|false, "severity": "minor"|"major", "reason": "<one sentence, empty string if no violation>"}
@@ -172,10 +294,16 @@ export async function checkPlayerAgencyViolation(
   playerChoice: string,
   narration: string,
   apiOptions: ObserverApiOptions,
+  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.player_agency,
 ): Promise<ObserverFlag | null> {
-  if (!narration.trim()) return null;
+  if (!settings.enabled || !narration.trim()) return null;
 
-  const result = await callAgencyCheckApi(playerChoice, narration, apiOptions);
+  const result = await callAgencyCheckApi(
+    playerChoice,
+    narration,
+    apiOptions,
+    settings.sensitivity,
+  );
   if (!result || !result.violation) return null;
 
   const reason =
@@ -224,10 +352,13 @@ async function callOutcomeMismatchApi(
   narration: string,
   roll: RollOutcomeForCheck,
   apiOptions: ObserverApiOptions,
+  sensitivity: number,
 ): Promise<OutcomeMismatchResult | null> {
   const system = `You are a strict reviewer for a tabletop-style interactive fiction game. A dice roll or check was just mechanically resolved with a specific result, shown below - that result is ground truth and cannot be overridden by narration. Your only job is to check whether the GM's narration agrees with it.
 
 Given the mechanical result and the GM's narration that followed it, judge: does the narration directly contradict the mechanical result (e.g. the roll was a FAILURE but the narration describes clear, unqualified success, or vice versa)? A narration that adds partial success, complications, or a costly/Pyrrhic outcome on top of the correct pass/fail result is NOT a contradiction - only flag a direct reversal of the result itself.
+
+${sensitivityInstruction(sensitivity)}
 
 Respond with ONLY a JSON object, no other text:
 {"mismatch": true|false, "reason": "<one sentence, empty string if no mismatch>"}`;
@@ -285,8 +416,9 @@ export async function checkOutcomeMismatch(
   narration: string,
   rollResults: RollOutcomeForCheck[],
   apiOptions: ObserverApiOptions,
+  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.outcome_narration_mismatch,
 ): Promise<ObserverFlag | null> {
-  if (!narration.trim()) return null;
+  if (!settings.enabled || !narration.trim()) return null;
 
   const relevantRolls = rollResults.filter((r) =>
     OUTCOME_CHECK_TOOL_NAMES.has(r.toolName),
@@ -294,7 +426,12 @@ export async function checkOutcomeMismatch(
   if (relevantRolls.length === 0) return null;
   const lastRoll = relevantRolls[relevantRolls.length - 1];
 
-  const result = await callOutcomeMismatchApi(narration, lastRoll, apiOptions);
+  const result = await callOutcomeMismatchApi(
+    narration,
+    lastRoll,
+    apiOptions,
+    settings.sensitivity,
+  );
   if (!result || !result.mismatch) return null;
 
   const outcomeLabel = lastRoll.success ? "SUCCESS" : "FAILURE";
@@ -338,17 +475,19 @@ function extractToolUsageJson(content: string): ToolUsageJudgment | null {
 async function callToolUsageApi(
   narration: string,
   askAboutOracle: boolean,
+  oracleSensitivity: number,
   askAboutScene: boolean,
+  sceneSensitivity: number,
   apiOptions: ObserverApiOptions,
 ): Promise<ToolUsageJudgment | null> {
   const system = `You are a strict but fair reviewer for a tabletop-style interactive fiction game. Two of the Game Master AI's mechanics are relevant here:
 ${
   askAboutOracle
-    ? `1. THE ORACLE: for a genuinely uncertain in-world question the GM doesn't already know the answer to (e.g. "is the door locked?", "did the guard notice?"), or for random flavor content, the GM is supposed to consult a fate_question oracle roll or roll_table - not just invent an answer for narrative convenience.\n`
+    ? `1. THE ORACLE: for a genuinely uncertain in-world question the GM doesn't already know the answer to (e.g. "is the door locked?", "did the guard notice?"), or for random flavor content, the GM is supposed to consult a fate_question oracle roll or roll_table - not just invent an answer for narrative convenience. ${sensitivityInstruction(oracleSensitivity)}\n`
     : ""
 }${
   askAboutScene
-    ? `${askAboutOracle ? "2" : "1"}. SCENE TRANSITIONS: when the narration moves to a clearly new scene (a new location, a time skip like "the next morning" or "hours later", a new chapter), the GM is supposed to call increment_scene to run the scene-pacing system - not just narrate the transition directly.\n`
+    ? `${askAboutOracle ? "2" : "1"}. SCENE TRANSITIONS: when the narration moves to a clearly new scene (a new location, a time skip like "the next morning" or "hours later", a new chapter), the GM is supposed to call increment_scene to run the scene-pacing system - not just narrate the transition directly. ${sensitivityInstruction(sceneSensitivity)}\n`
     : ""
 }
 Given the GM's narration below, judge only the question(s) above. Respond with ONLY a JSON object, no other text:
@@ -397,16 +536,22 @@ Given the GM's narration below, judge only the question(s) above. Respond with O
  * Checks for two tool-usage gaps, in a single LLM call: an uncertain
  * outcome or random flavor decided by narration instead of fate_question/
  * roll_table, and a narrated scene transition that never called
- * increment_scene. Both are advisory (minor severity, log-only - neither
- * rule was ever stated to the GM as a hard requirement the way PLAYER
- * AGENCY was, so a violation here shouldn't trigger the same reset-and-
- * retry response). Deterministically skips whichever half was already
- * satisfied this turn, and skips the whole call if both were.
+ * increment_scene. Both default to advisory (minor severity, log-only -
+ * neither rule was ever stated to the GM as a hard requirement the way
+ * PLAYER AGENCY was) - but unlike the other checks, these two have no
+ * natural major/minor gradient of their own, so cranking a type's
+ * sensitivity past TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD is what makes it
+ * report "major" (and therefore reset-eligible, if that type's
+ * triggersReset is also on). Deterministically skips whichever half is
+ * disabled or was already satisfied this turn, and skips the whole call if
+ * both were.
  */
 export async function checkToolUsageGaps(
   narration: string,
   toolNames: string[],
   apiOptions: ObserverApiOptions,
+  oracleSettings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.missing_oracle_or_table,
+  sceneSettings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.missing_scene_increment,
 ): Promise<ObserverFlag[]> {
   if (!narration.trim()) return [];
 
@@ -415,14 +560,16 @@ export async function checkToolUsageGaps(
   );
   const usedSceneIncrement = toolNames.includes("increment_scene");
 
-  const askAboutOracle = !usedOracleOrTable;
-  const askAboutScene = !usedSceneIncrement;
+  const askAboutOracle = oracleSettings.enabled && !usedOracleOrTable;
+  const askAboutScene = sceneSettings.enabled && !usedSceneIncrement;
   if (!askAboutOracle && !askAboutScene) return [];
 
   const judgment = await callToolUsageApi(
     narration,
     askAboutOracle,
+    oracleSettings.sensitivity,
     askAboutScene,
+    sceneSettings.sensitivity,
     apiOptions,
   );
   if (!judgment) return [];
@@ -435,7 +582,10 @@ export async function checkToolUsageGaps(
       "This turn may have invented an uncertain outcome instead of consulting the oracle or a table.";
     flags.push({
       type: "missing_oracle_or_table",
-      severity: "minor",
+      severity:
+        oracleSettings.sensitivity >= TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD
+          ? "major"
+          : "minor",
       detail: reason,
       correctivePrompt: `Consider using fate_question (for uncertain yes/no world questions) or roll_table (for random flavor) instead of deciding an outcome narratively: ${reason}`,
     });
@@ -447,7 +597,10 @@ export async function checkToolUsageGaps(
       "This turn may have narrated a scene transition without calling increment_scene.";
     flags.push({
       type: "missing_scene_increment",
-      severity: "minor",
+      severity:
+        sceneSettings.sensitivity >= TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD
+          ? "major"
+          : "minor",
       detail: reason,
       correctivePrompt: `This turn narrated a scene transition without calling increment_scene: ${reason} Call increment_scene when the narration moves to a clearly new scene (new location, time skip).`,
     });
@@ -463,6 +616,8 @@ export interface ObserverParams {
   toolNames?: string[];
   rollResults?: RollOutcomeForCheck[];
   apiOptions: ObserverApiOptions;
+  /** Per-flag-type enable/reset/sensitivity config - defaults to DEFAULT_OBSERVER_SETTINGS (today's shipped behavior) for any type a partial/future config omits. */
+  settings?: ObserverSettings;
 }
 
 /**
@@ -474,13 +629,18 @@ export interface ObserverParams {
 export async function runObserver(params: ObserverParams): Promise<ObserverFlag[]> {
   const flags: ObserverFlag[] = [];
 
-  const lengthFlag = checkResponseLength(params.narration, params.replyLength);
+  const lengthFlag = checkResponseLength(
+    params.narration,
+    params.replyLength,
+    settingsFor(params.settings, "response_length"),
+  );
   if (lengthFlag) flags.push(lengthFlag);
 
   const agencyFlag = await checkPlayerAgencyViolation(
     params.playerChoice,
     params.narration,
     params.apiOptions,
+    settingsFor(params.settings, "player_agency"),
   );
   if (agencyFlag) flags.push(agencyFlag);
 
@@ -488,6 +648,7 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
     params.narration,
     params.rollResults || [],
     params.apiOptions,
+    settingsFor(params.settings, "outcome_narration_mismatch"),
   );
   if (outcomeFlag) flags.push(outcomeFlag);
 
@@ -495,6 +656,8 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
     params.narration,
     params.toolNames || [],
     params.apiOptions,
+    settingsFor(params.settings, "missing_oracle_or_table"),
+    settingsFor(params.settings, "missing_scene_increment"),
   );
   flags.push(...toolUsageFlags);
 
