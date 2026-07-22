@@ -47,12 +47,15 @@ import {
 } from "@/app/misc/observer";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
 import { runDirectorAssistant } from "@/app/misc/directorAssistant";
+import { runStoryProgressObserver } from "@/app/misc/storyProgressObserver";
 import {
   getObserverSettings,
   getObserverModelOverride,
   getMemoryKeeperModelOverride,
   getReflectionModelOverride,
   getDirectorAssistantModelOverride,
+  getStoryProgressObserverModelOverride,
+  getStoryProgressCheckInterval,
   resolveSideCallModel,
 } from "@/app/misc/layerSettings";
 import {
@@ -215,6 +218,11 @@ export interface GenerationOptions {
   // DEFAULT_OBSERVER_SETTINGS' behavior, which reproduces exactly what
   // shipped before this option existed.
   observerSettings?: ObserverSettings;
+  // Layer 3 periodic check-in (see storyProgressObserver.ts): set internally
+  // by generateStoryTurn from the prior turn's surviving note, not meant to
+  // be passed in by callers. Injected into the GM prompt as a holistic
+  // pacing/momentum read, refreshed only every N turns.
+  storyProgressNote?: string;
 }
 
 export interface GenerationCallbacks {
@@ -691,6 +699,11 @@ export async function generateStoryTurn(
   let observerNote: string | undefined = buildObserverWarningNote(
     lastAssistantPart?.observerFlags,
   );
+  // Layer 3 periodic check-in (storyProgressObserver.ts): the prior turn's
+  // note, if any, carries forward exactly once - it's about the last N
+  // turns as of when it fired, not just the immediately preceding turn, so
+  // there's no reset-and-replace lifecycle here the way observerNote has.
+  const storyProgressNote: string | undefined = lastAssistantPart?.storyProgressNote;
   let resetAttempts = 0;
 
   while (true) {
@@ -700,6 +713,7 @@ export async function generateStoryTurn(
       {
         ...options,
         observerNote,
+        storyProgressNote,
         // A reset discards the previous attempt's tool calls/narration - if
         // it also came with a precomputedGMConversation (manual Retry flow),
         // replaying that would just replay the flagged content, so force a
@@ -867,6 +881,44 @@ export async function generateStoryTurn(
       }
     }
 
+    // Layer 3: the Story Progress Observer (storyProgressObserver.ts)
+    // advances its own turn-count cadence and, once every N accepted turns
+    // (getStoryProgressCheckInterval, default 10), reads back a holistic
+    // "how's the story's pacing/momentum going" note for the GM. Unlike
+    // pacingFeedback.ts's per-turn word-count trend or the Director
+    // Assistant's per-scene spotlight ledger, this fires on a plain turn
+    // cadence and judges narrative momentum, not turn length or spotlight
+    // fairness. Best-effort, same fail-open posture as the other side calls
+    // above - an infra failure just means no note this cycle.
+    try {
+      const storyProgressApiOptions = {
+        ...sideCallApiOptions,
+        ...resolveSideCallModel(
+          getStoryProgressObserverModelOverride(),
+          sideCallApiOptions.model,
+        ),
+      };
+      const progressResult = await runStoryProgressObserver(
+        storyData,
+        result.content,
+        storyProgressApiOptions,
+        getStoryProgressCheckInterval(),
+      );
+      if (progressResult.note) {
+        result.scenePart = {
+          ...result.scenePart,
+          storyProgressNote: progressResult.note,
+        };
+      }
+    } catch (storyProgressError) {
+      logger.action("Story progress observer failed, skipping (fail open)", {
+        error:
+          storyProgressError instanceof Error
+            ? storyProgressError.message
+            : String(storyProgressError),
+      });
+    }
+
     return result;
   }
 }
@@ -966,6 +1018,7 @@ async function generateStoryTurnOnce(
         replyLength: options.replyLength,
         pacingNote,
         observerNote: options.observerNote,
+        storyProgressNote: options.storyProgressNote,
       });
       gmBaseMessages = gmPrompt.messages;
       logger.action("Using precomputed GM conversation (retry flow)", {
@@ -992,6 +1045,7 @@ async function generateStoryTurnOnce(
           replyLength: options.replyLength,
           pacingNote,
           observerNote: options.observerNote,
+          storyProgressNote: options.storyProgressNote,
         });
         gmBaseMessages = gmPrompt.messages;
       } else {
@@ -1227,6 +1281,7 @@ async function generateStoryTurnOnce(
               replyLength: options.replyLength,
               pacingNote,
               observerNote: options.observerNote,
+              storyProgressNote: options.storyProgressNote,
               // Skip the literal <thinking> prefill for reasoning-tier models
               // (they emit CoT natively); keep it for effort:"none" models.
               usesNativeReasoning: gmReasoningEffort !== "none",
