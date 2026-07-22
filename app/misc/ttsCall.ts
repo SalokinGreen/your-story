@@ -68,6 +68,109 @@ export const ELEVENLABS_VOICES = {
 
 const MAX_TEXT_LENGTH = 10000;
 
+// Strips emoji and other pictographic/symbol characters that TTS providers
+// tend to either mispronounce (reading out Unicode names) or choke on
+// entirely. \p{Extended_Pictographic} covers the bulk of actual emoji;
+// the explicit ranges below catch the surrounding symbol blocks (arrows,
+// geometric shapes, dingbats, enclosed alphanumerics) that aren't emoji but
+// are just as unreadable aloud, plus the invisible joiner/selector
+// characters emoji sequences are built from.
+function stripEmojiAndSymbols(text: string): string {
+  return text
+    .replace(/\p{Extended_Pictographic}/gu, "")
+    .replace(/[\u{1F1E6}-\u{1F1FF}]/gu, "") // regional indicator (flag) letters
+    .replace(/[\u{1F3FB}-\u{1F3FF}]/gu, "") // skin tone modifiers
+    .replace(/[←-⇿]/g, "") // arrows
+    .replace(/[①-⓿]/g, "") // enclosed alphanumerics (①②③...)
+    .replace(/[■-◿]/g, "") // geometric shapes
+    .replace(/[☀-➿]/g, "") // misc symbols + dingbats
+    .replace(/[⬀-⯿]/g, "") // misc symbols and arrows
+    .replace(/[︀-️]/g, "") // variation selectors
+    .replace(/‍/g, ""); // zero-width joiner
+}
+
+// Recognizes GFM-style pipe table rows so we can turn them into short
+// spoken sentences instead of leaving raw "| a | b |" syntax for the TTS
+// engine to stumble over.
+function isTableRow(line: string): boolean {
+  const trimmed = line.trim();
+  if (!trimmed) return false;
+  return trimmed.startsWith("|") || trimmed.split("|").length > 2;
+}
+
+function isTableSeparatorRow(line: string): boolean {
+  const trimmed = line.trim();
+  return trimmed.includes("-") && /^\|?[\s:|-]+\|?$/.test(trimmed);
+}
+
+function splitTableRow(line: string): string[] {
+  let trimmed = line.trim();
+  if (trimmed.startsWith("|")) trimmed = trimmed.slice(1);
+  if (trimmed.endsWith("|")) trimmed = trimmed.slice(0, -1);
+  return trimmed.split("|").map((cell) => cell.trim());
+}
+
+// Converts every "header row + separator row + data rows" table into one
+// short sentence per data row ("Name: Goblin, HP: 7, AC: 15."), and drops
+// any leftover stray "|" characters that aren't part of a table.
+function convertMarkdownTables(text: string): string {
+  const lines = text.split("\n");
+  const output: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    if (isTableRow(lines[i]) && i + 1 < lines.length && isTableSeparatorRow(lines[i + 1])) {
+      const headers = splitTableRow(lines[i]);
+      let j = i + 2;
+      const rows: string[][] = [];
+      while (j < lines.length && isTableRow(lines[j])) {
+        rows.push(splitTableRow(lines[j]));
+        j++;
+      }
+
+      for (const row of rows) {
+        const parts = headers
+          .map((header, idx) => {
+            const cell = row[idx] ?? "";
+            if (!cell) return "";
+            return header ? `${header}: ${cell}` : cell;
+          })
+          .filter(Boolean);
+        if (parts.length > 0) output.push(parts.join(", ") + ".");
+      }
+
+      i = j;
+    } else {
+      output.push(lines[i]);
+      i++;
+    }
+  }
+
+  return output.join("\n").replace(/\|/g, ", ");
+}
+
+// Cleans raw story/narration text into something safe for a TTS provider to
+// read aloud: strips markdown syntax, emoji/symbols, converts tables and
+// links into speakable text, and normalizes whitespace. Exported for direct
+// unit testing (tests/ttsTextCleaning.test.ts).
+export function cleanTextForTTS(rawText: string): string {
+  // Spoiler removal has to run before convertMarkdownTables, since that
+  // function's fallback replaces any leftover "|" with ", " - which would
+  // otherwise destroy the "||...||" pattern this regex looks for.
+  const withoutSpoilers = rawText.replace(/\|\|.*?\|\|/g, "");
+
+  const withoutTables = convertMarkdownTables(withoutSpoilers)
+    .replace(/^[ \t]*[-*_]{3,}[ \t]*$/gm, "") // horizontal rules (---, ***, ___)
+    .replace(/^>+\s?/gm, "") // blockquote markers
+    .replace(/[#*_~`]/g, "")
+    .replace(/\[(.*?)\]\(.*?\)/g, "$1");
+
+  return stripEmojiAndSymbols(withoutTables)
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[<>{}[\]]/g, "")
+    .trim();
+}
+
 export interface TTSRequestBody {
   text: string;
   voiceId?: string;
@@ -345,20 +448,18 @@ export async function generateTTSAudioStream(
   }
 
   const truncatedText = text.slice(0, MAX_TEXT_LENGTH);
-
-  const cleanText = truncatedText
-    .replace(/[#*_~`]/g, "")
-    .replace(/\[(.*?)\]\(.*?\)/g, "$1")
-    .replace(/\|\|.*?\|\|/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/[<>{}[\]]/g, "")
-    .trim();
+  const cleanText = cleanTextForTTS(truncatedText);
 
   if (cleanText.length === 0) {
     return { error: "Text is empty after cleaning", status: 400 };
   }
 
-  const chunkSize = ttsModel === "orpheus" ? 300 : 1500;
+  // Smaller chunks mean the first provider request finishes sooner, which
+  // is what the client actually needs to start playback - the rest keep
+  // generating in parallel behind it (see the Promise-per-chunk dispatch
+  // below), so shrinking chunk size mainly buys lower time-to-first-audio,
+  // not total generation time.
+  const chunkSize = ttsModel === "orpheus" ? 200 : 500;
   const chunks = splitTextIntoChunks(cleanText, chunkSize);
   const providerFetch = getProviderFetch();
 

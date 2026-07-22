@@ -180,6 +180,13 @@ export default function TTSControls({
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [hasAudio, setHasAudio] = useState(false);
+  // True after the user presses Stop while audio was still being generated
+  // (manual whole-text stream or a live auto-narration session) - playback
+  // is silenced but the underlying generation keeps running in the
+  // background so all of it is ready the moment the user presses the button
+  // again, rather than throwing away work just because they wanted a
+  // moment of quiet. See handleToggle and onChunkArrived.
+  const [isMuted, setIsMuted] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Object URLs for each chunk received so far, in order - populated
   // progressively as the stream arrives, and replayed from index 0 on
@@ -190,8 +197,11 @@ export default function TTSControls({
   // True when playback has caught up to a chunk that hasn't arrived yet -
   // onChunkArrived plays it immediately once it lands.
   const waitingForNextRef = useRef<boolean>(false);
+  const playbackMutedRef = useRef<boolean>(false);
   // Lets a press mid-generation cancel the in-flight request/stream instead
-  // of just stopping playback of whatever's already landed.
+  // of just stopping playback of whatever's already landed. Only used when
+  // `text` itself is about to change (new turn, navigation, undo/edit) -
+  // the user pressing Stop no longer aborts anything, see handleToggle.
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastTextRef = useRef<string>("");
   const isGeneratingRef = useRef<boolean>(false);
@@ -297,7 +307,9 @@ export default function TTSControls({
   // whole-text generation or one of many live per-sentence requests, both
   // just append to the same ordered queue. Starts playback the moment the
   // first chunk lands, and auto-plays any later chunk that arrives while
-  // playback is waiting on it.
+  // playback is waiting on it - unless the user has muted playback (Stop
+  // pressed mid-generation), in which case chunks keep accumulating for a
+  // later Resume/Replay but nothing auto-plays.
   const onChunkArrived = useCallback(
     (blob: Blob) => {
       const url = URL.createObjectURL(blob);
@@ -306,10 +318,16 @@ export default function TTSControls({
 
       if (idx === 0) {
         setHasAudio(true);
-        setIsPlaying(true);
         setIsLoading(false);
-        playChunkAt(0);
-      } else if (waitingForNextRef.current && idx === currentChunkIndexRef.current) {
+        if (!playbackMutedRef.current) {
+          setIsPlaying(true);
+          playChunkAt(0);
+        }
+      } else if (
+        !playbackMutedRef.current &&
+        waitingForNextRef.current &&
+        idx === currentChunkIndexRef.current
+      ) {
         waitingForNextRef.current = false;
         playChunkAt(idx);
       }
@@ -382,6 +400,11 @@ export default function TTSControls({
         if (audioUrlsRef.current.length === 0) {
           setIsLoading(false);
           setIsPlaying(false);
+          // Nothing came through and nothing more is coming - don't leave
+          // the button stuck offering to "Resume" a session that has
+          // nothing left to generate.
+          playbackMutedRef.current = false;
+          setIsMuted(false);
         }
       })
       .finally(() => {
@@ -452,43 +475,68 @@ export default function TTSControls({
     isStreamingRef.current = false;
     waitingForNextRef.current = false;
     isGeneratingRef.current = false;
+    playbackMutedRef.current = false;
     setHasAudio(false);
     setIsPlaying(false);
     setIsLoading(false);
+    setIsMuted(false);
   }, []);
 
   // Single toggle button behavior:
-  // - idle (no cached audio for this text) -> activate: generate + stream +
-  //   play live.
+  // - idle, nothing cached -> activate: turn on auto-narrate (so future
+  //   streamed turns start reading themselves too) and generate + stream +
+  //   play the current text live.
   // - active (generating and/or playing, manually or via live narration) ->
-  //   deactivate: stop playback and cancel the in-flight request/stream.
-  // - inactive with cached audio for this text (either deactivated, or
-  //   playback finished naturally) -> replay the cached recording without
-  //   regenerating.
+  //   stop: pause playback immediately, but if audio is still being
+  //   generated in the background (manual stream or live narration mid
+  //   GM-response), let it keep generating rather than aborting it - the
+  //   user may just have wanted a moment of quiet, not to throw the work
+  //   away. `isMuted` tracks this "generating quietly" state.
+  // - muted (stopped mid-generation) -> resume: unmute and either play what
+  //   is already cached, or, if nothing has arrived yet, wait for the first
+  //   chunk and play it when it lands.
+  // - inactive with cached audio for this text (deactivated after
+  //   generation finished, or playback finished naturally) -> replay the
+  //   cached recording without regenerating.
   const handleToggle = useCallback(async () => {
     if (isPlaying || isLoading) {
-      // Always allow stopping, even while `disabled` would otherwise block
-      // starting something new (e.g. narration still streaming) - this is
-      // what lets a live auto-narration session be stopped early.
-      abortControllerRef.current?.abort();
-      abortControllerRef.current = null;
-      liveAbortControllerRef.current?.abort();
-      liveAbortControllerRef.current = null;
-      liveModeActiveRef.current = false;
-      liveDispatchQueueRef.current = [];
-      isGeneratingRef.current = false;
-      isStreamingRef.current = false;
-      waitingForNextRef.current = false;
       if (audioRef.current) {
         audioRef.current.pause();
         audioRef.current.currentTime = 0;
       }
       setIsPlaying(false);
       setIsLoading(false);
+
+      if (isStreamingRef.current) {
+        // More audio is still on its way (manual stream or live
+        // auto-narration) - mute instead of aborting so it all finishes
+        // generating in the background.
+        playbackMutedRef.current = true;
+        setIsMuted(true);
+      }
       return;
     }
 
     if (disabled || !text.trim()) return;
+
+    if (playbackMutedRef.current) {
+      // Resuming a muted, still-generating (or since-finished) session -
+      // checked against audioUrlsRef directly (not the `hasAudio` state)
+      // since this can fire before a render has caught up with it.
+      playbackMutedRef.current = false;
+      setIsMuted(false);
+      if (audioUrlsRef.current.length === 0) {
+        // Nothing has arrived yet - wait for onChunkArrived to play chunk 0
+        // once it lands, now that we're unmuted.
+        setIsLoading(true);
+        return;
+      }
+      currentChunkIndexRef.current = 0;
+      waitingForNextRef.current = false;
+      setIsPlaying(true);
+      playChunkAt(0);
+      return;
+    }
 
     if (hasAudio && audioUrlsRef.current.length > 0) {
       currentChunkIndexRef.current = 0;
@@ -496,6 +544,12 @@ export default function TTSControls({
       setIsPlaying(true);
       playChunkAt(0);
       return;
+    }
+
+    // Fresh activation: turn on auto-narrate so future streamed turns start
+    // reading themselves too, in addition to reading the current text now.
+    if (typeof window !== "undefined") {
+      localStorage.setItem("ttsAutoGenerate", "true");
     }
 
     const volume = getVolume();
@@ -556,6 +610,13 @@ export default function TTSControls({
         error instanceof Error ? error.message : "Failed to generate speech";
       addNotification(errorMessage, "failure");
       setIsPlaying(false);
+      if (audioUrlsRef.current.length === 0) {
+        // Nothing came through and nothing more is coming - don't leave the
+        // button stuck offering to "Resume" a session that has nothing left
+        // to generate.
+        playbackMutedRef.current = false;
+        setIsMuted(false);
+      }
     } finally {
       setIsLoading(false);
       isGeneratingRef.current = false;
@@ -651,12 +712,13 @@ export default function TTSControls({
   }
 
   const isActive = isPlaying || isLoading;
-  const isGeneratingOnly = isLoading && !isPlaying;
-  const canReplay = !isActive && hasAudio;
+  const isGeneratingOnly = isLoading && !isPlaying && !isMuted;
+  const canReplay = !isActive && !isMuted && hasAudio;
   // `disabled` blocks starting something new (text isn't ready yet), but
-  // never blocks stopping something already active - that's what lets a
-  // live auto-narration session be stopped early via this same button.
-  const buttonDisabled = (disabled || !text.trim()) && !isActive;
+  // never blocks stopping something already active, and never blocks
+  // resuming a muted session - both must stay clickable even while
+  // narration is still streaming, since that's exactly when they apply.
+  const buttonDisabled = (disabled || !text.trim()) && !isActive && !isMuted;
 
   return (
     <div className="flex items-center gap-2">
@@ -670,7 +732,7 @@ export default function TTSControls({
               ? "bg-linear-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-md shadow-red-950/40"
               : "bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-950/40"
         }`}
-        title={isActive ? "Stop" : canReplay ? "Replay" : "Read aloud"}
+        title={isActive ? "Stop" : isMuted ? "Resume playback" : canReplay ? "Replay" : "Read aloud"}
       >
         {isGeneratingOnly ? (
           <>
@@ -681,6 +743,11 @@ export default function TTSControls({
           <>
             <DynamicIcon name="Square" className="w-4 h-4" />
             <span className="hidden sm:inline">Stop</span>
+          </>
+        ) : isMuted ? (
+          <>
+            <DynamicIcon name="Play" className="w-4 h-4" />
+            <span className="hidden sm:inline">Resume</span>
           </>
         ) : canReplay ? (
           <>
