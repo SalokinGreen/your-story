@@ -1,11 +1,5 @@
 "use client";
-import {
-  Choice,
-  Choices,
-  StoryData,
-  ActionAnalysis,
-  CouchPlayer,
-} from "../misc/structs";
+import { Choice, Choices, StoryData, CouchPlayer } from "../misc/structs";
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -64,9 +58,6 @@ interface StoryProps {
   onLocalActivity?: (state: "recording" | "processing" | "idle") => void;
   netSession?: NetSessionInfo | null;
   netPeers?: GuestJoinedInfo[];
-  onActionSubmit?: (
-    text: string,
-  ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
   onActionConfirm?: (choice: Choice, playerComment?: string) => void;
   onCommentSubmit?: (comment: string) => void;
   onRerollChoices?: () => void;
@@ -420,7 +411,6 @@ interface StoryComposerProps {
   loadingStage?: "gm" | "story" | "choices" | null;
   couchPlayers: CouchPlayer[];
   onCustomInput?: StoryProps["onCustomInput"];
-  onActionSubmit?: StoryProps["onActionSubmit"];
   onActionConfirm?: StoryProps["onActionConfirm"];
   onStop?: () => void;
   onFocusChange?: () => void;
@@ -437,7 +427,6 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       loadingStage,
       couchPlayers,
       onCustomInput,
-      onActionSubmit,
       onActionConfirm,
       onStop,
       onFocusChange,
@@ -485,41 +474,15 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       el.style.height = Math.min(el.scrollHeight, 140) + "px";
     };
 
-    // Shared freeform submit path (composer + STT): analyze the action for
-    // mechanics (skill checks, items, tables), then submit it as a Choice.
-    const submitFreeformAction = async (text: string, isStt = false) => {
+    // Shared freeform submit path (composer + STT): submit the action as a
+    // plain Choice - the GM stage determines mechanics (skill checks, items,
+    // tables) during generation, so no client-side analysis step happens here.
+    const submitFreeformAction = (text: string, isStt = false) => {
       const trimmed = text.trim();
       if (!trimmed) return;
       const sttFlag = isStt || undefined;
 
-      if (onActionSubmit && onActionConfirm) {
-        try {
-          const result = await onActionSubmit(trimmed);
-          if (result) {
-            // Submit with analyzed mechanics (skill checks, tables, etc.)
-            const choice: Choice = {
-              text: trimmed,
-              skill_used: result.analysis.skill_used || undefined,
-              skill_dc: result.analysis.skill_dc || undefined,
-              item_used: result.analysis.item_used || undefined,
-              ability_used: result.analysis.ability_used || undefined,
-              resource_used: result.analysis.resource_used || undefined,
-              agmt_check: result.analysis.agmt_check || undefined,
-              table: result.analysis.table || undefined,
-              stt_input: sttFlag,
-            };
-            onActionConfirm(choice);
-          } else {
-            // Analysis failed, submit as plain action
-            onActionConfirm({ text: trimmed, stt_input: sttFlag });
-          }
-        } catch (error) {
-          console.error("Action analysis failed:", error);
-          // Fallback to plain action
-          onActionConfirm({ text: trimmed, stt_input: sttFlag });
-        }
-      } else if (onActionConfirm) {
-        // No analysis available, submit plain
+      if (onActionConfirm) {
         onActionConfirm({ text: trimmed, stt_input: sttFlag });
       } else if (onCustomInput) {
         onCustomInput(trimmed);
@@ -734,7 +697,6 @@ export default function Story({
   handleChoice,
   handleSelect,
   onCustomInput,
-  onActionSubmit,
   onActionConfirm,
   onCommentSubmit,
   onRerollChoices,
@@ -1470,7 +1432,6 @@ export default function Story({
             loadingStage={loadingStage}
             couchPlayers={couchPlayers}
             onCustomInput={onCustomInput}
-            onActionSubmit={onActionSubmit}
             onActionConfirm={onActionConfirm}
             onStop={onStop}
             onFocusChange={onViewportRecalc}
@@ -1504,7 +1465,6 @@ export default function Story({
         onSelectChoice={handleSelectChoice}
         onConfirm={handleChoice}
         onCustomInput={onCustomInput}
-        onActionSubmit={onActionSubmit}
         onActionConfirm={onActionConfirm}
         onCommentSubmit={onCommentSubmit}
         onRerollChoices={onRerollChoices}

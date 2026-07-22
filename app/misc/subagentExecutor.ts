@@ -57,8 +57,7 @@ interface ChatMessage {
 
 /**
  * Extract a JSON object from a model response that may be wrapped in
- * markdown code fences or have stray prose around it. Mirrors the
- * extraction idiom used in generation.ts's analyzeAction().
+ * markdown code fences or have stray prose around it.
  */
 function extractJSONFromContent(content: string): unknown {
   let jsonStr = content;
