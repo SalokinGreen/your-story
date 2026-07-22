@@ -186,7 +186,7 @@ export function checkResponseLength(
     type: "response_length",
     severity: "major",
     detail: `This turn ran ${words} words, well past the "${replyLength}" reply-length setting's usual ceiling (~${band.high} words).`,
-    correctivePrompt: `Your previous attempt at this turn was reset because it was far too long for the "${replyLength}" reply-length setting (${words} words, vs. a usual ceiling of ~${band.high}). Rewrite this turn much shorter - state the outcome and stop, per the LENGTH & PACING rules you were already given.`,
+    correctivePrompt: `Your previous attempt at this turn was reset because it was far too long for the "${replyLength}" reply-length setting (${words} words, vs. a usual ceiling of ~${band.high}). Here is what you wrote last time, so you can see what to cut:\n"""\n${narration.trim()}\n"""\nRewrite this turn much shorter - state the outcome and stop, per the LENGTH & PACING rules you were already given.`,
   };
 }
 

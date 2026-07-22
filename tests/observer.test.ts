@@ -44,6 +44,13 @@ describe("checkResponseLength", () => {
     expect(flag?.detail).toContain("400 words");
   });
 
+  it("includes the flagged narration itself in the corrective prompt", () => {
+    const narration = `The lantern flickers wildly. ${Array(400).fill("word").join(" ")}`;
+    const flag = checkResponseLength(narration, "medium");
+    expect(flag?.correctivePrompt).toContain(narration);
+    expect(flag?.correctivePrompt).toContain("what you wrote last time");
+  });
+
   it("does not flag a turn that's long but still under the hard ceiling", () => {
     // Under 2x the "long" band's high (300), e.g. a legitimate climax beat.
     const narration = Array(280).fill("word").join(" ");
