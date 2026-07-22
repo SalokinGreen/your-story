@@ -5,9 +5,17 @@ import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
 import { ttsFetch } from "../misc/ttsFetch";
+import { cleanTextForSpeech } from "../misc/ai";
 import { TTSModelKey } from "../misc/ai_prices";
 
 interface TTSControlsProps {
+  // Raw (uncleaned) narration text - cleaning happens inside this component,
+  // once per finalized sentence during live narration, rather than by the
+  // caller. See feedLiveText for why: cleanTextForSpeech isn't prefix-stable
+  // (e.g. a ||spoiler|| tag that hasn't closed yet leaves the raw markers in
+  // place, then disappears retroactively once it closes), so re-cleaning the
+  // whole growing text on every chunk and slicing by absolute offset would
+  // desync and silently drop everything after the first such tag.
   text: string;
   disabled?: boolean;
   // Narrower than `disabled`: true once `text` reflects the final,
@@ -168,6 +176,18 @@ export function extractCompleteSentences(
   }
 
   return { sentences, remainder: remaining };
+}
+
+// A "||" spoiler tag that hasn't closed yet must not be spoken past (its
+// contents may include punctuation that looks like a sentence end, and
+// cleanTextForSpeech can't strip it until the closing "||" shows up) - this
+// holds back everything from an odd (unclosed) "||" onward so the caller
+// only ever extracts sentences from text with no dangling spoiler markers.
+export function withholdOpenSpoiler(pending: string): { safe: string; held: string } {
+  const markerCount = (pending.match(/\|\|/g) || []).length;
+  if (markerCount % 2 === 0) return { safe: pending, held: "" };
+  const lastMarker = pending.lastIndexOf("||");
+  return { safe: pending.slice(0, lastMarker), held: pending.slice(lastMarker) };
 }
 
 export default function TTSControls({
@@ -421,25 +441,39 @@ export default function TTSControls({
       });
   };
 
-  // Consumes newly-arrived streaming text: splits off every complete
-  // sentence since the last call and queues it for audio. `flush` (called
-  // once narration finishes) also queues whatever trailing partial
-  // sentence is left, even without closing punctuation.
-  const feedLiveText = useCallback((fullText: string, flush: boolean) => {
-    const pending = fullText.slice(liveSentCharsRef.current);
-    const { sentences, remainder } = extractCompleteSentences(pending);
+  // Consumes newly-arrived RAW streaming text: splits off every complete
+  // sentence since the last call and queues it for audio, cleaning each
+  // sentence individually (once, right before it's queued) rather than
+  // re-cleaning the whole growing text and slicing by absolute offset - the
+  // latter breaks as soon as a ||spoiler|| tag closes, since cleaning the
+  // fuller text then retroactively shrinks it and desyncs the offset,
+  // silently dropping everything spoken after that point. `flush` (called
+  // once narration finishes) also queues whatever trailing partial sentence
+  // is left, even without closing punctuation.
+  const feedLiveText = useCallback((fullRawText: string, flush: boolean) => {
+    const pending = fullRawText.slice(liveSentCharsRef.current);
+
+    // Don't split sentences out of an unclosed ||spoiler|| span - hold that
+    // part back until its closing "||" arrives, so it's never spoken
+    // half-hidden and its internal punctuation never gets mistaken for a
+    // sentence boundary.
+    const { safe, held } = flush
+      ? { safe: pending, held: "" }
+      : withholdOpenSpoiler(pending);
+    const { sentences, remainder } = extractCompleteSentences(safe);
 
     for (const sentence of sentences) {
-      liveDispatchQueueRef.current.push(sentence);
+      const spoken = cleanTextForSpeech(sentence).trim();
+      if (spoken) liveDispatchQueueRef.current.push(spoken);
     }
-    liveSentCharsRef.current = fullText.length - remainder.length;
+    liveSentCharsRef.current = fullRawText.length - (remainder.length + held.length);
 
     if (flush) {
-      const trimmedRemainder = remainder.trim();
+      const trimmedRemainder = cleanTextForSpeech(remainder).trim();
       if (trimmedRemainder) {
         liveDispatchQueueRef.current.push(trimmedRemainder);
       }
-      liveSentCharsRef.current = fullText.length;
+      liveSentCharsRef.current = fullRawText.length;
     }
 
     if (liveDispatchQueueRef.current.length > 0) {
@@ -580,7 +614,10 @@ export default function TTSControls({
       waitingForNextRef.current = false;
       isStreamingRef.current = true;
 
-      const chunkCount = await generateAndQueueAudio(text, controller.signal);
+      const chunkCount = await generateAndQueueAudio(
+        cleanTextForSpeech(text),
+        controller.signal,
+      );
       isStreamingRef.current = false;
 
       if (controller.signal.aborted) {
