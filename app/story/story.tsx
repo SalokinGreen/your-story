@@ -1362,10 +1362,11 @@ export default function Story({
           </div>
         )}
 
-        {/* Action Buttons Bar */}
+        {/* Action Buttons Bar: Retry, Undo & Edit. Narration now plays
+            automatically (see TTSControls below) instead of needing a
+            button here. */}
         {!editMode && (
-          <div className="flex items-center justify-between px-4 py-2 bg-white/[0.03] border-t border-white/10">
-            {/* Left side: Retry, Undo & Edit */}
+          <div className="flex items-center px-4 py-2 bg-white/[0.03] border-t border-white/10">
             <div className="flex items-center gap-1.5 sm:gap-1">
               {canUndo && onUndo && (
                 <button
@@ -1411,16 +1412,18 @@ export default function Story({
                 </button>
               )}
             </div>
-
-            {/* Right side: TTS - manual press waits for narration to finish;
-                auto-narrate (if enabled) starts reading live as the GM
-                streams instead of waiting - see storyTextReady prop. */}
-            <TTSControls
-              text={cleanTextForSpeech(storyText)}
-              disabled={loading || !storyTextReady}
-              storyTextReady={storyTextReady}
-            />
           </div>
+        )}
+
+        {/* Renders nothing - just drives automatic narration playback for
+            the current turn (see storyTextReady prop for live vs. finished
+            text). */}
+        {!editMode && (
+          <TTSControls
+            text={cleanTextForSpeech(storyText)}
+            disabled={loading || !storyTextReady}
+            storyTextReady={storyTextReady}
+          />
         )}
 
         {/* Composer: suggested choices, player switcher, and chat input */}
