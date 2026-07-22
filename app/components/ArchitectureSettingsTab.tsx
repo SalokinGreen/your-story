@@ -15,6 +15,8 @@ import {
   setMemoryKeeperModelOverride,
   getReflectionModelOverride,
   setReflectionModelOverride,
+  getDirectorAssistantModelOverride,
+  setDirectorAssistantModelOverride,
   getObserverSettings,
   setObserverCheckSetting,
   resetObserverSettings,
@@ -59,9 +61,10 @@ const LAYERS: LayerInfo[] = [
     title: "Director / Pacing",
     badge: "Layer 3",
     summary:
-      "A deterministic policy that tracks narrative tension and picks from a bounded menu of pacing moves (escalate, complicate, breathe, ...). The model narrates whichever move gets picked - it never picks the move itself.",
-    files: "app/misc/structs.ts (AGMTState), selectDirectorMove()",
-    aiDriven: false,
+      "A deterministic policy that tracks narrative tension and picks from a bounded menu of pacing moves (escalate, complicate, breathe, ...). The model narrates whichever move gets picked - it never picks the move itself. The Director Assistant is a separate AI pass that only judges which threads/NPCs got the spotlight each scene, feeding that as a signal into the same deterministic policy - it never chooses a move either.",
+    files:
+      "app/misc/structs.ts (AGMTState), selectDirectorMove(), app/misc/directorAssistant.ts",
+    aiDriven: true,
   },
   {
     title: "Memory",
@@ -248,6 +251,8 @@ export default function ArchitectureSettingsTab() {
   const [reflectionModelOverride, setReflectionModelOverrideState] = useState<
     ModelEffortOverride | null
   >(() => getReflectionModelOverride());
+  const [directorAssistantModelOverride, setDirectorAssistantModelOverrideState] =
+    useState<ModelEffortOverride | null>(() => getDirectorAssistantModelOverride());
 
   const [observerSettings, setObserverSettingsState] = useState(() =>
     getObserverSettings(),
@@ -266,6 +271,12 @@ export default function ArchitectureSettingsTab() {
   const handleReflectionModelChange = (override: ModelEffortOverride | null) => {
     setReflectionModelOverride(override);
     setReflectionModelOverrideState(override);
+  };
+  const handleDirectorAssistantModelChange = (
+    override: ModelEffortOverride | null,
+  ) => {
+    setDirectorAssistantModelOverride(override);
+    setDirectorAssistantModelOverrideState(override);
   };
 
   const handleFlagPatch = (
@@ -365,6 +376,16 @@ export default function ArchitectureSettingsTab() {
         description="Runs periodically (once enough memory has accumulated) to synthesize higher-level insights from clusters of recent memories."
         override={reflectionModelOverride}
         onChange={handleReflectionModelChange}
+        customModels={customModels}
+      />
+
+      {/* Director Assistant */}
+      <StageOverrideCard
+        icon="Focus"
+        title="Director Assistant"
+        description="Runs once per scene, after the turn is final, judging which active threads/NPCs got the spotlight. Only feeds a neglect signal into the existing deterministic pacing policy - it never picks a move itself."
+        override={directorAssistantModelOverride}
+        onChange={handleDirectorAssistantModelChange}
         customModels={customModels}
       />
 

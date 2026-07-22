@@ -14,6 +14,8 @@ import type {
   PendingDirectorMove,
   CouchPlayer,
   PlayerStyleType,
+  StoryThread,
+  NPC,
 } from "./structs";
 import { pickTagFocusExamples } from "./tagFocusExamples";
 
@@ -522,6 +524,49 @@ function availableTagCandidates(storyData: StoryData): TagCandidate[] {
   ];
 }
 
+// Given a list of active threads, picks whichever has gone longest without
+// director-assistant-judged spotlight (storyData.directorAssistant.
+// threadSpotlight - see directorAssistant.ts). Falls back to array order
+// (the previous activeThreads[0] behavior) when no ledger data exists yet
+// for any of them - e.g. a fresh story, or one where the Director Assistant
+// hasn't run yet (it only runs on scene increments, and only once threads
+// exist to judge). Still deterministic: the engine picks the target, the
+// LLM only supplied the neglect signal it's picking from.
+function mostNeglectedThread(
+  storyData: StoryData,
+  threads: StoryThread[]
+): StoryThread | undefined {
+  if (threads.length === 0) return undefined;
+  const ledger = storyData.directorAssistant?.threadSpotlight || {};
+  let chosen = threads[0];
+  let chosenNeglect = ledger[chosen.id] ?? 0;
+  for (const thread of threads.slice(1)) {
+    const neglect = ledger[thread.id] ?? 0;
+    if (neglect > chosenNeglect) {
+      chosen = thread;
+      chosenNeglect = neglect;
+    }
+  }
+  return chosen;
+}
+
+// Same pattern as mostNeglectedThread, for NPCs (storyData.directorAssistant.
+// npcSpotlight, keyed by NPC.name).
+function mostNeglectedNpc(storyData: StoryData, npcs: NPC[]): NPC | undefined {
+  if (npcs.length === 0) return undefined;
+  const ledger = storyData.directorAssistant?.npcSpotlight || {};
+  let chosen = npcs[0];
+  let chosenNeglect = ledger[chosen.name] ?? 0;
+  for (const npc of npcs.slice(1)) {
+    const neglect = ledger[npc.name] ?? 0;
+    if (neglect > chosenNeglect) {
+      chosen = npc;
+      chosenNeglect = neglect;
+    }
+  }
+  return chosen;
+}
+
 /**
  * Deterministic GM-move selection policy (PbtA-style bounded move menu).
  *
@@ -576,7 +621,7 @@ export function selectDirectorMove(
   }
 
   if (sceneType === "Interrupted" || sceneType === "Altered") {
-    const thread = activeThreads[0];
+    const thread = mostNeglectedThread(storyData, activeThreads);
     return {
       id: crypto.randomUUID(),
       move: "announce_future_badness",
@@ -595,13 +640,21 @@ export function selectDirectorMove(
     // already-tracked state" pattern targetThreadId/targetTimerId below
     // already use, not invented judgment. Deliberately only applied at
     // this single, most-severe trigger - not a general dial on every move.
-    const alliedNpc = (storyData.npcs || []).find(
+    const alliedNpcs = (storyData.npcs || []).filter(
       (n) => n.attitude === "allied"
     );
+    // Prefer whichever allied NPC the spotlight ledger says has gone longest
+    // without focus (falls back to the first tracked one with no ledger data
+    // yet) - named directly in context so the neglect signal actually
+    // changes which NPC the GM is nudged toward, not just whether the
+    // hardness dimension fires at all.
+    const alliedNpc = mostNeglectedNpc(storyData, alliedNpcs);
     return {
       id: crypto.randomUUID(),
       move: "put_someone_in_a_spot",
-      context: `Tension running high (${tension}/10)`,
+      context: alliedNpc
+        ? `Tension running high (${tension}/10) - ${alliedNpc.name} hasn't had recent focus`
+        : `Tension running high (${tension}/10)`,
       hardnessForcesChoice: true,
       hardnessTarget: alliedNpc ? "someone_they_love" : undefined,
       createdAt: Date.now(),
@@ -742,7 +795,7 @@ export function selectDirectorMove(
     return {
       id: crypto.randomUUID(),
       move: "offer_opportunity",
-      targetThreadId: activeThreads[0].id,
+      targetThreadId: mostNeglectedThread(storyData, activeThreads)!.id,
       context: `Scene resolved normally, pacing on track (tension ${tension}/10)`,
       createdAt: Date.now(),
     };

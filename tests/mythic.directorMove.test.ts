@@ -16,7 +16,21 @@ import {
   targetTensionForProgress,
 } from "../app/misc/mythic";
 import { formatDirectorMoveLine } from "../app/misc/ai_staged";
-import type { StoryData, PendingDirectorMove } from "../app/misc/structs";
+import type { StoryData, PendingDirectorMove, NPC } from "../app/misc/structs";
+
+function testNpc(overrides: Partial<NPC> = {}): NPC {
+  return {
+    id: "npc1",
+    name: "A Stranger",
+    description: "",
+    role: "",
+    status: "alive",
+    relationship: "",
+    attitude: "neutral",
+    createdAt: Date.now(),
+    ...overrides,
+  };
+}
 
 function createTestStory(overrides: Partial<StoryData> = {}): StoryData {
   return {
@@ -139,6 +153,32 @@ describe("selectDirectorMove", () => {
     expect(move?.targetThreadId).toBe("th1");
   });
 
+  it("announce_future_badness targets the most director-assistant-neglected active thread, not just the first one", () => {
+    const storyData = createTestStory({
+      threads: [
+        { id: "th1", title: "The Missing Heir", description: "D", status: "active", createdAt: Date.now() },
+        { id: "th2", title: "The Ritual", description: "D", status: "active", createdAt: Date.now() },
+      ],
+      directorAssistant: {
+        threadSpotlight: { th1: 0, th2: 3 },
+      },
+    });
+    const move = selectDirectorMove(storyData, "Interrupted");
+    expect(move?.move).toBe("announce_future_badness");
+    expect(move?.targetThreadId).toBe("th2");
+  });
+
+  it("falls back to the first active thread when no spotlight ledger data exists yet", () => {
+    const storyData = createTestStory({
+      threads: [
+        { id: "th1", title: "The Missing Heir", description: "D", status: "active", createdAt: Date.now() },
+        { id: "th2", title: "The Ritual", description: "D", status: "active", createdAt: Date.now() },
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Interrupted");
+    expect(move?.targetThreadId).toBe("th1");
+  });
+
   it("selects put_someone_in_a_spot when tension is high with no other trigger", () => {
     const storyData = createTestStory({
       agmtState: {
@@ -178,7 +218,7 @@ describe("selectDirectorMove", () => {
     expect(move?.hardnessTarget).toBe("someone_they_love");
   });
 
-  it("leaves hardnessTarget unset at the tension ceiling when no allied NPC is tracked", () => {
+  it("put_someone_in_a_spot names the most director-assistant-neglected allied NPC in context, not just the first tracked one", () => {
     const storyData = createTestStory({
       agmtState: {
         chaosFactor: 5,
@@ -189,8 +229,48 @@ describe("selectDirectorMove", () => {
         tension: 9,
       },
       npcs: [
-        { id: "npc1", name: "A Stranger", status: "alive", attitude: "neutral" } as any,
+        testNpc({ id: "npc1", name: "Marcus", attitude: "allied" }),
+        testNpc({ id: "npc2", name: "Elira", attitude: "allied" }),
       ],
+      directorAssistant: {
+        npcSpotlight: { Marcus: 0, Elira: 4 },
+      },
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.hardnessTarget).toBe("someone_they_love");
+    expect(move?.context).toContain("Elira");
+  });
+
+  it("put_someone_in_a_spot falls back to the first tracked allied NPC when no spotlight ledger data exists yet", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 9,
+      },
+      npcs: [
+        testNpc({ id: "npc1", name: "Marcus", attitude: "allied" }),
+        testNpc({ id: "npc2", name: "Elira", attitude: "allied" }),
+      ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.context).toContain("Marcus");
+  });
+
+  it("leaves hardnessTarget unset at the tension ceiling when no allied NPC is tracked", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 9,
+      },
+      npcs: [testNpc({ attitude: "neutral" })],
     });
     const move = selectDirectorMove(storyData, "Normal");
     expect(move?.hardnessForcesChoice).toBe(true);
@@ -326,6 +406,41 @@ describe("selectDirectorMove", () => {
           createdAt: Date.now(),
         },
       ],
+    });
+    const move = selectDirectorMove(storyData, "Normal");
+    expect(move?.move).toBe("offer_opportunity");
+    expect(move?.targetThreadId).toBe("th1");
+  });
+
+  it("offer_opportunity targets the most director-assistant-neglected active thread when several are open", () => {
+    const storyData = createTestStory({
+      agmtState: {
+        chaosFactor: 5,
+        sceneCount: 1,
+        skillCheckHistory: [],
+        currentStreak: 0,
+        lastChaosAdjustment: -999,
+        tension: 5,
+      },
+      threads: [
+        {
+          id: "th1",
+          title: "The Locked Vault",
+          description: "Something valuable is sealed inside",
+          status: "active",
+          createdAt: Date.now(),
+        },
+        {
+          id: "th2",
+          title: "The Missing Heir",
+          description: "Someone is hiding the truth",
+          status: "active",
+          createdAt: Date.now(),
+        },
+      ],
+      directorAssistant: {
+        threadSpotlight: { th1: 5, th2: 0 },
+      },
     });
     const move = selectDirectorMove(storyData, "Normal");
     expect(move?.move).toBe("offer_opportunity");
