@@ -28,6 +28,7 @@ import {
 } from "./structs";
 import {
   StartChallengeParams,
+  CancelChallengeParams,
   CalculateParams,
   TakeRestParams,
   FormulaRollParams,
@@ -114,6 +115,8 @@ import {
   rollFormulaAsync,
   RollResult,
   DiceResolver,
+  MAX_DICE_COUNT,
+  MAX_DICE_SIDES,
 } from "./diceFormula";
 import { executeTools as executeStateTools } from "./toolExecutor";
 
@@ -127,6 +130,7 @@ export interface GMToolResult {
   success: boolean;
   result:
     | GMChallengeResult
+    | GMCancelChallengeResult
     | GMCalculateResult
     | GMRestResult
     | GMFormulaRollResult
@@ -185,6 +189,12 @@ export interface GMChallengeResult {
   difficulty: string;
   victoryConsequence?: string;
   defeatConsequence?: string;
+}
+
+export interface GMCancelChallengeResult {
+  type: "cancel_challenge";
+  name: string;
+  reason: string;
 }
 
 export interface GMCalculateResult {
@@ -304,10 +314,14 @@ export interface GMFormulaChallengeResult {
   rolls: number[]; // Flattened list of all dice rolled
   total: number;
   dc: number;
+  reverseDC?: boolean; // If true, success = roll ≤ DC
   success: boolean;
   margin: number;
   description: string;
   displayName?: string;
+  stakes?: string;
+  target?: string; // Hardness dimension: who the failure consequence lands on
+  forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
   consequences?: {
     success?: string;
     failure?: string;
@@ -876,6 +890,13 @@ export async function executeGMTools(
             modified
           );
           break;
+        case "cancel_challenge":
+          result = executeCancelChallenge(
+            call.id,
+            params as CancelChallengeParams,
+            modified
+          );
+          break;
         case "calculate":
           result = executeCalculate(call.id, params as CalculateParams);
           break;
@@ -1330,7 +1351,10 @@ function executeStartChallenge(
     };
   }
 
-  // Create new challenge - rounds is max(required, max_failures) * 2 - 1 for best-of-X format
+  // rounds is a display-only "best of X" figure - the actual win/loss
+  // thresholds are requiredSuccesses/maxFailures below, kept independent so
+  // a deliberately asymmetric challenge doesn't collapse into one symmetric
+  // majority derived from this number.
   const rounds =
     Math.max(params.required_successes, params.max_failures) * 2 - 1;
 
@@ -1341,6 +1365,8 @@ function executeStartChallenge(
     rounds,
     currentSuccesses: 0,
     currentFailures: 0,
+    requiredSuccesses: params.required_successes,
+    maxFailures: params.max_failures,
     active: true,
     createdAt: Date.now(),
   };
@@ -1368,6 +1394,44 @@ function executeStartChallenge(
   };
 }
 
+function executeCancelChallenge(
+  toolCallId: string,
+  params: CancelChallengeParams,
+  storyData: StoryData
+): GMToolResult {
+  const challenge = storyData.activeChallenge;
+  if (!challenge?.active) {
+    return {
+      toolName: "cancel_challenge",
+      toolCallId,
+      success: false,
+      result: {
+        type: "cancel_challenge",
+        name: "",
+        reason: params.reason,
+      } as GMCancelChallengeResult,
+      contextForStory: "[ERROR: No active challenge to cancel]",
+    };
+  }
+
+  challenge.active = false;
+  challenge.resolvedAt = Date.now();
+  // Deliberately no `result` ("won"/"lost") - this challenge was abandoned,
+  // not resolved to a threshold either way.
+
+  return {
+    toolName: "cancel_challenge",
+    toolCallId,
+    success: true,
+    result: {
+      type: "cancel_challenge",
+      name: challenge.name,
+      reason: params.reason,
+    } as GMCancelChallengeResult,
+    contextForStory: `[Challenge Cancelled: "${challenge.name}" - ${params.reason}]`,
+  };
+}
+
 // ============================================
 // CALCULATE EXECUTOR
 // ============================================
@@ -1391,6 +1455,25 @@ function executeCalculate(
       const [, numDice, dieSize] = diceMatch.match(/(\d+)d(\d+)/i) || [];
       const n = parseInt(numDice, 10);
       const d = parseInt(dieSize, 10);
+
+      // Same bound diceFormula.ts enforces on every other roll in the app -
+      // this expression parser rolls dice itself instead of going through
+      // diceFormula.ts, so it needs the same DoS guard applied explicitly.
+      if (n < 1 || n > MAX_DICE_COUNT || d < 1 || d > MAX_DICE_SIDES) {
+        return {
+          toolName: "calculate",
+          toolCallId,
+          success: false,
+          result: {
+            type: "calculate",
+            expression: params.expression,
+            result: 0,
+            reason: params.reason,
+            displayName: params.display_name,
+          } as GMCalculateResult,
+          contextForStory: `[ERROR: Invalid dice "${diceMatch}" in "${params.expression}" - count must be 1-${MAX_DICE_COUNT}, sides must be 1-${MAX_DICE_SIDES}]`,
+        };
+      }
 
       const rolls: number[] = [];
       for (let i = 0; i < n; i++) {
@@ -2389,8 +2472,17 @@ async function executeFormulaChallengeCheck(
   }
 
   const resolvedFormula = rollResult.breakdown || params.formula;
-  const success = rollResult.total >= params.dc;
-  const margin = rollResult.total - params.dc;
+  const reverseDC = params.reverse_dc || false;
+  let success: boolean;
+  let margin: number;
+  if (reverseDC) {
+    // Roll-under: success = roll ≤ DC (Call of Cthulhu/BRP style)
+    success = rollResult.total <= params.dc;
+    margin = params.dc - rollResult.total;
+  } else {
+    success = rollResult.total >= params.dc;
+    margin = rollResult.total - params.dc;
+  }
 
   // Update challenge progress
   if (success) {
@@ -2399,19 +2491,25 @@ async function executeFormulaChallengeCheck(
     challenge.currentFailures = (challenge.currentFailures || 0) + 1;
   }
 
-  // Calculate majority needed: (rounds / 2) + 1 rounded down
-  const requiredToWin = Math.floor(challenge.rounds / 2) + 1;
+  // Use the thresholds declared at start_challenge time so an intentionally
+  // asymmetric challenge (e.g. 3 successes to win, 5 failures to lose) is
+  // honored instead of collapsed into one symmetric majority. Falls back to
+  // the old rounds-derived majority only for challenges started before
+  // requiredSuccesses/maxFailures existed.
+  const legacyMajority = Math.floor(challenge.rounds / 2) + 1;
+  const requiredSuccessesToWin = challenge.requiredSuccesses ?? legacyMajority;
+  const maxFailuresToLose = challenge.maxFailures ?? legacyMajority;
 
   // Check if challenge is complete
   let completed = false;
   let won = false;
-  if (challenge.currentSuccesses >= requiredToWin) {
+  if (challenge.currentSuccesses >= requiredSuccessesToWin) {
     completed = true;
     won = true;
     challenge.result = "won";
     challenge.active = false;
     challenge.resolvedAt = Date.now();
-  } else if (challenge.currentFailures >= requiredToWin) {
+  } else if (challenge.currentFailures >= maxFailuresToLose) {
     completed = true;
     won = false;
     challenge.result = "lost";
@@ -2425,15 +2523,36 @@ async function executeFormulaChallengeCheck(
   if (resolvedFormula !== params.formula) {
     contextForStory += ` → ${resolvedFormula}`;
   }
-  contextForStory += ` = ${rollResult.total} vs DC ${params.dc} → ${
-    success ? "SUCCESS" : "FAILURE"
-  }]`;
+  contextForStory += `: [${flattenRolls(rollResult.rolls).join(", ")}] = **${
+    rollResult.total
+  }**`;
+  if (reverseDC) {
+    contextForStory += ` = ${rollResult.total} vs DC ${params.dc} → ${
+      success ? "SUCCESS" : "FAILURE"
+    }`;
+  } else {
+    contextForStory += ` vs DC ${params.dc} → ${
+      success ? "SUCCESS" : "FAILURE"
+    }`;
+  }
+  contextForStory += ` (margin: ${margin >= 0 ? "+" : ""}${margin})]`;
   contextForStory += `\n[${params.description}]`;
-  contextForStory += `\n[Challenge "${challenge.name}": ${challenge.currentSuccesses}/${requiredToWin} successes, ${challenge.currentFailures}/${requiredToWin} failures]`;
+  contextForStory += `\n[Challenge "${challenge.name}": ${challenge.currentSuccesses}/${requiredSuccessesToWin} successes, ${challenge.currentFailures}/${maxFailuresToLose} failures]`;
 
   if (completed) {
     contextForStory += `\n[Challenge ${won ? "WON" : "LOST"}!]`;
   }
+
+  if (params.stakes) {
+    contextForStory += `\n[Stakes: ${params.stakes}]`;
+    contextForStory += applyStakesEscalation(storyData, params.stakes);
+  }
+
+  contextForStory += checkStatIntegrity(
+    storyData,
+    params.stat_name,
+    rollResult.modifiers
+  );
 
   if (params.consequences) {
     const outcome = success
@@ -2442,6 +2561,10 @@ async function executeFormulaChallengeCheck(
     if (outcome) {
       contextForStory += `\n[Intended consequence: ${outcome}]`;
     }
+  }
+
+  if (!success) {
+    contextForStory += describeHardness(params.target, params.forces_choice);
   }
 
   return {
@@ -2455,17 +2578,21 @@ async function executeFormulaChallengeCheck(
       rolls: flattenRolls(rollResult.rolls),
       total: rollResult.total,
       dc: params.dc,
+      reverseDC,
       success,
       margin,
       description: params.description,
       displayName: params.display_name,
+      stakes: params.stakes,
+      target: params.target,
+      forcesChoice: params.forces_choice,
       consequences: params.consequences,
       challengeProgress: {
         name: challenge.name,
         successes: challenge.currentSuccesses,
         failures: challenge.currentFailures,
-        required: requiredToWin,
-        maxFailures: requiredToWin,
+        required: requiredSuccessesToWin,
+        maxFailures: maxFailuresToLose,
         completed,
         won,
       },

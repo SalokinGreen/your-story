@@ -380,7 +380,12 @@ export interface ConsistencyWarning {
 // stated in the GM's own system prompt. A "major" flag can trigger a full
 // StoryData rollback + forced retry (generation.ts); "minor" flags are
 // logged/surfaced only, same posture as ConsistencyWarning.
-export type ObserverFlagType = "player_agency" | "response_length";
+export type ObserverFlagType =
+  | "player_agency"
+  | "response_length"
+  | "missing_oracle_or_table"
+  | "missing_scene_increment"
+  | "outcome_narration_mismatch";
 export type ObserverSeverity = "minor" | "major";
 
 export interface ObserverFlag {
@@ -519,9 +524,17 @@ export interface SceneChallenge {
   id: string; // Unique identifier
   name: string; // Display name (e.g., "Battle with the Orcs")
   description?: string; // Optional description of the challenge
-  rounds: number; // Total rounds in "best of X" format (odd: 3, 5, 7, 9). First to majority wins.
+  rounds: number; // "Best of X" display figure only (odd: 3, 5, 7, 9) - NOT the win/loss threshold, see requiredSuccesses/maxFailures.
   currentSuccesses: number; // Current success count
   currentFailures: number; // Current failure count
+  // The actual win/loss thresholds as declared at start_challenge time -
+  // kept independent so an intentionally asymmetric challenge (e.g. 3
+  // successes to win but 5 failures to lose) isn't silently collapsed into
+  // one symmetric majority derived from `rounds`. Optional only for
+  // backward compat with challenges started before this field existed -
+  // falls back to the old rounds-derived majority for those.
+  requiredSuccesses?: number;
+  maxFailures?: number;
   active: boolean; // Whether challenge is ongoing
   createdAt: number; // Timestamp when challenge started
   resolvedAt?: number; // Timestamp when challenge ended

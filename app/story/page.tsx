@@ -94,6 +94,7 @@ import { tickCooldowns } from "../misc/abilitySystem";
 import CharacterCreationForm from "./create-character/form";
 import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
+import { MAX_DICE_COUNT, MAX_DICE_SIDES } from "../misc/diceFormula";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -2009,6 +2010,21 @@ function StoryPageContent() {
             const count = parseInt(diceMatch[1] || "1");
             const sides = parseInt(diceMatch[2]);
             const modifier = parseInt(diceMatch[3] || "0");
+
+            // Same bound diceFormula.ts enforces on every other roll in the
+            // app - this flavor-dice path parses its own notation instead
+            // of going through diceFormula.ts, so it needs the same DoS
+            // guard applied explicitly rather than inheriting it.
+            if (count < 1 || count > MAX_DICE_COUNT) {
+              throw new Error(
+                `Invalid dice count in "${roll.dice}": must be between 1 and ${MAX_DICE_COUNT}`,
+              );
+            }
+            if (sides < 1 || sides > MAX_DICE_SIDES) {
+              throw new Error(
+                `Invalid dice sides in "${roll.dice}": must be between 1 and ${MAX_DICE_SIDES}`,
+              );
+            }
 
             let total = modifier;
             const diceResults: number[] = [];

@@ -39,7 +39,13 @@ import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { ensureStoryReflected } from "@/app/misc/reflection";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
-import { runObserver } from "@/app/misc/observer";
+import {
+  runObserver,
+  buildObserverWarningNote,
+  settingsFor,
+  ObserverSettings,
+} from "@/app/misc/observer";
+import { runMemoryAgent } from "@/app/misc/memoryAgent";
 import {
   outputToScenePart,
   extractThinkingTags,
@@ -193,6 +199,13 @@ export interface GenerationOptions {
   // observer retry loop, not meant to be passed in by callers. Injected into
   // the GM prompt to explain why the previous attempt at this turn was reset.
   observerNote?: string;
+  // Per-flag-type observer configuration (which flag types are enabled,
+  // whether a "major" instance of each is allowed to trigger a reset, and
+  // how sensitive each check is) - backend for a settings UI that doesn't
+  // exist yet. Omit (or leave individual types unset) to get
+  // DEFAULT_OBSERVER_SETTINGS' behavior, which reproduces exactly what
+  // shipped before this option existed.
+  observerSettings?: ObserverSettings;
 }
 
 export interface GenerationCallbacks {
@@ -657,7 +670,18 @@ export async function generateStoryTurn(
     );
   }
 
-  let observerNote: string | undefined;
+  // Carry forward any flags that survived the PRIOR turn (minor flags never
+  // trigger a reset, and a major flag can still survive if the reset budget
+  // ran out) - otherwise a flagged mistake reaches the player via the
+  // ScenePart.observerFlags toast but the GM itself never learns it did
+  // anything wrong. Overridden below the moment a same-turn reset fires,
+  // since that corrective note is about THIS turn and takes priority.
+  const lastAssistantPart = [...storyData.scene.parts]
+    .reverse()
+    .find((p) => !p.user && p.role === "assistant");
+  let observerNote: string | undefined = buildObserverWarningNote(
+    lastAssistantPart?.observerFlags,
+  );
   let resetAttempts = 0;
 
   while (true) {
@@ -685,25 +709,37 @@ export async function generateStoryTurn(
       return result;
     }
 
+    // Shared by the observer and the memory agent below - both are
+    // best-effort side calls for the turn that just completed, using
+    // whatever model actually generated it.
+    const sideCallApiOptions = {
+      model:
+        result.meta.storyMeta?.model ||
+        result.meta.gmMeta?.model ||
+        options.storyModel,
+      token: null,
+      openRouterKey: options.openRouterKey,
+      deepseekKey: options.deepseekKey,
+      googleKey: options.googleKey,
+      mistralKey: options.mistralKey,
+      deepinfraKey: options.deepinfraKey,
+      abortSignal: options.abortSignal,
+    };
+
     let flags: ObserverFlag[] = [];
     try {
       flags = await runObserver({
         narration: result.content,
         playerChoice: userChoice,
         replyLength: options.replyLength,
-        apiOptions: {
-          model:
-            result.meta.storyMeta?.model ||
-            result.meta.gmMeta?.model ||
-            options.storyModel,
-          token: null,
-          openRouterKey: options.openRouterKey,
-          deepseekKey: options.deepseekKey,
-          googleKey: options.googleKey,
-          mistralKey: options.mistralKey,
-          deepinfraKey: options.deepinfraKey,
-          abortSignal: options.abortSignal,
-        },
+        toolNames: (result.gmResults || []).map((r) => r.toolName),
+        rollResults: (result.gmResults || []).map((r) => ({
+          toolName: r.toolName,
+          success: r.success,
+          contextForStory: r.contextForStory,
+        })),
+        settings: options.observerSettings,
+        apiOptions: sideCallApiOptions,
       });
     } catch (observerError) {
       // Fail open - an observer infra failure should never block the turn.
@@ -716,7 +752,16 @@ export async function generateStoryTurn(
       flags = [];
     }
 
-    const majorFlag = flags.find((f) => f.severity === "major");
+    // A flag only resets when it's both "major" severity (decided per-
+    // instance by the check itself) AND that flag type's triggersReset is
+    // on (decided by config - defaults to true for the three checks that
+    // can naturally be major, false for the two tool-usage-gap checks,
+    // reproducing exactly what shipped before this setting existed).
+    const majorFlag = flags.find(
+      (f) =>
+        f.severity === "major" &&
+        settingsFor(options.observerSettings, f.type).triggersReset,
+    );
 
     if (majorFlag && preTurnSnapshot && resetAttempts < MAX_OBSERVER_RESETS) {
       resetAttempts++;
@@ -743,6 +788,27 @@ export async function generateStoryTurn(
     if (flags.length > 0) {
       result.scenePart = { ...result.scenePart, observerFlags: flags };
     }
+
+    // Layer 4: the memory agent (memoryAgent.ts) decides what from this
+    // turn is worth persisting, now that the turn is final and won't be
+    // reset again. Mutates storyData.memory directly; best-effort, same
+    // fail-open posture as the observer above.
+    try {
+      await runMemoryAgent(
+        storyData,
+        result.content,
+        userChoice,
+        sideCallApiOptions,
+      );
+    } catch (memoryAgentError) {
+      logger.action("Memory agent failed, skipping (fail open)", {
+        error:
+          memoryAgentError instanceof Error
+            ? memoryAgentError.message
+            : String(memoryAgentError),
+      });
+    }
+
     return result;
   }
 }
