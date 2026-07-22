@@ -2,21 +2,21 @@
 
 ## Overview
 
-The Your Story app features text-to-speech capabilities across four BYOK
-providers/models. Users can listen to the generated story content with
-multiple voice options from: **Kokoro** (fast & affordable, DeepInfra),
-**Orpheus** (premium & expressive, DeepInfra), **Cartesia Sonic-3**
-(ultra-low-latency), and **ElevenLabs Flash v2.5** (best-in-class quality).
-All four are BYOK - the user supplies their own provider API key in Settings;
-there is no server-side "Coins" path for TTS.
+The Your Story app features text-to-speech capabilities across two BYOK
+providers/models: **Cartesia Sonic-3** (ultra-low-latency) and **ElevenLabs
+Flash v2.5** (best-in-class quality). Both are BYOK - the user supplies their
+own provider API key in Settings; there is no server-side "Coins" path for
+TTS. (DeepInfra's Kokoro/Orpheus models were removed - they were the older,
+lower-quality option now that Cartesia and ElevenLabs cover both the
+cheap/fast and premium/expressive ends of the spectrum.)
 
 ## Features
 
 ✅ **Real-time narration** - Listen to AI-generated story content  
-✅ **Four TTS models across four providers** - pick fast/cheap, premium
-DeepInfra, low-latency Cartesia, or best-quality ElevenLabs  
-✅ **20+ built-in voice options plus custom voice IDs** - American, British,
-multi-language, and provider voice libraries  
+✅ **Two TTS models across two providers** - pick low-latency Cartesia or
+best-quality ElevenLabs  
+✅ **12+ built-in voice options plus custom voice IDs** - provider voice
+libraries, expandable via custom voice IDs  
 ✅ **Playback controls** - Play, pause/resume, and stop audio  
 ✅ **TTS-friendly text cleaning** - Strips markdown formatting, emoji, and
 misc Unicode symbols, and converts markdown tables into short spoken
@@ -30,67 +30,32 @@ stumble over
 
 ## TTS Models
 
-### Kokoro-82M ($0.62 per 1M characters, DeepInfra)
-
-Fast, cost-effective TTS with natural voices. Best for everyday use.
-
-### Orpheus 3B ($7.00 per 1M characters, DeepInfra)
-
-Premium Llama-based TTS with exceptional clarity, expressiveness, and emotional range. Best for immersive storytelling.
-
 ### Cartesia Sonic-3 (Cartesia, ~1 credit/character - plan-dependent)
 
 Purpose-built for low-latency, real-time narration. Requires a Cartesia API
 key from [play.cartesia.ai](https://play.cartesia.ai/keys). Voice IDs are
-UUIDs from Cartesia's voice library - two samples are bundled, add more via
+UUIDs from Cartesia's voice library - five samples are bundled, add more via
 the custom voice field.
 
-### ElevenLabs Flash v2.5 (ElevenLabs, ~0.5 credits/character - plan-dependent)
+### ElevenLabs Flash v2.5 (ElevenLabs, ~0.5 credits/character - plan-dependent) — default
 
 Best-in-class expressiveness and emotional range, still low-latency (~75ms).
 Requires an ElevenLabs API key from
 [elevenlabs.io/app/settings/api-keys](https://elevenlabs.io/app/settings/api-keys).
-Voice IDs come from ElevenLabs' voice library - a few premade voices are
+Voice IDs come from ElevenLabs' voice library - seven premade voices are
 bundled, add more via the custom voice field.
 
 ## Available Voices
 
-### Kokoro Voices
-
-| Voice ID      | Name      | Accent          |
-| ------------- | --------- | --------------- |
-| `af_heart`    | Heart ❤️  | American Female |
-| `af_bella`    | Bella 🔥  | American Female |
-| `af_nicole`   | Nicole 🎧 | American Female |
-| `af_sarah`    | Sarah     | American Female |
-| `af_sky`      | Sky       | American Female |
-| `am_adam`     | Adam      | American Male   |
-| `am_michael`  | Michael   | American Male   |
-| `am_fenrir`   | Fenrir    | American Male   |
-| `bf_emma`     | Emma      | British Female  |
-| `bf_isabella` | Isabella  | British Female  |
-| `bm_george`   | George    | British Male    |
-| `bm_daniel`   | Daniel    | British Male    |
-
-### Orpheus Voices
-
-| Voice ID | Name | Type   |
-| -------- | ---- | ------ |
-| `tara`   | Tara | Female |
-| `leah`   | Leah | Female |
-| `jess`   | Jess | Female |
-| `mia`    | Mia  | Female |
-| `zoe`    | Zoe  | Female |
-| `leo`    | Leo  | Male   |
-| `dan`    | Dan  | Male   |
-| `zac`    | Zac  | Male   |
-
 ### Cartesia Voices (bundled samples - full library at play.cartesia.ai)
 
-| Voice ID                              | Name           |
-| -------------------------------------- | -------------- |
-| `a0e99841-438c-4a64-b679-ae501e7d6091` | Barbershop Man |
-| `156fb8d2-335b-4950-9cb3-a2d33befec77` | Helpful Woman  |
+| Voice ID                              | Name                     |
+| -------------------------------------- | ------------------------ |
+| `a0e99841-438c-4a64-b679-ae501e7d6091` | Barbershop Man           |
+| `156fb8d2-335b-4950-9cb3-a2d33befec77` | Helpful Woman            |
+| `f786b574-daa5-4673-aa0c-cbe3e8534c02` | Katie (American Female)  |
+| `db6b0ed5-d5d3-463d-ae85-518a07d3c2b4` | Skylar (American Female) |
+| `a5136bf9-224c-4d76-b823-52bd5efcffcc` | Jameson (American Male)  |
 
 ### ElevenLabs Voices (bundled samples - full library at elevenlabs.io/app/voice-library)
 
@@ -99,11 +64,15 @@ bundled, add more via the custom voice field.
 | `21m00Tcm4TlvDq8ikWAM` | Rachel (Female) |
 | `EXAVITQu4vr4xnSDxMaL` | Bella (Female)  |
 | `ErXwobaYiN019PkySvjV` | Antoni (Male)   |
+| `pNInz6obpgDQGcFmaJgB` | Adam (Male)     |
+| `TxGEqnHWrfWFTfGW9XjX` | Josh (Male)     |
+| `yoZ06aMxZJJ28mfd3POQ` | Sam (Male)      |
+| `AZnzlk1XvdvUeBnXmlld` | Domi (Female)   |
 
-For Cartesia and ElevenLabs, any other voice ID from the provider's voice
-library can be added via the custom voice field in Settings - both providers
-have large libraries that aren't fully enumerable the way Kokoro/Orpheus's
-small named voice sets are.
+Any other voice ID from either provider's voice library can be added via the
+custom voice field in Settings - both providers have large libraries that
+aren't fully enumerable, so the bundled lists above are convenience defaults,
+not the full catalog.
 
 ## Implementation
 
@@ -122,7 +91,7 @@ small named voice sets are.
   everything that's ready instead of regenerating from scratch - see
   "Stop vs. Mute" below
 - Handles voice/model selection, playback, and audio state
-- Picks the matching BYOK key (`deepinfraKey`/`cartesiaKey`/`elevenlabsKey`) for the selected model
+- Picks the matching BYOK key (`cartesiaKey`/`elevenlabsKey`) for the selected model
 - Integrates with NotificationContext for user feedback
 - Runs a live, sentence-by-sentence auto-narration pipeline when auto-narrate
   is enabled and `storyTextReady` is false (narration still streaming) - see
@@ -130,14 +99,14 @@ small named voice sets are.
 
 **`app/components/APIKeysModal.tsx`**
 
-- Settings UI for TTS configuration and all four provider API keys
-- Model selector (Kokoro/Orpheus/Cartesia/ElevenLabs)
+- Settings UI for TTS configuration and both provider API keys
+- Model selector (Cartesia/ElevenLabs)
 - Voice dropdown with organized optgroups, resets to a sensible default voice on model switch
 - Volume slider and auto-generate toggle
 
 **`app/components/CustomVoiceManager.tsx`**
 
-- Free-form list of extra voice IDs, shared across all four models
+- Free-form list of extra voice IDs, shared across both models
 - Shows a model-specific hint (e.g. "Cartesia voice IDs are UUIDs...")
 
 ### API Routes
@@ -145,7 +114,7 @@ small named voice sets are.
 **`app/api/tts/generate/route.ts`** → **`app/misc/ttsCall.ts`**
 
 - POST endpoint to generate speech from text
-- Accepts: `text` (string), `voiceId` (string), `model` ("kokoro" | "orpheus" | "cartesia" | "elevenlabs"), and the matching BYOK key field
+- Accepts: `text` (string), `voiceId` (string), `model` ("cartesia" | "elevenlabs"), and the matching BYOK key field
 - Automatically chunks long text at sentence boundaries
 - Streams the response body: each chunk's MP3 audio is sent as soon as it's generated, framed as `[4-byte big-endian length][chunk bytes]` (see `frameChunk()`/`generateTTSAudioStream()` in `ttsCall.ts`), instead of waiting for every chunk and concatenating one big buffer. `TTSControls.tsx` reads the frames off the stream and starts playing chunk 0 as soon as it arrives.
 - The very first chunk is still awaited before any bytes are streamed, so a bad/rate-limited key fails with a normal JSON error (400/429/403) exactly as before, rather than a half-streamed response
@@ -157,8 +126,6 @@ Defined in `app/misc/ai_prices.ts` (`TTS_MODELS`). These are cost *estimates*
 only, used for the optional cost-preview UI - since TTS is BYOK, the actual
 amount billed depends on the user's own plan with that provider:
 
-- **Kokoro**: $0.62 / 1M characters (DeepInfra)
-- **Orpheus**: $7.00 / 1M characters (DeepInfra)
 - **Cartesia Sonic-3**: ~$30 / 1M characters (varies by Cartesia plan tier)
 - **ElevenLabs Flash v2.5**: ~$50 / 1M characters (varies by ElevenLabs plan tier)
 
@@ -166,7 +133,7 @@ amount billed depends on the user's own plan with that provider:
 
 1. Go to **Settings** (gear icon) → **API Keys** tab, add the API key for whichever provider(s) you want to use
 2. Go to **Settings** → **Voice** tab, enable TTS
-3. Choose a model: Kokoro/Orpheus (DeepInfra), Cartesia Sonic-3, or ElevenLabs Flash v2.5
+3. Choose a model: Cartesia Sonic-3 or ElevenLabs Flash v2.5
 4. Select a voice from the dropdown (or add a custom voice ID)
 5. Adjust volume as needed
 6. Optionally enable auto-generate for automatic narration
@@ -176,17 +143,17 @@ amount billed depends on the user's own plan with that provider:
 
 TTS settings are stored in localStorage:
 
-| Key               | Description                   | Default      |
-| ----------------- | ----------------------------- | ------------ |
-| `ttsEnabled`      | TTS feature toggle            | `true`       |
-| `ttsModel`        | Selected model                | `"kokoro"`   |
-| `ttsLastVoice`    | Selected voice ID             | `"af_heart"` |
-| `ttsVolume`       | Playback volume (0-1)         | `1.0`        |
-| `ttsAutoGenerate` | Auto-narrate new content - also flipped to `true` by activating the TTS button | `false`      |
-| `ttsCustomVoices` | Custom voice IDs (JSON array) | `[]`         |
+| Key               | Description                   | Default                  |
+| ----------------- | ------------------------------ | ------------------------ |
+| `ttsEnabled`      | TTS feature toggle            | `true`                    |
+| `ttsModel`        | Selected model                | `"elevenlabs"`            |
+| `ttsLastVoice`    | Selected voice ID             | `"21m00Tcm4TlvDq8ikWAM"`  |
+| `ttsVolume`       | Playback volume (0-1)         | `1.0`                     |
+| `ttsAutoGenerate` | Auto-narrate new content - also flipped to `true` by activating the TTS button | `false` |
+| `ttsCustomVoices` | Custom voice IDs (JSON array) | `[]`                      |
 
-API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
-`APIKeysContext`, also backed by localStorage.
+API keys (`cartesiaKey`, `elevenlabsKey`) live in `APIKeysContext`, also
+backed by localStorage.
 
 ## Technical Details
 
@@ -195,8 +162,8 @@ API keys (`deepinfraKey`, `cartesiaKey`, `elevenlabsKey`) live in
 1. User clicks "TTS" button - this also flips the persistent `ttsAutoGenerate` setting on
 2. Component shows loading state
 3. POST request sent to `/api/tts/generate` with text, voiceId, model, and the matching provider key
-4. `generateTTSAudioStream()` runs `cleanTextForTTS()` (strips markdown, emoji/symbols, converts tables) and splits the result into small chunks (200-500 chars depending on model) so the first request comes back fast
-5. The provider implied by `model` is called in parallel for each chunk - DeepInfra returns JSON with base64 audio, Cartesia/ElevenLabs return raw MP3 bytes directly
+4. `generateTTSAudioStream()` runs `cleanTextForTTS()` (strips markdown, emoji/symbols, converts tables) and splits the result into 500-character chunks so the first request comes back fast
+5. The provider implied by `model` is called in parallel for each chunk - both Cartesia and ElevenLabs return raw MP3 bytes directly
 6. The first chunk's audio is awaited, then streamed to the client frame-by-frame as each subsequent chunk finishes (still generated in parallel behind the scenes, just emitted in order)
 7. `TTSControls.tsx` parses frames off the response stream and plays chunk 0 in the `<audio>` element the moment it lands, queuing later chunks to play back-to-back via `onended` as they arrive
 8. Playback finishes once the last chunk has played and the stream has closed
@@ -275,8 +242,7 @@ Covered by `tests/ttsTextCleaning.test.ts`.
 
 ### Chunking Strategy
 
-- **Orpheus**: 200 character chunks (smaller chunks keep this model's higher per-chunk latency down)
-- **Kokoro / Cartesia / ElevenLabs**: 500 character chunks
+- 500 character chunks for both models
 - Small chunk sizes are deliberate: only the *first* chunk gates
   time-to-first-audio (the rest generate in parallel behind it), so keeping
   it short is what makes both the manual and live-narration paths start
@@ -286,11 +252,9 @@ Covered by `tests/ttsTextCleaning.test.ts`.
 
 ## Environment Variables
 
-None required for TTS specifically - all four providers are BYOK, so the
-provider API key comes from the request body (`deepinfraKey`/`cartesiaKey`/
-`elevenlabsKey`, from `APIKeysContext`/localStorage), not a server env var.
-(`DEEPINFRA_API_KEY` does exist as a server env var, but it's used for the
-server-side "Coins" LLM/image-generation path elsewhere in the app, not TTS.)
+None required for TTS specifically - both providers are BYOK, so the
+provider API key comes from the request body (`cartesiaKey`/`elevenlabsKey`,
+from `APIKeysContext`/localStorage), not a server env var.
 
 ## Error Handling
 
@@ -310,11 +274,10 @@ To test TTS:
 4. Go to a story and generate content
 5. Click "TTS" and verify audio plays
 6. Test pause/stop controls
-7. Try all four models (Kokoro, Orpheus, Cartesia, ElevenLabs)
+7. Try both models (Cartesia, ElevenLabs)
 
 ## Credits
 
-- **DeepInfra**: [Kokoro-82M](https://deepinfra.com/hexgrad/Kokoro-82M), [Orpheus 3B](https://deepinfra.com/canopylabs/orpheus-3b-0.1-ft)
 - **Cartesia**: [Sonic-3](https://cartesia.ai)
 - **ElevenLabs**: [Flash v2.5](https://elevenlabs.io)
-- **Integration**: Your Story - Cartesia/ElevenLabs added July 2026
+- **Integration**: Your Story - Cartesia/ElevenLabs added July 2026; DeepInfra's Kokoro/Orpheus removed July 2026

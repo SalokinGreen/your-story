@@ -13,8 +13,6 @@ interface CustomVoiceManagerProps {
 }
 
 const VOICE_ID_HINTS: Record<string, string> = {
-  kokoro: "Kokoro voices follow pattern: af_name, am_name, bf_name, bm_name",
-  orpheus: "Orpheus voice IDs are short first names, e.g. tara, leo",
   cartesia: "Cartesia voice IDs are UUIDs, copy one from play.cartesia.ai",
   elevenlabs:
     "ElevenLabs voice IDs are ~20-character IDs from your voice library",
@@ -23,7 +21,7 @@ const VOICE_ID_HINTS: Record<string, string> = {
 export default function CustomVoiceManager({
   onVoicesChange,
   addNotification,
-  ttsModel = "kokoro",
+  ttsModel = "elevenlabs",
 }: CustomVoiceManagerProps) {
   const [customVoices, setCustomVoices] = useState<string[]>([]);
   const [newVoiceInput, setNewVoiceInput] = useState("");
@@ -76,7 +74,7 @@ export default function CustomVoiceManager({
         <div className="flex gap-2">
           <input
             type="text"
-            placeholder="Enter voice ID (e.g. af_nova)"
+            placeholder="Enter voice ID (e.g. 21m00Tcm4TlvDq8ikWAM)"
             value={newVoiceInput}
             onChange={(e) => setNewVoiceInput(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && addCustomVoice()}
@@ -111,7 +109,7 @@ export default function CustomVoiceManager({
         )}
         <p className="text-xs text-gray-600 dark:text-gray-400 mt-2 flex items-center gap-1">
           <DynamicIcon name="Lightbulb" className="w-3 h-3" /> Add custom voice
-          IDs. {VOICE_ID_HINTS[ttsModel] ?? VOICE_ID_HINTS.kokoro}
+          IDs. {VOICE_ID_HINTS[ttsModel] ?? VOICE_ID_HINTS.elevenlabs}
         </p>
       </div>
     </div>

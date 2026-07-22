@@ -36,8 +36,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
   // TTS Settings state (read from localStorage)
   const [ttsEnabled, setTtsEnabled] = useState(true);
   const [ttsAutoGenerate, setTtsAutoGenerate] = useState(false);
-  const [ttsVoice, setTtsVoice] = useState("af_heart");
-  const [ttsModel, setTtsModel] = useState<TTSModelKey>("kokoro");
+  const [ttsVoice, setTtsVoice] = useState("21m00Tcm4TlvDq8ikWAM");
+  const [ttsModel, setTtsModel] = useState<TTSModelKey>("elevenlabs");
   const [ttsVolume, setTtsVolume] = useState(1.0);
   const [sttEnabled, setSttEnabled] = useState(true);
   const [showHiddenMessages, setShowHiddenMessages] = useState(false);
@@ -50,16 +50,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
     if (typeof window !== "undefined") {
       setTtsEnabled(localStorage.getItem("ttsEnabled") !== "false");
       setTtsAutoGenerate(localStorage.getItem("ttsAutoGenerate") === "true");
-      setTtsVoice(localStorage.getItem("ttsLastVoice") || "af_heart");
+      setTtsVoice(localStorage.getItem("ttsLastVoice") || "21m00Tcm4TlvDq8ikWAM");
       {
         const storedModel = localStorage.getItem("ttsModel");
-        setTtsModel(
-          storedModel === "orpheus" ||
-            storedModel === "cartesia" ||
-            storedModel === "elevenlabs"
-            ? storedModel
-            : "kokoro",
-        );
+        setTtsModel(storedModel === "cartesia" ? "cartesia" : "elevenlabs");
       }
       setTtsVolume(parseFloat(localStorage.getItem("ttsVolume") || "1.0"));
       setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
@@ -439,7 +433,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
                     />
                     <p className="text-xs text-blue-300/50 mt-1">
-                      Used for text-to-speech (Kokoro/Orpheus) and image generation.
+                      Used for image generation.
                     </p>
                   </div>
                 </div>
@@ -592,7 +586,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       Bring your own TTS provider
                     </p>
                     <p className="text-xs text-blue-300/60">
-                      Kokoro/Orpheus (DeepInfra), Cartesia Sonic-3, or ElevenLabs Flash -
+                      Cartesia Sonic-3 or ElevenLabs Flash -
                       add the matching key in the Keys tab
                     </p>
                   </div>
@@ -683,16 +677,12 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       localStorage.setItem("ttsModel", newModel);
                       // Reset voice to a sensible default for the new model
                       const defaultVoice = {
-                        kokoro: "af_heart",
-                        orpheus: "tara",
                         cartesia: "a0e99841-438c-4a64-b679-ae501e7d6091",
                         elevenlabs: "21m00Tcm4TlvDq8ikWAM",
                       }[newModel];
                       setTtsVoice(defaultVoice);
                       localStorage.setItem("ttsLastVoice", defaultVoice);
                       const modelLabel = {
-                        kokoro: "Kokoro (Fast)",
-                        orpheus: "Orpheus (Premium)",
                         cartesia: "Cartesia Sonic-3",
                         elevenlabs: "ElevenLabs Flash v2.5",
                       }[newModel];
@@ -700,12 +690,6 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     }}
                     className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
-                    <option value="kokoro">
-                      Kokoro - Fast & Affordable ($0.62/1M chars, DeepInfra)
-                    </option>
-                    <option value="orpheus">
-                      Orpheus - Premium Expressive ($7/1M chars, DeepInfra)
-                    </option>
                     <option value="cartesia">
                       Cartesia Sonic-3 - Ultra Low Latency (Cartesia)
                     </option>
@@ -734,43 +718,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     }}
                     className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
-                    {ttsModel === "kokoro" ? (
-                      <>
-                        <optgroup label="American English - Female">
-                          <option value="af_heart">Heart ❤️</option>
-                          <option value="af_bella">Bella 🔥</option>
-                          <option value="af_nicole">Nicole 🎧</option>
-                          <option value="af_sarah">Sarah</option>
-                          <option value="af_sky">Sky</option>
-                        </optgroup>
-                        <optgroup label="American English - Male">
-                          <option value="am_adam">Adam</option>
-                          <option value="am_michael">Michael</option>
-                          <option value="am_fenrir">Fenrir</option>
-                        </optgroup>
-                        <optgroup label="British English">
-                          <option value="bf_emma">Emma (Female)</option>
-                          <option value="bf_isabella">Isabella (Female)</option>
-                          <option value="bm_george">George (Male)</option>
-                          <option value="bm_daniel">Daniel (Male)</option>
-                        </optgroup>
-                      </>
-                    ) : ttsModel === "orpheus" ? (
-                      <>
-                        <optgroup label="Female Voices">
-                          <option value="tara">Tara</option>
-                          <option value="leah">Leah</option>
-                          <option value="jess">Jess</option>
-                          <option value="mia">Mia</option>
-                          <option value="zoe">Zoe</option>
-                        </optgroup>
-                        <optgroup label="Male Voices">
-                          <option value="leo">Leo</option>
-                          <option value="dan">Dan</option>
-                          <option value="zac">Zac</option>
-                        </optgroup>
-                      </>
-                    ) : ttsModel === "cartesia" ? (
+                    {ttsModel === "cartesia" ? (
                       <optgroup label="Sample Voices">
                         <option value="a0e99841-438c-4a64-b679-ae501e7d6091">
                           Barbershop Man
@@ -778,12 +726,25 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                         <option value="156fb8d2-335b-4950-9cb3-a2d33befec77">
                           Helpful Woman
                         </option>
+                        <option value="f786b574-daa5-4673-aa0c-cbe3e8534c02">
+                          Katie (Female)
+                        </option>
+                        <option value="db6b0ed5-d5d3-463d-ae85-518a07d3c2b4">
+                          Skylar (Female)
+                        </option>
+                        <option value="a5136bf9-224c-4d76-b823-52bd5efcffcc">
+                          Jameson (Male)
+                        </option>
                       </optgroup>
                     ) : (
                       <optgroup label="Sample Voices">
                         <option value="21m00Tcm4TlvDq8ikWAM">Rachel (Female)</option>
                         <option value="EXAVITQu4vr4xnSDxMaL">Bella (Female)</option>
                         <option value="ErXwobaYiN019PkySvjV">Antoni (Male)</option>
+                        <option value="pNInz6obpgDQGcFmaJgB">Adam (Male)</option>
+                        <option value="TxGEqnHWrfWFTfGW9XjX">Josh (Male)</option>
+                        <option value="yoZ06aMxZJJ28mfd3POQ">Sam (Male)</option>
+                        <option value="AZnzlk1XvdvUeBnXmlld">Domi (Female)</option>
                       </optgroup>
                     )}
                     {customVoices.map((id) => (
