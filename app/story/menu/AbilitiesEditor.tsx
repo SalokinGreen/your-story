@@ -167,12 +167,14 @@ export default function AbilitiesEditor({
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-lg font-bold text-white flex items-center gap-2">
-          <DynamicIcon name="Sparkles" className="w-6 h-6" /> Abilities (
-          {localAbilities.length})
+          <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
+            <DynamicIcon name="Sparkles" className="w-4 h-4 text-purple-300" />
+          </span>
+          Abilities ({localAbilities.length})
         </h4>
         <button
           onClick={addAbility}
-          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg"
+          className="px-3 py-1.5 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white text-sm font-medium rounded-lg shadow-md shadow-emerald-950/40 transition-all"
         >
           + Add Ability
         </button>
@@ -182,7 +184,7 @@ export default function AbilitiesEditor({
           editingAbilityIndex === index ? (
             <div
               key={index}
-              className="p-4 bg-purple-100 dark:bg-purple-900/40 border-2 border-purple-400 rounded-lg"
+              className="p-4 bg-white/[0.04] backdrop-blur-xl border border-purple-400/30 rounded-2xl shadow-[0_0_20px_rgba(168,85,247,0.1)]"
             >
               <div className="space-y-3">
                 <input
@@ -192,7 +194,7 @@ export default function AbilitiesEditor({
                     setEditAbility({ ...editAbility, name: e.target.value })
                   }
                   placeholder="Ability name"
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                 />
                 <div className="relative z-30">
                   <IconPicker
@@ -215,7 +217,7 @@ export default function AbilitiesEditor({
                           grade: e.target.value as AbilityGrade,
                         })
                       }
-                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                       style={{
                         color:
                           ABILITY_GRADE_CONFIG[
@@ -248,7 +250,7 @@ export default function AbilitiesEditor({
                           cooldown: parseInt(e.target.value) || 0,
                         })
                       }
-                      className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                     />
                   </div>
                 </div>
@@ -266,7 +268,7 @@ export default function AbilitiesEditor({
                       })
                     }
                     placeholder="e.g., Strength, Magic, etc."
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                   />
                 </div>
                 <textarea
@@ -278,19 +280,19 @@ export default function AbilitiesEditor({
                     })
                   }
                   placeholder="Description"
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                   rows={2}
                 />
 
                 {/* Costs Section */}
-                <div className="border-t border-blue-700/30 pt-3">
+                <div className="border-t border-white/10 pt-3">
                   <div className="flex items-center justify-between mb-2">
                     <label className="text-sm font-medium text-blue-200/80">
                       Costs
                     </label>
                     <button
                       onClick={addCost}
-                      className="px-2 py-1 text-xs bg-blue-600 hover:bg-blue-700 text-white rounded"
+                      className="px-2 py-1 text-xs bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg transition-colors"
                     >
                       + Add Cost
                     </button>
@@ -304,14 +306,14 @@ export default function AbilitiesEditor({
                       {editCosts.map((cost, costIndex) => (
                         <div
                           key={costIndex}
-                          className="flex items-center gap-2 p-2 bg-blue-950/30 rounded"
+                          className="flex items-center gap-2 p-2 bg-white/[0.03] rounded-lg border border-white/10"
                         >
                           <select
                             value={cost.type}
                             onChange={(e) =>
                               updateCost(costIndex, "type", e.target.value)
                             }
-                            className="px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-white text-sm"
+                            className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                           >
                             <option value="resource">Resource</option>
                             <option value="variable">Variable</option>
@@ -321,7 +323,7 @@ export default function AbilitiesEditor({
                             onChange={(e) =>
                               updateCost(costIndex, "name", e.target.value)
                             }
-                            className="flex-1 px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-white text-sm"
+                            className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                           >
                             <option value="">Select...</option>
                             {cost.type === "resource"
@@ -347,11 +349,11 @@ export default function AbilitiesEditor({
                                 parseInt(e.target.value) || 1,
                               )
                             }
-                            className="w-16 px-2 py-1 bg-blue-950/50 border border-blue-700/40 rounded text-white text-sm"
+                            className="w-16 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                           />
                           <button
                             onClick={() => removeCost(costIndex)}
-                            className="p-1 text-red-400 hover:text-red-300"
+                            className="p-1 text-red-400 hover:text-red-300 transition-colors"
                           >
                             <DynamicIcon name="X" className="w-4 h-4" />
                           </button>
@@ -364,13 +366,13 @@ export default function AbilitiesEditor({
                 <div className="flex gap-2">
                   <button
                     onClick={() => saveEdit(index)}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                    className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 text-white rounded-lg shadow-md shadow-emerald-950/40 transition-all"
                   >
                     Save
                   </button>
                   <button
                     onClick={cancelEdit}
-                    className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg"
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-all"
                   >
                     Cancel
                   </button>
@@ -397,7 +399,7 @@ export default function AbilitiesEditor({
                 }30`,
               }}
             >
-              <span className="text-gray-400 select-none">
+              <span className="text-blue-300/40 select-none">
                 <DynamicIcon name="GripVertical" className="w-5 h-5" />
               </span>
               <div className="flex-1">
@@ -458,10 +460,10 @@ export default function AbilitiesEditor({
                   <button
                     onClick={() => moveUp(index)}
                     disabled={index === 0}
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded flex items-center justify-center ${
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-colors ${
                       index === 0
-                        ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700 text-white"
+                        ? "bg-white/5 text-blue-300/30 cursor-not-allowed"
+                        : "bg-white/5 hover:bg-white/10 text-blue-200 border border-white/10"
                     }`}
                     title="Move Up"
                   >
@@ -473,10 +475,10 @@ export default function AbilitiesEditor({
                   <button
                     onClick={() => moveDown(index)}
                     disabled={index === localAbilities.length - 1}
-                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded flex items-center justify-center ${
+                    className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-colors ${
                       index === localAbilities.length - 1
-                        ? "bg-gray-700 text-gray-500 cursor-not-allowed"
-                        : "bg-blue-600 hover:bg-blue-700 text-white"
+                        ? "bg-white/5 text-blue-300/30 cursor-not-allowed"
+                        : "bg-white/5 hover:bg-white/10 text-blue-200 border border-white/10"
                     }`}
                     title="Move Down"
                   >
@@ -488,7 +490,7 @@ export default function AbilitiesEditor({
                 </div>
                 <button
                   onClick={() => startEdit(index)}
-                  className="w-7 h-7 sm:w-8 sm:h-8 bg-yellow-600 hover:bg-yellow-700 text-white rounded flex items-center justify-center"
+                  className="w-7 h-7 sm:w-8 sm:h-8 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg flex items-center justify-center transition-colors"
                   title="Edit"
                 >
                   <DynamicIcon
@@ -498,7 +500,7 @@ export default function AbilitiesEditor({
                 </button>
                 <button
                   onClick={() => removeAbility(index)}
-                  className="w-7 h-7 sm:w-8 sm:h-8 bg-red-600 hover:bg-red-700 text-white rounded flex items-center justify-center"
+                  className="w-7 h-7 sm:w-8 sm:h-8 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg flex items-center justify-center transition-colors"
                   title="Remove"
                 >
                   <DynamicIcon

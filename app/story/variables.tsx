@@ -16,7 +16,7 @@ interface VariablesDisplayProps {
 export default function VariablesDisplay({ variables }: VariablesDisplayProps) {
   if (!variables || variables.length === 0) {
     return (
-      <div className="p-4 text-center rounded-lg bg-blue-900/30 border border-blue-800/30">
+      <div className="p-4 text-center rounded-xl bg-white/[0.03] backdrop-blur-md border border-white/10">
         <p className="text-sm text-blue-200/40">No variables tracked</p>
       </div>
     );
@@ -144,7 +144,7 @@ function NumberVariableDetails({ variable }: { variable: NumberVariable }) {
           <span>{variable.minValue}</span>
           <span>{variable.maxValue}</span>
         </div>
-        <div className="w-full bg-blue-900/50 rounded-full h-1.5">
+        <div className="w-full bg-white/10 rounded-full h-1.5">
           <div
             className="bg-linear-to-r from-cyan-400 to-cyan-500 h-1.5 rounded-full transition-all duration-300"
             style={{ width: `${Math.min(Math.max(fillPercent, 0), 100)}%` }}
@@ -174,7 +174,7 @@ function ListVariableDetails({ variable }: { variable: ListVariable }) {
       {variable.items.map((item, index) => (
         <span
           key={index}
-          className="px-2 py-0.5 text-xs rounded bg-violet-500/20 text-violet-300"
+          className="px-2 py-0.5 text-xs rounded-full bg-violet-500/10 text-violet-300 border border-violet-400/20"
         >
           {item}
         </span>

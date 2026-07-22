@@ -97,44 +97,44 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
       className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={handleBackdropClick}
     >
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 border border-white/10 w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="shrink-0 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+        <div className="shrink-0 px-6 py-4 border-b border-white/10 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+            <div className="p-2 bg-purple-500/10 ring-1 ring-purple-400/20 rounded-lg">
               <DynamicIcon
                 name="Settings"
-                className="w-5 h-5 text-purple-600 dark:text-purple-400"
+                className="w-5 h-5 text-purple-300"
               />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-lg font-semibold text-white">
                 Settings
               </h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">
+              <p className="text-xs text-blue-300/60">
                 AI models and API keys
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
           >
             <DynamicIcon
               name="X"
-              className="w-5 h-5 text-gray-500 dark:text-gray-400"
+              className="w-5 h-5 text-blue-300/60"
             />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex shrink-0 border-b border-gray-200 dark:border-gray-700 px-6 overflow-x-auto">
+        <div className="flex shrink-0 border-b border-white/10 px-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab("config")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "config"
-                ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "border-purple-400 text-purple-300"
+                : "border-transparent text-blue-300/50 hover:text-blue-200"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -146,8 +146,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("display")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "display"
-                ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "border-purple-400 text-purple-300"
+                : "border-transparent text-blue-300/50 hover:text-blue-200"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -159,8 +159,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("game")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "game"
-                ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "border-purple-400 text-purple-300"
+                : "border-transparent text-blue-300/50 hover:text-blue-200"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -172,8 +172,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("services")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "services"
-                ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "border-purple-400 text-purple-300"
+                : "border-transparent text-blue-300/50 hover:text-blue-200"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -185,8 +185,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             onClick={() => setActiveTab("llm")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
               activeTab === "llm"
-                ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                : "border-transparent text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
+                ? "border-purple-400 text-purple-300"
+                : "border-transparent text-blue-300/50 hover:text-blue-200"
             }`}
           >
             <span className="flex items-center gap-2">
@@ -218,7 +218,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-white">
                         OpenRouter
                       </span>
                       {hasKey("openRouterKey") && (
@@ -244,12 +244,12 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                           setKey("openRouterKey", e.target.value)
                         }
                         placeholder="sk-or-..."
-                        className="flex-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                        className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
                       />
                       {hasKey("openRouterKey") && (
                         <button
                           onClick={disconnectOpenRouter}
-                          className="p-1 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                          className="p-1 text-red-400 hover:bg-red-500/10 rounded-lg"
                           title="Clear key"
                         >
                           <DynamicIcon name="X" className="w-3.5 h-3.5" />
@@ -289,7 +289,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-white">
                         DeepSeek
                       </span>
                       {hasKey("deepseekKey") && (
@@ -312,7 +312,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.deepseekKey}
                       onChange={(e) => setKey("deepseekKey", e.target.value)}
                       placeholder="sk-..."
-                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
                     />
                   </div>
                 </div>
@@ -324,7 +324,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-white">
                         Google AI Studio
                       </span>
                       {hasKey("googleKey") && (
@@ -347,7 +347,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.googleKey}
                       onChange={(e) => setKey("googleKey", e.target.value)}
                       placeholder="AIza..."
-                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
                     />
                   </div>
                 </div>
@@ -359,7 +359,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-white">
                         Mistral
                       </span>
                       {hasKey("mistralKey") && (
@@ -382,9 +382,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.mistralKey}
                       onChange={(e) => setKey("mistralKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
                     />
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    <p className="text-xs text-blue-300/50 mt-1">
                       Used for Mistral models, OCR, and speech-to-text.
                     </p>
                   </div>
@@ -397,7 +397,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-white">
                         DeepInfra
                       </span>
                       {hasKey("deepinfraKey") && (
@@ -420,9 +420,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.deepinfraKey}
                       onChange={(e) => setKey("deepinfraKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
                     />
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    <p className="text-xs text-blue-300/50 mt-1">
                       Used for text-to-speech (Kokoro/Orpheus) and image generation.
                     </p>
                   </div>
@@ -435,7 +435,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-white">
                         Cartesia
                       </span>
                       {hasKey("cartesiaKey") && (
@@ -458,9 +458,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.cartesiaKey}
                       onChange={(e) => setKey("cartesiaKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
                     />
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    <p className="text-xs text-blue-300/50 mt-1">
                       Used for low-latency Sonic-3 text-to-speech.
                     </p>
                   </div>
@@ -473,7 +473,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-white">
                         ElevenLabs
                       </span>
                       {hasKey("elevenlabsKey") && (
@@ -496,9 +496,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.elevenlabsKey}
                       onChange={(e) => setKey("elevenlabsKey", e.target.value)}
                       placeholder="..."
-                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
                     />
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    <p className="text-xs text-blue-300/50 mt-1">
                       Used for premium Flash v2.5 text-to-speech.
                     </p>
                   </div>
@@ -511,7 +511,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="text-sm font-medium text-white">
                         Brave Search
                       </span>
                       {hasKey("braveSearchKey") && (
@@ -534,9 +534,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       value={keys.braveSearchKey}
                       onChange={(e) => setKey("braveSearchKey", e.target.value)}
                       placeholder="BSA..."
-                      className="w-full mt-1 px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono"
+                      className="w-full mt-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-xs font-mono text-white"
                     />
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    <p className="text-xs text-blue-300/50 mt-1">
                       Only used if the GM delegates a web research task - enable that in
                       the Game tab.
                     </p>
@@ -545,10 +545,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
               </div>
 
               {/* Show/Hide Keys & Privacy Info */}
-              <div className="flex items-center justify-between pt-3 border-t border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between pt-3 border-t border-white/10">
                 <button
                   onClick={() => setShowKeys(!showKeys)}
-                  className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+                  className="flex items-center gap-2 text-xs text-blue-300/60 hover:text-blue-200 transition-colors"
                 >
                   <DynamicIcon
                     name={showKeys ? "EyeOff" : "Eye"}
@@ -556,7 +556,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                   />
                   {showKeys ? "Hide" : "Show"}
                 </button>
-                <p className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1">
+                <p className="text-xs text-blue-300/50 flex items-center gap-1">
                   <DynamicIcon name="Shield" className="w-3 h-3" />
                   Keys are never shared
                 </p>
@@ -565,17 +565,17 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
           ) : activeTab === "services" ? (
             <>
               {/* TTS Provider Info */}
-              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700/50 -mt-2 mb-4">
+              <div className="p-3 bg-blue-500/10 rounded-lg border border-blue-400/20 -mt-2 mb-4">
                 <div className="flex items-center gap-2">
                   <DynamicIcon
                     name="Volume2"
-                    className="w-4 h-4 text-blue-600 dark:text-blue-400"
+                    className="w-4 h-4 text-blue-300"
                   />
                   <div>
-                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                    <p className="text-sm font-medium text-white">
                       Bring your own TTS provider
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-blue-300/60">
                       Kokoro/Orpheus (DeepInfra), Cartesia Sonic-3, or ElevenLabs Flash -
                       add the matching key in the Keys tab
                     </p>
@@ -585,7 +585,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
               {/* TTS Settings Section */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-sm font-medium text-white flex items-center gap-2">
                   <DynamicIcon name="Settings" className="w-4 h-4" />
                   Voice Settings
                 </h3>
@@ -593,10 +593,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                 {/* Enable TTS Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <p className="text-sm text-blue-100">
                       Enable TTS
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-blue-300/60">
                       Show audio controls for story narration
                     </p>
                   </div>
@@ -617,17 +617,17 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
                   </label>
                 </div>
 
                 {/* Auto-Generate Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <p className="text-sm text-blue-100">
                       Auto-Generate Audio
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-blue-300/60">
                       Automatically narrate new story content
                     </p>
                   </div>
@@ -650,13 +650,13 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
                   </label>
                 </div>
 
                 {/* TTS Model Selector */}
                 <div>
-                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm text-blue-100 mb-2">
                     TTS Model
                   </label>
                   <select
@@ -682,7 +682,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }[newModel];
                       addNotification(`Switched to ${modelLabel}`, "success");
                     }}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="kokoro">
                       Kokoro - Fast & Affordable ($0.62/1M chars, DeepInfra)
@@ -701,7 +701,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* Voice Selector - Dynamic based on model */}
                 <div>
-                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm text-blue-100 mb-2">
                     Voice
                   </label>
                   <select
@@ -716,7 +716,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                         "success",
                       );
                     }}
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     {ttsModel === "kokoro" ? (
                       <>
@@ -777,7 +777,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                     ))}
                   </select>
                   {(ttsModel === "cartesia" || ttsModel === "elevenlabs") && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                    <p className="text-xs text-blue-300/50 mt-1">
                       Browse more voices at{" "}
                       {ttsModel === "cartesia" ? (
                         <a
@@ -812,7 +812,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
                 {/* Volume Slider */}
                 <div>
-                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm text-blue-100 mb-2">
                     Volume: {Math.round(ttsVolume * 100)}%
                   </label>
                   <input
@@ -826,17 +826,17 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       setTtsVolume(value);
                       localStorage.setItem("ttsVolume", e.target.value);
                     }}
-                    className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                    className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
                   />
                 </div>
               </div>
 
               {/* Divider */}
-              <hr className="border-gray-200 dark:border-gray-700" />
+              <hr className="border-white/10" />
 
               {/* STT Settings Section */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-sm font-medium text-white flex items-center gap-2">
                   <DynamicIcon name="Mic" className="w-4 h-4" />
                   Speech-to-Text
                 </h3>
@@ -844,10 +844,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                 {/* Enable STT Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <p className="text-sm text-blue-100">
                       Enable Speech Input
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-blue-300/60">
                       Show microphone button for voice input (2 coins per use)
                     </p>
                   </div>
@@ -872,7 +872,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
                   </label>
                 </div>
               </div>
@@ -881,17 +881,17 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <>
               {/* Game Settings Tab */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-sm font-medium text-white flex items-center gap-2">
                   <DynamicIcon name="Gamepad2" className="w-4 h-4" />
                   Game Settings
                 </h3>
 
                 {/* Default User Notes */}
                 <div>
-                  <label className="block text-sm text-gray-700 dark:text-gray-300 mb-2">
+                  <label className="block text-sm text-blue-100 mb-2">
                     Default User Notes
                   </label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                  <p className="text-xs text-blue-300/60 mb-2">
                     These notes will be automatically added to every new
                     story&apos;s author notes. Use this to set persistent
                     preferences like writing style, content boundaries, or
@@ -904,24 +904,24 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       localStorage.setItem("defaultUserNotes", e.target.value);
                     }}
                     placeholder="e.g., Always write in first person. Include vivid sensory details. Keep dialogue natural and character-driven..."
-                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-[120px]"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-[120px]"
                     rows={5}
                   />
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  <p className="text-xs text-blue-300/50 mt-1">
                     {defaultUserNotes.length} characters
                   </p>
                 </div>
 
                 {/* Divider */}
-                <hr className="border-gray-200 dark:border-gray-700" />
+                <hr className="border-white/10" />
 
                 {/* Web Research Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <p className="text-sm text-blue-100">
                       Enable Web Research
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 max-w-sm">
+                    <p className="text-xs text-blue-300/60 max-w-sm">
                       Lets the GM delegate real-world research questions to a web
                       search (via your Brave Search key in API Keys). Off by
                       default - each search uses your own key.
@@ -946,7 +946,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
                   </label>
                 </div>
               </div>
@@ -955,7 +955,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             <>
               {/* Display Settings Tab */}
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+                <h3 className="text-sm font-medium text-white flex items-center gap-2">
                   <DynamicIcon name="Monitor" className="w-4 h-4" />
                   Display Settings
                 </h3>
@@ -963,10 +963,10 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                 {/* Show Hidden Messages Toggle */}
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                    <p className="text-sm text-blue-100">
                       Show Hidden Messages
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-blue-300/60">
                       Reveal ||double pipe|| text (AI internal notes)
                     </p>
                   </div>
@@ -991,12 +991,12 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       }}
                       className="sr-only peer"
                     />
-                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer dark:bg-gray-700 peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-gray-600 peer-checked:bg-purple-600" />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-purple-500 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:start-0.5 after:bg-white after:border-white/20 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-linear-to-r peer-checked:from-purple-600 peer-checked:to-blue-600" />
                   </label>
                 </div>
 
                 {/* Divider */}
-                <hr className="border-gray-200 dark:border-gray-700" />
+                <hr className="border-white/10" />
 
                 {/* Font Settings */}
                 <FontSettingsTab addNotification={addNotification} />

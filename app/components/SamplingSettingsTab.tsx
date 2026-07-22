@@ -49,21 +49,21 @@ function SliderControl({
   return (
     <div className={`space-y-1 ${disabled ? "opacity-50" : ""}`}>
       <div className="flex items-center justify-between">
-        <label className="text-sm font-medium text-gray-700 dark:text-gray-300 flex items-center gap-2">
+        <label className="text-sm font-medium text-blue-200/80 flex items-center gap-2">
           {label}
           {provider !== "both" && (
-            <span className="text-xs px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded">
+            <span className="text-xs px-1.5 py-0.5 bg-blue-500/10 text-blue-300 border border-blue-400/20 rounded-md">
               {provider === "deepinfra" ? "DeepInfra only" : "Mistral only"}
             </span>
           )}
         </label>
-        <span className="text-sm text-purple-600 dark:text-purple-400 font-mono">
+        <span className="text-sm text-purple-300 font-mono">
           {value.toFixed(step < 1 ? 2 : 0)}
         </span>
       </div>
       <div className="flex items-center gap-2">
         {leftLabel && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap w-16">
+          <span className="text-xs text-blue-300/50 whitespace-nowrap w-16">
             {leftLabel}
           </span>
         )}
@@ -75,15 +75,15 @@ function SliderControl({
           value={value}
           onChange={(e) => onChange(parseFloat(e.target.value))}
           disabled={disabled}
-          className="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500 disabled:cursor-not-allowed"
+          className="flex-1 h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500 disabled:cursor-not-allowed"
         />
         {rightLabel && (
-          <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap w-16 text-right">
+          <span className="text-xs text-blue-300/50 whitespace-nowrap w-16 text-right">
             {rightLabel}
           </span>
         )}
       </div>
-      <p className="text-xs text-gray-500 dark:text-gray-400">{description}</p>
+      <p className="text-xs text-blue-300/50">{description}</p>
     </div>
   );
 }
@@ -232,8 +232,8 @@ export default function SamplingSettingsTab({
   // Hide only for DeepSeek-only BYOK mode
   if (byokMode && !hasOpenRouterKey) {
     return (
-      <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-        <div className="flex items-center gap-2 text-gray-500 dark:text-gray-400">
+      <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg">
+        <div className="flex items-center gap-2 text-blue-300/60">
           <DynamicIcon name="Info" className="w-4 h-4" />
           <p className="text-sm">
             Sampling settings are available for Coins mode models
@@ -277,8 +277,8 @@ export default function SamplingSettingsTab({
 
       {/* Preset Manager */}
       {showPresetManager && (
-        <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-4">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+        <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-4">
+          <h4 className="text-sm font-medium text-white flex items-center gap-2">
             <DynamicIcon name="Layers" className="w-4 h-4" />
             Sampling Presets
           </h4>
@@ -290,17 +290,17 @@ export default function SamplingSettingsTab({
                 key={preset.id}
                 className={`relative p-3 rounded-lg border cursor-pointer transition-all ${
                   currentPresetId === preset.id
-                    ? "border-purple-500 bg-purple-50 dark:bg-purple-900/20"
-                    : "border-gray-200 dark:border-gray-700 hover:border-purple-300 dark:hover:border-purple-700"
+                    ? "border-purple-400/50 bg-purple-500/10"
+                    : "border-white/10 hover:border-purple-400/40"
                 }`}
                 onClick={() => applyPreset(preset)}
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                    <p className="text-sm font-medium text-white truncate">
                       {preset.name}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-xs text-blue-300/50 truncate">
                       {preset.description}
                     </p>
                   </div>
@@ -311,7 +311,7 @@ export default function SamplingSettingsTab({
                           e.stopPropagation();
                           exportPreset(preset);
                         }}
-                        className="p-1 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                        className="p-1 text-blue-400 hover:bg-blue-500/10 rounded-md"
                         title="Copy to clipboard"
                       >
                         <DynamicIcon name="Copy" className="w-3 h-3" />
@@ -321,7 +321,7 @@ export default function SamplingSettingsTab({
                           e.stopPropagation();
                           deletePreset(preset.id);
                         }}
-                        className="p-1 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+                        className="p-1 text-red-400 hover:bg-red-500/10 rounded-md"
                         title="Delete preset"
                       >
                         <DynamicIcon name="Trash2" className="w-3 h-3" />
@@ -330,7 +330,7 @@ export default function SamplingSettingsTab({
                   )}
                 </div>
                 {preset.authorName && !preset.isBuiltIn && (
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  <p className="text-xs text-blue-300/40 mt-1">
                     by {preset.authorName}
                   </p>
                 )}
@@ -347,8 +347,8 @@ export default function SamplingSettingsTab({
           </div>
 
           {/* Save Current as Preset */}
-          <div className="pt-3 border-t border-gray-200 dark:border-gray-700 space-y-2">
-            <p className="text-xs font-medium text-gray-600 dark:text-gray-400">
+          <div className="pt-3 border-t border-white/10 space-y-2">
+            <p className="text-xs font-medium text-blue-300/60">
               Save Current Settings as Preset
             </p>
             <div className="flex gap-2">
@@ -357,12 +357,12 @@ export default function SamplingSettingsTab({
                 value={newPresetName}
                 onChange={(e) => setNewPresetName(e.target.value)}
                 placeholder="Preset name"
-                className="flex-1 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+                className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-blue-300/40"
               />
               <button
                 onClick={saveAsPreset}
                 disabled={!newPresetName.trim()}
-                className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg text-sm font-medium shadow-md shadow-purple-950/40 transition-all disabled:opacity-50"
               >
                 Save
               </button>
@@ -372,25 +372,25 @@ export default function SamplingSettingsTab({
               value={newPresetDescription}
               onChange={(e) => setNewPresetDescription(e.target.value)}
               placeholder="Description (optional)"
-              className="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm"
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-blue-300/40"
             />
           </div>
 
           {/* Import Preset */}
-          <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="pt-3 border-t border-white/10">
             {showImportDialog ? (
               <div className="space-y-2">
                 <textarea
                   value={importJson}
                   onChange={(e) => setImportJson(e.target.value)}
                   placeholder="Paste preset JSON here..."
-                  className="w-full h-24 px-3 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg text-sm font-mono resize-none"
+                  className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm font-mono text-white resize-none"
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={handleImport}
                     disabled={!importJson.trim()}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+                    className="px-4 py-2 bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-sm font-medium shadow-md shadow-emerald-950/40 transition-all disabled:opacity-50"
                   >
                     Import
                   </button>
@@ -399,7 +399,7 @@ export default function SamplingSettingsTab({
                       setShowImportDialog(false);
                       setImportJson("");
                     }}
-                    className="px-4 py-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium"
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg text-sm font-medium transition-colors"
                   >
                     Cancel
                   </button>
@@ -408,7 +408,7 @@ export default function SamplingSettingsTab({
             ) : (
               <button
                 onClick={() => setShowImportDialog(true)}
-                className="w-full py-2 border border-dashed border-gray-300 dark:border-gray-600 hover:border-purple-500 dark:hover:border-purple-500 rounded-lg text-sm text-gray-600 dark:text-gray-400 hover:text-purple-600 dark:hover:text-purple-400 transition-colors"
+                className="w-full py-2 border border-dashed border-white/15 hover:border-purple-400 rounded-lg text-sm text-blue-300/60 hover:text-purple-300 transition-colors"
               >
                 <DynamicIcon name="Download" className="w-4 h-4 inline mr-1" />
                 Import Preset from JSON
@@ -448,7 +448,7 @@ export default function SamplingSettingsTab({
       {/* Advanced Settings Toggle */}
       <button
         onClick={() => setShowAdvanced(!showAdvanced)}
-        className="flex items-center gap-2 text-sm text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300"
+        className="flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200"
       >
         <DynamicIcon
           name={showAdvanced ? "ChevronUp" : "ChevronDown"}
@@ -459,8 +459,8 @@ export default function SamplingSettingsTab({
 
       {/* Advanced Settings */}
       {showAdvanced && (
-        <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-          <h4 className="text-sm font-medium text-gray-900 dark:text-white flex items-center gap-2">
+        <div className="space-y-4 p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg">
+          <h4 className="text-sm font-medium text-white flex items-center gap-2">
             <DynamicIcon name="SlidersHorizontal" className="w-4 h-4" />
             Advanced Sampling
           </h4>
@@ -489,8 +489,8 @@ export default function SamplingSettingsTab({
             rightLabel="Penalize"
           />
 
-          <div className="pt-3 border-t border-gray-200 dark:border-gray-700">
-            <p className="text-xs text-amber-600 dark:text-amber-400 mb-3 flex items-center gap-1">
+          <div className="pt-3 border-t border-white/10">
+            <p className="text-xs text-amber-300 mb-3 flex items-center gap-1">
               <DynamicIcon name="AlertTriangle" className="w-3.5 h-3.5" />
               The following settings only work with DeepInfra and OpenRouter
               models
@@ -538,8 +538,8 @@ export default function SamplingSettingsTab({
       )}
 
       {/* Info Box */}
-      <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-        <p className="text-xs text-blue-700 dark:text-blue-300 flex items-start gap-1.5">
+      <div className="p-3 bg-blue-500/[0.06] border border-blue-400/20 rounded-lg">
+        <p className="text-xs text-blue-200/80 flex items-start gap-1.5">
           <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
           <span>
             Sampling settings only affect the <strong>story stage</strong> of

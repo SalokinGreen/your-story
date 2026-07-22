@@ -623,7 +623,7 @@ function PendingLinesPanel({
 }) {
   return (
     <div
-      className="fixed z-40 left-1/2 -translate-x-1/2 bottom-24 w-[min(22rem,calc(100vw-2rem))] max-h-40 overflow-y-auto rounded-xl bg-gray-900/90 backdrop-blur border border-white/10 shadow-2xl p-2 space-y-1"
+      className="fixed z-40 left-1/2 -translate-x-1/2 bottom-24 w-[min(22rem,calc(100vw-2rem))] max-h-40 overflow-y-auto rounded-xl bg-[#0d1829]/90 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/50 p-2 space-y-1"
       role="log"
       aria-label="Queued player turns"
     >

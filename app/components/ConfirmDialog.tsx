@@ -21,7 +21,7 @@ export default function ConfirmDialog({
   message,
   confirmText = "Confirm",
   cancelText = "Cancel",
-  confirmButtonClass = "bg-purple-600 hover:bg-purple-700",
+  confirmButtonClass = "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 shadow-md shadow-purple-950/40",
   onConfirm,
   onCancel,
   icon = "AlertTriangle",
@@ -51,20 +51,20 @@ export default function ConfirmDialog({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-blue-950 rounded-2xl shadow-2xl p-6 max-w-md w-full border-2 border-gray-200 dark:border-gray-700 animate-in zoom-in-95 duration-200">
+      <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 p-6 max-w-md w-full border border-white/10 animate-in zoom-in-95 duration-200">
         {/* Icon & Title */}
         <div className="flex items-center gap-3 mb-4">
           <DynamicIcon
             name={icon as any}
-            className="w-10 h-10 text-gray-900 dark:text-white"
+            className="w-10 h-10 text-white"
           />
-          <h3 className="text-xl font-bold text-gray-900 dark:text-white">
+          <h3 className="text-xl font-bold text-white">
             {title}
           </h3>
         </div>
 
         {/* Message */}
-        <p className="text-gray-700 dark:text-gray-300 mb-6 leading-relaxed">
+        <p className="text-blue-200/80 mb-6 leading-relaxed">
           {message}
         </p>
 
@@ -72,7 +72,7 @@ export default function ConfirmDialog({
         <div className="flex gap-3">
           <button
             onClick={onCancel}
-            className="flex-1 px-4 py-3 bg-gray-200 dark:bg-gray-900 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-900 dark:text-white font-semibold rounded-lg transition-colors"
+            className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-white font-semibold rounded-lg transition-colors"
           >
             {cancelText}
           </button>

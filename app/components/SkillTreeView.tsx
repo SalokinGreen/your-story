@@ -195,7 +195,7 @@ export default function SkillTreeView({
     if (from.state === "unlocked" && to.state === "available") {
       return "stroke-yellow-400";
     }
-    return "stroke-gray-600";
+    return "stroke-white/15";
   };
 
   // Handle panning
@@ -283,11 +283,11 @@ export default function SkillTreeView({
 
       {/* Zoom Controls */}
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-sm text-gray-400">Zoom:</span>
+        <span className="text-sm text-blue-300/60">Zoom:</span>
         <button
           onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
           disabled={zoom <= 0.5}
-          className="p-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
+          className="p-1.5 bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
           title="Zoom out"
         >
           <DynamicIcon name="ZoomOut" className="w-4 h-4 text-white" />
@@ -298,7 +298,7 @@ export default function SkillTreeView({
         <button
           onClick={() => setZoom(Math.min(2, zoom + 0.25))}
           disabled={zoom >= 2}
-          className="p-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
+          className="p-1.5 bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
           title="Zoom in"
         >
           <DynamicIcon name="ZoomIn" className="w-4 h-4 text-white" />
@@ -308,11 +308,11 @@ export default function SkillTreeView({
             setZoom(1);
             setPanOffset({ x: 0, y: 0 });
           }}
-          className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
+          className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-colors"
         >
           Reset
         </button>
-        <span className="text-xs text-gray-500 ml-2 hidden sm:inline">
+        <span className="text-xs text-blue-300/40 ml-2 hidden sm:inline">
           Drag to pan
         </span>
       </div>
@@ -320,7 +320,7 @@ export default function SkillTreeView({
       {/* Tree Visualization */}
       <div
         ref={containerRef}
-        className="relative bg-linear-to-br from-gray-900/80 to-blue-950/80 rounded-xl border border-blue-800/30 overflow-hidden w-full cursor-grab active:cursor-grabbing touch-none"
+        className="relative bg-white/[0.03] backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden w-full cursor-grab active:cursor-grabbing touch-none"
         style={{ minHeight: "400px", aspectRatio: "4 / 3" }}
         onMouseDown={(e) => {
           // Start panning unless clicking on a node
@@ -434,13 +434,13 @@ export default function SkillTreeView({
                   w-full h-full rounded-lg border-2 flex items-center justify-center
                   transition-all duration-200
                   ${styles.opacity} ${styles.scale}
-                  ${pos.state === "unlocked" ? colors.bg : "bg-gray-800"}
+                  ${pos.state === "unlocked" ? colors.bg : "bg-white/5"}
                   ${
                     pos.state === "unlocked"
                       ? colors.border
                       : pos.state === "available"
                       ? "border-yellow-400"
-                      : "border-gray-600"
+                      : "border-white/15"
                   }
                   ${
                     pos.state === "available" && !readOnly
@@ -449,7 +449,7 @@ export default function SkillTreeView({
                   }
                   ${
                     isHovered || isSelected
-                      ? "ring-2 ring-white ring-offset-2 ring-offset-gray-900"
+                      ? "ring-2 ring-white ring-offset-2 ring-offset-[#0d1829]"
                       : ""
                   }
                 `}
@@ -461,7 +461,7 @@ export default function SkillTreeView({
                         ? "text-white"
                         : pos.state === "available"
                         ? "text-yellow-400"
-                        : "text-gray-500"
+                        : "text-blue-300/40"
                     }`}
                   />
                 </div>
@@ -475,7 +475,7 @@ export default function SkillTreeView({
 
                 {/* Node name tooltip */}
                 {isHovered && (
-                  <div className="absolute left-1/2 -translate-x-1/2 -bottom-8 whitespace-nowrap px-2 py-1 bg-gray-900 rounded text-xs text-white border border-gray-700 z-10">
+                  <div className="absolute left-1/2 -translate-x-1/2 -bottom-8 whitespace-nowrap px-2 py-1 bg-[#0d1829]/95 backdrop-blur-md rounded-lg text-xs text-white border border-white/10 z-10">
                     {pos.node.name}
                   </div>
                 )}
@@ -487,7 +487,7 @@ export default function SkillTreeView({
 
       {/* Node Details Panel */}
       {selectedNode && (
-        <div className="mt-4 p-4 bg-gray-900/80 rounded-lg border border-blue-800/30">
+        <div className="mt-4 p-4 bg-white/[0.03] backdrop-blur-md rounded-lg border border-white/10">
           <div className="flex flex-col gap-4">
             {/* Node info */}
             <div className="flex items-start gap-3">
@@ -580,8 +580,8 @@ export default function SkillTreeView({
 
             {/* Prerequisites info */}
             {selectedNode.prerequisites.length > 0 && (
-              <div className="pt-3 border-t border-gray-700">
-                <p className="text-xs text-gray-400">
+              <div className="pt-3 border-t border-white/10">
+                <p className="text-xs text-blue-300/60">
                   <span className="font-semibold">Requires:</span>{" "}
                   {selectedNode.prerequisites
                     .map(
@@ -599,7 +599,7 @@ export default function SkillTreeView({
                   <button
                     onClick={handleUnlock}
                     disabled={availableUpgrades <= 0}
-                    className="flex-1 px-4 py-2 bg-yellow-600 hover:bg-yellow-500 disabled:bg-gray-700 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+                    className="flex-1 px-4 py-2 bg-linear-to-r from-yellow-600 to-amber-600 hover:from-yellow-500 hover:to-amber-500 disabled:from-white/10 disabled:to-white/10 disabled:cursor-not-allowed text-white font-semibold rounded-lg shadow-md shadow-amber-950/40 disabled:shadow-none transition-all"
                   >
                     {availableUpgrades > 0 ? "✓ Unlock" : "No Points"}
                   </button>
@@ -610,13 +610,13 @@ export default function SkillTreeView({
                 </span>
               )}
               {getNodeState(storyData, tree, selectedNode) === "locked" && (
-                <span className="flex-1 px-4 py-2 bg-gray-700/50 text-gray-400 font-semibold rounded-lg text-center">
+                <span className="flex-1 px-4 py-2 bg-white/5 border border-white/10 text-blue-300/50 font-semibold rounded-lg text-center">
                   🔒 Locked
                 </span>
               )}
               <button
                 onClick={() => setSelectedNode(null)}
-                className="flex-1 sm:flex-none px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors"
+                className="flex-1 sm:flex-none px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-colors"
               >
                 Close
               </button>
@@ -626,7 +626,7 @@ export default function SkillTreeView({
       )}
 
       {/* Legend */}
-      <div className="mt-4 flex flex-wrap gap-2 sm:gap-3 text-xs text-gray-400">
+      <div className="mt-4 flex flex-wrap gap-2 sm:gap-3 text-xs text-blue-300/60">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-yellow-600 border border-yellow-400 animate-pulse" />
           <span>Available</span>
@@ -636,7 +636,7 @@ export default function SkillTreeView({
           <span>Unlocked</span>
         </div>
         <div className="flex items-center gap-1">
-          <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-gray-800 border border-gray-600 opacity-40" />
+          <div className="w-3 h-3 sm:w-4 sm:h-4 rounded bg-white/5 border border-white/15 opacity-40" />
           <span>Locked</span>
         </div>
         <span className="mx-1 sm:mx-2 hidden sm:inline">|</span>

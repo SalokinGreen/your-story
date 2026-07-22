@@ -134,7 +134,7 @@ export default function NPCEditor({
         </h4>
         <button
           onClick={addNPC}
-          className="px-3 py-1 bg-pink-600 hover:bg-pink-700 text-white text-sm rounded-lg flex items-center gap-1"
+          className="px-3 py-1.5 bg-linear-to-r from-pink-600 to-rose-600 hover:from-pink-500 hover:to-rose-500 text-white text-sm font-medium rounded-lg shadow-md shadow-pink-950/40 transition-all flex items-center gap-1"
         >
           <DynamicIcon name="Plus" className="w-4 h-4" />
           Add Character
@@ -146,14 +146,14 @@ export default function NPCEditor({
           editingId === npc.id ? (
             <div
               key={npc.id}
-              className="p-4 bg-pink-900/40 border-2 border-pink-500 rounded-lg space-y-4"
+              className="p-4 bg-white/[0.04] backdrop-blur-xl border border-pink-400/30 rounded-2xl shadow-[0_0_20px_rgba(236,72,153,0.1)] space-y-4"
             >
               {/* Name and Icon */}
               <div className="flex gap-3">
                 <div className="shrink-0">
                   <button
                     onClick={() => setShowIconPicker(!showIconPicker)}
-                    className="w-14 h-14 rounded-lg bg-pink-800/50 border border-pink-600/50 flex items-center justify-center hover:bg-pink-700/50 transition-colors"
+                    className="w-14 h-14 rounded-xl bg-pink-500/10 border border-pink-400/20 flex items-center justify-center hover:bg-pink-500/20 transition-colors"
                     title="Change icon"
                   >
                     <DynamicIcon
@@ -181,7 +181,7 @@ export default function NPCEditor({
                       setEditNPC({ ...editNPC, name: e.target.value })
                     }
                     placeholder="Character Name"
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white font-semibold text-lg"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white font-semibold text-lg focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                   />
                   <input
                     type="text"
@@ -190,7 +190,7 @@ export default function NPCEditor({
                       setEditNPC({ ...editNPC, role: e.target.value })
                     }
                     placeholder="Role (e.g., Tavern Owner, Quest Giver, Rival)"
-                    className="w-full px-3 py-2 mt-2 bg-blue-950/50 border border-blue-700/40 rounded text-white text-sm"
+                    className="w-full px-3 py-2 mt-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                   />
                 </div>
               </div>
@@ -209,7 +209,7 @@ export default function NPCEditor({
                         status: e.target.value as NPCStatus,
                       })
                     }
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                   >
                     {STATUS_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -230,7 +230,7 @@ export default function NPCEditor({
                         attitude: e.target.value as NPCAttitude,
                       })
                     }
-                    className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                   >
                     {ATTITUDE_OPTIONS.map((opt) => (
                       <option key={opt.value} value={opt.value}>
@@ -256,7 +256,7 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, relationship: e.target.value })
                   }
                   placeholder='e.g., "Trusted mentor", "Bitter rival", "Old friend from academy"'
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                 />
               </div>
 
@@ -272,7 +272,7 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, faction: e.target.value })
                   }
                   placeholder="Organization, guild, or group affiliation"
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                 />
               </div>
 
@@ -287,7 +287,7 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, description: e.target.value })
                   }
                   placeholder="Physical appearance, personality, motivations..."
-                  className="w-full h-24 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                  className="w-full h-24 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                 />
               </div>
 
@@ -303,7 +303,7 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, lastSeen: e.target.value })
                   }
                   placeholder="Location or circumstance"
-                  className="w-full px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                 />
               </div>
 
@@ -318,7 +318,7 @@ export default function NPCEditor({
                     setEditNPC({ ...editNPC, notes: e.target.value })
                   }
                   placeholder="Personal notes about this character..."
-                  className="w-full h-20 px-3 py-2 bg-blue-950/50 border border-blue-700/40 rounded text-white resize-none"
+                  className="w-full h-20 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none focus:outline-none focus:ring-2 focus:ring-pink-500/40 focus:border-pink-400/40 transition-colors"
                 />
               </div>
 
@@ -327,14 +327,14 @@ export default function NPCEditor({
                 <button
                   onClick={saveEdit}
                   disabled={!editNPC.name}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 text-white rounded flex items-center gap-1"
+                  className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-emerald-950/40 disabled:shadow-none transition-all flex items-center gap-1"
                 >
                   <DynamicIcon name="Save" className="w-4 h-4" />
                   Save
                 </button>
                 <button
                   onClick={cancelEdit}
-                  className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-all"
                 >
                   Cancel
                 </button>
@@ -343,17 +343,17 @@ export default function NPCEditor({
           ) : (
             <div
               key={npc.id}
-              className="flex items-start gap-3 p-4 bg-pink-900/20 rounded-lg border border-pink-800/40 hover:border-pink-700/50 transition-colors"
+              className="flex items-start gap-3 p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 hover:border-pink-400/20 hover:bg-white/[0.05] transition-colors"
             >
               <div className="shrink-0">
                 {npc.custom_symbol_url ? (
                   <img
                     src={npc.custom_symbol_url}
                     alt={npc.name}
-                    className="w-12 h-12 rounded-lg object-cover border border-pink-700/30"
+                    className="w-12 h-12 rounded-lg object-cover border border-pink-400/20"
                   />
                 ) : (
-                  <div className="w-12 h-12 rounded-lg bg-pink-800/30 border border-pink-700/30 flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-lg bg-pink-500/10 border border-pink-400/20 flex items-center justify-center">
                     <DynamicIcon
                       name={npc.symbol || "User"}
                       className="w-6 h-6 text-pink-400"
@@ -414,14 +414,14 @@ export default function NPCEditor({
               <div className="flex gap-2 shrink-0">
                 <button
                   onClick={() => startEdit(npc)}
-                  className="px-3 py-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded"
+                  className="px-3 py-1 bg-purple-500/10 hover:bg-purple-500/20 text-purple-200 border border-purple-400/20 rounded-lg transition-colors"
                   title="Edit"
                 >
                   <DynamicIcon name="Edit" className="w-4 h-4" />
                 </button>
                 <button
                   onClick={() => removeNPC(npc.id)}
-                  className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded"
+                  className="px-3 py-1 bg-red-500/10 hover:bg-red-500/20 text-red-300 border border-red-400/20 rounded-lg transition-colors"
                   title="Remove"
                 >
                   <DynamicIcon name="Trash2" className="w-4 h-4" />
@@ -432,7 +432,7 @@ export default function NPCEditor({
         )}
 
         {localNPCs.length === 0 && (
-          <div className="p-8 text-center rounded-lg bg-pink-900/20 border-2 border-dashed border-pink-700/40">
+          <div className="p-8 text-center rounded-2xl bg-white/[0.02] border-2 border-dashed border-pink-400/20">
             <DynamicIcon
               name="Users"
               className="w-12 h-12 text-pink-400/30 mx-auto mb-3"

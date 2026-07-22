@@ -337,7 +337,7 @@ export default function SkillTreeEditor({
             type="text"
             value={tree.name}
             onChange={(e) => handleNameChange(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
             placeholder="e.g., Combat Skills, Magic Mastery"
           />
         </div>
@@ -349,7 +349,7 @@ export default function SkillTreeEditor({
             type="text"
             value={tree.description || ""}
             onChange={(e) => handleDescriptionChange(e.target.value)}
-            className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
             placeholder="What this skill tree offers"
           />
         </div>
@@ -414,7 +414,7 @@ export default function SkillTreeEditor({
         <button
           onClick={() => setZoom(Math.max(0.5, zoom - 0.25))}
           disabled={zoom <= 0.5}
-          className="p-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
+          className="p-1.5 bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
           title="Zoom out"
         >
           <DynamicIcon name="ZoomOut" className="w-4 h-4 text-white" />
@@ -425,7 +425,7 @@ export default function SkillTreeEditor({
         <button
           onClick={() => setZoom(Math.min(2, zoom + 0.25))}
           disabled={zoom >= 2}
-          className="p-1.5 bg-gray-800 hover:bg-gray-700 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
+          className="p-1.5 bg-white/5 hover:bg-white/10 border border-white/10 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg transition-colors"
           title="Zoom in"
         >
           <DynamicIcon name="ZoomIn" className="w-4 h-4 text-white" />
@@ -435,7 +435,7 @@ export default function SkillTreeEditor({
             setZoom(1);
             setPanOffset({ x: 0, y: 0 });
           }}
-          className="px-2 py-1 text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 rounded transition-colors"
+          className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 rounded-lg transition-colors"
         >
           Reset View
         </button>
@@ -447,7 +447,7 @@ export default function SkillTreeEditor({
       {/* Canvas */}
       <div
         ref={canvasRef}
-        className="relative bg-gray-900/50 border border-gray-700 rounded-lg overflow-hidden w-full cursor-grab active:cursor-grabbing"
+        className="relative bg-white/[0.03] backdrop-blur-xl border border-white/10 rounded-2xl overflow-hidden w-full cursor-grab active:cursor-grabbing"
         style={{ aspectRatio: "8 / 5", minHeight: "300px" }}
         onMouseDown={(e) => {
           // Start panning unless clicking on a node
@@ -567,7 +567,7 @@ export default function SkillTreeEditor({
                 />
 
                 {/* Node name label */}
-                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-white whitespace-nowrap bg-gray-900/80 px-1 rounded">
+                <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-xs text-white whitespace-nowrap bg-[#0d1829]/90 backdrop-blur-md px-1 rounded">
                   {node.name}
                 </div>
               </div>
@@ -593,7 +593,7 @@ export default function SkillTreeEditor({
 
       {/* Selected Node Panel */}
       {selectedNode && (
-        <div className="p-3 sm:p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+        <div className="p-3 sm:p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-xl">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
             <h4 className="font-bold text-white flex items-center gap-2 text-sm sm:text-base">
               <DynamicIcon
@@ -655,7 +655,7 @@ export default function SkillTreeEditor({
       {/* Node Edit Modal */}
       {showNodeModal && editingNode && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-gray-900 rounded-xl p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-gray-700">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/10 shadow-2xl shadow-black/50">
             <h3 className="text-lg sm:text-xl font-bold text-white mb-4 flex items-center gap-2">
               <DynamicIcon
                 name={NODE_TYPE_ICONS[editingNode.type]}
@@ -679,7 +679,7 @@ export default function SkillTreeEditor({
                     onChange={(e) =>
                       setEditingNode({ ...editingNode, name: e.target.value })
                     }
-                    className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                   />
                 </div>
                 <div>
@@ -709,7 +709,7 @@ export default function SkillTreeEditor({
                       description: e.target.value,
                     })
                   }
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                   rows={2}
                 />
               </div>
@@ -726,7 +726,7 @@ export default function SkillTreeEditor({
                       type: e.target.value as SkillNode["type"],
                     })
                   }
-                  className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                 >
                   <option value="stat">Stat - Boosts a stat value</option>
                   <option value="ability">Ability - Grants an ability</option>
@@ -790,7 +790,7 @@ export default function SkillTreeEditor({
                   {editingNode.effects.map((effect, idx) => (
                     <div
                       key={idx}
-                      className="flex flex-wrap gap-2 items-center p-2 bg-gray-800/50 rounded-lg"
+                      className="flex flex-wrap gap-2 items-center p-2 bg-white/[0.03] rounded-lg"
                     >
                       <select
                         value={effect.type}
@@ -818,7 +818,7 @@ export default function SkillTreeEditor({
                             effects: newEffects,
                           });
                         }}
-                        className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs sm:text-sm shrink-0"
+                        className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-xs sm:text-sm shrink-0 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                       >
                         <option value="stat_bonus">Stat Bonus</option>
                         <option value="resource_bonus">Resource Bonus</option>
@@ -842,7 +842,7 @@ export default function SkillTreeEditor({
                               effects: newEffects,
                             });
                           }}
-                          className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm flex-1"
+                          className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                         >
                           <option value="">Select Stat</option>
                           {availableStats.map((stat) => (
@@ -867,7 +867,7 @@ export default function SkillTreeEditor({
                               effects: newEffects,
                             });
                           }}
-                          className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm flex-1"
+                          className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                         >
                           <option value="">Select Resource</option>
                           {availableResources.map((res) => (
@@ -879,7 +879,7 @@ export default function SkillTreeEditor({
                       )}
 
                       {effect.type === "grant_ability" && (
-                        <div className="w-full mt-2 p-3 bg-gray-800 rounded-lg border border-purple-700/50 space-y-3">
+                        <div className="w-full mt-2 p-3 bg-purple-500/[0.05] backdrop-blur-md rounded-lg border border-purple-400/20 space-y-3">
                           <div className="text-xs text-purple-400 font-medium mb-2">
                             Define Ability to Grant
                           </div>
@@ -913,7 +913,7 @@ export default function SkillTreeEditor({
                                   effects: newEffects,
                                 });
                               }}
-                              className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                              className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                               placeholder="Ability name"
                             />
                             <IconPicker
@@ -966,7 +966,7 @@ export default function SkillTreeEditor({
                                 effects: newEffects,
                               });
                             }}
-                            className="w-full px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                            className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                             placeholder="Ability description"
                             rows={2}
                           />
@@ -996,7 +996,7 @@ export default function SkillTreeEditor({
                                   effects: newEffects,
                                 });
                               }}
-                              className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                              className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                             >
                               {Object.entries(ABILITY_GRADE_CONFIG).map(
                                 ([key, config]) => (
@@ -1033,7 +1033,7 @@ export default function SkillTreeEditor({
                                   effects: newEffects,
                                 });
                               }}
-                              className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                              className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                             >
                               <option value="">No associated stat</option>
                               {availableStats.map((stat) => (
@@ -1074,7 +1074,7 @@ export default function SkillTreeEditor({
                                   effects: newEffects,
                                 });
                               }}
-                              className="w-16 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                              className="w-16 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                             />
                           </div>
 
@@ -1152,7 +1152,7 @@ export default function SkillTreeEditor({
                                         effects: newEffects,
                                       });
                                     }}
-                                    className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs"
+                                    className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                                   >
                                     <option value="resource">Resource</option>
                                     <option value="variable">Variable</option>
@@ -1183,7 +1183,7 @@ export default function SkillTreeEditor({
                                         effects: newEffects,
                                       });
                                     }}
-                                    className="flex-1 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs"
+                                    className="flex-1 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                                     placeholder={
                                       costItem.type === "resource"
                                         ? "Resource name"
@@ -1217,7 +1217,7 @@ export default function SkillTreeEditor({
                                         effects: newEffects,
                                       });
                                     }}
-                                    className="w-14 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-xs"
+                                    className="w-14 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-xs focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                                   />
                                   <button
                                     type="button"
@@ -1270,7 +1270,7 @@ export default function SkillTreeEditor({
                               effects: newEffects,
                             });
                           }}
-                          className="px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm flex-1"
+                          className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                           placeholder={
                             effect.type === "grant_item"
                               ? "Item name"
@@ -1296,7 +1296,7 @@ export default function SkillTreeEditor({
                               effects: newEffects,
                             });
                           }}
-                          className="w-16 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                          className="w-16 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                           placeholder="Value"
                         />
                       )}
@@ -1317,7 +1317,7 @@ export default function SkillTreeEditor({
                               effects: newEffects,
                             });
                           }}
-                          className="w-16 px-2 py-1 bg-gray-700 border border-gray-600 rounded text-white text-sm"
+                          className="w-16 px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 transition-colors"
                           placeholder="Qty"
                         />
                       )}
@@ -1349,13 +1349,13 @@ export default function SkillTreeEditor({
             </div>
 
             {/* Modal Actions */}
-            <div className="flex gap-3 mt-6 pt-4 border-t border-gray-700">
+            <div className="flex gap-3 mt-6 pt-4 border-t border-white/10">
               <button
                 onClick={() => {
                   setShowNodeModal(false);
                   setEditingNode(null);
                 }}
-                className="flex-1 px-4 py-2 font-medium rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
+                className="flex-1 px-4 py-2 font-medium rounded-lg bg-white/5 text-blue-200 hover:bg-white/10 border border-white/10 transition-colors"
               >
                 Cancel
               </button>
@@ -1371,7 +1371,7 @@ export default function SkillTreeEditor({
       )}
 
       {/* Instructions */}
-      <div className="p-3 bg-gray-800/30 rounded-lg text-xs text-gray-500">
+      <div className="p-3 bg-white/[0.02] rounded-lg text-xs text-blue-300/40">
         <p className="font-medium mb-1">Quick Guide:</p>
         <ul className="space-y-0.5">
           <li>

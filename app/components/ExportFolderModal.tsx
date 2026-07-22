@@ -102,7 +102,7 @@ export default function ExportFolderModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
+      <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-2xl shadow-2xl shadow-black/50 p-6 max-w-md w-full">
         <div className="flex items-center gap-2 mb-4">
           <DynamicIcon
             name={folder.icon}
@@ -124,8 +124,8 @@ export default function ExportFolderModal({
                 key={row.key}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg border transition-colors ${
                   row.count === 0
-                    ? "opacity-40 cursor-not-allowed border-blue-800/30"
-                    : "cursor-pointer border-blue-800/50 hover:bg-blue-900/40"
+                    ? "opacity-40 cursor-not-allowed border-white/10"
+                    : "cursor-pointer border-white/10 hover:bg-white/5"
                 }`}
               >
                 <input
@@ -146,14 +146,14 @@ export default function ExportFolderModal({
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
+            className="flex-1 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
           >
             Cancel
           </button>
           <button
             onClick={handleExport}
             disabled={loading}
-            className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-semibold rounded-lg shadow-md shadow-purple-950/40 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
           >
             <DynamicIcon name="Download" className="w-4 h-4" />
             Export

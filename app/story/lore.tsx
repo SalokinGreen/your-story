@@ -383,14 +383,14 @@ export default function LorePage(props: LorePageProps) {
   return (
     <div className="w-full space-y-4">
       {/* Header Section */}
-      <div className="bg-linear-to-br from-blue-950/80 to-indigo-950/50 rounded-2xl border border-blue-700/30 p-4 shadow-lg">
+      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
+              <div className="p-2 bg-purple-500/10 ring-1 ring-purple-400/20 rounded-lg">
                 <DynamicIcon
                   name="BookOpen"
-                  className="w-5 h-5 text-purple-400"
+                  className="w-5 h-5 text-purple-300"
                 />
               </div>
               Story Notes
@@ -405,7 +405,7 @@ export default function LorePage(props: LorePageProps) {
             {onUpdateLore && (
               <button
                 onClick={() => setIsAddingNote(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-emerald-600/80 hover:bg-emerald-500/80 border border-emerald-500/40 rounded-lg text-sm text-white transition-all"
+                className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-lg text-sm text-white font-medium shadow-md shadow-emerald-950/40 transition-all"
               >
                 <DynamicIcon name="Plus" className="w-4 h-4" />
                 <span className="hidden sm:inline">Add Note</span>
@@ -416,7 +416,7 @@ export default function LorePage(props: LorePageProps) {
             <div className="relative">
               <button
                 onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-900/60 hover:bg-blue-800/60 border border-blue-700/40 rounded-lg text-sm text-white transition-all"
+                className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white transition-all"
               >
                 <DynamicIcon
                   name={TYPE_CONFIG[selectedType].icon}
@@ -442,7 +442,7 @@ export default function LorePage(props: LorePageProps) {
                     className="fixed inset-0 z-40"
                     onClick={() => setIsTypeDropdownOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-56 bg-blue-950 border border-blue-700/50 rounded-xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
+                  <div className="absolute right-0 mt-2 w-56 bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden max-h-96 overflow-y-auto">
                     {(
                       [
                         "all",
@@ -468,8 +468,8 @@ export default function LorePage(props: LorePageProps) {
                         }}
                         className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
                           selectedType === type
-                            ? "bg-blue-800/50 text-white"
-                            : "text-blue-100 hover:bg-blue-900/50"
+                            ? "bg-white/10 text-white"
+                            : "text-blue-100 hover:bg-white/5"
                         }`}
                       >
                         <div
@@ -507,7 +507,7 @@ export default function LorePage(props: LorePageProps) {
               setSearchTerm(e.target.value);
               setPage(1);
             }}
-            className="w-full px-4 py-2.5 pl-10 bg-blue-900/40 border border-blue-700/30 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
+            className="w-full px-4 py-2.5 pl-10 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-all"
           />
           <DynamicIcon
             name="Search"
@@ -519,7 +519,7 @@ export default function LorePage(props: LorePageProps) {
                 setSearchTerm("");
                 setPage(1);
               }}
-              className="absolute right-3 top-2.5 p-0.5 hover:bg-blue-800/50 rounded"
+              className="absolute right-3 top-2.5 p-0.5 hover:bg-white/10 rounded"
             >
               <DynamicIcon name="X" className="h-4 w-4 text-blue-300/50" />
             </button>
@@ -530,7 +530,7 @@ export default function LorePage(props: LorePageProps) {
       {/* Main Content - Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* Lore List */}
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-2xl border border-blue-800/30 p-3 lg:col-span-1 xl:col-span-2">
+        <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-3 lg:col-span-1 xl:col-span-2">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-blue-100 flex items-center gap-2">
               <DynamicIcon
@@ -546,7 +546,7 @@ export default function LorePage(props: LorePageProps) {
 
           {filteredLore.length === 0 && !searchTerm && (
             <div className="text-center py-12">
-              <div className="p-4 bg-blue-900/20 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+              <div className="p-4 bg-white/5 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
                 <DynamicIcon
                   name={TYPE_CONFIG[selectedType].icon}
                   className="w-8 h-8 text-blue-400/30"
@@ -588,11 +588,11 @@ export default function LorePage(props: LorePageProps) {
                   className={`w-full text-left p-2 rounded-lg border transition-all group ${
                     isSelected
                       ? isSecret
-                        ? "border-amber-500/50 bg-linear-to-r from-amber-500/15 to-orange-500/10"
-                        : "border-purple-500/50 bg-linear-to-r from-purple-500/15 to-blue-500/10"
+                        ? "border-amber-400/40 bg-linear-to-r from-amber-500/15 to-orange-500/10"
+                        : "border-purple-400/40 bg-linear-to-r from-purple-500/15 to-blue-500/10"
                       : isSecret
-                      ? "border-amber-800/30 hover:border-amber-600/40 hover:bg-amber-500/5"
-                      : "border-blue-800/20 hover:border-blue-600/40 hover:bg-blue-500/5"
+                      ? "border-amber-500/20 hover:border-amber-400/30 hover:bg-amber-500/5"
+                      : "border-white/10 hover:border-white/20 hover:bg-white/5"
                   } ${isInactive ? "opacity-50" : ""} ${
                     isPinned ? "ring-1 ring-yellow-500/30" : ""
                   } card-interactive ${
@@ -615,16 +615,16 @@ export default function LorePage(props: LorePageProps) {
                         alt={loreItem.title}
                         className={`w-8 h-8 rounded object-cover border shrink-0 ${
                           isSecret
-                            ? "border-amber-700/30"
-                            : "border-blue-700/30"
+                            ? "border-amber-400/20"
+                            : "border-white/10"
                         }`}
                       />
                     ) : (
                       <div
                         className={`w-8 h-8 rounded flex items-center justify-center shrink-0 ${
                           isSecret
-                            ? "bg-amber-900/30 border border-amber-700/30"
-                            : `${TYPE_CONFIG[itemType].bgColor} border border-blue-700/30`
+                            ? "bg-amber-500/10 border border-amber-400/20"
+                            : `${TYPE_CONFIG[itemType].bgColor} border border-white/10`
                         }`}
                       >
                         <DynamicIcon
@@ -675,8 +675,8 @@ export default function LorePage(props: LorePageProps) {
                       }}
                       className={`mt-1 p-1 rounded transition-colors ${
                         isPinned
-                          ? "text-yellow-400 hover:bg-yellow-500/20"
-                          : "text-blue-400/40 hover:text-blue-300 hover:bg-blue-500/10 opacity-0 group-hover:opacity-100"
+                          ? "text-yellow-400 hover:bg-yellow-500/15"
+                          : "text-blue-400/40 hover:text-blue-300 hover:bg-white/10 opacity-0 group-hover:opacity-100"
                       }`}
                       title={isPinned ? "Unpin note" : "Pin note to top"}
                     >
@@ -689,11 +689,11 @@ export default function LorePage(props: LorePageProps) {
           </div>
 
           {totalPages > 1 && (
-            <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-blue-800/30">
+            <div className="flex items-center justify-between gap-2 mt-3 pt-3 border-t border-white/10">
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage <= 1}
-                className="p-1.5 rounded-lg text-blue-300 hover:bg-blue-800/50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 rounded-lg text-blue-300 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Previous page"
               >
                 <DynamicIcon name="ChevronLeft" className="w-4 h-4" />
@@ -704,7 +704,7 @@ export default function LorePage(props: LorePageProps) {
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages}
-                className="p-1.5 rounded-lg text-blue-300 hover:bg-blue-800/50 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
+                className="p-1.5 rounded-lg text-blue-300 hover:bg-white/10 disabled:opacity-30 disabled:hover:bg-transparent transition-colors"
                 title="Next page"
               >
                 <DynamicIcon name="ChevronRight" className="w-4 h-4" />
@@ -714,11 +714,11 @@ export default function LorePage(props: LorePageProps) {
         </div>
 
         {/* Lore Detail */}
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-2xl border border-blue-800/30 lg:col-span-2 xl:col-span-4 flex flex-col">
+        <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 lg:col-span-2 xl:col-span-4 flex flex-col">
           {!selectedLore ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="text-center">
-                <div className="p-6 bg-blue-900/20 rounded-full w-24 h-24 mx-auto mb-4 flex items-center justify-center">
+                <div className="p-6 bg-white/5 rounded-full w-24 h-24 mx-auto mb-4 flex items-center justify-center">
                   <DynamicIcon
                     name="BookOpen"
                     className="w-12 h-12 text-blue-400/20"
@@ -735,12 +735,12 @@ export default function LorePage(props: LorePageProps) {
           ) : (
             <>
               {/* Detail Header */}
-              <div className="p-4 border-b border-blue-800/30">
+              <div className="p-4 border-b border-white/10">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {selectedLore.secrtet && (
-                        <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 rounded text-xs flex items-center gap-1">
+                        <span className="px-2 py-0.5 bg-amber-500/10 text-amber-300 border border-amber-400/20 rounded text-xs flex items-center gap-1">
                           <DynamicIcon name="Lock" className="w-3 h-3" />
                           Secret
                         </span>
@@ -759,7 +759,7 @@ export default function LorePage(props: LorePageProps) {
                         <button
                           onClick={handlePushToLibrary}
                           disabled={syncingLibrary}
-                          className="p-2 hover:bg-blue-800/50 rounded-lg transition-colors group disabled:opacity-50"
+                          className="p-2 hover:bg-white/10 rounded-lg transition-colors group disabled:opacity-50"
                           title="Push this version to your notes library"
                         >
                           <DynamicIcon
@@ -770,7 +770,7 @@ export default function LorePage(props: LorePageProps) {
                         <button
                           onClick={handlePullFromLibrary}
                           disabled={syncingLibrary}
-                          className="p-2 hover:bg-blue-800/50 rounded-lg transition-colors group disabled:opacity-50"
+                          className="p-2 hover:bg-white/10 rounded-lg transition-colors group disabled:opacity-50"
                           title="Pull the latest version from your notes library"
                         >
                           <DynamicIcon
@@ -783,7 +783,7 @@ export default function LorePage(props: LorePageProps) {
                       <button
                         onClick={handleSaveToLibrary}
                         disabled={syncingLibrary}
-                        className="p-2 hover:bg-blue-800/50 rounded-lg transition-colors group shrink-0 disabled:opacity-50"
+                        className="p-2 hover:bg-white/10 rounded-lg transition-colors group shrink-0 disabled:opacity-50"
                         title="Save to your notes library for reuse in other stories"
                       >
                         <DynamicIcon
@@ -798,7 +798,7 @@ export default function LorePage(props: LorePageProps) {
                   {onUpdateLore && !isEditing && (
                     <button
                       onClick={startEditing}
-                      className="p-2 hover:bg-blue-800/50 rounded-lg transition-colors group"
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors group"
                       title="Edit note"
                     >
                       <DynamicIcon
@@ -814,19 +814,19 @@ export default function LorePage(props: LorePageProps) {
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Image */}
                 {selectedLore.thumbnailUrl && (
-                  <div className="relative overflow-hidden rounded-xl border border-blue-700/30 shadow-lg group">
+                  <div className="relative overflow-hidden rounded-xl border border-white/10 shadow-lg group">
                     <img
                       src={selectedLore.thumbnailUrl}
                       alt={selectedLore.title}
                       className="w-full h-48 sm:h-56 xl:h-64 object-cover transition-transform duration-300 group-hover:scale-105"
                     />
-                    <div className="absolute inset-0 bg-linear-to-t from-blue-950/80 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-black/60 via-transparent to-transparent" />
                   </div>
                 )}
 
                 {/* AI Image Generator */}
                 {onUpdateLore && (
-                  <div className="border border-blue-800/30 rounded-xl overflow-hidden">
+                  <div className="border border-white/10 rounded-xl overflow-hidden">
                     <button
                       onClick={() => setShowImageGen(!showImageGen)}
                       className="w-full flex items-center gap-2 px-4 py-3 text-sm text-purple-300 hover:bg-purple-500/10 transition-colors"
@@ -843,7 +843,7 @@ export default function LorePage(props: LorePageProps) {
                       </span>
                     </button>
                     {showImageGen && (
-                      <div className="px-4 pb-4 pt-2 border-t border-blue-800/30">
+                      <div className="px-4 pb-4 pt-2 border-t border-white/10">
                         <LoreImageGenerator
                           loreTitle={selectedLore.title}
                           loreContent={selectedLore.content}
@@ -879,7 +879,7 @@ export default function LorePage(props: LorePageProps) {
                         onChange={(e) =>
                           setEditType(e.target.value as LoreType)
                         }
-                        className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/50 text-sm"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 text-sm transition-colors"
                       >
                         <option value="lore">📁 World Lore</option>
                         <option value="secret">🔒 Secret</option>
@@ -907,7 +907,7 @@ export default function LorePage(props: LorePageProps) {
                         value={editAliases}
                         onChange={(e) => setEditAliases(e.target.value)}
                         placeholder="Comma-separated alternate names, e.g. Bobby, the old man"
-                        className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                       />
                       <p className="text-xs text-blue-300/40 mt-1">
                         Also highlighted and clickable in the story text, alongside the title
@@ -916,7 +916,7 @@ export default function LorePage(props: LorePageProps) {
                     <textarea
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}
-                      className="w-full h-64 px-4 py-3 bg-blue-900/40 border border-blue-700/30 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none font-mono"
+                      className="w-full h-64 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none font-mono transition-colors"
                       placeholder="Enter note content (Markdown supported)..."
                     />
                     <div className="flex items-center justify-between">
@@ -926,13 +926,13 @@ export default function LorePage(props: LorePageProps) {
                       <div className="flex gap-2">
                         <button
                           onClick={() => setIsEditing(false)}
-                          className="px-4 py-2 text-sm text-blue-300 hover:bg-blue-800/50 rounded-lg transition-colors"
+                          className="px-4 py-2 text-sm text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={handleSaveEdit}
-                          className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors flex items-center gap-2"
+                          className="px-4 py-2 text-sm bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all flex items-center gap-2"
                         >
                           <DynamicIcon name="Check" className="w-4 h-4" />
                           Save Changes
@@ -950,7 +950,7 @@ export default function LorePage(props: LorePageProps) {
 
                 {/* Related Info */}
                 {!isEditing && (
-                  <div className="space-y-3 pt-4 border-t border-blue-800/30">
+                  <div className="space-y-3 pt-4 border-t border-white/10">
                     {!!selectedLore.aliases?.length && (
                       <div>
                         <h4 className="text-xs font-medium text-blue-200/50 mb-2 flex items-center gap-2">
@@ -961,7 +961,7 @@ export default function LorePage(props: LorePageProps) {
                           {selectedLore.aliases.map((alias, idx) => (
                             <span
                               key={idx}
-                              className="px-2.5 py-1 bg-purple-500/15 text-purple-300 rounded-lg text-xs"
+                              className="px-2.5 py-1 bg-purple-500/10 text-purple-300 border border-purple-400/20 rounded-lg text-xs"
                             >
                               {alias}
                             </span>
@@ -980,7 +980,7 @@ export default function LorePage(props: LorePageProps) {
                           {selectedLore.relatedCharacters.map((char, idx) => (
                             <span
                               key={idx}
-                              className="px-2.5 py-1 bg-blue-500/15 text-blue-300 rounded-lg text-xs"
+                              className="px-2.5 py-1 bg-blue-500/10 text-blue-300 border border-blue-400/20 rounded-lg text-xs"
                             >
                               {char}
                             </span>
@@ -999,7 +999,7 @@ export default function LorePage(props: LorePageProps) {
                           {selectedLore.relatedLocations.map((loc, idx) => (
                             <span
                               key={idx}
-                              className="px-2.5 py-1 bg-green-500/15 text-green-300 rounded-lg text-xs"
+                              className="px-2.5 py-1 bg-green-500/10 text-green-300 border border-green-400/20 rounded-lg text-xs"
                             >
                               {loc}
                             </span>
@@ -1018,7 +1018,7 @@ export default function LorePage(props: LorePageProps) {
                           {selectedLore.keys.map((key, idx) => (
                             <span
                               key={idx}
-                              className="px-2.5 py-1 bg-slate-700/50 text-blue-200/60 rounded-lg text-xs"
+                              className="px-2.5 py-1 bg-white/5 text-blue-200/60 border border-white/10 rounded-lg text-xs"
                             >
                               {key}
                             </span>
@@ -1037,15 +1037,15 @@ export default function LorePage(props: LorePageProps) {
       {/* Add Note Modal */}
       {isAddingNote && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-linear-to-br from-blue-950 to-slate-900 rounded-xl border border-blue-700/40 w-full max-w-lg shadow-2xl">
-            <div className="flex items-center justify-between p-4 border-b border-blue-800/40">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl border border-white/10 w-full max-w-lg shadow-2xl shadow-black/50">
+            <div className="flex items-center justify-between p-4 border-b border-white/10">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <DynamicIcon name="Plus" className="w-5 h-5 text-emerald-400" />
                 Add New Note
               </h3>
               <button
                 onClick={() => setIsAddingNote(false)}
-                className="p-1 hover:bg-blue-800/50 rounded-lg transition-colors"
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors"
               >
                 <DynamicIcon name="X" className="w-5 h-5 text-blue-300" />
               </button>
@@ -1064,7 +1064,7 @@ export default function LorePage(props: LorePageProps) {
                     setNewNote({ ...newNote, title: e.target.value })
                   }
                   placeholder="Note title..."
-                  className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white placeholder-blue-400/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-400/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 transition-colors"
                 />
               </div>
 
@@ -1078,7 +1078,7 @@ export default function LorePage(props: LorePageProps) {
                   onChange={(e) =>
                     setNewNote({ ...newNote, type: e.target.value as LoreType })
                   }
-                  className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 transition-colors"
                 >
                   <option value="lore">📁 World Lore</option>
                   <option value="secret">🔒 Secret</option>
@@ -1108,22 +1108,22 @@ export default function LorePage(props: LorePageProps) {
                   }
                   placeholder="Note content... (supports Markdown)"
                   rows={6}
-                  className="w-full px-3 py-2 bg-blue-900/40 border border-blue-700/40 rounded-lg text-white placeholder-blue-400/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-400/50 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 resize-none transition-colors"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 p-4 border-t border-blue-800/40">
+            <div className="flex justify-end gap-2 p-4 border-t border-white/10">
               <button
                 onClick={() => setIsAddingNote(false)}
-                className="px-4 py-2 text-blue-300 hover:bg-blue-800/40 rounded-lg transition-colors"
+                className="px-4 py-2 text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddNote}
                 disabled={!newNote.title}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-blue-800/40 disabled:text-blue-400/50 text-white rounded-lg transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-400/40 text-white rounded-lg shadow-md shadow-emerald-950/40 disabled:shadow-none transition-all flex items-center gap-2"
               >
                 <DynamicIcon name="Plus" className="w-4 h-4" />
                 Add Note

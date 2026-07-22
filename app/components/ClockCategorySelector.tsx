@@ -375,8 +375,8 @@ export function ClockCategorySelector({
         onClick={() => setIsOpen(true)}
         className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all ${
           isCompleted
-            ? "bg-green-900/40 border-2 border-green-600/50 text-green-300"
-            : "bg-purple-600/80 border-2 border-purple-400/50 text-white"
+            ? "bg-green-500/10 border-2 border-green-400/30 text-green-300"
+            : "bg-linear-to-r from-purple-600 to-blue-600 border-2 border-purple-400/30 text-white shadow-md shadow-purple-950/40"
         } hover:scale-105 shadow-lg`}
       >
         <DynamicIcon name={current.icon} className="w-5 h-5" />
@@ -594,7 +594,7 @@ export function ClockCategorySelector({
                   setLocalIndex((prev) => Math.max(0, prev - 1));
                 }}
                 disabled={localIndex === 0}
-                className="absolute top-4 left-1/2 -translate-x-1/2 z-30 p-2 text-purple-400 hover:text-purple-300 disabled:opacity-20 disabled:cursor-not-allowed transition-all hover:scale-110 bg-gray-900/50 rounded-full"
+                className="absolute top-4 left-1/2 -translate-x-1/2 z-30 p-2 text-purple-400 hover:text-purple-300 disabled:opacity-20 disabled:cursor-not-allowed transition-all hover:scale-110 bg-white/5 rounded-full"
               >
                 <DynamicIcon name="ChevronUp" className="w-6 h-6" />
               </button>
@@ -606,7 +606,7 @@ export function ClockCategorySelector({
                   );
                 }}
                 disabled={localIndex === categories.length - 1}
-                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 p-2 text-purple-400 hover:text-purple-300 disabled:opacity-20 disabled:cursor-not-allowed transition-all hover:scale-110 bg-gray-900/50 rounded-full"
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30 p-2 text-purple-400 hover:text-purple-300 disabled:opacity-20 disabled:cursor-not-allowed transition-all hover:scale-110 bg-white/5 rounded-full"
               >
                 <DynamicIcon name="ChevronDown" className="w-6 h-6" />
               </button>
@@ -615,15 +615,15 @@ export function ClockCategorySelector({
             {/* Footer hint */}
             <div className="absolute -bottom-12 left-1/2 -translate-x-1/2 text-center whitespace-nowrap">
               <div className="text-blue-400/50 text-xs flex items-center gap-2">
-                <kbd className="px-1.5 py-0.5 bg-blue-900/50 rounded text-[10px]">
+                <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
                   ↑↓
                 </kbd>
                 <span>navigate</span>
-                <kbd className="px-1.5 py-0.5 bg-blue-900/50 rounded text-[10px]">
+                <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
                   Enter
                 </kbd>
                 <span>select</span>
-                <kbd className="px-1.5 py-0.5 bg-blue-900/50 rounded text-[10px]">
+                <kbd className="px-1.5 py-0.5 bg-white/10 rounded text-[10px]">
                   Esc
                 </kbd>
                 <span>close</span>

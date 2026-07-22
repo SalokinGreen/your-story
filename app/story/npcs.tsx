@@ -247,16 +247,16 @@ export default function NPCsPage(props: NPCsPageProps) {
   return (
     <div className="w-full space-y-4">
       {/* Header Section */}
-      <div className="bg-linear-to-br from-blue-950/80 to-indigo-950/50 rounded-xl border border-blue-700/30 p-4 shadow-lg">
+      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
           <div>
             <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <div className="p-2 bg-purple-500/20 rounded-lg">
-                <DynamicIcon name="Users" className="w-5 h-5 text-purple-400" />
+              <div className="p-2 bg-purple-500/10 ring-1 ring-purple-400/20 rounded-lg">
+                <DynamicIcon name="Users" className="w-5 h-5 text-purple-300" />
               </div>
               Characters
             </h2>
-            <p className="text-xs text-slate-400 mt-1 ml-11">
+            <p className="text-xs text-blue-200/50 mt-1 ml-11">
               Track NPCs you've encountered
             </p>
           </div>
@@ -266,7 +266,7 @@ export default function NPCsPage(props: NPCsPageProps) {
             {onUpdateNPCs && (
               <button
                 onClick={() => setIsAddingNPC(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-emerald-600/80 hover:bg-emerald-500/80 border border-emerald-500/40 rounded-lg text-sm text-white transition-all"
+                className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-lg text-sm text-white font-medium shadow-md shadow-emerald-950/40 transition-all"
               >
                 <DynamicIcon name="Plus" className="w-4 h-4" />
                 <span className="hidden sm:inline">Add NPC</span>
@@ -277,7 +277,7 @@ export default function NPCsPage(props: NPCsPageProps) {
             <div className="relative">
               <button
                 onClick={() => setIsFilterDropdownOpen(!isFilterDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-2 bg-blue-900/60 hover:bg-blue-800/60 border border-blue-700/40 rounded-lg text-sm text-white transition-all"
+                className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white transition-all"
               >
                 <DynamicIcon
                   name={getFilterIcon()}
@@ -291,7 +291,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                 </span>
                 <DynamicIcon
                   name={isFilterDropdownOpen ? "ChevronUp" : "ChevronDown"}
-                  className="w-4 h-4 text-slate-400"
+                  className="w-4 h-4 text-blue-300/60"
                 />
               </button>
 
@@ -301,7 +301,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                     className="fixed inset-0 z-40"
                     onClick={() => setIsFilterDropdownOpen(false)}
                   />
-                  <div className="absolute right-0 mt-2 w-56 bg-blue-950 border border-blue-700/50 rounded-xl shadow-xl z-50 overflow-hidden max-h-96 overflow-y-auto">
+                  <div className="absolute right-0 mt-2 w-56 bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden max-h-96 overflow-y-auto">
                     {/* All option */}
                     <button
                       onClick={() => {
@@ -311,11 +311,11 @@ export default function NPCsPage(props: NPCsPageProps) {
                       }}
                       className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
                         filterType === "all"
-                          ? "bg-slate-700/50 text-white"
-                          : "text-slate-100 hover:bg-slate-800/50"
+                          ? "bg-white/10 text-white"
+                          : "text-blue-100 hover:bg-white/5"
                       }`}
                     >
-                      <div className="p-1.5 rounded-lg bg-purple-500/20">
+                      <div className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
                         <DynamicIcon
                           name="Users"
                           className="w-4 h-4 text-purple-300"
@@ -328,7 +328,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                     </button>
 
                     {/* Status filters */}
-                    <div className="px-3 py-2 text-xs text-slate-500 uppercase tracking-wider border-t border-slate-700/30">
+                    <div className="px-3 py-2 text-xs text-blue-300/40 uppercase tracking-wider border-t border-white/10">
                       Status
                     </div>
                     {(Object.keys(STATUS_CONFIG) as NPCStatus[]).map(
@@ -342,8 +342,8 @@ export default function NPCsPage(props: NPCsPageProps) {
                           }}
                           className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
                             filterType === status
-                              ? "bg-slate-700/50 text-white"
-                              : "text-slate-100 hover:bg-slate-800/50"
+                              ? "bg-white/10 text-white"
+                              : "text-blue-100 hover:bg-white/5"
                           }`}
                         >
                           <div
@@ -367,7 +367,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                     )}
 
                     {/* Attitude filters */}
-                    <div className="px-3 py-2 text-xs text-slate-500 uppercase tracking-wider border-t border-slate-700/30">
+                    <div className="px-3 py-2 text-xs text-blue-300/40 uppercase tracking-wider border-t border-white/10">
                       Attitude
                     </div>
                     {(Object.keys(ATTITUDE_CONFIG) as NPCAttitude[]).map(
@@ -381,8 +381,8 @@ export default function NPCsPage(props: NPCsPageProps) {
                           }}
                           className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
                             filterType === attitude
-                              ? "bg-slate-700/50 text-white"
-                              : "text-slate-100 hover:bg-slate-800/50"
+                              ? "bg-white/10 text-white"
+                              : "text-blue-100 hover:bg-white/5"
                           }`}
                         >
                           <div
@@ -413,18 +413,18 @@ export default function NPCsPage(props: NPCsPageProps) {
             placeholder="Search characters..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2.5 pl-10 bg-slate-800/40 border border-slate-600/30 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 transition-all"
+            className="w-full px-4 py-2.5 pl-10 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-all"
           />
           <DynamicIcon
             name="Search"
-            className="absolute left-3 top-3 h-4 w-4 text-slate-500"
+            className="absolute left-3 top-3 h-4 w-4 text-blue-300/50"
           />
           {searchTerm && (
             <button
               onClick={() => setSearchTerm("")}
-              className="absolute right-3 top-2.5 p-0.5 hover:bg-slate-700/50 rounded"
+              className="absolute right-3 top-2.5 p-0.5 hover:bg-white/10 rounded"
             >
-              <DynamicIcon name="X" className="h-4 w-4 text-slate-500" />
+              <DynamicIcon name="X" className="h-4 w-4 text-blue-300/50" />
             </button>
           )}
         </div>
@@ -433,26 +433,26 @@ export default function NPCsPage(props: NPCsPageProps) {
       {/* Main Content - Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         {/* NPC List */}
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 p-3 lg:col-span-1 xl:col-span-2">
+        <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-3 lg:col-span-1 xl:col-span-2">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-slate-200 flex items-center gap-2">
+            <h3 className="text-sm font-semibold text-blue-100 flex items-center gap-2">
               <DynamicIcon
                 name={getFilterIcon()}
                 className={`w-4 h-4 ${getFilterColor()}`}
               />
               {getFilterLabel()}
             </h3>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-blue-300/50">
               {filteredNPCs.length} characters
             </span>
           </div>
 
           {filteredNPCs.length === 0 && !searchTerm && (
             <div className="text-center py-12">
-              <div className="p-4 bg-blue-900/20 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
-                <DynamicIcon name="Users" className="w-8 h-8 text-slate-600" />
+              <div className="p-4 bg-white/5 rounded-full w-16 h-16 mx-auto mb-3 flex items-center justify-center">
+                <DynamicIcon name="Users" className="w-8 h-8 text-blue-300/30" />
               </div>
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-blue-200/40">
                 No characters encountered yet. Continue your adventure!
               </p>
             </div>
@@ -462,15 +462,15 @@ export default function NPCsPage(props: NPCsPageProps) {
             <div className="text-center py-12">
               <DynamicIcon
                 name="SearchX"
-                className="w-10 h-10 text-slate-600 mx-auto mb-2"
+                className="w-10 h-10 text-blue-300/20 mx-auto mb-2"
               />
-              <p className="text-sm text-slate-500">
+              <p className="text-sm text-blue-200/40">
                 No characters match your search.
               </p>
             </div>
           )}
 
-          <div className="space-y-1 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-700/50 scrollbar-track-transparent">
+          <div className="space-y-1 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
             {filteredNPCs.map((npc) => {
               const isSelected = selectedNPC?.id === npc.id;
               const statusConfig = STATUS_CONFIG[npc.status || "unknown"];
@@ -486,8 +486,8 @@ export default function NPCsPage(props: NPCsPageProps) {
                   }}
                   className={`card-interactive w-full text-left p-2 rounded-lg border transition-all group hover:shadow-[0_4px_16px_rgba(147,51,234,0.12)] ${
                     isSelected
-                      ? "border-purple-500/50 bg-linear-to-r from-purple-500/15 to-blue-500/10"
-                      : "border-blue-800/20 hover:border-blue-700/40 hover:bg-blue-900/20"
+                      ? "border-purple-400/40 bg-linear-to-r from-purple-500/15 to-blue-500/10"
+                      : "border-white/10 hover:border-white/20 hover:bg-white/5"
                   } ${isDead ? "opacity-60" : ""}`}
                 >
                   <div className="flex items-center gap-2">
@@ -496,13 +496,13 @@ export default function NPCsPage(props: NPCsPageProps) {
                       <img
                         src={npc.custom_symbol_url}
                         alt={npc.name}
-                        className="w-10 h-10 rounded-lg object-cover border border-slate-600/30 shrink-0"
+                        className="w-10 h-10 rounded-lg object-cover border border-white/10 shrink-0"
                       />
                     ) : (
-                      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-slate-800/50 border border-slate-600/30">
+                      <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 bg-white/5 border border-white/10">
                         <DynamicIcon
                           name={npc.symbol || "User"}
-                          className="w-5 h-5 text-slate-500"
+                          className="w-5 h-5 text-blue-300/50"
                         />
                       </div>
                     )}
@@ -524,7 +524,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                         </span>
                       </div>
                       {npc.role && (
-                        <p className="text-xs text-slate-500 truncate">
+                        <p className="text-xs text-blue-300/50 truncate">
                           {npc.role}
                         </p>
                       )}
@@ -547,20 +547,20 @@ export default function NPCsPage(props: NPCsPageProps) {
         </div>
 
         {/* NPC Detail */}
-        <div className="bg-linear-to-br from-blue-950/60 to-slate-900/60 rounded-xl border border-blue-800/30 lg:col-span-2 xl:col-span-4 flex flex-col">
+        <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 lg:col-span-2 xl:col-span-4 flex flex-col">
           {!selectedNPC ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="text-center">
-                <div className="p-6 bg-blue-900/20 rounded-full w-24 h-24 mx-auto mb-4 flex items-center justify-center">
+                <div className="p-6 bg-white/5 rounded-full w-24 h-24 mx-auto mb-4 flex items-center justify-center">
                   <DynamicIcon
                     name="User"
-                    className="w-12 h-12 text-slate-600"
+                    className="w-12 h-12 text-blue-300/20"
                   />
                 </div>
-                <p className="text-sm text-slate-500 mb-1">
+                <p className="text-sm text-blue-200/40 mb-1">
                   Select a character to view details
                 </p>
-                <p className="text-xs text-slate-600">
+                <p className="text-xs text-blue-300/30">
                   Click on any character from the list
                 </p>
               </div>
@@ -568,20 +568,20 @@ export default function NPCsPage(props: NPCsPageProps) {
           ) : (
             <>
               {/* Detail Header */}
-              <div className="p-4 border-b border-slate-700/30">
+              <div className="p-4 border-b border-white/10">
                 <div className="flex items-start gap-4">
                   {/* Avatar */}
                   {selectedNPC.custom_symbol_url ? (
                     <img
                       src={selectedNPC.custom_symbol_url}
                       alt={selectedNPC.name}
-                      className="w-16 h-16 rounded-xl object-cover border border-slate-600/30 shrink-0"
+                      className="w-16 h-16 rounded-xl object-cover border border-white/10 shrink-0"
                     />
                   ) : (
-                    <div className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 bg-slate-800/50 border border-slate-600/30">
+                    <div className="w-16 h-16 rounded-xl flex items-center justify-center shrink-0 bg-white/5 border border-white/10">
                       <DynamicIcon
                         name={selectedNPC.symbol || "User"}
-                        className="w-8 h-8 text-slate-500"
+                        className="w-8 h-8 text-blue-300/50"
                       />
                     </div>
                   )}
@@ -591,7 +591,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                       {selectedNPC.name}
                     </h2>
                     {selectedNPC.role && (
-                      <p className="text-sm text-slate-400">
+                      <p className="text-sm text-blue-300/60">
                         {selectedNPC.role}
                       </p>
                     )}
@@ -636,7 +636,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                       </span>
                       {/* Faction badge */}
                       {selectedNPC.faction && (
-                        <span className="text-xs px-2 py-1 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center gap-1">
+                        <span className="text-xs px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-300 border border-indigo-400/20 flex items-center gap-1">
                           <DynamicIcon name="Flag" className="w-3.5 h-3.5" />
                           {selectedNPC.faction}
                         </span>
@@ -645,7 +645,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                       {selectedNPC.aliases?.map((alias, idx) => (
                         <span
                           key={idx}
-                          className="text-xs px-2 py-1 rounded-lg bg-pink-500/15 text-pink-300 flex items-center gap-1"
+                          className="text-xs px-2 py-1 rounded-lg bg-pink-500/10 text-pink-300 border border-pink-400/20 flex items-center gap-1"
                         >
                           <DynamicIcon name="AtSign" className="w-3.5 h-3.5" />
                           {alias}
@@ -658,12 +658,12 @@ export default function NPCsPage(props: NPCsPageProps) {
                   {onUpdateNPCs && !isEditing && (
                     <button
                       onClick={startEditing}
-                      className="p-2 hover:bg-slate-700/50 rounded-lg transition-colors group"
+                      className="p-2 hover:bg-white/10 rounded-lg transition-colors group"
                       title="Edit notes"
                     >
                       <DynamicIcon
                         name="Pencil"
-                        className="w-5 h-5 text-slate-500 group-hover:text-slate-300"
+                        className="w-5 h-5 text-blue-300/50 group-hover:text-blue-200"
                       />
                     </button>
                   )}
@@ -674,8 +674,8 @@ export default function NPCsPage(props: NPCsPageProps) {
               <div className="flex-1 overflow-y-auto p-4 space-y-4">
                 {/* Relationship */}
                 {selectedNPC.relationship && (
-                  <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-500/30">
-                    <h4 className="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
+                  <div className="p-3 rounded-lg bg-purple-500/10 border border-purple-400/20">
+                    <h4 className="text-xs font-medium text-blue-300/60 mb-1 flex items-center gap-1.5">
                       <DynamicIcon name="Heart" className="w-3.5 h-3.5" />
                       Relationship
                     </h4>
@@ -688,11 +688,11 @@ export default function NPCsPage(props: NPCsPageProps) {
                 {/* Description */}
                 {selectedNPC.description && (
                   <div>
-                    <h4 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
+                    <h4 className="text-xs font-medium text-blue-300/60 mb-2 flex items-center gap-1.5">
                       <DynamicIcon name="FileText" className="w-3.5 h-3.5" />
                       Description
                     </h4>
-                    <div className="prose prose-sm prose-invert max-w-none text-slate-300 prose-headings:text-white prose-strong:text-white prose-a:text-purple-400">
+                    <div className="prose prose-sm prose-invert max-w-none text-blue-100/80 prose-headings:text-white prose-strong:text-white prose-a:text-purple-400">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {preprocessMarkdown(selectedNPC.description || "")}
                       </ReactMarkdown>
@@ -703,26 +703,26 @@ export default function NPCsPage(props: NPCsPageProps) {
                 {/* Last Seen */}
                 {selectedNPC.lastSeen && (
                   <div>
-                    <h4 className="text-xs font-medium text-slate-400 mb-1 flex items-center gap-1.5">
+                    <h4 className="text-xs font-medium text-blue-300/60 mb-1 flex items-center gap-1.5">
                       <DynamicIcon name="MapPin" className="w-3.5 h-3.5" />
                       Last Seen
                     </h4>
-                    <p className="text-sm text-slate-300">
+                    <p className="text-sm text-blue-100/80">
                       {selectedNPC.lastSeen}
                     </p>
                   </div>
                 )}
 
                 {/* Notes - Edit Mode or Display Mode */}
-                <div className="pt-4 border-t border-slate-700/30">
-                  <h4 className="text-xs font-medium text-slate-400 mb-2 flex items-center gap-1.5">
+                <div className="pt-4 border-t border-white/10">
+                  <h4 className="text-xs font-medium text-blue-300/60 mb-2 flex items-center gap-1.5">
                     <DynamicIcon name="StickyNote" className="w-3.5 h-3.5" />
                     Your Notes
                   </h4>
                   {isEditing ? (
                     <div className="space-y-3">
                       <div>
-                        <label className="block text-xs font-medium text-slate-400 mb-1">
+                        <label className="block text-xs font-medium text-blue-300/60 mb-1">
                           Aliases
                         </label>
                         <input
@@ -730,28 +730,28 @@ export default function NPCsPage(props: NPCsPageProps) {
                           value={editAliases}
                           onChange={(e) => setEditAliases(e.target.value)}
                           placeholder="Comma-separated alternate names, e.g. Bobby, the old man"
-                          className="w-full px-3 py-2 bg-slate-800/40 border border-slate-600/30 rounded-lg text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
                         />
-                        <p className="text-xs text-slate-500 mt-1">
+                        <p className="text-xs text-blue-300/40 mt-1">
                           Also highlighted and clickable in the story text, alongside the name
                         </p>
                       </div>
                       <textarea
                         value={editNotes}
                         onChange={(e) => setEditNotes(e.target.value)}
-                        className="w-full h-32 px-4 py-3 bg-slate-800/40 border border-slate-600/30 rounded-xl text-white text-sm placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 resize-none"
+                        className="w-full h-32 px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 resize-none transition-colors"
                         placeholder="Add your own notes about this character..."
                       />
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => setIsEditing(false)}
-                          className="px-4 py-2 text-sm text-slate-400 hover:bg-slate-700/50 rounded-lg transition-colors"
+                          className="px-4 py-2 text-sm text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
                         >
                           Cancel
                         </button>
                         <button
                           onClick={handleSaveNotes}
-                          className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors flex items-center gap-2"
+                          className="px-4 py-2 text-sm bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all flex items-center gap-2"
                         >
                           <DynamicIcon name="Check" className="w-4 h-4" />
                           Save
@@ -761,13 +761,13 @@ export default function NPCsPage(props: NPCsPageProps) {
                   ) : (
                     <div>
                       {selectedNPC.notes ? (
-                        <div className="prose prose-sm prose-invert max-w-none text-slate-300">
+                        <div className="prose prose-sm prose-invert max-w-none text-blue-100/80">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {preprocessMarkdown(selectedNPC.notes || "")}
                           </ReactMarkdown>
                         </div>
                       ) : (
-                        <p className="text-sm text-slate-600 italic">
+                        <p className="text-sm text-blue-300/40 italic">
                           No notes yet. Click the edit button to add your own.
                         </p>
                       )}
@@ -777,8 +777,8 @@ export default function NPCsPage(props: NPCsPageProps) {
 
                 {/* Metadata */}
                 {selectedNPC.createdAt && (
-                  <div className="pt-4 border-t border-slate-700/30">
-                    <p className="text-xs text-slate-600">
+                  <div className="pt-4 border-t border-white/10">
+                    <p className="text-xs text-blue-300/30">
                       First encountered:{" "}
                       {new Date(selectedNPC.createdAt).toLocaleDateString()}
                     </p>
@@ -793,8 +793,8 @@ export default function NPCsPage(props: NPCsPageProps) {
       {/* Add NPC Modal */}
       {isAddingNPC && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-linear-to-br from-blue-950 to-slate-900 rounded-xl border border-blue-700/40 w-full max-w-lg shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-slate-700/40 sticky top-0 bg-blue-950/95 backdrop-blur-sm">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl border border-white/10 w-full max-w-lg shadow-2xl shadow-black/50 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-4 border-b border-white/10 sticky top-0 bg-[#0d1829]/95 backdrop-blur-sm">
               <h3 className="text-lg font-semibold text-white flex items-center gap-2">
                 <DynamicIcon
                   name="UserPlus"
@@ -804,16 +804,16 @@ export default function NPCsPage(props: NPCsPageProps) {
               </h3>
               <button
                 onClick={() => setIsAddingNPC(false)}
-                className="p-1 hover:bg-slate-700/50 rounded-lg transition-colors"
+                className="p-1 hover:bg-white/10 rounded-lg transition-colors"
               >
-                <DynamicIcon name="X" className="w-5 h-5 text-slate-400" />
+                <DynamicIcon name="X" className="w-5 h-5 text-blue-300/60" />
               </button>
             </div>
 
             <div className="p-4 space-y-4">
               {/* Name */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
                   Name *
                 </label>
                 <input
@@ -823,13 +823,13 @@ export default function NPCsPage(props: NPCsPageProps) {
                     setNewNPC({ ...newNPC, name: e.target.value })
                   }
                   placeholder="Character name..."
-                  className="w-full px-3 py-2 bg-blue-900/60 border border-blue-700/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 transition-colors"
                 />
               </div>
 
               {/* Role */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
                   Role
                 </label>
                 <input
@@ -839,14 +839,14 @@ export default function NPCsPage(props: NPCsPageProps) {
                     setNewNPC({ ...newNPC, role: e.target.value })
                   }
                   placeholder="e.g. Blacksmith, Guard Captain, Mysterious Stranger..."
-                  className="w-full px-3 py-2 bg-blue-900/60 border border-blue-700/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 transition-colors"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 {/* Status */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                  <label className="block text-sm font-medium text-blue-200/70 mb-1">
                     Status
                   </label>
                   <select
@@ -857,7 +857,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                         status: e.target.value as NPCStatus,
                       })
                     }
-                    className="w-full px-3 py-2 bg-blue-900/60 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 transition-colors"
                   >
                     {(Object.keys(STATUS_CONFIG) as NPCStatus[]).map(
                       (status) => (
@@ -871,7 +871,7 @@ export default function NPCsPage(props: NPCsPageProps) {
 
                 {/* Attitude */}
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                  <label className="block text-sm font-medium text-blue-200/70 mb-1">
                     Attitude
                   </label>
                   <select
@@ -882,7 +882,7 @@ export default function NPCsPage(props: NPCsPageProps) {
                         attitude: e.target.value as NPCAttitude,
                       })
                     }
-                    className="w-full px-3 py-2 bg-blue-900/60 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                    className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 transition-colors"
                   >
                     {(Object.keys(ATTITUDE_CONFIG) as NPCAttitude[]).map(
                       (attitude) => (
@@ -897,7 +897,7 @@ export default function NPCsPage(props: NPCsPageProps) {
 
               {/* Relationship */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
                   Relationship
                 </label>
                 <input
@@ -907,13 +907,13 @@ export default function NPCsPage(props: NPCsPageProps) {
                     setNewNPC({ ...newNPC, relationship: e.target.value })
                   }
                   placeholder="e.g. Trusted mentor, Rival, Secret ally..."
-                  className="w-full px-3 py-2 bg-blue-900/60 border border-blue-700/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 transition-colors"
                 />
               </div>
 
               {/* Faction */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
                   Faction
                 </label>
                 <input
@@ -923,13 +923,13 @@ export default function NPCsPage(props: NPCsPageProps) {
                     setNewNPC({ ...newNPC, faction: e.target.value })
                   }
                   placeholder="e.g. The Guild, Royal Guard, Independent..."
-                  className="w-full px-3 py-2 bg-blue-900/60 border border-blue-700/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 transition-colors"
                 />
               </div>
 
               {/* Description */}
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-1">
+                <label className="block text-sm font-medium text-blue-200/70 mb-1">
                   Description
                 </label>
                 <textarea
@@ -939,22 +939,22 @@ export default function NPCsPage(props: NPCsPageProps) {
                   }
                   placeholder="Physical appearance, notable traits, background..."
                   rows={4}
-                  className="w-full px-3 py-2 bg-blue-900/60 border border-blue-700/40 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 resize-none"
+                  className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 resize-none transition-colors"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 p-4 border-t border-slate-700/40 sticky bottom-0 bg-blue-950/95 backdrop-blur-sm">
+            <div className="flex justify-end gap-2 p-4 border-t border-white/10 sticky bottom-0 bg-[#0d1829]/95 backdrop-blur-sm">
               <button
                 onClick={() => setIsAddingNPC(false)}
-                className="px-4 py-2 text-slate-400 hover:bg-slate-700/40 rounded-lg transition-colors"
+                className="px-4 py-2 text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddNPC}
                 disabled={!newNPC.name}
-                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700/40 disabled:text-slate-500 text-white rounded-lg transition-colors flex items-center gap-2"
+                className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-emerald-950/40 disabled:shadow-none transition-all flex items-center gap-2"
               >
                 <DynamicIcon name="UserPlus" className="w-4 h-4" />
                 Add Character

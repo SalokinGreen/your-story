@@ -263,7 +263,7 @@ export default function CreatorLandingPage() {
         {/* Three Options Grid */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
           {/* Quick Generation */}
-          <div className="bg-blue-950/50 rounded-2xl border border-blue-700/30 p-6 hover:border-purple-500/50 transition-all group">
+          <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/10 p-6 hover:border-purple-400/40 transition-all group">
             <div className="w-14 h-14 rounded-full bg-linear-to-br from-green-500 to-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <StaticIcon name="Zap" className="w-7 h-7 text-white" />
             </div>
@@ -292,7 +292,7 @@ export default function CreatorLandingPage() {
           </div>
 
           {/* Advanced Generation */}
-          <div className="bg-blue-950/50 rounded-2xl border border-blue-700/30 p-6 hover:border-purple-500/50 transition-all group">
+          <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/10 p-6 hover:border-purple-400/40 transition-all group">
             <div className="w-14 h-14 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <StaticIcon name="Wand2" className="w-7 h-7 text-white" />
             </div>
@@ -321,7 +321,7 @@ export default function CreatorLandingPage() {
           </div>
 
           {/* Manual Creator */}
-          <div className="bg-blue-950/50 rounded-2xl border border-blue-700/30 p-6 hover:border-purple-500/50 transition-all group">
+          <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/10 p-6 hover:border-purple-400/40 transition-all group">
             <div className="w-14 h-14 rounded-full bg-linear-to-br from-amber-500 to-orange-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
               <StaticIcon name="Palette" className="w-7 h-7 text-white" />
             </div>
@@ -351,7 +351,7 @@ export default function CreatorLandingPage() {
         </div>
 
         {/* Quick comparison */}
-        <div className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6 mb-8">
+        <div className="bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 p-6 mb-8">
           <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
             <StaticIcon name="HelpCircle" className="w-5 h-5 text-blue-400" />
             Which should I choose?
@@ -416,7 +416,7 @@ export default function CreatorLandingPage() {
       {/* Quick Generation Modal */}
       {showQuickModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-blue-950 border border-blue-700/50 rounded-xl p-6 max-w-2xl w-full shadow-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 max-w-2xl w-full shadow-2xl shadow-black/50 max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
@@ -447,7 +447,7 @@ export default function CreatorLandingPage() {
                     <button
                       key={genre.name}
                       onClick={() => openQuickModal(genre)}
-                      className="p-4 bg-blue-900/40 hover:bg-blue-800/50 rounded-xl border border-blue-700/30 hover:border-blue-500/50 transition-all group text-center"
+                      className="p-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-purple-400/40 transition-all group text-center"
                     >
                       <div
                         className={`w-10 h-10 rounded-full bg-linear-to-br ${genre.color} flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform`}
@@ -465,11 +465,11 @@ export default function CreatorLandingPage() {
                 </div>
 
                 {/* Custom Genre Input */}
-                <div className="mt-4 pt-4 border-t border-blue-700/30">
+                <div className="mt-4 pt-4 border-t border-white/10">
                   {!showCustomGenreInput ? (
                     <button
                       onClick={() => setShowCustomGenreInput(true)}
-                      className="w-full p-3 bg-violet-900/30 hover:bg-violet-800/40 rounded-lg border border-violet-600/30 hover:border-violet-500/50 transition-all flex items-center justify-center gap-2 text-violet-300 hover:text-white"
+                      className="w-full p-3 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg border border-violet-400/20 hover:border-violet-400/40 transition-all flex items-center justify-center gap-2 text-violet-300 hover:text-white"
                     >
                       <StaticIcon name="Edit3" className="w-4 h-4" />
                       <span className="font-medium text-sm">Custom Genre</span>
@@ -489,13 +489,13 @@ export default function CreatorLandingPage() {
                           }
                         }}
                         placeholder="Enter your genre name..."
-                        className="flex-1 px-4 py-2 bg-blue-900/30 border border-blue-700/30 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                        className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-violet-500"
                         autoFocus
                       />
                       <button
                         onClick={selectCustomGenre}
                         disabled={!customGenreName.trim()}
-                        className="px-4 py-2 bg-violet-600 hover:bg-violet-500 disabled:bg-violet-800/50 disabled:text-violet-400 text-white rounded-lg transition-colors"
+                        className="px-4 py-2 bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-40 disabled:from-white/10 disabled:to-white/10 text-white rounded-lg shadow-md shadow-violet-950/40 transition-all"
                       >
                         <StaticIcon name="Check" className="w-4 h-4" />
                       </button>
@@ -504,7 +504,7 @@ export default function CreatorLandingPage() {
                           setShowCustomGenreInput(false);
                           setCustomGenreName("");
                         }}
-                        className="px-4 py-2 bg-blue-800/50 hover:bg-blue-700/50 text-blue-300 hover:text-white rounded-lg transition-colors"
+                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-300 hover:text-white rounded-lg transition-colors"
                       >
                         <StaticIcon name="X" className="w-4 h-4" />
                       </button>
@@ -553,7 +553,7 @@ export default function CreatorLandingPage() {
                     value={customPrompt}
                     onChange={(e) => setCustomPrompt(e.target.value)}
                     placeholder={`Describe your ${selectedGenre.name.toLowerCase()} adventure idea, or leave blank for AI to decide...`}
-                    className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-20"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-20"
                     rows={3}
                   />
                 </div>
@@ -563,14 +563,14 @@ export default function CreatorLandingPage() {
                   <label className="block text-sm font-medium text-blue-200 mb-2">
                     Adventure Size
                   </label>
-                  <div className="bg-blue-900/30 border border-blue-700/30 rounded-lg p-4">
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
                     <input
                       type="range"
                       min={0}
                       max={sizePresets.length - 1}
                       value={sizeIndex}
                       onChange={(e) => setSizeIndex(parseInt(e.target.value))}
-                      className="w-full h-2 bg-blue-800/50 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                      className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
                     />
                     <div className="flex justify-between text-xs text-blue-400/60 mt-1 px-1">
                       {sizePresets.map((preset) => (
@@ -603,7 +603,7 @@ export default function CreatorLandingPage() {
                   <select
                     value={quickModel}
                     onChange={(e) => setQuickModel(e.target.value)}
-                    className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
                   >
                     {quickGenModels.map(([key, model]) => (
                       <option key={key} value={key}>
@@ -620,7 +620,7 @@ export default function CreatorLandingPage() {
                 </div>
 
                 {/* Info Box */}
-                <div className="bg-purple-900/20 border border-purple-500/30 rounded-lg p-3 mb-4">
+                <div className="bg-purple-500/[0.06] border border-purple-400/20 rounded-lg p-3 mb-4">
                   <div className="flex items-start gap-2">
                     <StaticIcon
                       name="Sparkles"
@@ -639,7 +639,7 @@ export default function CreatorLandingPage() {
                 </div>
 
                 {/* Warning Box */}
-                <div className="bg-amber-900/20 border border-amber-500/30 rounded-lg p-3 mb-6">
+                <div className="bg-amber-500/[0.06] border border-amber-400/20 rounded-lg p-3 mb-6">
                   <div className="flex items-start gap-2">
                     <StaticIcon
                       name="AlertTriangle"
@@ -659,7 +659,7 @@ export default function CreatorLandingPage() {
                       setShowQuickModal(false);
                       setSelectedGenre(null);
                     }}
-                    className="flex-1 px-4 py-2.5 bg-blue-900/40 hover:bg-blue-800/50 text-white rounded-lg transition-colors"
+                    className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-colors"
                   >
                     Cancel
                   </button>

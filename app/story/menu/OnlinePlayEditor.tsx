@@ -112,7 +112,7 @@ export default function OnlinePlayEditor({
 
   if (netSession) {
     return (
-      <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40 space-y-3">
+      <div className="p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 space-y-3">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2.5 w-2.5">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-60" />
@@ -123,7 +123,7 @@ export default function OnlinePlayEditor({
           </span>
         </div>
 
-        <div className="flex items-center justify-between gap-3 p-3 bg-blue-900/30 rounded-lg border border-blue-700/30">
+        <div className="flex items-center justify-between gap-3 p-3 bg-white/[0.03] rounded-lg border border-white/10">
           <div>
             <p className="text-xs text-blue-200/60">Room code</p>
             <p className="text-lg font-mono font-bold tracking-widest text-white">
@@ -136,7 +136,7 @@ export default function OnlinePlayEditor({
               navigator.clipboard.writeText(netSession.roomId);
               addNotification("Room code copied", "success");
             }}
-            className="p-2 text-blue-200/70 hover:text-white hover:bg-blue-800/40 rounded-lg transition-colors"
+            className="p-2 text-blue-200/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
             title="Copy room code"
           >
             <DynamicIcon name="Copy" className="w-4 h-4" />
@@ -152,7 +152,7 @@ export default function OnlinePlayEditor({
               value={netSession.backend}
               disabled={switching}
               onChange={(e) => handleSwitch(e.target.value as MPBackend)}
-              className="w-full px-3 py-2 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 disabled:opacity-50"
+              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 disabled:opacity-50 transition-colors"
             >
               {BACKEND_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -175,7 +175,7 @@ export default function OnlinePlayEditor({
             {peers.map((p) => (
               <div
                 key={p.localPlayerId}
-                className="flex items-center gap-2 px-2.5 py-1.5 bg-blue-900/20 rounded-lg border border-blue-700/20"
+                className="flex items-center gap-2 px-2.5 py-1.5 bg-white/[0.03] rounded-lg border border-white/10"
               >
                 <span
                   className="w-2.5 h-2.5 rounded-full shrink-0"
@@ -191,7 +191,7 @@ export default function OnlinePlayEditor({
           type="button"
           onClick={handleLeave}
           disabled={busy}
-          className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors bg-red-900/30 hover:bg-red-900/50 disabled:opacity-40 disabled:cursor-not-allowed text-red-200 border border-red-500/30"
+          className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all bg-red-500/10 hover:bg-red-500/20 disabled:opacity-40 disabled:cursor-not-allowed text-red-300 border border-red-400/20"
         >
           Leave room
         </button>
@@ -200,15 +200,15 @@ export default function OnlinePlayEditor({
   }
 
   return (
-    <div className="p-4 bg-blue-950/50 rounded-lg border-2 border-blue-700/40 space-y-4">
+    <div className="p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 space-y-4">
       <div className="flex gap-2">
         <button
           type="button"
           onClick={() => setIntent(intent === "host" ? null : "host")}
-          className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors border ${
+          className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all border ${
             intent === "host"
-              ? "bg-purple-600/40 border-purple-500/50 text-white"
-              : "bg-blue-900/20 border-blue-700/40 text-blue-200 hover:bg-blue-900/40"
+              ? "bg-linear-to-r from-purple-600 to-pink-600 border-transparent text-white shadow-md shadow-purple-950/40"
+              : "bg-white/[0.03] border-white/10 text-blue-200 hover:bg-white/[0.06]"
           }`}
         >
           Host a room
@@ -216,10 +216,10 @@ export default function OnlinePlayEditor({
         <button
           type="button"
           onClick={() => setIntent(intent === "join" ? null : "join")}
-          className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors border ${
+          className={`flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-all border ${
             intent === "join"
-              ? "bg-purple-600/40 border-purple-500/50 text-white"
-              : "bg-blue-900/20 border-blue-700/40 text-blue-200 hover:bg-blue-900/40"
+              ? "bg-linear-to-r from-purple-600 to-pink-600 border-transparent text-white shadow-md shadow-purple-950/40"
+              : "bg-white/[0.03] border-white/10 text-blue-200 hover:bg-white/[0.06]"
           }`}
         >
           Join a room
@@ -227,13 +227,13 @@ export default function OnlinePlayEditor({
       </div>
 
       {intent && (
-        <div className="space-y-3 pt-2 border-t border-blue-800/20">
+        <div className="space-y-3 pt-2 border-t border-white/5">
           <div className="flex items-center gap-2">
             <input
               type="color"
               value={color}
               onChange={(e) => setColor(e.target.value)}
-              className="w-11 h-11 shrink-0 rounded-lg cursor-pointer bg-transparent border border-blue-700/40"
+              className="w-11 h-11 shrink-0 rounded-lg cursor-pointer bg-transparent border border-white/10"
               title="Your bubble color"
             />
             <input
@@ -241,7 +241,7 @@ export default function OnlinePlayEditor({
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Your name"
-              className="flex-1 min-w-0 px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="flex-1 min-w-0 px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
             />
           </div>
 
@@ -252,7 +252,7 @@ export default function OnlinePlayEditor({
             <select
               value={backend}
               onChange={(e) => setBackend(e.target.value as MPBackend)}
-              className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
+              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
             >
               {BACKEND_OPTIONS.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -272,7 +272,7 @@ export default function OnlinePlayEditor({
               type="button"
               onClick={handleCreate}
               disabled={busy}
-              className="w-full px-4 py-3 text-sm font-semibold rounded-lg transition-colors bg-purple-600/30 hover:bg-purple-600/50 disabled:opacity-40 disabled:cursor-not-allowed text-purple-200 border border-purple-500/30 flex items-center justify-center gap-2"
+              className="w-full px-4 py-3 text-sm font-semibold rounded-lg transition-all bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:from-white/10 disabled:to-white/10 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md shadow-purple-950/40 disabled:shadow-none flex items-center justify-center gap-2"
             >
               {busy && (
                 <DynamicIcon name="Loader2" className="w-4 h-4 animate-spin" />
@@ -293,13 +293,13 @@ export default function OnlinePlayEditor({
                 }}
                 placeholder="Room code"
                 maxLength={ROOM_CODE_LENGTH}
-                className="w-full px-4 py-3 bg-blue-900/20 border border-blue-700/40 rounded-lg text-white font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-purple-500"
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white font-mono tracking-widest uppercase focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
               />
               <button
                 type="button"
                 onClick={handleJoin}
                 disabled={busy}
-                className="w-full px-4 py-3 text-sm font-semibold rounded-lg transition-colors bg-purple-600/30 hover:bg-purple-600/50 disabled:opacity-40 disabled:cursor-not-allowed text-purple-200 border border-purple-500/30 flex items-center justify-center gap-2"
+                className="w-full px-4 py-3 text-sm font-semibold rounded-lg transition-all bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:from-white/10 disabled:to-white/10 disabled:opacity-60 disabled:cursor-not-allowed text-white shadow-md shadow-purple-950/40 disabled:shadow-none flex items-center justify-center gap-2"
               >
                 {busy && (
                   <DynamicIcon name="Loader2" className="w-4 h-4 animate-spin" />

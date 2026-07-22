@@ -337,15 +337,15 @@ function ChatMessage({
             <img
               src={avatarUrl}
               alt={displayName}
-              className="w-6 h-6 rounded-full object-cover border-2 border-blue-500/30"
+              className="w-6 h-6 rounded-full object-cover border-2 border-blue-400/30"
             />
           ) : (
-            <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center border-2 border-blue-500/30">
+            <div className="w-6 h-6 rounded-full bg-linear-to-br from-blue-500 to-indigo-600 flex items-center justify-center border-2 border-blue-400/30">
               <DynamicIcon name="User" className="w-3 h-3 text-white" />
             </div>
           )
         ) : (
-          <div className="w-6 h-6 rounded-full bg-purple-600 flex items-center justify-center border-2 border-purple-500/30 shadow-[0_0_8px_rgba(147,51,234,0.5)]">
+          <div className="w-6 h-6 rounded-full bg-linear-to-br from-purple-500 to-pink-600 flex items-center justify-center border-2 border-purple-400/30 shadow-[0_0_8px_rgba(147,51,234,0.5)]">
             <DynamicIcon name="Sparkles" className="w-3 h-3 text-white" />
           </div>
         )}
@@ -365,12 +365,12 @@ function ChatMessage({
       <div className="w-full">
         {showBox && (
           <div
-            className={`rounded-xl p-2 sm:p-3 ${
+            className={`rounded-xl p-2 sm:p-3 backdrop-blur-md ${
               isUser
                 ? isComment
-                  ? "bg-blue-900/15 border border-blue-700/20"
-                  : "bg-blue-900/30 border border-blue-700/30"
-                : "bg-purple-900/20 border border-purple-700/20"
+                  ? "bg-blue-500/[0.06] border border-blue-400/15"
+                  : "bg-blue-500/[0.08] border border-blue-400/20"
+                : "bg-purple-500/[0.06] border border-purple-400/15"
             }`}
           >
             {isLoading && timeline.length === 0 && !content ? (
@@ -589,7 +589,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
                   key={`chip-${i}-${choice.text}`}
                   onClick={() => handleChipSelect(choice)}
                   disabled={composerBusy}
-                  className="shrink-0 max-w-[16rem] px-3 py-1.5 rounded-full bg-purple-900/25 hover:bg-purple-800/40 border border-purple-600/30 hover:border-purple-500/60 text-purple-100/90 text-xs transition-colors truncate touch-manipulation disabled:opacity-50"
+                  className="shrink-0 max-w-[16rem] px-3 py-1.5 rounded-full bg-purple-500/10 hover:bg-purple-500/20 border border-purple-400/20 hover:border-purple-400/40 text-purple-100/90 text-xs transition-colors truncate touch-manipulation disabled:opacity-50"
                   title={choice.text}
                 >
                   {choice.text}
@@ -676,7 +676,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
                     ? `What does ${activeSpeaker.name} do?`
                     : "What do you do?"
               }
-              className="w-full resize-none pl-4 pr-12 py-3 bg-blue-900/25 border border-blue-700/40 rounded-2xl text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/70 text-base leading-snug"
+              className="w-full resize-none pl-4 pr-12 py-3 bg-white/5 border border-white/10 rounded-2xl text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:border-purple-400/40 text-base leading-snug transition-colors"
               style={
                 couchPlayers.length > 1 && activeSpeaker
                   ? { borderColor: `${activeSpeaker.color}66` }
@@ -1174,7 +1174,7 @@ export default function Story({
     <div className="w-full flex-1 min-h-0 flex flex-col px-0 sm:px-1 sm:max-w-3xl mx-auto">
       {/* Main Story Card */}
       <div
-        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-blue-800/30 sm:shadow-2xl sm:shadow-purple-950/30 overflow-hidden relative flex flex-col flex-1 min-h-0"
+        className="rounded-none sm:rounded-2xl border-0 sm:border sm:border-white/10 sm:shadow-2xl sm:shadow-black/50 overflow-hidden relative flex flex-col flex-1 min-h-0 backdrop-blur-xl"
         style={{
           backgroundColor: fontSettings.themeColors?.background,
         }}
@@ -1194,7 +1194,7 @@ export default function Story({
         )}
 
         {/* Header with story name, chapter nav, and scroll indicator */}
-        <div className="flex items-center justify-between px-3 py-1 sm:px-4 sm:py-2 bg-linear-to-r from-blue-900/40 via-blue-900/30 to-purple-900/20 border-b border-blue-800/30">
+        <div className="flex items-center justify-between px-3 py-1 sm:px-4 sm:py-2 bg-white/[0.03] border-b border-white/10">
           <div className="flex items-center gap-2 min-w-0">
             <DynamicIcon name="BookOpen" className="w-4 h-4 text-blue-300 shrink-0" />
             <span className="text-sm font-medium text-blue-200 truncate max-w-[200px]">
@@ -1352,7 +1352,7 @@ export default function Story({
 
         {/* Edit Mode */}
         {editMode && (
-          <div className="p-4 bg-blue-900/20 border-t border-blue-800/30">
+          <div className="p-4 bg-white/[0.03] border-t border-white/10">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-semibold text-white flex items-center gap-2">
@@ -1363,7 +1363,7 @@ export default function Story({
               <textarea
                 value={editedText}
                 onChange={(e) => setEditedText(e.target.value)}
-                className="w-full h-48 px-3 py-2 bg-blue-900/50 border border-blue-800/30 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm resize-none"
+                className="w-full h-48 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 font-mono text-sm resize-none transition-colors"
                 placeholder="Edit the raw AI output..."
               />
               <div className="flex items-center justify-between">
@@ -1376,7 +1376,7 @@ export default function Story({
                       setEditMode(false);
                       setEditedText("");
                     }}
-                    className="px-3 py-1.5 text-sm font-medium text-blue-200 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
+                    className="px-3 py-1.5 text-sm font-medium text-blue-200 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
                   >
                     Cancel
                   </button>
@@ -1389,7 +1389,7 @@ export default function Story({
                       }
                     }}
                     disabled={!editedText.trim()}
-                    className="px-3 py-1.5 text-sm font-medium bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800/50 disabled:text-blue-400 text-white rounded-lg transition-colors flex items-center gap-1.5"
+                    className="px-3 py-1.5 text-sm font-medium bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-purple-950/40 disabled:shadow-none transition-all flex items-center gap-1.5"
                   >
                     <DynamicIcon name="Save" className="w-4 h-4" />
                     Save
@@ -1402,14 +1402,14 @@ export default function Story({
 
         {/* Action Buttons Bar */}
         {!editMode && (
-          <div className="flex items-center justify-between px-4 py-2 bg-linear-to-r from-blue-900/30 via-blue-900/20 to-purple-900/20 border-t border-blue-800/30">
+          <div className="flex items-center justify-between px-4 py-2 bg-white/[0.03] border-t border-white/10">
             {/* Left side: Retry, Undo & Edit */}
             <div className="flex items-center gap-1.5 sm:gap-1">
               {canUndo && onUndo && (
                 <button
                   onClick={onUndo}
                   disabled={loading || !!loadingStage}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-blue-800/50 active:bg-blue-700/50 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                   title="Undo last action"
                 >
                   <DynamicIcon name="Undo2" className="w-5 h-5 sm:w-4 sm:h-4" />
@@ -1420,7 +1420,7 @@ export default function Story({
                 <button
                   onClick={onRetry}
                   disabled={loading || !!loadingStage}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-900/30 active:bg-amber-800/40 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
+                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-amber-400 hover:bg-amber-500/15 active:bg-amber-500/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
                   title="Regenerate response"
                 >
                   <DynamicIcon
@@ -1438,7 +1438,7 @@ export default function Story({
                       storyData.scene.parts[storyData.scene.parts.length - 1];
                     setEditedText(lastPart?.raw || storyText);
                   }}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-blue-800/50 active:bg-blue-700/50 rounded-lg transition-colors flex items-center gap-1.5 touch-manipulation"
+                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 touch-manipulation"
                   title="Edit response"
                 >
                   <DynamicIcon
