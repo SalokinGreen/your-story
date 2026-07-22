@@ -17,6 +17,10 @@ import {
   setReflectionModelOverride,
   getDirectorAssistantModelOverride,
   setDirectorAssistantModelOverride,
+  getStoryProgressObserverModelOverride,
+  setStoryProgressObserverModelOverride,
+  getStoryProgressCheckInterval,
+  setStoryProgressCheckInterval,
   getObserverSettings,
   setObserverCheckSetting,
   resetObserverSettings,
@@ -61,9 +65,9 @@ const LAYERS: LayerInfo[] = [
     title: "Director / Pacing",
     badge: "Layer 3",
     summary:
-      "A deterministic policy that tracks narrative tension and picks from a bounded menu of pacing moves (escalate, complicate, breathe, ...). The model narrates whichever move gets picked - it never picks the move itself. The Director Assistant is a separate AI pass that only judges which threads/NPCs got the spotlight each scene, feeding that as a signal into the same deterministic policy - it never chooses a move either.",
+      "A deterministic policy that tracks narrative tension and picks from a bounded menu of pacing moves (escalate, complicate, breathe, ...). The model narrates whichever move gets picked - it never picks the move itself. The Director Assistant is a separate AI pass that only judges which threads/NPCs got the spotlight each scene, feeding that as a signal into the same deterministic policy. The Story Progress Observer is a third AI pass, checking in every few turns with a plain-language read on whether the story's overall pacing is on track, dragging, or rushing - neither of the two AI passes ever chooses a move themselves.",
     files:
-      "app/misc/structs.ts (AGMTState), selectDirectorMove(), app/misc/directorAssistant.ts",
+      "app/misc/structs.ts (AGMTState), selectDirectorMove(), app/misc/directorAssistant.ts, app/misc/storyProgressObserver.ts",
     aiDriven: true,
   },
   {
@@ -253,6 +257,14 @@ export default function ArchitectureSettingsTab() {
   >(() => getReflectionModelOverride());
   const [directorAssistantModelOverride, setDirectorAssistantModelOverrideState] =
     useState<ModelEffortOverride | null>(() => getDirectorAssistantModelOverride());
+  const [
+    storyProgressObserverModelOverride,
+    setStoryProgressObserverModelOverrideState,
+  ] = useState<ModelEffortOverride | null>(() =>
+    getStoryProgressObserverModelOverride(),
+  );
+  const [storyProgressCheckInterval, setStoryProgressCheckIntervalState] =
+    useState<number>(() => getStoryProgressCheckInterval());
 
   const [observerSettings, setObserverSettingsState] = useState(() =>
     getObserverSettings(),
@@ -277,6 +289,16 @@ export default function ArchitectureSettingsTab() {
   ) => {
     setDirectorAssistantModelOverride(override);
     setDirectorAssistantModelOverrideState(override);
+  };
+  const handleStoryProgressObserverModelChange = (
+    override: ModelEffortOverride | null,
+  ) => {
+    setStoryProgressObserverModelOverride(override);
+    setStoryProgressObserverModelOverrideState(override);
+  };
+  const handleStoryProgressCheckIntervalChange = (turns: number) => {
+    setStoryProgressCheckInterval(turns);
+    setStoryProgressCheckIntervalState(getStoryProgressCheckInterval());
   };
 
   const handleFlagPatch = (
@@ -388,6 +410,40 @@ export default function ArchitectureSettingsTab() {
         onChange={handleDirectorAssistantModelChange}
         customModels={customModels}
       />
+
+      {/* Story Progress Observer */}
+      <div className="space-y-3">
+        <StageOverrideCard
+          icon="Compass"
+          title="Story Progress Observer"
+          description="Checks in every few turns (not every turn) with a plain-language read on the story's overall pacing - on track, dragging, or rushing - and hands the GM one or two sentences of direct feedback. Never shown to the player."
+          override={storyProgressObserverModelOverride}
+          onChange={handleStoryProgressObserverModelChange}
+          customModels={customModels}
+        />
+        <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-2">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-sm text-white">Check-in interval</span>
+            <span className="text-purple-300 font-medium text-xs">
+              Every {storyProgressCheckInterval} turns
+            </span>
+          </div>
+          <p className="text-xs text-blue-300/60">
+            How many accepted turns pass between check-ins.
+          </p>
+          <input
+            type="range"
+            min="2"
+            max="50"
+            step="1"
+            value={storyProgressCheckInterval}
+            onChange={(e) =>
+              handleStoryProgressCheckIntervalChange(parseInt(e.target.value, 10))
+            }
+            className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
+          />
+        </div>
+      </div>
 
       {/* Observer */}
       <div className="space-y-3">
