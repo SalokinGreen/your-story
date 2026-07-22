@@ -89,6 +89,7 @@ import { fillTemplate } from "../misc/characterSheetTemplate";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { outputToScenePart } from "../misc/ai";
 import { generateStoryTurn } from "../misc/generation";
+import { MAX_UNDO_STACK_SIZE } from "../misc/localStoryManager";
 import { GMNPCReactionResult } from "../misc/gmExecutor";
 import { tickCooldowns } from "../misc/abilitySystem";
 import CharacterCreationForm from "./create-character/form";
@@ -413,14 +414,16 @@ function StoryPageContent() {
   const diceThrowRelayResolversRef = useRef<
     Map<string, { forPlayerId: string; resolve: (faces: number[] | null) => void }>
   >(new Map());
-  // Full pre-turn StoryData snapshot, taken right before each turn's GM
-  // tool calls can mutate state. Session-only (not persisted) - lets
-  // handleUndo actually undo a turn's mechanical state changes (NPC
-  // attitude, quests, stats, etc.), not just its scene.parts entries. See
-  // §2.5 in docs/research-paper-ttrpg-theory-gap-analysis.md - this closes
-  // the "misread input" rollback gap by fixing Undo's existing scope
-  // rather than adding a new UX concept.
-  const preTurnSnapshotRef = useRef<StoryData | null>(null);
+  // Stack of full pre-turn StoryData snapshots, one pushed right before each
+  // turn's GM tool calls can mutate state. Persisted to IndexedDB (see
+  // localStoryManager's undo_snapshots store) and hydrated on load, so it
+  // survives page reloads - lets handleUndo/handleRetry actually revert a
+  // turn's mechanical state changes (NPC attitude, quests, stats, combat,
+  // etc.), not just its scene.parts entries. See §2.5 in
+  // docs/research-paper-ttrpg-theory-gap-analysis.md. Bounded by
+  // MAX_UNDO_STACK_SIZE - only the most recent turns are undoable, matching
+  // the "misread input" framing rather than a full campaign-length history.
+  const undoStackRef = useRef<StoryData[]>([]);
   const [choices, setChoices] = useState<Choices>({ choices: [] });
   const [input, setInput] = useState<Record<string, boolean>>({});
   const [storyText, setStoryText] = useState("");
@@ -833,8 +836,18 @@ function StoryPageContent() {
     const lastPart = storyData.scene.parts[storyData.scene.parts.length - 1];
     const hasAIPart = lastPart && !lastPart.user;
 
-    // Can undo if we have at least 2 parts and last part is from AI
-    setCanUndo(storyData.scene.parts.length > 1 && hasAIPart);
+    // Can undo only if we actually have a pre-turn snapshot to restore -
+    // otherwise the button would be honest-looking but silently unable to
+    // revert mechanical state (NPCs, stats, combat, etc.), which is exactly
+    // the bug this was rewritten to avoid. undoStackRef is a ref (not
+    // state), but every push/pop site below also calls setStoryData or
+    // setCanUndo directly afterward, so this effect re-reads a fresh value
+    // whenever it matters.
+    setCanUndo(
+      storyData.scene.parts.length > 1 &&
+        hasAIPart &&
+        undoStackRef.current.length > 0,
+    );
 
     // Can retry if we have at least 1 part and last part is from AI
     setCanRetry(storyData.scene.parts.length > 0 && hasAIPart);
@@ -920,7 +933,9 @@ function StoryPageContent() {
 
     async function loadStory() {
       try {
-        const { getLocalStory } = await import("@/app/misc/localStoryManager");
+        const { getLocalStory, getUndoStack } = await import(
+          "@/app/misc/localStoryManager"
+        );
         const localStory = await getLocalStory(storyId!);
 
         if (!localStory) {
@@ -929,6 +944,17 @@ function StoryPageContent() {
 
         console.log("Local story loaded:", localStory);
         setStoryDbId(localStory.id);
+
+        // Hydrate the undo/retry snapshot stack before setupUIFromStory
+        // triggers the canUndo/canRetry effect below, so a page reload
+        // doesn't leave Undo looking available while actually having
+        // nothing to restore from.
+        try {
+          undoStackRef.current = await getUndoStack(localStory.id);
+        } catch (undoStackError) {
+          console.error("Failed to load undo stack", undoStackError);
+          undoStackRef.current = [];
+        }
         setSyncStatus("local-only");
 
         if (setupUIFromStory(localStory.storyData)) return;
@@ -1147,6 +1173,19 @@ function StoryPageContent() {
     }
   };
 
+  // Best-effort persist of the undo stack to IndexedDB so it survives a
+  // reload - fire-and-forget like saveProgress's debounced writes below,
+  // since losing the very latest push just degrades Undo/Retry back to "no
+  // snapshot available" rather than corrupting any state.
+  function persistUndoStack() {
+    if (!storyDbId) return;
+    import("@/app/misc/localStoryManager").then(({ saveUndoStack }) => {
+      saveUndoStack(storyDbId, undoStackRef.current).catch((error) => {
+        console.error("Failed to persist undo stack", error);
+      });
+    });
+  }
+
   //Savestoryprogresstodatabase(debounced)
   async function saveProgress(updatedStoryData: StoryData, immediate = false) {
     if (!storyDbId) return;
@@ -1245,6 +1284,22 @@ function StoryPageContent() {
     inputKind: "freeform" | "voice" = "freeform",
   ) {
     if (!storyData) return;
+
+    // Snapshot full state before this turn's GM tool calls can mutate it -
+    // same undo/retry stack handleChoiceWithAction pushes onto, so a
+    // freeform/voice action is just as undoable/rerollable as a plain
+    // choice. Previously only handleChoiceWithAction did this, so Undo
+    // after a freeform action silently fell back to a scene.parts-only
+    // pop that left mechanical state (NPCs, stats, combat, etc.) intact.
+    try {
+      const snapshot = structuredClone(storyData);
+      undoStackRef.current = [...undoStackRef.current, snapshot].slice(
+        -MAX_UNDO_STACK_SIZE,
+      );
+      persistUndoStack();
+    } catch (snapshotError) {
+      console.error("Failed to snapshot pre-turn state for undo", snapshotError);
+    }
 
     if (netSession?.role === "guest") {
       logger.action("Guest custom input, sending to host", { customText });
@@ -1744,7 +1799,7 @@ function StoryPageContent() {
             }
 
             setCanRetry(true);
-            setCanUndo(true);
+            setCanUndo(undoStackRef.current.length > 0);
             setLoadingStage(null);
             setStoryTextReady(true);
 
@@ -1830,6 +1885,393 @@ function StoryPageContent() {
     handleChoiceWithAction(undefined, playerComment);
   }
 
+  // Shared by handleChoiceWithAction (a fresh choice/freeform submission)
+  // and handleRetry's full-reroll path - builds the standard GM-stage +
+  // story-stage + tools/choices generateStoryTurn call with full callback
+  // wiring. Kept as one implementation so the two call sites can't drift:
+  // a reroll is meant to be indistinguishable from a fresh submission of
+  // the same player action (new dice, new tool calls), not a special case.
+  // Assumes the caller has already pushed the user's turn onto
+  // storyData.scene.parts and set up `partialPart` as the (empty) upcoming
+  // assistant part.
+  async function runTurnGeneration(
+    storyData: StoryData,
+    partialPart: ScenePart,
+    opts: { logLabel: string; successNotification?: string },
+  ) {
+    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
+    const toolCallingEnabled = true;
+
+    logger.ai_request(`Starting generation (${opts.logLabel})`, {
+      storyModel,
+      toolsModel,
+      choicesModel,
+      toolCallingEnabled,
+    });
+
+    const maxToolLoops =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("maxToolLoops") || "10", 10)
+        : 10;
+    const customMaxContext =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
+        : 36000;
+    const customMaxOutput =
+      typeof window !== "undefined"
+        ? parseInt(localStorage.getItem("customMaxOutput") || "8000", 10)
+        : 8000;
+    const embeddingsEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("embeddingsEnabled") === "true"
+        : false;
+    const webResearchEnabled =
+      typeof window !== "undefined"
+        ? localStorage.getItem("webResearchEnabled") === "true"
+        : false;
+    const embeddingThreshold =
+      typeof window !== "undefined"
+        ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
+        : 0.25;
+    const usePrefill =
+      typeof window !== "undefined"
+        ? localStorage.getItem("usePrefill") !== "false"
+        : true;
+    const storytellerMode =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
+          "narrator"
+        : "narrator";
+    const deAiifyWords =
+      typeof window !== "undefined"
+        ? localStorage.getItem("deAiifyWords") !== "false"
+        : true;
+    const replyLength =
+      typeof window !== "undefined"
+        ? (localStorage.getItem("replyLength") as "short" | "medium" | "long") ||
+          "medium"
+        : "medium";
+    // GM Stage is always enabled - legacy tool calling is deprecated
+    const gmStageEnabled = true;
+
+    // Track parallel completion of tools and choices
+    let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
+    let choicesComplete = true; // Choices stage is disabled - see skipChoices below
+
+    const checkBothComplete = () => {
+      if (toolsComplete && choicesComplete) {
+        setLoadingStage(null);
+        setStoryTextReady(true);
+      }
+    };
+
+    // Create abort controller for this generation
+    generationAbortRef.current = new AbortController();
+
+    try {
+      await generateStoryTurn(
+        storyData,
+        "", // User choice already in storyData.scene.parts
+        {
+          storyModel,
+          toolsModel,
+          choicesModel,
+          enableTools: toolCallingEnabled,
+          maxToolLoops,
+          customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
+          customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
+          // Suggested-action chips are gone - never spend an extra AI call
+          // generating them, regardless of how this turn was triggered.
+          skipChoices: true,
+          openRouterKey,
+          deepseekKey,
+          googleKey,
+          mistralKey,
+          deepinfraKey,
+          storyId: storyDbId || undefined,
+          abortSignal: generationAbortRef.current.signal,
+          enableEmbeddings: embeddingsEnabled,
+          embeddingThreshold,
+          webResearchEnabled,
+          braveSearchKey,
+          samplingSettings: getSamplingSettings(),
+          usePrefill,
+          storytellerMode,
+          deAiifyWords,
+          replyLength,
+          enableGMStage: gmStageEnabled,
+          gmStageModel: toolsModel, // Use same model as tools stage
+        },
+        {
+          onGMStageStart: () => {
+            setLoadingStage("gm");
+            // Reset live GM entries for new generation
+            setLiveGMEntries([]);
+            logger.action("GM stage started - determining mechanics");
+          },
+          onAskForRoll: requestManualRoll,
+          onAskQuestion: requestPlayerAnswer,
+          onRequestDiceThrow:
+            storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
+          onCompaction: (summary) => {
+            addNotification(
+              "Recap: earlier events were condensed into a summary to save space",
+              "info",
+              6000,
+            );
+            logger.action("Story history compacted", {
+              summaryLength: summary.length,
+            });
+          },
+          onGMContent: (delta, fullContent) => {
+            // Re-parse the current round's buffer into thinking/text blocks
+            // (see turnTimeline.ts) - earlier rounds stay frozen behind
+            // their tool-call block.
+            setLiveGMEntries((prev) => updateLiveRoundBlocks(prev, fullContent));
+          },
+          onGMReasoning: (delta, fullReasoning) => {
+            setLiveGMEntries((prev) =>
+              updateLiveReasoningBlock(prev, fullReasoning),
+            );
+          },
+          onGMToolResult: (result) => {
+            setLiveGMEntries((prev) => [
+              ...freezeBlocks(prev),
+              toolResultBlock(result),
+            ]);
+          },
+          onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
+            logger.ai_response(`GM stage complete (${opts.logLabel})`, {
+              toolCount: gmResults.length,
+              tools: gmResults.map((r) => r.toolName),
+              contextLength: storyContext.length,
+              thinkingLines: thinking?.length || 0,
+              usage,
+            });
+
+            setLiveGMEntries([]);
+
+            if (gmResults.length > 0) {
+              partialPart.gmToolCalls = gmResults;
+            }
+            if (storyContext) {
+              partialPart.gmStoryContext = storyContext;
+            }
+            if (thinking && thinking.length > 0) {
+              partialPart.gmThinking = thinking;
+            }
+
+            // Extract NPC reactions from GM results and show as toast notifications
+            const npcReactionResults = gmResults.filter(
+              (r) => r.toolName === "npc_reaction",
+            );
+            if (npcReactionResults.length > 0) {
+              const newReactions = npcReactionResults
+                .map((r) => (r.result as GMNPCReactionResult)?.reaction)
+                .filter((r): r is NPCReaction => r !== undefined);
+
+              if (newReactions.length > 0) {
+                setPendingNPCReactions((prev) => [...prev, ...newReactions]);
+
+                if (!partialPart.npcReactions) {
+                  partialPart.npcReactions = [];
+                }
+                partialPart.npcReactions.push(...newReactions);
+
+                logger.action("NPC reactions triggered", {
+                  count: newReactions.length,
+                  npcs: newReactions.map((r) => r.npcName),
+                });
+              }
+            }
+
+            setLoadingStage("story");
+          },
+          onStoryReasoning: (delta, fullReasoning) => {
+            setLiveGMEntries((prev) =>
+              updateLiveReasoningBlock(prev, fullReasoning),
+            );
+          },
+          onStoryContent: (chunk: string, fullContent: string) => {
+            partialPart.content = fullContent;
+
+            if (
+              storyData.scene.parts[storyData.scene.parts.length - 1] !==
+              partialPart
+            ) {
+              storyData.scene.parts = [...storyData.scene.parts, partialPart];
+            }
+
+            setStoryText(fullContent);
+            setLoading(false); // Let player read while tools/choices generate
+            setPendingUserChoice(""); // Clear pending choice - response is here
+          },
+          onStoryComplete: (content: string, usage: any) => {
+            partialPart.content = content;
+            setStoryText(content);
+            setStoryData({ ...storyData }); // Full update only at completion
+            // Narration itself is done - unlock TTS now rather than waiting
+            // for the tools/choices phase below to also finish.
+            setStoryTextReady(true);
+
+            logger.ai_response(`Story narration complete (${opts.logLabel})`, {
+              length: content.length,
+              usage,
+            });
+          },
+          onToolsStart: () => {
+            // Keep showing tools stage while either is running
+          },
+          onToolsComplete: (
+            toolCalls,
+            toolResponses,
+            stateChanges,
+            usage,
+          ) => {
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                toolCalls,
+                toolResponses,
+                stateChanges:
+                  stateChanges.length > 0 ? stateChanges : undefined,
+              };
+            }
+
+            processQuestNotifications(toolResponses, addNotification);
+
+            setStoryData({ ...storyData });
+            toolsComplete = true;
+            checkBothComplete();
+
+            logger.ai_response(`Tools complete (${opts.logLabel})`, {
+              toolCallsCount: toolCalls.length,
+              responsesCount: toolResponses.length,
+              stateChangesCount: stateChanges.length,
+              usage,
+            });
+          },
+          onChoicesStart: () => {
+            // Keep showing tools stage while either is running
+          },
+          onChoicesComplete: (newChoices, usage) => {
+            const lastPartIndex = storyData.scene.parts.length - 1;
+            if (lastPartIndex >= 0) {
+              storyData.scene.parts[lastPartIndex] = {
+                ...storyData.scene.parts[lastPartIndex],
+                choices: newChoices,
+              };
+            }
+
+            setChoices({ choices: newChoices });
+            setStoryData({ ...storyData });
+            choicesComplete = true;
+            checkBothComplete();
+
+            logger.ai_response(`Choices complete (${opts.logLabel})`, {
+              choicesCount: newChoices.length,
+              usage,
+            });
+          },
+          onObserverReset: (flags, triggeringFlag) => {
+            handleObserverReset(
+              partialPart,
+              flags,
+              triggeringFlag,
+              setStoryText,
+              setLiveGMEntries,
+              setLoadingStage,
+              addNotification,
+            );
+          },
+          onComplete: (result) => {
+            if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
+              const currentChapter = storyData.chapters.length;
+              addNotification(
+                `Chapter ${currentChapter} Complete!`,
+                "success",
+              );
+            }
+
+            // Tick ability cooldowns at end of turn
+            if (storyData.abilities && storyData.abilities.length > 0) {
+              const offCooldown = tickCooldowns(storyData.abilities);
+              if (offCooldown.length > 0) {
+                addNotification(
+                  `Abilities ready: ${offCooldown.join(", ")}`,
+                  "success",
+                );
+              }
+            }
+
+            const lastIdx = storyData.scene.parts.length - 1;
+            if (lastIdx >= 0 && result.scenePart?.gmConversation) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                gmConversation: result.scenePart.gmConversation,
+              };
+            }
+
+            // Copy the story stage's own native reasoning too - it streams
+            // live via onStoryReasoning, but without this it never reaches
+            // the persisted part, so it vanishes once the live timeline
+            // hands off to the saved one (turnTimeline.ts:buildSavedTimeline).
+            if (lastIdx >= 0 && result.scenePart?.reasoning) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                reasoning: result.scenePart.reasoning,
+                reasoning_details: result.scenePart.reasoning_details,
+              };
+            }
+
+            setCanRetry(true);
+            setCanUndo(undoStackRef.current.length > 0);
+            setLoadingStage(null);
+            setStoryTextReady(true);
+
+            setStoryData({ ...storyData });
+
+            saveProgress(storyData, true);
+
+            if (opts.successNotification) {
+              addNotification(opts.successNotification, "success");
+            }
+
+            logger.ai_response(`Generation complete (${opts.logLabel})`, {
+              totalTokenCost: result.meta.totalTokenCost,
+            });
+          },
+          onError: (error) => {
+            addNotification(`Error: ${error.message}`, "failure");
+            setLoading(false);
+            setLoadingStage(null);
+            setStoryTextReady(true);
+            setCanRetry(true);
+            setChoices({
+              choices:
+                storyData.scene.parts[storyData.scene.parts.length - 1]
+                  ?.choices || [],
+            });
+
+            logger.error(`Generation error (${opts.logLabel})`, {
+              message: error.message,
+            });
+          },
+        },
+      );
+    } catch (error: any) {
+      addNotification(`Error: ${error.message}`, "failure");
+      setLoading(false);
+      setLoadingStage(null);
+      setStoryTextReady(true);
+      setCanRetry(true);
+      logger.error(`Generation exception (${opts.logLabel})`, {
+        message: error.message,
+      });
+    }
+  }
+
   // Internal function that handles both regular choices and freeform actions
   async function handleChoiceWithAction(
     actionChoice?: Choice,
@@ -1838,15 +2280,20 @@ function StoryPageContent() {
     if (!storyData) return;
 
     // Snapshot full state before this turn's GM tool calls can mutate it,
-    // so handleUndo can restore mechanical state (not just pop scene.parts)
-    // if the player says "that's not what I meant." Best-effort: if the
-    // structure somehow isn't cloneable, undo just falls back to its old
-    // scene.parts-only behavior rather than failing the turn.
+    // so handleUndo/handleRetry can restore mechanical state (not just pop
+    // scene.parts) if the player says "that's not what I meant." Pushed
+    // onto the bounded stack (persisted to IndexedDB) rather than a single
+    // slot, so undo/retry survive reloads and repeated use within a
+    // session. Best-effort: if the structure somehow isn't cloneable, the
+    // turn still proceeds, just without a fresh snapshot to undo/retry from.
     try {
-      preTurnSnapshotRef.current = structuredClone(storyData);
+      const snapshot = structuredClone(storyData);
+      undoStackRef.current = [...undoStackRef.current, snapshot].slice(
+        -MAX_UNDO_STACK_SIZE,
+      );
+      persistUndoStack();
     } catch (snapshotError) {
       console.error("Failed to snapshot pre-turn state for undo", snapshotError);
-      preTurnSnapshotRef.current = null;
     }
 
     let choice: Choice | undefined;
@@ -2071,16 +2518,6 @@ function StoryPageContent() {
 
     processLoreTriggers(storyData, addNotification);
 
-    const { storyModel, toolsModel, choicesModel } = getModelsFromPreset();
-    const toolCallingEnabled = true;
-
-    logger.ai_request("Starting generation (choice)", {
-      storyModel,
-      toolsModel,
-      choicesModel,
-      toolCallingEnabled,
-    });
-
     // Track partial scene part as we stream
     let partialPart: ScenePart = {
       content: "",
@@ -2090,367 +2527,7 @@ function StoryPageContent() {
       choices: [],
     };
 
-    const maxToolLoops =
-      typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("maxToolLoops") || "10", 10)
-        : 10;
-    const customMaxContext =
-      typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("customMaxContext") || "36000", 10)
-        : 36000;
-    const customMaxOutput =
-      typeof window !== "undefined"
-        ? parseInt(localStorage.getItem("customMaxOutput") || "8000", 10)
-        : 8000;
-    const embeddingsEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("embeddingsEnabled") === "true"
-        : false;
-    const webResearchEnabled =
-      typeof window !== "undefined"
-        ? localStorage.getItem("webResearchEnabled") === "true"
-        : false;
-    const embeddingThreshold =
-      typeof window !== "undefined"
-        ? parseFloat(localStorage.getItem("embeddingThreshold") || "0.25")
-        : 0.25;
-    const usePrefill =
-      typeof window !== "undefined"
-        ? localStorage.getItem("usePrefill") !== "false"
-        : true;
-    const storytellerMode =
-      typeof window !== "undefined"
-        ? (localStorage.getItem("storytellerMode") as "narrator" | "dm") ||
-          "narrator"
-        : "narrator";
-    const deAiifyWords =
-      typeof window !== "undefined"
-        ? localStorage.getItem("deAiifyWords") !== "false"
-        : true;
-    const replyLength =
-      typeof window !== "undefined"
-        ? (localStorage.getItem("replyLength") as "short" | "medium" | "long") ||
-          "medium"
-        : "medium";
-    // GM Stage is always enabled - legacy tool calling is deprecated
-    const gmStageEnabled = true;
-
-    // Track parallel completion of tools and choices
-    let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
-    let choicesComplete = true; // Choices stage is disabled - see skipChoices below
-
-    const checkBothComplete = () => {
-      if (toolsComplete && choicesComplete) {
-        setLoadingStage(null);
-        setStoryTextReady(true);
-      }
-    };
-
-    console.log(
-      "[page.tsx] About to call generateStoryTurn. actionChoice:",
-      !!actionChoice,
-      actionChoice?.text?.slice(0, 50),
-    );
-
-    // Create abort controller for this generation
-    generationAbortRef.current = new AbortController();
-
-    try {
-      await generateStoryTurn(
-        storyData,
-        "", // User choice already in storyData.scene.parts
-        {
-          storyModel,
-          toolsModel,
-          choicesModel,
-          enableTools: toolCallingEnabled,
-          maxToolLoops,
-          customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
-          customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
-          // Suggested-action chips are gone - never spend an extra AI call
-          // generating them, regardless of how this turn was triggered.
-          skipChoices: true,
-          openRouterKey,
-          deepseekKey,
-          googleKey,
-          mistralKey,
-          deepinfraKey,
-          storyId: storyDbId || undefined,
-          abortSignal: generationAbortRef.current.signal,
-          enableEmbeddings: embeddingsEnabled,
-          embeddingThreshold,
-          webResearchEnabled,
-          braveSearchKey,
-          samplingSettings: getSamplingSettings(),
-          usePrefill,
-          storytellerMode,
-          deAiifyWords,
-          replyLength,
-          enableGMStage: gmStageEnabled,
-          gmStageModel: toolsModel, // Use same model as tools stage
-        },
-        {
-          onGMStageStart: () => {
-            setLoadingStage("gm");
-            // Reset live GM entries for new generation
-            setLiveGMEntries([]);
-            logger.action("GM stage started - determining mechanics");
-          },
-          onAskForRoll: requestManualRoll,
-          onAskQuestion: requestPlayerAnswer,
-          onRequestDiceThrow:
-            storyData?.diceMode === "physical" ? requestDiceThrow : undefined,
-          onCompaction: (summary) => {
-            addNotification(
-              "Recap: earlier events were condensed into a summary to save space",
-              "info",
-              6000,
-            );
-            logger.action("Story history compacted", {
-              summaryLength: summary.length,
-            });
-          },
-          onGMContent: (delta, fullContent) => {
-            // Re-parse the current round's buffer into thinking/text blocks
-            // (see turnTimeline.ts) - earlier rounds stay frozen behind
-            // their tool-call block.
-            setLiveGMEntries((prev) => updateLiveRoundBlocks(prev, fullContent));
-          },
-          onGMReasoning: (delta, fullReasoning) => {
-            setLiveGMEntries((prev) =>
-              updateLiveReasoningBlock(prev, fullReasoning),
-            );
-          },
-          onGMToolResult: (result) => {
-            setLiveGMEntries((prev) => [
-              ...freezeBlocks(prev),
-              toolResultBlock(result),
-            ]);
-          },
-          onGMStageComplete: (gmResults, storyContext, usage, thinking) => {
-            logger.ai_response("GM stage complete", {
-              toolCount: gmResults.length,
-              tools: gmResults.map((r) => r.toolName),
-              contextLength: storyContext.length,
-              thinkingLines: thinking?.length || 0,
-              usage,
-            });
-
-            setLiveGMEntries([]);
-
-            if (gmResults.length > 0) {
-              partialPart.gmToolCalls = gmResults;
-            }
-            if (storyContext) {
-              partialPart.gmStoryContext = storyContext;
-            }
-            if (thinking && thinking.length > 0) {
-              partialPart.gmThinking = thinking;
-            }
-
-            // Extract NPC reactions from GM results and show as toast notifications
-            const npcReactionResults = gmResults.filter(
-              (r) => r.toolName === "npc_reaction",
-            );
-            if (npcReactionResults.length > 0) {
-              const newReactions = npcReactionResults
-                .map((r) => (r.result as GMNPCReactionResult)?.reaction)
-                .filter((r): r is NPCReaction => r !== undefined);
-
-              if (newReactions.length > 0) {
-                setPendingNPCReactions((prev) => [...prev, ...newReactions]);
-
-                if (!partialPart.npcReactions) {
-                  partialPart.npcReactions = [];
-                }
-                partialPart.npcReactions.push(...newReactions);
-
-                logger.action("NPC reactions triggered", {
-                  count: newReactions.length,
-                  npcs: newReactions.map((r) => r.npcName),
-                });
-              }
-            }
-
-            setLoadingStage("story");
-          },
-          onStoryReasoning: (delta, fullReasoning) => {
-            setLiveGMEntries((prev) =>
-              updateLiveReasoningBlock(prev, fullReasoning),
-            );
-          },
-          onStoryContent: (chunk: string, fullContent: string) => {
-            partialPart.content = fullContent;
-
-            if (
-              storyData.scene.parts[storyData.scene.parts.length - 1] !==
-              partialPart
-            ) {
-              storyData.scene.parts = [...storyData.scene.parts, partialPart];
-            }
-
-            setStoryText(fullContent);
-            setLoading(false); // Let player read while tools/choices generate
-            setPendingUserChoice(""); // Clear pending choice - response is here
-          },
-          onStoryComplete: (content: string, usage: any) => {
-            partialPart.content = content;
-            setStoryText(content);
-            setStoryData({ ...storyData }); // Full update only at completion
-            // Narration itself is done - unlock TTS now rather than waiting
-            // for the tools/choices phase below to also finish.
-            setStoryTextReady(true);
-
-            logger.ai_response("Story narration complete", {
-              length: content.length,
-              usage,
-            });
-          },
-          onToolsStart: () => {
-            // Keep showing tools stage while either is running
-          },
-          onToolsComplete: (
-            toolCalls,
-            toolResponses,
-            stateChanges,
-            usage,
-          ) => {
-            const lastPartIndex = storyData.scene.parts.length - 1;
-            if (lastPartIndex >= 0) {
-              storyData.scene.parts[lastPartIndex] = {
-                ...storyData.scene.parts[lastPartIndex],
-                toolCalls,
-                toolResponses,
-                stateChanges:
-                  stateChanges.length > 0 ? stateChanges : undefined,
-              };
-            }
-
-            processQuestNotifications(toolResponses, addNotification);
-
-            setStoryData({ ...storyData });
-            toolsComplete = true;
-            checkBothComplete();
-
-            logger.ai_response("Tools complete", {
-              toolCallsCount: toolCalls.length,
-              responsesCount: toolResponses.length,
-              stateChangesCount: stateChanges.length,
-              usage,
-            });
-          },
-          onChoicesStart: () => {
-            // Keep showing tools stage while either is running
-          },
-          onChoicesComplete: (newChoices, usage) => {
-            const lastPartIndex = storyData.scene.parts.length - 1;
-            if (lastPartIndex >= 0) {
-              storyData.scene.parts[lastPartIndex] = {
-                ...storyData.scene.parts[lastPartIndex],
-                choices: newChoices,
-              };
-            }
-
-            setChoices({ choices: newChoices });
-            setStoryData({ ...storyData });
-            choicesComplete = true;
-            checkBothComplete();
-
-            logger.ai_response("Choices complete", {
-              choicesCount: newChoices.length,
-              usage,
-            });
-          },
-          onObserverReset: (flags, triggeringFlag) => {
-            handleObserverReset(
-              partialPart,
-              flags,
-              triggeringFlag,
-              setStoryText,
-              setLiveGMEntries,
-              setLoadingStage,
-              addNotification,
-            );
-          },
-          onComplete: (result) => {
-            if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
-              const currentChapter = storyData.chapters.length;
-              addNotification(
-                `Chapter ${currentChapter} Complete!`,
-                "success",
-              );
-            }
-
-            // Tick ability cooldowns at end of turn
-            if (storyData.abilities && storyData.abilities.length > 0) {
-              const offCooldown = tickCooldowns(storyData.abilities);
-              if (offCooldown.length > 0) {
-                addNotification(
-                  `Abilities ready: ${offCooldown.join(", ")}`,
-                  "success",
-                );
-              }
-            }
-
-            const lastIdx = storyData.scene.parts.length - 1;
-            if (lastIdx >= 0 && result.scenePart?.gmConversation) {
-              storyData.scene.parts[lastIdx] = {
-                ...storyData.scene.parts[lastIdx],
-                gmConversation: result.scenePart.gmConversation,
-              };
-            }
-
-            // Copy the story stage's own native reasoning too - it streams
-            // live via onStoryReasoning, but without this it never reaches
-            // the persisted part, so it vanishes once the live timeline
-            // hands off to the saved one (turnTimeline.ts:buildSavedTimeline).
-            if (lastIdx >= 0 && result.scenePart?.reasoning) {
-              storyData.scene.parts[lastIdx] = {
-                ...storyData.scene.parts[lastIdx],
-                reasoning: result.scenePart.reasoning,
-                reasoning_details: result.scenePart.reasoning_details,
-              };
-            }
-
-            setCanRetry(true);
-            setCanUndo(true);
-            setLoadingStage(null);
-            setStoryTextReady(true);
-
-            setStoryData({ ...storyData });
-
-            saveProgress(storyData, true);
-
-            logger.ai_response("Generation complete (choice)", {
-              totalTokenCost: result.meta.totalTokenCost,
-            });
-          },
-          onError: (error) => {
-            addNotification(`Error: ${error.message}`, "failure");
-            setLoading(false);
-            setLoadingStage(null);
-            setStoryTextReady(true);
-            setCanRetry(true);
-            setChoices({
-              choices:
-                storyData.scene.parts[storyData.scene.parts.length - 1]
-                  ?.choices || [],
-            });
-
-            logger.error("Generation error (choice)", {
-              message: error.message,
-            });
-          },
-        },
-      );
-    } catch (error: any) {
-      addNotification(`Error: ${error.message}`, "failure");
-      setLoading(false);
-      setLoadingStage(null);
-      setStoryTextReady(true);
-      setCanRetry(true);
-      logger.error("Generation exception (choice)", { message: error.message });
-    }
+    await runTurnGeneration(storyData, partialPart, { logLabel: "choice" });
   }
 
   function handleSelect(index: number): void {
@@ -2587,10 +2664,77 @@ function StoryPageContent() {
       return;
     }
 
+    const userChoicePart =
+      storyData.scene.parts[storyData.scene.parts.length - 2];
+    if (!userChoicePart?.user) {
+      addNotification("Cannot retry initial story", "warning");
+      return;
+    }
+
     setLoading(true);
     setLoadingStage("story");
     setStoryTextReady(false);
     setCanRetry(false);
+
+    // Full reroll: if this turn's pre-turn snapshot is still on the undo
+    // stack, restore full mechanical state (NPCs, quests, stats, combat,
+    // etc. - not just scene.parts) and resubmit the exact same player
+    // action through the normal GM-stage pipeline, so Retry produces a
+    // genuinely new dice roll/tool-call outcome instead of just reworded
+    // narration for the same one. A reroll doesn't consume the snapshot -
+    // it stays valid for a later Undo, however many times the player
+    // rerolls first.
+    const snapshot = undoStackRef.current[undoStackRef.current.length - 1];
+    if (snapshot) {
+      const userChoiceContent = userChoicePart.content;
+      const savedPlayerComment = userChoicePart.playerComment;
+      const savedSpeakerIds = userChoicePart.speakerIds;
+
+      for (const key of Object.keys(storyData)) {
+        delete (storyData as unknown as Record<string, unknown>)[key];
+      }
+      Object.assign(storyData, snapshot);
+
+      storyData.scene.parts.push({
+        content: userChoiceContent,
+        imageUrl: "",
+        user: true,
+        role: "user",
+        playerComment: savedPlayerComment,
+        speakerIds: savedSpeakerIds,
+        choices: [],
+      });
+
+      setChoices({ choices: [] });
+      currentTurnSpeakerIdsRef.current = savedSpeakerIds;
+
+      processLoreTriggers(storyData, addNotification);
+
+      addNotification("Rerolling turn...", "info");
+      logger.action("User requested full reroll retry", {
+        userChoice: userChoiceContent.substring(0, 100),
+      });
+
+      let partialPart: ScenePart = {
+        content: "",
+        imageUrl: "",
+        user: false,
+        role: "assistant",
+        choices: [],
+      };
+
+      await runTurnGeneration(storyData, partialPart, {
+        logLabel: "reroll",
+        successNotification: "Turn rerolled",
+      });
+      return;
+    }
+
+    // Legacy fallback: no saved pre-turn snapshot for this turn (e.g. it
+    // was taken before undo/retry snapshots existed, or before an app
+    // update mid-session). Can't safely redo mechanics without one, so
+    // fall back to the previous behavior: only regenerate the narration
+    // text, reusing the original attempt's dice rolls/tool results as-is.
 
     // Save GM context from the last AI response before popping it
     // This preserves the dice rolls, skill checks, and reasoning for the regeneration
@@ -2603,19 +2747,13 @@ function StoryPageContent() {
     // Remove the last AI response
     storyData.scene.parts.pop();
 
-    // Get the user choice part (now the last part after popping AI response)
-    const userChoicePart =
-      storyData.scene.parts[storyData.scene.parts.length - 1];
-
     // Get the user's choice content and choices for regeneration
     const userChoiceContent = userChoicePart?.content || "";
     const savedChoices = userChoicePart?.choices || [];
 
     // Also pop the user choice part - we'll re-add it via generateStoryTurn
     // This prevents duplicate user messages in the prompt
-    if (userChoicePart?.user) {
-      storyData.scene.parts.pop();
-    }
+    storyData.scene.parts.pop();
 
     // Restore choices from the user's choice part
     if (savedChoices.length > 0) {
@@ -2623,7 +2761,7 @@ function StoryPageContent() {
     }
 
     addNotification("Regenerating response...", "info");
-    logger.action("User requested retry", {
+    logger.action("User requested retry (no snapshot, reword-only)", {
       hasGMThinking: !!savedGMThinking?.length,
       hasGMStoryContext: !!savedGMStoryContext,
       userChoice: userChoiceContent.substring(0, 100),
@@ -2935,7 +3073,7 @@ function StoryPageContent() {
             }
 
             setCanRetry(true);
-            setCanUndo(true);
+            setCanUndo(undoStackRef.current.length > 0);
             setLoadingStage(null);
             setStoryTextReady(true);
 
@@ -2992,40 +3130,35 @@ function StoryPageContent() {
       return;
     }
 
+    // Pop the most recent pre-turn snapshot off the stack - restoring full
+    // mechanical state (NPCs, quests, stats, timers, combat, etc.), not just
+    // the conversational scene.parts record (the "misread input" gap - see
+    // §2.5 in docs/research-paper-ttrpg-theory-gap-analysis.md). The stack
+    // is persisted, so this works the same right after a reload as it does
+    // mid-session, and repeated Undo clicks keep walking back turn by turn
+    // instead of degrading after the first.
+    const snapshot = undoStackRef.current[undoStackRef.current.length - 1];
+    if (!snapshot) {
+      addNotification(
+        "Nothing to undo - no saved state for this turn",
+        "warning",
+      );
+      return;
+    }
+
     logger.action("User requested undo");
 
-    // Prefer restoring the full pre-turn snapshot over just popping
-    // scene.parts - a turn's GM tool calls may have mutated NPCs, quests,
-    // stats, timers, etc. directly on storyData, and popping the
-    // conversational record alone left those mechanical changes in place
-    // (the "misread input" gap - see §2.5 in
-    // docs/research-paper-ttrpg-theory-gap-analysis.md). Only usable to
-    // undo the single most recent turn - the snapshot is consumed and not
-    // stacked, matching the paper's "misread input rolls back the whole
-    // turn" behavior rather than a general multi-step undo history.
-    const snapshot = preTurnSnapshotRef.current;
-    const snapshotMatchesCurrentTurn =
-      snapshot &&
-      snapshot.scene.parts.length === storyData.scene.parts.length - 2;
-
-    if (snapshotMatchesCurrentTurn) {
-      // Restore in place (mutate the existing object, matching this
-      // codebase's storyData-mutation convention) rather than swapping to a
-      // new object reference, so every other handler's closure over
-      // `storyData` keeps working unchanged.
-      for (const key of Object.keys(storyData)) {
-        delete (storyData as unknown as Record<string, unknown>)[key];
-      }
-      Object.assign(storyData, snapshot);
-      preTurnSnapshotRef.current = null;
-      logger.action("Undo restored full pre-turn state (mechanics included)");
-    } else {
-      // No matching snapshot (e.g. page was reloaded, or undoing further
-      // back than the single most recent turn) - fall back to the old
-      // scene.parts-only behavior rather than failing the undo outright.
-      storyData.scene.parts.pop();
-      storyData.scene.parts.pop();
+    // Restore in place (mutate the existing object, matching this
+    // codebase's storyData-mutation convention) rather than swapping to a
+    // new object reference, so every other handler's closure over
+    // `storyData` keeps working unchanged.
+    for (const key of Object.keys(storyData)) {
+      delete (storyData as unknown as Record<string, unknown>)[key];
     }
+    Object.assign(storyData, snapshot);
+    undoStackRef.current = undoStackRef.current.slice(0, -1);
+    persistUndoStack();
+    logger.action("Undo restored full pre-turn state (mechanics included)");
 
     // Update state to previous scene part
     if (storyData.scene.parts.length > 0) {
@@ -3042,11 +3175,11 @@ function StoryPageContent() {
     }
 
     setCanRetry(false);
-    setCanUndo(storyData.scene.parts.length >= 2);
+    setCanUndo(undoStackRef.current.length > 0 && storyData.scene.parts.length >= 2);
     addNotification("Undone last action", "success");
 
     // Save progress
-    await saveProgress(storyData);
+    await saveProgress(storyData, true);
   }
 
   async function handleEdit(editedText: string, partIndex: number) {
