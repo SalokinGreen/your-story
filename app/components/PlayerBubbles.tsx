@@ -70,7 +70,6 @@ function clampPct(v: number, min: number, max: number) {
 }
 
 interface RecordingSession {
-  reason: "generate" | "queue";
   stopped: boolean;
 }
 
@@ -102,8 +101,8 @@ export default function PlayerBubbles({
   const { keys } = useAPIKeys();
 
   const [activePlayerId, setActivePlayerId] = useState<string | null>(null);
-  const [processingPlayerId, setProcessingPlayerId] = useState<string | null>(
-    null,
+  const [processingPlayerIds, setProcessingPlayerIds] = useState<Set<string>>(
+    new Set(),
   );
   const [pendingLines, setPendingLines] = useState<PendingLine[]>([]);
 
@@ -167,12 +166,7 @@ export default function PlayerBubbles({
   );
 
   const handleRecordingStopped = useCallback(
-    async (
-      player: CouchPlayer,
-      mimeType: string,
-      chunks: Blob[],
-      session: RecordingSession,
-    ) => {
+    async (player: CouchPlayer, mimeType: string, chunks: Blob[]) => {
       setActivePlayerId((cur) => (cur === player.id ? null : cur));
 
       if (chunks.length === 0) {
@@ -185,7 +179,7 @@ export default function PlayerBubbles({
         return;
       }
 
-      setProcessingPlayerId(player.id);
+      setProcessingPlayerIds((prev) => new Set(prev).add(player.id));
       onLocalActivity?.("processing");
       try {
         const transcript = await transcribe(blob);
@@ -199,22 +193,7 @@ export default function PlayerBubbles({
             color: player.color,
             text: trimmed,
           };
-          setPendingLines((prev) => {
-            const next = [...prev, line];
-            if (session.reason === "generate") {
-              submitLines(next);
-              return [];
-            }
-            return next;
-          });
-        } else if (session.reason === "generate") {
-          setPendingLines((prev) => {
-            if (prev.length > 0) {
-              submitLines(prev);
-              return [];
-            }
-            return prev;
-          });
+          setPendingLines((prev) => [...prev, line]);
         }
       } catch (error) {
         const message =
@@ -223,31 +202,31 @@ export default function PlayerBubbles({
             : "Couldn't transcribe that — try again";
         addNotification(message, "failure");
       } finally {
-        setProcessingPlayerId((cur) => (cur === player.id ? null : cur));
+        setProcessingPlayerIds((prev) => {
+          const next = new Set(prev);
+          next.delete(player.id);
+          return next;
+        });
         onLocalActivity?.("idle");
       }
     },
-    [transcribe, submitLines, addNotification, onLocalActivity],
+    [transcribe, addNotification, onLocalActivity],
   );
 
-  const stopRecording = useCallback(
-    (reason: "generate" | "queue") => {
-      const session = sessionRef.current;
-      if (!session) return;
-      session.reason = reason;
-      session.stopped = true;
-      sessionRef.current = null;
+  const stopRecording = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+    session.stopped = true;
+    sessionRef.current = null;
 
-      if (
-        mediaRecorderRef.current &&
-        mediaRecorderRef.current.state !== "inactive"
-      ) {
-        mediaRecorderRef.current.stop();
-      }
-      teardownAudio();
-    },
-    [teardownAudio],
-  );
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
+      mediaRecorderRef.current.stop();
+    }
+    teardownAudio();
+  }, [teardownAudio]);
 
   const watchSilence = useCallback((session: RecordingSession) => {
     const analyser = analyserRef.current;
@@ -266,7 +245,7 @@ export default function PlayerBubbles({
         lastSoundTime = Date.now();
       } else if (Date.now() - lastSoundTime > SILENCE_TIMEOUT_MS) {
         // Silence: pause and queue what was said, but don't generate yet.
-        stopRecording("queue");
+        stopRecording();
         return;
       }
       animationFrameRef.current = requestAnimationFrame(tick);
@@ -317,14 +296,14 @@ export default function PlayerBubbles({
         const mediaRecorder = new MediaRecorder(stream, { mimeType });
         mediaRecorderRef.current = mediaRecorder;
 
-        const session: RecordingSession = { reason: "queue", stopped: false };
+        const session: RecordingSession = { stopped: false };
         sessionRef.current = session;
 
         mediaRecorder.ondataavailable = (e) => {
           if (e.data.size > 0) chunks.push(e.data);
         };
         mediaRecorder.onstop = () => {
-          handleRecordingStopped(player, mimeType, chunks, session);
+          handleRecordingStopped(player, mimeType, chunks);
         };
         mediaRecorder.onerror = () => {
           addNotification("Recording error", "failure");
@@ -359,13 +338,17 @@ export default function PlayerBubbles({
 
   const handleBubbleTap = useCallback(
     async (player: CouchPlayer) => {
-      if (disabled || processingPlayerId) return;
+      if (disabled) return;
       if (myPlayerId && player.id !== myPlayerId) return;
+      // Only block re-tapping this specific player while their own last
+      // line is still transcribing - other players can start recording
+      // immediately, they don't wait on someone else's STT call.
+      if (processingPlayerIds.has(player.id)) return;
 
       if (activePlayerId === player.id) {
-        stopRecording("generate");
+        stopRecording();
       } else if (activePlayerId) {
-        stopRecording("queue");
+        stopRecording();
         await beginRecording(player);
       } else {
         await beginRecording(player);
@@ -373,7 +356,7 @@ export default function PlayerBubbles({
     },
     [
       disabled,
-      processingPlayerId,
+      processingPlayerIds,
       myPlayerId,
       activePlayerId,
       stopRecording,
@@ -386,10 +369,10 @@ export default function PlayerBubbles({
   }, []);
 
   const handleGenerateTap = useCallback(() => {
-    if (disabled || processingPlayerId) return;
+    if (disabled || processingPlayerIds.size > 0) return;
     submitLines(pendingLines);
     setPendingLines([]);
-  }, [disabled, processingPlayerId, submitLines, pendingLines]);
+  }, [disabled, processingPlayerIds, submitLines, pendingLines]);
 
   if (players.length === 0) return null;
 
@@ -408,7 +391,7 @@ export default function PlayerBubbles({
             player={player}
             index={index}
             isActive={isOwnBubble ? activePlayerId === player.id : remote === "recording"}
-            isProcessing={isOwnBubble ? processingPlayerId === player.id : remote === "processing"}
+            isProcessing={isOwnBubble ? processingPlayerIds.has(player.id) : remote === "processing"}
             disabled={disabled || !isOwnBubble}
             onTap={() => handleBubbleTap(player)}
           />
@@ -422,7 +405,7 @@ export default function PlayerBubbles({
       {pendingLines.length > 0 && !activePlayerId && (
         <GenerateBubble
           count={pendingLines.length}
-          disabled={disabled || !!processingPlayerId}
+          disabled={disabled || processingPlayerIds.size > 0}
           onTap={handleGenerateTap}
         />
       )}
@@ -522,7 +505,7 @@ function Bubble({
       }}
       title={
         isActive
-          ? `${player.name} is speaking — tap to finish & generate`
+          ? `${player.name} is speaking — tap to stop & queue`
           : `Tap to let ${player.name} speak`
       }
     >
