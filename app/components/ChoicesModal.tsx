@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { Choice, Choices, StoryData, ActionAnalysis } from "../misc/structs";
+import { Choice, Choices, StoryData } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
 import { getLocalPlayerId } from "@/app/misc/localPlayerId";
 import {
@@ -9,10 +9,6 @@ import {
   findResourceMatch,
   findItemMatch,
 } from "../misc/fuzzyMatch";
-
-// Default DC hint shown in the manual action builder - the GM interprets
-// this narratively via its own dice tools, it isn't enforced client-side.
-const DEFAULT_BUILDER_DC = 12;
 
 interface ChoicesModalProps {
   isOpen: boolean;
@@ -23,9 +19,6 @@ interface ChoicesModalProps {
   onSelectChoice: (choice: Choice) => void;
   onConfirm: (playerComment?: string) => void;
   onCustomInput?: (text: string, playerComment?: string) => void;
-  onActionSubmit?: (
-    text: string,
-  ) => Promise<{ analysis: ActionAnalysis; warnings: string[] } | null>;
   onActionConfirm?: (choice: Choice, playerComment?: string) => void;
   onCommentSubmit?: (comment: string) => void;
   onRerollChoices?: () => void;
@@ -48,7 +41,6 @@ export default function ChoicesModal({
   onSelectChoice,
   onConfirm,
   onCustomInput,
-  onActionSubmit,
   onActionConfirm,
   onCommentSubmit,
   onRerollChoices,
@@ -61,8 +53,6 @@ export default function ChoicesModal({
   // Action mode state
   const [actionText, setActionText] = useState("");
   const [commentMode, setCommentMode] = useState(false);
-  const [analyzingAction, setAnalyzingAction] = useState(false);
-  const [showActionBuilder, setShowActionBuilder] = useState(false);
 
   const multiplayerEnabled = !!storyData.multiplayer?.enabled;
   const multiplayerMode = storyData.multiplayer?.mode || "host";
@@ -88,13 +78,6 @@ export default function ChoicesModal({
     return isHostUser;
   })();
 
-  // Action builder state
-  const [builderSkill, setBuilderSkill] = useState("");
-  const [builderDc, setBuilderDc] = useState(12);
-  const [builderItem, setBuilderItem] = useState("");
-  const [builderResource, setBuilderResource] = useState("");
-  const [builderPlain, setBuilderPlain] = useState(true);
-
   // Ref for auto-focusing textarea in action mode
   const actionTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -114,13 +97,6 @@ export default function ChoicesModal({
     if (!isOpen) {
       setActionText("");
       setCommentMode(false);
-      setAnalyzingAction(false);
-      setShowActionBuilder(false);
-      setBuilderSkill("");
-      setBuilderDc(DEFAULT_BUILDER_DC);
-      setBuilderItem("");
-      setBuilderResource("");
-      setBuilderPlain(true);
       setPendingMultiplayer([]);
       setMultiplayerName("");
       setMultiplayerTimerStart(null);
@@ -182,16 +158,12 @@ export default function ChoicesModal({
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && isOpen) {
-        if (showActionBuilder) {
-          setShowActionBuilder(false);
-        } else {
-          onClose();
-        }
+        onClose();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose, showActionBuilder]);
+  }, [isOpen, onClose]);
 
   // Prevent body scroll when modal is open
   useEffect(() => {
@@ -203,19 +175,16 @@ export default function ChoicesModal({
     }
   }, [isOpen]);
 
-  const handleActionAnalyze = async (
-    overrideText?: string,
-    isStt?: boolean,
-  ) => {
+  const handleActionAnalyze = (overrideText?: string, isStt?: boolean) => {
     const text = (overrideText ?? actionText).trim();
 
-    // Multiplayer (non-comment): queue the action instead of calling AI directly.
+    // Multiplayer (non-comment): queue the action instead of submitting directly.
     if (multiplayerEnabled && !commentMode) {
       handleMultiplayerAdd();
       return;
     }
 
-    // Comment mode: post a player-visible comment only (no AI call)
+    // Comment mode: post a player-visible comment only (no generation)
     if (commentMode) {
       if (!onCommentSubmit) return;
       if (!text) return;
@@ -224,66 +193,14 @@ export default function ChoicesModal({
       return;
     }
 
-    // If no text, just send "> continue"
-    if (!text) {
-      if (onActionConfirm) {
-        const choice: Choice = {
-          text: "continue",
-        };
-        onActionConfirm(choice, undefined);
-        onClose();
-      }
-      return;
-    }
-
-    if (!onActionSubmit || !onActionConfirm) return;
-
-    setAnalyzingAction(true);
-    setShowActionBuilder(false);
-    try {
-      const result = await onActionSubmit(text);
-      if (result) {
-        // Directly submit the action without requiring confirmation
-        const choice: Choice = {
-          text: text,
-          skill_used: result.analysis.skill_used || undefined,
-          skill_dc: result.analysis.skill_dc || undefined,
-          item_used: result.analysis.item_used || undefined,
-          resource_used: result.analysis.resource_used || undefined,
-          agmt_check: result.analysis.agmt_check || undefined,
-          table: result.analysis.table || undefined,
-          stt_input: isStt || undefined,
-        };
-        onActionConfirm(choice, undefined);
-        onClose();
-      } else {
-        // Analysis failed - show action builder
-        setShowActionBuilder(true);
-        setAnalyzingAction(false);
-      }
-    } catch (error) {
-      console.error("Action analysis failed:", error);
-      setShowActionBuilder(true);
-      setAnalyzingAction(false);
-    }
-  };
-
-  const handleManualActionSubmit = () => {
     if (!onActionConfirm) return;
 
-    const choice: Choice = {
-      text: actionText,
-    };
-
-    if (!builderPlain) {
-      if (builderSkill) {
-        choice.skill_used = builderSkill;
-        choice.skill_dc = builderDc;
-      }
-      if (builderItem) choice.item_used = builderItem;
-      if (builderResource) choice.resource_used = builderResource;
-    }
-
+    // No text: just send "> continue". Otherwise submit the freeform action
+    // as-is - the GM stage determines mechanics (skill checks, items, dice)
+    // during generation, so no client-side analysis step is needed here.
+    const choice: Choice = text
+      ? { text, stt_input: isStt || undefined }
+      : { text: "continue" };
     onActionConfirm(choice, undefined);
     onClose();
   };
@@ -304,7 +221,6 @@ export default function ChoicesModal({
     });
 
     setActionText("");
-    setShowActionBuilder(false);
   };
 
   const handleMultiplayerSkip = () => {
@@ -318,7 +234,6 @@ export default function ChoicesModal({
       return next;
     });
     setActionText("");
-    setShowActionBuilder(false);
   };
 
   const handleMultiplayerClear = () => {
@@ -477,102 +392,6 @@ export default function ChoicesModal({
     }
 
     return details;
-  };
-
-  // Render action builder UI for when analysis fails
-  const renderActionBuilder = () => {
-    return (
-      <div className="bg-amber-500/[0.06] backdrop-blur-md border border-amber-400/20 rounded-lg p-3 space-y-3">
-        <div className="flex items-center gap-2 text-amber-300 text-sm font-medium">
-          <DynamicIcon name="AlertTriangle" className="w-4 h-4" />
-          Build Action Manually
-        </div>
-
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => setBuilderPlain(!builderPlain)}
-            className={`relative w-10 h-5 rounded-full transition-colors ${
-              builderPlain
-                ? "bg-linear-to-r from-purple-600 to-blue-600"
-                : "bg-white/10"
-            }`}
-          >
-            <div
-              className={`absolute top-0.5 w-4 h-4 bg-white rounded-full transition-transform ${
-                builderPlain ? "left-5" : "left-0.5"
-              }`}
-            />
-          </button>
-          <span className="text-xs text-blue-200">
-            {builderPlain ? "Plain action" : "With mechanics"}
-          </span>
-        </div>
-
-        {!builderPlain && (
-          <div className="space-y-2">
-            <div className="flex gap-2">
-              <select
-                value={builderSkill}
-                onChange={(e) => setBuilderSkill(e.target.value)}
-                className="flex-1 px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-xs"
-              >
-                <option value="">No skill check</option>
-                {storyData.stats.map((s) => (
-                  <option key={s.name} value={s.name}>
-                    {s.name} (+{s.value})
-                  </option>
-                ))}
-              </select>
-              {builderSkill && (
-                <input
-                  type="number"
-                  value={builderDc}
-                  onChange={(e) => setBuilderDc(parseInt(e.target.value) || 10)}
-                  className="w-14 px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-xs text-center"
-                  placeholder="DC"
-                />
-              )}
-            </div>
-            {storyData.inventory.length > 0 && (
-              <select
-                value={builderItem}
-                onChange={(e) => setBuilderItem(e.target.value)}
-                className="w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-xs"
-              >
-                <option value="">No item</option>
-                {storyData.inventory.map((i) => (
-                  <option key={i.name} value={i.name}>
-                    {i.name} x{i.quantity}
-                  </option>
-                ))}
-              </select>
-            )}
-            {storyData.resources.length > 0 && (
-              <select
-                value={builderResource}
-                onChange={(e) => setBuilderResource(e.target.value)}
-                className="w-full px-2 py-1.5 bg-white/5 border border-white/10 rounded-lg text-white text-xs"
-              >
-                <option value="">No resource</option>
-                {storyData.resources.map((r) => (
-                  <option key={r.name} value={r.name}>
-                    {r.name} ({r.value}/{r.maxValue})
-                  </option>
-                ))}
-              </select>
-            )}
-          </div>
-        )}
-
-        <button
-          onClick={handleManualActionSubmit}
-          disabled={loading}
-          className="w-full py-2 bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-lg shadow-md shadow-amber-950/40 text-sm font-medium transition-all"
-        >
-          Submit Action
-        </button>
-      </div>
-    );
   };
 
   if (!isOpen) return null;
@@ -736,22 +555,13 @@ export default function ChoicesModal({
                   </div>
                   <button
                     type="button"
-                    onClick={() => {
-                      setCommentMode((prev) => {
-                        const next = !prev;
-                        if (next) {
-                          setShowActionBuilder(false);
-                          setAnalyzingAction(false);
-                        }
-                        return next;
-                      });
-                    }}
+                    onClick={() => setCommentMode((prev) => !prev)}
                     className={`px-2.5 py-1.5 rounded-md text-xs font-semibold border transition-colors ${
                       commentMode
                         ? "bg-emerald-500/20 border-emerald-400/40 text-emerald-100"
                         : "bg-white/[0.03] border-white/10 text-blue-200/60 hover:bg-white/5"
                     }`}
-                    disabled={loading || analyzingAction}
+                    disabled={loading}
                     title="When enabled, anything you submit is posted as a player-visible comment and is not sent to the AI."
                   >
                     {commentMode ? "On" : "Off"}
@@ -762,17 +572,14 @@ export default function ChoicesModal({
                   <textarea
                     ref={actionTextareaRef}
                     value={actionText}
-                    onChange={(e) => {
-                      setActionText(e.target.value);
-                      setShowActionBuilder(false);
-                    }}
+                    onChange={(e) => setActionText(e.target.value)}
                     placeholder={
                       commentMode
                         ? "Write a comment for the other players..."
                         : "Describe your action... (e.g., 'I kick the door open' or 'I try to convince the guard to let us pass')"
                     }
                     rows={3}
-                    disabled={analyzingAction || loading}
+                    disabled={loading}
                     className="flex-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-200/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none text-sm"
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && e.ctrlKey) {
@@ -791,183 +598,156 @@ export default function ChoicesModal({
                 </p>
               </div>
 
-              {/* Action Builder (only shown when analysis fails) */}
-              {showActionBuilder && renderActionBuilder()}
-
               {/* Act / Multiplayer buttons */}
-              {!showActionBuilder && (
-                <>
-                  {multiplayerEnabled ? (
-                    <div className="space-y-2">
-                      {commentMode ? (
-                        <button
-                          onClick={() => handleActionAnalyze()}
-                          disabled={
-                            analyzingAction ||
-                            loading ||
-                            (commentMode && !actionText.trim())
-                          }
-                          className={`w-full py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                            analyzingAction ||
-                            loading ||
-                            (commentMode && !actionText.trim())
-                              ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
-                              : "bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-950/40"
-                          }`}
-                        >
-                          <DynamicIcon
-                            name="MessageSquare"
-                            className="w-4 h-4"
-                          />
-                          Send Comment
-                        </button>
-                      ) : (
-                        <>
-                          <div className="grid grid-cols-2 gap-2">
-                            <button
-                              onClick={handleMultiplayerAdd}
-                              disabled={
-                                loading ||
-                                analyzingAction ||
-                                !multiplayerName.trim()
-                              }
-                              className={`py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                                loading ||
-                                analyzingAction ||
-                                !multiplayerName.trim()
-                                  ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
-                                  : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-md shadow-purple-950/40"
-                              }`}
-                              title={
-                                actionText.trim()
-                                  ? "Submit your action for this turn"
-                                  : "Submit a skip (continue) for this turn"
-                              }
-                            >
-                              <DynamicIcon name="Plus" className="w-4 h-4" />
-                              Add To Turn
-                            </button>
-                            <button
-                              onClick={handleMultiplayerSkip}
-                              disabled={
-                                loading ||
-                                analyzingAction ||
-                                !multiplayerName.trim()
-                              }
-                              className={`py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
-                                loading ||
-                                analyzingAction ||
-                                !multiplayerName.trim()
-                                  ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
-                                  : "bg-white/5 hover:bg-white/10 border border-white/10 text-blue-100"
-                              }`}
-                              title="Skip your turn (submit continue)"
-                            >
-                              <DynamicIcon
-                                name="FastForward"
-                                className="w-4 h-4"
-                              />
-                              Skip Turn
-                            </button>
-                          </div>
-
+              <>
+                {multiplayerEnabled ? (
+                  <div className="space-y-2">
+                    {commentMode ? (
+                      <button
+                        onClick={() => handleActionAnalyze()}
+                        disabled={
+                          loading || (commentMode && !actionText.trim())
+                        }
+                        className={`w-full py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                          loading || (commentMode && !actionText.trim())
+                            ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                            : "bg-linear-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md shadow-emerald-950/40"
+                        }`}
+                      >
+                        <DynamicIcon
+                          name="MessageSquare"
+                          className="w-4 h-4"
+                        />
+                        Send Comment
+                      </button>
+                    ) : (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
                           <button
-                            onClick={handleMultiplayerSend}
-                            disabled={
-                              loading ||
-                              pendingMultiplayer.length === 0 ||
-                              !canManageTurn
-                            }
-                            className={`w-full py-3 rounded-lg font-medium transition-all ${
-                              loading ||
-                              pendingMultiplayer.length === 0 ||
-                              !canManageTurn
+                            onClick={handleMultiplayerAdd}
+                            disabled={loading || !multiplayerName.trim()}
+                            className={`py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                              loading || !multiplayerName.trim()
                                 ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
-                                : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-md shadow-purple-950/40"
+                                : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-md shadow-purple-950/40"
                             }`}
                             title={
-                              !canManageTurn
-                                ? "Only the host can generate"
-                                : undefined
+                              actionText.trim()
+                                ? "Submit your action for this turn"
+                                : "Submit a skip (continue) for this turn"
                             }
                           >
-                            {multiplayerMode === "timer"
-                              ? "Generate Now"
-                              : "Generate"}
+                            <DynamicIcon name="Plus" className="w-4 h-4" />
+                            Add To Turn
                           </button>
-
                           <button
-                            onClick={handleMultiplayerClear}
-                            disabled={
-                              loading ||
-                              pendingMultiplayer.length === 0 ||
-                              !canManageTurn
-                            }
-                            className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                              loading ||
-                              pendingMultiplayer.length === 0 ||
-                              !canManageTurn
-                                ? "bg-white/5 text-red-300/30 cursor-not-allowed"
-                                : "bg-red-500/10 hover:bg-red-500/20 border border-red-400/20 text-red-300"
+                            onClick={handleMultiplayerSkip}
+                            disabled={loading || !multiplayerName.trim()}
+                            className={`py-3 rounded-lg font-medium transition-colors flex items-center justify-center gap-2 ${
+                              loading || !multiplayerName.trim()
+                                ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                                : "bg-white/5 hover:bg-white/10 border border-white/10 text-blue-100"
                             }`}
-                            title={
-                              !canManageTurn
-                                ? "Only the host can clear the turn"
-                                : undefined
-                            }
+                            title="Skip your turn (submit continue)"
                           >
-                            Clear Turn
+                            <DynamicIcon
+                              name="FastForward"
+                              className="w-4 h-4"
+                            />
+                            Skip Turn
                           </button>
-                        </>
-                      )}
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleActionAnalyze()}
-                      disabled={
-                        analyzingAction ||
-                        loading ||
-                        (commentMode && !actionText.trim())
-                      }
-                      className={`w-full py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                        analyzingAction ||
-                        loading ||
-                        (commentMode && !actionText.trim())
-                          ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
-                          : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-md shadow-purple-950/40"
-                      }`}
-                    >
-                      {analyzingAction || loading ? (
-                        <>
-                          <DynamicIcon
-                            name="Loader2"
-                            className="w-4 h-4 animate-spin"
-                          />
-                          {analyzingAction ? "Processing..." : "Generating..."}
-                        </>
-                      ) : commentMode ? (
-                        <>
-                          <DynamicIcon
-                            name="MessageSquare"
-                            className="w-4 h-4"
-                          />
-                          Send Comment
-                        </>
-                      ) : actionText.trim() ? (
-                        <>
-                          <DynamicIcon name="Play" className="w-4 h-4" />
-                          Act
-                        </>
-                      ) : (
-                        <>
-                          <DynamicIcon name="FastForward" className="w-4 h-4" />
-                          Continue
-                        </>
-                      )}
-                    </button>
-                  )}
-                </>
-              )}
+                        </div>
+
+                        <button
+                          onClick={handleMultiplayerSend}
+                          disabled={
+                            loading ||
+                            pendingMultiplayer.length === 0 ||
+                            !canManageTurn
+                          }
+                          className={`w-full py-3 rounded-lg font-medium transition-all ${
+                            loading ||
+                            pendingMultiplayer.length === 0 ||
+                            !canManageTurn
+                              ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                              : "bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white shadow-md shadow-purple-950/40"
+                          }`}
+                          title={
+                            !canManageTurn
+                              ? "Only the host can generate"
+                              : undefined
+                          }
+                        >
+                          {multiplayerMode === "timer"
+                            ? "Generate Now"
+                            : "Generate"}
+                        </button>
+
+                        <button
+                          onClick={handleMultiplayerClear}
+                          disabled={
+                            loading ||
+                            pendingMultiplayer.length === 0 ||
+                            !canManageTurn
+                          }
+                          className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                            loading ||
+                            pendingMultiplayer.length === 0 ||
+                            !canManageTurn
+                              ? "bg-white/5 text-red-300/30 cursor-not-allowed"
+                              : "bg-red-500/10 hover:bg-red-500/20 border border-red-400/20 text-red-300"
+                          }`}
+                          title={
+                            !canManageTurn
+                              ? "Only the host can clear the turn"
+                              : undefined
+                          }
+                        >
+                          Clear Turn
+                        </button>
+                      </>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => handleActionAnalyze()}
+                    disabled={loading || (commentMode && !actionText.trim())}
+                    className={`w-full py-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
+                      loading || (commentMode && !actionText.trim())
+                        ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                        : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white shadow-md shadow-purple-950/40"
+                    }`}
+                  >
+                    {loading ? (
+                      <>
+                        <DynamicIcon
+                          name="Loader2"
+                          className="w-4 h-4 animate-spin"
+                        />
+                        Generating...
+                      </>
+                    ) : commentMode ? (
+                      <>
+                        <DynamicIcon
+                          name="MessageSquare"
+                          className="w-4 h-4"
+                        />
+                        Send Comment
+                      </>
+                    ) : actionText.trim() ? (
+                      <>
+                        <DynamicIcon name="Play" className="w-4 h-4" />
+                        Act
+                      </>
+                    ) : (
+                      <>
+                        <DynamicIcon name="FastForward" className="w-4 h-4" />
+                        Continue
+                      </>
+                    )}
+                  </button>
+                )}
+              </>
             </div>
           ) : (
             /* CHOICE MODE */

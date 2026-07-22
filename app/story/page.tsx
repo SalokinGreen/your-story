@@ -88,7 +88,7 @@ import { processLoreTriggers } from "../misc/lore";
 import { fillTemplate } from "../misc/characterSheetTemplate";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { outputToScenePart } from "../misc/ai";
-import { generateStoryTurn, analyzeAction } from "../misc/generation";
+import { generateStoryTurn } from "../misc/generation";
 import { GMNPCReactionResult } from "../misc/gmExecutor";
 import { tickCooldowns } from "../misc/abilitySystem";
 import CharacterCreationForm from "./create-character/form";
@@ -1806,69 +1806,9 @@ function StoryPageContent() {
     setStoryData(updatedStory);
   }
 
-  // Handle freeform action submission - analyze the action and return metadata
-  async function handleActionSubmit(
-    actionText: string,
-  ): Promise<{ analysis: any; warnings: string[] } | null> {
-    if (!storyData) return null;
-
-    // Check if GM Stage is enabled - if so, skip action analysis
-    // The GM Stage will determine mechanics during generation
-    // GM Stage is always enabled - legacy tool calling is deprecated
-    const gmStageEnabled = true;
-
-    if (gmStageEnabled) {
-      logger.action("GM Stage enabled - skipping action analysis", {
-        actionText,
-      });
-      // Return a plain action analysis - GM Stage will determine mechanics
-      return {
-        analysis: {
-          action_summary: actionText,
-          skill_used: null,
-          skill_dc: null,
-          item_used: null,
-          ability_used: null,
-          resource_used: null,
-          agmt_check: null,
-          table: null,
-          is_plain_action: true,
-          stat_bonus: null,
-          rolls: undefined,
-        },
-        warnings: ["GM Stage will determine mechanics during generation"],
-      };
-    }
-
-    logger.action("Analyzing freeform action", { actionText });
-
-    try {
-      const { choicesModel } = getModelsFromPreset();
-      const result = await analyzeAction(storyData, actionText, choicesModel, {
-        openRouterKey,
-        deepseekKey,
-        googleKey,
-        mistralKey,
-        deepinfraKey,
-      });
-
-      logger.ai_response("Action analysis complete", {
-        analysis: result.analysis,
-        warnings: result.validationWarnings,
-      });
-
-      return {
-        analysis: result.analysis,
-        warnings: result.validationWarnings,
-      };
-    } catch (error: any) {
-      logger.error("Action analysis failed", { error: error.message });
-      addNotification(`Analysis failed: ${error.message}`, "failure");
-      return null;
-    }
-  }
-
-  // Handle confirmed freeform action - this is called after analysis with a Choice object
+  // Handle confirmed freeform action - the GM stage determines mechanics
+  // (skill checks, items, dice) during generation, so no analysis step
+  // happens client-side before this.
   async function handleActionConfirm(choice: Choice, playerComment?: string) {
     if (!storyData) return;
 
@@ -3804,7 +3744,6 @@ function StoryPageContent() {
             handleChoice={handleChoice}
             handleSelect={handleSelect}
             onCustomInput={handleCustomInput}
-            onActionSubmit={handleActionSubmit}
             onActionConfirm={handleActionConfirm}
             onCommentSubmit={handleCommentSubmit}
             onRerollChoices={handleRerollChoices}
