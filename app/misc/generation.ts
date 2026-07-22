@@ -45,6 +45,7 @@ import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { ensureStoryReflected } from "@/app/misc/reflection";
 import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import { runObserver } from "@/app/misc/observer";
+import { runMemoryAgent } from "@/app/misc/memoryAgent";
 import {
   outputToScenePart,
   extractThinkingTags,
@@ -695,25 +696,36 @@ export async function generateStoryTurn(
       return result;
     }
 
+    // Shared by the observer and the memory agent below - both are
+    // best-effort side calls for the turn that just completed, using
+    // whatever model actually generated it.
+    const sideCallApiOptions = {
+      model:
+        result.meta.storyMeta?.model ||
+        result.meta.gmMeta?.model ||
+        options.storyModel,
+      token: null,
+      openRouterKey: options.openRouterKey,
+      deepseekKey: options.deepseekKey,
+      googleKey: options.googleKey,
+      mistralKey: options.mistralKey,
+      deepinfraKey: options.deepinfraKey,
+      abortSignal: options.abortSignal,
+    };
+
     let flags: ObserverFlag[] = [];
     try {
       flags = await runObserver({
         narration: result.content,
         playerChoice: userChoice,
         replyLength: options.replyLength,
-        apiOptions: {
-          model:
-            result.meta.storyMeta?.model ||
-            result.meta.gmMeta?.model ||
-            options.storyModel,
-          token: null,
-          openRouterKey: options.openRouterKey,
-          deepseekKey: options.deepseekKey,
-          googleKey: options.googleKey,
-          mistralKey: options.mistralKey,
-          deepinfraKey: options.deepinfraKey,
-          abortSignal: options.abortSignal,
-        },
+        toolNames: (result.gmResults || []).map((r) => r.toolName),
+        rollResults: (result.gmResults || []).map((r) => ({
+          toolName: r.toolName,
+          success: r.success,
+          contextForStory: r.contextForStory,
+        })),
+        apiOptions: sideCallApiOptions,
       });
     } catch (observerError) {
       // Fail open - an observer infra failure should never block the turn.
@@ -753,6 +765,27 @@ export async function generateStoryTurn(
     if (flags.length > 0) {
       result.scenePart = { ...result.scenePart, observerFlags: flags };
     }
+
+    // Layer 4: the memory agent (memoryAgent.ts) decides what from this
+    // turn is worth persisting, now that the turn is final and won't be
+    // reset again. Mutates storyData.memory directly; best-effort, same
+    // fail-open posture as the observer above.
+    try {
+      await runMemoryAgent(
+        storyData,
+        result.content,
+        userChoice,
+        sideCallApiOptions,
+      );
+    } catch (memoryAgentError) {
+      logger.action("Memory agent failed, skipping (fail open)", {
+        error:
+          memoryAgentError instanceof Error
+            ? memoryAgentError.message
+            : String(memoryAgentError),
+      });
+    }
+
     return result;
   }
 }

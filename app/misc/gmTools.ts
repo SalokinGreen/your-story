@@ -130,16 +130,37 @@ export interface OpposedFormulaParams {
 /**
  * Challenge check using a formula instead of stat lookup
  * GM should look up character values and insert actual numbers
+ *
+ * Same optional fields as FormulaRollParams (reverse_dc, stakes, the
+ * target/forces_choice hardness dimensions, stat_name) - challenges are
+ * reserved for the biggest scenes by this tool's own convention, so they
+ * get the same rigor as an ordinary roll instead of a stripped-down subset.
  */
 export interface FormulaChallengeCheckParams {
   formula: string; // "1d20+5" (actual value)
   dc: number;
+  reverse_dc?: boolean; // If true, success = roll ≤ DC (Call of Cthulhu style)
   description: string;
   display_name?: string;
+  stakes?: "low" | "medium" | "high" | "deadly";
+  target?: "self" | "someone_they_love" | "someone_present";
+  forces_choice?: boolean;
+  stat_name?: string;
   consequences?: {
     success?: string;
     failure?: string;
   };
+}
+
+/**
+ * Abandon the active challenge without forcing it to a win/loss threshold -
+ * for when it stops mattering narratively (enemies flee, the scene changes)
+ * before either side reaches its required count. Without this, an active
+ * challenge with no path to threshold stays active forever, blocking both
+ * starting a new challenge and resting.
+ */
+export interface CancelChallengeParams {
+  reason: string; // Why the challenge is being abandoned
 }
 
 // ============================================
@@ -556,6 +577,7 @@ export interface NegotiatePriceParams {
 // Union type for all GM tool parameters
 export type GMToolParams =
   | { name: "start_challenge"; params: StartChallengeParams }
+  | { name: "cancel_challenge"; params: CancelChallengeParams }
   | { name: "calculate"; params: CalculateParams }
   | { name: "take_rest"; params: TakeRestParams }
   | { name: "formula_roll"; params: FormulaRollParams }
@@ -660,6 +682,24 @@ Only ONE challenge can be active at a time.`,
         "primary_stat",
         "difficulty",
       ],
+    },
+  },
+};
+
+const cancelChallengeTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "cancel_challenge",
+    description: `Abandon the active challenge without forcing it to a win/loss result - use when it stops mattering narratively before either side reaches its threshold (the enemies flee, the scene changes, the player disengages). Without calling this, a challenge that never reaches threshold stays active forever and blocks starting a new one or resting.`,
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description: "Why the challenge is being abandoned",
+        },
+      },
+      required: ["reason"],
     },
   },
 };
@@ -1063,6 +1103,11 @@ This tool updates challenge progress (successes/failures) based on the roll resu
           type: "number",
           description: "Target number to beat for success",
         },
+        reverse_dc: {
+          type: "boolean",
+          description:
+            "If true, success = roll ≤ DC (Call of Cthulhu/BRP style roll-under). Default: false (roll ≥ DC)",
+        },
         description: {
           type: "string",
           description:
@@ -1071,6 +1116,28 @@ This tool updates challenge progress (successes/failures) based on the roll resu
         display_name: {
           type: "string",
           description: "Optional label for UI (e.g., 'Athletics Check')",
+        },
+        stakes: {
+          type: "string",
+          enum: ["low", "medium", "high", "deadly"],
+          description:
+            "Consequence tier on failure. Challenges are reserved for the biggest scenes - most challenge checks should be at least 'high'.",
+        },
+        target: {
+          type: "string",
+          enum: ["self", "someone_they_love", "someone_present"],
+          description:
+            "Who the failure consequence actually lands on. Independent of stakes. Omit for an ordinary consequence to the character themselves.",
+        },
+        forces_choice: {
+          type: "boolean",
+          description:
+            "If true, present the failure consequence as a dilemma between two costs the player must choose between, not a single flat cost.",
+        },
+        stat_name: {
+          type: "string",
+          description:
+            "Optional: name of the stat/resource this formula's flat modifier comes from. If it matches a tracked stat/resource, the modifier is cross-checked against it as an integrity check.",
         },
         consequences: {
           type: "object",
@@ -2309,6 +2376,7 @@ Each call costs an extra round-trip - use it for jobs worth the wait, not simple
  */
 export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   startChallengeTool,
+  cancelChallengeTool,
   calculateTool,
   takeRestTool,
   // Formula-based tools (primary dice mechanics)

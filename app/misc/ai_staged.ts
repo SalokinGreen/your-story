@@ -2169,6 +2169,7 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "search_memory",
     // Flow control
     "start_challenge",
+    "cancel_challenge",
     "take_rest",
     // Combat tools
     "start_combat",
@@ -2210,8 +2211,11 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "edit_lore_insert",
     "merge_lore",
     "duplicate_lore",
-    // Memory
-    "add_memory",
+    // Memory: add_memory deliberately NOT whitelisted here - a dedicated
+    // memory agent (memoryAgent.ts) now decides what's worth persisting
+    // after each turn instead of the GM calling this itself mid-generation.
+    // Retrieval is unchanged - search_memory (in legacyToolNames above)
+    // still lets the GM look memory up on demand.
     // Thread tools
     "create_thread",
     "update_thread",

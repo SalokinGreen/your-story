@@ -9,6 +9,8 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   checkResponseLength,
   checkPlayerAgencyViolation,
+  checkOutcomeMismatch,
+  checkToolUsageGaps,
   runObserver,
 } from "../app/misc/observer";
 
@@ -170,6 +172,285 @@ describe("checkPlayerAgencyViolation", () => {
   });
 });
 
+describe("checkOutcomeMismatch", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("returns null for empty narration without calling the API", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkOutcomeMismatch(
+      "",
+      [{ toolName: "formula_roll", success: false, contextForStory: "FAILURE" }],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("returns null when there are no roll/oracle results to check against", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkOutcomeMismatch("You succeed effortlessly.", [], {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flag).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("ignores fate_question results (not a SUCCESS/FAILURE check)", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkOutcomeMismatch(
+      "The omens are unclear.",
+      [{ toolName: "fate_question", success: true, contextForStory: "Answer: No" }],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("flags a mismatch when the model finds narration contradicts a FAILURE", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          mismatch: true,
+          reason: "The roll failed but the narration describes a clean success.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkOutcomeMismatch(
+      "You leap the gap easily and land without a scratch.",
+      [
+        {
+          toolName: "formula_roll",
+          success: false,
+          contextForStory: "[Athletics: 8 vs DC 15 -> FAILURE]",
+        },
+      ],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).not.toBeNull();
+    expect(flag?.type).toBe("outcome_narration_mismatch");
+    expect(flag?.severity).toBe("major");
+    expect(flag?.correctivePrompt).toContain("ground truth");
+  });
+
+  it("returns null when the model finds no mismatch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ mismatch: false, reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkOutcomeMismatch(
+      "You stumble and fall short of the ledge.",
+      [{ toolName: "formula_roll", success: false, contextForStory: "FAILURE" }],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).toBeNull();
+  });
+
+  it("only checks the last relevant roll when multiple rolls happened this turn", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ mismatch: false, reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await checkOutcomeMismatch(
+      "You succeed on the second attempt.",
+      [
+        { toolName: "formula_roll", success: false, contextForStory: "first: FAILURE" },
+        { toolName: "formula_roll", success: true, contextForStory: "second: SUCCESS" },
+      ],
+      { model: "test-model", token: "tok" },
+    );
+
+    const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const userMessage = sentBody.messages[1].content;
+    expect(userMessage).toContain("SUCCESS");
+    expect(userMessage).toContain("second: SUCCESS");
+  });
+
+  it("fails open (returns null) when the API call errors", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkOutcomeMismatch(
+      "Something happens.",
+      [{ toolName: "npc_roll", success: true, contextForStory: "SUCCESS" }],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).toBeNull();
+  });
+});
+
+describe("checkToolUsageGaps", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("returns no flags for empty narration without calling the API", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await checkToolUsageGaps("", [], {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flags).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips the API call entirely when both tools were already used this turn", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await checkToolUsageGaps(
+      "The sun sets over the ruined tower.",
+      ["fate_question", "increment_scene"],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flags).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("flags a missing oracle/table use", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          missed_oracle_or_table: true,
+          oracle_reason: "The GM decided the guard didn't notice without any roll.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await checkToolUsageGaps(
+      "You slip past. The guard doesn't notice a thing.",
+      [],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flags).toHaveLength(1);
+    expect(flags[0].type).toBe("missing_oracle_or_table");
+    expect(flags[0].severity).toBe("minor");
+    expect(flags[0].detail).toContain("guard didn't notice");
+  });
+
+  it("flags a missing scene increment", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          missed_scene_increment: true,
+          scene_reason: "The narration time-skipped to the next morning.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await checkToolUsageGaps(
+      "The next morning, you wake in a new city entirely.",
+      [],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flags).toHaveLength(1);
+    expect(flags[0].type).toBe("missing_scene_increment");
+    expect(flags[0].severity).toBe("minor");
+  });
+
+  it("only reports the gap that was actually asked about, even if the model answers both", async () => {
+    // increment_scene was already called this turn - only the oracle/table
+    // half should be asked about, so a spurious missed_scene_increment:true
+    // from the model must be ignored.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          missed_oracle_or_table: true,
+          oracle_reason: "Invented an uncertain outcome.",
+          missed_scene_increment: true,
+          scene_reason: "Should not be reported.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await checkToolUsageGaps(
+      "You guess the lock is unlocked, and it is.",
+      ["increment_scene"],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flags).toHaveLength(1);
+    expect(flags[0].type).toBe("missing_oracle_or_table");
+  });
+
+  it("reports nothing when the model finds no gap", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          missed_oracle_or_table: false,
+          oracle_reason: "",
+          missed_scene_increment: false,
+          scene_reason: "",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await checkToolUsageGaps("You nod and walk on.", [], {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flags).toEqual([]);
+  });
+
+  it("fails open (empty array) when the API call errors", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await checkToolUsageGaps("Something happens.", [], {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flags).toEqual([]);
+  });
+});
+
 describe("runObserver", () => {
   const originalFetch = global.fetch;
 
@@ -218,5 +499,32 @@ describe("runObserver", () => {
     });
 
     expect(flags).toEqual([]);
+  });
+
+  it("includes tool-usage-gap flags when toolNames is passed and a gap is found", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          violation: false,
+          severity: "minor",
+          reason: "",
+          missed_oracle_or_table: true,
+          oracle_reason: "Invented whether the trap was disarmed.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: "You guess the trap is disarmed, and it is.",
+      playerChoice: "Disarm the trap",
+      replyLength: "medium",
+      toolNames: ["increment_scene"], // scene already handled, oracle wasn't
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(flags.some((f) => f.type === "missing_oracle_or_table")).toBe(true);
+    expect(flags.some((f) => f.type === "missing_scene_increment")).toBe(false);
   });
 });
