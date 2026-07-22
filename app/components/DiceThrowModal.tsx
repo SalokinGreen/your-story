@@ -23,7 +23,6 @@ const SUPPORTED_SIDES = new Set([4, 6, 8, 10, 12, 20, 100]);
 interface DragState {
   startX: number;
   startY: number;
-  startTime: number;
   // Tray's bounding rect at drag-start, so the visual throw-vector line can
   // be drawn in tray-local coordinates without re-measuring on every move.
   rectLeft: number;
@@ -37,16 +36,20 @@ interface DragVisual {
   y2: number;
 }
 
-// Converts a screen-space drag gesture into a world-space throw. Tuned by
-// eye against the default dice-box camera/tray - see app/dev/dice-spike
-// for how this was validated against the patched physics worker.
-function throwFromDrag(dx: number, dy: number, dtMs: number) {
-  const dtSec = Math.max(dtMs, 16) / 1000;
+// Converts a screen-space drag gesture into a world-space throw. Power
+// comes from how FAR the player dragged, not how fast - a slow, deliberate
+// drag-and-release should throw just as hard as a quick flick across the
+// same distance. (An earlier speed-based version - dist/elapsedTime -
+// looked fine against synthetic test gestures that move instantly, but a
+// real ~1s human drag scored a forceScale near 1, weak enough that the
+// dice barely left the ground.) Tuned by eye against the default dice-box
+// camera/tray - see app/dev/dice-spike for how this was validated against
+// the patched physics worker.
+function throwFromDrag(dx: number, dy: number) {
   const dist = Math.hypot(dx, dy) || 1;
-  const speed = Math.min(dist / dtSec, 4000); // px/sec, clamped
   const dirX = dx / dist;
   const dirZ = dy / dist;
-  const forceScale = speed / 200;
+  const forceScale = Math.min(Math.max(dist / 25, 4), 16);
 
   const velocity: [number, number, number] = [
     dirX * forceScale,
@@ -177,7 +180,6 @@ export default function DiceThrowModal({
     dragRef.current = {
       startX: e.clientX,
       startY: e.clientY,
-      startTime: performance.now(),
       rectLeft: rect.left,
       rectTop: rect.top,
     };
@@ -213,7 +215,6 @@ export default function DiceThrowModal({
 
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
-    const dtMs = performance.now() - drag.startTime;
     if (Math.hypot(dx, dy) < 20) return; // require an actual drag, not a tap
 
     const token = requestTokenRef.current;
@@ -222,14 +223,18 @@ export default function DiceThrowModal({
       if (requestTokenRef.current !== token) return;
 
       setPhase("rolling");
-      const { velocity, spin } = throwFromDrag(dx, dy, dtMs);
+      const { velocity, spin } = throwFromDrag(dx, dy);
       await diceBox.updateConfig({
         customThrowVelocity: velocity,
         customThrowSpin: spin,
       });
       const group = diceGroupRef.current;
+      // newStartPoint:false keeps the dice launching from the same edge
+      // point the initial resting toss already used (validated to land
+      // reasonably centered) instead of dice-box re-rolling a brand new
+      // random edge, which could be a much more awkward spot.
       const results = group
-        ? await diceBox.reroll(group, { remove: true })
+        ? await diceBox.reroll(group, { remove: true, newStartPoint: false })
         : await diceBox.roll(`${request.count}d${request.sides}`);
       if (requestTokenRef.current !== token) return;
 
@@ -295,7 +300,14 @@ export default function DiceThrowModal({
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={cancelDrag}
-        className="flex-1 relative"
+        // min-h-0 overrides the flex default of min-height:auto - without it,
+        // a <canvas> child's intrinsic size (its width/height attributes,
+        // which dice-box sets to match this container's last measured size)
+        // becomes this flex item's content-based minimum, so it never
+        // shrinks back down when the footer grows on settle (the result
+        // line + bigger Continue button), pushing the footer off the
+        // bottom of the screen.
+        className="flex-1 min-h-0 relative"
         style={{ touchAction: "none", cursor: phase === "aiming" ? "grab" : "default" }}
       >
         <style jsx>{`
