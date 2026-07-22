@@ -199,6 +199,55 @@ export default function LibraryPickerModal({
 
   const totalSelected = selectedIds.size + selectedTableIds.size;
 
+  const folderNotes = useMemo(() => {
+    if (selectedFolder === null) return [];
+    return notes.filter((n) => {
+      if (filterType && n.type !== filterType) return false;
+      return selectedFolder === "uncategorized"
+        ? !n.folderId
+        : n.folderId === selectedFolder;
+    });
+  }, [notes, filterType, selectedFolder]);
+
+  const folderTables = useMemo(() => {
+    if (selectedFolder === null) return [];
+    return tables.filter((t) =>
+      selectedFolder === "uncategorized"
+        ? !t.folderId
+        : t.folderId === selectedFolder,
+    );
+  }, [tables, selectedFolder]);
+
+  const folderLabel =
+    selectedFolder === "uncategorized"
+      ? "Uncategorized"
+      : folders.find((f) => f.id === selectedFolder)?.name || "";
+
+  const folderAllSelected =
+    (folderNotes.length > 0 || folderTables.length > 0) &&
+    folderNotes.every((n) => selectedIds.has(n.id)) &&
+    folderTables.every((t) => selectedTableIds.has(t.id));
+
+  const toggleSelectFolder = () => {
+    if (folderAllSelected) {
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        folderNotes.forEach((n) => next.delete(n.id));
+        return next;
+      });
+      setSelectedTableIds((prev) => {
+        const next = new Set(prev);
+        folderTables.forEach((t) => next.delete(t.id));
+        return next;
+      });
+    } else {
+      setSelectedIds((prev) => new Set([...prev, ...folderNotes.map((n) => n.id)]));
+      setSelectedTableIds(
+        (prev) => new Set([...prev, ...folderTables.map((t) => t.id)]),
+      );
+    }
+  };
+
   const handleConfirm = () => {
     onImport(
       notes.filter((n) => selectedIds.has(n.id)),
@@ -320,6 +369,26 @@ export default function LibraryPickerModal({
                   </button>
                 ))}
               </DraggableScroll>
+            )}
+
+          {selectedFolder !== null &&
+            (folderNotes.length > 0 || folderTables.length > 0) && (
+              <button
+                onClick={toggleSelectFolder}
+                className={`w-full px-3 py-2 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 border ${
+                  folderAllSelected
+                    ? "bg-purple-500/10 border-purple-500/50 text-purple-200"
+                    : "bg-white/5 border-white/10 text-blue-200/70 hover:bg-white/10"
+                }`}
+              >
+                <DynamicIcon
+                  name={folderAllSelected ? "SquareCheck" : "FolderOpen"}
+                  className="w-3.5 h-3.5"
+                />
+                {folderAllSelected
+                  ? `Deselect All from "${folderLabel}"`
+                  : `Select All from "${folderLabel}" (${folderNotes.length} note${folderNotes.length === 1 ? "" : "s"}${folderTables.length > 0 ? `, ${folderTables.length} table${folderTables.length === 1 ? "" : "s"}` : ""})`}
+              </button>
             )}
         </div>
 
