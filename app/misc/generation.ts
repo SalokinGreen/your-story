@@ -47,6 +47,13 @@ import {
 } from "@/app/misc/observer";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
 import {
+  getObserverSettings,
+  getObserverModelOverride,
+  getMemoryKeeperModelOverride,
+  getReflectionModelOverride,
+  resolveSideCallModel,
+} from "@/app/misc/layerSettings";
+import {
   outputToScenePart,
   extractThinkingTags,
   detectRepetition,
@@ -711,7 +718,9 @@ export async function generateStoryTurn(
 
     // Shared by the observer and the memory agent below - both are
     // best-effort side calls for the turn that just completed, using
-    // whatever model actually generated it.
+    // whatever model actually generated it, unless the user pinned a
+    // specific model/effort for that stage in Settings > Architecture
+    // (layerSettings.ts).
     const sideCallApiOptions = {
       model:
         result.meta.storyMeta?.model ||
@@ -726,6 +735,16 @@ export async function generateStoryTurn(
       abortSignal: options.abortSignal,
     };
 
+    // Explicit caller-supplied settings win; otherwise fall back to the
+    // user's stored Architecture-tab config (defaults to
+    // DEFAULT_OBSERVER_SETTINGS, reproducing pre-existing behavior).
+    const observerSettings = options.observerSettings ?? getObserverSettings();
+    const observerModelOverride = getObserverModelOverride();
+    const observerApiOptions = {
+      ...sideCallApiOptions,
+      ...resolveSideCallModel(observerModelOverride, sideCallApiOptions.model),
+    };
+
     let flags: ObserverFlag[] = [];
     try {
       flags = await runObserver({
@@ -738,8 +757,8 @@ export async function generateStoryTurn(
           success: r.success,
           contextForStory: r.contextForStory,
         })),
-        settings: options.observerSettings,
-        apiOptions: sideCallApiOptions,
+        settings: observerSettings,
+        apiOptions: observerApiOptions,
       });
     } catch (observerError) {
       // Fail open - an observer infra failure should never block the turn.
@@ -760,7 +779,7 @@ export async function generateStoryTurn(
     const majorFlag = flags.find(
       (f) =>
         f.severity === "major" &&
-        settingsFor(options.observerSettings, f.type).triggersReset,
+        settingsFor(observerSettings, f.type).triggersReset,
     );
 
     if (majorFlag && preTurnSnapshot && resetAttempts < MAX_OBSERVER_RESETS) {
@@ -794,11 +813,18 @@ export async function generateStoryTurn(
     // reset again. Mutates storyData.memory directly; best-effort, same
     // fail-open posture as the observer above.
     try {
+      const memoryKeeperApiOptions = {
+        ...sideCallApiOptions,
+        ...resolveSideCallModel(
+          getMemoryKeeperModelOverride(),
+          sideCallApiOptions.model,
+        ),
+      };
       await runMemoryAgent(
         storyData,
         result.content,
         userChoice,
-        sideCallApiOptions,
+        memoryKeeperApiOptions,
       );
     } catch (memoryAgentError) {
       logger.action("Memory agent failed, skipping (fail open)", {
@@ -1063,14 +1089,22 @@ async function generateStoryTurnOnce(
         // above - only fires once enough importance-weighted new memory has
         // accumulated since the last pass.
         try {
-          const reflectionResult = await ensureStoryReflected(storyData, {
-            model: options.storyModel || gmModel,
+          const reflectionModelOverride = getReflectionModelOverride();
+          const reflectionApiOptions = {
+            ...resolveSideCallModel(
+              reflectionModelOverride,
+              options.storyModel || gmModel,
+            ),
             token,
             openRouterKey: options.openRouterKey,
             deepseekKey: options.deepseekKey,
             googleKey: options.googleKey,
             abortSignal: options.abortSignal,
-          });
+          };
+          const reflectionResult = await ensureStoryReflected(
+            storyData,
+            reflectionApiOptions,
+          );
           if (reflectionResult.ran) {
             logger.action("Reflected on recent memory, synthesized insights", {
               insightCount: reflectionResult.insights?.length ?? 0,
