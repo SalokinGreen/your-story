@@ -42,6 +42,7 @@ import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   runObserver,
   buildObserverWarningNote,
+  rewriteFlaggedNarration,
   settingsFor,
   ObserverSettings,
 } from "@/app/misc/observer";
@@ -275,11 +276,25 @@ export interface GenerationCallbacks {
   // silently condensing history the player can no longer scroll back to.
   onCompaction?: (summary: string) => void;
   // Layer 5 hardening (see observer.ts): fired when the observer flagged the
-  // just-completed turn as a major violation (GM spoke/acted for the player,
-  // or blew way past the reply-length ceiling) and generateStoryTurn is
-  // discarding it and forcing a fresh attempt. storyData has already been
-  // rolled back to its pre-turn snapshot by the time this fires - the UI
-  // should clear anything it displayed/streamed for the discarded attempt.
+  // just-completed turn as a major violation and rewriteFlaggedNarration
+  // (observer.ts) successfully rewrote just the narration text - dice
+  // rolls/tool calls/state changes are untouched. rewrittenNarration is the
+  // corrected text; the UI should update whatever it displayed/streamed for
+  // this turn's narration to match it (and expect a following
+  // onChoicesStart/onChoicesComplete pair as choices are re-derived from it)
+  // rather than clearing tool call/state displays the way onObserverReset
+  // below does.
+  onObserverRewrite?: (
+    flags: ObserverFlag[],
+    triggeringFlag: ObserverFlag,
+    rewrittenNarration: string,
+  ) => void;
+  // Layer 5 hardening (see observer.ts): fired only when a major violation's
+  // targeted rewrite (onObserverRewrite above) itself failed, and
+  // generateStoryTurn is falling back to discarding the whole turn and
+  // forcing a completely fresh attempt. storyData has already been rolled
+  // back to its pre-turn snapshot by the time this fires - the UI should
+  // clear anything it displayed/streamed for the discarded attempt.
   onObserverReset?: (flags: ObserverFlag[], triggeringFlag: ObserverFlag) => void;
   onComplete?: (result: GenerationResult) => void;
   onError?: (error: Error) => void;
@@ -644,19 +659,26 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
 // MAIN GENERATION FUNCTION
 // ============================================================
 
-// A whole-turn redo (fresh GM + story + choices calls) is much costlier
-// than the M2 gate's per-round retry, so the observer's automatic reset is
-// capped much lower - one retry, then fail open (accept the turn, keep the
-// flag attached for display) rather than risk looping the player forever.
+// A whole-turn redo (fresh GM + story + choices calls, rerolling dice along
+// the way) is much costlier - and less faithful - than a targeted narration
+// rewrite, so the observer's automatic correction is capped much lower - one
+// attempt, then fail open (accept the turn, keep the flag attached for
+// display) rather than risk looping the player forever.
 const MAX_OBSERVER_RESETS = 1;
 
 /**
  * Executes a complete story turn, then runs the Layer-5 observer (see
  * observer.ts) against the result. A "major" flag (the GM spoke/acted for
- * the player, or blew way past the reply-length ceiling) rolls storyData
- * back to its pre-turn snapshot and retries the whole turn with a corrective
- * note telling the GM exactly what it was flagged for - same fail-open
- * posture as the M2 roll-invariant gate below: never blocks play forever.
+ * the player, blew way past the reply-length ceiling, or contradicted a
+ * roll's result) is always a complaint about the narration text alone, so
+ * the correction is a targeted rewrite (observer.ts's
+ * rewriteFlaggedNarration): the GM is shown the exact narration it wrote and
+ * why it was flagged, and rewrites just the prose - dice rolls/tool
+ * calls/state changes stay untouched since they were never in question.
+ * Only falls back to rolling storyData back to its pre-turn snapshot and
+ * retrying the whole turn blind if the rewrite call itself fails - same
+ * fail-open posture as the M2 roll-invariant gate below: never blocks play
+ * forever.
  */
 export async function generateStoryTurn(
   storyData: StoryData,
@@ -784,26 +806,132 @@ export async function generateStoryTurn(
         settingsFor(observerSettings, f.type).triggersReset,
     );
 
-    if (majorFlag && preTurnSnapshot && resetAttempts < MAX_OBSERVER_RESETS) {
+    if (majorFlag && resetAttempts < MAX_OBSERVER_RESETS) {
       resetAttempts++;
-      logger.action("Observer flagged turn for automatic reset", {
+      logger.action("Observer flagged turn - attempting a targeted rewrite", {
         type: majorFlag.type,
         detail: majorFlag.detail,
         attempt: resetAttempts,
       });
 
-      // Full state rollback, restored in place (delete-all-keys +
-      // Object.assign) so every closure over storyData (the caller, other
-      // callbacks already fired this turn) keeps seeing the same object -
-      // same idiom as page.tsx's handleUndo.
-      for (const key of Object.keys(storyData)) {
-        delete (storyData as unknown as Record<string, unknown>)[key];
+      // Rewrite first (see observer.ts's rewriteFlaggedNarration): every
+      // check that can reach here is a complaint about the narration TEXT,
+      // never about which tools were called or what a roll resolved to - so
+      // the GM is shown the exact narration it wrote plus the specific
+      // reason it was flagged, and asked to rewrite just the prose. The
+      // turn's dice rolls/tool calls/state changes are ground truth and
+      // stay untouched. Only falls back to the old full-turn reset
+      // (rollback + a completely fresh blind attempt, which can reroll dice
+      // into a different outcome) if the rewrite call itself fails.
+      let rewrittenNarration: string | null = null;
+      try {
+        rewrittenNarration = await rewriteFlaggedNarration({
+          narration: result.content,
+          playerChoice: userChoice,
+          gmStoryContext: result.gmStoryContext,
+          flag: majorFlag,
+          replyLength: options.replyLength,
+          storytellerMode: options.storytellerMode,
+          apiOptions: sideCallApiOptions,
+        });
+      } catch (rewriteError) {
+        logger.action(
+          "Observer rewrite call failed, falling back to full-turn reset",
+          {
+            error:
+              rewriteError instanceof Error
+                ? rewriteError.message
+                : String(rewriteError),
+          },
+        );
       }
-      Object.assign(storyData, preTurnSnapshot);
 
-      observerNote = majorFlag.correctivePrompt;
-      callbacks.onObserverReset?.(flags, majorFlag);
-      continue;
+      if (rewrittenNarration) {
+        logger.action(
+          "Observer rewrite succeeded, keeping tool calls/rolls and replacing narration",
+          { type: majorFlag.type },
+        );
+        result.content = rewrittenNarration;
+        result.scenePart = {
+          ...result.scenePart,
+          content: rewrittenNarration,
+        };
+        callbacks.onObserverRewrite?.(flags, majorFlag, rewrittenNarration);
+
+        // Choices were parsed from the flagged narration - regenerate them
+        // off the corrected text. Best-effort: keep the original choices if
+        // this fails rather than losing the whole turn over a side call.
+        try {
+          callbacks.onChoicesStart?.();
+          const { content: rawChoicesContent, meta: rewrittenChoicesMeta } =
+            await generateChoicesWithRetry(
+              {
+                storyData,
+                storyContent: rewrittenNarration,
+                usePrefill: options.usePrefill !== false,
+              },
+              {
+                token: null,
+                model: sideCallApiOptions.model,
+                openRouterKey: options.openRouterKey,
+                deepseekKey: options.deepseekKey,
+                googleKey: options.googleKey,
+                mistralKey: options.mistralKey,
+                deepinfraKey: options.deepinfraKey,
+                abortSignal: options.abortSignal,
+              },
+            );
+          const cleanedChoicesContent =
+            options.usePrefill !== false
+              ? stripAffirmationPrefill(rawChoicesContent, CHOICES_AFFIRMATION)
+              : rawChoicesContent;
+          const rewrittenChoices = parseChoices(
+            cleanedChoicesContent,
+            storyData,
+          );
+          result.choices = rewrittenChoices;
+          result.scenePart = {
+            ...result.scenePart,
+            choices: rewrittenChoices,
+          };
+          callbacks.onChoicesComplete?.(
+            rewrittenChoices,
+            rewrittenChoicesMeta?.usage || {
+              promptTokens: 0,
+              completionTokens: 0,
+              totalTokens: 0,
+            },
+          );
+        } catch (choicesError) {
+          logger.action(
+            "Failed to regenerate choices after observer rewrite, keeping original choices",
+            {
+              error:
+                choicesError instanceof Error
+                  ? choicesError.message
+                  : String(choicesError),
+            },
+          );
+        }
+
+        // Any OTHER flags from this turn (the one just fixed aside) still
+        // get surfaced to the player, same as a turn that finishes with
+        // surviving minor flags normally would.
+        flags = flags.filter((f) => f !== majorFlag);
+      } else if (preTurnSnapshot) {
+        // Full state rollback, restored in place (delete-all-keys +
+        // Object.assign) so every closure over storyData (the caller, other
+        // callbacks already fired this turn) keeps seeing the same object -
+        // same idiom as page.tsx's handleUndo.
+        for (const key of Object.keys(storyData)) {
+          delete (storyData as unknown as Record<string, unknown>)[key];
+        }
+        Object.assign(storyData, preTurnSnapshot);
+
+        observerNote = majorFlag.correctivePrompt;
+        callbacks.onObserverReset?.(flags, majorFlag);
+        continue;
+      }
     }
 
     if (flags.length > 0) {

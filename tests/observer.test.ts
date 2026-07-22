@@ -13,6 +13,7 @@ import {
   checkToolUsageGaps,
   runObserver,
   buildObserverWarningNote,
+  rewriteFlaggedNarration,
   settingsFor,
   DEFAULT_OBSERVER_SETTINGS,
   ObserverCheckSettings,
@@ -747,5 +748,97 @@ describe("DEFAULT_OBSERVER_SETTINGS / settingsFor", () => {
     const settings = { response_length: { enabled: false } } as any;
     expect(settingsFor(settings, "response_length").enabled).toBe(false);
     expect(settingsFor(settings, "player_agency").enabled).toBe(true);
+  });
+});
+
+describe("rewriteFlaggedNarration", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  const flag: ObserverFlag = {
+    type: "player_agency",
+    severity: "major",
+    detail: "The GM had the player character apologize, which the player never said.",
+    correctivePrompt: "Rewrite this turn so you don't speak for the player character.",
+  };
+
+  it("sends the flagged narration and violation reason, and returns the model's rewrite", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword, saying nothing." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const rewritten = await rewriteFlaggedNarration({
+      narration: "You draw your sword. \"I'm sorry it has to be this way,\" you say.",
+      playerChoice: "I draw my sword",
+      gmStoryContext: "formula_roll: SUCCESS (used to inform the narration)",
+      flag,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(rewritten).toBe("You draw your sword, saying nothing.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    const [, requestInit] = fetchMock.mock.calls[0];
+    const body = JSON.parse(requestInit.body);
+    const userMessage = body.messages.find(
+      (m: { role: string; content: string }) => m.role === "user",
+    ).content;
+    // The rewrite call must show the model its own flagged text, the
+    // specific reason, and the mechanical ground truth - not just a vague
+    // instruction to try again blind.
+    expect(userMessage).toContain("I'm sorry it has to be this way");
+    expect(userMessage).toContain(flag.detail);
+    expect(userMessage).toContain("formula_roll: SUCCESS");
+  });
+
+  it("returns null (fail open) when the API call fails", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const rewritten = await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(rewritten).toBeNull();
+  });
+
+  it("returns null (fail open) when the response has no content", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "" }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const rewritten = await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(rewritten).toBeNull();
+  });
+
+  it("returns null (fail open) when fetch throws", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network error"));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const rewritten = await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(rewritten).toBeNull();
   });
 });

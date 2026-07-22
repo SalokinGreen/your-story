@@ -228,6 +228,35 @@ function handleObserverReset(
   );
 }
 
+// Layer 5 hardening: fired via GenerationCallbacks.onObserverRewrite when
+// rewriteFlaggedNarration (observer.ts) successfully rewrote a flagged
+// turn's narration in place. Unlike handleObserverReset above, the turn's
+// tool calls/dice rolls/state changes were left untouched (they were never
+// the problem), so there's nothing to blank out here - just swap the
+// displayed narration for the corrected text.
+function handleObserverRewrite(
+  partialPart: ScenePart,
+  flags: ObserverFlag[],
+  triggeringFlag: ObserverFlag,
+  rewrittenNarration: string,
+  setStoryText: (text: string) => void,
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "info" | "warning",
+  ) => void,
+) {
+  partialPart.content = rewrittenNarration;
+  setStoryText(rewrittenNarration);
+
+  logger.action("Observer flagged turn, narration rewritten in place", {
+    type: triggeringFlag.type,
+    detail: triggeringFlag.detail,
+    totalFlags: flags.length,
+  });
+
+  addNotification(`Narration revised: ${triggeringFlag.detail}`, "warning");
+}
+
 enum StoryState {
   STORY = "STORY",
   STATS = "STATS",
@@ -1656,6 +1685,16 @@ function StoryPageContent() {
               usage,
             });
           },
+          onObserverRewrite: (flags, triggeringFlag, rewrittenNarration) => {
+            handleObserverRewrite(
+              partialPart,
+              flags,
+              triggeringFlag,
+              rewrittenNarration,
+              setStoryText,
+              addNotification,
+            );
+          },
           onObserverReset: (flags, triggeringFlag) => {
             handleObserverReset(
               partialPart,
@@ -2361,6 +2400,16 @@ function StoryPageContent() {
               usage,
             });
           },
+          onObserverRewrite: (flags, triggeringFlag, rewrittenNarration) => {
+            handleObserverRewrite(
+              partialPart,
+              flags,
+              triggeringFlag,
+              rewrittenNarration,
+              setStoryText,
+              addNotification,
+            );
+          },
           onObserverReset: (flags, triggeringFlag) => {
             handleObserverReset(
               partialPart,
@@ -2855,6 +2904,16 @@ function StoryPageContent() {
               choicesCount: newChoices.length,
               usage,
             });
+          },
+          onObserverRewrite: (flags, triggeringFlag, rewrittenNarration) => {
+            handleObserverRewrite(
+              partialPart,
+              flags,
+              triggeringFlag,
+              rewrittenNarration,
+              setStoryText,
+              addNotification,
+            );
           },
           onObserverReset: (flags, triggeringFlag) => {
             handleObserverReset(
