@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { IDBFactory } from "fake-indexeddb";
 import type { StoryData } from "@/app/misc/structs";
+import * as syncManager from "@/app/misc/syncManager";
+import * as storyManager from "@/app/misc/localStoryManager";
+import * as folderManager from "@/app/misc/localFolderManager";
 
 class MemoryStorage {
   private map = new Map<string, string>();
@@ -68,135 +71,261 @@ function makeStoryData(name: string): StoryData {
   } as unknown as StoryData;
 }
 
+// A "device" owns its own localStorage/IndexedDB, and re-activates them
+// (via vi.stubGlobal) immediately before every operation, so tests can
+// freely interleave actions across multiple devices in any order - e.g.
+// "device A syncs again after device B changed something" - which a single
+// shared global couldn't support. syncManager/localStoryManager/etc. read
+// `localStorage`/`indexedDB` as bare globals at call time (never capture
+// them at import time), so swapping the global right before each call is
+// sufficient; no per-device module re-import is needed.
+class Device {
+  storage = new MemoryStorage();
+  idb = new IDBFactory();
+
+  constructor(syncKey: string) {
+    this.activate();
+    syncManager.setSyncKey(syncKey);
+  }
+
+  activate() {
+    vi.stubGlobal("localStorage", this.storage);
+    vi.stubGlobal("indexedDB", this.idb);
+  }
+
+  sync() {
+    this.activate();
+    return syncManager.syncAll();
+  }
+  saveStory(id: string, data: StoryData) {
+    this.activate();
+    return storyManager.saveLocalStory(id, data);
+  }
+  getStory(id: string) {
+    this.activate();
+    return storyManager.getLocalStory(id);
+  }
+  createFolder(name: string) {
+    this.activate();
+    return folderManager.createLocalFolder(name);
+  }
+  deleteFolder(id: string) {
+    this.activate();
+    return folderManager.deleteLocalFolder(id);
+  }
+  listFolders() {
+    this.activate();
+    return folderManager.listLocalFolders();
+  }
+  setSetting(key: string, value: string) {
+    this.activate();
+    localStorage.setItem(key, value);
+  }
+  getSetting(key: string): string | null {
+    this.activate();
+    return localStorage.getItem(key);
+  }
+}
+
 beforeEach(() => {
-  vi.resetModules();
   // syncManager/localFolderManager follow this codebase's SSR-safety
   // convention of gating browser-only storage access behind
   // `typeof window !== "undefined"` - stub it so that guard passes under
   // Vitest's node test environment, same as the real browser runtime.
   vi.stubGlobal("window", globalThis);
-  vi.stubGlobal("localStorage", new MemoryStorage());
-  vi.stubGlobal("indexedDB", new IDBFactory());
   process.env.NEXT_PUBLIC_SYNC_API_URL = "https://fake-sync.example";
 });
 
 describe("syncManager", () => {
-  it("generates a grouped, high-entropy sync key and persists it", async () => {
-    const { generateSyncKey, getSyncKey } = await import("@/app/misc/syncManager");
-    const key = generateSyncKey();
+  it("generates a grouped, high-entropy sync key and persists it", () => {
+    vi.stubGlobal("localStorage", new MemoryStorage());
+    const key = syncManager.generateSyncKey();
     expect(key).toMatch(/^([0-9a-f]{4}-){7}[0-9a-f]{4}$/);
-    expect(getSyncKey()).toBe(key);
+    expect(syncManager.getSyncKey()).toBe(key);
   });
 
-  it("round-trips folders through encryption via push then pull on a fresh device", async () => {
+  it("keeps both devices' independently-created folders after syncing (no data loss)", async () => {
     installFakeServer();
+    const key = "test-key-concurrent-create";
 
-    const syncManager = await import("@/app/misc/syncManager");
-    const folderManager = await import("@/app/misc/localFolderManager");
+    const a = new Device(key);
+    a.createFolder("From A");
+    const resultsA = await a.sync();
+    // Counts describe what changed in *this device's own* local storage as
+    // a result of the merge - A already had "From A" before syncing (it
+    // just pushes), so nothing changes locally here.
+    expect(resultsA.find((r) => r.bucket === "folders")).toMatchObject({
+      action: "merged",
+      added: 0,
+    });
 
-    syncManager.setSyncKey("test-key-device-a");
-    folderManager.createLocalFolder("Adventures", "Folder", "#111111");
-    const resultsA = await syncManager.syncAll();
-    expect(resultsA.find((r) => r.bucket === "folders")?.action).toBe("pushed");
+    // B never saw A's folder - it independently creates its own before ever
+    // syncing. Under the old whole-bucket-LWW behavior, whichever device
+    // synced more recently would have wiped out the other's folder here.
+    const b = new Device(key);
+    b.createFolder("From B");
+    const resultsB = await b.sync();
+    expect(b.listFolders().map((f) => f.name).sort()).toEqual(["From A", "From B"]);
+    expect(resultsB.find((r) => r.bucket === "folders")).toMatchObject({
+      action: "merged",
+      added: 1, // pulled in "From A"
+    });
 
-    // Simulate a second, empty device linking the same key.
-    vi.resetModules();
-    vi.stubGlobal("localStorage", new MemoryStorage());
-    vi.stubGlobal("indexedDB", new IDBFactory());
-    const syncManagerB = await import("@/app/misc/syncManager");
-    const folderManagerB = await import("@/app/misc/localFolderManager");
-    syncManagerB.setSyncKey("test-key-device-a");
-    const resultsB = await syncManagerB.syncAll();
-    expect(resultsB.find((r) => r.bucket === "folders")?.action).toBe("pulled");
-    expect(folderManagerB.listLocalFolders().map((f) => f.name)).toEqual(["Adventures"]);
+    // A syncs again and should pick up B's folder too.
+    await a.sync();
+    expect(a.listFolders().map((f) => f.name).sort()).toEqual(["From A", "From B"]);
   });
 
-  it("round-trips stories (IndexedDB-backed) through push then pull", async () => {
+  it("propagates a deletion to another device while an untouched sibling survives", async () => {
     installFakeServer();
+    const key = "test-key-deletion";
 
-    const syncManager = await import("@/app/misc/syncManager");
-    const storyManager = await import("@/app/misc/localStoryManager");
+    const a = new Device(key);
+    const temp = a.createFolder("Temp Folder");
+    a.createFolder("Keeper");
+    await a.sync();
 
-    syncManager.setSyncKey("test-key-stories");
-    await storyManager.saveLocalStory("local_1", makeStoryData("Test Story"));
-    const resultsA = await syncManager.syncAll();
-    expect(resultsA.find((r) => r.bucket === "stories")?.action).toBe("pushed");
+    const b = new Device(key);
+    await b.sync();
+    expect(b.listFolders().map((f) => f.name).sort()).toEqual(["Keeper", "Temp Folder"]);
 
-    vi.resetModules();
-    vi.stubGlobal("localStorage", new MemoryStorage());
-    vi.stubGlobal("indexedDB", new IDBFactory());
-    const syncManagerB = await import("@/app/misc/syncManager");
-    const storyManagerB = await import("@/app/misc/localStoryManager");
-    syncManagerB.setSyncKey("test-key-stories");
-    const resultsB = await syncManagerB.syncAll();
-    expect(resultsB.find((r) => r.bucket === "stories")?.action).toBe("pulled");
+    a.deleteFolder(temp.id);
+    const resultsA2 = await a.sync();
+    // A already deleted it locally before syncing, so this sync's local
+    // diff is empty - it just propagates the deletion to the server.
+    expect(resultsA2.find((r) => r.bucket === "folders")).toMatchObject({
+      action: "merged",
+      removed: 0,
+    });
 
-    const pulled = await storyManagerB.getLocalStory("local_1");
-    expect(pulled?.storyData.story_name).toBe("Test Story");
-    expect(pulled?.syncStatus).toBe("synced");
+    const resultsB2 = await b.sync();
+    expect(b.listFolders().map((f) => f.name)).toEqual(["Keeper"]);
+    expect(resultsB2.find((r) => r.bucket === "folders")).toMatchObject({
+      action: "merged",
+      removed: 1,
+    });
   });
 
-  it("syncs the settings allowlist and leaves excluded keys (like API keys) untouched", async () => {
+  it("never resurrects a deleted item for a brand-new device linking after the deletion", async () => {
     installFakeServer();
+    const key = "test-key-no-resurrect";
 
-    const syncManager = await import("@/app/misc/syncManager");
-    syncManager.setSyncKey("test-key-settings");
-    localStorage.setItem("storyFontSize", "18");
-    localStorage.setItem("openRouterKey", "sk-should-not-sync");
-    await syncManager.syncAll();
+    const a = new Device(key);
+    const temp = a.createFolder("Temp Folder");
+    a.createFolder("Keeper");
+    await a.sync();
+    a.deleteFolder(temp.id);
+    await a.sync();
 
-    vi.resetModules();
-    vi.stubGlobal("localStorage", new MemoryStorage());
-    vi.stubGlobal("indexedDB", new IDBFactory());
-    const syncManagerB = await import("@/app/misc/syncManager");
-    syncManagerB.setSyncKey("test-key-settings");
-    localStorage.setItem("openRouterKey", "sk-device-b-local-key");
-    await syncManagerB.syncAll();
+    const c = new Device(key); // fresh third device, first-ever link
+    await c.sync();
+    expect(c.listFolders().map((f) => f.name)).toEqual(["Keeper"]);
+  });
 
-    expect(localStorage.getItem("storyFontSize")).toBe("18");
+  it("resolves a same-item edit conflict by newest-updatedAt while an untouched sibling survives", async () => {
+    installFakeServer();
+    const key = "test-key-edit-conflict";
+
+    const a = new Device(key);
+    await a.saveStory("local_one", makeStoryData("Story One"));
+    await a.saveStory("local_two", makeStoryData("Story Two"));
+    await a.sync();
+
+    const b = new Device(key);
+    await b.sync(); // pulls both stories
+
+    await a.saveStory("local_one", makeStoryData("Story One - Edited By A"));
+    await a.sync();
+
+    // B edits the same story differently, strictly after A's edit.
+    await new Promise((r) => setTimeout(r, 5));
+    await b.saveStory("local_one", makeStoryData("Story One - Edited By B"));
+    await b.sync();
+
+    const bOne = await b.getStory("local_one");
+    expect(bOne?.storyData.story_name).toBe("Story One - Edited By B");
+    // The untouched sibling must survive - this is what distinguishes
+    // per-item merge from the old whole-bucket last-write-wins, which would
+    // have overwritten Story Two too just because Story One conflicted.
+    const bTwo = await b.getStory("local_two");
+    expect(bTwo?.storyData.story_name).toBe("Story Two");
+
+    // A syncs again and should pick up B's newer edit.
+    await a.sync();
+    const aOne = await a.getStory("local_one");
+    expect(aOne?.storyData.story_name).toBe("Story One - Edited By B");
+    const aTwo = await a.getStory("local_two");
+    expect(aTwo?.storyData.story_name).toBe("Story Two");
+  });
+
+  it("merges settings per key so two devices changing different keys both survive, and clearing a key propagates as a deletion", async () => {
+    installFakeServer();
+    const key = "test-key-settings-merge";
+
+    const a = new Device(key);
+    a.setSetting("storyFontSize", "18");
+    await a.sync();
+
+    const b = new Device(key);
+    await b.sync(); // pulls storyFontSize
+    expect(b.getSetting("storyFontSize")).toBe("18");
+    b.setSetting("storyTheme", "forest"); // a different key, changed on B
+    await b.sync();
+
+    // A syncs again - should pick up storyTheme while keeping its own
+    // storyFontSize (both survive, unlike the old whole-blob fingerprint
+    // scheme where one device's settings snapshot could fully overwrite
+    // the other's).
+    await a.sync();
+    expect(a.getSetting("storyFontSize")).toBe("18");
+    expect(a.getSetting("storyTheme")).toBe("forest");
+
+    // Now B clears storyTheme entirely. B already removed it locally before
+    // syncing, so this sync's local diff is empty - it just propagates the
+    // clear to the server (mirrored below on A, which still has it).
+    b.activate();
+    localStorage.removeItem("storyTheme");
+    const resultsB = await b.sync();
+    expect(resultsB.find((r) => r.bucket === "settings")).toMatchObject({
+      action: "merged",
+      removed: 0,
+    });
+
+    const resultsA = await a.sync();
+    expect(a.getSetting("storyTheme")).toBeNull();
+    expect(a.getSetting("storyFontSize")).toBe("18"); // untouched key survives
+    expect(resultsA.find((r) => r.bucket === "settings")).toMatchObject({
+      action: "merged",
+      removed: 1,
+    });
+  });
+
+  it("never syncs excluded keys like API keys, even though other settings do", async () => {
+    installFakeServer();
+    const key = "test-key-excluded-settings";
+
+    const a = new Device(key);
+    a.setSetting("storyFontSize", "18");
+    a.setSetting("openRouterKey", "sk-should-not-sync");
+    await a.sync();
+
+    const b = new Device(key);
+    b.setSetting("openRouterKey", "sk-device-b-local-key");
+    await b.sync();
+
+    expect(b.getSetting("storyFontSize")).toBe("18");
     // Excluded key must survive untouched by the sync that just ran.
-    expect(localStorage.getItem("openRouterKey")).toBe("sk-device-b-local-key");
+    expect(b.getSetting("openRouterKey")).toBe("sk-device-b-local-key");
   });
 
   it("reports noop when nothing changed since the last sync", async () => {
     installFakeServer();
+    const key = "test-key-noop";
 
-    const syncManager = await import("@/app/misc/syncManager");
-    const folderManager = await import("@/app/misc/localFolderManager");
-    syncManager.setSyncKey("test-key-noop");
-    folderManager.createLocalFolder("Solo Adventures");
-
-    await syncManager.syncAll();
-    const second = await syncManager.syncAll();
+    const a = new Device(key);
+    a.createFolder("Solo Adventures");
+    await a.sync();
+    const second = await a.sync();
     expect(second.find((r) => r.bucket === "folders")?.action).toBe("noop");
-  });
-
-  it("resolves a real conflict with last-write-wins by timestamp", async () => {
-    const { store } = installFakeServer();
-
-    const syncManager = await import("@/app/misc/syncManager");
-    const folderManager = await import("@/app/misc/localFolderManager");
-    syncManager.setSyncKey("test-key-conflict");
-    folderManager.createLocalFolder("Local Change");
-    await syncManager.syncAll(); // establishes a baseline lastSyncedAt
-
-    // Simulate a newer remote write from another device after the baseline.
-    const mapKey = "test-key-conflict::folders";
-    const existing = store.get(mapKey)!;
-    store.set(mapKey, { ...existing, updatedAt: new Date(Date.now() + 60_000).toISOString() });
-
-    // Also make a local change so both sides look changed relative to
-    // lastSyncedAt. A tiny delay guarantees its ISO timestamp is strictly
-    // after the baseline sync's, since both are millisecond-resolution.
-    await new Promise((r) => setTimeout(r, 5));
-    folderManager.updateLocalFolder(
-      folderManager.listLocalFolders()[0].id,
-      { name: "Renamed Locally" },
-    );
-
-    const results = await syncManager.syncAll();
-    // Remote write is newer, so the remote (still-old-named) copy should win
-    // and get pulled, overwriting the local rename.
-    expect(results.find((r) => r.bucket === "folders")?.action).toBe("conflict-remote-won");
   });
 });

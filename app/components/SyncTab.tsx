@@ -28,14 +28,27 @@ const BUCKET_LABELS: Record<SyncBucket, string> = {
   settings: "Settings",
 };
 
+// Counts-only fragment like "+2 ~1 -1", or null if the merge touched
+// nothing (a bucket can still report "merged" after a no-op round trip).
+function mergeCounts(r: SyncResult): string | null {
+  const parts: string[] = [];
+  if (r.added) parts.push(`+${r.added}`);
+  if (r.updated) parts.push(`~${r.updated}`);
+  if (r.removed) parts.push(`-${r.removed}`);
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
+function describeMerge(r: SyncResult): string {
+  const counts = mergeCounts(r);
+  return `${BUCKET_LABELS[r.bucket]} (${counts ?? "merged"})`;
+}
+
 function summarizeResults(results: SyncResult[]): {
   message: string;
   hasError: boolean;
 } {
   const errors = results.filter((r) => r.action === "error");
-  const changed = results.filter(
-    (r) => r.action !== "noop" && r.action !== "error"
-  );
+  const merged = results.filter((r) => r.action === "merged");
   if (errors.length > 0) {
     return {
       message: `Sync finished with ${errors.length} error(s): ${errors
@@ -44,13 +57,11 @@ function summarizeResults(results: SyncResult[]): {
       hasError: true,
     };
   }
-  if (changed.length === 0) {
+  if (merged.length === 0) {
     return { message: "Already up to date.", hasError: false };
   }
   return {
-    message: `Synced: ${changed
-      .map((r) => `${BUCKET_LABELS[r.bucket]} (${r.action})`)
-      .join(", ")}`,
+    message: `Synced: ${merged.map(describeMerge).join(", ")}`,
     hasError: false,
   };
 }
@@ -274,9 +285,12 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
         </div>
 
         <p className="text-xs text-blue-300/60">
-          Sync only runs when you tap this button - stories, adventures,
-          folders, and settings (not API keys, which never leave this
-          device) each sync independently, newest side wins if both changed.
+          Sync only runs when you tap this button. Changes from different
+          devices merge together item by item - creating a story on your
+          phone and a different one on your laptop keeps both. Only an edit
+          to the exact same item on two devices falls back to newest-wins;
+          everything else (including API keys, which never leave this
+          device) merges cleanly.
         </p>
 
         <div className="space-y-1.5">
@@ -309,9 +323,12 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
                       className="w-3 h-3"
                     />
                   )}
-                  {lastSynced[bucket]
-                    ? `Last synced ${new Date(lastSynced[bucket]!).toLocaleString()}`
-                    : "Never synced"}
+                  {result?.action === "error"
+                    ? result.error
+                    : (result?.action === "merged" && mergeCounts(result)) ||
+                      (lastSynced[bucket]
+                        ? `Last synced ${new Date(lastSynced[bucket]!).toLocaleString()}`
+                        : "Never synced")}
                 </span>
               </div>
             );
