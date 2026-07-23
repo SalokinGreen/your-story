@@ -1431,7 +1431,14 @@ function StoryPageContent() {
     setStoryTextReady(false);
 
     //Adduser'scustominputtoscene
-    let customContent = ">" + customText;
+    // Couch co-op (StoryComposer) and voice (PlayerBubbles) submissions
+    // already format their own "> Name: text" line(s) before calling us -
+    // only bare freeform text (no leading ">") still needs one added here.
+    // Prepending unconditionally double-prefixed those turns as ">> Name:
+    // ...", which read as a duplicated line to both the player and the GM.
+    let customContent = customText.startsWith(">")
+      ? customText
+      : ">" + customText;
     if (inputKind === "voice") {
       customContent += "\n[Voice Input - may contain transcription errors]";
     }

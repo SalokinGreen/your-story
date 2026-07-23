@@ -526,19 +526,21 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       setComposerText("");
       if (composerRef.current) composerRef.current.style.height = "auto";
 
-      // Couch co-op: attribute the line to the active player (same "> Name:
-      // action" format PlayerBubbles uses), then pass the mic to the next one.
-      if (couchPlayers.length > 1 && activeSpeaker && onCustomInput) {
-        onCustomInput(`> ${activeSpeaker.name}: ${text}`, undefined, [
-          activeSpeaker.id,
-        ]);
-        const idx = couchPlayers.findIndex((p) => p.id === activeSpeaker.id);
-        setActiveSpeakerId(couchPlayers[(idx + 1) % couchPlayers.length].id);
-        return;
-      }
-
       setComposerBusy(true);
       try {
+        // Couch co-op: attribute the line to the active player (same "> Name:
+        // action" format PlayerBubbles uses), then pass the mic to the next one.
+        if (couchPlayers.length > 1 && activeSpeaker && onCustomInput) {
+          onCustomInput(`> ${activeSpeaker.name}: ${text}`, undefined, [
+            activeSpeaker.id,
+          ]);
+          const idx = couchPlayers.findIndex(
+            (p) => p.id === activeSpeaker.id,
+          );
+          setActiveSpeakerId(couchPlayers[(idx + 1) % couchPlayers.length].id);
+          return;
+        }
+
         await submitFreeformAction(text);
       } finally {
         setComposerBusy(false);
@@ -993,7 +995,20 @@ export default function Story({
       .toLowerCase();
   };
 
+  // The GM part currently being narrated is published into scene.parts as
+  // soon as streaming starts (see page.tsx onStoryContent/onStoryComplete),
+  // but its gmConversation/reasoning/reasoningTier only land later, in
+  // onComplete once tools+choices also finish. Rendering it here in the
+  // meantime would show a second, metadata-less bubble alongside the "live"
+  // one below (which has the Thought/tool pills) - so skip it until
+  // loadingStage clears and the finalized part has its full data.
+  const isLiveStreamingPart = (index: number) =>
+    (loadingStage === "gm" || loadingStage === "story") &&
+    index === storyData.scene.parts.length - 1 &&
+    !storyData.scene.parts[index].user;
+
   storyData.scene.parts.forEach((part, index) => {
+    if (isLiveStreamingPart(index)) return;
     if (part.content.trim()) {
       chatMessages.push({
         isUser: part.user,
