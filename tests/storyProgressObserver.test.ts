@@ -5,7 +5,10 @@
  * mocking pattern as directorAssistant.test.ts/observer.test.ts.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { runStoryProgressObserver } from "../app/misc/storyProgressObserver";
+import {
+  runStoryProgressObserver,
+  findRepeatedPhrases,
+} from "../app/misc/storyProgressObserver";
 import { StoryData, StoryThread, Goal } from "../app/misc/structs";
 
 function createMockStoryData(overrides: Partial<StoryData> = {}): StoryData {
@@ -51,6 +54,80 @@ function goal(overrides: Partial<Goal> = {}): Goal {
 }
 
 const apiOptions = { model: "test-model", token: "tok" };
+
+function assistantPart(content: string) {
+  return { role: "assistant", user: false, content } as StoryData["scene"]["parts"][number];
+}
+
+describe("findRepeatedPhrases", () => {
+  it("flags a phrase repeated across at least 3 distinct turns", () => {
+    const turns = [
+      "Her knuckles went white on the wheel.",
+      "Something else entirely happens here.",
+      "Her knuckles went white again.",
+      "A different sentence with no overlap.",
+      "Once more, her knuckles went white.",
+    ];
+
+    const result = findRepeatedPhrases(turns);
+
+    // The longer, more specific "her knuckles went white" supersedes the
+    // shorter substring it contains (see the dedup test below) - either is
+    // an acceptable catch here, so just check the tic was caught at all.
+    expect(result.some((c) => c.phrase.includes("knuckles went white"))).toBe(true);
+  });
+
+  it("does not flag a phrase repeated in only 2 turns", () => {
+    const turns = [
+      "Her knuckles went white on the wheel.",
+      "Nothing repeats in this turn.",
+      "Her knuckles went white again.",
+    ];
+
+    const result = findRepeatedPhrases(turns);
+
+    expect(result.some((c) => c.phrase === "knuckles went white")).toBe(false);
+  });
+
+  it("counts a phrase once per turn even if it appears twice in the same turn", () => {
+    const turns = [
+      "white knuckles gripped the wheel, white knuckles never let go.",
+      "Elsewhere, nothing similar happens.",
+      "white knuckles gripped the railing too.",
+    ];
+
+    const result = findRepeatedPhrases(turns);
+
+    // 3 total occurrences, but only 2 distinct turns - below the threshold.
+    expect(result.some((c) => c.phrase === "white knuckles")).toBe(false);
+  });
+
+  it("ignores phrases made entirely of stopwords", () => {
+    const turns = [
+      "and then he was in the of it",
+      "and then he was in the of it",
+      "and then he was in the of it",
+    ];
+
+    const result = findRepeatedPhrases(turns);
+
+    expect(result.length).toBe(0);
+  });
+
+  it("prefers a longer phrase over a shorter substring it contains", () => {
+    const turns = [
+      "her white knuckles gripped the wheel",
+      "her white knuckles trembled with fear",
+      "her white knuckles never relaxed and her white knuckles ached",
+    ];
+
+    const result = findRepeatedPhrases(turns);
+    const phrases = result.map((c) => c.phrase);
+
+    expect(phrases).toContain("her white knuckles");
+    expect(phrases).not.toContain("white knuckles");
+  });
+});
 
 describe("runStoryProgressObserver", () => {
   const originalFetch = global.fetch;
@@ -240,6 +317,103 @@ describe("runStoryProgressObserver", () => {
 
     expect(result.status).toBe("rushing");
     expect(result.note).toBe("Slow down.");
+  });
+
+  it("passes deterministically-detected repeated phrases to the judge and surfaces the ones it confirms", async () => {
+    const storyData = createMockStoryData({
+      scene: {
+        parts: [
+          assistantPart("Her knuckles went white as she gripped the wheel."),
+          assistantPart("Her knuckles went white against the cold railing."),
+          assistantPart("His amber eyes watched her from the shadows."),
+          assistantPart("Those amber eyes seemed to glow in the dark."),
+        ],
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          status: "on_track",
+          note: "Good momentum.",
+          repeated_phrases: ["knuckles went white", "amber eyes"],
+          repetition_note:
+            "You've leaned on 'knuckles went white' and 'amber eyes' repeatedly - vary the description.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await runStoryProgressObserver(
+      storyData,
+      "Her knuckles went white one more time, and his amber eyes never left her.",
+      apiOptions,
+      1,
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const userMessage = requestBody.messages.find((m: { role: string }) => m.role === "user")
+      .content as string;
+    expect(userMessage).toContain("knuckles went white");
+    expect(userMessage).toContain("amber eyes");
+
+    expect(result.repeatedPhrases).toEqual(["knuckles went white", "amber eyes"]);
+    expect(result.repetitionNote).toBe(
+      "You've leaned on 'knuckles went white' and 'amber eyes' repeatedly - vary the description.",
+    );
+  });
+
+  it("leaves repeatedPhrases/repetitionNote undefined when the judge confirms none of the candidates", async () => {
+    const storyData = createMockStoryData({
+      scene: {
+        parts: [
+          assistantPart("Her knuckles went white as she gripped the wheel."),
+          assistantPart("Her knuckles went white against the cold railing."),
+        ],
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          status: "on_track",
+          note: "Good momentum.",
+          repeated_phrases: [],
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await runStoryProgressObserver(
+      storyData,
+      "Her knuckles went white one more time.",
+      apiOptions,
+      1,
+    );
+
+    expect(result.repeatedPhrases).toBeUndefined();
+    expect(result.repetitionNote).toBeUndefined();
+  });
+
+  it("leaves repeatedPhrases/repetitionNote undefined when no phrase clears the deterministic threshold", async () => {
+    const storyData = createMockStoryData();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ status: "on_track", note: "Keep it up." }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await runStoryProgressObserver(storyData, "Turn.", apiOptions, 1);
+
+    expect(result.repeatedPhrases).toBeUndefined();
+    expect(result.repetitionNote).toBeUndefined();
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const userMessage = requestBody.messages.find((m: { role: string }) => m.role === "user")
+      .content as string;
+    expect(userMessage).not.toContain("mechanical word-counter");
   });
 
   it("defaults to DEFAULT_STORY_PROGRESS_CHECK_INTERVAL when no interval is passed", async () => {

@@ -368,6 +368,12 @@ export interface ScenePart {
   // observerFlags feeds buildObserverWarningNote, to carry the note forward
   // into the next turn's prompt.
   storyProgressNote?: string;
+  // Repeated-phrase callout from the same Layer 3 check-in (see
+  // storyProgressObserver.ts's findRepeatedPhrases): GM-facing feedback on
+  // word/phrase tics the deterministic counter caught recurring across
+  // turns and the judge confirmed worth flagging. Never shown to the
+  // player, carried forward the same way as storyProgressNote.
+  repetitionNote?: string;
   npcReactions?: NPCReaction[]; // NPC reactions to show as notifications (e.g., "Lisa liked this")
   endChapter?: boolean;
   endStory?: boolean;
