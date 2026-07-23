@@ -24,6 +24,7 @@ interface SyncTabProps {
 const BUCKET_LABELS: Record<SyncBucket, string> = {
   stories: "Stories",
   adventures: "Adventures",
+  notes: "Notes",
   folders: "Folders",
   settings: "Settings",
 };

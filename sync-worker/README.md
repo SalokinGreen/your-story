@@ -1,7 +1,7 @@
 # your-story-sync
 
 Minimal Cloudflare Worker + KV backend for cross-device sync of Your Story's
-local data (stories, adventures, folders, settings). No accounts — the app
+local data (stories, adventures, notes, folders, settings). No accounts — the app
 generates a random "sync key" that doubles as the client-side encryption key;
 this worker only ever stores encrypted blobs, keyed by a hash of that key.
 
@@ -52,4 +52,4 @@ All routes require `Authorization: Bearer <syncKey>`.
 - `GET /sync/:bucket` — `{ ciphertext, iv, updatedAt }` or 404.
 - `PUT /sync/:bucket` — body `{ ciphertext, iv, updatedAt }`, overwrites.
 
-`bucket` is one of `stories | adventures | folders | settings`.
+`bucket` is one of `stories | adventures | notes | folders | settings`.

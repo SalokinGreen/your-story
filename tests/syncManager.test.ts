@@ -4,6 +4,7 @@ import type { StoryData } from "@/app/misc/structs";
 import * as syncManager from "@/app/misc/syncManager";
 import * as storyManager from "@/app/misc/localStoryManager";
 import * as folderManager from "@/app/misc/localFolderManager";
+import * as notesManager from "@/app/misc/localNotesLibraryManager";
 
 class MemoryStorage {
   private map = new Map<string, string>();
@@ -116,6 +117,31 @@ class Device {
   listFolders() {
     this.activate();
     return folderManager.listLocalFolders();
+  }
+  createNote(title: string, content: string) {
+    this.activate();
+    return notesManager.createLibraryNote({
+      title,
+      content,
+      type: "lore",
+      tags: [],
+      source: "manual",
+      relatedCharacters: [],
+      relatedLocations: [],
+      keys: [],
+    });
+  }
+  updateNote(id: string, updates: Partial<Omit<notesManager.LibraryNote, "id" | "createdAt">>) {
+    this.activate();
+    return notesManager.updateLibraryNote(id, updates);
+  }
+  deleteNote(id: string) {
+    this.activate();
+    return notesManager.deleteLibraryNote(id);
+  }
+  listNotes() {
+    this.activate();
+    return notesManager.listLibraryNotes();
   }
   setSetting(key: string, value: string) {
     this.activate();
@@ -258,6 +284,67 @@ describe("syncManager", () => {
     expect(aOne?.storyData.story_name).toBe("Story One - Edited By B");
     const aTwo = await a.getStory("local_two");
     expect(aTwo?.storyData.story_name).toBe("Story Two");
+  });
+
+  it("keeps both devices' independently-created notes after syncing (no data loss)", async () => {
+    installFakeServer();
+    const key = "test-key-notes-concurrent-create";
+
+    const a = new Device(key);
+    await a.createNote("From A", "Note content A");
+    await a.sync();
+
+    const b = new Device(key);
+    await b.createNote("From B", "Note content B");
+    await b.sync();
+    expect((await b.listNotes()).map((n) => n.title).sort()).toEqual([
+      "From A",
+      "From B",
+    ]);
+
+    await a.sync();
+    expect((await a.listNotes()).map((n) => n.title).sort()).toEqual([
+      "From A",
+      "From B",
+    ]);
+  });
+
+  it("resolves a same-note edit conflict by newest-updatedAt and propagates note deletions", async () => {
+    installFakeServer();
+    const key = "test-key-notes-edit-conflict";
+
+    const a = new Device(key);
+    const note = await a.createNote("Shared Note", "Original content");
+    await a.createNote("Untouched Note", "Stays as-is");
+    await a.sync();
+
+    const b = new Device(key);
+    await b.sync(); // pulls both notes
+
+    await a.updateNote(note.id, { content: "Edited by A" });
+    await a.sync();
+
+    await new Promise((r) => setTimeout(r, 5));
+    await b.updateNote(note.id, { content: "Edited by B" });
+    await b.sync();
+
+    const bNotes = await b.listNotes();
+    expect(bNotes.find((n) => n.id === note.id)?.content).toBe("Edited by B");
+    expect(bNotes.find((n) => n.title === "Untouched Note")?.content).toBe(
+      "Stays as-is",
+    );
+
+    await a.sync();
+    const aNotes = await a.listNotes();
+    expect(aNotes.find((n) => n.id === note.id)?.content).toBe("Edited by B");
+
+    // B deletes the shared note; A should pick up the deletion.
+    await b.deleteNote(note.id);
+    await b.sync();
+    await a.sync();
+    expect((await a.listNotes()).map((n) => n.title)).toEqual([
+      "Untouched Note",
+    ]);
   });
 
   it("merges settings per key so two devices changing different keys both survive, and clearing a key propagates as a deletion", async () => {
