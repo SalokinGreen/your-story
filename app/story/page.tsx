@@ -239,18 +239,37 @@ function handleObserverReset(
 // the problem), so there's nothing to blank out here - just swap the
 // displayed narration for the corrected text.
 function handleObserverRewrite(
+  storyData: StoryData,
   partialPart: ScenePart,
   flags: ObserverFlag[],
   triggeringFlag: ObserverFlag,
   rewrittenNarration: string,
   setStoryText: (text: string) => void,
+  setStoryData: (data: StoryData) => void,
   addNotification: (
     message: string,
     type: "success" | "failure" | "info" | "warning",
   ) => void,
 ) {
   partialPart.content = rewrittenNarration;
+
+  // storyData.scene.parts[lastIndex] may no longer be the same object as
+  // partialPart by now - STAGE 3 choices generation (generation.ts) already
+  // ran once for the original (flagged) narration before the observer got a
+  // say, and its onChoicesComplete handler below replaces the array slot
+  // with a shallow copy rather than mutating in place. Patch whatever
+  // object is actually in the array, or the rewritten text never reaches
+  // what's rendered/saved even though partialPart itself is correct.
+  const lastIndex = storyData.scene.parts.length - 1;
+  if (lastIndex >= 0) {
+    storyData.scene.parts[lastIndex] = {
+      ...storyData.scene.parts[lastIndex],
+      content: rewrittenNarration,
+    };
+  }
+
   setStoryText(rewrittenNarration);
+  setStoryData({ ...storyData });
 
   logger.action("Observer flagged turn, narration rewritten in place", {
     type: triggeringFlag.type,
@@ -1778,11 +1797,13 @@ function StoryPageContent() {
           },
           onObserverRewrite: (flags, triggeringFlag, rewrittenNarration) => {
             handleObserverRewrite(
+              storyData,
               partialPart,
               flags,
               triggeringFlag,
               rewrittenNarration,
               setStoryText,
+              setStoryData,
               addNotification,
             );
           },
@@ -2270,11 +2291,13 @@ function StoryPageContent() {
           },
           onObserverRewrite: (flags, triggeringFlag, rewrittenNarration) => {
             handleObserverRewrite(
+              storyData,
               partialPart,
               flags,
               triggeringFlag,
               rewrittenNarration,
               setStoryText,
+              setStoryData,
               addNotification,
             );
           },
@@ -3174,11 +3197,13 @@ function StoryPageContent() {
           },
           onObserverRewrite: (flags, triggeringFlag, rewrittenNarration) => {
             handleObserverRewrite(
+              storyData,
               partialPart,
               flags,
               triggeringFlag,
               rewrittenNarration,
               setStoryText,
+              setStoryData,
               addNotification,
             );
           },
