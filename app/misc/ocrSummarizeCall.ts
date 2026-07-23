@@ -17,7 +17,7 @@ import {
 } from "@/app/misc/big_adventure_ai";
 import { getProviderFetch } from "@/app/misc/platformFetch";
 
-type AIProvider = "openrouter" | "deepseek" | "mistral" | "google" | "deepinfra";
+export type AIProvider = "openrouter" | "deepseek" | "mistral" | "google" | "deepinfra";
 
 export interface OCRSummarizeRequestBody {
   markdown: string;
@@ -48,7 +48,7 @@ export interface OCRSummarizeError {
   status: number;
 }
 
-function inferProvider(model: string): AIProvider {
+export function inferProvider(model: string): AIProvider {
   if (
     model.startsWith("mistral-") ||
     model.startsWith("ministral-") ||
@@ -69,7 +69,7 @@ const PROVIDER_ENDPOINTS: Record<AIProvider, string> = {
   deepinfra: "https://api.deepinfra.com/v1/openai/chat/completions",
 };
 
-async function callProviderAI(
+export async function callProviderAI(
   provider: AIProvider,
   systemPrompt: string,
   userPrompt: string,

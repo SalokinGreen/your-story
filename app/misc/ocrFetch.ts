@@ -6,6 +6,7 @@
 import { isStandalone } from "./standalone";
 import { processOCR, OCRProcessRequestBody } from "./ocrCall";
 import { summarizeOCR, OCRSummarizeRequestBody } from "./ocrSummarizeCall";
+import { mergeOCREntries, OCRMergeRequestBody } from "./ocrMergeCall";
 
 async function toResponse(result: { error: string; status: number } | object): Promise<Response> {
   const status = "error" in result ? (result as { status: number }).status : 200;
@@ -16,8 +17,8 @@ async function toResponse(result: { error: string; status: number } | object): P
 }
 
 export async function ocrFetch(
-  path: "/api/ocr/process" | "/api/ocr/summarize",
-  body: OCRProcessRequestBody | OCRSummarizeRequestBody,
+  path: "/api/ocr/process" | "/api/ocr/summarize" | "/api/ocr/merge",
+  body: OCRProcessRequestBody | OCRSummarizeRequestBody | OCRMergeRequestBody,
   signal?: AbortSignal,
 ): Promise<Response> {
   if (!isStandalone()) {
@@ -32,5 +33,8 @@ export async function ocrFetch(
   if (path === "/api/ocr/process") {
     return toResponse(await processOCR(body as OCRProcessRequestBody));
   }
-  return toResponse(await summarizeOCR(body as OCRSummarizeRequestBody));
+  if (path === "/api/ocr/summarize") {
+    return toResponse(await summarizeOCR(body as OCRSummarizeRequestBody));
+  }
+  return toResponse(await mergeOCREntries(body as OCRMergeRequestBody));
 }

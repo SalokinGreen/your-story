@@ -11,7 +11,7 @@
  * - Word overlap (how many words from search appear in target)
  * - Character overlap (Jaccard similarity)
  */
-function calculateSimilarity(search: string, target: string): number {
+export function calculateSimilarity(search: string, target: string): number {
   const searchLower = search.toLowerCase().trim();
   const targetLower = target.toLowerCase().trim();
 
