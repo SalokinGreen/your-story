@@ -6,14 +6,19 @@
  * after narration has already streamed to the player and just records a
  * warning. This module is the active counterpart - it reviews a completed GM
  * turn for violations of rules the GM was already given, and a "major" flag
- * can trigger generateStoryTurn (generation.ts) to roll StoryData back to its
- * pre-turn snapshot and force a fresh attempt, telling the GM exactly what it
- * was flagged for. Same fail-open posture as the M2 roll-invariant gate
+ * can trigger generateStoryTurn (generation.ts) to call
+ * rewriteFlaggedNarration below: the GM is shown the exact narration it
+ * wrote and the specific reason it was flagged, and rewrites just the prose
+ * - dice rolls/tool calls/state changes are left untouched, since every
+ * major-eligible check here is a complaint about the narration text alone.
+ * Only if that rewrite call itself fails does generateStoryTurn fall back to
+ * rolling StoryData back to its pre-turn snapshot and forcing a completely
+ * fresh, blind attempt. Same fail-open posture as the M2 roll-invariant gate
  * (reasoningTiers.ts/generation.ts): never block play indefinitely.
  *
  * Five checks, two severities:
  *
- * Major (can trigger generateStoryTurn's reset-and-retry):
+ * Major (can trigger generateStoryTurn's rewrite-or-reset correction):
  * - checkResponseLength: the word-count trip itself is deterministic and
  *   free - catches a single turn blowing way past the Reply Length setting's
  *   ceiling. pacingFeedback.ts already nudges based on a trailing 3-turn
@@ -67,7 +72,7 @@
  */
 
 import { ObserverFlag, ObserverFlagType } from "./structs";
-import { ReplyLength } from "./ai_staged";
+import { ReplyLength, getLengthGuidance } from "./ai_staged";
 import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
 import { getCustomModelIfUUID } from "./user_settings";
 
@@ -220,6 +225,99 @@ export async function checkResponseLength(
     detail: `This turn ran ${words} words, well past the "${replyLength}" reply-length setting's usual ceiling (~${band.high} words).`,
     correctivePrompt: `Your previous attempt at this turn was reset because it was far too long for the "${replyLength}" reply-length setting (${words} words, vs. a usual ceiling of ~${band.high}). Here is what you wrote last time, so you can see what to cut:\n"""\n${narration.trim()}\n"""\nRewrite this turn much shorter - state the outcome and stop, per the LENGTH & PACING rules you were already given.`,
   };
+}
+
+export interface RewriteNarrationParams {
+  /** The exact narration text that was flagged - the GM rewrites this, not a fresh attempt. */
+  narration: string;
+  playerChoice: string;
+  /** The turn's already-executed tool/roll results (GMToolResult context strings, joined) - ground truth, unaffected by any check that can trigger a reset. */
+  gmStoryContext?: string;
+  flag: ObserverFlag;
+  replyLength?: ReplyLength;
+  storytellerMode?: "narrator" | "dm";
+  apiOptions: ObserverApiOptions;
+}
+
+/**
+ * Layer 5 hardening's answer to "just regenerate and hope for something
+ * different": every check that can trigger a reset (checkResponseLength,
+ * checkPlayerAgencyViolation, checkOutcomeMismatch) is a complaint about the
+ * NARRATION TEXT specifically, never about which tools were called or what
+ * a roll resolved to. So instead of discarding the whole turn - dice rolls,
+ * tool calls, state changes and all - and re-running the entire GM/story
+ * pipeline from scratch (which can reroll dice into a completely different
+ * outcome), this shows the GM the exact narration it just wrote plus the
+ * specific reason it was flagged, and asks it to rewrite only the prose.
+ * The turn's mechanical results (gmStoryContext) are passed through as
+ * ground truth the rewrite must stay consistent with, not redone.
+ *
+ * Returns null (fail open) on any API error or empty response - the caller
+ * falls back to the old full-turn reset rather than silently keeping
+ * flagged content.
+ */
+export async function rewriteFlaggedNarration(
+  params: RewriteNarrationParams,
+): Promise<string | null> {
+  const { narration, playerChoice, gmStoryContext, flag, apiOptions } = params;
+  const replyLength = params.replyLength || "medium";
+  const storytellerMode = params.storytellerMode || "narrator";
+  const { paragraphs } = getLengthGuidance(replyLength);
+  const band = PACING_BANDS[replyLength] ?? PACING_BANDS.medium;
+
+  const voiceGuidance =
+    storytellerMode === "dm"
+      ? `Write as a Dungeon Master narrating to the player. You may reference dice results naturally. Use second person ("You swing your sword...").`
+      : `Write immersive prose - show, don't tell. No dice results or mechanical language.`;
+
+  const system = `You are the Game Master for a tabletop-style interactive fiction game. You just wrote a turn of narration in response to the player's action, but an automated reviewer flagged it for a specific problem - see below.
+
+Rewrite the narration to fix that exact problem. Keep everything that was already correct (the events, the tone, the outcome) - fix only what's wrong. Any mechanical results given below are ground truth and must not change.
+
+${paragraphs} ${voiceGuidance}
+
+Output ONLY the corrected narration prose - no meta-commentary, no explanation of what you changed, no notes to yourself.`;
+
+  const contextBlock = gmStoryContext?.trim()
+    ? `\n\nMechanical results this turn (ground truth, do not contradict):\n"""\n${gmStoryContext.trim()}\n"""`
+    : "";
+
+  const user = `Player's declared action:\n"""\n${playerChoice.trim() || "(none - opening scene)"}\n"""${contextBlock}\n\nYour previous narration (FLAGGED - do not repeat this):\n"""\n${narration.trim()}\n"""\n\nWhat was wrong: ${flag.detail}\n\nRewrite the narration now.`;
+
+  try {
+    const response = await fetch("/api/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiOptions.token}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        model: apiOptions.model,
+        maxTokens: Math.max(400, Math.ceil(band.high * 3)),
+        temperature: 0.7,
+        openRouterKey: apiOptions.openRouterKey,
+        deepseekKey: apiOptions.deepseekKey,
+        googleKey: apiOptions.googleKey,
+        mistralKey: apiOptions.mistralKey,
+        deepinfraKey: apiOptions.deepinfraKey,
+        customModel: getCustomModelIfUUID(apiOptions.model),
+        reasoningEffort: apiOptions.reasoningEffort,
+      }),
+      signal: apiOptions.abortSignal,
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const content = (data.content || "").trim();
+    return content || null;
+  } catch {
+    return null;
+  }
 }
 
 interface LengthJustificationResult {
