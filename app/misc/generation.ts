@@ -223,6 +223,12 @@ export interface GenerationOptions {
   // be passed in by callers. Injected into the GM prompt as a holistic
   // pacing/momentum read, refreshed only every N turns.
   storyProgressNote?: string;
+  // Same check-in's repeated-phrase callout (see storyProgressObserver.ts's
+  // findRepeatedPhrases) - set internally the same way as storyProgressNote.
+  repetitionNote?: string;
+  // Same check-in's NPC knowledge-consistency callout - set internally the
+  // same way as storyProgressNote.
+  knowledgeNote?: string;
 }
 
 export interface GenerationCallbacks {
@@ -704,6 +710,8 @@ export async function generateStoryTurn(
   // turns as of when it fired, not just the immediately preceding turn, so
   // there's no reset-and-replace lifecycle here the way observerNote has.
   const storyProgressNote: string | undefined = lastAssistantPart?.storyProgressNote;
+  const repetitionNote: string | undefined = lastAssistantPart?.repetitionNote;
+  const knowledgeNote: string | undefined = lastAssistantPart?.knowledgeNote;
   let resetAttempts = 0;
 
   while (true) {
@@ -714,6 +722,8 @@ export async function generateStoryTurn(
         ...options,
         observerNote,
         storyProgressNote,
+        repetitionNote,
+        knowledgeNote,
         // A reset discards the previous attempt's tool calls/narration - if
         // it also came with a precomputedGMConversation (manual Retry flow),
         // replaying that would just replay the flagged content, so force a
@@ -910,6 +920,18 @@ export async function generateStoryTurn(
           storyProgressNote: progressResult.note,
         };
       }
+      if (progressResult.repetitionNote) {
+        result.scenePart = {
+          ...result.scenePart,
+          repetitionNote: progressResult.repetitionNote,
+        };
+      }
+      if (progressResult.knowledgeNote) {
+        result.scenePart = {
+          ...result.scenePart,
+          knowledgeNote: progressResult.knowledgeNote,
+        };
+      }
     } catch (storyProgressError) {
       logger.action("Story progress observer failed, skipping (fail open)", {
         error:
@@ -1019,6 +1041,8 @@ async function generateStoryTurnOnce(
         pacingNote,
         observerNote: options.observerNote,
         storyProgressNote: options.storyProgressNote,
+        repetitionNote: options.repetitionNote,
+        knowledgeNote: options.knowledgeNote,
       });
       gmBaseMessages = gmPrompt.messages;
       logger.action("Using precomputed GM conversation (retry flow)", {
@@ -1046,6 +1070,8 @@ async function generateStoryTurnOnce(
           pacingNote,
           observerNote: options.observerNote,
           storyProgressNote: options.storyProgressNote,
+          repetitionNote: options.repetitionNote,
+          knowledgeNote: options.knowledgeNote,
         });
         gmBaseMessages = gmPrompt.messages;
       } else {
@@ -1282,6 +1308,8 @@ async function generateStoryTurnOnce(
               pacingNote,
               observerNote: options.observerNote,
               storyProgressNote: options.storyProgressNote,
+              repetitionNote: options.repetitionNote,
+              knowledgeNote: options.knowledgeNote,
               // Skip the literal <thinking> prefill for reasoning-tier models
               // (they emit CoT natively); keep it for effort:"none" models.
               usesNativeReasoning: gmReasoningEffort !== "none",
