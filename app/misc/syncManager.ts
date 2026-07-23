@@ -29,11 +29,28 @@ import {
   listLocalFolders,
   replaceLocalFolders,
 } from "./localFolderManager";
+import {
+  LibraryNote,
+  listLibraryNotes,
+  saveLibraryNote,
+  deleteLibraryNote,
+} from "./localNotesLibraryManager";
 import { SYNCABLE_SETTINGS_KEYS } from "./syncableSettingsKeys";
 import { getProviderFetch } from "./platformFetch";
 
-export type SyncBucket = "stories" | "adventures" | "folders" | "settings";
-const BUCKETS: SyncBucket[] = ["stories", "adventures", "folders", "settings"];
+export type SyncBucket =
+  | "stories"
+  | "adventures"
+  | "notes"
+  | "folders"
+  | "settings";
+const BUCKETS: SyncBucket[] = [
+  "stories",
+  "adventures",
+  "notes",
+  "folders",
+  "settings",
+];
 
 const SYNC_KEY_STORAGE_KEY = "yourStory_syncKey";
 const LAST_SYNCED_PREFIX = "yourStory_lastSynced_";
@@ -323,6 +340,7 @@ const storiesAdapter: MergeAdapter<LocalStory> = {
       await saveLocalStory(s.id, s.storyData, s.folder_id ?? undefined, {
         serverUpdatedAt: s.serverUpdatedAt,
         markAsSynced: true,
+        updatedAt: new Date(item.updatedAt),
       });
     }
     for (const before of localItemsBefore) {
@@ -350,10 +368,30 @@ const adventuresAdapter: MergeAdapter<LocalAdventure> = {
       await saveLocalAdventure(a.id, a.adventureData, {
         serverUpdatedAt: a.serverUpdatedAt,
         markAsSynced: true,
+        updatedAt: new Date(item.updatedAt),
       });
     }
     for (const before of localItemsBefore) {
       if (!mergedIds.has(before.id)) await deleteLocalAdventure(before.id);
+    }
+  },
+};
+
+const notesAdapter: MergeAdapter<LibraryNote> = {
+  collectLocalItems: async () => {
+    const notes = await listLibraryNotes();
+    return notes.map((n) => ({ id: n.id, updatedAt: n.updatedAt, payload: n }));
+  },
+  applyMerged: async (merged, localItemsBefore) => {
+    const localMap = new Map(localItemsBefore.map((i) => [i.id, i]));
+    const mergedIds = new Set(merged.map((i) => i.id));
+    for (const item of merged) {
+      const before = localMap.get(item.id);
+      if (before && before.updatedAt === item.updatedAt) continue;
+      await saveLibraryNote(item.payload);
+    }
+    for (const before of localItemsBefore) {
+      if (!mergedIds.has(before.id)) await deleteLibraryNote(before.id);
     }
   },
 };
@@ -438,6 +476,7 @@ const settingsAdapter: MergeAdapter<string> = {
 const adapters: { [B in SyncBucket]: MergeAdapter<unknown> } = {
   stories: storiesAdapter as MergeAdapter<unknown>,
   adventures: adventuresAdapter as MergeAdapter<unknown>,
+  notes: notesAdapter as MergeAdapter<unknown>,
   folders: foldersAdapter as MergeAdapter<unknown>,
   settings: settingsAdapter as MergeAdapter<unknown>,
 };
