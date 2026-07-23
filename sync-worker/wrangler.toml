@@ -6,7 +6,7 @@ compatibility_date = "2025-01-01"
 # "https://your-story.app,http://localhost:3000"
 # Set via `wrangler secret put ALLOWED_ORIGINS` or as a plain var below.
 [vars]
-ALLOWED_ORIGINS = "http://localhost:3000"
+ALLOWED_ORIGINS = "http://localhost:3000,https://your-story.io,https://www.your-story.io"
 
 # Create with: wrangler kv namespace create SYNC_KV
 # then paste the returned id here.
