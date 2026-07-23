@@ -99,6 +99,7 @@ import CharacterCreationForm from "./create-character/form";
 import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
 import { MAX_DICE_COUNT, MAX_DICE_SIDES } from "../misc/diceFormula";
+import { SYNC_COMPLETED_EVENT, SyncResult } from "../misc/syncManager";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -426,6 +427,11 @@ function StoryPageContent() {
   );
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const hasLoadedStoryRef = useRef<string | null>(null); // Track loaded story ID to prevent re-fetching on tab focus
+  // Bumped to force the load-story effect below to re-run after a sync -
+  // otherwise this story's periodic autosave (using its stale in-memory
+  // storyData) would silently overwrite whatever a sync merge just wrote to
+  // IndexedDB the next time it fires.
+  const [reloadTick, setReloadTick] = useState(0);
   const generationAbortRef = useRef<AbortController | null>(null); // Abort controller for stopping generation
   // Manual dice mode: a pending ask_for_roll request means the GM loop is
   // paused awaiting the player's physical roll. The resolver ref completes
@@ -1041,7 +1047,32 @@ function StoryPageContent() {
     }
 
     loadStory();
-  }, [storyId, addNotification]);
+  }, [storyId, addNotification, reloadTick]);
+
+  // A background sync writes straight to IndexedDB and has no way to update
+  // this page's in-memory storyData on its own. If the sync actually
+  // touched the stories bucket, force the load-story effect above to
+  // re-fetch from IndexedDB by clearing the "already loaded" guard and
+  // bumping reloadTick - otherwise this story's next autosave would
+  // silently overwrite whatever the sync just merged in with the stale
+  // in-memory copy.
+  useEffect(() => {
+    function handleSyncCompleted(event: Event) {
+      const results = (event as CustomEvent<SyncResult[]>).detail;
+      const storiesChanged = results?.some(
+        (r) =>
+          r.bucket === "stories" &&
+          r.action === "merged" &&
+          (r.added || r.updated || r.removed),
+      );
+      if (!storiesChanged) return;
+      hasLoadedStoryRef.current = null;
+      setReloadTick((t) => t + 1);
+    }
+    window.addEventListener(SYNC_COMPLETED_EVENT, handleSyncCompleted);
+    return () =>
+      window.removeEventListener(SYNC_COMPLETED_EVENT, handleSyncCompleted);
+  }, []);
 
   // Deep-link auto-host / auto-join: the Library, home page, and
   // GuidedStoryStart wizard route here with extra query params instead of
