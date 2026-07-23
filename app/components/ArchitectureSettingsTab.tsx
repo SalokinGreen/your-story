@@ -122,6 +122,12 @@ const OBSERVER_FLAG_INFO: Record<
       "The narration moved to a clearly new scene without calling increment_scene.",
     llmBacked: true,
   },
+  tier_escalation_missed: {
+    label: "Tier Escalation Missed",
+    description:
+      "This turn's own complexity/stakes called for a higher reasoning tier than it ran at, and the GM never self-escalated. Unlike the other resettable flags, this can't be fixed by rewriting the narration - a reset forces the retry onto a higher tier.",
+    llmBacked: true,
+  },
 };
 
 const OBSERVER_FLAG_ORDER: ObserverFlagType[] = [
@@ -129,6 +135,7 @@ const OBSERVER_FLAG_ORDER: ObserverFlagType[] = [
   "outcome_narration_mismatch",
   "missing_oracle_or_table",
   "missing_scene_increment",
+  "tier_escalation_missed",
   "response_length",
 ];
 
