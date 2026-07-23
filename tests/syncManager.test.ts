@@ -131,8 +131,10 @@ beforeEach(() => {
   // syncManager/localFolderManager follow this codebase's SSR-safety
   // convention of gating browser-only storage access behind
   // `typeof window !== "undefined"` - stub it so that guard passes under
-  // Vitest's node test environment, same as the real browser runtime.
-  vi.stubGlobal("window", globalThis);
+  // Vitest's node test environment, same as the real browser runtime. Node's
+  // built-in EventTarget (not plain globalThis) gives syncAll()'s
+  // window.dispatchEvent(SYNC_COMPLETED_EVENT) something real to call.
+  vi.stubGlobal("window", new EventTarget());
   process.env.NEXT_PUBLIC_SYNC_API_URL = "https://fake-sync.example";
 });
 

@@ -523,6 +523,14 @@ async function syncBucketMerge(
   return { bucket, action: "merged", added, updated, removed };
 }
 
+// syncAll() writes straight to IndexedDB/localStorage via the local
+// managers - it has no idea which React components currently have that
+// data loaded into state. Dispatching this after every sync lets any
+// mounted page (Library, an open story) notice and refresh itself, the
+// same convention this codebase already uses for font/layer/model settings
+// changes (see FontSettingsTab.tsx, layerSettings.ts, user_settings.ts).
+export const SYNC_COMPLETED_EVENT = "yourStorySyncCompleted";
+
 export async function syncAll(): Promise<SyncResult[]> {
   const syncKey = getSyncKey();
   if (!syncKey) throw new Error("No sync key configured");
@@ -542,5 +550,12 @@ export async function syncAll(): Promise<SyncResult[]> {
       });
     }
   }
+
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(
+      new CustomEvent(SYNC_COMPLETED_EVENT, { detail: results }),
+    );
+  }
+
   return results;
 }
