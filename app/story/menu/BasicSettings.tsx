@@ -44,6 +44,7 @@ export interface BasicSettingsForm {
   displayAvatar: string;
   diceMode: DiceMode;
   playerArchetype?: PlayerArchetype;
+  autoGenerateChoices?: boolean;
 }
 
 
@@ -210,6 +211,48 @@ export default function BasicSettings({
               </button>
             );
           })}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-semibold text-blue-200 mb-2">
+          Suggested Choices
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => onChange({ ...form, autoGenerateChoices: false })}
+            className={`p-3 rounded-xl border text-left transition-all ${
+              !form.autoGenerateChoices
+                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
+                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+              <DynamicIcon name="PenLine" className="w-4 h-4 text-purple-300" />
+              Off
+            </span>
+            <span className="block text-xs text-blue-300/50">
+              Freeform text only - type or say what you do
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange({ ...form, autoGenerateChoices: true })}
+            className={`p-3 rounded-xl border text-left transition-all ${
+              form.autoGenerateChoices
+                ? "bg-purple-500/10 border-purple-400/40 ring-1 ring-purple-400/30 shadow-[0_0_16px_rgba(168,85,247,0.15)]"
+                : "bg-white/[0.03] border-white/10 hover:border-purple-400/30 hover:bg-white/5"
+            }`}
+          >
+            <span className="flex items-center gap-1.5 text-sm font-semibold text-white mb-0.5">
+              <DynamicIcon name="List" className="w-4 h-4 text-purple-300" />
+              On
+            </span>
+            <span className="block text-xs text-blue-300/50">
+              Also suggest a few tappable actions after each turn
+            </span>
+          </button>
         </div>
       </div>
 
