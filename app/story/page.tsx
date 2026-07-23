@@ -98,7 +98,9 @@ import { tickCooldowns } from "../misc/abilitySystem";
 import CharacterCreationForm from "./create-character/form";
 import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
+import { useViewportHeight } from "../misc/useViewportHeight";
 import { MAX_DICE_COUNT, MAX_DICE_SIDES } from "../misc/diceFormula";
+import { SYNC_COMPLETED_EVENT, SyncResult } from "../misc/syncManager";
 
 // Cryptographically secure random number generator
 // Returns a random integer between min (inclusive) and max (inclusive)
@@ -232,6 +234,46 @@ function handleObserverReset(
   );
 }
 
+// Fired via GenerationCallbacks.onBackgroundObserverFlags - only reachable
+// when the observer ran in the background (generateStoryTurn's
+// resetPossible was false, so a rewrite/reset was never on the table) and
+// found something worth flagging after the turn already completed and
+// control was already handed back to the player. storyData.scene.parts was
+// already patched in place by generateStoryTurn itself (same object
+// reference), so this just needs to re-render/persist/notify - mirrors the
+// observerFlags branch inside onComplete below, just arriving later.
+function handleBackgroundObserverFlags(
+  storyData: StoryData,
+  flags: ObserverFlag[],
+  setStoryData: (data: StoryData) => void,
+  saveProgress: (data: StoryData, immediate?: boolean) => void,
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "info" | "warning",
+  ) => void,
+) {
+  setStoryData({ ...storyData });
+  saveProgress(storyData, true);
+  addNotification(
+    `GM response flagged: ${flags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+    "warning",
+  );
+}
+
+// Fired via GenerationCallbacks.onBackgroundLayersUpdate once the
+// fire-and-forget memory agent/director assistant/story progress observer
+// wave (and the observer itself, when deferred) finishes - they mutate
+// storyData in place rather than returning anything, so this just
+// re-renders/persists whatever they wrote.
+function handleBackgroundLayersUpdate(
+  storyData: StoryData,
+  setStoryData: (data: StoryData) => void,
+  saveProgress: (data: StoryData, immediate?: boolean) => void,
+) {
+  setStoryData({ ...storyData });
+  saveProgress(storyData, true);
+}
+
 // Layer 5 hardening: fired via GenerationCallbacks.onObserverRewrite when
 // rewriteFlaggedNarration (observer.ts) successfully rewrote a flagged
 // turn's narration in place. Unlike handleObserverReset above, the turn's
@@ -335,13 +377,9 @@ function StoryPageContent() {
     // time this effect runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentState]);
-  // Real, JS-measured viewport height in px. Some mobile browsers (in
-  // particular embedded/in-app webviews) don't support the `dvh` unit and
-  // fall back to a stale `100vh` that ignores the address bar/toolbar,
-  // leaving a gap of bare body background below the game area. Measuring
-  // window.visualViewport (falling back to window.innerHeight) and applying
-  // it as an inline min-height is a more reliable fix than CSS units alone.
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  // Real, JS-measured viewport height in px - see useViewportHeight for why
+  // CSS units alone (`dvh`/`vh`) aren't reliable enough here.
+  const viewportHeight = useViewportHeight();
   // How tall the active tab's content area can be before it must scroll
   // internally, computed from where that area actually starts on screen
   // (below the tab bar) rather than guessed offsets. The Story tab uses
@@ -354,7 +392,6 @@ function StoryPageContent() {
   const contentWrapperRef = useRef<HTMLDivElement | null>(null);
   const updateHeights = useCallback(() => {
     const vh = window.visualViewport?.height ?? window.innerHeight;
-    setViewportHeight(vh);
     if (contentWrapperRef.current) {
       const top = contentWrapperRef.current.getBoundingClientRect().top;
       // Clamp to the visible viewport: if a mobile browser has scrolled the
@@ -426,6 +463,11 @@ function StoryPageContent() {
   );
   const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const hasLoadedStoryRef = useRef<string | null>(null); // Track loaded story ID to prevent re-fetching on tab focus
+  // Bumped to force the load-story effect below to re-run after a sync -
+  // otherwise this story's periodic autosave (using its stale in-memory
+  // storyData) would silently overwrite whatever a sync merge just wrote to
+  // IndexedDB the next time it fires.
+  const [reloadTick, setReloadTick] = useState(0);
   const generationAbortRef = useRef<AbortController | null>(null); // Abort controller for stopping generation
   // Manual dice mode: a pending ask_for_roll request means the GM loop is
   // paused awaiting the player's physical roll. The resolver ref completes
@@ -1041,7 +1083,32 @@ function StoryPageContent() {
     }
 
     loadStory();
-  }, [storyId, addNotification]);
+  }, [storyId, addNotification, reloadTick]);
+
+  // A background sync writes straight to IndexedDB and has no way to update
+  // this page's in-memory storyData on its own. If the sync actually
+  // touched the stories bucket, force the load-story effect above to
+  // re-fetch from IndexedDB by clearing the "already loaded" guard and
+  // bumping reloadTick - otherwise this story's next autosave would
+  // silently overwrite whatever the sync just merged in with the stale
+  // in-memory copy.
+  useEffect(() => {
+    function handleSyncCompleted(event: Event) {
+      const results = (event as CustomEvent<SyncResult[]>).detail;
+      const storiesChanged = results?.some(
+        (r) =>
+          r.bucket === "stories" &&
+          r.action === "merged" &&
+          (r.added || r.updated || r.removed),
+      );
+      if (!storiesChanged) return;
+      hasLoadedStoryRef.current = null;
+      setReloadTick((t) => t + 1);
+    }
+    window.addEventListener(SYNC_COMPLETED_EVENT, handleSyncCompleted);
+    return () =>
+      window.removeEventListener(SYNC_COMPLETED_EVENT, handleSyncCompleted);
+  }, []);
 
   // Deep-link auto-host / auto-join: the Library, home page, and
   // GuidedStoryStart wizard route here with extra query params instead of
@@ -1400,7 +1467,14 @@ function StoryPageContent() {
     setStoryTextReady(false);
 
     //Adduser'scustominputtoscene
-    let customContent = ">" + customText;
+    // Couch co-op (StoryComposer) and voice (PlayerBubbles) submissions
+    // already format their own "> Name: text" line(s) before calling us -
+    // only bare freeform text (no leading ">") still needs one added here.
+    // Prepending unconditionally double-prefixed those turns as ">> Name:
+    // ...", which read as a duplicated line to both the player and the GM.
+    let customContent = customText.startsWith(">")
+      ? customText
+      : ">" + customText;
     if (inputKind === "voice") {
       customContent += "\n[Voice Input - may contain transcription errors]";
     }
@@ -1817,6 +1891,18 @@ function StoryPageContent() {
               setLoadingStage,
               addNotification,
             );
+          },
+          onBackgroundObserverFlags: (flags) => {
+            handleBackgroundObserverFlags(
+              storyData,
+              flags,
+              setStoryData,
+              saveProgress,
+              addNotification,
+            );
+          },
+          onBackgroundLayersUpdate: () => {
+            handleBackgroundLayersUpdate(storyData, setStoryData, saveProgress);
           },
           onComplete: (result) => {
             if (result.meta.totalTokenCost) {
@@ -2311,6 +2397,18 @@ function StoryPageContent() {
               setLoadingStage,
               addNotification,
             );
+          },
+          onBackgroundObserverFlags: (flags) => {
+            handleBackgroundObserverFlags(
+              storyData,
+              flags,
+              setStoryData,
+              saveProgress,
+              addNotification,
+            );
+          },
+          onBackgroundLayersUpdate: () => {
+            handleBackgroundLayersUpdate(storyData, setStoryData, saveProgress);
           },
           onComplete: (result) => {
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
@@ -3217,6 +3315,18 @@ function StoryPageContent() {
               setLoadingStage,
               addNotification,
             );
+          },
+          onBackgroundObserverFlags: (flags) => {
+            handleBackgroundObserverFlags(
+              storyData,
+              flags,
+              setStoryData,
+              saveProgress,
+              addNotification,
+            );
+          },
+          onBackgroundLayersUpdate: () => {
+            handleBackgroundLayersUpdate(storyData, setStoryData, saveProgress);
           },
           onComplete: (result) => {
             // Check for chapter completion

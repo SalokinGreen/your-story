@@ -48,6 +48,7 @@ import JoinGameModal from "@/app/components/JoinGameModal";
 import HostGameModal from "@/app/components/HostGameModal";
 import ExportFolderModal from "@/app/components/ExportFolderModal";
 import { readFolderLibraryFile } from "@/app/misc/folderLibraryExport";
+import { SYNC_COMPLETED_EVENT } from "@/app/misc/syncManager";
 import type { CustomTable, StoryLore } from "@/app/misc/structs";
 
 type LibraryView = "stories" | "adventures" | "notes";
@@ -139,6 +140,20 @@ export default function LibraryPage() {
     if (!hasLoadedLocalRef.current) {
       loadLocalData();
     }
+  }, []);
+
+  // A background sync writes straight to IndexedDB/localStorage and has no
+  // way to update this page's already-loaded state on its own - reload once
+  // a sync actually changes something, so newly-pulled-in stories/
+  // adventures/folders/notes from another device show up without requiring
+  // a manual page reload.
+  useEffect(() => {
+    function handleSyncCompleted() {
+      loadLocalData();
+    }
+    window.addEventListener(SYNC_COMPLETED_EVENT, handleSyncCompleted);
+    return () =>
+      window.removeEventListener(SYNC_COMPLETED_EVENT, handleSyncCompleted);
   }, []);
 
   const loadLocalData = async () => {

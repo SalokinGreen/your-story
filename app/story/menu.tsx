@@ -45,6 +45,7 @@ import CouchPlayersEditor from "./menu/CouchPlayersEditor";
 import OnlinePlayEditor from "./menu/OnlinePlayEditor";
 import APIKeysModal from "../components/APIKeysModal";
 import CompactStoryModal from "./menu/CompactStoryModal";
+import FullScreenView from "../components/FullScreenView";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
 import type { MPBackend } from "../misc/multiplayer/types";
@@ -1018,74 +1019,81 @@ export default function MenuPage({
 
       {/* Comprehensive Settings Modal */}
       {showSettings && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 sm:p-4">
-          {/* Full screen on mobile, constrained on desktop */}
-          <div className="bg-[#0a1628]/95 backdrop-blur-2xl sm:rounded-2xl shadow-2xl shadow-black/50 max-w-6xl w-full border-0 sm:border border-white/10 h-full sm:h-[90vh] flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between p-3 sm:p-6 border-b border-white/10">
-              <h3 className="text-base sm:text-xl font-bold text-white flex items-center gap-2">
-                <span className="p-1.5 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20">
-                  <DynamicIcon
-                    name="Settings"
-                    className="w-4 h-4 sm:w-5 sm:h-5 text-purple-300"
-                  />
-                </span>
-                Story Editor
-              </h3>
-              <button
-                onClick={() => setShowSettings(false)}
-                className="p-2 text-blue-300/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+        <FullScreenView
+          title="Story Editor"
+          icon="Settings"
+          onClose={() => setShowSettings(false)}
+          navClassName="w-14 sm:w-56"
+          nav={
+            <div className="py-2 sm:py-4 px-1.5 sm:px-3 space-y-1">
+              {sections.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => scrollToSection(tab.id)}
+                  className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                    activeTab === tab.id
+                      ? "bg-linear-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-950/40"
+                      : "text-blue-200 hover:bg-white/5"
+                  }`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
+                  <DynamicIcon
+                    name={tab.icon}
+                    className="w-4 h-4 sm:w-5 sm:h-5 shrink-0"
                   />
-                </svg>
+                  <span className="hidden sm:inline truncate">
+                    {tab.label}
+                  </span>
+                </button>
+              ))}
+            </div>
+          }
+          bodyClassName="p-0"
+          footer={
+            <div className="flex gap-2 sm:gap-3 p-3 sm:p-6">
+              <button
+                onClick={() => {
+                  setSettingsForm({
+                    story_name: storyData.story_name,
+                    player_name: storyData.player_name,
+                    player_summary: storyData.player_summary,
+                    premise: storyData.premise,
+                    max_chapters: storyData.max_chapters,
+                    displayName: storyData.displayName || "",
+                    displayAvatar: storyData.displayAvatar || "",
+                    diceMode: storyData.diceMode || "ai",
+                  });
+                  setMultiplayerEnabled(!!storyData.multiplayer?.enabled);
+                  setMultiplayerMode(storyData.multiplayer?.mode || "host");
+                  setMultiplayerTimerMinutes(
+                    storyData.multiplayer?.timerMinutes ?? 2,
+                  );
+                  setMultiplayerHostUserId(
+                    storyData.multiplayer?.hostUserId || "",
+                  );
+                  setShowSettings(false);
+                }}
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 text-sm sm:text-base font-semibold rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveSettings}
+                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-sm sm:text-base font-semibold rounded-xl transition-all shadow-lg shadow-purple-950/40 hover:shadow-purple-500/25 flex items-center justify-center gap-1"
+              >
+                <DynamicIcon name="Save" className="w-4 h-4" />
+                <span className="hidden sm:inline">Save All Changes</span>
+                <span className="sm:hidden">Save</span>
               </button>
             </div>
-
-            {/* Sidebar nav + continuous scrolling content */}
-            <div className="flex-1 flex overflow-hidden min-h-0">
-              {/* Sidebar Navigation */}
-              <nav className="w-14 sm:w-56 shrink-0 border-r border-white/10 overflow-y-auto scrollbar-thin bg-white/[0.02]">
-                <div className="py-2 sm:py-4 px-1.5 sm:px-3 space-y-1">
-                  {sections.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => scrollToSection(tab.id)}
-                      className={`w-full flex items-center gap-2 sm:gap-3 px-2 sm:px-4 py-2.5 sm:py-3 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
-                        activeTab === tab.id
-                          ? "bg-linear-to-r from-purple-600 to-pink-600 text-white shadow-lg shadow-purple-950/40"
-                          : "text-blue-200 hover:bg-white/5"
-                      }`}
-                    >
-                      <DynamicIcon
-                        name={tab.icon}
-                        className="w-4 h-4 sm:w-5 sm:h-5 shrink-0"
-                      />
-                      <span className="hidden sm:inline truncate">
-                        {tab.label}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </nav>
-
-              {/* Content Area - all categories stacked, scroll down to move through them */}
-              <div
-                ref={contentScrollRef}
-                className="flex-1 overflow-y-auto px-3 sm:px-6 pb-6 min-h-0"
-                style={{ scrollSnapType: "y proximity" }}
-              >
-                <div
+          }
+        >
+          {/* Content Area - all categories stacked, scroll down to move through them */}
+          <div
+            ref={contentScrollRef}
+            className="h-full overflow-y-auto px-3 sm:px-6 pb-6 min-h-0"
+            style={{ scrollSnapType: "y proximity" }}
+          >
+            <div
                   ref={(el) => {
                     sectionRefs.current["basic"] = el;
                   }}
@@ -1690,47 +1698,7 @@ export default function MenuPage({
                   />
                 </div>
               </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex gap-2 sm:gap-3 p-3 sm:p-6 border-t border-white/10">
-              <button
-                onClick={() => {
-                  setSettingsForm({
-                    story_name: storyData.story_name,
-                    player_name: storyData.player_name,
-                    player_summary: storyData.player_summary,
-                    premise: storyData.premise,
-                    max_chapters: storyData.max_chapters,
-                    displayName: storyData.displayName || "",
-                    displayAvatar: storyData.displayAvatar || "",
-                    diceMode: storyData.diceMode || "ai",
-                  });
-                  setMultiplayerEnabled(!!storyData.multiplayer?.enabled);
-                  setMultiplayerMode(storyData.multiplayer?.mode || "host");
-                  setMultiplayerTimerMinutes(
-                    storyData.multiplayer?.timerMinutes ?? 2,
-                  );
-                  setMultiplayerHostUserId(
-                    storyData.multiplayer?.hostUserId || "",
-                  );
-                  setShowSettings(false);
-                }}
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 text-sm sm:text-base font-semibold rounded-xl transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveSettings}
-                className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white text-sm sm:text-base font-semibold rounded-xl transition-all shadow-lg shadow-purple-950/40 hover:shadow-purple-500/25 flex items-center justify-center gap-1"
-              >
-                <DynamicIcon name="Save" className="w-4 h-4" />
-                <span className="hidden sm:inline">Save All Changes</span>
-                <span className="sm:hidden">Save</span>
-              </button>
-            </div>
-          </div>
-        </div>
+        </FullScreenView>
       )}
 
       {/* Compact Story Modal */}

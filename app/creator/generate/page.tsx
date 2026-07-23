@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import PDFImporter from "@/app/components/PDFImporter";
+import FullScreenView from "@/app/components/FullScreenView";
 import { creatorStreamFetch, creatorImageFetch } from "@/app/misc/creatorFetch";
 import {
   BigAdventureConfig,
@@ -237,29 +238,45 @@ function JsonRepairModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-              <span className="text-xl">🔧</span>
-            </div>
-            <div>
-              <h3 className="text-lg font-bold text-white">Fix JSON Output</h3>
-              <p className="text-sm text-blue-300/60">Stage: {stageName}</p>
-            </div>
+    <FullScreenView
+      title="Fix JSON Output"
+      subtitle={`Stage: ${stageName}`}
+      icon="Wrench"
+      onClose={onClose}
+      bodyClassName="p-0"
+      footer={
+        <div className="flex items-center justify-between p-4 bg-white/[0.03]">
+          <div className="text-xs text-blue-300/50">
+            Tip: Look for missing commas, unclosed brackets, or truncated
+            strings
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 text-blue-300/60 hover:text-white transition-colors"
-          >
-            ✕
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleValidate}
+              className="px-4 py-2 bg-white/10 hover:bg-white/10 text-blue-200 rounded-lg transition-colors"
+            >
+              Validate
+            </button>
+            <button
+              onClick={onClose}
+              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isParsing}
+              className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg transition-colors"
+            >
+              {isParsing ? "Parsing..." : "Save & Continue"}
+            </button>
+          </div>
         </div>
-
+      }
+    >
+      <div className="h-full flex flex-col">
         {/* Error message */}
-        <div className="px-4 py-2 bg-red-900/20 border-b border-red-700/30">
+        <div className="px-4 py-2 bg-red-900/20 border-b border-red-700/30 shrink-0">
           <p className="text-sm text-red-300">
             <span className="font-semibold">Error:</span> {error}
           </p>
@@ -300,37 +317,8 @@ function JsonRepairModal({
             </div>
           )}
         </div>
-
-        {/* Footer with actions */}
-        <div className="flex items-center justify-between p-4 border-t border-white/10 bg-white/[0.03]">
-          <div className="text-xs text-blue-300/50">
-            Tip: Look for missing commas, unclosed brackets, or truncated
-            strings
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={handleValidate}
-              className="px-4 py-2 bg-white/10 hover:bg-white/10 text-blue-200 rounded-lg transition-colors"
-            >
-              Validate
-            </button>
-            <button
-              onClick={onClose}
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={isParsing}
-              className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:from-gray-600 disabled:to-gray-600 text-white rounded-lg transition-colors"
-            >
-              {isParsing ? "Parsing..." : "Save & Continue"}
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </FullScreenView>
   );
 }
 
@@ -2960,37 +2948,32 @@ ${result.description || ""}`;
 
       {/* Stage Preview Modal */}
       {showStagePreview && previewStageData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setShowStagePreview(false)}
-          />
-          <div className="relative bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 rounded-xl border border-purple-500/30 max-w-4xl w-full max-h-[85vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="bg-purple-900/30 border-b border-purple-700/30 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="text-2xl">
-                    {getStageInfo(previewStageData.stage).emoji}
-                  </span>
-                  <div>
-                    <h3 className="text-lg font-bold text-white">
-                      Stage Complete:{" "}
-                      {getStageInfo(previewStageData.stage).name}
-                    </h3>
-                    <p className="text-sm text-blue-300/60">
-                      Review the generated content before continuing
-                    </p>
-                  </div>
-                </div>
-                <div className="text-sm text-blue-300/60">
-                  {completedStages.length} / {stages.length} stages
-                </div>
+        <FullScreenView
+          title={`${getStageInfo(previewStageData.stage).emoji} Stage Complete: ${getStageInfo(previewStageData.stage).name}`}
+          subtitle="Review the generated content before continuing"
+          onClose={() => setShowStagePreview(false)}
+          headerActions={
+            <span className="text-sm text-blue-300/60 whitespace-nowrap">
+              {completedStages.length} / {stages.length} stages
+            </span>
+          }
+          footer={
+            <div className="flex items-center justify-between p-4">
+              <p className="text-xs text-blue-300/50">
+                Generation continues in the background. Close to see progress.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowStagePreview(false)}
+                  className="px-6 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  Continue →
+                </button>
               </div>
             </div>
-
-            {/* Content */}
-            <div className="p-6 overflow-y-auto max-h-[50vh]">
+          }
+        >
+          <div className="max-w-4xl mx-auto">
               {/* Summary of what was generated */}
               {previewStageData.partialResult.storyTemplate && (
                 <div className="mb-6">
@@ -3063,25 +3046,7 @@ ${result.description || ""}`;
                 </div>
               </div>
             </div>
-
-            {/* Footer */}
-            <div className="bg-white/[0.03] backdrop-blur-md border-t border-white/10 px-6 py-4">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-blue-300/50">
-                  Generation continues in the background. Close to see progress.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowStagePreview(false)}
-                    className="px-6 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg font-medium transition-colors"
-                  >
-                    Continue →
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        </FullScreenView>
       )}
 
       {/* Save Template Modal */}
@@ -3166,32 +3131,32 @@ ${result.description || ""}`;
 
       {/* History Modal */}
       {showHistoryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => setShowHistoryModal(false)}
-          />
-          <div className="relative bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 rounded-xl border border-blue-500/30 max-w-2xl w-full max-h-[80vh] overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="bg-white/5 border-b border-white/10 px-6 py-4 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-bold text-white">
-                  📜 Generation History
-                </h3>
-                <p className="text-sm text-blue-300/60 mt-1">
-                  Last {history.length} generations (max 10)
-                </p>
-              </div>
-              {history.length > 0 && (
-                <button
-                  onClick={handleClearHistory}
-                  className="text-xs px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded transition-colors"
-                >
-                  Clear All
-                </button>
-              )}
+        <FullScreenView
+          title="📜 Generation History"
+          subtitle={`Last ${history.length} generations (max 10)`}
+          onClose={() => setShowHistoryModal(false)}
+          headerActions={
+            history.length > 0 ? (
+              <button
+                onClick={handleClearHistory}
+                className="text-xs px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 text-red-300 rounded transition-colors"
+              >
+                Clear All
+              </button>
+            ) : undefined
+          }
+          footer={
+            <div className="flex justify-end p-4">
+              <button
+                onClick={() => setShowHistoryModal(false)}
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
+              >
+                Close
+              </button>
             </div>
-
-            <div className="p-6 overflow-y-auto max-h-[60vh]">
+          }
+        >
+          <div className="max-w-2xl mx-auto">
               {history.length > 0 ? (
                 <div className="space-y-3">
                   {history.map((entry) => (
@@ -3260,17 +3225,7 @@ ${result.description || ""}`;
                 </div>
               )}
             </div>
-
-            <div className="bg-white/[0.03] backdrop-blur-md border-t border-white/10 px-6 py-4 flex justify-end">
-              <button
-                onClick={() => setShowHistoryModal(false)}
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
+        </FullScreenView>
       )}
 
       {/* Header */}

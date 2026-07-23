@@ -48,6 +48,7 @@ import {
 } from "@/app/misc/presets";
 import CreatorAIChat from "@/app/components/CreatorAIChat";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
+import FullScreenView from "@/app/components/FullScreenView";
 import { IconPicker } from "@/app/components/IconPicker";
 import { CustomTablesEditor } from "@/app/components/CustomTablesEditor";
 import { DraggableScroll } from "@/app/components/DraggableScroll";
@@ -8585,25 +8586,13 @@ ${description || ""}`;
 
       {/* Conflict Resolution Modal */}
       {showConflictModal && conflictData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-amber-500/50 rounded-xl p-6 max-w-2xl w-full shadow-2xl">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-amber-500/20 rounded-full flex items-center justify-center">
-                <DynamicIcon
-                  name="AlertTriangle"
-                  className="w-5 h-5 text-amber-400"
-                />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">
-                  Version Conflict Detected
-                </h3>
-                <p className="text-sm text-blue-300/70">
-                  Choose which version to keep
-                </p>
-              </div>
-            </div>
-
+        <FullScreenView
+          title="Version Conflict Detected"
+          subtitle="Choose which version to keep"
+          icon="AlertTriangle"
+          onClose={() => setShowConflictModal(false)}
+        >
+          <div className="max-w-2xl mx-auto">
             <p className="text-blue-200/80 mb-6">
               This adventure has been edited on another device. You have unsaved
               changes from this device that conflict with the online version.
@@ -8705,27 +8694,40 @@ ${description || ""}`;
               ⚠️ The version you don&apos;t choose will be discarded
             </div>
           </div>
-        </div>
+        </FullScreenView>
       )}
 
       {/* AI Image Generation Modal */}
       {showAIImageModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl p-6 max-w-lg w-full mx-4 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-white">
-                🎨 AI{" "}
-                {showAIImageModal === "thumbnail" ? "Thumbnail" : "Banner"}{" "}
-                Generation
-              </h3>
+        <FullScreenView
+          title={`🎨 AI ${showAIImageModal === "thumbnail" ? "Thumbnail" : "Banner"} Generation`}
+          onClose={() => setShowAIImageModal(null)}
+          footer={
+            <div className="max-w-lg mx-auto flex gap-3 justify-end p-4">
               <button
                 onClick={() => setShowAIImageModal(null)}
-                className="text-blue-400 hover:text-blue-300"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
               >
-                <DynamicIcon name="X" className="w-5 h-5" />
+                Cancel
+              </button>
+              <button
+                onClick={() => generateAIImage(showAIImageModal)}
+                disabled={
+                  (showAIImageModal === "thumbnail"
+                    ? !thumbnailPrompt.trim()
+                    : !bannerPrompt.trim()) ||
+                  generatingThumbnail ||
+                  generatingBanner ||
+                  (imageProvider === "openrouter" && !apiKeys.openRouterKey)
+                }
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-white/5 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+              >
+                🎨 Generate
               </button>
             </div>
-
+          }
+        >
+          <div className="max-w-lg mx-auto">
             {/* Provider Toggle */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-blue-300/80 mb-2">
@@ -8859,32 +8861,8 @@ ${description || ""}`;
                 </span>
               </div>
             </div>
-
-            {/* Actions */}
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowAIImageModal(null)}
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => generateAIImage(showAIImageModal)}
-                disabled={
-                  (showAIImageModal === "thumbnail"
-                    ? !thumbnailPrompt.trim()
-                    : !bannerPrompt.trim()) ||
-                  generatingThumbnail ||
-                  generatingBanner ||
-                  (imageProvider === "openrouter" && !apiKeys.openRouterKey)
-                }
-                className="px-6 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-white/5 disabled:text-blue-300/50 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
-              >
-                🎨 Generate
-              </button>
-            </div>
           </div>
-        </div>
+        </FullScreenView>
       )}
 
       {/* AI Chat - Single instance handles both pinned drawer and modal modes */}

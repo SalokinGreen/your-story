@@ -4,6 +4,7 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { useAPIKeys, APIKeys } from "@/app/misc/APIKeysContext";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
+import FullScreenView from "@/app/components/FullScreenView";
 import {
   validateOCRFile,
   estimateOCRCostUSD,
@@ -2650,39 +2651,47 @@ export default function PDFImporter({
 
       {/* Modal */}
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-purple-600/30 flex items-center justify-center">
-                  <DynamicIcon
-                    name="FileUp"
-                    className="w-5 h-5 text-purple-300"
-                  />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">
-                    Import from PDF
-                  </h3>
-                  <p className="text-sm text-blue-300/60">
-                    Extract notes from RPG rulebooks & adventures
-                  </p>
-                </div>
-              </div>
+        <FullScreenView
+          title="Import from PDF"
+          subtitle="Extract notes from RPG rulebooks & adventures"
+          icon="FileUp"
+          className="z-60"
+          onClose={() => {
+            closeModal();
+            resetState();
+          }}
+          bodyClassName="p-4"
+          footer={
+            <div className="max-w-2xl mx-auto flex justify-end gap-3 p-4">
               <button
                 onClick={() => {
                   closeModal();
                   resetState();
                 }}
-                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
               >
-                <DynamicIcon name="X" className="w-5 h-5 text-blue-300/60" />
+                Cancel
+              </button>
+              <button
+                onClick={
+                  importMode === "link" ? processLinkImport : processFiles
+                }
+                disabled={
+                  (importMode === "link"
+                    ? !linkUrl.trim()
+                    : selectedFiles.length === 0) ||
+                  step !== "idle" ||
+                  (aiModel === "custom-model" && !customModelId.trim())
+                }
+                className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
+              >
+                <DynamicIcon name="Sparkles" className="w-4 h-4" />
+                Start Import
               </button>
             </div>
-
-            {/* Content */}
-            <div className="p-4 space-y-4">
+          }
+        >
+            <div className="max-w-2xl mx-auto space-y-4">
               {/* Interrupted Import Recovery Banner */}
               {interruptedImport && step === "idle" && (
                 <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg p-4">
@@ -3770,99 +3779,92 @@ export default function PDFImporter({
                 </>
               )}
             </div>
-
-            {/* Footer */}
-            <div className="flex justify-end gap-3 p-4 border-t border-white/10">
-              <button
-                onClick={() => {
-                  closeModal();
-                  resetState();
-                }}
-                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={
-                  importMode === "link" ? processLinkImport : processFiles
-                }
-                disabled={
-                  (importMode === "link"
-                    ? !linkUrl.trim()
-                    : selectedFiles.length === 0) ||
-                  step !== "idle" ||
-                  (aiModel === "custom-model" && !customModelId.trim())
-                }
-                className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
-              >
-                <DynamicIcon name="Sparkles" className="w-4 h-4" />
-                Start Import
-              </button>
-            </div>
-          </div>
-        </div>
+        </FullScreenView>
       )}
 
       {/* JSON Repair Modal - for manually fixing broken chunk output */}
       {repairModalOpen && repairChunkIndex !== null && repairFileIndex !== null && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-white/10">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
-                  <DynamicIcon
-                    name="Wrench"
-                    className="w-5 h-5 text-amber-400"
-                  />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-white">
-                    Fix JSON Output
-                  </h3>
-                  <p className="text-sm text-blue-300/60">
-                    {
-                      chunkStatuses.find(
-                        (cs) =>
-                          cs.fileIndex === repairFileIndex &&
-                          cs.chunkIndex === repairChunkIndex,
-                      )?.fileName
-                    }{" "}
-                    — Chunk {repairChunkIndex + 1}: Pages{" "}
-                    {
-                      chunkStatuses.find(
-                        (cs) =>
-                          cs.fileIndex === repairFileIndex &&
-                          cs.chunkIndex === repairChunkIndex,
-                      )?.pageStart
-                    }
-                    -
-                    {
-                      chunkStatuses.find(
-                        (cs) =>
-                          cs.fileIndex === repairFileIndex &&
-                          cs.chunkIndex === repairChunkIndex,
-                      )?.pageEnd
-                    }
-                  </p>
-                </div>
+        <FullScreenView
+          title="Fix JSON Output"
+          subtitle={`${
+            chunkStatuses.find(
+              (cs) =>
+                cs.fileIndex === repairFileIndex &&
+                cs.chunkIndex === repairChunkIndex,
+            )?.fileName
+          } — Chunk ${repairChunkIndex + 1}: Pages ${
+            chunkStatuses.find(
+              (cs) =>
+                cs.fileIndex === repairFileIndex &&
+                cs.chunkIndex === repairChunkIndex,
+            )?.pageStart
+          }-${
+            chunkStatuses.find(
+              (cs) =>
+                cs.fileIndex === repairFileIndex &&
+                cs.chunkIndex === repairChunkIndex,
+            )?.pageEnd
+          }`}
+          icon="Wrench"
+          className="z-70"
+          onClose={() => {
+            setRepairModalOpen(false);
+            setRepairChunkIndex(null);
+            setRepairFileIndex(null);
+            setRepairContent("");
+            setRepairError("");
+          }}
+          bodyClassName="p-0"
+          footer={
+            <div className="flex items-center justify-between p-4 bg-white/[0.03]">
+              <div className="text-xs text-blue-300/50">
+                Tip: Look for missing commas, unclosed brackets, or truncated
+                strings
               </div>
-              <button
-                onClick={() => {
-                  setRepairModalOpen(false);
-                  setRepairChunkIndex(null);
-                  setRepairFileIndex(null);
-                  setRepairContent("");
-                  setRepairError("");
-                }}
-                className="p-2 text-blue-300/60 hover:text-white transition-colors"
-              >
-                <DynamicIcon name="X" className="w-5 h-5" />
-              </button>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    try {
+                      JSON.parse(repairContent);
+                      addNotification("JSON is valid!", "success");
+                    } catch (e) {
+                      addNotification(
+                        `Invalid JSON: ${
+                          e instanceof Error ? e.message : "Parse error"
+                        }`,
+                        "warning",
+                      );
+                    }
+                  }}
+                  className="px-4 py-2 bg-white/10 hover:bg-white/10 text-blue-200 rounded-lg transition-colors"
+                >
+                  Validate
+                </button>
+                <button
+                  onClick={() => {
+                    setRepairModalOpen(false);
+                    setRepairChunkIndex(null);
+                    setRepairFileIndex(null);
+                    setRepairContent("");
+                    setRepairError("");
+                  }}
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleRepairSave(repairContent)}
+                  className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-colors"
+                >
+                  Save & Apply
+                </button>
+              </div>
             </div>
-
+          }
+        >
+          <div className="h-full flex flex-col">
             {/* Error message */}
-            <div className="px-4 py-2 bg-red-900/20 border-b border-red-700/30">
+            <div className="px-4 py-2 bg-red-900/20 border-b border-red-700/30 shrink-0">
               <p className="text-sm text-red-300">
                 <span className="font-semibold">Error:</span> {repairError}
               </p>
@@ -3924,54 +3926,8 @@ export default function PDFImporter({
                 spellCheck={false}
               />
             </div>
-
-            {/* Footer with actions */}
-            <div className="flex items-center justify-between p-4 border-t border-white/10 bg-white/[0.03]">
-              <div className="text-xs text-blue-300/50">
-                Tip: Look for missing commas, unclosed brackets, or truncated
-                strings
-              </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => {
-                    try {
-                      JSON.parse(repairContent);
-                      addNotification("JSON is valid!", "success");
-                    } catch (e) {
-                      addNotification(
-                        `Invalid JSON: ${
-                          e instanceof Error ? e.message : "Parse error"
-                        }`,
-                        "warning",
-                      );
-                    }
-                  }}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/10 text-blue-200 rounded-lg transition-colors"
-                >
-                  Validate
-                </button>
-                <button
-                  onClick={() => {
-                    setRepairModalOpen(false);
-                    setRepairChunkIndex(null);
-                    setRepairFileIndex(null);
-                    setRepairContent("");
-                    setRepairError("");
-                  }}
-                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={() => handleRepairSave(repairContent)}
-                  className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-colors"
-                >
-                  Save & Apply
-                </button>
-              </div>
-            </div>
           </div>
-        </div>
+        </FullScreenView>
       )}
     </>
   );

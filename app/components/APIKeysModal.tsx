@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { DynamicIcon } from "./DynamicIcon";
+import FullScreenView from "./FullScreenView";
 import AIConfigTab from "./AIConfigTab";
 import ArchitectureSettingsTab from "./ArchitectureSettingsTab";
 import CustomVoiceManager from "./CustomVoiceManager";
@@ -88,49 +89,15 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
 
   if (!isOpen || !mounted) return null;
 
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  };
-
   const modalContent = (
-    <div
-      className="fixed inset-0 z-100 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={handleBackdropClick}
-    >
-      <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 border border-white/10 w-full max-w-lg mx-4 max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className="shrink-0 px-6 py-4 border-b border-white/10 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-500/10 ring-1 ring-purple-400/20 rounded-lg">
-              <DynamicIcon
-                name="Settings"
-                className="w-5 h-5 text-purple-300"
-              />
-            </div>
-            <div>
-              <h2 className="text-lg font-semibold text-white">
-                Settings
-              </h2>
-              <p className="text-xs text-blue-300/60">
-                AI models and API keys
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-          >
-            <DynamicIcon
-              name="X"
-              className="w-5 h-5 text-blue-300/60"
-            />
-          </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex shrink-0 border-b border-white/10 px-6 overflow-x-auto">
+    <FullScreenView
+      title="Settings"
+      subtitle="AI models and API keys"
+      icon="Settings"
+      onClose={onClose}
+      className="z-100"
+      tabs={
+        <div className="flex px-3 sm:px-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab("config")}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
@@ -223,9 +190,9 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
             </span>
           </button>
         </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6">
+      }
+    >
+      <div className="max-w-lg mx-auto space-y-6">
           {!isLoaded ? (
             <div className="flex items-center justify-center py-8">
               <DynamicIcon
@@ -1002,9 +969,8 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
               </div>
             </>
           )}
-        </div>
       </div>
-    </div>
+    </FullScreenView>
   );
 
   // Use portal to render outside of any stacking context (like sticky header)

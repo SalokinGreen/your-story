@@ -4,6 +4,7 @@ import type { StoryData } from "@/app/misc/structs";
 import * as syncManager from "@/app/misc/syncManager";
 import * as storyManager from "@/app/misc/localStoryManager";
 import * as folderManager from "@/app/misc/localFolderManager";
+import * as notesManager from "@/app/misc/localNotesLibraryManager";
 
 class MemoryStorage {
   private map = new Map<string, string>();
@@ -117,6 +118,31 @@ class Device {
     this.activate();
     return folderManager.listLocalFolders();
   }
+  createNote(title: string, content: string) {
+    this.activate();
+    return notesManager.createLibraryNote({
+      title,
+      content,
+      type: "lore",
+      tags: [],
+      source: "manual",
+      relatedCharacters: [],
+      relatedLocations: [],
+      keys: [],
+    });
+  }
+  updateNote(id: string, updates: Partial<Omit<notesManager.LibraryNote, "id" | "createdAt">>) {
+    this.activate();
+    return notesManager.updateLibraryNote(id, updates);
+  }
+  deleteNote(id: string) {
+    this.activate();
+    return notesManager.deleteLibraryNote(id);
+  }
+  listNotes() {
+    this.activate();
+    return notesManager.listLibraryNotes();
+  }
   setSetting(key: string, value: string) {
     this.activate();
     localStorage.setItem(key, value);
@@ -131,8 +157,10 @@ beforeEach(() => {
   // syncManager/localFolderManager follow this codebase's SSR-safety
   // convention of gating browser-only storage access behind
   // `typeof window !== "undefined"` - stub it so that guard passes under
-  // Vitest's node test environment, same as the real browser runtime.
-  vi.stubGlobal("window", globalThis);
+  // Vitest's node test environment, same as the real browser runtime. Node's
+  // built-in EventTarget (not plain globalThis) gives syncAll()'s
+  // window.dispatchEvent(SYNC_COMPLETED_EVENT) something real to call.
+  vi.stubGlobal("window", new EventTarget());
   process.env.NEXT_PUBLIC_SYNC_API_URL = "https://fake-sync.example";
 });
 
@@ -222,6 +250,57 @@ describe("syncManager", () => {
     expect(c.listFolders().map((f) => f.name)).toEqual(["Keeper"]);
   });
 
+  it("doesn't let a passive pull's local write time shadow a genuinely newer offline edit from a third device", async () => {
+    installFakeServer();
+    const key = "test-key-passive-pull-timestamp";
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(0);
+      const a = new Device(key);
+      await a.saveStory("shared", makeStoryData("Original"));
+      await a.sync(); // pushes with the real edit timestamp, t=0
+
+      // C is offline and edits the same story at t=5 - a real, later edit -
+      // but doesn't sync yet, so nobody else knows about it.
+      vi.setSystemTime(5);
+      const c = new Device(key);
+      await c.saveStory("shared", makeStoryData("Edited by C"));
+
+      // B links up later, at t=10, and just pulls A's (still-current) copy.
+      // B makes no edit of its own - this is a passive sync.
+      vi.setSystemTime(10);
+      const b = new Device(key);
+      await b.sync();
+      expect((await b.getStory("shared"))?.storyData.story_name).toBe(
+        "Original",
+      );
+
+      // C comes online at t=20 and pushes its real t=5 edit.
+      vi.setSystemTime(20);
+      await c.sync();
+
+      // B syncs again at t=30. If B's earlier passive pull had stamped its
+      // local copy with t=10 (the pull time) instead of preserving the
+      // original t=0, B's untouched copy would incorrectly look newer than
+      // C's genuine t=5 edit and win the merge, silently discarding it (and
+      // pushing the stale content back over C's on the server).
+      vi.setSystemTime(30);
+      await b.sync();
+      expect((await b.getStory("shared"))?.storyData.story_name).toBe(
+        "Edited by C",
+      );
+
+      // A syncs too and must also converge on C's edit, not B's stale copy.
+      await a.sync();
+      expect((await a.getStory("shared"))?.storyData.story_name).toBe(
+        "Edited by C",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("resolves a same-item edit conflict by newest-updatedAt while an untouched sibling survives", async () => {
     installFakeServer();
     const key = "test-key-edit-conflict";
@@ -256,6 +335,67 @@ describe("syncManager", () => {
     expect(aOne?.storyData.story_name).toBe("Story One - Edited By B");
     const aTwo = await a.getStory("local_two");
     expect(aTwo?.storyData.story_name).toBe("Story Two");
+  });
+
+  it("keeps both devices' independently-created notes after syncing (no data loss)", async () => {
+    installFakeServer();
+    const key = "test-key-notes-concurrent-create";
+
+    const a = new Device(key);
+    await a.createNote("From A", "Note content A");
+    await a.sync();
+
+    const b = new Device(key);
+    await b.createNote("From B", "Note content B");
+    await b.sync();
+    expect((await b.listNotes()).map((n) => n.title).sort()).toEqual([
+      "From A",
+      "From B",
+    ]);
+
+    await a.sync();
+    expect((await a.listNotes()).map((n) => n.title).sort()).toEqual([
+      "From A",
+      "From B",
+    ]);
+  });
+
+  it("resolves a same-note edit conflict by newest-updatedAt and propagates note deletions", async () => {
+    installFakeServer();
+    const key = "test-key-notes-edit-conflict";
+
+    const a = new Device(key);
+    const note = await a.createNote("Shared Note", "Original content");
+    await a.createNote("Untouched Note", "Stays as-is");
+    await a.sync();
+
+    const b = new Device(key);
+    await b.sync(); // pulls both notes
+
+    await a.updateNote(note.id, { content: "Edited by A" });
+    await a.sync();
+
+    await new Promise((r) => setTimeout(r, 5));
+    await b.updateNote(note.id, { content: "Edited by B" });
+    await b.sync();
+
+    const bNotes = await b.listNotes();
+    expect(bNotes.find((n) => n.id === note.id)?.content).toBe("Edited by B");
+    expect(bNotes.find((n) => n.title === "Untouched Note")?.content).toBe(
+      "Stays as-is",
+    );
+
+    await a.sync();
+    const aNotes = await a.listNotes();
+    expect(aNotes.find((n) => n.id === note.id)?.content).toBe("Edited by B");
+
+    // B deletes the shared note; A should pick up the deletion.
+    await b.deleteNote(note.id);
+    await b.sync();
+    await a.sync();
+    expect((await a.listNotes()).map((n) => n.title)).toEqual([
+      "Untouched Note",
+    ]);
   });
 
   it("merges settings per key so two devices changing different keys both survive, and clearing a key propagates as a deletion", async () => {
