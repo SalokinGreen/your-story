@@ -458,6 +458,42 @@ describe("syncManager", () => {
     expect(b.getSetting("openRouterKey")).toBe("sk-device-b-local-key");
   });
 
+  it("pulls the newly-linked key's data even when this device already synced under a different key", async () => {
+    installFakeServer();
+    const keyA = "test-key-relink-source";
+    const keyB = "test-key-relink-old-local";
+
+    // Device A sets up sync under keyA and pushes a story. This is the
+    // "other device" the user wants to pull from.
+    const a = new Device(keyA);
+    await a.saveStory("from_a", makeStoryData("Story From A"));
+    await a.sync();
+
+    // Device B has its OWN prior sync history under a different key (keyB) -
+    // e.g. it generated its own key and synced before the user realized both
+    // devices must share one key. That prior sync stamped B's
+    // yourStory_lastSynced_* / syncedIds_* bookkeeping.
+    const b = new Device(keyB);
+    await b.saveStory("from_b", makeStoryData("Story From B"));
+    await b.sync();
+
+    // Now the user links B to A's key and hits Sync Now. B must actually
+    // pull A's data. Before the fix, B's stale last-sync timestamps (newer
+    // than keyA's server manifest) tripped the noop fast-path and B pulled
+    // nothing - the reported "I don't get anything from the other device".
+    b.activate();
+    syncManager.setSyncKey(keyA);
+    await b.sync();
+
+    expect((await b.getStory("from_a"))?.storyData.story_name).toBe(
+      "Story From A",
+    );
+    // B's own pre-existing story survives the relink (union, not a wipe).
+    expect((await b.getStory("from_b"))?.storyData.story_name).toBe(
+      "Story From B",
+    );
+  });
+
   it("reports noop when nothing changed since the last sync", async () => {
     installFakeServer();
     const key = "test-key-noop";
