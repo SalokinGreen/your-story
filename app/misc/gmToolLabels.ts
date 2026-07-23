@@ -23,6 +23,7 @@ const TOOL_LABELS: Record<string, string> = {
   read_notes: "Reading notes",
   search_notes: "Searching notes",
   search_memory: "Searching memory",
+  get_game_state: "Checking game state",
   create_note: "Creating a note",
   delete_note: "Deleting a note",
   edit_note: "Updating a note",

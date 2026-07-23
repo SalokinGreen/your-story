@@ -248,6 +248,26 @@ export interface SearchMemoryParams {
 }
 
 /**
+ * Get Game State - Re-read the current live *volatile* state during the GM
+ * turn. The state message injected at turn-start is a snapshot; once the GM
+ * starts calling tools (rolling, advancing combat, ticking timers) that
+ * snapshot goes stale. This lets the GM re-sync to the CURRENT state after
+ * its own mutations. Deliberately volatile-only - lore/NPC notes go through
+ * read_notes, memory through search_memory.
+ */
+export type GameStateSection =
+  | "challenge"
+  | "combat"
+  | "timers"
+  | "goals"
+  | "threads";
+
+export interface GetGameStateParams {
+  // Optional filter: return only these sections. Omit for all volatile state.
+  sections?: GameStateSection[];
+}
+
+/**
  * Respond to Player - TERMINAL TOOL that ends the GM stage loop
  * Called when all mechanics are resolved and ready to narrate
  */
@@ -590,6 +610,7 @@ export type GMToolParams =
   | { name: "roll_table"; params: RollTableParams }
   | { name: "read_notes"; params: ReadNotesParams }
   | { name: "search_memory"; params: SearchMemoryParams }
+  | { name: "get_game_state"; params: GetGameStateParams }
   | { name: "request_continuation"; params: RequestContinuationParams }
   | { name: "end_gm_thinking"; params: RespondToPlayerParams }
   // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
@@ -1463,6 +1484,52 @@ Example patterns:
         },
       },
       required: ["patterns"],
+    },
+  },
+};
+
+const getGameStateTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "get_game_state",
+    description: `Re-read the CURRENT live volatile game state during your turn.
+
+The game state shown at the start of your turn is a snapshot. Once you start
+calling tools that change state - resolving a challenge check, advancing a
+combat turn, ticking a timer, completing a goal - that snapshot is stale. Call
+this to see the state as it actually is RIGHT NOW, after your own changes.
+
+Returns only fast-changing ("volatile") state:
+- Active challenge: success/failure counts vs. what's needed to win/lose
+- Combat: round, whose turn it is, and each combatant's stats/conditions
+- Timers: remaining ticks and status
+- Goals: active, unfinished objectives
+- Threads: open plotlines
+
+WHEN TO USE:
+- Mid-combat, to confirm a combatant's current HP/conditions before deciding
+- After several rolls in a challenge, to check if it's now won or lost
+- Before narrating, to make sure you're describing the real current state
+
+For lore/NPC/location notes use read_notes; for past events use search_memory.
+This tool does NOT return those - only the live volatile state above.
+
+Example: get_game_state({}) for everything, or
+get_game_state({ sections: ["combat"] }) for just combat.`,
+    parameters: {
+      type: "object",
+      properties: {
+        sections: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["challenge", "combat", "timers", "goals", "threads"],
+          },
+          description:
+            "Optional. Return only these sections. Omit to get all volatile state.",
+        },
+      },
+      required: [],
     },
   },
 };
@@ -2392,6 +2459,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Note & memory lookup tools
   readNotesTool,
   searchMemoryTool,
+  getGameStateTool,
   requestContinuationTool,
   // Countdown timer tool (create/advance/toggle_pause/cancel/trigger via `action`)
   manageTimerTool,

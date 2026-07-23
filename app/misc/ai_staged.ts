@@ -1418,6 +1418,7 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Before NPC interactions**: Check if notes exist about that character
 - **When player asks about lore**: Search notes for relevant world info
 - Use \`search_notes\` when unsure what exists, \`read_notes\` when you know the title
+- Use \`get_game_state\` to re-check the CURRENT live volatile state (active challenge counts, combat HP/turn order, timers, goals, threads) after you've changed it this turn - the state shown above is a snapshot from turn-start and goes stale once you roll or advance combat
 
 ### Creating Records
 - **New enemy encountered without stats**: Create a note with their combat stats (HP, attacks, abilities)
@@ -1504,6 +1505,10 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     // Lookup
     "read_notes",
     "search_memory",
+    // Re-read current live volatile state (challenge/combat/timers/goals/
+    // threads) mid-turn, after the GM's own tool calls have mutated it - the
+    // injected state message is only a turn-start snapshot.
+    "get_game_state",
     // Flow control
     "start_challenge",
     "cancel_challenge",

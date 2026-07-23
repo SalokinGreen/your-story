@@ -42,6 +42,8 @@ import {
   RollTableParams,
   ReadNotesParams,
   SearchMemoryParams,
+  GetGameStateParams,
+  GameStateSection,
   RequestContinuationParams,
   RespondToPlayerParams,
   // Timer tools
@@ -143,6 +145,7 @@ export interface GMToolResult {
     | GMRollTableResult
     | GMReadNotesResult
     | GMSearchMemoryResult
+    | GMGetGameStateResult
     | GMRequestContinuationResult
     | GMEndGmThinkingResult
     | GMSetReasoningTierResult
@@ -372,6 +375,12 @@ export interface GMSearchMemoryResult {
   type: "search_memory";
   matchCount: number;
   totalMemories: number;
+}
+
+export interface GMGetGameStateResult {
+  type: "get_game_state";
+  sections: GameStateSection[]; // Which sections were included in the render
+  hasActiveState: boolean; // False when nothing volatile is currently active
 }
 
 export interface GMRequestContinuationResult {
@@ -971,6 +980,13 @@ export async function executeGMTools(
             params as SearchMemoryParams,
             modified,
             semanticContext
+          );
+          break;
+        case "get_game_state":
+          result = executeGetGameState(
+            call.id,
+            params as GetGameStateParams,
+            modified
           );
           break;
         case "request_continuation":
@@ -2916,6 +2932,148 @@ function executeReadNotes(
       readCount: foundNotes.length,
       titles: foundNotes.map((n) => n.title),
       notFoundTitles: notFoundTitles.length > 0 ? notFoundTitles : undefined,
+    },
+    contextForStory,
+  };
+}
+
+/**
+ * Execute get_game_state: render the CURRENT live volatile state so the GM
+ * can re-sync mid-turn after its own tool calls have mutated things (the
+ * state message injected at turn-start is only a snapshot). Deliberately
+ * volatile-only - lore/NPC notes are read_notes' job, memory is
+ * search_memory's. Pure and synchronous; reads storyData, mutates nothing.
+ */
+function executeGetGameState(
+  toolCallId: string,
+  params: GetGameStateParams,
+  storyData: StoryData
+): GMToolResult {
+  const ALL_SECTIONS: GameStateSection[] = [
+    "challenge",
+    "combat",
+    "timers",
+    "goals",
+    "threads",
+  ];
+  // Normalize the section filter: keep only recognized sections; an empty or
+  // missing filter means "all of them".
+  const requested =
+    params.sections && params.sections.length > 0
+      ? ALL_SECTIONS.filter((s) => params.sections!.includes(s))
+      : ALL_SECTIONS;
+
+  const blocks: string[] = [];
+  const includedSections: GameStateSection[] = [];
+
+  if (requested.includes("challenge")) {
+    const ch = storyData.activeChallenge;
+    if (ch && ch.active) {
+      const needWin = ch.requiredSuccesses ?? Math.ceil(ch.rounds / 2);
+      const needLose = ch.maxFailures ?? Math.ceil(ch.rounds / 2);
+      blocks.push(
+        `### ⚔️ Active Challenge: ${ch.name}\n` +
+          `- Successes: ${ch.currentSuccesses}/${needWin} needed to WIN\n` +
+          `- Failures: ${ch.currentFailures}/${needLose} needed to LOSE` +
+          (ch.description ? `\n- ${ch.description}` : "")
+      );
+      includedSections.push("challenge");
+    }
+  }
+
+  if (requested.includes("combat")) {
+    const combat = storyData.combatState;
+    if (combat && combat.active) {
+      const order =
+        combat.turnOrder && combat.turnOrder.length > 0
+          ? combat.turnOrder
+          : combat.combatants.map((c) => c.id);
+      const currentId = order[combat.currentTurnIndex];
+      const lines = order.map((id) => {
+        const c = combat.combatants.find((cb) => cb.id === id);
+        if (!c) return null;
+        const statStr =
+          Object.entries(c.stats)
+            .map(([k, v]) => `${k} ${v}`)
+            .join(", ") || "no stats";
+        const conds =
+          c.conditions && c.conditions.length > 0
+            ? ` [${c.conditions
+                .map((cond) =>
+                  cond.duration !== undefined
+                    ? `${cond.name} (${cond.duration})`
+                    : cond.name
+                )
+                .join(", ")}]`
+            : "";
+        const marker = id === currentId ? "▶ " : "  ";
+        const downed = c.isActive ? "" : " (out of combat)";
+        return `${marker}${c.name} [${c.type}]: ${statStr}${conds}${downed}`;
+      });
+      blocks.push(
+        `### 🗡️ Combat: ${combat.name || "in progress"} — Round ${combat.round}\n` +
+          `(▶ marks whose turn it is now)\n` +
+          lines.filter(Boolean).join("\n")
+      );
+      includedSections.push("combat");
+    }
+  }
+
+  if (requested.includes("timers")) {
+    const timers = (storyData.timers || []).filter(
+      (t) => t.status === "active" || t.status === "paused"
+    );
+    if (timers.length > 0) {
+      const lines = timers.map(
+        (t) =>
+          `- ${t.name}: ${t.currentTicks}/${t.totalTicks} ticks left${
+            t.status === "paused" ? " (paused)" : ""
+          }${t.description ? ` — ${t.description}` : ""}`
+      );
+      blocks.push(`### ⏳ Timers\n${lines.join("\n")}`);
+      includedSections.push("timers");
+    }
+  }
+
+  if (requested.includes("goals")) {
+    const goals = (storyData.goals || []).filter(
+      (g) => g.active && !g.fulfilled
+    );
+    if (goals.length > 0) {
+      const lines = goals.map(
+        (g) => `- ${g.title}: ${g.shortDescription || g.description}`
+      );
+      blocks.push(`### 🎯 Active Goals\n${lines.join("\n")}`);
+      includedSections.push("goals");
+    }
+  }
+
+  if (requested.includes("threads")) {
+    const threads = (storyData.threads || []).filter(
+      (t) => t.status === "active"
+    );
+    if (threads.length > 0) {
+      const lines = threads.map(
+        (t) => `- ${t.title}${t.priority ? ` (${t.priority})` : ""}`
+      );
+      blocks.push(`### 🧵 Open Threads\n${lines.join("\n")}`);
+      includedSections.push("threads");
+    }
+  }
+
+  const hasActiveState = blocks.length > 0;
+  const contextForStory = hasActiveState
+    ? `📋 CURRENT GAME STATE (live)\n\n${blocks.join("\n\n")}`
+    : `📋 CURRENT GAME STATE (live)\n\nNo active volatile state right now (no active challenge, combat, timers, goals, or threads for the requested sections). This is normal - not an error.`;
+
+  return {
+    toolName: "get_game_state",
+    toolCallId,
+    success: true,
+    result: {
+      type: "get_game_state",
+      sections: includedSections,
+      hasActiveState,
     },
     contextForStory,
   };
