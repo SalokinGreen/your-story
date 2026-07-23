@@ -11,6 +11,9 @@ import { PALETTE } from "@/app/story/menu/CouchPlayersEditor";
 interface JoinGameModalProps {
   isOpen: boolean;
   onClose: () => void;
+  // Prefilled from a shareable invite link (?join=CODE&provider=BACKEND).
+  initialCode?: string;
+  initialBackend?: MPBackend;
 }
 
 /**
@@ -20,13 +23,18 @@ interface JoinGameModalProps {
  * placeholder story and routes there with join params - see
  * createJoinPlaceholderStory() and the join-param effect in story/page.tsx.
  */
-export default function JoinGameModal({ isOpen, onClose }: JoinGameModalProps) {
+export default function JoinGameModal({
+  isOpen,
+  onClose,
+  initialCode,
+  initialBackend,
+}: JoinGameModalProps) {
   const router = useRouter();
   const { addNotification } = useNotification();
-  const [roomCode, setRoomCode] = useState("");
+  const [roomCode, setRoomCode] = useState(initialCode?.toUpperCase() ?? "");
   const [name, setName] = useState("Player");
   const [color, setColor] = useState(PALETTE[0]);
-  const [backend, setBackend] = useState<MPBackend>("torrent");
+  const [backend, setBackend] = useState<MPBackend>(initialBackend ?? "torrent");
   const [busy, setBusy] = useState(false);
 
   if (!isOpen) return null;

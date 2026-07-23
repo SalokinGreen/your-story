@@ -11,6 +11,7 @@ import { libraryNoteToStoryLore } from "../misc/localNotesLibraryManager";
 import { libraryTableToCustomTable } from "../misc/localTablesLibraryManager";
 import type { CustomTable, DiceMode, PlayerArchetype, StoryLore } from "../misc/structs";
 import type { FreeformPlayerSetup } from "../misc/localStoryManager";
+import type { MPBackend } from "../misc/multiplayer/types";
 import { ARCHETYPE_INFO } from "../misc/gmAdvice";
 
 // Same palette as CouchPlayersEditor so colors stay consistent across the app
@@ -28,7 +29,9 @@ const PALETTE = [
 const MAX_PLAYERS = 4;
 const MAX_PERSONALITY_TAGS = 4;
 
-const PERSONALITY_TAGS = [
+// Exported so the online-join profile creator (ProfilePickerModal) offers the
+// same personality/wish tags as the couch wizard.
+export const PERSONALITY_TAGS = [
   "Brave",
   "Cunning",
   "Curious",
@@ -47,7 +50,7 @@ const PERSONALITY_TAGS = [
   "Optimistic",
 ];
 
-const WISH_TAGS = [
+export const WISH_TAGS = [
   "Epic battles",
   "Deep roleplay",
   "Mystery & secrets",
@@ -99,6 +102,13 @@ type WizardStep = "count" | "player" | "ready";
  */
 export default function GuidedStoryStart() {
   const router = useRouter();
+  // Shareable invite link (?join=CODE[&provider=BACKEND]). Read from the URL in
+  // an effect rather than via useSearchParams so the statically-prerendered
+  // home page doesn't need a Suspense boundary / client bailout.
+  const [inviteCode, setInviteCode] = useState<string | undefined>(undefined);
+  const [inviteBackend, setInviteBackend] = useState<MPBackend | undefined>(
+    undefined,
+  );
   const [open, setOpen] = useState(false);
   const [step, setStep] = useState<WizardStep>("count");
   const [playerIndex, setPlayerIndex] = useState(0);
@@ -111,6 +121,10 @@ export default function GuidedStoryStart() {
   const [attachedTables, setAttachedTables] = useState<CustomTable[]>([]);
   const [diceMode, setDiceMode] = useState<DiceMode>("ai");
   const [showJoinGameModal, setShowJoinGameModal] = useState(false);
+  // "Play Online" path: you set up only your own profile and host a room others
+  // join over the internet (they build their own profiles on join), rather than
+  // seating a fixed couch party up front.
+  const [hostOnlineMode, setHostOnlineMode] = useState(false);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   const characterAttached = attachedLore.some(
@@ -127,6 +141,22 @@ export default function GuidedStoryStart() {
     }
   }, [open, step, playerIndex]);
 
+  // Parse a shareable invite link once on mount and, if present, open the join
+  // modal prefilled so a fresh visitor lands straight on the join screen.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("join");
+    if (!code) return;
+    const VALID_BACKENDS: MPBackend[] = ["torrent", "nostr", "mqtt", "peerjs"];
+    const raw = params.get("provider") ?? params.get("backend") ?? undefined;
+    setInviteCode(code);
+    setInviteBackend(
+      VALID_BACKENDS.includes(raw as MPBackend) ? (raw as MPBackend) : undefined,
+    );
+    setShowJoinGameModal(true);
+  }, []);
+
   const openWizard = () => {
     setStep("count");
     setPlayerIndex(0);
@@ -134,11 +164,22 @@ export default function GuidedStoryStart() {
     setAttachedLore([]);
     setAttachedTables([]);
     setDiceMode("ai");
+    setHostOnlineMode(false);
     setOpen(true);
   };
 
   const chooseCount = (count: number) => {
+    setHostOnlineMode(false);
     setPlayers(Array.from({ length: count }, (_, i) => makePlayer(i)));
+    setPlayerIndex(0);
+    setStep("player");
+  };
+
+  // Play Online: just you as host - set up your own profile, then open a room
+  // that others join over the internet (each builds their own profile on join).
+  const choosePlayOnline = () => {
+    setHostOnlineMode(true);
+    setPlayers([makePlayer(0)]);
     setPlayerIndex(0);
     setStep("player");
   };
@@ -243,6 +284,8 @@ export default function GuidedStoryStart() {
       <JoinGameModal
         isOpen={showJoinGameModal}
         onClose={() => setShowJoinGameModal(false)}
+        initialCode={inviteCode}
+        initialBackend={inviteBackend}
       />
 
       {/* Setup wizard modal */}
@@ -346,6 +389,22 @@ export default function GuidedStoryStart() {
                         </button>
                       ),
                     )}
+                  </div>
+
+                  {/* Play Online: host a room others join over the internet -
+                      you only set up your own profile; friends build theirs
+                      when they join. */}
+                  <div className="mt-3 pt-3 border-t border-white/10">
+                    <button
+                      onClick={choosePlayOnline}
+                      className="w-full p-4 rounded-xl bg-linear-to-r from-purple-600/20 to-indigo-600/20 hover:from-purple-600/30 hover:to-indigo-600/30 border border-purple-400/30 hover:border-purple-400/50 transition-all flex items-center justify-center gap-2.5 text-center"
+                    >
+                      <DynamicIcon name="Wifi" className="w-5 h-5 text-purple-300" />
+                      <span className="font-semibold text-white">Play Online</span>
+                      <span className="text-xs text-blue-300/60">
+                        Friends join over the internet
+                      </span>
+                    </button>
                   </div>
                 </div>
               )}
@@ -714,26 +773,41 @@ export default function GuidedStoryStart() {
                     </button>
                   </div>
 
-                  <button
-                    onClick={() => beginStory()}
-                    disabled={starting}
-                    className="w-full py-3.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white text-base font-semibold shadow-lg shadow-purple-950/40 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
-                  >
-                    <StaticIcon name="Sparkles" className="w-5 h-5" />
-                    {starting ? "Starting..." : "Begin Adventure"}
-                  </button>
-                  <button
-                    onClick={() => beginStory(true)}
-                    disabled={starting}
-                    className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 active:scale-[0.99] text-blue-200 text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
-                    title="Start this story and immediately open it as an online room others can join"
-                  >
-                    <DynamicIcon name="Wifi" className="w-4 h-4" />
-                    Host Online Game
-                  </button>
+                  {hostOnlineMode ? (
+                    <button
+                      onClick={() => beginStory(true)}
+                      disabled={starting}
+                      className="w-full py-3.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white text-base font-semibold shadow-lg shadow-purple-950/40 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                    >
+                      <DynamicIcon name="Wifi" className="w-5 h-5" />
+                      {starting ? "Starting..." : "Host Online Game"}
+                    </button>
+                  ) : (
+                    <>
+                      <button
+                        onClick={() => beginStory()}
+                        disabled={starting}
+                        className="w-full py-3.5 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] text-white text-base font-semibold shadow-lg shadow-purple-950/40 transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                      >
+                        <StaticIcon name="Sparkles" className="w-5 h-5" />
+                        {starting ? "Starting..." : "Begin Adventure"}
+                      </button>
+                      <button
+                        onClick={() => beginStory(true)}
+                        disabled={starting}
+                        className="w-full py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 active:scale-[0.99] text-blue-200 text-sm font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-60"
+                        title="Start this story and immediately open it as an online room others can join"
+                      >
+                        <DynamicIcon name="Wifi" className="w-4 h-4" />
+                        Host Online Game
+                      </button>
+                    </>
+                  )}
                   <p className="text-xs text-blue-300/40 text-center">
-                    The GM will ask what kind of world you want - then build
-                    it around {players.length > 1 ? "your party" : "you"}.
+                    {hostOnlineMode
+                      ? "You'll get a room code to share. Friends pick their own characters when they join."
+                      : "The GM will ask what kind of world you want - then build it around " +
+                        (players.length > 1 ? "your party." : "you.")}
                   </p>
                 </div>
               )}

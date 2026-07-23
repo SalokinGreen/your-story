@@ -65,6 +65,7 @@ import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import OOCChatPanel from "../components/OOCChatPanel";
 import TurnLobbyOverlay from "../components/TurnLobbyOverlay";
+import ProfilePickerModal from "../components/ProfilePickerModal";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
 import AskQuestionModal from "../components/AskQuestionModal";
@@ -587,6 +588,13 @@ function StoryPageContent() {
   // relayed audio chunks (see TTSControls relayMode). Guest ignores its own
   // TTS text pipeline when relaying.
   const ttsRelayRef = useRef<TTSRelayHandle | null>(null);
+  // Guest-only: profile picker shown right after connecting, before claiming a
+  // seat. `connecting` is true until the host's first snapshot (the saved-
+  // profile roster) lands.
+  const [profilePickerOpen, setProfilePickerOpen] = useState(false);
+  const [profilePickerConnecting, setProfilePickerConnecting] = useState(false);
+  const pendingJoinNameRef = useRef("Player");
+  const pendingJoinColorRef = useRef("#22c55e");
 
   // Networked P2P multiplayer (internet, not couch co-op - see
   // app/misc/multiplayer/session.ts). Host role runs generation locally as
@@ -692,27 +700,42 @@ function StoryPageContent() {
       setLoading(false);
       setLoadingStage(null);
       setStoryTextReady(true);
+      // First snapshot after connecting means the saved-profile roster is now
+      // available for the picker to show.
+      setProfilePickerConnecting(false);
     },
     onGuestJoined: (info) => {
       setStoryData((prev) => {
         if (!prev) return prev;
         const existingPlayers = prev.multiplayer?.couchPlayers ?? [];
-        if (existingPlayers.some((p) => p.id === info.localPlayerId)) {
-          addNotification(`${info.displayName} reconnected`, "success");
-          return prev; // reconnect - seat already exists
-        }
-        addNotification(`${info.displayName} joined the room`, "success");
-        const newPlayer: CouchPlayer = {
+        // Full profile the guest claimed (a saved one resumed, or newly made).
+        const claimed: CouchPlayer = {
           id: info.localPlayerId,
           name: info.displayName,
           color: info.color,
+          archetype: info.archetype ?? undefined,
+          personalityTags: info.personalityTags ?? undefined,
+          wishTags: info.wishTags ?? undefined,
         };
+        const idx = existingPlayers.findIndex((p) => p.id === info.localPlayerId);
+        if (idx >= 0) {
+          // Resuming a saved profile - refresh its fields (name/color/tags may
+          // have been edited on the joiner's side) rather than duplicating it.
+          addNotification(`${info.displayName} reconnected`, "success");
+          const merged = [...existingPlayers];
+          merged[idx] = { ...existingPlayers[idx], ...claimed };
+          return {
+            ...prev,
+            multiplayer: { ...prev.multiplayer, enabled: true, couchPlayers: merged },
+          };
+        }
+        addNotification(`${info.displayName} joined the room`, "success");
         return {
           ...prev,
           multiplayer: {
             ...prev.multiplayer,
             enabled: true,
-            couchPlayers: [...existingPlayers, newPlayer],
+            couchPlayers: [...existingPlayers, claimed],
           },
         };
       });
@@ -753,13 +776,28 @@ function StoryPageContent() {
     },
   });
 
-  // Guest's only link (the host) dropped - fall back to a normal local view
-  // rather than leaving the player stuck sending actions into the void.
+  // Guest's only link (the host) dropped. Rather than silently falling back to
+  // a local view, keep the session info and surface a reconnect banner (see
+  // below) so the player can re-join the same room once the host is back.
   useEffect(() => {
     if (!hostDisconnected) return;
-    addNotification("Host disconnected", "failure");
-    leaveNetRoom();
-  }, [hostDisconnected, addNotification, leaveNetRoom]);
+    addNotification("Host connection lost", "warning");
+  }, [hostDisconnected, addNotification]);
+
+  // Guest-only: re-join the same room (same code/backend, re-claiming the same
+  // profile) after the host dropped or timed out.
+  const handleGuestReconnect = async () => {
+    if (!netSession) return;
+    try {
+      await switchNetBackend(netSession.backend);
+      addNotification("Reconnected", "success");
+    } catch {
+      addNotification(
+        "Couldn't reconnect - the host may still be offline. Try again in a moment.",
+        "failure",
+      );
+    }
+  };
 
   // Give the host their own bubble too (Discord-call parity - guests get
   // one automatically via onGuestJoined above; the host doesn't send itself
@@ -1290,13 +1328,23 @@ function StoryPageContent() {
 
     if (joinCode && !autoJoinAttemptedRef.current && !netSession) {
       autoJoinAttemptedRef.current = true;
-      const backend = parseBackend(searchParams.get("joinBackend"));
+      // Backend can be given as either joinBackend or a shorter `provider`
+      // param (used in shareable invite links).
+      const backend = parseBackend(
+        searchParams.get("joinBackend") || searchParams.get("provider"),
+      );
       const name = searchParams.get("joinName") || "Player";
       const color = searchParams.get("joinColor") || "#22c55e";
+      pendingJoinNameRef.current = name;
+      pendingJoinColorRef.current = color;
       router.replace(`/story?storyId=${storyId}`);
-      setLoading(true);
+      // Connect first, then let the player pick/create a profile once the
+      // host's roster arrives (presence_join is deferred until they claim one).
+      setProfilePickerOpen(true);
+      setProfilePickerConnecting(true);
       joinNetRoom(backend, joinCode, name, color).catch((error) => {
-        setLoading(false);
+        setProfilePickerOpen(false);
+        setProfilePickerConnecting(false);
         addNotification(
           error instanceof Error ? error.message : "Failed to join room",
           "failure",
@@ -4655,6 +4703,58 @@ function StoryPageContent() {
             onPass={passThisRound}
           />
         )}
+        {/* Host timed out / dropped: let the guest re-join the same room
+            rather than being silently stranded. */}
+        {netSession?.role === "guest" && hostDisconnected && (
+          <div className="fixed inset-x-0 top-0 z-50 flex justify-center px-3 pt-[max(0.75rem,env(safe-area-inset-top))] pointer-events-none">
+            <div className="pointer-events-auto w-full max-w-md rounded-2xl bg-[#0d1829]/95 backdrop-blur-xl border border-amber-400/30 shadow-2xl shadow-black/50 p-4 flex items-center gap-3">
+              <DynamicIcon
+                name="WifiOff"
+                className="w-5 h-5 text-amber-300 shrink-0"
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-white">
+                  Lost connection to the host
+                </p>
+                <p className="text-xs text-blue-200/60">
+                  Reconnect to the same room, or leave to play on your own.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleGuestReconnect}
+                className="shrink-0 px-3 py-2 text-sm font-semibold rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white transition-all"
+              >
+                Reconnect
+              </button>
+              <button
+                type="button"
+                onClick={() => leaveNetRoom()}
+                className="shrink-0 px-3 py-2 text-sm font-semibold rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-blue-200 transition-colors"
+              >
+                Leave
+              </button>
+            </div>
+          </div>
+        )}
+        {/* Guest profile picker: pick a saved character or create one right
+            after connecting, before claiming a seat. */}
+        <ProfilePickerModal
+          isOpen={profilePickerOpen}
+          connecting={profilePickerConnecting}
+          savedProfiles={storyData?.multiplayer?.couchPlayers ?? []}
+          defaultName={pendingJoinNameRef.current}
+          defaultColor={pendingJoinColorRef.current}
+          onClaim={(profile) => {
+            announceNetProfile(profile);
+            setProfilePickerOpen(false);
+          }}
+          onCancel={() => {
+            setProfilePickerOpen(false);
+            leaveNetRoom();
+            router.push("/library");
+          }}
+        />
         {currentState === StoryState.CHARACTER_CREATION && (
           <CharacterCreationForm
             storyData={storyData}
@@ -4699,7 +4799,21 @@ function StoryPageContent() {
             netSession={netSession}
             netPeers={netPeers}
             onCreateNetRoom={createNetRoom}
-            onJoinNetRoom={joinNetRoom}
+            onJoinNetRoom={async (backend, roomId, name, color) => {
+              // Joining from the in-story Online Play editor: same deferred
+              // flow as the deep link - connect, then pick a profile.
+              pendingJoinNameRef.current = name;
+              pendingJoinColorRef.current = color;
+              setProfilePickerOpen(true);
+              setProfilePickerConnecting(true);
+              try {
+                await joinNetRoom(backend, roomId, name, color);
+              } catch (error) {
+                setProfilePickerOpen(false);
+                setProfilePickerConnecting(false);
+                throw error;
+              }
+            }}
             onLeaveNetRoom={leaveNetRoom}
             onSwitchNetBackend={switchNetBackend}
             autoOpenSection={autoOpenOnlineSection ? "online" : undefined}

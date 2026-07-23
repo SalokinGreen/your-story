@@ -104,9 +104,12 @@ export function useNetSession({
   const onFloorTakeRef = useRef(onFloorTake);
   const onFloorReleaseRef = useRef(onFloorRelease);
   // Latest storyData, so the host-peer-connected handler can push a current
-  // snapshot to a freshly-joined guest without re-subscribing.
+  // snapshot to a freshly-joined guest without re-subscribing. Synced in an
+  // effect (not during render) per React's rules on refs.
   const storyDataRef = useRef(storyData);
-  storyDataRef.current = storyData;
+  useEffect(() => {
+    storyDataRef.current = storyData;
+  }, [storyData]);
   useEffect(() => {
     onGuestActionRef.current = onGuestAction;
     onSnapshotRef.current = onSnapshot;
