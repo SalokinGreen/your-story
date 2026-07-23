@@ -1,12 +1,18 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { StoryData, MemoryEntry, ConsistencyWarning } from "../misc/structs";
+import {
+  StoryData,
+  MemoryEntry,
+  ConsistencyWarning,
+  ObserverFlag,
+} from "../misc/structs";
 import {
   buildGMStagePrompt,
   buildChoicesPrompt,
   ChatMessage,
 } from "../misc/ai_staged";
+import { buildObserverWarningNote } from "../misc/observer";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { getModelConfig } from "../misc/ai_prices";
 import {
@@ -149,12 +155,28 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
       loreEntries: storyData.lore.filter((l) => l.on !== false).length,
     });
 
+    // Mirror generateStoryTurn's carry-forward logic (generation.ts) exactly,
+    // so the previewed prompt below actually shows the "## OBSERVER
+    // FEEDBACK" / "## STORY PROGRESS CHECK-IN" / etc. blocks the GM would
+    // really receive next turn - these are never shown to the player
+    // in-story, so this viewer is the only place to see them at all.
+    const lastAssistantPartForNotes = [...storyData.scene.parts]
+      .reverse()
+      .find((p) => !p.user && p.role === "assistant");
+    const observerNoteForPrompt = buildObserverWarningNote(
+      lastAssistantPartForNotes?.observerFlags,
+    );
+
     // Build GM stage messages using the SAME function as generation.ts
     const gmPrompt = buildGMStagePrompt({
       storyData,
       userChoice,
       customMaxContext,
       modelName: gmModel,
+      observerNote: observerNoteForPrompt,
+      storyProgressNote: lastAssistantPartForNotes?.storyProgressNote,
+      repetitionNote: lastAssistantPartForNotes?.repetitionNote,
+      knowledgeNote: lastAssistantPartForNotes?.knowledgeNote,
     });
     const contextMessages = gmPrompt.messages;
     setMessages(contextMessages);
@@ -329,6 +351,11 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
     : null;
   const lastConsistencyWarnings: ConsistencyWarning[] =
     lastAssistantPart?.consistencyWarnings || [];
+  // Layer-5 observer flags that survived to the accepted turn (minor, or
+  // major but the reset budget ran out) - see observer.ts. A flag that
+  // triggered a reset/rewrite doesn't land here since that attempt was
+  // discarded/corrected before the turn was accepted.
+  const lastObserverFlags: ObserverFlag[] = lastAssistantPart?.observerFlags || [];
   const tierLadder = getEffectiveTiers();
 
   return (
@@ -843,6 +870,38 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                       .join(", ")}
                   </p>
                 )}
+                {(lastAssistantPart?.storyProgressNote ||
+                  lastAssistantPart?.repetitionNote ||
+                  lastAssistantPart?.knowledgeNote) && (
+                  <div className="mt-2 pt-2 border-t border-amber-400/10 space-y-1">
+                    <p className="font-semibold text-amber-300">
+                      Story Progress Observer check-in (GM-facing only -
+                      never shown to the player in-story; this is the same
+                      text folded into next turn&apos;s prompt under &quot;##
+                      STORY PROGRESS CHECK-IN&quot; etc. - see the prompt
+                      below):
+                    </p>
+                    {lastAssistantPart?.storyProgressNote && (
+                      <p>{lastAssistantPart.storyProgressNote}</p>
+                    )}
+                    {lastAssistantPart?.repetitionNote && (
+                      <p>
+                        <span className="text-amber-400/70">
+                          Repetition:
+                        </span>{" "}
+                        {lastAssistantPart.repetitionNote}
+                      </p>
+                    )}
+                    {lastAssistantPart?.knowledgeNote && (
+                      <p>
+                        <span className="text-amber-400/70">
+                          NPC knowledge:
+                        </span>{" "}
+                        {lastAssistantPart.knowledgeNote}
+                      </p>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -965,6 +1024,35 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                       </li>
                     ))}
                   </ul>
+                )}
+                <p>
+                  Observer flags (last turn):{" "}
+                  <strong>{lastObserverFlags.length}</strong>
+                </p>
+                {lastObserverFlags.length > 0 && (
+                  <ul className="list-disc list-inside space-y-0.5">
+                    {lastObserverFlags.map((f, i) => (
+                      <li key={i}>
+                        <span
+                          className={
+                            f.severity === "major"
+                              ? "text-red-300 font-semibold"
+                              : "text-rose-300/80"
+                          }
+                        >
+                          [{f.severity}] {f.type}
+                        </span>
+                        : {f.detail}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {lastObserverFlags.length === 0 && (
+                  <p className="italic text-rose-300/40">
+                    No survived flags - either the checks passed, or a major
+                    flag was fixed via reset/rewrite this turn (see Debug
+                    Logs for that history).
+                  </p>
                 )}
               </div>
             </div>

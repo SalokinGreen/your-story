@@ -819,6 +819,20 @@ export async function generateStoryTurn(
       flags = [];
     }
 
+    // Log every check result, not just the failure/reset paths below - this
+    // is the only record of a flag that never becomes a reset (minor
+    // severity, or a type with triggersReset off), which otherwise only
+    // ever reached the player as a toast and never showed up in Debug Logs.
+    if (flags.length > 0) {
+      logger.action("Observer: turn flagged", {
+        flags: flags.map((f) => ({
+          type: f.type,
+          severity: f.severity,
+          detail: f.detail,
+        })),
+      });
+    }
+
     // A flag only resets when it's both "major" severity (decided per-
     // instance by the check itself) AND that flag type's triggersReset is
     // on (decided by config - defaults to true for the three checks that
@@ -1059,6 +1073,18 @@ export async function generateStoryTurn(
           ...result.scenePart,
           knowledgeNote: progressResult.knowledgeNote,
         };
+      }
+      // Log the check-in itself (not just infra failures below) - this note
+      // is GM-facing only and never shown to the player, so Debug Logs is
+      // otherwise the only place to see it fired at all.
+      if (progressResult.ran) {
+        logger.action("Story progress observer: checked in", {
+          status: progressResult.status,
+          note: progressResult.note,
+          repeatedPhrases: progressResult.repeatedPhrases,
+          repetitionNote: progressResult.repetitionNote,
+          knowledgeNote: progressResult.knowledgeNote,
+        });
       }
     } catch (storyProgressError) {
       logger.action("Story progress observer failed, skipping (fail open)", {
