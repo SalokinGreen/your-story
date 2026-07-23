@@ -587,6 +587,15 @@ function StoryPageContent() {
   // Live GM streaming state - chronological thinking/tool/text blocks,
   // rendered inline (Claude-style) as they arrive - see turnTimeline.ts
   const [liveGMEntries, setLiveGMEntries] = useState<TimelineBlock[]>([]);
+  // Live narration text (see generation.ts:onLiveNarrationUpdate) - the
+  // player-visible prose accumulated so far this turn, updated as the GM
+  // stage streams it. Only meaningful while storyTextReady is false; once a
+  // turn finishes, storyText is the source of truth again (see Story's
+  // ttsText prop below). Lets TTS auto-narrate start speaking as narration
+  // is written instead of waiting for the whole GM stage (thinking + tool
+  // calls + narration) to finish, which is the only thing storyText itself
+  // reflects on the common path (GM's own final round writes the story).
+  const [liveNarrationText, setLiveNarrationText] = useState("");
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
   // Deep-link auto-host: opens the Menu tab's Story Editor straight to the
@@ -1506,6 +1515,7 @@ function StoryPageContent() {
           onGMStageStart: () => {
             setLoadingStage("gm");
             setLiveGMEntries([]);
+            setLiveNarrationText("");
             logger.action("GM stage started (custom input)");
           },
           onAskForRoll: requestManualRoll,
@@ -1521,6 +1531,9 @@ function StoryPageContent() {
             logger.action("Story history compacted", {
               summaryLength: summary.length,
             });
+          },
+          onLiveNarrationUpdate: (visibleTextSoFar) => {
+            setLiveNarrationText(visibleTextSoFar);
           },
           onGMContent: (delta, fullContent) => {
             // Re-parse the current round's buffer into thinking/text blocks
@@ -2007,6 +2020,7 @@ function StoryPageContent() {
             setLoadingStage("gm");
             // Reset live GM entries for new generation
             setLiveGMEntries([]);
+            setLiveNarrationText("");
             logger.action("GM stage started - determining mechanics");
           },
           onAskForRoll: requestManualRoll,
@@ -2022,6 +2036,9 @@ function StoryPageContent() {
             logger.action("Story history compacted", {
               summaryLength: summary.length,
             });
+          },
+          onLiveNarrationUpdate: (visibleTextSoFar) => {
+            setLiveNarrationText(visibleTextSoFar);
           },
           onGMContent: (delta, fullContent) => {
             // Re-parse the current round's buffer into thinking/text blocks
@@ -2851,8 +2868,13 @@ function StoryPageContent() {
     // This retry path skips the GM stage entirely (reuses saved context),
     // so nothing will reset liveGMEntries the way onGMStageStart normally
     // does - clear it here so a stale timeline from a previous turn can't
-    // linger into this one.
+    // linger into this one. Same for liveNarrationText: retry never fires
+    // onLiveNarrationUpdate (no GM round loop to fire it), but Story's
+    // ttsText prop still prefers it over storyText while storyTextReady is
+    // false - a stale value from an earlier inline-narrated turn would
+    // otherwise shadow the storyText this path streams normally.
     setLiveGMEntries([]);
+    setLiveNarrationText("");
 
     // Re-add the user choice part before generation (matching normal flow)
     // The prompt builder will deduplicate this when building the context
@@ -3927,6 +3949,7 @@ function StoryPageContent() {
             onOpenNote={handleOpenNote}
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
+            liveNarrationText={liveNarrationText}
             myPlayerId={netSession ? netSession.myLocalPlayerId : undefined}
             remoteActivity={netActivity}
             onLocalActivity={sendNetActivity}
