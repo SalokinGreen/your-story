@@ -336,7 +336,28 @@ export const GM_ADVICE_TIPS: GMAdviceTip[] = [
   { id: 232, category: "craft", context: "any", text: "Reward clever play and roleplay with tangible story payoff, not just a line of acknowledgment." },
   { id: 233, category: "craft", context: "any", text: "Deliver exposition only as the player pulls on it - answer what they ask, not everything you happen to know." },
   { id: 234, category: "craft", context: "any", text: "When in doubt, make the player's last action matter - react to it visibly rather than moving on as if it never happened." },
+
+  // --- Oracle & Randomness (fighting the pull toward safe, predictable outcomes) ---
+  { id: 235, category: "oracle", context: "any", text: "Before deciding an unresolved world fact or a hidden NPC reaction yourself, ask fate_question with an honestly calibrated likelihood instead of defaulting to whatever feels safe or pleasant." },
+  { id: 236, category: "oracle", context: "any", text: "Don't default fate_question to 50/50 out of habit - actually weigh what you believe the odds are and pick Very Unlikely/Unlikely or Very Likely/Likely accordingly." },
+  { id: 237, category: "oracle", context: "any", text: "Use roll_table (or a quick custom table) to generate encounters, complications, or NPC reactions instead of always picking the option that feels nicest." },
+  { id: 238, category: "oracle", context: "any", text: "When you notice yourself steering every outcome toward what pleases the player, that's the moment to hand the decision to the oracle instead." },
+  { id: 239, category: "oracle", context: "any", text: "Treat an Exceptional Yes or Exceptional No from fate_question as a mandate to swing the fiction hard, not a nudge to soften." },
+  { id: 240, category: "oracle", context: "any", text: "A high chaos factor means the world should behave unpredictably right now - let an oracle result introduce a twist you wouldn't have chosen yourself." },
+  { id: 241, category: "oracle", context: "any", text: "If the player asks \"is X true?\" and you don't already know, that's a fate_question, not a chance to invent the convenient answer." },
+  { id: 242, category: "oracle", context: "any", text: "Randomness is a check on your own bias toward tidy, agreeable stories - reach for the oracle or a table the moment you catch yourself smoothing over every rough edge." },
+  { id: 243, category: "oracle", context: "any", text: "Roll a table for minor improvised detail (a name, a rumor, a complication) rather than just going with the first idea that comes to mind." },
+  { id: 244, category: "oracle", context: "any", text: "An unfavorable oracle result is a gift, not a problem to write around - let it complicate the story exactly as rolled." },
 ];
+
+// Category that gets a guaranteed minimum appearance rate in the per-turn
+// picker (see ORACLE_MIN_FREQUENCY below) rather than relying on chance
+// alone to surface it as often as the other ~230 tips in the pool.
+const BOOSTED_CATEGORY = "oracle";
+// Force a tip from BOOSTED_CATEGORY into the pair at least this often, so
+// oracle/table usage gets reinforced every few turns instead of drifting to
+// the bottom of a large, evenly-rotated pool.
+const ORACLE_MIN_FREQUENCY = 3;
 
 // How many of the most recently shown tip ids to avoid repeating. Comfortably
 // smaller than the pool so variety holds up over a long campaign without
@@ -405,7 +426,17 @@ export function selectGMAdviceForTurn(
     : GM_ADVICE_TIPS.filter((t) => t.context === "any");
   if (pool.length === 0) return [];
   const s = Math.abs(Math.floor(seed));
-  const first = pool[s % pool.length];
+
+  // Every ORACLE_MIN_FREQUENCY turns, force one slot to be an oracle tip
+  // (cycling through just that subset) instead of leaving it to chance -
+  // otherwise a ~10-tip category inside a ~240-tip pool would only surface
+  // once every couple hundred turns.
+  const boostedPool = pool.filter((t) => t.category === BOOSTED_CATEGORY);
+  const forceBoosted =
+    boostedPool.length > 0 && s % ORACLE_MIN_FREQUENCY === 0;
+  const first = forceBoosted
+    ? boostedPool[Math.floor(s / ORACLE_MIN_FREQUENCY) % boostedPool.length]
+    : pool[s % pool.length];
   // Second index uses a coprime stride so it lands on a different tip than
   // `first` for essentially every seed, giving two distinct tips per turn.
   const second = pool[(s * 7 + 13) % pool.length];
