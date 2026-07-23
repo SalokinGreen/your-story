@@ -2885,23 +2885,6 @@ function StoryPageContent() {
   ) {
     if (!storyData) return;
 
-    // Snapshot full state before this turn's GM tool calls can mutate it,
-    // so handleUndo/handleRetry can restore mechanical state (not just pop
-    // scene.parts) if the player says "that's not what I meant." Pushed
-    // onto the bounded stack (persisted to IndexedDB) rather than a single
-    // slot, so undo/retry survive reloads and repeated use within a
-    // session. Best-effort: if the structure somehow isn't cloneable, the
-    // turn still proceeds, just without a fresh snapshot to undo/retry from.
-    try {
-      const snapshot = structuredClone(storyData);
-      undoStackRef.current = [...undoStackRef.current, snapshot].slice(
-        -MAX_UNDO_STACK_SIZE,
-      );
-      persistUndoStack();
-    } catch (snapshotError) {
-      console.error("Failed to snapshot pre-turn state for undo", snapshotError);
-    }
-
     let choice: Choice | undefined;
     if (actionChoice) {
       // Direct action from freeform mode
@@ -2927,7 +2910,9 @@ function StoryPageContent() {
     }
 
     // Host in a networked room: buffer the host's own pick and wait for the
-    // rest of the table instead of firing a turn immediately.
+    // rest of the table instead of firing a turn immediately. The undo
+    // snapshot is taken by the batched turn's handleCustomInput call, so we
+    // don't snapshot here (buffering isn't a turn).
     if (netSession?.role === "host") {
       recordSeatInput({
         playerId: netSession.myLocalPlayerId,
@@ -2937,6 +2922,21 @@ function StoryPageContent() {
         choiceIndex: key,
       });
       return;
+    }
+
+    // Local (single-player / couch) play generates here - snapshot full state
+    // before this turn's GM tool calls can mutate it, so handleUndo/handleRetry
+    // can restore mechanical state (not just pop scene.parts) if the player
+    // says "that's not what I meant." Best-effort: if the structure somehow
+    // isn't cloneable, the turn still proceeds without a fresh snapshot.
+    try {
+      const snapshot = structuredClone(storyData);
+      undoStackRef.current = [...undoStackRef.current, snapshot].slice(
+        -MAX_UNDO_STACK_SIZE,
+      );
+      persistUndoStack();
+    } catch (snapshotError) {
+      console.error("Failed to snapshot pre-turn state for undo", snapshotError);
     }
 
     logger.action("User selected choice", { choice: choice.text, index: key });
