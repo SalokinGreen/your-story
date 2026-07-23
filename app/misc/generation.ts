@@ -772,6 +772,7 @@ export async function generateStoryTurn(
     // judge. generateStoryTurnOnce throws rather than returning on failure,
     // so a successfully-returned result always has success: true here.
     if (!result.content.trim()) {
+      callbacks.onComplete?.(result);
       return result;
     }
 
@@ -1106,6 +1107,7 @@ export async function generateStoryTurn(
       });
     }
 
+    callbacks.onComplete?.(result);
     return result;
   }
 }
@@ -2712,7 +2714,15 @@ async function generateStoryTurnOnce(
       },
     };
 
-    callbacks.onComplete?.(result);
+    // onComplete is NOT fired here - this is one attempt inside
+    // generateStoryTurn's while loop, and the observer (observer.ts) still
+    // needs to review this attempt's narration and potentially rewrite or
+    // fully reset it before the turn is actually final. Firing onComplete
+    // this early made the UI (page.tsx) finalize/save/clear its loading
+    // state on the FLAGGED narration, so by the time onObserverRewrite fired
+    // afterward the "not final yet" warning had already vanished and the
+    // corrected text had nowhere left to land. generateStoryTurn calls
+    // onComplete itself, once, after the observer has had its say.
     return result;
   } catch (error: any) {
     logger.error("Generation failed", { error: error.message });
