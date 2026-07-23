@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Choice, Choices, StoryData } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
+import FullScreenView from "./FullScreenView";
 import { getLocalPlayerId } from "@/app/misc/localPlayerId";
 import {
   findStatMatch,
@@ -397,63 +398,69 @@ export default function ChoicesModal({
   if (!isOpen) return null;
 
   return (
-    <div
-      className={`fixed inset-0 z-50 flex justify-center ${
-        actionMode ? "items-start pt-4 sm:items-center sm:pt-0" : "items-center"
-      }`}
-    >
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl shadow-2xl shadow-black/50 border border-white/10 max-w-2xl w-full mx-4 max-h-[85vh] flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-white/10">
-          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+    <FullScreenView
+      title={actionMode ? "Your Action" : "Choose Your Path"}
+      icon={actionMode ? "PenLine" : "Compass"}
+      onClose={onClose}
+      headerActions={
+        onActionModeChange && (
+          <button
+            onClick={() => onActionModeChange(!actionMode)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              actionMode
+                ? "bg-purple-500/10 text-purple-300 border border-purple-400/20 hover:bg-purple-500/20"
+                : "bg-blue-500/10 text-blue-300 border border-blue-400/20 hover:bg-blue-500/20"
+            }`}
+            title={
+              actionMode ? "Switch to Choices" : "Switch to Freeform Actions"
+            }
+          >
             <DynamicIcon
-              name={actionMode ? "PenLine" : "Compass"}
-              className="w-5 h-5 text-blue-400"
+              name={actionMode ? "List" : "PenLine"}
+              className="w-3.5 h-3.5"
             />
-            {actionMode ? "Your Action" : "Choose Your Path"}
-          </h2>
-          <div className="flex items-center gap-2">
-            {/* Mode Toggle */}
-            {onActionModeChange && (
-              <button
-                onClick={() => onActionModeChange(!actionMode)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
-                  actionMode
-                    ? "bg-purple-500/10 text-purple-300 border border-purple-400/20 hover:bg-purple-500/20"
-                    : "bg-blue-500/10 text-blue-300 border border-blue-400/20 hover:bg-blue-500/20"
-                }`}
-                title={
-                  actionMode
-                    ? "Switch to Choices"
-                    : "Switch to Freeform Actions"
-                }
-              >
-                <DynamicIcon
-                  name={actionMode ? "List" : "PenLine"}
-                  className="w-3.5 h-3.5"
-                />
-                {actionMode ? "Choices" : "Freeform"}
-              </button>
-            )}
+            {actionMode ? "Choices" : "Freeform"}
+          </button>
+        )
+      }
+      bodyClassName="overscroll-contain p-4 sm:p-3"
+      footer={
+        <div className="max-w-2xl mx-auto p-3 space-y-2">
+          {/* Confirm Button - only for choice mode */}
+          {!actionMode && (
             <button
-              onClick={onClose}
-              className="p-2.5 sm:p-2 text-blue-200/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors touch-manipulation"
+              onClick={() => {
+                onConfirm(undefined);
+                onClose();
+              }}
+              disabled={!selectedChoice || loading}
+              className={`w-full py-3.5 sm:py-2.5 rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation ${
+                !selectedChoice || loading
+                  ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+                  : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 active:scale-[0.99] text-white shadow-md shadow-purple-950/40"
+              }`}
             >
-              <DynamicIcon name="X" className="w-5 h-5 sm:w-4 sm:h-4" />
+              {loading ? (
+                <>
+                  <DynamicIcon
+                    name="Loader2"
+                    className="w-4 h-4 animate-spin"
+                  />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <DynamicIcon name="Sparkles" className="w-4 h-4" />
+                  Continue Story
+                </>
+              )}
             </button>
-          </div>
+          )}
         </div>
-
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-3 space-y-2.5 sm:space-y-2">
-          {actionMode ? (
+      }
+    >
+      <div className="max-w-2xl mx-auto space-y-2.5 sm:space-y-2">
+      {actionMode ? (
             /* ACTION MODE */
             <div className="space-y-3">
               {multiplayerEnabled && (
@@ -824,42 +831,7 @@ export default function ChoicesModal({
               )}
             </>
           )}
-        </div>
-
-        {/* Footer with Confirm */}
-        <div className="p-3 border-t border-white/10 bg-white/[0.02] space-y-2">
-          {/* Confirm Button - only for choice mode */}
-          {!actionMode && (
-            <button
-              onClick={() => {
-                onConfirm(undefined);
-                onClose();
-              }}
-              disabled={!selectedChoice || loading}
-              className={`w-full py-3.5 sm:py-2.5 rounded-lg font-semibold transition-all duration-150 flex items-center justify-center gap-2 touch-manipulation ${
-                !selectedChoice || loading
-                  ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
-                  : "bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 active:scale-[0.99] text-white shadow-md shadow-purple-950/40"
-              }`}
-            >
-              {loading ? (
-                <>
-                  <DynamicIcon
-                    name="Loader2"
-                    className="w-4 h-4 animate-spin"
-                  />
-                  Generating...
-                </>
-              ) : (
-                <>
-                  <DynamicIcon name="Sparkles" className="w-4 h-4" />
-                  Continue Story
-                </>
-              )}
-            </button>
-          )}
-        </div>
       </div>
-    </div>
+    </FullScreenView>
   );
 }

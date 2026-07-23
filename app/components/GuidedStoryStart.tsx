@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { StaticIcon } from "./StaticIcon";
 import { DynamicIcon } from "./DynamicIcon";
+import FullScreenView from "./FullScreenView";
 import LibraryPickerModal from "./LibraryPickerModal";
 import JoinGameModal from "./JoinGameModal";
 import { libraryNoteToStoryLore } from "../misc/localNotesLibraryManager";
@@ -246,45 +247,32 @@ export default function GuidedStoryStart() {
 
       {/* Setup wizard modal */}
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-2xl w-full max-w-lg shadow-2xl shadow-black/50 max-h-[90vh] flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-              <div className="flex items-center gap-2 min-w-0">
-                {step !== "count" && (
-                  <button
-                    onClick={() => {
-                      if (step === "player") {
-                        backFromPlayer();
-                      } else {
-                        setPlayerIndex(Math.max(0, players.length - 1));
-                        setStep(players.length > 0 ? "player" : "count");
-                      }
-                    }}
-                    className="p-1.5 -ml-1.5 text-blue-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                    title="Back"
-                  >
-                    <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
-                  </button>
-                )}
-                <h3 className="text-base font-bold text-white truncate">
-                  {step === "count" && "Who's playing?"}
-                  {step === "player" &&
-                    (players.length > 1
-                      ? `Player ${playerIndex + 1} of ${players.length}`
-                      : "Your character")}
-                  {step === "ready" && "Ready to play"}
-                </h3>
-              </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="p-1.5 text-blue-300/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                title="Close"
-              >
-                <DynamicIcon name="X" className="w-4 h-4" />
-              </button>
-            </div>
-
+        <FullScreenView
+          title={
+            step === "count"
+              ? "Who's playing?"
+              : step === "player"
+                ? players.length > 1
+                  ? `Player ${playerIndex + 1} of ${players.length}`
+                  : "Your character"
+                : "Ready to play"
+          }
+          onClose={() => setOpen(false)}
+          onBack={
+            step !== "count"
+              ? () => {
+                  if (step === "player") {
+                    backFromPlayer();
+                  } else {
+                    setPlayerIndex(Math.max(0, players.length - 1));
+                    setStep(players.length > 0 ? "player" : "count");
+                  }
+                }
+              : undefined
+          }
+          bodyClassName="p-0"
+        >
+          <div className="max-w-lg mx-auto">
             {/* Progress dots */}
             <div className="flex items-center justify-center gap-1.5 pt-3">
               <span
@@ -318,7 +306,7 @@ export default function GuidedStoryStart() {
             </div>
 
             {/* Body */}
-            <div className="p-5 overflow-y-auto">
+            <div className="p-5">
               {step === "count" && (
                 <div>
                   <p className="text-sm text-blue-200/60 mb-4 text-center">
@@ -751,7 +739,7 @@ export default function GuidedStoryStart() {
               )}
             </div>
           </div>
-        </div>
+        </FullScreenView>
       )}
 
       <LibraryPickerModal

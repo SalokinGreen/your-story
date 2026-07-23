@@ -95,6 +95,7 @@ import { tickCooldowns } from "../misc/abilitySystem";
 import CharacterCreationForm from "./create-character/form";
 import { NPCReactionContainer } from "./NPCReactionToast";
 import { getSamplingSettings } from "../misc/samplingSettings";
+import { useViewportHeight } from "../misc/useViewportHeight";
 import { MAX_DICE_COUNT, MAX_DICE_SIDES } from "../misc/diceFormula";
 
 // Cryptographically secure random number generator
@@ -284,13 +285,9 @@ function StoryPageContent() {
     // time this effect runs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentState]);
-  // Real, JS-measured viewport height in px. Some mobile browsers (in
-  // particular embedded/in-app webviews) don't support the `dvh` unit and
-  // fall back to a stale `100vh` that ignores the address bar/toolbar,
-  // leaving a gap of bare body background below the game area. Measuring
-  // window.visualViewport (falling back to window.innerHeight) and applying
-  // it as an inline min-height is a more reliable fix than CSS units alone.
-  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  // Real, JS-measured viewport height in px - see useViewportHeight for why
+  // CSS units alone (`dvh`/`vh`) aren't reliable enough here.
+  const viewportHeight = useViewportHeight();
   // How tall the active tab's content area can be before it must scroll
   // internally, computed from where that area actually starts on screen
   // (below the tab bar) rather than guessed offsets. The Story tab uses
@@ -303,7 +300,6 @@ function StoryPageContent() {
   const contentWrapperRef = useRef<HTMLDivElement | null>(null);
   const updateHeights = useCallback(() => {
     const vh = window.visualViewport?.height ?? window.innerHeight;
-    setViewportHeight(vh);
     if (contentWrapperRef.current) {
       const top = contentWrapperRef.current.getBoundingClientRect().top;
       // Clamp to the visible viewport: if a mobile browser has scrolled the

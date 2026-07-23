@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { StaticIcon } from "./StaticIcon";
+import FullScreenView from "./FullScreenView";
 
 // Genre quick starts with AI-friendly descriptions
 const genres = [
@@ -160,28 +161,30 @@ export default function QuickStartGenres() {
 
       {/* Quick Start Modal */}
       {selectedGenre && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl shadow-black/50">
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-4">
-              <div
-                className={`w-12 h-12 rounded-full bg-linear-to-br ${selectedGenre.color} flex items-center justify-center`}
+        <FullScreenView
+          title={`${selectedGenre.name} Adventure`}
+          subtitle={selectedGenre.description}
+          icon={selectedGenre.icon}
+          onClose={() => setSelectedGenre(null)}
+          footer={
+            <div className="flex gap-3 p-4">
+              <button
+                onClick={() => setSelectedGenre(null)}
+                className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-colors"
               >
-                <StaticIcon
-                  name={selectedGenre.icon}
-                  className="w-6 h-6 text-white"
-                />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-white">
-                  {selectedGenre.name} Adventure
-                </h3>
-                <p className="text-sm text-blue-300/60">
-                  {selectedGenre.description}
-                </p>
-              </div>
+                Cancel
+              </button>
+              <button
+                onClick={handleGenerate}
+                className="flex-1 px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all font-medium flex items-center justify-center gap-2"
+              >
+                <StaticIcon name="Wand2" className="w-4 h-4" />
+                Generate Adventure
+              </button>
             </div>
-
+          }
+        >
+          <div className="max-w-lg mx-auto">
             {/* Prompt Input */}
             <div className="mb-4">
               <label className="block text-sm font-medium text-blue-200 mb-2">
@@ -271,24 +274,8 @@ export default function QuickStartGenres() {
               </div>
             </div>
 
-            {/* Buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setSelectedGenre(null)}
-                className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleGenerate}
-                className="flex-1 px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all font-medium flex items-center justify-center gap-2"
-              >
-                <StaticIcon name="Wand2" className="w-4 h-4" />
-                Generate Adventure
-              </button>
-            </div>
           </div>
-        </div>
+        </FullScreenView>
       )}
     </>
   );

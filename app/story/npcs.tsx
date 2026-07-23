@@ -3,6 +3,7 @@
 import { useState, useMemo } from "react";
 import { StoryData, NPC, NPCStatus, NPCAttitude } from "../misc/structs";
 import { DynamicIcon } from "../components/DynamicIcon";
+import FullScreenView from "../components/FullScreenView";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { preprocessMarkdown } from "../misc/markdownUtils";
@@ -792,26 +793,32 @@ export default function NPCsPage(props: NPCsPageProps) {
 
       {/* Add NPC Modal */}
       {isAddingNPC && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl border border-white/10 w-full max-w-lg shadow-2xl shadow-black/50 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-white/10 sticky top-0 bg-[#0d1829]/95 backdrop-blur-sm">
-              <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                <DynamicIcon
-                  name="UserPlus"
-                  className="w-5 h-5 text-emerald-400"
-                />
-                Add Character
-              </h3>
+        <FullScreenView
+          title="Add Character"
+          icon="UserPlus"
+          onClose={() => setIsAddingNPC(false)}
+          bodyClassName="p-4"
+          footer={
+            <div className="max-w-lg mx-auto flex justify-end gap-2 p-4">
               <button
                 onClick={() => setIsAddingNPC(false)}
-                className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                className="px-4 py-2 text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
               >
-                <DynamicIcon name="X" className="w-5 h-5 text-blue-300/60" />
+                Cancel
+              </button>
+              <button
+                onClick={handleAddNPC}
+                disabled={!newNPC.name}
+                className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-emerald-950/40 disabled:shadow-none transition-all flex items-center gap-2"
+              >
+                <DynamicIcon name="UserPlus" className="w-4 h-4" />
+                Add Character
               </button>
             </div>
-
-            <div className="p-4 space-y-4">
-              {/* Name */}
+          }
+        >
+          <div className="max-w-lg mx-auto space-y-4">
+          {/* Name */}
               <div>
                 <label className="block text-sm font-medium text-blue-200/70 mb-1">
                   Name *
@@ -942,26 +949,8 @@ export default function NPCsPage(props: NPCsPageProps) {
                   className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-emerald-500/40 focus:border-emerald-400/40 resize-none transition-colors"
                 />
               </div>
-            </div>
-
-            <div className="flex justify-end gap-2 p-4 border-t border-white/10 sticky bottom-0 bg-[#0d1829]/95 backdrop-blur-sm">
-              <button
-                onClick={() => setIsAddingNPC(false)}
-                className="px-4 py-2 text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddNPC}
-                disabled={!newNPC.name}
-                className="px-4 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:from-white/10 disabled:to-white/10 disabled:text-blue-300/40 text-white rounded-lg shadow-md shadow-emerald-950/40 disabled:shadow-none transition-all flex items-center gap-2"
-              >
-                <DynamicIcon name="UserPlus" className="w-4 h-4" />
-                Add Character
-              </button>
-            </div>
           </div>
-        </div>
+        </FullScreenView>
       )}
     </div>
   );
