@@ -15,6 +15,7 @@ import { OCRProcessRequestBody } from "@/app/misc/ocrCall";
 import { OCRSummarizeRequestBody } from "@/app/misc/ocrSummarizeCall";
 import { StoryLore, CustomTable } from "@/app/misc/structs";
 import { AI_MODELS } from "@/app/misc/ai_prices";
+import { mergeExtractedContent } from "@/app/misc/ocrMerge";
 import { PDFDocument } from "pdf-lib";
 import {
   LocalPDFImport,
@@ -33,8 +34,12 @@ import {
 
 // Maximum size per PDF chunk for Mistral OCR (in MB)
 const MAX_CHUNK_SIZE_MB = 4;
-// Pages per chunk (approximate, will be adjusted based on actual size)
-const PAGES_PER_CHUNK = 15;
+// Pages per chunk (approximate, will be adjusted based on actual size).
+// Bigger chunks mean a topic split across pages is less likely to land on a
+// chunk boundary (see ocrMerge.ts for the post-import cleanup pass that
+// handles the cases this doesn't prevent), but can't grow much further
+// without pushing into the OCR payload/summarize-prompt limits below.
+const PAGES_PER_CHUNK = 20;
 // Maximum concurrent requests - increased for faster processing
 const MAX_CONCURRENT_REQUESTS = 10;
 // Maximum concurrent OCR uploads while a chunk is being split. Each chunk
@@ -130,6 +135,7 @@ interface PDFImporterSettings {
   customModelId: string;
   customInstructions: string;
   maxOutputTokens: number;
+  mergeDuplicates: boolean;
 }
 
 const DEFAULT_PDF_IMPORTER_SETTINGS: PDFImporterSettings = {
@@ -138,6 +144,7 @@ const DEFAULT_PDF_IMPORTER_SETTINGS: PDFImporterSettings = {
   customModelId: "",
   customInstructions: "",
   maxOutputTokens: 16000,
+  mergeDuplicates: true,
 };
 
 const PDF_IMPORTER_SETTINGS_KEY = "pdfImporterSettings";
@@ -748,6 +755,13 @@ export default function PDFImporter({
   const [maxOutputTokens, setMaxOutputTokens] = useState(
     () => loadPDFImporterSettings().maxOutputTokens,
   );
+  // Post-import cleanup pass (see ocrMerge.ts) that merges lore/mechanic
+  // entries fragmented or duplicated across chunk boundaries. On by default;
+  // exposed as a toggle for users who want the raw per-chunk output
+  // untouched (e.g. before using the manual JSON-repair flow).
+  const [mergeDuplicates, setMergeDuplicates] = useState(
+    () => loadPDFImporterSettings().mergeDuplicates,
+  );
 
   // Persist the AI model + advanced options whenever they change, so they
   // survive closing/reopening the importer.
@@ -758,6 +772,7 @@ export default function PDFImporter({
       customModelId,
       customInstructions,
       maxOutputTokens,
+      mergeDuplicates,
     };
     try {
       localStorage.setItem(
@@ -773,6 +788,7 @@ export default function PDFImporter({
     customModelId,
     customInstructions,
     maxOutputTokens,
+    mergeDuplicates,
   ]);
 
   const resetPDFImporterSettings = useCallback(() => {
@@ -781,6 +797,7 @@ export default function PDFImporter({
     setCustomModelId(DEFAULT_PDF_IMPORTER_SETTINGS.customModelId);
     setCustomInstructions(DEFAULT_PDF_IMPORTER_SETTINGS.customInstructions);
     setMaxOutputTokens(DEFAULT_PDF_IMPORTER_SETTINGS.maxOutputTokens);
+    setMergeDuplicates(DEFAULT_PDF_IMPORTER_SETTINGS.mergeDuplicates);
     addNotification("Reset to default AI model and settings", "success");
   }, [addNotification]);
 
@@ -831,6 +848,30 @@ export default function PDFImporter({
     (): { model: string; provider: BYOKProvider } =>
       resolveModelSelection({ aiModel, customModelProvider, customModelId }),
     [aiModel, customModelId, customModelProvider],
+  );
+
+  // Post-import cleanup pass shared by every path that finishes an import
+  // (fresh, "complete with current results", and resumed) - merges entries
+  // fragmented/duplicated across chunk boundaries (see ocrMerge.ts). A no-op
+  // passthrough when the user has disabled it in Advanced Options.
+  const applyMergePass = useCallback(
+    async (
+      lore: StoryLore[],
+      mechanicNotes: StoryLore[],
+      customTables: CustomTable[],
+    ) => {
+      if (!mergeDuplicates) {
+        return { lore, mechanicNotes, customTables, mergedCount: 0 };
+      }
+      setStatusMessage("Merging duplicate entries...");
+      const { model, provider } = getSelectedModel();
+      return mergeExtractedContent(lore, mechanicNotes, customTables, {
+        model,
+        provider,
+        keys,
+      });
+    },
+    [mergeDuplicates, getSelectedModel, keys],
   );
 
   // Load saved imports from IndexedDB on mount
@@ -1185,7 +1226,7 @@ export default function PDFImporter({
   }, [chunkStatuses]);
 
   // Complete import with current chunk results (even if some failed)
-  const completeWithCurrentResults = useCallback(() => {
+  const completeWithCurrentResults = useCallback(async () => {
     const results = collectChunkResults();
     const completedCount = chunkStatuses.filter(
       (cs) => cs.status === "complete",
@@ -1203,10 +1244,16 @@ export default function PDFImporter({
       reason: cs.error || "Unknown error",
     }));
 
+    const merged = await applyMergePass(
+      results.lore,
+      results.mechanicNotes,
+      results.customTables,
+    );
+
     const importData = {
-      lore: results.lore,
-      mechanicNotes: results.mechanicNotes,
-      customTables: results.customTables,
+      lore: merged.lore,
+      mechanicNotes: merged.mechanicNotes,
+      customTables: merged.customTables,
       summary: `Imported ${completedCount} chunks (${failedCount} failed)`,
       failedPages,
     };
@@ -1225,11 +1272,12 @@ export default function PDFImporter({
     );
 
     const totalItems =
-      results.lore.length +
-      results.mechanicNotes.length +
-      results.customTables.length;
+      merged.lore.length + merged.mechanicNotes.length + merged.customTables.length;
     addNotification(
-      `Imported ${totalItems} items from ${completedCount} chunks (${failedCount} skipped)`,
+      `Imported ${totalItems} items from ${completedCount} chunks (${failedCount} skipped)` +
+        (merged.mergedCount > 0
+          ? ` · merged ${merged.mergedCount} duplicate entries`
+          : ""),
       failedCount > 0 ? "warning" : "success",
     );
 
@@ -1240,6 +1288,7 @@ export default function PDFImporter({
     collectChunkResults,
     chunkStatuses,
     selectedFiles,
+    applyMergePass,
     saveImport,
     onImportComplete,
     addNotification,
@@ -2060,16 +2109,22 @@ export default function PDFImporter({
         }
       }
 
-      // Step 4: Complete
+      // Step 4: Merge duplicate/fragmented entries, then complete
+      const merged = await applyMergePass(
+        allLore,
+        allMechanicNotes,
+        allCustomTables,
+      );
+
       setStep("complete");
       setStatusMessage("Import complete!");
       setProgress(100);
 
       // Prepare import data
       const importData = {
-        lore: allLore,
-        mechanicNotes: allMechanicNotes,
-        customTables: allCustomTables,
+        lore: merged.lore,
+        mechanicNotes: merged.mechanicNotes,
+        customTables: merged.customTables,
         summary: `Imported from ${totalFiles} file${totalFiles > 1 ? "s" : ""}`,
         failedPages: allFailedPages,
       };
@@ -2088,11 +2143,14 @@ export default function PDFImporter({
 
       // Show success notification
       const totalItems =
-        allLore.length + allMechanicNotes.length + allCustomTables.length;
+        merged.lore.length + merged.mechanicNotes.length + merged.customTables.length;
       addNotification(
         `Imported ${totalItems} items from ${totalPagesProcessed} pages across ${totalFiles} file${
           totalFiles > 1 ? "s" : ""
-        } (~$${estimateOCRCostUSD(totalPagesProcessed).toFixed(3)} in OCR costs, paid to your own API key)`,
+        } (~$${estimateOCRCostUSD(totalPagesProcessed).toFixed(3)} in OCR costs, paid to your own API key)` +
+          (merged.mergedCount > 0
+            ? ` · merged ${merged.mergedCount} duplicate entries`
+            : ""),
         "success",
       );
       if (allFailedPages.length > 0) {
@@ -2332,14 +2390,20 @@ export default function PDFImporter({
         settings,
       );
 
+      const merged = await applyMergePass(
+        chunkResult.lore,
+        chunkResult.mechanicNotes,
+        chunkResult.customTables,
+      );
+
       setStep("complete");
       setStatusMessage("Import complete!");
       setProgress(100);
 
       const importData = {
-        lore: chunkResult.lore,
-        mechanicNotes: chunkResult.mechanicNotes,
-        customTables: chunkResult.customTables,
+        lore: merged.lore,
+        mechanicNotes: merged.mechanicNotes,
+        customTables: merged.customTables,
         summary: `Resumed import from ${interruptedImport.fileName}`,
         failedPages: chunkResult.failedPages,
       };
@@ -2350,11 +2414,12 @@ export default function PDFImporter({
       setInterruptedImport(null);
 
       const totalItems =
-        chunkResult.lore.length +
-        chunkResult.mechanicNotes.length +
-        chunkResult.customTables.length;
+        merged.lore.length + merged.mechanicNotes.length + merged.customTables.length;
       addNotification(
-        `Resumed and imported ${totalItems} items from ${interruptedImport.fileName}`,
+        `Resumed and imported ${totalItems} items from ${interruptedImport.fileName}` +
+          (merged.mergedCount > 0
+            ? ` · merged ${merged.mergedCount} duplicate entries`
+            : ""),
         chunkResult.failedPages.length > 0 ? "warning" : "success",
       );
 
@@ -2379,6 +2444,7 @@ export default function PDFImporter({
     keys,
     addNotification,
     processChunkedRanges,
+    applyMergePass,
     onImportComplete,
     saveImport,
     closeModal,
@@ -3334,6 +3400,29 @@ export default function PDFImporter({
                             className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none"
                           />
                         </div>
+
+                        {/* Merge Duplicates Toggle */}
+                        <label className="flex items-start gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={mergeDuplicates}
+                            onChange={(e) =>
+                              setMergeDuplicates(e.target.checked)
+                            }
+                            className="mt-1 accent-purple-500"
+                          />
+                          <span className="text-sm">
+                            <span className="block font-semibold text-blue-200">
+                              Merge duplicate entries
+                            </span>
+                            <span className="block text-xs text-blue-300/60">
+                              After import, combine notes/tables that were
+                              split across chunk boundaries or extracted
+                              twice under different names. Disable to keep
+                              each chunk&apos;s raw output untouched.
+                            </span>
+                          </span>
+                        </label>
                       </div>
                     )}
                   </div>
