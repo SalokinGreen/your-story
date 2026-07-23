@@ -65,6 +65,15 @@ const isAutoGenerateEnabled = (): boolean => {
   return localStorage.getItem("ttsAutoGenerate") === "true";
 };
 
+// Formats a seconds count as m:ss for the seek bar's time readouts.
+const formatTime = (seconds: number): string => {
+  if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
+  const total = Math.floor(seconds);
+  const mins = Math.floor(total / 60);
+  const secs = total % 60;
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+};
+
 // A tiny (near-silent) WAV data URI used to "unlock" an <audio> element.
 // Browsers such as Safari/iOS only allow `play()` to succeed when it is
 // invoked synchronously inside a user-gesture handler; once an element has
@@ -209,11 +218,28 @@ export default function TTSControls({
   // stay the source of truth (see setCurrentChunkIndex below).
   const [chunkIndex, setChunkIndexState] = useState(0);
   const [chunkCount, setChunkCountState] = useState(0);
+  // Continuous-timeline state driving the scrubbable seek bar. The narration
+  // is really many independent per-sentence MP3 chunks, but we present them
+  // as one seekable track: `totalDuration` is the summed length of every
+  // chunk buffered so far (grows as more stream in), `globalTime` is the
+  // playhead's position across that whole timeline, and while the user is
+  // dragging the bar we show `dragTime` instead so the thumb tracks the
+  // pointer without committing a seek until release.
+  const [totalDuration, setTotalDuration] = useState(0);
+  const [globalTime, setGlobalTime] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragTime, setDragTime] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Object URLs for each chunk received so far, in order - populated
   // progressively as the stream arrives, and replayed from index 0 on
   // "Replay" without re-fetching.
   const audioUrlsRef = useRef<string[]>([]);
+  // Per-chunk duration in seconds, parallel to audioUrlsRef - filled in
+  // asynchronously as each chunk's metadata loads (see probeChunkDuration).
+  // An entry is 0 until its duration is known (or if it can't be read); the
+  // seek math tolerates that and self-corrects once the metadata lands.
+  const chunkDurationsRef = useRef<number[]>([]);
+  const seekBarRef = useRef<HTMLDivElement | null>(null);
   const currentChunkIndexRef = useRef<number>(0);
   // True once playback has run all the way to the end of the narration with
   // nothing left generating - distinguishes "finished, next Play should
@@ -225,6 +251,52 @@ export default function TTSControls({
     currentChunkIndexRef.current = index;
     setChunkIndexState(index);
   }, []);
+
+  // Recompute the total (summed) duration of every buffered chunk into state
+  // so the seek bar's length/labels update as durations resolve.
+  const recomputeTotalDuration = useCallback(() => {
+    const total = chunkDurationsRef.current.reduce(
+      (sum, d) => sum + (d > 0 ? d : 0),
+      0,
+    );
+    setTotalDuration(total);
+  }, []);
+
+  // Sum of the durations of every chunk *before* `index` - i.e. the global
+  // timeline offset at which chunk `index` begins. Reads the ref directly so
+  // it needs no re-render to stay correct.
+  const cumulativeBefore = useCallback((index: number): number => {
+    let acc = 0;
+    for (let i = 0; i < index; i++) acc += chunkDurationsRef.current[i] || 0;
+    return acc;
+  }, []);
+
+  // Load a chunk's duration off-screen (a throwaway metadata-only <audio>)
+  // and fold it into the timeline once known. `durationchange` catches the
+  // case where a duration first reports Infinity/NaN and is corrected later.
+  const probeChunkDuration = useCallback(
+    (index: number, url: string) => {
+      const probe = new Audio();
+      probe.preload = "metadata";
+      const record = () => {
+        const d = probe.duration;
+        if (Number.isFinite(d) && d > 0) {
+          chunkDurationsRef.current[index] = d;
+          recomputeTotalDuration();
+        }
+      };
+      probe.addEventListener("loadedmetadata", record);
+      probe.addEventListener("durationchange", record);
+      probe.addEventListener("error", () => {
+        // Leave the duration at 0 - the seek math treats unknown chunks as
+        // zero-length rather than breaking the whole timeline.
+        recomputeTotalDuration();
+      });
+      probe.src = url;
+    },
+    [recomputeTotalDuration],
+  );
+
   const isStreamingRef = useRef<boolean>(false);
   // True when playback has caught up to a chunk that hasn't arrived yet -
   // onChunkArrived plays it immediately once it lands.
@@ -332,13 +404,12 @@ export default function TTSControls({
   const advanceToNextChunkRef = useRef<() => void>(() => {});
 
   const playChunkAt = useCallback(
-    (index: number) => {
+    (index: number, offsetSeconds = 0) => {
       const url = audioUrlsRef.current[index];
       if (!url) return;
 
       const audio = getAudioElement();
       audio.volume = getVolume();
-      audio.src = url;
 
       audio.onended = () => advanceToNextChunkRef.current();
       audio.onerror = () => {
@@ -346,15 +417,40 @@ export default function TTSControls({
         setIsPlaying(false);
       };
 
-      audio.play().catch((err) => {
-        console.error("TTS playback error:", err);
-        // A rejected play() (e.g. the browser's autoplay policy blocking a
-        // call that isn't tied to a user gesture) leaves nothing actually
-        // audible - don't leave the button showing "Stop" for playback that
-        // never started. The audio is still cached (hasAudio/audioUrlsRef),
-        // so the next real click will play it as a genuine gesture instead.
-        setIsPlaying(false);
-      });
+      const startPlayback = () => {
+        audio.play().catch((err) => {
+          console.error("TTS playback error:", err);
+          // A rejected play() (e.g. the browser's autoplay policy blocking a
+          // call that isn't tied to a user gesture) leaves nothing actually
+          // audible - don't leave the button showing "Stop" for playback that
+          // never started. The audio is still cached (hasAudio/audioUrlsRef),
+          // so the next real click will play it as a genuine gesture instead.
+          setIsPlaying(false);
+        });
+      };
+
+      audio.src = url;
+
+      if (offsetSeconds > 0) {
+        // Seeking into the middle of a chunk: currentTime can only be set
+        // once the chunk's metadata is loaded, so defer the seek + play
+        // until then (guarded so a rapid re-seek that swapped src first
+        // doesn't get hijacked by a stale metadata event).
+        const onMeta = () => {
+          audio.removeEventListener("loadedmetadata", onMeta);
+          if (audio.src !== url) return;
+          try {
+            audio.currentTime = offsetSeconds;
+          } catch {
+            // Ignore - fall back to playing from the chunk start.
+          }
+          startPlayback();
+        };
+        audio.addEventListener("loadedmetadata", onMeta);
+        audio.load();
+      } else {
+        startPlayback();
+      }
     },
     [getAudioElement, addNotification],
   );
@@ -405,6 +501,137 @@ export default function TTSControls({
     skipToChunk(currentChunkIndexRef.current + 1);
   }, [skipToChunk]);
 
+  // Commit a scrub to an absolute position on the continuous timeline: find
+  // which buffered chunk that time falls in, then play it from the matching
+  // in-chunk offset. Clamped to what's actually buffered so far, so dragging
+  // past the streamed-in portion just lands at the latest available point.
+  const seekToGlobalTime = useCallback(
+    (targetSeconds: number) => {
+      const buffered = audioUrlsRef.current.length;
+      if (buffered === 0) return;
+
+      const durations = chunkDurationsRef.current;
+      const target = Math.max(0, targetSeconds);
+      let acc = 0;
+      let targetIndex = buffered - 1;
+      let offset = 0;
+
+      for (let i = 0; i < buffered; i++) {
+        const d = durations[i] || 0;
+        if (target < acc + d || i === buffered - 1) {
+          targetIndex = i;
+          // Keep a hair away from the very end of the chunk so playback
+          // doesn't instantly fire `ended` and skip the chunk.
+          offset = d > 0 ? Math.max(0, Math.min(target - acc, d - 0.05)) : 0;
+          break;
+        }
+        acc += d;
+      }
+
+      waitingForNextRef.current = false;
+      finishedRef.current = false;
+      playbackMutedRef.current = false;
+      setIsMuted(false);
+      setCurrentChunkIndex(targetIndex);
+      setGlobalTime(cumulativeBefore(targetIndex) + offset);
+      setIsPlaying(true);
+      playChunkAt(targetIndex, offset);
+    },
+    [playChunkAt, setCurrentChunkIndex, cumulativeBefore],
+  );
+
+  // Translate a pointer x-position over the seek bar into a timeline second.
+  const timeFromPointer = useCallback(
+    (clientX: number): number => {
+      const el = seekBarRef.current;
+      if (!el || totalDuration <= 0) return 0;
+      const rect = el.getBoundingClientRect();
+      const frac = (clientX - rect.left) / rect.width;
+      return Math.max(0, Math.min(1, frac)) * totalDuration;
+    },
+    [totalDuration],
+  );
+
+  // Pointer-driven scrubbing: while dragging we only move the visual thumb
+  // (dragTime) so we're not thrashing the <audio> src on every pixel; the
+  // actual seek is committed once on release. Pointer capture keeps the drag
+  // tracking even when the pointer leaves the (thin) bar.
+  const handleSeekPointerDown = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (totalDuration <= 0) return;
+      e.preventDefault();
+      const el = seekBarRef.current;
+      el?.setPointerCapture?.(e.pointerId);
+      setIsDragging(true);
+      setDragTime(timeFromPointer(e.clientX));
+    },
+    [totalDuration, timeFromPointer],
+  );
+
+  const handleSeekPointerMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDragging) return;
+      setDragTime(timeFromPointer(e.clientX));
+    },
+    [isDragging, timeFromPointer],
+  );
+
+  const handleSeekPointerUp = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!isDragging) return;
+      const el = seekBarRef.current;
+      el?.releasePointerCapture?.(e.pointerId);
+      const target = timeFromPointer(e.clientX);
+      setIsDragging(false);
+      seekToGlobalTime(target);
+    },
+    [isDragging, timeFromPointer, seekToGlobalTime],
+  );
+
+  // Keyboard scrubbing (bar is focusable and exposed as a slider): arrows
+  // nudge by 5s, Home/End jump to the ends.
+  const handleSeekKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLDivElement>) => {
+      if (totalDuration <= 0) return;
+      const current = cumulativeBefore(currentChunkIndexRef.current) +
+        (audioRef.current?.currentTime || 0);
+      let next: number | null = null;
+      if (e.key === "ArrowRight" || e.key === "ArrowUp") next = current + 5;
+      else if (e.key === "ArrowLeft" || e.key === "ArrowDown") next = current - 5;
+      else if (e.key === "Home") next = 0;
+      else if (e.key === "End") next = totalDuration;
+      if (next === null) return;
+      e.preventDefault();
+      seekToGlobalTime(Math.max(0, Math.min(next, totalDuration)));
+    },
+    [totalDuration, cumulativeBefore, seekToGlobalTime],
+  );
+
+  // Smoothly track the playhead across the timeline while playing. Reading
+  // the live element position each animation frame (rather than relying on
+  // the sparse `timeupdate` event) keeps the thumb gliding. We only push a
+  // new value into state when it moved enough to matter (~30ms) so we're not
+  // forcing a re-render on every single frame. Paused/dragging states
+  // intentionally freeze the displayed position.
+  useEffect(() => {
+    if (!isPlaying || isDragging) return;
+    let raf = 0;
+    let lastEmitted = -1;
+    const tick = () => {
+      const audio = audioRef.current;
+      if (audio) {
+        const t = cumulativeBefore(currentChunkIndexRef.current) + audio.currentTime;
+        if (Math.abs(t - lastEmitted) >= 0.03) {
+          lastEmitted = t;
+          setGlobalTime(t);
+        }
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [isPlaying, isDragging, cumulativeBefore]);
+
   // Called as each chunk finishes streaming in - whether from a single
   // whole-text generation or one of many live per-sentence requests, both
   // just append to the same ordered queue. Starts playback the moment the
@@ -418,6 +645,7 @@ export default function TTSControls({
       audioUrlsRef.current.push(url);
       const idx = audioUrlsRef.current.length - 1;
       setChunkCountState(audioUrlsRef.current.length);
+      probeChunkDuration(idx, url);
 
       if (idx === 0) {
         finishedRef.current = false;
@@ -436,7 +664,7 @@ export default function TTSControls({
         playChunkAt(idx);
       }
     },
-    [playChunkAt],
+    [playChunkAt, probeChunkDuration],
   );
 
   // Shared by both the manual "activate" path and the live narration
@@ -590,8 +818,13 @@ export default function TTSControls({
     }
     audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     audioUrlsRef.current = [];
+    chunkDurationsRef.current = [];
     setCurrentChunkIndex(0);
     setChunkCountState(0);
+    setTotalDuration(0);
+    setGlobalTime(0);
+    setDragTime(0);
+    setIsDragging(false);
     finishedRef.current = true;
     isStreamingRef.current = false;
     waitingForNextRef.current = false;
@@ -622,8 +855,10 @@ export default function TTSControls({
   const handleToggle = useCallback(async () => {
     if (isPlaying || isLoading) {
       if (audioRef.current) {
+        // Pause in place (don't rewind the chunk) so resume can pick up
+        // exactly where it left off - important now that the seek bar shows a
+        // continuous playhead the user expects Play to continue from.
         audioRef.current.pause();
-        audioRef.current.currentTime = 0;
       }
       setIsPlaying(false);
       setIsLoading(false);
@@ -662,8 +897,18 @@ export default function TTSControls({
     }
 
     if (hasAudio && audioUrlsRef.current.length > 0) {
-      // Paused mid-way -> resume at the current sentence; finished
-      // naturally -> Play restarts from the top, like a podcast player.
+      const audio = audioRef.current;
+      const currentUrl = audioUrlsRef.current[currentChunkIndexRef.current];
+      if (!finishedRef.current && audio && audio.src === currentUrl) {
+        // Paused mid-sentence: continue from the exact same spot rather than
+        // reloading the chunk and restarting the sentence.
+        waitingForNextRef.current = false;
+        setIsPlaying(true);
+        audio.play().catch(() => setIsPlaying(false));
+        return;
+      }
+      // Finished naturally -> Play restarts from the top, like a podcast
+      // player; otherwise resume at the start of the current sentence.
       const resumeIndex = finishedRef.current ? 0 : currentChunkIndexRef.current;
       setCurrentChunkIndex(resumeIndex);
       waitingForNextRef.current = false;
@@ -702,8 +947,11 @@ export default function TTSControls({
 
       audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       audioUrlsRef.current = [];
+      chunkDurationsRef.current = [];
       setChunkCountState(0);
       setCurrentChunkIndex(0);
+      setTotalDuration(0);
+      setGlobalTime(0);
       waitingForNextRef.current = false;
       isStreamingRef.current = true;
 
@@ -856,7 +1104,15 @@ export default function TTSControls({
   const buttonDisabled = (disabled || !text.trim()) && !isActive && !isMuted;
   const canSkipBack = hasController && chunkIndex > 0;
   const canSkipForward = hasController && chunkIndex < chunkCount - 1;
-  const progressPct = chunkCount > 0 ? ((chunkIndex + 1) / chunkCount) * 100 : 0;
+  // Scrub bar geometry: while dragging, follow the pointer (dragTime) so the
+  // thumb stays glued to the finger even though the seek only commits on
+  // release; otherwise follow the live playhead (globalTime).
+  const displayTime = isDragging ? dragTime : globalTime;
+  const seekPct =
+    totalDuration > 0
+      ? Math.max(0, Math.min(100, (displayTime / totalDuration) * 100))
+      : 0;
+  const seekable = totalDuration > 0;
 
   const centerTitle = isGeneratingOnly
     ? "Generating..."
@@ -889,7 +1145,7 @@ export default function TTSControls({
   }
 
   return (
-    <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full pl-1 pr-2.5 py-1">
+    <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full pl-1 pr-3 py-1 flex-1 min-w-0 max-w-[20rem] ml-2">
       <button
         onClick={handleSkipBack}
         disabled={!canSkipBack}
@@ -935,17 +1191,46 @@ export default function TTSControls({
         <DynamicIcon name="SkipForward" className="w-4 h-4" />
       </button>
 
-      {chunkCount > 1 && (
-        <div
-          className="w-10 h-1 rounded-full bg-white/10 overflow-hidden ml-0.5"
-          aria-hidden="true"
-        >
+      {/* Scrubbable timeline across the whole narration (all per-sentence
+          chunks stitched into one continuous track). Drag or click anywhere
+          to jump; the thumb only appears once there's a known duration. */}
+      <div
+        ref={seekBarRef}
+        onPointerDown={handleSeekPointerDown}
+        onPointerMove={handleSeekPointerMove}
+        onPointerUp={handleSeekPointerUp}
+        onPointerCancel={handleSeekPointerUp}
+        onKeyDown={handleSeekKeyDown}
+        role="slider"
+        aria-label="Seek narration"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(totalDuration)}
+        aria-valuenow={Math.round(displayTime)}
+        aria-valuetext={`${formatTime(displayTime)} of ${formatTime(totalDuration)}`}
+        tabIndex={seekable ? 0 : -1}
+        className={`group relative flex-1 min-w-[3rem] h-6 flex items-center touch-none select-none focus:outline-none ${
+          seekable ? "cursor-pointer" : "cursor-default"
+        }`}
+      >
+        <div className="w-full h-1.5 rounded-full bg-white/10 overflow-hidden">
           <div
-            className="h-full bg-purple-400/80 transition-[width]"
-            style={{ width: `${progressPct}%` }}
+            className={`h-full bg-purple-400/80 ${isDragging ? "" : "transition-[width] duration-75"}`}
+            style={{ width: `${seekPct}%` }}
           />
         </div>
-      )}
+        {seekable && (
+          <div
+            className={`absolute w-3 h-3 rounded-full bg-white shadow-md shadow-purple-950/40 ring-2 ring-purple-500/70 -translate-x-1/2 transition-transform ${
+              isDragging ? "scale-125" : "scale-0 group-hover:scale-100 group-focus:scale-100"
+            }`}
+            style={{ left: `${seekPct}%` }}
+          />
+        )}
+      </div>
+
+      <span className="shrink-0 text-[10px] leading-none tabular-nums text-blue-100/60 min-w-[4.5rem] text-right">
+        {formatTime(displayTime)} / {formatTime(totalDuration)}
+      </span>
     </div>
   );
 }
