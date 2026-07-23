@@ -52,14 +52,20 @@ A new `LoreType`, following the identical pattern to `mechanics` /
 
 - **Pinned**: loaded in full into the GM stage every turn (re-injection ⇒
   point 1 above).
-- **GM-stage only, never shown to player, never shown to the narrator.** The
-  plan contains future beats and hidden arc directions; leaking it to the
+- **Full text is GM-stage only and never shown to the narrator.** The plan
+  contains future beats and hidden candidate arc directions; leaking it to the
   narrator stage would spoil prose and re-introduce railroading through the
-  back door. Same visibility posture as `dm_instructions`.
-- **Repeatable** (like `character_sheet` already is): one campaign-spine plan,
-  plus optionally one arc plan per player in a co-op story. Practically, Phase
-  1 uses a single note with sections; the repeatable capacity is inherent to
-  the lore array and needs no extra work.
+  back door. A *redacted* projection is shown to the player — see "Player
+  visibility" below.
+- **One campaign-spine note, plus one arc note per player** (decided). The lore
+  array is already repeatable and `character_sheet` already carries an
+  `ownerCouchPlayerId` (`structs.ts:236`) to identify whose sheet is whose; the
+  per-player arc notes reuse that exact field so a co-op story can hold one arc
+  note per participant. Single-player is the common case: one spine note + one
+  arc note.
+- **Fixed beat names** (decided): the spine uses the fixed template below, not
+  GM-invented names. Consistency across campaigns beats bespoke naming, and it
+  gives the Phase 2 gate stable beat identifiers to key off.
 
 ### Structure / template
 
@@ -101,8 +107,69 @@ possibilities per character and lets play collapse them; it does not pick one
 and steer.
 
 The beats above are a light TTRPG reframing of a standard dramatic spine
-(story-circle / Save-the-Cat family). The point is a recognizable shape, not a
-rigid template — the GM adapts beat names to the adventure.
+(story-circle / Save-the-Cat family). The beat **names are fixed** (decided);
+the GM fills in each beat's content but does not rename the spine.
+
+## Player visibility
+
+The player *can* see the plan (decided) — but not all of it, because the full
+note contains future beats and the candidate arc directions the GM is weighing,
+and revealing those spoils the story and telegraphs the GM's hand. So player
+visibility is a **redacted projection**, not the raw note:
+
+| Part of the plan | Player sees | Rationale |
+|---|---|---|
+| Premise | ✅ yes | It's the pitch; no spoiler. |
+| Spine — completed + current beat (name only) | ✅ yes | A "campaign so far" sense of progress. |
+| Spine — future beats | ❌ no | Spoils the story. |
+| Current-beat checklist / advance-when | ❌ no | GM bookkeeping; telegraphs the seams. |
+| Own arc — current state + active hooks | ✅ yes (own only) | Reflects what they already know about their character. |
+| Own arc — candidate directions | ❌ no | These are possibilities the GM is holding open; showing them collapses the mystery. |
+| Another player's arc note | ❌ no | Each player sees only their own arc. |
+
+Mechanically this is three tiers, and the codebase already has the pieces:
+
+- **GM stage**: full plan text, pinned every turn.
+- **Narrator stage**: excluded (spoiler firewall), same as `dm_instructions`.
+- **Player UI**: a projection rendered in the story UI (e.g. a "Campaign"
+  panel) that pulls only the ✅ rows above. Per-player scoping reuses
+  `ownerCouchPlayerId`.
+
+The one thing to confirm: this redacted model, versus showing the whole note
+verbatim. I recommend the redaction — a fully-visible plan would spoil future
+beats and make the GM's candidate arcs feel like a menu. Flag if you'd rather
+ship it fully transparent.
+
+## Side beats (focus detours / side quests)
+
+A GM needs to be able to *pull focus off the main spine* for a while — a side
+quest, a character-focused detour, a self-contained episode — and then return.
+This is a **pacing/focus** action, distinct from an open plotline
+(`StoryThread`), so it gets its own explicit tool pair rather than being buried
+in `edit_note`:
+
+- **`open_side_beat({ title, goal, return_when, owner? })`** — creates a
+  `gm_plan` note tagged as a side beat (its own small checklist + a
+  `return_when` condition), and marks it the **active focus**. While a side
+  beat is active, the GM-stage injection foregrounds *it* as the current beat;
+  the main spine beat is shown as "paused, will resume." `owner` scopes a
+  character-focused detour to one player in co-op.
+- **`close_side_beat({ resolution })`** — resolves the side beat (records the
+  outcome) and returns focus to the paused main-spine beat.
+
+Focus is a small **stack**, not a boolean: opening a side beat pushes it,
+closing pops back to whatever was underneath (usually the main spine, but side
+beats can nest one level in practice). Phase 1 tracks the active side beat with
+a lightweight pointer on `StoryData` (e.g. `activeSideBeatTitle?: string`) so
+the prompt injection knows what to foreground; the enforcement stays
+prompt-driven like the rest of Phase 1. Side beats appear in the player-visible
+projection as the current focus (title + goal), same redaction rules as spine
+beats.
+
+Why a tool and not just a note: making focus-switching an explicit, tracked
+action is what lets the director and (later) the Phase 2 gate reason about "are
+we on a detour, and for how long" — and it stops side content from silently
+becoming the main story with no way back.
 
 ## Bootstrap sequencing (matches the user's original design)
 
@@ -142,11 +209,18 @@ lifecycle:
 
 - Add `gm_plan` to the `LoreType` union, the pinned-type lists, and the
   `create_note` enum.
-- Inject the pinned plan into `buildGMStagePrompt` alongside the
-  character-sheet/mechanics sections; **exclude it from the narrator stage**.
-- Add prompt guidance: create the plan at setup; only ever detail one beat
-  ahead; tick the checklist via `edit_note`; when the current beat's
-  advance-when condition is met, write the next beat before continuing.
+- Inject the pinned plan (spine + the active player's arc + any active side
+  beat) into `buildGMStagePrompt` alongside the character-sheet/mechanics
+  sections; **exclude it from the narrator stage**.
+- Render the redacted player projection in the story UI ("Campaign" panel),
+  scoped per player via `ownerCouchPlayerId`.
+- Add the `open_side_beat` / `close_side_beat` tool pair + `activeSideBeatTitle`
+  pointer on `StoryData`; foreground the active side beat in the injection.
+- Add prompt guidance: create the spine + per-player arc notes at setup; only
+  ever detail one beat ahead; tick the checklist via `edit_note`; when the
+  current beat's advance-when condition is met, write the next beat before
+  continuing; use `open_side_beat`/`close_side_beat` for detours rather than
+  quietly wandering off the spine.
 - Extend `freshStorySetupBlock` for the Session-0 creation step.
 
 This is contained and reversible, and it proves the concept. Its known
@@ -184,30 +258,46 @@ Following the repo's `tests/*.test.ts` + seeded-`Math.random` conventions:
 
 - `gm_plan` is recognized as a pinned type and injected into the GM prompt but
   **absent** from the narrator/story prompt (visibility regression).
+- The player-facing projection includes the ✅ rows and **excludes** future
+  beats, checklists, and candidate arc directions (redaction regression).
+- Per-player scoping: player A's projection excludes player B's arc note.
 - `create_note` accepts `type: "gm_plan"` and round-trips through
   `toolExecutor`.
+- `open_side_beat` sets `activeSideBeatTitle` and foregrounds the side beat in
+  the injection; `close_side_beat` clears it and restores the spine beat as
+  current focus.
 - `freshStorySetupBlock` guidance appears only when no plan exists.
 - A campaign-regression scenario (mirroring the existing one) that runs a few
-  turns and asserts the plan note is created and advanced across a beat
-  boundary, and that no future beat is written more than one ahead.
+  turns and asserts the plan notes are created and advanced across a beat
+  boundary, that no future beat is written more than one ahead, and that a
+  side beat opens and closes returning focus to the spine.
 
-## Open questions for review
+## Decisions locked
 
-1. **One note or several?** Phase 1 proposes a single sectioned note. Split
-   the per-player arc plans into their own `gm_plan` notes only if co-op
-   sessions make one note unwieldy — defer.
-2. **Beat vocabulary.** Fixed template names vs. GM-chosen beat names. Spec
-   leans toward a suggested-but-adaptable spine. Confirm.
-3. **Should the plan ever be player-visible** (an opt-in "campaign so far"
-   view)? Currently no — GM-only. Flag if that's desired later.
+- One campaign-spine note + **one arc note per player** (via `ownerCouchPlayerId`).
+- **Fixed** beat names.
+- **Player-visible** via a redacted projection (recommended), not the raw note.
+- A **side-beat tool pair** (`open_side_beat` / `close_side_beat`) for focus detours.
+
+## Open question remaining
+
+1. **Redacted projection vs. fully-transparent plan.** Spec recommends
+   redaction (hide future beats + candidate arc directions). Confirm, or say
+   you want the whole note shown verbatim.
 
 ## Phased implementation checklist (Phase 1)
 
 - [ ] `LoreType` union — `app/misc/structs.ts:159`
+- [ ] `activeSideBeatTitle?` on `StoryData` — `structs.ts`
 - [ ] Pinned-type list + `isPinnedNoteType` — `ai_staged.ts:388`
-- [ ] GM-stage injection block — `buildGMStagePrompt` (~`ai_staged.ts:1064`)
+- [ ] GM-stage injection: spine + active player's arc + active side beat —
+      `buildGMStagePrompt` (~`ai_staged.ts:1064`)
 - [ ] Exclude from narrator/story stage
+- [ ] Redacted player projection + "Campaign" panel in the story UI
 - [ ] `create_note` enum — `toolSchemas.ts:343`
+- [ ] `open_side_beat` / `close_side_beat` schemas (`toolSchemas.ts`) +
+      executors (`toolExecutor.ts`)
 - [ ] `freshStorySetupBlock` extension — `ai_staged.ts:1307`
-- [ ] Prompt guidance (create / one-beat-ahead / checklist / advance-when)
+- [ ] Prompt guidance (create spine + per-player arcs / one-beat-ahead /
+      checklist / advance-when / side beats)
 - [ ] Tests per above
