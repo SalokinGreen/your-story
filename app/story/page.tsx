@@ -1993,6 +1993,19 @@ function StoryPageContent() {
               );
             }
 
+            // Flags that the observer already fixed via a same-turn rewrite
+            // (see observer.ts's buildObserverCorrectionNote) - GM-facing
+            // only, never shown to the player, same posture as
+            // storyProgressNote/repetitionNote/knowledgeNote. Carried so the
+            // next turn's prompt still tells the GM a correction was needed
+            // here, even though this turn's own narration already reads clean.
+            if (lastIdx >= 0 && result.scenePart?.correctedObserverFlags?.length) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                correctedObserverFlags: result.scenePart.correctedObserverFlags,
+              };
+            }
+
             setCanRetry(true);
             setCanUndo(undoStackRef.current.length > 0);
             setLoadingStage(null);
@@ -3406,6 +3419,19 @@ function StoryPageContent() {
                 `GM response flagged: ${result.scenePart.observerFlags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
                 "warning",
               );
+            }
+
+            // Flags that the observer already fixed via a same-turn rewrite
+            // (see observer.ts's buildObserverCorrectionNote) - GM-facing
+            // only, never shown to the player, same posture as
+            // storyProgressNote/repetitionNote/knowledgeNote. Carried so the
+            // next turn's prompt still tells the GM a correction was needed
+            // here, even though this turn's own narration already reads clean.
+            if (lastIdx >= 0 && result.scenePart?.correctedObserverFlags?.length) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                correctedObserverFlags: result.scenePart.correctedObserverFlags,
+              };
             }
 
             setCanRetry(true);
