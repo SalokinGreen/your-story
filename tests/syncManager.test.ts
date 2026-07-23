@@ -494,6 +494,41 @@ describe("syncManager", () => {
     );
   });
 
+  it("self-heals a device stranded with stale pre-fix bookkeeping (no version marker)", async () => {
+    installFakeServer();
+    const key = "test-key-migration-selfheal";
+
+    // Device A publishes a story under the shared key.
+    const a = new Device(key);
+    await a.saveStory("shared_story", makeStoryData("From A"));
+    await a.sync();
+
+    // Device B represents a device configured *before* the reset fix: same
+    // key, but carrying stale bookkeeping (a lastSynced timestamp far in the
+    // future, an empty synced-id set) and - crucially - no sync-state version
+    // marker. Under the pre-migration code this stranded B in the noop
+    // fast-path forever: its lastSynced looked newer than the server
+    // manifest, so nothing was ever pulled, and the manual escape hatch
+    // (regenerate/re-link) was itself broken by the window.confirm bug.
+    const b = new Device(key);
+    b.activate();
+    localStorage.setItem(
+      "yourStory_lastSynced_stories",
+      "2999-01-01T00:00:00.000Z",
+    );
+    localStorage.setItem("yourStory_syncedIds_stories", "[]");
+    localStorage.removeItem("yourStory_syncStateVersion");
+
+    await b.sync();
+
+    // The one-time migration clears the stale bookkeeping so this sync does a
+    // clean full union and actually pulls A's story.
+    expect((await b.getStory("shared_story"))?.storyData.story_name).toBe(
+      "From A",
+    );
+    expect(localStorage.getItem("yourStory_syncStateVersion")).toBe("2");
+  });
+
   it("reports noop when nothing changed since the last sync", async () => {
     installFakeServer();
     const key = "test-key-noop";

@@ -55,6 +55,12 @@ const BUCKETS: SyncBucket[] = [
 const SYNC_KEY_STORAGE_KEY = "yourStory_syncKey";
 const LAST_SYNCED_PREFIX = "yourStory_lastSynced_";
 const SETTINGS_TIMESTAMPS_KEY = "yourStory_settingsValueTimestamps";
+// Bumped whenever a bug could have left stale per-bucket bookkeeping on
+// already-configured devices. On the first syncAll() after an upgrade,
+// migrateSyncStateIfNeeded() clears the bookkeeping once so those devices
+// aren't permanently stranded in the noop fast-path (see the migration).
+const SYNC_STATE_VERSION_KEY = "yourStory_syncStateVersion";
+const CURRENT_SYNC_STATE_VERSION = "2";
 
 function syncedIdsKey(bucket: SyncBucket): string {
   return `yourStory_syncedIds_${bucket}`;
@@ -94,6 +100,23 @@ function resetSyncState(): void {
     localStorage.removeItem(syncedIdsKey(bucket));
   }
   localStorage.removeItem(SETTINGS_TIMESTAMPS_KEY);
+}
+
+// resetSyncState() only fires when the *key* changes, so a device already
+// configured before that fix shipped keeps its stale bookkeeping and can stay
+// stuck in the noop fast-path (nothing ever pulls or pushes) - and the manual
+// escape hatch (regenerate / re-link / forget the key) was itself broken by
+// the window.confirm bug. This runs once per version bump on the next sync,
+// clearing the bookkeeping so the very next sync does a clean full union with
+// the server. It never touches the sync key or any actual story/setting data,
+// so it's safe to run on healthy devices too (they just do one full re-sync).
+function migrateSyncStateIfNeeded(): void {
+  if (typeof window === "undefined") return;
+  if (localStorage.getItem(SYNC_STATE_VERSION_KEY) === CURRENT_SYNC_STATE_VERSION) {
+    return;
+  }
+  resetSyncState();
+  localStorage.setItem(SYNC_STATE_VERSION_KEY, CURRENT_SYNC_STATE_VERSION);
 }
 
 export function generateSyncKey(): string {
@@ -596,6 +619,8 @@ export async function syncAll(): Promise<SyncResult[]> {
   const syncKey = getSyncKey();
   if (!syncKey) throw new Error("No sync key configured");
   if (!isSyncConfigured()) throw new Error("Sync API URL not configured");
+
+  migrateSyncStateIfNeeded();
 
   const manifest = await fetchManifest(syncKey);
 

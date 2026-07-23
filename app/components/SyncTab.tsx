@@ -77,6 +77,14 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
     Partial<Record<SyncBucket, string>>
   >({});
   const [lastResults, setLastResults] = useState<SyncResult[] | null>(null);
+  // In-app confirmation for the destructive key actions. Previously these
+  // used window.confirm(), which silently returns false (so the button does
+  // nothing) inside installed-PWA standalone mode and the Capacitor/Tauri
+  // native WebViews this app also ships as - see platformFetch.ts. A local
+  // state flag works in every shell.
+  const [pendingConfirm, setPendingConfirm] = useState<
+    null | "regenerate" | "forget"
+  >(null);
 
   useEffect(() => {
     setConfigured(isSyncConfigured());
@@ -84,20 +92,23 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
     setLastSynced(getLastSyncedTimes());
   }, []);
 
-  const handleGenerate = () => {
-    if (
-      syncKey &&
-      !window.confirm(
-        "Generate a new sync key? Any other device still using the current key will stop syncing until you re-link it with the new key."
-      )
-    ) {
-      return;
-    }
+  const performGenerate = () => {
     const key = generateSyncKey();
     setSyncKeyState(key);
     setRevealed(true);
     setLastResults(null);
+    setPendingConfirm(null);
     addNotification("New sync key generated.", "success");
+  };
+
+  // First-time generation (no key yet) needs no confirmation; regenerating an
+  // existing key does, since it orphans other devices until they re-link.
+  const handleGenerate = () => {
+    if (syncKey) {
+      setPendingConfirm("regenerate");
+      return;
+    }
+    performGenerate();
   };
 
   const handleLink = () => {
@@ -107,23 +118,18 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
     setSyncKeyState(trimmed);
     setLinkInput("");
     setLastResults(null);
+    setPendingConfirm(null);
     addNotification(
       "Sync key linked. Hit \"Sync Now\" to pull this device's data.",
       "success"
     );
   };
 
-  const handleForget = () => {
-    if (
-      !window.confirm(
-        "Remove the sync key from this device? Your local data stays put, but this device will stop syncing until you link a key again."
-      )
-    ) {
-      return;
-    }
+  const performForget = () => {
     clearSyncKey();
     setSyncKeyState(null);
     setLastResults(null);
+    setPendingConfirm(null);
   };
 
   const handleCopy = async () => {
@@ -224,12 +230,41 @@ export default function SyncTab({ addNotification }: SyncTabProps) {
                 Generate new key
               </button>
               <button
-                onClick={handleForget}
+                onClick={() => setPendingConfirm("forget")}
                 className="text-xs text-red-400 hover:text-red-300"
               >
                 Remove from this device
               </button>
             </div>
+            {pendingConfirm && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg space-y-2">
+                <p className="text-xs text-amber-200/90">
+                  {pendingConfirm === "regenerate"
+                    ? "Generate a new sync key? Any other device still using the current key will stop syncing until you re-link it with the new key."
+                    : "Remove the sync key from this device? Your local data stays put, but this device will stop syncing until you link a key again."}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={
+                      pendingConfirm === "regenerate"
+                        ? performGenerate
+                        : performForget
+                    }
+                    className="px-3 py-1.5 bg-red-500/80 hover:bg-red-500 text-white text-xs font-medium rounded-lg"
+                  >
+                    {pendingConfirm === "regenerate"
+                      ? "Generate new key"
+                      : "Remove"}
+                  </button>
+                  <button
+                    onClick={() => setPendingConfirm(null)}
+                    className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white text-xs font-medium rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         ) : (
           <button
