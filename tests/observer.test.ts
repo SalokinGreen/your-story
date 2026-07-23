@@ -17,6 +17,7 @@ import {
   checkTierEscalation,
   runObserver,
   buildObserverWarningNote,
+  buildObserverCorrectionNote,
   rewriteFlaggedNarration,
   settingsFor,
   DEFAULT_OBSERVER_SETTINGS,
@@ -1037,6 +1038,38 @@ describe("buildObserverWarningNote", () => {
     const note = buildObserverWarningNote([
       flag({ detail: "First issue." }),
       flag({ type: "missing_oracle_or_table", detail: "Second issue." }),
+    ]);
+    expect(note).toContain("First issue.");
+    expect(note).toContain("Second issue.");
+  });
+});
+
+describe("buildObserverCorrectionNote", () => {
+  function flag(overrides: Partial<ObserverFlag> = {}): ObserverFlag {
+    return {
+      type: "response_length",
+      severity: "major",
+      detail: "This turn ran 900 words, well past the ceiling.",
+      correctivePrompt: "unused for this note",
+      ...overrides,
+    };
+  }
+
+  it("returns undefined when there are no corrected flags", () => {
+    expect(buildObserverCorrectionNote(undefined)).toBeUndefined();
+    expect(buildObserverCorrectionNote([])).toBeUndefined();
+  });
+
+  it("builds a correction note from a single fixed flag's detail", () => {
+    const note = buildObserverCorrectionNote([flag()]);
+    expect(note).toContain("corrected by the observer");
+    expect(note).toContain("This turn ran 900 words, well past the ceiling.");
+  });
+
+  it("lists every corrected flag's detail, not just the first", () => {
+    const note = buildObserverCorrectionNote([
+      flag({ detail: "First issue." }),
+      flag({ type: "player_agency", detail: "Second issue." }),
     ]);
     expect(note).toContain("First issue.");
     expect(note).toContain("Second issue.");

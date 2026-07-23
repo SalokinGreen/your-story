@@ -1058,3 +1058,25 @@ export function buildObserverWarningNote(
   const lines = flags.map((f) => `- ${f.detail}`);
   return `Your previous turn was flagged by the observer for the following - keep this in mind and avoid repeating it:\n${lines.join("\n")}`;
 }
+
+/**
+ * Mirror case to buildObserverWarningNote above, for flags that WERE fixed
+ * this turn via a successful rewriteFlaggedNarration rewrite. Those flags
+ * never reach ScenePart.observerFlags (generateStoryTurn filters the
+ * rewrite-triggering flag out once it's fixed - see generation.ts), so the
+ * GM's own history shows only the clean, already-corrected prose and never
+ * learns a correction was needed at all. Left alone, this repeats: e.g.
+ * checkResponseLength trips, the turn gets rewritten shorter, and the very
+ * next turn runs long again because the GM was never told about the
+ * tendency, only shown the fixed result. Read back from the PRIOR turn's
+ * ScenePart.correctedObserverFlags, same call site and cadence as
+ * buildObserverWarningNote.
+ */
+export function buildObserverCorrectionNote(
+  flags: ObserverFlag[] | undefined,
+): string | undefined {
+  if (!flags || flags.length === 0) return undefined;
+
+  const lines = flags.map((f) => `- ${f.detail}`);
+  return `Your previous turn's first draft had to be corrected by the observer before it reached the player - the version in your history is already fixed, but you should still avoid the habit that caused this:\n${lines.join("\n")}`;
+}

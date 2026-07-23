@@ -42,6 +42,7 @@ import { checkNarrationConsistency } from "@/app/misc/consistencyCheck";
 import {
   runObserver,
   buildObserverWarningNote,
+  buildObserverCorrectionNote,
   rewriteFlaggedNarration,
   settingsFor,
   canObserverTriggerReset,
@@ -773,9 +774,16 @@ export async function generateStoryTurn(
   const lastAssistantPart = [...storyData.scene.parts]
     .reverse()
     .find((p) => !p.user && p.role === "assistant");
-  let observerNote: string | undefined = buildObserverWarningNote(
-    lastAssistantPart?.observerFlags,
-  );
+  // A prior turn can carry BOTH kinds of note at once: surviving flags
+  // (never corrected) and corrected flags (fixed via a same-turn rewrite,
+  // but the GM was never told the fix was needed) are independent - a turn
+  // can have one, the other, or both.
+  let observerNote: string | undefined = [
+    buildObserverWarningNote(lastAssistantPart?.observerFlags),
+    buildObserverCorrectionNote(lastAssistantPart?.correctedObserverFlags),
+  ]
+    .filter((note): note is string => Boolean(note))
+    .join("\n\n") || undefined;
   // Layer 3 periodic check-in (storyProgressObserver.ts): the prior turn's
   // note, if any, carries forward exactly once - it's about the last N
   // turns as of when it fired, not just the immediately preceding turn, so
@@ -1038,6 +1046,15 @@ export async function generateStoryTurn(
           // get surfaced to the player, same as a turn that finishes with
           // surviving minor flags normally would.
           flags = flags.filter((f) => f !== majorFlag);
+
+          // The fixed flag itself doesn't disappear - it's recorded
+          // separately (see buildObserverCorrectionNote) so the NEXT turn's
+          // prompt still tells the GM a correction was needed here, even
+          // though this turn's own narration already reads clean.
+          result.scenePart = {
+            ...result.scenePart,
+            correctedObserverFlags: [majorFlag],
+          };
         } else if (preTurnSnapshot) {
           // Full state rollback, restored in place (delete-all-keys +
           // Object.assign) so every closure over storyData (the caller, other

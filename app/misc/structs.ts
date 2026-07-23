@@ -361,6 +361,15 @@ export interface ScenePart {
   // that triggered a reset does NOT appear here, since that turn was
   // discarded entirely - see GenerationCallbacks.onObserverReset instead.
   observerFlags?: ObserverFlag[];
+  // Layer-5 observer flags (see observer.ts) that triggered a successful
+  // same-turn rewrite (rewriteFlaggedNarration) - the narration was already
+  // corrected before it reached the player, so these never appear in
+  // observerFlags above. Carried forward the same way as storyProgressNote
+  // (see buildObserverCorrectionNote in observer.ts), so the GM is told what
+  // its own first draft got wrong even though the accepted turn looks clean -
+  // otherwise the corrected history gives no signal that a mistake (e.g.
+  // running too long) keeps happening.
+  correctedObserverFlags?: ObserverFlag[];
   // Layer 3 periodic story-progress check-in (see storyProgressObserver.ts):
   // a GM-facing note on how the overall story is pacing (dragging, rushed,
   // or on track), produced every N turns rather than every turn. Never shown
