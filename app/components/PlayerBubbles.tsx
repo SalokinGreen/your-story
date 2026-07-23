@@ -6,6 +6,12 @@ import { DynamicIcon } from "./DynamicIcon";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { sttFetch } from "../misc/sttFetch";
+import {
+  createFloor,
+  lockedOutIds as floorLockedOutList,
+  pruneLockouts,
+  FLOOR_STEAL_COOLDOWN_MS,
+} from "../misc/multiplayer/floorControl";
 
 interface PendingLine {
   id: string;
@@ -198,6 +204,16 @@ interface PlayerBubblesProps {
   myPlayerId?: string;
   remoteActivity?: Record<string, ActivityState>;
   onLocalActivity?: (state: ActivityState) => void;
+  // Party-voice floor (talking stick). In networked play these are supplied
+  // by the host-authoritative floor (see floorControl.ts): floorHolderId is
+  // whoever currently has the mic, floorLockedOutIds are players briefly barred
+  // from grabbing it back after being interrupted, and onFloorTake/Release let
+  // this device claim/yield the floor. In couch play they're all unset and a
+  // local floor is maintained here instead.
+  floorHolderId?: string | null;
+  floorLockedOutIds?: string[];
+  onFloorTake?: () => void;
+  onFloorRelease?: () => void;
 }
 
 export default function PlayerBubbles({
@@ -207,6 +223,10 @@ export default function PlayerBubbles({
   myPlayerId,
   remoteActivity,
   onLocalActivity,
+  floorHolderId,
+  floorLockedOutIds,
+  onFloorTake,
+  onFloorRelease,
 }: PlayerBubblesProps) {
   const { addNotification } = useNotification();
   const { keys } = useAPIKeys();
@@ -223,6 +243,42 @@ export default function PlayerBubbles({
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const sessionRef = useRef<RecordingSession | null>(null);
+
+  // Networked play drives the floor from the host (props); couch play keeps a
+  // local floor here so the talking-stick + anti-steal-back rules still apply
+  // when everyone shares one device.
+  const isNetworked = !!myPlayerId;
+  const couchFloorRef = useRef(createFloor());
+  const [couchLockedOut, setCouchLockedOut] = useState<string[]>([]);
+  const couchFloorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Unified per-player floor view for rendering, sourced from props (net) or
+  // the local couch floor.
+  const floorHolder = isNetworked ? floorHolderId ?? null : activePlayerId;
+  const lockedOutSet = new Set(
+    isNetworked ? floorLockedOutIds ?? [] : couchLockedOut,
+  );
+
+  const refreshCouchFloor = useCallback(() => {
+    const now = Date.now();
+    pruneLockouts(couchFloorRef.current, now);
+    setCouchLockedOut(floorLockedOutList(couchFloorRef.current, now));
+    if (couchFloorTimerRef.current) {
+      clearTimeout(couchFloorTimerRef.current);
+      couchFloorTimerRef.current = null;
+    }
+    const locks = [...couchFloorRef.current.lockouts.values()];
+    if (locks.length > 0) {
+      const delay = Math.max(0, Math.min(...locks) - now) + 50;
+      couchFloorTimerRef.current = setTimeout(refreshCouchFloor, delay);
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (couchFloorTimerRef.current) clearTimeout(couchFloorTimerRef.current);
+    };
+  }, []);
 
   const teardownAudio = useCallback(() => {
     if (animationFrameRef.current) {
@@ -337,7 +393,9 @@ export default function PlayerBubbles({
       mediaRecorderRef.current.stop();
     }
     teardownAudio();
-  }, [teardownAudio]);
+    // Networked: yield the party-voice floor so the next speaker can take it.
+    if (isNetworked) onFloorRelease?.();
+  }, [teardownAudio, isNetworked, onFloorRelease]);
 
   // Like stopRecording, but marks the take to be discarded once the
   // MediaRecorder actually stops (see onstop in beginRecording) instead of
@@ -356,7 +414,8 @@ export default function PlayerBubbles({
       mediaRecorderRef.current.stop();
     }
     teardownAudio();
-  }, [teardownAudio]);
+    if (isNetworked) onFloorRelease?.();
+  }, [teardownAudio, isNetworked, onFloorRelease]);
 
   const watchSilence = useCallback((session: RecordingSession) => {
     const analyser = analyserRef.current;
@@ -452,6 +511,10 @@ export default function PlayerBubbles({
         mediaRecorder.start(100);
         setActivePlayerId(player.id);
         onLocalActivity?.("recording");
+        // Networked: claim the party-voice floor (host arbitrates and may
+        // interrupt someone else). Couch play grabs the floor in handleBubbleTap
+        // before we ever get here.
+        if (isNetworked) onFloorTake?.();
         watchSilence(session);
       } catch (error) {
         let message =
@@ -468,7 +531,15 @@ export default function PlayerBubbles({
         teardownAudio();
       }
     },
-    [addNotification, handleRecordingStopped, teardownAudio, watchSilence, onLocalActivity],
+    [
+      addNotification,
+      handleRecordingStopped,
+      teardownAudio,
+      watchSilence,
+      onLocalActivity,
+      isNetworked,
+      onFloorTake,
+    ],
   );
 
   const handleBubbleTap = useCallback(
@@ -480,9 +551,47 @@ export default function PlayerBubbles({
       // immediately, they don't wait on someone else's STT call.
       if (processingPlayerIds.has(player.id)) return;
 
+      // Tapping your own active bubble always just stops (yields the floor).
       if (activePlayerId === player.id) {
         stopRecording();
-      } else if (activePlayerId) {
+        return;
+      }
+
+      // Party-voice floor: a player who was just interrupted has to wait before
+      // they can grab the mic again, so two people can't ping-pong it.
+      if (isNetworked) {
+        // Networked: only my own bubble reaches here (gated above). If I'm
+        // locked out, the host would reject the take anyway - block locally so
+        // recording never even starts.
+        if ((floorLockedOutIds ?? []).includes(player.id)) {
+          addNotification("Hold on — wait your turn to speak", "warning");
+          return;
+        }
+      } else {
+        // Couch: a player just talked over is on cooldown and can't grab the
+        // mic back yet.
+        const now = Date.now();
+        pruneLockouts(couchFloorRef.current, now);
+        const lockedUntil = couchFloorRef.current.lockouts.get(player.id);
+        if (lockedUntil !== undefined && now < lockedUntil) {
+          addNotification(
+            `${player.name} was just interrupted — wait a moment`,
+            "warning",
+          );
+          return;
+        }
+        // Interrupting whoever's currently speaking locks *them* out (not this
+        // tapper), so they can't immediately steal it back.
+        if (activePlayerId && activePlayerId !== player.id) {
+          couchFloorRef.current.lockouts.set(
+            activePlayerId,
+            now + FLOOR_STEAL_COOLDOWN_MS,
+          );
+        }
+        refreshCouchFloor();
+      }
+
+      if (activePlayerId) {
         stopRecording();
         await beginRecording(player);
       } else {
@@ -496,8 +605,25 @@ export default function PlayerBubbles({
       activePlayerId,
       stopRecording,
       beginRecording,
+      isNetworked,
+      floorLockedOutIds,
+      refreshCouchFloor,
+      addNotification,
     ],
   );
+
+  // Networked: if the host reassigns the floor to someone else while I'm
+  // recording, I've been talked over - stop (my partial take is still queued).
+  useEffect(() => {
+    if (!isNetworked || !myPlayerId) return;
+    if (
+      activePlayerId === myPlayerId &&
+      floorHolderId != null &&
+      floorHolderId !== myPlayerId
+    ) {
+      stopRecording();
+    }
+  }, [isNetworked, myPlayerId, activePlayerId, floorHolderId, stopRecording]);
 
   const removePendingLine = useCallback((id: string) => {
     setPendingLines((prev) => prev.filter((l) => l.id !== id));
@@ -527,14 +653,21 @@ export default function PlayerBubbles({
         // broadcast instead.
         const isOwnBubble = !myPlayerId || player.id === myPlayerId;
         const remote = isOwnBubble ? undefined : remoteActivity?.[player.id];
+        const isActive = isOwnBubble
+          ? activePlayerId === player.id
+          : remote === "recording";
+        // Locked out (just interrupted) and not the one currently speaking:
+        // show a brief cooldown so it's clear why the mic won't respond.
+        const lockedOut = lockedOutSet.has(player.id) && floorHolder !== player.id;
         return (
           <Bubble
             key={player.id}
             player={player}
             index={index}
-            isActive={isOwnBubble ? activePlayerId === player.id : remote === "recording"}
+            isActive={isActive}
             isProcessing={isOwnBubble ? processingPlayerIds.has(player.id) : remote === "processing"}
-            disabled={disabled || !isOwnBubble}
+            lockedOut={lockedOut}
+            disabled={disabled || !isOwnBubble || (lockedOut && isOwnBubble)}
             onTap={() => handleBubbleTap(player)}
           />
         );
@@ -569,6 +702,7 @@ function Bubble({
   index,
   isActive,
   isProcessing,
+  lockedOut = false,
   disabled,
   onTap,
 }: {
@@ -576,6 +710,7 @@ function Bubble({
   index: number;
   isActive: boolean;
   isProcessing: boolean;
+  lockedOut?: boolean;
   disabled: boolean;
   onTap: () => void;
 }) {
@@ -688,11 +823,10 @@ function Bubble({
               name="Loader2"
               className="w-6 h-6 text-white animate-spin"
             />
+          ) : lockedOut ? (
+            <DynamicIcon name="MicOff" className="w-6 h-6 text-white/80" />
           ) : (
-            <DynamicIcon
-              name={isActive ? "Mic" : "Mic"}
-              className="w-6 h-6 text-white"
-            />
+            <DynamicIcon name="Mic" className="w-6 h-6 text-white" />
           )}
         </span>
       </span>

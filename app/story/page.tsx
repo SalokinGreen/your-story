@@ -21,6 +21,26 @@ import {
 } from "../misc/structs";
 import { useNetSession } from "../misc/multiplayer/useNetSession";
 import type { MPBackend } from "../misc/multiplayer/types";
+import type { FloorSnapshot, TurnStatus } from "../misc/multiplayer/session";
+import type { TTSRelayHandle } from "../components/TTSControls";
+import {
+  aggregateBatch,
+  clearBatch,
+  createBatch,
+  isBatchReady,
+  passedIds as batchPassedIds,
+  recordInput,
+  submittedIds as batchSubmittedIds,
+  type BatchedInput,
+} from "../misc/multiplayer/turnBatch";
+import {
+  createFloor,
+  lockedOutIds as floorLockedOutIds,
+  pruneLockouts,
+  releaseFloor,
+  takeFloor,
+  FLOOR_STEAL_COOLDOWN_MS,
+} from "../misc/multiplayer/floorControl";
 import {
   askFate,
   generateElement,
@@ -44,6 +64,7 @@ import { StoryTabBar } from "./StoryTabBar";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import OOCChatPanel from "../components/OOCChatPanel";
+import TurnLobbyOverlay from "../components/TurnLobbyOverlay";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
 import AskQuestionModal from "../components/AskQuestionModal";
@@ -533,6 +554,40 @@ function StoryPageContent() {
   // Pending user choice text - shown in chat while GM is generating
   const [pendingUserChoice, setPendingUserChoice] = useState<string>("");
 
+  // --- Networked multiplayer: batched turns, streaming, floor control ---
+  // Host-only: the current collection round's buffered per-player inputs. The
+  // host waits until every connected seat has submitted or passed (or forces
+  // it) before generating a single combined turn - see turnBatch.ts.
+  const turnBatchRef = useRef(createBatch());
+  // Set true while startBatchedTurn is actually running generation, so the
+  // host-side submit guards don't re-buffer the batched turn's own input.
+  const runningBatchedTurnRef = useRef(false);
+  // Live "who's submitted / who we're waiting on" for the collection lobby,
+  // shown to the host and mirrored to guests via turn_status. Null when no
+  // round is in progress (single-player, or between turns).
+  const [turnLobby, setTurnLobby] = useState<TurnStatus | null>(null);
+  // Host-only authoritative party-voice floor (talking stick). Guests reflect
+  // floorSnapshot instead.
+  const floorRef = useRef(createFloor());
+  const floorPruneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Everyone's view of the floor: on the host it's derived from floorRef; on a
+  // guest it's whatever the host last broadcast.
+  const [floorSnapshot, setFloorSnapshot] = useState<FloorSnapshot>({
+    holderId: null,
+    lockedOutIds: [],
+  });
+  // Host-only: turn id for the narration/TTS relay, bumped each turn so late
+  // chunks from a previous turn are discardable on the guest side.
+  const relayTurnIdRef = useRef(0);
+  const lastStreamedTextRef = useRef("");
+  // Tracks storyTextReady's previous value so the host streaming effect can
+  // detect turn start (ready -> not-ready) and completion (not-ready -> ready).
+  const prevStoryReadyRef = useRef(true);
+  // Guest-only: imperative handle into TTSControls for injecting the host's
+  // relayed audio chunks (see TTSControls relayMode). Guest ignores its own
+  // TTS text pipeline when relaying.
+  const ttsRelayRef = useRef<TTSRelayHandle | null>(null);
+
   // Networked P2P multiplayer (internet, not couch co-op - see
   // app/misc/multiplayer/session.ts). Host role runs generation locally as
   // usual and this just mirrors resulting state out to guests; guest role
@@ -555,28 +610,77 @@ function StoryPageContent() {
     sendOOCChat: sendNetOOCChat,
     sendDiceThrowRequest: sendNetDiceThrowRequest,
     sendDiceThrowResult: sendNetDiceThrowResult,
+    announceProfile: announceNetProfile,
+    hasAnnouncedProfile: hasAnnouncedNetProfile,
+    sendPass: sendNetPass,
+    broadcastTurnStatus: broadcastNetTurnStatus,
+    broadcastStoryStream: broadcastNetStoryStream,
+    broadcastTTSAudio: broadcastNetTTSAudio,
+    broadcastFloorState: broadcastNetFloorState,
+    sendFloorTake: sendNetFloorTake,
+    sendFloorRelease: sendNetFloorRelease,
   } = useNetSession({
     storyData,
     loading,
     onGuestAction: (action) => {
+      // Host no longer generates on the first action - it buffers each
+      // player's submission and fires one combined turn once everyone's in
+      // (see recordSeatInput / maybeStartBatchedTurn below).
       if (action.kind === "choice") {
         if (action.choiceIndex === null) return;
         const targetChoice = choices.choices[action.choiceIndex];
-        if (targetChoice) handleChoiceWithAction(targetChoice);
+        if (!targetChoice) return;
+        recordSeatInput({
+          playerId: action.localPlayerId,
+          name: resolveSeatName(action.localPlayerId),
+          kind: "choice",
+          text: targetChoice.text,
+          choiceIndex: action.choiceIndex,
+        });
       } else if (action.text) {
-        // freeform and voice (voice arrives as already-transcribed text -
-        // see PlayerBubbles wiring) both land here as a custom input
-        // attributed to the sending guest's seat. Forward action.kind so a
-        // guest's voice input still gets the transcription-error marker
-        // that handleCustomInput adds for inputKind "voice".
-        handleCustomInput(
-          action.text,
-          undefined,
-          [action.localPlayerId],
-          action.kind === "voice" ? "voice" : "freeform",
-        );
+        recordSeatInput({
+          playerId: action.localPlayerId,
+          name: resolveSeatName(action.localPlayerId),
+          kind: action.kind === "voice" ? "voice" : "freeform",
+          text: action.text,
+          choiceIndex: null,
+        });
       }
     },
+    onGuestPass: (localPlayerId) => {
+      recordSeatInput({
+        playerId: localPlayerId,
+        name: resolveSeatName(localPlayerId),
+        kind: "pass",
+        text: null,
+        choiceIndex: null,
+      });
+    },
+    onTurnStatus: (status) => {
+      // Guest-only: mirror the host's collection lobby.
+      setTurnLobby(status.phase === "generating" ? null : status);
+    },
+    onStoryStream: (update) => {
+      // Guest-only: render the host's narration as it streams.
+      setTurnLobby(null);
+      setStoryText(update.text);
+      setStoryTextReady(update.done);
+      setLoadingStage(update.done ? null : update.stage);
+      setLoading(false);
+      setPendingUserChoice("");
+      setLiveNarrationText(update.done ? "" : update.text);
+    },
+    onTTSAudio: (chunk) => {
+      // Guest-only: feed the host's relayed audio into TTSControls.
+      ttsRelayRef.current?.push(chunk.turnId, chunk.index, chunk.dataB64);
+      if (chunk.done) ttsRelayRef.current?.end(chunk.turnId);
+    },
+    onFloorState: (floor) => {
+      // Guest-only: reflect the host-authoritative party-voice floor.
+      setFloorSnapshot(floor);
+    },
+    onFloorTake: (localPlayerId) => hostHandleFloorTake(localPlayerId),
+    onFloorRelease: (localPlayerId) => hostHandleFloorRelease(localPlayerId),
     onSnapshot: (incoming) => {
       setStoryData(incoming);
       const lastPart = incoming.scene.parts[incoming.scene.parts.length - 1];
@@ -703,6 +807,44 @@ function StoryPageContent() {
   // generation so a stale tier from the previous turn can't linger.
   const [liveReasoningTier, setLiveReasoningTier] =
     useState<ResolvedTier | null>(null);
+
+  // Host-only: relay the live narration to guests so they watch the story
+  // being written in real time (and can TTS it), instead of only seeing the
+  // final snapshot. Mirrors the same visible-text logic story.tsx feeds to
+  // TTSControls (prefer liveNarrationText while streaming, else storyText).
+  useEffect(() => {
+    if (netSession?.role !== "host") {
+      prevStoryReadyRef.current = storyTextReady;
+      return;
+    }
+    const wasReady = prevStoryReadyRef.current;
+    prevStoryReadyRef.current = storyTextReady;
+
+    if (wasReady && !storyTextReady) {
+      // A new turn just started streaming - fresh relay id.
+      relayTurnIdRef.current += 1;
+      lastStreamedTextRef.current = "";
+    }
+
+    const turnId = String(relayTurnIdRef.current);
+    if (!storyTextReady) {
+      const text =
+        liveNarrationText && liveNarrationText.length > 0
+          ? liveNarrationText
+          : storyText;
+      if (text && text !== lastStreamedTextRef.current) {
+        lastStreamedTextRef.current = text;
+        broadcastNetStoryStream({ turnId, text, stage: loadingStage, done: false });
+      }
+    } else if (lastStreamedTextRef.current) {
+      // Turn finished after actually streaming this round - send the finalized
+      // text so guests' live view resolves (the authoritative snapshot follows).
+      broadcastNetStoryStream({ turnId, text: storyText, stage: null, done: true });
+      lastStreamedTextRef.current = "";
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storyText, liveNarrationText, storyTextReady, loadingStage, netSession]);
+
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
   // Deep-link auto-host: opens the Menu tab's Story Editor straight to the
@@ -1418,13 +1560,178 @@ function StoryPageContent() {
     setStoryData(updatedStory);
   }
 
+  // ---- Networked multiplayer: collect-all-then-generate + party voice ----
+
+  // Display name for a connected seat, from the persisted couch-player roster.
+  function resolveSeatName(id: string): string {
+    const player = storyData?.multiplayer?.couchPlayers?.find((c) => c.id === id);
+    return player?.name || "Player";
+  }
+
+  // Every seat the host waits on this round: the host itself plus every
+  // currently-connected guest. Deduped and stable.
+  function expectedSeatIds(): string[] {
+    if (!netSession) return [];
+    return Array.from(
+      new Set([netSession.myLocalPlayerId, ...netPeers.map((p) => p.localPlayerId)]),
+    );
+  }
+
+  function buildTurnStatus(phase: "collecting" | "generating"): TurnStatus {
+    return {
+      phase,
+      submittedPlayerIds: batchSubmittedIds(turnBatchRef.current),
+      passedPlayerIds: batchPassedIds(turnBatchRef.current),
+      expectedPlayerIds: expectedSeatIds(),
+    };
+  }
+
+  function broadcastCollectionLobby(): void {
+    const status = buildTurnStatus("collecting");
+    setTurnLobby(status);
+    broadcastNetTurnStatus(status);
+  }
+
+  // Host-only: buffer one seat's submission, then fire the combined turn once
+  // everyone has responded (or keep waiting and update the lobby).
+  function recordSeatInput(input: BatchedInput): void {
+    if (netSession?.role !== "host") return;
+    recordInput(turnBatchRef.current, input);
+    if (isBatchReady(turnBatchRef.current, expectedSeatIds())) {
+      startBatchedTurn();
+    } else {
+      broadcastCollectionLobby();
+    }
+  }
+
+  // Host-only: aggregate every buffered submission into a single user turn and
+  // generate once. Reused by the auto-fire path and the "Start now" override.
+  function startBatchedTurn(): void {
+    if (netSession?.role !== "host") return;
+    const aggregated = aggregateBatch(turnBatchRef.current, expectedSeatIds());
+    clearBatch(turnBatchRef.current);
+    setTurnLobby(null);
+    broadcastNetTurnStatus(buildTurnStatus("generating"));
+    if (!aggregated) {
+      // Everyone passed - nothing to narrate. Drop back to collecting.
+      addNotification("Everyone passed - nothing to narrate yet", "warning");
+      return;
+    }
+    runningBatchedTurnRef.current = true;
+    void handleCustomInput(
+      aggregated.content,
+      undefined,
+      aggregated.speakerIds,
+      "freeform",
+      true,
+    ).finally(() => {
+      runningBatchedTurnRef.current = false;
+    });
+  }
+
+  // Host-only: force the turn to start now with whatever's collected, without
+  // waiting on stragglers.
+  function hostForceStartTurn(): void {
+    if (netSession?.role !== "host") return;
+    if (batchSubmittedIds(turnBatchRef.current).length === 0) {
+      addNotification("No one has submitted anything yet", "warning");
+      return;
+    }
+    startBatchedTurn();
+  }
+
+  // The local player passes this round (host records directly; a guest sends a
+  // pass over the wire and shows the waiting lobby).
+  function passThisRound(): void {
+    if (!netSession) return;
+    if (netSession.role === "host") {
+      recordSeatInput({
+        playerId: netSession.myLocalPlayerId,
+        name: resolveSeatName(netSession.myLocalPlayerId),
+        kind: "pass",
+        text: null,
+        choiceIndex: null,
+      });
+    } else {
+      sendNetPass();
+    }
+  }
+
+  // ---- Party-voice floor (host-authoritative arbitration) ----
+
+  function pushFloorState(): void {
+    if (netSession?.role !== "host") return;
+    const now = Date.now();
+    pruneLockouts(floorRef.current, now);
+    const snap: FloorSnapshot = {
+      holderId: floorRef.current.holderId,
+      lockedOutIds: floorLockedOutIds(floorRef.current, now),
+    };
+    setFloorSnapshot(snap);
+    broadcastNetFloorState(snap);
+    scheduleFloorPrune();
+  }
+
+  // Re-broadcast the floor when the soonest lockout expires, so a just-freed
+  // player's bubble unlocks for everyone without needing a fresh action.
+  function scheduleFloorPrune(): void {
+    if (floorPruneTimerRef.current) {
+      clearTimeout(floorPruneTimerRef.current);
+      floorPruneTimerRef.current = null;
+    }
+    const locks = [...floorRef.current.lockouts.values()];
+    if (locks.length === 0) return;
+    const delay = Math.max(0, Math.min(...locks) - Date.now()) + 50;
+    floorPruneTimerRef.current = setTimeout(() => pushFloorState(), delay);
+  }
+
+  function hostHandleFloorTake(playerId: string): void {
+    if (netSession?.role !== "host") return;
+    if (takeFloor(floorRef.current, playerId, Date.now()).changed) pushFloorState();
+  }
+
+  function hostHandleFloorRelease(playerId: string): void {
+    if (netSession?.role !== "host") return;
+    if (releaseFloor(floorRef.current, playerId).changed) pushFloorState();
+  }
+
+  // Called by PlayerBubbles when the local player grabs / releases the mic.
+  // Host arbitrates locally; a guest asks the host over the wire.
+  function requestFloorTake(): void {
+    if (!netSession) return;
+    if (netSession.role === "host") hostHandleFloorTake(netSession.myLocalPlayerId);
+    else sendNetFloorTake();
+  }
+
+  function requestFloorRelease(): void {
+    if (!netSession) return;
+    if (netSession.role === "host") hostHandleFloorRelease(netSession.myLocalPlayerId);
+    else sendNetFloorRelease();
+  }
+
   async function handleCustomInput(
     customText: string,
     playerComment?: string,
     speakerIds?: string[],
     inputKind: "freeform" | "voice" = "freeform",
+    // Set by startBatchedTurn so the aggregated turn actually generates instead
+    // of being re-buffered by the host collect-all guard below.
+    bypassBatch: boolean = false,
   ) {
     if (!storyData) return;
+
+    // Host in a networked room: don't generate on the host's own submit -
+    // buffer it and wait for the rest of the table (see recordSeatInput).
+    if (netSession?.role === "host" && !bypassBatch) {
+      recordSeatInput({
+        playerId: netSession.myLocalPlayerId,
+        name: resolveSeatName(netSession.myLocalPlayerId),
+        kind: inputKind,
+        text: customText,
+        choiceIndex: null,
+      });
+      return;
+    }
 
     // Snapshot full state before this turn's GM tool calls can mutate it -
     // same undo/retry stack handleChoiceWithAction pushes onto, so a
@@ -2568,6 +2875,19 @@ function StoryPageContent() {
       setStoryTextReady(false);
       setPendingUserChoice(choice.text);
       sendNetChoice(key);
+      return;
+    }
+
+    // Host in a networked room: buffer the host's own pick and wait for the
+    // rest of the table instead of firing a turn immediately.
+    if (netSession?.role === "host") {
+      recordSeatInput({
+        playerId: netSession.myLocalPlayerId,
+        name: resolveSeatName(netSession.myLocalPlayerId),
+        kind: "choice",
+        text: choice.text,
+        choiceIndex: key,
+      });
       return;
     }
 
@@ -4297,8 +4617,43 @@ function StoryPageContent() {
             netSession={netSession}
             netPeers={netPeers}
             onViewportRecalc={updateHeights}
+            // Party-voice floor (talking stick). Only meaningful in a
+            // networked room; couch play runs its own local floor.
+            floorHolderId={netSession ? floorSnapshot.holderId : undefined}
+            floorLockedOutIds={netSession ? floorSnapshot.lockedOutIds : undefined}
+            onFloorTake={netSession ? requestFloorTake : undefined}
+            onFloorRelease={netSession ? requestFloorRelease : undefined}
+            // Host relays its generated TTS audio to guests; guests play the
+            // relayed audio instead of generating their own.
+            onTTSAudioChunk={
+              netSession?.role === "host"
+                ? (turnId, index, base64) =>
+                    broadcastNetTTSAudio({ turnId, index, dataB64: base64, done: false })
+                : undefined
+            }
+            onTTSAudioEnd={
+              netSession?.role === "host"
+                ? (turnId) =>
+                    broadcastNetTTSAudio({ turnId, index: -1, dataB64: "", done: true })
+                : undefined
+            }
+            ttsRelayMode={netSession?.role === "guest"}
+            ttsRelayHandleRef={ttsRelayRef}
           />
           </div>
+        )}
+        {/* Collect-all-then-generate lobby: shown while the host is waiting on
+            the table (host sees "Start now" / "Pass"; guests see who we're
+            waiting on and can pass their own turn). */}
+        {netSession && turnLobby && (
+          <TurnLobbyOverlay
+            status={turnLobby}
+            couchPlayers={storyData?.multiplayer?.couchPlayers ?? []}
+            myPlayerId={netSession.myLocalPlayerId}
+            isHost={netSession.role === "host"}
+            onStartNow={hostForceStartTurn}
+            onPass={passThisRound}
+          />
         )}
         {currentState === StoryState.CHARACTER_CREATION && (
           <CharacterCreationForm

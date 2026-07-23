@@ -3,7 +3,7 @@ import { Choice, Choices, StoryData, CouchPlayer } from "../misc/structs";
 import React, { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import TTSControls from "../components/TTSControls";
+import TTSControls, { TTSRelayHandle } from "../components/TTSControls";
 import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
@@ -81,6 +81,18 @@ interface StoryProps {
   onLocalActivity?: (state: "recording" | "processing" | "idle") => void;
   netSession?: NetSessionInfo | null;
   netPeers?: GuestJoinedInfo[];
+  // Party-voice floor (talking stick), networked play only. When set, voice
+  // bubbles obey the host-authoritative floor instead of couch-local state.
+  floorHolderId?: string | null;
+  floorLockedOutIds?: string[];
+  onFloorTake?: () => void;
+  onFloorRelease?: () => void;
+  // Host TTS relay: forward each generated MP3 chunk to guests. Guest relay:
+  // play the host's pushed audio instead of self-generating.
+  onTTSAudioChunk?: (turnId: string, index: number, base64: string) => void;
+  onTTSAudioEnd?: (turnId: string) => void;
+  ttsRelayMode?: boolean;
+  ttsRelayHandleRef?: React.Ref<TTSRelayHandle>;
   onActionConfirm?: (choice: Choice, playerComment?: string) => void;
   onCommentSubmit?: (comment: string) => void;
   onRerollChoices?: () => void;
@@ -743,6 +755,14 @@ export default function Story({
   onLocalActivity,
   netSession,
   netPeers,
+  floorHolderId,
+  floorLockedOutIds,
+  onFloorTake,
+  onFloorRelease,
+  onTTSAudioChunk,
+  onTTSAudioEnd,
+  ttsRelayMode,
+  ttsRelayHandleRef,
   onViewportRecalc,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
@@ -1520,6 +1540,10 @@ export default function Story({
               }
               disabled={loading || !storyTextReady}
               storyTextReady={storyTextReady}
+              onAudioChunk={onTTSAudioChunk}
+              onAudioEnd={onTTSAudioEnd}
+              relayMode={ttsRelayMode}
+              relayHandleRef={ttsRelayHandleRef}
             />
           </div>
         )}
@@ -1554,6 +1578,10 @@ export default function Story({
           myPlayerId={myPlayerId}
           remoteActivity={remoteActivity}
           onLocalActivity={onLocalActivity}
+          floorHolderId={floorHolderId}
+          floorLockedOutIds={floorLockedOutIds}
+          onFloorTake={onFloorTake}
+          onFloorRelease={onFloorRelease}
         />
       )}
 

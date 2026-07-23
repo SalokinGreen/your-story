@@ -1,12 +1,47 @@
 "use client";
 
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useImperativeHandle,
+} from "react";
 import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
 import { ttsFetch } from "../misc/ttsFetch";
 import { cleanTextForSpeech } from "../misc/ai";
 import { TTSModelKey } from "../misc/ai_prices";
+
+// Imperative handle a networked guest uses to feed the host's relayed audio
+// chunks straight into this player's playback queue (see relayMode). The host
+// generates TTS once and forwards each MP3 chunk; guests play them without
+// needing their own TTS key.
+export interface TTSRelayHandle {
+  // Push one base64-encoded MP3 chunk for `turnId` at play order `index`. A new
+  // turnId resets the queue (a fresh narration is starting).
+  push: (turnId: string, index: number, base64: string) => void;
+  // No more chunks are coming for `turnId` - let playback finish.
+  end: (turnId: string) => void;
+}
+
+// base64 <-> bytes helpers for relaying MP3 chunks over the JSON-safe wire.
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
 
 interface TTSControlsProps {
   // Raw (uncleaned) narration text - cleaning happens inside this component,
@@ -24,6 +59,16 @@ interface TTSControlsProps {
   // unset callers just never enter that mode (text is always treated as
   // already-final).
   storyTextReady?: boolean;
+  // Host relay (networked co-op): called with each generated MP3 chunk as
+  // base64, tagged with a per-session turnId and its play order, so the host
+  // can forward the audio to guests. onAudioEnd fires once generation for that
+  // session finishes.
+  onAudioChunk?: (turnId: string, index: number, base64: string) => void;
+  onAudioEnd?: (turnId: string) => void;
+  // Guest relay: when true this component never generates its own audio - it
+  // only plays chunks pushed in through relayHandleRef (the host's narration).
+  relayMode?: boolean;
+  relayHandleRef?: React.Ref<TTSRelayHandle>;
 }
 
 const getSelectedVoice = (): string => {
@@ -200,6 +245,10 @@ export default function TTSControls({
   text,
   disabled = false,
   storyTextReady = true,
+  onAudioChunk,
+  onAudioEnd,
+  relayMode = false,
+  relayHandleRef,
 }: TTSControlsProps) {
   const { addNotification } = useNotification();
   const { keys: apiKeys } = useAPIKeys();
@@ -323,7 +372,23 @@ export default function TTSControls({
   const liveDispatchBusyRef = useRef<boolean>(false);
   const liveAbortControllerRef = useRef<AbortController | null>(null);
 
+  // Host relay: the current generation session's id (fresh per narration) and
+  // whether we've emitted any chunk for it yet, so onAudioEnd only fires for
+  // sessions that actually produced audio.
+  const relaySessionIdRef = useRef<string>("");
+  const relayEmittedRef = useRef<boolean>(false);
+  // Guest relay: the turnId currently being played, so a new turnId resets the
+  // queue. Refs so the imperative handle callbacks stay stable.
+  const relayCurrentTurnRef = useRef<string>("");
+
   const ttsEnabled = isTTSEnabled();
+
+  const emitAudioEnd = useCallback(() => {
+    if (relayEmittedRef.current && relaySessionIdRef.current) {
+      onAudioEnd?.(relaySessionIdRef.current);
+    }
+    relayEmittedRef.current = false;
+  }, [onAudioEnd]);
 
   // Update volume when it changes in localStorage
   useEffect(() => {
@@ -647,6 +712,20 @@ export default function TTSControls({
       setChunkCountState(audioUrlsRef.current.length);
       probeChunkDuration(idx, url);
 
+      // Host relay: forward this freshly-generated chunk to guests. Skipped in
+      // relayMode (a guest never re-relays), and only when a host callback is
+      // wired up.
+      if (onAudioChunk && !relayMode) {
+        blob.arrayBuffer().then((buf) => {
+          relayEmittedRef.current = true;
+          onAudioChunk(
+            relaySessionIdRef.current,
+            idx,
+            bytesToBase64(new Uint8Array(buf)),
+          );
+        });
+      }
+
       if (idx === 0) {
         finishedRef.current = false;
         setHasAudio(true);
@@ -664,7 +743,7 @@ export default function TTSControls({
         playChunkAt(idx);
       }
     },
-    [playChunkAt, probeChunkDuration],
+    [playChunkAt, probeChunkDuration, onAudioChunk, relayMode],
   );
 
   // Shared by both the manual "activate" path and the live narration
@@ -744,6 +823,9 @@ export default function TTSControls({
           processLiveQueueRef.current();
         } else if (!liveModeActiveRef.current) {
           isStreamingRef.current = false;
+          // Host relay: the live narration queue has fully drained - no more
+          // chunks are coming for this session.
+          emitAudioEnd();
           if (waitingForNextRef.current) {
             waitingForNextRef.current = false;
             setIsPlaying(false);
@@ -917,11 +999,18 @@ export default function TTSControls({
       return;
     }
 
+    // Guest relay: never generate locally - the button only ever plays the
+    // host's pushed audio, handled by the cached-audio branches above.
+    if (relayMode) return;
+
     // Fresh activation: turn on auto-narrate so future streamed turns start
     // reading themselves too, in addition to reading the current text now.
     if (typeof window !== "undefined") {
       localStorage.setItem("ttsAutoGenerate", "true");
     }
+    // Fresh relay session for the host (manual read-aloud).
+    relaySessionIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    relayEmittedRef.current = false;
 
     const volume = getVolume();
 
@@ -971,6 +1060,10 @@ export default function TTSControls({
         throw new Error("No audio generated");
       }
 
+      // Host relay: whole-text generation done - tell guests no more chunks
+      // are coming for this session.
+      emitAudioEnd();
+
       // If playback already caught up to the end while the last chunk was
       // still in flight, finish here rather than leaving isPlaying stuck on
       // an onended that has nothing left to advance to.
@@ -1014,6 +1107,8 @@ export default function TTSControls({
     addNotification,
     getAudioElement,
     setCurrentChunkIndex,
+    relayMode,
+    emitAudioEnd,
   ]);
 
   // Drives four things off changes to `text`/`storyTextReady`:
@@ -1029,6 +1124,13 @@ export default function TTSControls({
   //    edit, or text that was never streaming to begin with) - the original
   //    "wait for text to settle, then generate once" behavior.
   useEffect(() => {
+    // Guest relay: this component's `text` prop is the streamed narration, but
+    // playback is driven entirely by the host's pushed audio chunks (see the
+    // imperative handle) - never by this device's own generation. Ignore all
+    // text-driven pipelines so a text change from story_stream doesn't reset
+    // the relayed audio.
+    if (relayMode) return;
+
     const textChanged = text !== lastTextRef.current;
     lastTextRef.current = text;
 
@@ -1039,6 +1141,9 @@ export default function TTSControls({
     if (isStreaming && !wasStreaming) {
       stopAndResetPlayback();
       liveSentCharsRef.current = 0;
+      // Fresh relay session for the host - a new narration is starting.
+      relaySessionIdRef.current = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      relayEmittedRef.current = false;
       if (ttsEnabled && isAutoGenerateEnabled()) {
         liveModeActiveRef.current = true;
         isStreamingRef.current = true;
@@ -1067,13 +1172,49 @@ export default function TTSControls({
         pendingAutoGenerateRef.current = true;
       }
     }
-  }, [text, storyTextReady, ttsEnabled, stopAndResetPlayback, feedLiveText]);
+  }, [text, storyTextReady, ttsEnabled, relayMode, stopAndResetPlayback, feedLiveText]);
+
+  // Guest relay: expose an imperative handle so the page can feed the host's
+  // relayed audio chunks straight into this player's playback queue. A new
+  // turnId resets playback (a fresh narration); end() lets it finish.
+  useImperativeHandle(
+    relayHandleRef,
+    () => ({
+      push: (turnId: string, index: number, base64: string) => {
+        if (!base64) return;
+        if (turnId !== relayCurrentTurnRef.current) {
+          relayCurrentTurnRef.current = turnId;
+          stopAndResetPlayback();
+          isStreamingRef.current = true;
+        }
+        try {
+          const bytes = base64ToBytes(base64);
+          onChunkArrived(
+            new Blob([bytes.buffer as ArrayBuffer], { type: "audio/mpeg" }),
+          );
+        } catch (err) {
+          console.error("Failed to decode relayed TTS chunk", err);
+        }
+      },
+      end: (turnId: string) => {
+        if (turnId !== relayCurrentTurnRef.current) return;
+        isStreamingRef.current = false;
+        if (waitingForNextRef.current) {
+          waitingForNextRef.current = false;
+          setIsPlaying(false);
+          finishedRef.current = true;
+        }
+      },
+    }),
+    [stopAndResetPlayback, onChunkArrived],
+  );
 
   // Trigger auto-generate (non-live case: text arrived already-finished,
   // e.g. navigation/undo/edit) when not disabled and pending
   useEffect(() => {
     if (
       !disabled &&
+      !relayMode &&
       pendingAutoGenerateRef.current &&
       !isGeneratingRef.current &&
       text.trim() &&
@@ -1085,7 +1226,7 @@ export default function TTSControls({
       }, 500);
       return () => clearTimeout(timer);
     }
-  }, [disabled, text, ttsEnabled, handleToggle]);
+  }, [disabled, text, ttsEnabled, relayMode, handleToggle]);
 
   if (!ttsEnabled) {
     return null;
