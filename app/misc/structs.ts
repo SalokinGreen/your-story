@@ -916,6 +916,12 @@ export interface StoryData {
   // player throws a 3D die on-screen (DiceThrowModal), settled by real
   // physics, still via formula_roll/opposed_formula/formula_challenge_check.
   diceMode?: DiceMode;
+  // Suggested-action chips: after each turn, run an extra AI call to propose
+  // a few tappable next actions (shown above the composer, alongside the
+  // always-available freeform text box). Off by default - most players just
+  // type/speak their action; this is an opt-in for players who like picking
+  // from a short list instead.
+  autoGenerateChoices?: boolean;
   stress?: number; // YZE: Current stress level (0-10)
   maxStress?: number; // YZE: Maximum stress (default 10)
   agmtState?: AGMTState; // Advanced RPG Tools state (chaos factor, threads, characters)

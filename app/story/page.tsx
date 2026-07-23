@@ -1516,7 +1516,7 @@ function StoryPageContent() {
 
       // Track parallel completion of tools and choices
       let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
-      let choicesComplete = true; // Choices stage is disabled - see skipChoices below
+      let choicesComplete = !storyData.autoGenerateChoices;
 
       const checkBothComplete = () => {
         if (toolsComplete && choicesComplete) {
@@ -1539,9 +1539,9 @@ function StoryPageContent() {
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
-          // Suggested-action chips are gone - never spend an extra AI call
-          // generating them (see also handleChoiceWithAction below).
-          skipChoices: true,
+          // Suggested-action chips are opt-in - see BasicSettings.tsx
+          // "Suggested Choices" toggle (StoryData.autoGenerateChoices).
+          skipChoices: !storyData.autoGenerateChoices,
           openRouterKey,
           deepseekKey,
           googleKey,
@@ -2044,7 +2044,7 @@ function StoryPageContent() {
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
-    let choicesComplete = true; // Choices stage is disabled - see skipChoices below
+    let choicesComplete = !storyData.autoGenerateChoices;
 
     const checkBothComplete = () => {
       if (toolsComplete && choicesComplete) {
@@ -2068,9 +2068,9 @@ function StoryPageContent() {
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
-          // Suggested-action chips are gone - never spend an extra AI call
-          // generating them, regardless of how this turn was triggered.
-          skipChoices: true,
+          // Suggested-action chips are opt-in - see BasicSettings.tsx
+          // "Suggested Choices" toggle (StoryData.autoGenerateChoices).
+          skipChoices: !storyData.autoGenerateChoices,
           openRouterKey,
           deepseekKey,
           googleKey,
@@ -2469,14 +2469,58 @@ function StoryPageContent() {
       setStoryText(choice.intro_override);
       setStoryData({ ...storyData });
       setLoading(false);
-      setLoadingStage(null);
       setStoryTextReady(true);
 
-      // Suggested-action chips are gone - no extra AI call to fetch a
-      // starting set of them. The player continues with freeform text.
-      setChoices({ choices: [] });
-      saveProgress(storyData);
-      addNotification("Story continues...", "success");
+      if (!storyData.autoGenerateChoices) {
+        setLoadingStage(null);
+        setChoices({ choices: [] });
+        saveProgress(storyData);
+        addNotification("Story continues...", "success");
+        return;
+      }
+
+      setLoadingStage("choices");
+      try {
+        const { choicesModel } = getModelsFromPreset();
+        const { generateChoicesOnly } = await import("../misc/generation");
+        const newChoices = await generateChoicesOnly(storyData, {
+          choicesModel,
+          openRouterKey,
+          deepseekKey,
+          googleKey,
+          mistralKey,
+          deepinfraKey,
+        });
+
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            choices: newChoices,
+          };
+        }
+
+        setChoices({ choices: newChoices });
+        setStoryData({ ...storyData });
+        setLoadingStage(null);
+
+        saveProgress(storyData);
+        addNotification("Story continues...", "success");
+      } catch (error) {
+        console.error("Error generating choices:", error);
+        const fallbackChoices = [{ text: "Continue" }];
+        const lastPartIndex = storyData.scene.parts.length - 1;
+        if (lastPartIndex >= 0) {
+          storyData.scene.parts[lastPartIndex] = {
+            ...storyData.scene.parts[lastPartIndex],
+            choices: fallbackChoices,
+          };
+        }
+        setChoices({ choices: fallbackChoices });
+        setStoryData({ ...storyData });
+        setLoadingStage(null);
+        saveProgress(storyData);
+      }
       return;
     }
 
@@ -2954,7 +2998,7 @@ function StoryPageContent() {
 
     // Track parallel completion of tools and choices
     let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
-    let choicesComplete = false;
+    let choicesComplete = !storyData.autoGenerateChoices;
 
     const checkBothComplete = () => {
       if (toolsComplete && choicesComplete) {
@@ -3001,7 +3045,9 @@ function StoryPageContent() {
           maxToolLoops,
           customMaxContext: customMaxContext > 0 ? customMaxContext : undefined,
           customMaxOutput: customMaxOutput > 0 ? customMaxOutput : undefined,
-          skipChoices: true, // On retry, we already have choices from the previous generation
+          // Suggested-action chips are opt-in - see BasicSettings.tsx
+          // "Suggested Choices" toggle (StoryData.autoGenerateChoices).
+          skipChoices: !storyData.autoGenerateChoices,
           openRouterKey,
           deepseekKey,
           googleKey,
