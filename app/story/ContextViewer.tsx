@@ -34,6 +34,30 @@ interface ContextViewerProps {
   storyData: StoryData;
 }
 
+// Mirrors the shape actually read off ScenePart.gmToolCalls (typed any[] in
+// structs.ts since it also carries legacy/back-compat shapes) - narrowed
+// here to just the fields this view renders.
+interface GMToolCallSummary {
+  toolName?: string;
+  success?: boolean;
+  contextForStory?: string;
+}
+
+interface TurnSummary {
+  index: number; // 0-based index into storyData.scene.parts
+  reasoningTier?: number;
+  reasoningTierModelKey?: string;
+  toolCalls: GMToolCallSummary[];
+  stateChanges: string[];
+  storyProgressNote?: string;
+  repetitionNote?: string;
+  knowledgeNote?: string;
+  consistencyWarnings: ConsistencyWarning[];
+  observerFlags: ObserverFlag[];
+  memoriesWritten: MemoryEntry[];
+  hasActivity: boolean;
+}
+
 // Layer 2 (Oracle) - chaos factor descriptor, mirrors ai_staged.ts's private
 // getChaosDescription (not exported) so this viewer doesn't need to import it.
 function describeChaos(chaos: number): string {
@@ -63,6 +87,213 @@ function timeAgo(timestamp?: number): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
+function TurnHistoryCard({ turn }: { turn: TurnSummary }) {
+  const [expanded, setExpanded] = useState(false);
+  const majorFlags = turn.observerFlags.filter((f) => f.severity === "major");
+
+  return (
+    <div className="rounded-lg border border-white/10 bg-white/[0.02] overflow-hidden">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="w-full flex items-center justify-between gap-2 p-2 text-xs hover:bg-white/5 transition-colors"
+      >
+        <span className="flex items-center gap-2 flex-wrap text-left">
+          <span className="font-semibold text-white">
+            Turn {turn.index + 1}
+          </span>
+          {turn.reasoningTierModelKey && (
+            <span className="px-1.5 py-0.5 rounded-md bg-white/5 border border-white/10 text-blue-300/70">
+              Tier {turn.reasoningTier ?? "?"} ·{" "}
+              {String(turn.reasoningTierModelKey)}
+            </span>
+          )}
+          {turn.toolCalls.length > 0 && (
+            <span className="flex items-center gap-1 text-cyan-300/80">
+              <DynamicIcon name="Dices" className="w-3 h-3" />
+              {turn.toolCalls.length}
+            </span>
+          )}
+          {turn.stateChanges.length > 0 && (
+            <span className="flex items-center gap-1 text-amber-300/80">
+              <DynamicIcon name="Zap" className="w-3 h-3" />
+              {turn.stateChanges.length}
+            </span>
+          )}
+          {turn.memoriesWritten.length > 0 && (
+            <span className="flex items-center gap-1 text-teal-300/80">
+              <DynamicIcon name="Brain" className="w-3 h-3" />
+              {turn.memoriesWritten.length}
+            </span>
+          )}
+          {(turn.consistencyWarnings.length > 0 ||
+            turn.observerFlags.length > 0) && (
+            <span
+              className={`flex items-center gap-1 ${
+                majorFlags.length > 0
+                  ? "text-red-400 font-semibold"
+                  : "text-rose-300/80"
+              }`}
+            >
+              <DynamicIcon name="ShieldAlert" className="w-3 h-3" />
+              {turn.consistencyWarnings.length + turn.observerFlags.length}
+            </span>
+          )}
+          {(turn.storyProgressNote ||
+            turn.repetitionNote ||
+            turn.knowledgeNote) && (
+            <span className="flex items-center gap-1 text-orange-300/80">
+              <DynamicIcon name="Compass" className="w-3 h-3" />
+            </span>
+          )}
+          {!turn.hasActivity && (
+            <span className="italic text-blue-300/40">quiet turn</span>
+          )}
+        </span>
+        <DynamicIcon
+          name={expanded ? "ChevronUp" : "ChevronDown"}
+          className="w-3.5 h-3.5 text-blue-300/50 shrink-0"
+        />
+      </button>
+
+      {expanded && (
+        <div className="p-2 pt-0 space-y-2 text-xs">
+          {turn.toolCalls.length > 0 && (
+            <div className="p-2 bg-cyan-500/[0.06] border border-cyan-400/20 rounded-lg">
+              <div className="font-semibold text-cyan-300 mb-1 flex items-center gap-1">
+                <DynamicIcon name="Dices" className="w-3 h-3" />
+                Tools called
+              </div>
+              <ul className="space-y-0.5 text-cyan-200/80">
+                {turn.toolCalls.map((tool, i) => (
+                  <li key={i} className="flex items-start gap-1">
+                    <span
+                      className={
+                        tool.success ? "text-green-400" : "text-red-400"
+                      }
+                    >
+                      {tool.success ? "✓" : "✗"}
+                    </span>
+                    <span className="font-mono">{tool.toolName}</span>
+                    {tool.contextForStory && (
+                      <span className="text-blue-300/50">
+                        → {tool.contextForStory.substring(0, 80)}
+                        {tool.contextForStory.length > 80 ? "..." : ""}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {turn.stateChanges.length > 0 && (
+            <div className="p-2 bg-amber-500/[0.06] border border-amber-400/20 rounded-lg">
+              <div className="font-semibold text-amber-300 mb-1 flex items-center gap-1">
+                <DynamicIcon name="Zap" className="w-3 h-3" />
+                State changes
+              </div>
+              <ul className="list-disc list-inside text-amber-200/80 space-y-0.5">
+                {turn.stateChanges.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {(turn.storyProgressNote ||
+            turn.repetitionNote ||
+            turn.knowledgeNote) && (
+            <div className="p-2 bg-orange-500/[0.06] border border-orange-400/20 rounded-lg">
+              <div className="font-semibold text-orange-300 mb-1 flex items-center gap-1">
+                <DynamicIcon name="Compass" className="w-3 h-3" />
+                Director check-in (GM-facing only, never shown to player)
+              </div>
+              <div className="text-orange-200/80 space-y-1">
+                {turn.storyProgressNote && <p>{turn.storyProgressNote}</p>}
+                {turn.repetitionNote && (
+                  <p>
+                    <span className="text-orange-400/70">Repetition:</span>{" "}
+                    {turn.repetitionNote}
+                  </p>
+                )}
+                {turn.knowledgeNote && (
+                  <p>
+                    <span className="text-orange-400/70">
+                      NPC knowledge:
+                    </span>{" "}
+                    {turn.knowledgeNote}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {(turn.consistencyWarnings.length > 0 ||
+            turn.observerFlags.length > 0) && (
+            <div className="p-2 bg-rose-500/[0.06] border border-rose-400/20 rounded-lg">
+              <div className="font-semibold text-rose-300 mb-1 flex items-center gap-1">
+                <DynamicIcon name="ShieldAlert" className="w-3 h-3" />
+                Adjudication flags
+              </div>
+              <ul className="space-y-0.5 text-rose-200/80">
+                {turn.consistencyWarnings.map((w, i) => (
+                  <li key={`c${i}`}>
+                    [{w.type}] {w.entity}: {w.detail}
+                  </li>
+                ))}
+                {turn.observerFlags.map((f, i) => (
+                  <li key={`o${i}`}>
+                    <span
+                      className={
+                        f.severity === "major"
+                          ? "text-red-300 font-semibold"
+                          : "text-rose-300/80"
+                      }
+                    >
+                      [{f.severity}] {f.type}
+                    </span>
+                    : {f.detail}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {turn.memoriesWritten.length > 0 && (
+            <div className="p-2 bg-teal-500/[0.06] border border-teal-400/20 rounded-lg">
+              <div className="font-semibold text-teal-300 mb-1 flex items-center gap-1">
+                <DynamicIcon name="Brain" className="w-3 h-3" />
+                Memory written this turn
+              </div>
+              <ul className="space-y-0.5 text-teal-200/80">
+                {turn.memoriesWritten.map((m, i) => (
+                  <li key={i}>
+                    {m.content.substring(0, 100)}
+                    {m.content.length > 100 ? "..." : ""}
+                    {m.importance != null && (
+                      <span className="text-teal-400/60">
+                        {" "}
+                        (importance {m.importance})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {!turn.hasActivity && (
+            <p className="italic text-blue-300/40">
+              No tool calls, state changes, director notes, adjudication
+              flags, or memory writes recorded for this turn.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [choicesMessages, setChoicesMessages] = useState<ChatMessage[]>([]);
@@ -84,6 +315,9 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const [showChoicesStage, setShowChoicesStage] = useState(false);
   const [showStateChanges, setShowStateChanges] = useState(false);
   const [showGMToolCalls, setShowGMToolCalls] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [hideQuietTurns, setHideQuietTurns] = useState(true);
+  const [historyShowCount, setHistoryShowCount] = useState(15);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -358,6 +592,58 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const lastObserverFlags: ObserverFlag[] = lastAssistantPart?.observerFlags || [];
   const tierLadder = getEffectiveTiers();
 
+  // ============================================
+  // Turn-by-turn history (pure derivation from storyData.scene.parts - every
+  // field read here is already persisted per-turn, nothing new to compute or
+  // store). A major observer flag that triggered a reset-and-retry never
+  // lands in a part's observerFlags (that attempt was discarded), so resets
+  // aren't visible here - only in the ephemeral Debug Logs for this session.
+  // ============================================
+  const turnSummaries: TurnSummary[] = storyData.scene.parts
+    .map((part, i): TurnSummary | null => {
+      if (part.user) return null;
+      const toolCalls = part.gmToolCalls || [];
+      const stateChanges = part.stateChanges || [];
+      const consistencyWarnings = part.consistencyWarnings || [];
+      const observerFlags = part.observerFlags || [];
+      const memoriesWritten = memory
+        .map(memoryEntryOf)
+        .filter(
+          (entry): entry is MemoryEntry =>
+            entry !== null && entry.sceneIndex === i + 1,
+        );
+      const hasActivity =
+        toolCalls.length > 0 ||
+        stateChanges.length > 0 ||
+        consistencyWarnings.length > 0 ||
+        observerFlags.length > 0 ||
+        memoriesWritten.length > 0 ||
+        !!part.storyProgressNote ||
+        !!part.repetitionNote ||
+        !!part.knowledgeNote;
+      return {
+        index: i,
+        reasoningTier: part.reasoningTier,
+        reasoningTierModelKey: part.reasoningTierModelKey,
+        toolCalls,
+        stateChanges,
+        storyProgressNote: part.storyProgressNote,
+        repetitionNote: part.repetitionNote,
+        knowledgeNote: part.knowledgeNote,
+        consistencyWarnings,
+        observerFlags,
+        memoriesWritten,
+        hasActivity,
+      };
+    })
+    .filter((t): t is TurnSummary => t !== null);
+
+  const visibleTurns = (
+    hideQuietTurns ? turnSummaries.filter((t) => t.hasActivity) : turnSummaries
+  )
+    .slice()
+    .reverse();
+
   return (
     <div className="flex flex-col h-[calc(100vh-200px)] bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 shadow-[0_4px_24px_rgba(0,0,0,0.3)] overflow-hidden">
       {/* Header */}
@@ -375,6 +661,14 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
             >
               <DynamicIcon name="Layers" className="w-4 h-4" />
               <span className="hidden sm:inline">Layers</span>
+            </button>
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="px-2 sm:px-3 py-1 text-xs sm:text-sm bg-fuchsia-500/10 text-fuchsia-300 border border-fuchsia-400/20 rounded-lg hover:bg-fuchsia-500/20 transition-colors flex items-center gap-1"
+              title="Toggle turn-by-turn AI activity history"
+            >
+              <DynamicIcon name="History" className="w-4 h-4" />
+              <span className="hidden sm:inline">History</span>
             </button>
             <button
               onClick={() => setShowInfo(!showInfo)}
@@ -1056,6 +1350,58 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
                 )}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* ============================================ */}
+        {/* TURN-BY-TURN AI ACTIVITY HISTORY */}
+        {/* ============================================ */}
+        {showHistory && (
+          <div className="mx-2 sm:mx-4 mb-4 p-3 rounded-xl border bg-white/[0.03] backdrop-blur-md border-white/10">
+            <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+              <h4 className="font-bold text-sm text-white flex items-center gap-2">
+                <DynamicIcon name="History" className="w-4 h-4" />
+                Turn-by-Turn AI Activity ({visibleTurns.length})
+              </h4>
+              <label className="flex items-center gap-2 cursor-pointer text-xs text-blue-200/70">
+                <input
+                  type="checkbox"
+                  checked={hideQuietTurns}
+                  onChange={(e) => setHideQuietTurns(e.target.checked)}
+                  className="w-3.5 h-3.5 rounded accent-purple-500"
+                />
+                Hide quiet turns
+              </label>
+            </div>
+            <p className="text-[11px] text-blue-300/50 mb-2">
+              Newest first. Director notes, adjudication flags, and memory
+              writes only fire periodically, not every turn. A turn that got
+              reset and retried by the observer doesn&apos;t appear here since
+              that attempt was discarded - check Debug Logs for that history.
+            </p>
+            {visibleTurns.length === 0 ? (
+              <p className="text-xs italic text-blue-300/50">
+                {hideQuietTurns
+                  ? "No flagged turns yet - nothing for the director, adjudication, or memory layers to report."
+                  : "No turns recorded yet."}
+              </p>
+            ) : (
+              <div className="space-y-1.5">
+                {visibleTurns.slice(0, historyShowCount).map((t) => (
+                  <TurnHistoryCard key={t.index} turn={t} />
+                ))}
+                {visibleTurns.length > historyShowCount && (
+                  <button
+                    onClick={() => setHistoryShowCount((n) => n + 15)}
+                    className="w-full px-3 py-1.5 text-xs bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-blue-200/70 transition-colors"
+                  >
+                    Show{" "}
+                    {Math.min(15, visibleTurns.length - historyShowCount)} more
+                    turns
+                  </button>
+                )}
+              </div>
+            )}
           </div>
         )}
 
