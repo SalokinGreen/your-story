@@ -51,6 +51,10 @@ NEXT_PUBLIC_SUPABASE_KEY=your_supabase_anon_key
 
 # Optional
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Optional - cross-device sync (see sync-worker/README.md); the Sync tab in
+# Settings stays disabled until this points at a deployed sync-worker
+NEXT_PUBLIC_SYNC_API_URL=
 ```
 
 **Important**: Client-side environment variables MUST be prefixed with `NEXT_PUBLIC_` for Next.js to expose them to the browser.

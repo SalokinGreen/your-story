@@ -72,3 +72,10 @@ export function deleteLocalFolder(folderId: string): void {
   const folders = readFolders().filter((f) => f.id !== folderId);
   writeFolders(folders);
 }
+
+// Full-collection replace, used by syncManager.ts to apply a pulled remote
+// snapshot (which carries its own ids/timestamps rather than generating new
+// ones via createLocalFolder).
+export function replaceLocalFolders(folders: LocalFolder[]): void {
+  writeFolders(folders);
+}
