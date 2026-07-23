@@ -77,6 +77,25 @@ export function getSyncKey(): string | null {
   return localStorage.getItem(SYNC_KEY_STORAGE_KEY);
 }
 
+// The per-bucket bookkeeping (lastSynced/syncedIds timestamps, settings value
+// timestamps) describes this device's position relative to *one specific*
+// server namespace - the SHA-256 hash of the current sync key. It is
+// meaningless, and actively harmful, once the key changes: a device that
+// already synced under an old key carries lastSynced timestamps newer than the
+// newly-linked key's server manifest, which trips syncBucketMerge()'s noop
+// fast-path and makes the very next "Sync Now" pull nothing (the "I don't get
+// anything from the other device" symptom). Wipe it on every key change so the
+// first sync under a new key starts clean and does a pure union with whatever
+// that key already has on the server.
+function resetSyncState(): void {
+  if (typeof window === "undefined") return;
+  for (const bucket of BUCKETS) {
+    localStorage.removeItem(`${LAST_SYNCED_PREFIX}${bucket}`);
+    localStorage.removeItem(syncedIdsKey(bucket));
+  }
+  localStorage.removeItem(SETTINGS_TIMESTAMPS_KEY);
+}
+
 export function generateSyncKey(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16)); // 128 bits
   const hex = Array.from(bytes)
@@ -85,17 +104,20 @@ export function generateSyncKey(): string {
   const grouped = hex.match(/.{1,4}/g)!.join("-");
   localStorage.setItem(SYNC_KEY_STORAGE_KEY, grouped);
   cachedKeyMaterial = null;
+  resetSyncState();
   return grouped;
 }
 
 export function setSyncKey(key: string): void {
   localStorage.setItem(SYNC_KEY_STORAGE_KEY, key.trim());
   cachedKeyMaterial = null;
+  resetSyncState();
 }
 
 export function clearSyncKey(): void {
   localStorage.removeItem(SYNC_KEY_STORAGE_KEY);
   cachedKeyMaterial = null;
+  resetSyncState();
 }
 
 export function getLastSyncedTimes(): Partial<Record<SyncBucket, string>> {
