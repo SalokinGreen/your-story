@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNotification } from "@/app/misc/NotificationContext";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
+import FullScreenView from "@/app/components/FullScreenView";
 import { IconPicker } from "@/app/components/IconPicker";
 import { DraggableScroll } from "../components/DraggableScroll";
 import { LibrarySkeleton } from "@/app/components/Skeleton";
@@ -1360,12 +1361,29 @@ export default function NotesLibraryTab({
 
       {/* New/Edit Note Modal */}
       {editingNoteId && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-lg w-full max-h-[85vh] overflow-y-auto">
-            <h2 className="text-xl font-bold mb-4">
-              {editingNoteId === "new" ? "New Note" : "Edit Note"}
-            </h2>
-            <div className="space-y-4">
+        <FullScreenView
+          title={editingNoteId === "new" ? "New Note" : "Edit Note"}
+          icon="FileText"
+          onClose={closeNoteEditor}
+          footer={
+            <div className="max-w-lg mx-auto flex gap-3 p-4">
+              <button
+                onClick={closeNoteEditor}
+                className="flex-1 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNote}
+                disabled={!editNote.title?.trim() || savingNote}
+                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-50"
+              >
+                {savingNote ? "Saving..." : "Save"}
+              </button>
+            </div>
+          }
+        >
+          <div className="max-w-lg mx-auto space-y-4">
               <div>
                 <label className="block text-sm font-medium text-blue-200/70 mb-1">
                   Title
@@ -1457,24 +1475,8 @@ export default function NotesLibraryTab({
                 <DynamicIcon name="Pin" className="w-3.5 h-3.5" />
                 Pinned (shown at top of list)
               </label>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={closeNoteEditor}
-                className="flex-1 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveNote}
-                disabled={!editNote.title?.trim() || savingNote}
-                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-50"
-              >
-                {savingNote ? "Saving..." : "Save"}
-              </button>
-            </div>
           </div>
-        </div>
+        </FullScreenView>
       )}
 
       {/* Folder Dialogs */}

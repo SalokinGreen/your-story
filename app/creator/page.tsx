@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { StaticIcon } from "@/app/components/StaticIcon";
+import FullScreenView from "@/app/components/FullScreenView";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 
@@ -415,27 +416,50 @@ export default function CreatorLandingPage() {
 
       {/* Quick Generation Modal */}
       {showQuickModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-2xl p-6 max-w-2xl w-full shadow-2xl shadow-black/50 max-h-[90vh] overflow-y-auto">
-            {/* Modal Header */}
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <StaticIcon name="Zap" className="w-5 h-5 text-green-400" />
-                Quick Adventure Generation
-              </h3>
-              <button
-                onClick={() => {
-                  setShowQuickModal(false);
+        <FullScreenView
+          title={
+            selectedGenre ? `${selectedGenre.name} Adventure` : "Quick Adventure Generation"
+          }
+          subtitle={selectedGenre ? selectedGenre.description : undefined}
+          icon={selectedGenre ? selectedGenre.icon : "Zap"}
+          onClose={() => {
+            setShowQuickModal(false);
+            setSelectedGenre(null);
+            setShowCustomGenreInput(false);
+            setCustomGenreName("");
+          }}
+          onBack={
+            selectedGenre
+              ? () => {
                   setSelectedGenre(null);
-                  setShowCustomGenreInput(false);
                   setCustomGenreName("");
-                }}
-                className="text-blue-400 hover:text-white transition-colors"
-              >
-                <StaticIcon name="X" className="w-5 h-5" />
-              </button>
-            </div>
-
+                }
+              : undefined
+          }
+          footer={
+            selectedGenre ? (
+              <div className="max-w-2xl mx-auto flex gap-3 p-4">
+                <button
+                  onClick={() => {
+                    setShowQuickModal(false);
+                    setSelectedGenre(null);
+                  }}
+                  className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleQuickGenerate}
+                  className="flex-1 px-4 py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
+                >
+                  <StaticIcon name="Wand2" className="w-4 h-4" />
+                  Generate Adventure
+                </button>
+              </div>
+            ) : undefined
+          }
+        >
+          <div className="max-w-2xl mx-auto">
             {/* Genre Selection */}
             {!selectedGenre ? (
               <>
@@ -514,35 +538,6 @@ export default function CreatorLandingPage() {
               </>
             ) : (
               <>
-                {/* Genre Header */}
-                <div className="flex items-center gap-3 mb-6">
-                  <button
-                    onClick={() => {
-                      setSelectedGenre(null);
-                      setCustomGenreName("");
-                    }}
-                    className="text-blue-400 hover:text-white transition-colors"
-                  >
-                    <StaticIcon name="ArrowLeft" className="w-5 h-5" />
-                  </button>
-                  <div
-                    className={`w-12 h-12 rounded-full bg-linear-to-br ${selectedGenre.color} flex items-center justify-center`}
-                  >
-                    <StaticIcon
-                      name={selectedGenre.icon}
-                      className="w-6 h-6 text-white"
-                    />
-                  </div>
-                  <div>
-                    <h4 className="text-lg font-bold text-white">
-                      {selectedGenre.name} Adventure
-                    </h4>
-                    <p className="text-sm text-blue-300/60">
-                      {selectedGenre.description}
-                    </p>
-                  </div>
-                </div>
-
                 {/* Prompt Input */}
                 <div className="mb-4">
                   <label className="block text-sm font-medium text-blue-200 mb-2">
@@ -651,30 +646,10 @@ export default function CreatorLandingPage() {
                     </p>
                   </div>
                 </div>
-
-                {/* Buttons */}
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setShowQuickModal(false);
-                      setSelectedGenre(null);
-                    }}
-                    className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleQuickGenerate}
-                    className="flex-1 px-4 py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
-                  >
-                    <StaticIcon name="Wand2" className="w-4 h-4" />
-                    Generate Adventure
-                  </button>
-                </div>
               </>
             )}
           </div>
-        </div>
+        </FullScreenView>
       )}
     </div>
   );

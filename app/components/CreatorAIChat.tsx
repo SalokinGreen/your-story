@@ -18,6 +18,7 @@ import {
   CreatorChanges,
 } from "@/app/misc/creator_tool_executor";
 import { DynamicIcon } from "./DynamicIcon";
+import FullScreenView from "./FullScreenView";
 import ConfirmDialog from "./ConfirmDialog";
 import {
   AI_MODELS,
@@ -645,13 +646,6 @@ export default function CreatorAIChat({
     });
   };
 
-  // Handle click outside to close
-  const handleBackdropClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget && !isPinned) {
-      onClose();
-    }
-  };
-
   // Prevent body scroll when modal is open (not in pinned mode)
   useEffect(() => {
     if (isOpen && !isPinned) {
@@ -976,29 +970,17 @@ export default function CreatorAIChat({
 
   // Modal mode (default)
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-md p-2 sm:p-4 animate-in fade-in duration-200"
-      onClick={handleBackdropClick}
-    >
-      <div className="flex h-[95vh] sm:h-[90vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl bg-[#0d1829]/95 backdrop-blur-2xl shadow-2xl border border-white/10 ring-1 ring-black/5">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-white/10 bg-white/[0.03] backdrop-blur-md px-6 py-4 backdrop-blur-sm">
-          <div className="flex items-center gap-3">
-            <div>
-              <h2 className="text-xl font-bold bg-linear-to-r from-blue-600 via-purple-600 to-pink-600 bg-clip-text text-transparent flex items-center gap-2">
-                <DynamicIcon
-                  name="Sparkles"
-                  className="w-5 h-5 text-purple-500"
-                />{" "}
-                AI Creative Assistant
-              </h2>
-              <p className="text-xs text-blue-300/60 mt-0.5">
-                For your Adventures
-              </p>
-            </div>
+    <>
+      <FullScreenView
+      title="AI Creative Assistant"
+      subtitle="For your Adventures"
+      icon="Sparkles"
+      onClose={onClose}
+      headerActions={
+        <>
             {/* Thread Selector */}
             {adventureId && (
-              <div className="relative ml-2" data-thread-selector>
+              <div className="relative" data-thread-selector>
                 <button
                   onClick={() => setShowThreadSelector(!showThreadSelector)}
                   className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-blue-200/80 transition-colors border border-white/15"
@@ -1091,8 +1073,6 @@ export default function CreatorAIChat({
                 )}
               </div>
             )}
-          </div>
-          <div className="flex items-center gap-2">
             {activeThread && messages.length > 0 && (
               <button
                 onClick={handleClearChat}
@@ -1112,17 +1092,10 @@ export default function CreatorAIChat({
                 <DynamicIcon name="PanelRightOpen" className="w-5 h-5" />
               </button>
             )}
-            <button
-              onClick={onClose}
-              className="rounded-full p-2 text-blue-300/60 hover:bg-white/5 hover:text-blue-100 transition-colors"
-            >
-              <DynamicIcon name="X" className="w-6 h-6" />
-            </button>
-          </div>
-        </div>
-
-        {/* Settings Bar */}
-        <div className="border-b border-white/10 bg-[#0d1829]/90 backdrop-blur-xl px-4 py-3">
+        </>
+      }
+      tabs={
+        <div className="px-4 py-3">
           <div className="flex flex-wrap items-center gap-3">
             {/* BYOK/Coins Toggle */}
             <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0d1829]/95 backdrop-blur-2xl rounded-lg border border-white/10">
@@ -1221,11 +1194,46 @@ export default function CreatorAIChat({
               </p>
             </div>
           )}
-
         </div>
-
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-black/20">
+      }
+      bodyClassName="p-6 space-y-6 bg-black/20"
+      footer={
+        <div className="p-4 sm:p-6">
+          <div className="relative flex items-end gap-2 bg-[#0d1829]/95 backdrop-blur-2xl p-2 rounded-xl border border-white/10 focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-500 transition-all shadow-inner">
+            <textarea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Describe what you want to create..."
+              className="flex-1 resize-none bg-transparent px-3 py-2 text-white placeholder-gray-400 focus:outline-none max-h-32 min-h-11"
+              rows={1}
+              style={{ height: "auto" }}
+              onInput={(e) => {
+                const target = e.target as HTMLTextAreaElement;
+                target.style.height = "auto";
+                target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+              }}
+            />
+            <button
+              onClick={handleSend}
+              disabled={loading || !input.trim()}
+              className="mb-0.5 p-2 rounded-lg bg-linear-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg active:scale-95"
+            >
+              {loading ? (
+                <DynamicIcon name="Loader2" className="w-5 h-5 animate-spin" />
+              ) : (
+                <DynamicIcon name="Send" className="w-5 h-5" />
+              )}
+            </button>
+          </div>
+          <div className="text-center mt-2">
+            <span className="text-[10px] text-blue-300/50">
+              AI can make mistakes. Review generated content before applying.
+            </span>
+          </div>
+        </div>
+      }
+    >
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center text-blue-300/60 space-y-4 p-8">
               <div className="w-20 h-20 bg-linear-to-br from-blue-900/30 to-purple-900/30 rounded-full flex items-center justify-center text-4xl shadow-inner">
@@ -1312,44 +1320,7 @@ export default function CreatorAIChat({
             </div>
           )}
           <div ref={messagesEndRef} />
-        </div>
-
-        {/* Input */}
-        <div className="border-t border-white/10 bg-[#0d1829]/95 backdrop-blur-2xl p-4 sm:p-6">
-          <div className="relative flex items-end gap-2 bg-[#0d1829]/95 backdrop-blur-2xl p-2 rounded-xl border border-white/10 focus-within:ring-2 focus-within:ring-purple-500/50 focus-within:border-purple-500 transition-all shadow-inner">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Describe what you want to create..."
-              className="flex-1 resize-none bg-transparent px-3 py-2 text-white placeholder-gray-400 focus:outline-none max-h-32 min-h-11"
-              rows={1}
-              style={{ height: "auto" }}
-              onInput={(e) => {
-                const target = e.target as HTMLTextAreaElement;
-                target.style.height = "auto";
-                target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
-              }}
-            />
-            <button
-              onClick={handleSend}
-              disabled={loading || !input.trim()}
-              className="mb-0.5 p-2 rounded-lg bg-linear-to-r from-blue-600 to-purple-600 text-white hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-md hover:shadow-lg active:scale-95"
-            >
-              {loading ? (
-                <DynamicIcon name="Loader2" className="w-5 h-5 animate-spin" />
-              ) : (
-                <DynamicIcon name="Send" className="w-5 h-5" />
-              )}
-            </button>
-          </div>
-          <div className="text-center mt-2">
-            <span className="text-[10px] text-blue-300/50">
-              AI can make mistakes. Review generated content before applying.
-            </span>
-          </div>
-        </div>
-      </div>
+      </FullScreenView>
 
       {/* Confirmation Dialog */}
       <ConfirmDialog
@@ -1364,7 +1335,7 @@ export default function CreatorAIChat({
           setConfirmDialog((prev) => ({ ...prev, isOpen: false }))
         }
       />
-    </div>
+    </>
   );
 }
 

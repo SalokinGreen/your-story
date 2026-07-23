@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { DynamicIcon } from "./DynamicIcon";
+import FullScreenView from "./FullScreenView";
 import { DraggableScroll } from "./DraggableScroll";
 import { LoreType } from "@/app/misc/structs";
 import {
@@ -258,30 +259,16 @@ export default function LibraryPickerModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl border border-white/10 w-full max-w-2xl max-h-[85vh] flex flex-col shadow-2xl shadow-black/50">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 p-4 border-b border-white/10">
-          <div>
-            <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-              <DynamicIcon
-                name="Library"
-                className="w-5 h-5 text-purple-400"
-              />
-              {title}
-            </h3>
-            <p className="text-xs text-blue-200/50 mt-0.5">{description}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-white/10 rounded-lg transition-colors shrink-0"
-          >
-            <DynamicIcon name="X" className="w-5 h-5 text-blue-300" />
-          </button>
-        </div>
-
-        {includeTables && (
-          <div className="flex border-b border-white/10">
+    <FullScreenView
+      title={title}
+      subtitle={description}
+      icon="Library"
+      onClose={onClose}
+      className="z-60"
+      bodyClassName="p-0"
+      tabs={
+        includeTables ? (
+          <div className="flex">
             <button
               onClick={() => setTab("notes")}
               className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
@@ -307,10 +294,43 @@ export default function LibraryPickerModal({
               {selectedTableIds.size > 0 && ` (${selectedTableIds.size})`}
             </button>
           </div>
-        )}
-
+        ) : undefined
+      }
+      footer={
+        <div className="flex items-center justify-between p-4">
+          <span className="text-xs text-blue-300/50">
+            {totalSelected} selected
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            {onSkip && (
+              <button
+                onClick={onSkip}
+                className="px-4 py-2 text-sm text-blue-200 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+              >
+                {skipLabel}
+              </button>
+            )}
+            <button
+              onClick={handleConfirm}
+              disabled={totalSelected === 0}
+              className="px-4 py-2 text-sm bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:from-white/10 disabled:to-white/10 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all flex items-center gap-2"
+            >
+              <DynamicIcon name="Import" className="w-4 h-4" />
+              {confirmLabel || "Attach Selected"}
+            </button>
+          </div>
+        </div>
+      }
+    >
+      <div className="flex flex-col h-full">
         {/* Filters */}
-        <div className="p-4 space-y-3 border-b border-white/10">
+        <div className="p-4 space-y-3 border-b border-white/10 shrink-0">
           <div className="relative">
             <input
               type="text"
@@ -561,38 +581,7 @@ export default function LibraryPickerModal({
             </div>
           </>
         )}
-
-        {/* Footer */}
-        <div className="flex items-center justify-between p-4 border-t border-white/10">
-          <span className="text-xs text-blue-300/50">
-            {totalSelected} selected
-          </span>
-          <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-2 text-sm text-blue-300 hover:bg-white/10 rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-            {onSkip && (
-              <button
-                onClick={onSkip}
-                className="px-4 py-2 text-sm text-blue-200 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
-              >
-                {skipLabel}
-              </button>
-            )}
-            <button
-              onClick={handleConfirm}
-              disabled={totalSelected === 0}
-              className="px-4 py-2 text-sm bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-40 disabled:from-white/10 disabled:to-white/10 text-white rounded-lg shadow-md shadow-purple-950/40 transition-all flex items-center gap-2"
-            >
-              <DynamicIcon name="Import" className="w-4 h-4" />
-              {confirmLabel || "Attach Selected"}
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </FullScreenView>
   );
 }

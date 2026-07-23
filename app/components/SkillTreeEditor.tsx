@@ -17,6 +17,7 @@ import {
   validateSkillTree,
 } from "../misc/skillTree";
 import { DynamicIcon } from "./DynamicIcon";
+import FullScreenView from "./FullScreenView";
 import { IconPicker } from "./IconPicker";
 import { ABILITY_GRADE_CONFIG } from "../misc/abilitySystem";
 
@@ -654,19 +655,34 @@ export default function SkillTreeEditor({
 
       {/* Node Edit Modal */}
       {showNodeModal && editingNode && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-          <div className="bg-[#0d1829]/95 backdrop-blur-2xl rounded-2xl p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/10 shadow-2xl shadow-black/50">
-            <h3 className="text-lg sm:text-xl font-bold text-white mb-4 flex items-center gap-2">
-              <DynamicIcon
-                name={NODE_TYPE_ICONS[editingNode.type]}
-                className={`w-5 h-5 sm:w-6 sm:h-6 ${
-                  NODE_COLORS[editingNode.type].text
-                }`}
-              />
-              Edit Node
-            </h3>
-
-            <div className="space-y-4">
+        <FullScreenView
+          title="Edit Node"
+          icon={NODE_TYPE_ICONS[editingNode.type]}
+          onClose={() => {
+            setShowNodeModal(false);
+            setEditingNode(null);
+          }}
+          footer={
+            <div className="max-w-2xl mx-auto flex gap-3 p-4">
+              <button
+                onClick={() => {
+                  setShowNodeModal(false);
+                  setEditingNode(null);
+                }}
+                className="flex-1 px-4 py-2 font-medium rounded-lg bg-white/5 text-blue-200 hover:bg-white/10 border border-white/10 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveNodeEdit}
+                className="flex-1 px-4 py-2 font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
+              >
+                Save Node
+              </button>
+            </div>
+          }
+        >
+          <div className="max-w-2xl mx-auto space-y-4">
               {/* Basic Info */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
@@ -1347,27 +1363,7 @@ export default function SkillTreeEditor({
                 </div>
               </div>
             </div>
-
-            {/* Modal Actions */}
-            <div className="flex gap-3 mt-6 pt-4 border-t border-white/10">
-              <button
-                onClick={() => {
-                  setShowNodeModal(false);
-                  setEditingNode(null);
-                }}
-                className="flex-1 px-4 py-2 font-medium rounded-lg bg-white/5 text-blue-200 hover:bg-white/10 border border-white/10 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveNodeEdit}
-                className="flex-1 px-4 py-2 font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-colors"
-              >
-                Save Node
-              </button>
-            </div>
-          </div>
-        </div>
+        </FullScreenView>
       )}
 
       {/* Instructions */}
