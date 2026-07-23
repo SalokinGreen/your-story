@@ -374,6 +374,12 @@ export interface ScenePart {
   // turns and the judge confirmed worth flagging. Never shown to the
   // player, carried forward the same way as storyProgressNote.
   repetitionNote?: string;
+  // NPC knowledge-consistency callout from the same Layer 3 check-in (see
+  // storyProgressObserver.ts's KNOWLEDGE_SYSTEM_ADDENDUM): GM-facing note
+  // when an NPC displayed knowledge it had no established way of having,
+  // per the visible narration window. Advisory only, never shown to the
+  // player, carried forward the same way as storyProgressNote.
+  knowledgeNote?: string;
   npcReactions?: NPCReaction[]; // NPC reactions to show as notifications (e.g., "Lisa liked this")
   endChapter?: boolean;
   endStory?: boolean;

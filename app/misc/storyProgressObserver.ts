@@ -33,6 +33,23 @@
  * tics versus a name/setting that's supposed to recur is still handed to
  * the same LLM call as the pacing judgment, one extra conditional section
  * in the same prompt rather than a second API call.
+ *
+ * Also riding the same call: NPC knowledge-consistency - an NPC narrated as
+ * reacting to or acting on something they had no established way of
+ * knowing (not present when it was revealed, never told). Unlike the
+ * repeated-phrase check, there's no deterministic pre-filter possible here:
+ * this codebase has no structured "who was present"/"who was told what"
+ * data (secrets and knowledge live in freeform lore notes and prose, per
+ * this app's "notes, not stat blocks" design), so it's pure LLM judgment
+ * reading the same narration window. That makes it exactly the kind of
+ * "general-purpose consistency grading of arbitrary prose" this codebase is
+ * normally wary of (see consistencyCheck.ts's doc comment) - deliberately
+ * scoped down to compensate: judged only against what's visible in the
+ * window itself (never assumes something couldn't have happened offscreen
+ * or before the window), always advisory/log-only (see
+ * DEFAULT_OBSERVER_SETTINGS-style posture - this has no reset path at all,
+ * unlike observer.ts's major-severity checks), and folded into the same
+ * note the GM sees next turn rather than surfaced as its own alarm.
  */
 
 import { StoryData } from "./structs";
@@ -168,6 +185,8 @@ export interface StoryProgressResult {
   repeatedPhrases?: string[];
   /** 1-2 sentence GM-facing note calling out the repeated phrases and asking for variety. Undefined if none were flagged. */
   repetitionNote?: string;
+  /** 1-2 sentence GM-facing note calling out an NPC who displayed knowledge they had no established way of having, per the visible narration window. Undefined if none was flagged. */
+  knowledgeNote?: string;
 }
 
 const SYSTEM_PROMPT_BASE = `You are the story-progress reviewer for an interactive fiction game's AI game master ("GM"). You check in periodically - not every turn - to judge how the *overall pacing and forward momentum* of the story has been over the recent stretch, not any single turn's prose quality.
@@ -183,14 +202,18 @@ const REPETITION_SYSTEM_ADDENDUM = `
 
 You're also given a list of phrases a mechanical word-counter found repeated verbatim across several of these turns. Some repetition is expected and fine - a character's name, an established location, a recurring in-world term. Others are lazy prose tics - the same stock description, sensory beat, or turn of phrase reused instead of varied. Decide which of the candidates (if any) are the latter, list only those in "repeated_phrases", and if you flagged any, write one or two direct sentences in "repetition_note" telling the GM which phrases it's leaning on too hard and to vary its language. If none of the candidates are worth flagging, return an empty array and omit "repetition_note".`;
 
+const KNOWLEDGE_SYSTEM_ADDENDUM = `
+
+You're also watching for one specific consistency problem: an NPC in this narration displaying knowledge of something they had no established way of knowing - reacting to, referencing, or acting on a fact, secret, or discovery that, as far as THIS WINDOW of narration shows, they were never present for and were never told. This is easy to get wrong, so be conservative: only flag a case where the window itself makes the impossibility clear (the information was revealed in one turn to someone else, in this NPC's clear absence, and nothing in the window shows them being told before they act on it). If the NPC could plausibly have learned it offscreen, before this window, from someone or something not shown here - or you're just not sure - do NOT flag it; silence is the safe default. If you do flag one, set "knowledge_issue" to true and write one or two direct sentences in "knowledge_note" naming the NPC and what they shouldn't know. Otherwise set "knowledge_issue" to false and omit "knowledge_note".`;
+
 function buildSystemPrompt(hasPhraseCandidates: boolean): string {
   const repetitionJsonField = hasPhraseCandidates
     ? `, "repeated_phrases": [<flagged phrases, empty array if none>], "repetition_note": "<1-2 sentences, omit or empty if none flagged>"`
     : "";
-  return `${SYSTEM_PROMPT_BASE}${hasPhraseCandidates ? REPETITION_SYSTEM_ADDENDUM : ""}
+  return `${SYSTEM_PROMPT_BASE}${hasPhraseCandidates ? REPETITION_SYSTEM_ADDENDUM : ""}${KNOWLEDGE_SYSTEM_ADDENDUM}
 
 Respond with ONLY a JSON object, no other text:
-{"status": "on_track"|"dragging"|"rushing", "note": "<1-2 sentences>"${repetitionJsonField}}`;
+{"status": "on_track"|"dragging"|"rushing", "note": "<1-2 sentences>"${repetitionJsonField}, "knowledge_issue": true|false, "knowledge_note": "<1-2 sentences, omit or empty if false>"}`;
 }
 
 interface StoryProgressJudgment {
@@ -198,6 +221,7 @@ interface StoryProgressJudgment {
   note: string;
   repeatedPhrases: string[];
   repetitionNote: string;
+  knowledgeNote: string;
 }
 
 function extractJudgment(content: string): StoryProgressJudgment | null {
@@ -220,7 +244,11 @@ function extractJudgment(content: string): StoryProgressJudgment | null {
       : [];
     const repetitionNote =
       typeof parsed.repetition_note === "string" ? parsed.repetition_note.trim() : "";
-    return { status, note, repeatedPhrases, repetitionNote };
+    const knowledgeNote =
+      parsed.knowledge_issue === true && typeof parsed.knowledge_note === "string"
+        ? parsed.knowledge_note.trim()
+        : "";
+    return { status, note, repeatedPhrases, repetitionNote, knowledgeNote };
   } catch {
     return null;
   }
@@ -375,5 +403,6 @@ export async function runStoryProgressObserver(
     note: judgment.note,
     repeatedPhrases: judgment.repeatedPhrases.length ? judgment.repeatedPhrases : undefined,
     repetitionNote: judgment.repetitionNote || undefined,
+    knowledgeNote: judgment.knowledgeNote || undefined,
   };
 }

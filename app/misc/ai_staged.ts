@@ -974,6 +974,7 @@ export function buildGMStagePrompt({
   observerNote,
   storyProgressNote,
   repetitionNote,
+  knowledgeNote,
   usesNativeReasoning = false,
 }: {
   storyData: StoryData;
@@ -1010,6 +1011,11 @@ export function buildGMStagePrompt({
   // recurring across recent turns and the judge confirmed worth flagging.
   // GM-facing only, never mentioned to the player.
   repetitionNote?: string;
+  // Same check-in's NPC knowledge-consistency callout: an NPC the judge
+  // believes displayed knowledge it had no established way of having,
+  // going only by the visible narration window. Advisory only - GM-facing,
+  // never mentioned to the player.
+  knowledgeNote?: string;
 }): { messages: ChatMessage[]; tools: any[] } {
   const lengthGuidance = getLengthGuidance(replyLength);
   const pacingFeedbackLine = pacingNote ? `\n${pacingNote}` : "";
@@ -1021,6 +1027,9 @@ export function buildGMStagePrompt({
     : "";
   const repetitionNoteBlock = repetitionNote
     ? `\n\n## REPEATED PHRASES\n${repetitionNote}`
+    : "";
+  const knowledgeNoteBlock = knowledgeNote
+    ? `\n\n## NPC KNOWLEDGE CHECK\n${knowledgeNote}`
     : "";
   const difficulty = storyData.difficulty || "medium";
 
@@ -1354,7 +1363,7 @@ ${freshStorySetupBlock}
 - NEVER decide what the player character says, thinks, feels, or does next. You resolve outcomes for the action they already declared - you don't invent their next action.
 - You control NPCs, monsters, the environment, and dice/table results. Everything about the player character's choices belongs to the player.
 - Resolve ONE beat at a time: the current action and its immediate consequence. Don't chain a second unrequested event, enemy turn, or complication onto the same turn "for free" - stop and hand control back at the next decision point.
-- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.${observerNoteBlock}${storyProgressNoteBlock}${repetitionNoteBlock}
+- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.${observerNoteBlock}${storyProgressNoteBlock}${repetitionNoteBlock}${knowledgeNoteBlock}
 
 ## LENGTH & PACING
 A real tabletop GM talks in a few sentences and hands the mic back - they don't narrate a mini scene around every action. Match your narration length to the moment, and end the instant the player has something to react to:

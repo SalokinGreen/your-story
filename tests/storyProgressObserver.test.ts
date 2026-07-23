@@ -416,6 +416,69 @@ describe("runStoryProgressObserver", () => {
     expect(userMessage).not.toContain("mechanical word-counter");
   });
 
+  it("surfaces a knowledge-consistency note when the judge flags one", async () => {
+    const storyData = createMockStoryData();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          status: "on_track",
+          note: "Good momentum.",
+          knowledge_issue: true,
+          knowledge_note:
+            "Marcus reacted to the stolen ledger even though he wasn't in the room when Elena found it and no one told him.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await runStoryProgressObserver(storyData, "Turn.", apiOptions, 1);
+
+    expect(result.knowledgeNote).toBe(
+      "Marcus reacted to the stolen ledger even though he wasn't in the room when Elena found it and no one told him.",
+    );
+    const requestBody = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    const systemMessage = requestBody.messages.find((m: { role: string }) => m.role === "system")
+      .content as string;
+    expect(systemMessage).toContain("knowledge_issue");
+  });
+
+  it("leaves knowledgeNote undefined when the judge reports no knowledge issue", async () => {
+    const storyData = createMockStoryData();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          status: "on_track",
+          note: "Good momentum.",
+          knowledge_issue: false,
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await runStoryProgressObserver(storyData, "Turn.", apiOptions, 1);
+
+    expect(result.knowledgeNote).toBeUndefined();
+  });
+
+  it("leaves knowledgeNote undefined when the response omits the knowledge fields entirely (backward compat)", async () => {
+    const storyData = createMockStoryData();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ status: "on_track", note: "Keep it up." }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await runStoryProgressObserver(storyData, "Turn.", apiOptions, 1);
+
+    expect(result.knowledgeNote).toBeUndefined();
+    expect(result.status).toBe("on_track");
+    expect(result.note).toBe("Keep it up.");
+  });
+
   it("defaults to DEFAULT_STORY_PROGRESS_CHECK_INTERVAL when no interval is passed", async () => {
     const storyData = createMockStoryData();
     const fetchMock = vi.fn();
