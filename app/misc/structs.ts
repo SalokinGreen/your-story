@@ -414,7 +414,8 @@ export type ObserverFlagType =
   | "response_length"
   | "missing_oracle_or_table"
   | "missing_scene_increment"
-  | "outcome_narration_mismatch";
+  | "outcome_narration_mismatch"
+  | "tier_escalation_missed";
 export type ObserverSeverity = "minor" | "major";
 
 export interface ObserverFlag {

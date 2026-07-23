@@ -108,6 +108,8 @@ import {
   getTierState,
   getEffectiveTiers,
   getEffectiveNarrationModelKey,
+  applyTierEscalation,
+  TOP_TIER,
 } from "@/app/misc/reasoningTiers";
 import { getCustomModelIfUUID, CustomModel } from "@/app/misc/user_settings";
 
@@ -239,6 +241,13 @@ export interface GenerationOptions {
   // Same check-in's NPC knowledge-consistency callout - set internally the
   // same way as storyProgressNote.
   knowledgeNote?: string;
+  // Set internally by generateStoryTurn when a tier_escalation_missed
+  // observer flag forces a full-turn retry (observer.ts) - floors the GM
+  // stage's starting tier for that retry so the forced escalation actually
+  // takes effect, instead of being immediately undone by the normal
+  // decay-toward-baseline step that assumes each call is a new turn rather
+  // than a retry of the same one.
+  forcedStartingTier?: number;
 }
 
 export interface GenerationCallbacks {
@@ -761,6 +770,10 @@ export async function generateStoryTurn(
   const repetitionNote: string | undefined = lastAssistantPart?.repetitionNote;
   const knowledgeNote: string | undefined = lastAssistantPart?.knowledgeNote;
   let resetAttempts = 0;
+  // Set only when a tier_escalation_missed flag forces a full-turn retry
+  // (see below) - floors the retry's GM-stage starting tier so the forced
+  // escalation isn't immediately undone by the normal turn-to-turn decay.
+  let forcedStartingTier: number | undefined;
 
   while (true) {
     const result = await generateStoryTurnOnce(
@@ -772,6 +785,7 @@ export async function generateStoryTurn(
         storyProgressNote,
         repetitionNote,
         knowledgeNote,
+        forcedStartingTier,
         // A reset discards the previous attempt's tool calls/narration - if
         // it also came with a precomputedGMConversation (manual Retry flow),
         // replaying that would just replay the flagged content, so force a
@@ -820,6 +834,12 @@ export async function generateStoryTurn(
       ...resolveSideCallModel(observerModelOverride, sideCallApiOptions.model),
     };
 
+    // The tier the GM stage actually ran at this turn - reasoningTierState is
+    // mutated directly on storyData through generateStoryTurnOnce, so it
+    // reflects the final round's tier here (see checkTierEscalation, which
+    // judges the completed turn against this).
+    const tierUsedThisTurn = storyData.reasoningTierState?.currentTier;
+
     let flags: ObserverFlag[] = [];
     try {
       flags = await runObserver({
@@ -832,6 +852,7 @@ export async function generateStoryTurn(
           success: r.success,
           contextForStory: r.contextForStory,
         })),
+        tierUsed: tierUsedThisTurn,
         settings: observerSettings,
         apiOptions: observerApiOptions,
       });
@@ -888,27 +909,35 @@ export async function generateStoryTurn(
       // stay untouched. Only falls back to the old full-turn reset
       // (rollback + a completely fresh blind attempt, which can reroll dice
       // into a different outcome) if the rewrite call itself fails.
+      //
+      // tier_escalation_missed is the one exception: it's a complaint that
+      // the turn ran at too low a reasoning tier, not about the narration
+      // text - rewriting the prose at the same (insufficient) tier wouldn't
+      // add any brainpower, so it skips straight to the full-turn reset
+      // below, which also forces the retry onto a higher tier.
       let rewrittenNarration: string | null = null;
-      try {
-        rewrittenNarration = await rewriteFlaggedNarration({
-          narration: result.content,
-          playerChoice: userChoice,
-          gmStoryContext: result.gmStoryContext,
-          flag: majorFlag,
-          replyLength: options.replyLength,
-          storytellerMode: options.storytellerMode,
-          apiOptions: sideCallApiOptions,
-        });
-      } catch (rewriteError) {
-        logger.action(
-          "Observer rewrite call failed, falling back to full-turn reset",
-          {
-            error:
-              rewriteError instanceof Error
-                ? rewriteError.message
-                : String(rewriteError),
-          },
-        );
+      if (majorFlag.type !== "tier_escalation_missed") {
+        try {
+          rewrittenNarration = await rewriteFlaggedNarration({
+            narration: result.content,
+            playerChoice: userChoice,
+            gmStoryContext: result.gmStoryContext,
+            flag: majorFlag,
+            replyLength: options.replyLength,
+            storytellerMode: options.storytellerMode,
+            apiOptions: sideCallApiOptions,
+          });
+        } catch (rewriteError) {
+          logger.action(
+            "Observer rewrite call failed, falling back to full-turn reset",
+            {
+              error:
+                rewriteError instanceof Error
+                  ? rewriteError.message
+                  : String(rewriteError),
+            },
+          );
+        }
       }
 
       if (rewrittenNarration) {
@@ -992,6 +1021,24 @@ export async function generateStoryTurn(
           delete (storyData as unknown as Record<string, unknown>)[key];
         }
         Object.assign(storyData, preTurnSnapshot);
+
+        if (majorFlag.type === "tier_escalation_missed") {
+          const requestedTier = Math.min(
+            TOP_TIER,
+            (tierUsedThisTurn ?? SCENE_BASELINE_TIER) + 1,
+          );
+          const escalation = applyTierEscalation(
+            storyData,
+            requestedTier,
+            majorFlag.detail,
+          );
+          forcedStartingTier = escalation.grantedTier;
+          logger.action("Observer forced a reasoning-tier escalation for retry", {
+            previousTier: tierUsedThisTurn,
+            grantedTier: escalation.grantedTier,
+            capped: escalation.capped,
+          });
+        }
 
         observerNote = majorFlag.correctivePrompt;
         callbacks.onObserverReset?.(flags, majorFlag);
@@ -1291,6 +1338,7 @@ async function generateStoryTurnOnce(
           hardRuleFloor(storyData),
           classifyTier(storyData, gmUserChoice),
           decayedTier,
+          options.forcedStartingTier ?? 0,
         );
 
         if (isClassificationAmbiguous(storyData, gmUserChoice)) {

@@ -14,6 +14,7 @@ import {
   checkPlayerAgencyViolation,
   checkOutcomeMismatch,
   checkToolUsageGaps,
+  checkTierEscalation,
   runObserver,
   buildObserverWarningNote,
   rewriteFlaggedNarration,
@@ -22,6 +23,7 @@ import {
   ObserverCheckSettings,
 } from "../app/misc/observer";
 import type { ObserverFlag } from "../app/misc/structs";
+import { TOP_TIER } from "../app/misc/reasoningTiers";
 
 function checkSettings(overrides: Partial<ObserverCheckSettings> = {}): ObserverCheckSettings {
   return { enabled: true, triggersReset: true, sensitivity: 5, ...overrides };
@@ -768,6 +770,118 @@ describe("checkToolUsageGaps", () => {
   });
 });
 
+describe("checkTierEscalation", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("returns null for empty narration without calling the API", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkTierEscalation("", "I open the door", 0, {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flag).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips the API call entirely when disabled", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkTierEscalation(
+      "You strike a bargain with the ancient spirit.",
+      "Negotiate with the spirit",
+      0,
+      { model: "test-model", token: "tok" },
+      checkSettings({ enabled: false }),
+    );
+
+    expect(flag).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("skips the API call entirely when already at the top tier - nothing to escalate to", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkTierEscalation(
+      "The final confrontation begins.",
+      "Attack the boss",
+      TOP_TIER,
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("flags a turn the judge says needed a higher tier", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          should_escalate: true,
+          reason: "This was a campaign-shaping decision that deserved careful adjudication.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkTierEscalation(
+      "You decide whether to betray the kingdom, forever changing the war's course.",
+      "Decide whether to betray the kingdom",
+      0,
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).not.toBeNull();
+    expect(flag?.type).toBe("tier_escalation_missed");
+    expect(flag?.severity).toBe("major");
+    expect(flag?.detail).toContain("campaign-shaping decision");
+    expect(flag?.correctivePrompt).toContain("higher reasoning tier");
+  });
+
+  it("returns null when the judge says the tier used was fine", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ should_escalate: false, reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkTierEscalation(
+      "You chat with the innkeeper about the weather.",
+      "Ask the innkeeper about the weather",
+      0,
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).toBeNull();
+  });
+
+  it("fails open (returns null) when the API call errors", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkTierEscalation(
+      "Something happens.",
+      "Do something",
+      0,
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).toBeNull();
+  });
+});
+
 describe("runObserver", () => {
   const originalFetch = global.fetch;
 
@@ -843,6 +957,57 @@ describe("runObserver", () => {
 
     expect(flags.some((f) => f.type === "missing_oracle_or_table")).toBe(true);
     expect(flags.some((f) => f.type === "missing_scene_increment")).toBe(false);
+  });
+
+  it("skips the tier check entirely when tierUsed is not passed", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ violation: false, severity: "minor", reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: "You decide whether to betray the kingdom.",
+      playerChoice: "Decide whether to betray the kingdom",
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(flags.some((f) => f.type === "tier_escalation_missed")).toBe(false);
+  });
+
+  it("includes a tier_escalation_missed flag when tierUsed is passed and the judge flags it", async () => {
+    const fetchMock = vi.fn().mockImplementation(async (_url, init) => {
+      const body = JSON.parse(init.body);
+      const isTierCall = (body.messages[0].content as string).includes(
+        "reasoning tier",
+      );
+      return {
+        ok: true,
+        json: async () =>
+          isTierCall
+            ? {
+                content: JSON.stringify({
+                  should_escalate: true,
+                  reason: "Deserved more careful adjudication.",
+                }),
+              }
+            : {
+                content: JSON.stringify({ violation: false, severity: "minor", reason: "" }),
+              },
+      };
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: "You decide whether to betray the kingdom.",
+      playerChoice: "Decide whether to betray the kingdom",
+      tierUsed: 0,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(flags.some((f) => f.type === "tier_escalation_missed")).toBe(true);
   });
 });
 

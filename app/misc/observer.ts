@@ -75,6 +75,7 @@ import { ObserverFlag, ObserverFlagType } from "./structs";
 import { ReplyLength, getLengthGuidance } from "./ai_staged";
 import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
 import { getCustomModelIfUUID } from "./user_settings";
+import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
 
 // ============================================================
 // PER-FLAG-TYPE CONFIGURATION
@@ -135,6 +136,7 @@ export const DEFAULT_OBSERVER_SETTINGS: ObserverSettings = {
   outcome_narration_mismatch: { ...DEFAULT_CHECK_SETTINGS },
   missing_oracle_or_table: { ...DEFAULT_CHECK_SETTINGS, triggersReset: false },
   missing_scene_increment: { ...DEFAULT_CHECK_SETTINGS, triggersReset: false },
+  tier_escalation_missed: { ...DEFAULT_CHECK_SETTINGS },
 };
 
 /** Settings for one flag type, falling back to its default for any field a partial/future config omits. */
@@ -840,12 +842,139 @@ export async function checkToolUsageGaps(
   return flags;
 }
 
+interface TierEscalationResult {
+  shouldEscalate: boolean;
+  reason: string;
+}
+
+function extractTierEscalationJson(content: string): TierEscalationResult | null {
+  const parsed = extractJsonObject(content);
+  if (!parsed || typeof parsed.should_escalate !== "boolean") return null;
+  return {
+    shouldEscalate: parsed.should_escalate,
+    reason: typeof parsed.reason === "string" ? parsed.reason.trim() : "",
+  };
+}
+
+async function callTierEscalationApi(
+  narration: string,
+  playerChoice: string,
+  tierUsed: number,
+  tiers: ReasoningTier[],
+  apiOptions: ObserverApiOptions,
+  sensitivity: number,
+): Promise<TierEscalationResult | null> {
+  const usedNote = tiers[tierUsed]?.note ?? "default";
+  const higherTierNotes = tiers
+    .map((t, i) => ({ i, note: t.note }))
+    .filter(({ i }) => i > tierUsed)
+    .map(({ i, note }) => `- tier ${i}: ${note}`)
+    .join("\n");
+
+  const system = `You are a strict but fair reviewer for a tabletop-style interactive fiction game. This turn's Game Master AI ran at reasoning tier ${tierUsed} (reserved for: ${usedNote}). Higher tiers exist for turns that need more careful adjudication:
+${higherTierNotes}
+
+Given the player's declared action and the GM's narration, judge whether this turn's own content - not its writing quality - was actually complex or high-stakes enough (a pivotal decision, a nuanced multi-step consequence, a moment demanding careful rules adjudication) that it should have run at a higher tier than tier ${tierUsed}.
+
+${sensitivityInstruction(sensitivity)}
+
+Respond with ONLY a JSON object, no other text:
+{"should_escalate": true|false, "reason": "<one sentence, empty string if not applicable>"}`;
+
+  const user = `Player's declared action:\n"""\n${playerChoice.trim() || "(none - opening scene)"}\n"""\n\nGM's narration (ran at tier ${tierUsed}):\n"""\n${narration.trim()}\n"""`;
+
+  try {
+    const response = await fetch("/api/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiOptions.token}`,
+      },
+      body: JSON.stringify({
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: user },
+        ],
+        model: apiOptions.model,
+        maxTokens: 200,
+        temperature: 0,
+        openRouterKey: apiOptions.openRouterKey,
+        deepseekKey: apiOptions.deepseekKey,
+        googleKey: apiOptions.googleKey,
+        mistralKey: apiOptions.mistralKey,
+        deepinfraKey: apiOptions.deepinfraKey,
+        customModel: getCustomModelIfUUID(apiOptions.model),
+        reasoningEffort: apiOptions.reasoningEffort,
+      }),
+      signal: apiOptions.abortSignal,
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const content = (data.content || "").trim();
+    if (!content) return null;
+
+    return extractTierEscalationJson(content);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Checks whether this turn's own complexity/stakes warranted a higher
+ * reasoning tier than it actually ran at - the model failing to recognize a
+ * turn needed more "brainpower" and self-escalate via set_reasoning_tier
+ * (reasoningTiers.ts), when nothing else (combat, declared stakes, the
+ * deterministic classifier) caught it either. Skipped once the turn is
+ * already at TOP_TIER - there's nowhere higher to escalate to. Unlike every
+ * other check here, this is never advisory-only in practice: a miss can't be
+ * fixed by rewriting the narration (the turn already ran at an insufficient
+ * tier), so generateStoryTurn (generation.ts) special-cases this flag type to
+ * skip the rewrite-first step and go straight to a full rollback + forced
+ * tier escalation before retrying.
+ */
+export async function checkTierEscalation(
+  narration: string,
+  playerChoice: string,
+  tierUsed: number,
+  apiOptions: ObserverApiOptions,
+  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.tier_escalation_missed,
+): Promise<ObserverFlag | null> {
+  if (!settings.enabled || !narration.trim()) return null;
+  if (tierUsed >= TOP_TIER) return null;
+
+  const tiers = getEffectiveTiers();
+  const result = await callTierEscalationApi(
+    narration,
+    playerChoice,
+    tierUsed,
+    tiers,
+    apiOptions,
+    settings.sensitivity,
+  );
+  if (!result || !result.shouldEscalate) return null;
+
+  const reason =
+    result.reason ||
+    `This turn's complexity called for more careful adjudication than tier ${tierUsed} provides.`;
+
+  return {
+    type: "tier_escalation_missed",
+    severity: "major",
+    detail: reason,
+    correctivePrompt: `Your previous attempt at this turn was reset because it needed more careful adjudication than it got: ${reason} This retry is running at a higher reasoning tier - take the extra room to think the stakes and consequences through before resolving the action.`,
+  };
+}
+
 export interface ObserverParams {
   narration: string;
   playerChoice: string;
   replyLength?: ReplyLength;
   toolNames?: string[];
   rollResults?: RollOutcomeForCheck[];
+  /** Tier the GM stage actually ran at this turn (see reasoningTiers.ts) - omit to skip checkTierEscalation entirely. */
+  tierUsed?: number;
   apiOptions: ObserverApiOptions;
   /** Per-flag-type enable/reset/sensitivity config - defaults to DEFAULT_OBSERVER_SETTINGS (today's shipped behavior) for any type a partial/future config omits. */
   settings?: ObserverSettings;
@@ -893,6 +1022,17 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
     settingsFor(params.settings, "missing_scene_increment"),
   );
   flags.push(...toolUsageFlags);
+
+  if (params.tierUsed !== undefined) {
+    const tierFlag = await checkTierEscalation(
+      params.narration,
+      params.playerChoice,
+      params.tierUsed,
+      params.apiOptions,
+      settingsFor(params.settings, "tier_escalation_missed"),
+    );
+    if (tierFlag) flags.push(tierFlag);
+  }
 
   return flags;
 }
