@@ -255,6 +255,17 @@ export interface GenerationCallbacks {
   onGMStageStart?: () => void;
   // NEW: Stream GM content as it generates (thinking text)
   onGMContent?: (content: string, fullContent: string) => void;
+  // Live narration text for TTS/auto-narrate purposes: the player-visible
+  // prose accumulated across every GM round so far this turn (same
+  // accumulation gmFinalStoryContent uses below), recomputed on every GM
+  // content delta. Unlike onGMContent (the raw current-round buffer, which
+  // may still contain <thinking> tags and resets every round), this is the
+  // one running "story so far" text - without it, the common inline-
+  // narration path (GM's own final round writes the story - see
+  // gmFinalStoryContent) only ever hands the story to the UI in one lump at
+  // the very end via onStoryContent, so live/streaming TTS has nothing to
+  // read until generation is already finished.
+  onLiveNarrationUpdate?: (visibleTextSoFar: string) => void;
   // Stream the model's native reasoning/CoT field as it generates (only
   // fires for providers that support it, e.g. DeepSeek reasoner,
   // OpenRouter reasoning-enabled models) - scoped to the current GM round,
@@ -1613,6 +1624,14 @@ async function generateStoryTurnOnce(
               gmContent += event.content;
               // Stream GM content to callback for real-time display
               callbacks.onGMContent?.(event.content, gmContent);
+              // Same accumulation gmFinalStoryContent uses below, computed
+              // live so TTS can start speaking narration as it's written
+              // instead of waiting for the whole GM stage to finish.
+              callbacks.onLiveNarrationUpdate?.(
+                extractVisibleText(
+                  [...gmAccumulatedStory, gmContent].join("\n\n"),
+                ),
+              );
             }
             if (event.type === "reasoning" && event.content) {
               gmReasoning += event.content;

@@ -92,6 +92,13 @@ interface StoryProps {
   // Chronological thinking/tool/text blocks for the turn currently
   // generating - see turnTimeline.ts
   liveGMEntries?: TimelineBlock[];
+  // Live-accumulating narration text for the turn currently generating -
+  // see generation.ts:onLiveNarrationUpdate. Only meaningful while
+  // storyTextReady is false; used to feed TTSControls so auto-narrate can
+  // start speaking as the GM writes the story instead of waiting for the
+  // whole GM stage (thinking + tool calls + narration) to finish, which is
+  // otherwise all storyText itself reflects until the turn completes.
+  liveNarrationText?: string;
   // Re-measure the page's keyboard-aware viewport height (see page.tsx) -
   // called on composer focus/blur since iOS can scroll/resize the visual
   // viewport asynchronously, after the initial resize event.
@@ -696,6 +703,7 @@ export default function Story({
   onOpenNote,
   pendingUserChoice,
   liveGMEntries,
+  liveNarrationText,
   myPlayerId,
   remoteActivity,
   onLocalActivity,
@@ -1098,12 +1106,17 @@ export default function Story({
 
   // Auto-scroll to bottom when new messages arrive or during streaming -
   // but only while the player is already at (or hasn't left) the bottom.
+  // liveGMEntries is included because that's what actually grows token-by-
+  // token while the GM stage is thinking/narrating (see liveTimeline in
+  // ChatMessage below) - storyText alone only changes once the turn's
+  // narration is fully assembled, so without this the view stayed put
+  // through the entire streaming turn and only jumped at the very end.
   useEffect(() => {
     if (stickToBottomRef.current && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTop =
         scrollContainerRef.current.scrollHeight;
     }
-  }, [chatMessages.length, loading, storyText, pendingUserChoice]);
+  }, [chatMessages.length, loading, storyText, pendingUserChoice, liveGMEntries]);
 
   // The container's actual scrollable height depends on page.tsx's
   // async viewport measurement (contentAreaHeight), which can resolve a
@@ -1420,9 +1433,19 @@ export default function Story({
 
             {/* Right side: TTS - manual press waits for narration to finish;
                 auto-narrate (if enabled) starts reading live as the GM
-                streams instead of waiting - see storyTextReady prop. */}
+                streams instead of waiting - see storyTextReady prop. While
+                streaming, prefer liveNarrationText (grows as the GM writes,
+                even on the common path where storyText itself only jumps to
+                the full text once at the very end) over storyText - falls
+                back to storyText when there's nothing live yet (e.g. the
+                separate story-stage path, which already streams storyText
+                incrementally on its own). */}
             <TTSControls
-              text={storyText}
+              text={
+                !storyTextReady && liveNarrationText
+                  ? liveNarrationText
+                  : storyText
+              }
               disabled={loading || !storyTextReady}
               storyTextReady={storyTextReady}
             />
