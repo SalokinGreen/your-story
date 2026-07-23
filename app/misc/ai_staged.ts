@@ -13,7 +13,11 @@
 } from "@/app/misc/structs";
 import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
-import { ARCHETYPE_INFO } from "@/app/misc/gmAdvice";
+import {
+  ARCHETYPE_INFO,
+  selectGMAdviceForTurn,
+  formatGMAdviceNote,
+} from "@/app/misc/gmAdvice";
 import { cleanString } from "@/app/misc/textUtils";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
@@ -968,6 +972,8 @@ export function buildGMStagePrompt({
   replyLength = "medium",
   pacingNote,
   observerNote,
+  storyProgressNote,
+  usesNativeReasoning = false,
 }: {
   storyData: StoryData;
   userChoice: string;
@@ -975,6 +981,14 @@ export function buildGMStagePrompt({
   modelName?: string; // Used to get model's actual context limit
   replyLength?: ReplyLength; // Reply Length setting - controls narration verbosity
   pacingNote?: string; // Deterministic pacing nudge (see pacingFeedback.ts)
+  // True when the resolved tier is a reasoning model that emits its chain of
+  // thought in a native `reasoning` channel (reasoningEffort !== "none").
+  // Such models don't need - and are muddled by - the literal <thinking>
+  // prefill, which forces the *content* channel to open a thinking tag that
+  // competes with their native reasoning. Non-reasoning models keep the
+  // prefill (it's what makes them structure their reasoning at all). Defaults
+  // false so callers that don't know the tier get today's behavior.
+  usesNativeReasoning?: boolean;
   // Layer 5 hardening (see observer.ts): explains an observer flag so the
   // GM doesn't just repeat the mistake. Two sources, mutually exclusive per
   // call - generateStoryTurn (generation.ts) picks whichever applies: a
@@ -985,11 +999,19 @@ export function buildGMStagePrompt({
   // triggers a reset) or a major flag whose reset budget ran out would
   // reach the player via a toast but never reach the GM at all.
   observerNote?: string;
+  // Layer 3 periodic check-in (see storyProgressObserver.ts): a holistic
+  // read on the story's overall pacing/momentum over recent turns, produced
+  // every N turns rather than every turn. GM-facing only, never mentioned
+  // to the player.
+  storyProgressNote?: string;
 }): { messages: ChatMessage[]; tools: any[] } {
   const lengthGuidance = getLengthGuidance(replyLength);
   const pacingFeedbackLine = pacingNote ? `\n${pacingNote}` : "";
   const observerNoteBlock = observerNote
     ? `\n\n## OBSERVER FEEDBACK\n${observerNote}`
+    : "";
+  const storyProgressNoteBlock = storyProgressNote
+    ? `\n\n## STORY PROGRESS CHECK-IN\n${storyProgressNote}`
     : "";
   const difficulty = storyData.difficulty || "medium";
 
@@ -1189,6 +1211,77 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
     })
     .join("\n- ");
 
+  // Player archetype(s) - self-selected playstyle (Robin Laws taxonomy). The
+  // GM stage is the decision-maker, so it needs this facilitation guidance
+  // too - previously only buildInfoMessage (Choices/story stage) surfaced it,
+  // leaving the "brain" blind to how the player wants to be engaged. Advisory
+  // only; never feeds the deterministic director. Read fresh every turn.
+  const gmArchetypeLines: string[] = [];
+  const gmCouchArchetypes = (storyData.multiplayer?.couchPlayers || []).filter(
+    (p) => p.archetype,
+  );
+  if (gmCouchArchetypes.length > 0) {
+    for (const p of gmCouchArchetypes) {
+      const info = ARCHETYPE_INFO[p.archetype!];
+      gmArchetypeLines.push(
+        `- ${p.name} (${info.label}): ${info.facilitation}`,
+      );
+    }
+  } else if (storyData.playerArchetype) {
+    const info = ARCHETYPE_INFO[storyData.playerArchetype];
+    gmArchetypeLines.push(
+      `- ${cleanString(storyData.player_name || "The player")} (${
+        info.label
+      }): ${info.facilitation}`,
+    );
+  }
+  const gmArchetypeSection = gmArchetypeLines.length
+    ? `## 🎭 Player Archetype (self-selected playstyle - lean into this)\n${gmArchetypeLines.join(
+        "\n",
+      )}`
+    : "";
+
+  // Active goals + story threads: the GM creates and updates these, so it
+  // must see the live set every turn. Previously absent from the GM stage's
+  // state message entirely (only the Choices/story info message had them),
+  // so the brain could lose track of its own open plotlines/objectives.
+  const gmActiveGoals = (storyData.goals || []).filter(
+    (g) => g.active && !g.fulfilled,
+  );
+  const gmGoalsSection = gmActiveGoals.length
+    ? `## 🎯 Active Goals\n${gmActiveGoals
+        .map((g) => `- ${g.title}: ${g.description}`)
+        .join("\n")}`
+    : "";
+
+  const gmTruncateDesc = (desc: string, max = 200) =>
+    desc.length > max ? desc.slice(0, max).trim() + "..." : desc;
+  const gmActiveThreads = (storyData.threads || []).filter(
+    (t) => t.status === "active",
+  );
+  const gmThreadsSection = gmActiveThreads.length
+    ? `## 🧵 Active Story Threads\n${gmActiveThreads
+        .map(
+          (t) =>
+            `- [${t.priority || "side"}] ${t.title}: ${gmTruncateDesc(
+              t.description,
+            )}`,
+        )
+        .join("\n")}`
+    : "";
+
+  // Oracle/chaos state (Mythic chaos factor): drives fate_question odds and
+  // signals how unpredictable the world should feel right now. The GM rolls
+  // the oracle, so it needs the current factor - another buildInfoMessage-only
+  // section the GM stage was missing.
+  const gmOracleSection = storyData.agmtState
+    ? `## 🎲 Oracle State\n- Chaos Factor: ${
+        storyData.agmtState.chaosFactor
+      }/9 (${getChaosDescription(storyData.agmtState.chaosFactor)})\n- Scene Count: ${
+        storyData.agmtState.sceneCount
+      }`
+    : "";
+
   // 🆕 Fresh story setup: no character_sheet note exists yet, meaning this
   // story hasn't been set up (e.g. a "Freeform Story" started with no
   // premise/adventure). Nudge the GM to interview the player briefly before
@@ -1221,21 +1314,38 @@ The players roll REAL dice at the table. For ANY roll a player character makes:
 - If the player skips the roll prompt, roll it for them with \`formula_roll\` and move on`
     : "";
 
+  // Per-turn facilitation nudge (see gmAdvice.ts): 1-2 rotating tips woven
+  // into the live prompt so the curated advice bank actually reaches the GM
+  // every turn, not only at scene boundaries via increment_scene.
+  // Deterministic (seeded on turn count, filtered by combat context) so it's
+  // stable across a turn's rounds and safe to compute on every prompt build.
+  const gmAdviceSection = formatGMAdviceNote(
+    selectGMAdviceForTurn(
+      storyData.scene?.parts?.length ?? 0,
+      !!storyData.combatState?.active,
+    ),
+  );
+
   const systemPrompt = `You ARE the Game Master. Run this like a real tabletop session.
 ${freshStorySetupBlock}
+## CORE STANCE (read this first)
+1. **You resolve, the player decides.** Never narrate what the player character says, thinks, feels, chooses, or does next - only the outcome of the action they already declared. (Full agency rules below.)
+2. **Roll only when it matters.** Call a dice or oracle tool ONLY when the outcome is genuinely uncertain AND a failure would change the fiction. Casual talk, description, simple movement, and foregone conclusions need no roll - just narrate them. Never invent a check to look busy or call a tool every turn out of habit.
+3. **Keep it short.** A few sentences, then hand the mic back. (Length limits below.)
+
 ## VISIBILITY RULES
 **Everything you write is shown to the player, EXCEPT text inside <thinking>...</thinking> tags.**
 - ALWAYS start with <thinking> for your private reasoning (dice math, difficulty calls, which notes to check)
 - After you close </thinking>, just write the story prose directly - no wrapper tag needed, it's shown to the player as-is
 - Tool calls are invisible to the player - they just see results narratively
-- Always read the DM Instructions and Character Sheet and Game Mechanics notes before acting or rolling dice.
-- Remember to check notes for NPCs, enemies, locations, items, and lore before making assumptions.
+- The DM Instructions, Character Sheet, and Known NPCs are already provided IN FULL below - don't spend a tool call re-reading them.
+- Everything else (Game Mechanics rules, and the individual NPC/location/item/faction/lore/secret notes) is listed by TITLE only. Use read_notes to open the ones this action actually touches BEFORE you roll dice or state a fact about them - never guess their contents.
 
 ## PLAYER AGENCY (NON-NEGOTIABLE)
 - NEVER decide what the player character says, thinks, feels, or does next. You resolve outcomes for the action they already declared - you don't invent their next action.
 - You control NPCs, monsters, the environment, and dice/table results. Everything about the player character's choices belongs to the player.
 - Resolve ONE beat at a time: the current action and its immediate consequence. Don't chain a second unrequested event, enemy turn, or complication onto the same turn "for free" - stop and hand control back at the next decision point.
-- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.${observerNoteBlock}
+- Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.${observerNoteBlock}${storyProgressNoteBlock}
 
 ## LENGTH & PACING
 A real tabletop GM talks in a few sentences and hands the mic back - they don't narrate a mini scene around every action. Match your narration length to the moment, and end the instant the player has something to react to:
@@ -1248,6 +1358,25 @@ These are hard ceilings, not targets to fill. Never pad a turn to hit a length b
 - Bad (too much staging): "You slide your hand into the paint case with the practiced ease of a man who's done this a thousand times. As you lift the tube, you tilt it just so, letting the light catch the crimp. There. A tiny roll of microfilm. 'Saving that blue for the next one, Bob?' calls Danny, the cameraman. 'Oh, you know me,' you say, flashing that gentle smile. 'Phthalo Blue waits for no one.' Danny chuckles and disappears. The microfilm is pressed between your fingers as you hum a tune."
 - Good (same beat, no padding): "You palm the tube - there's a grain of microfilm tucked against the cap. Danny glances over but doesn't clock it. Read it now, or wait till you're alone?"
 Same information, same stakes, a third of the words.
+
+## RUNNING THE GAME WELL
+The tools resolve mechanics; these principles are what make you a *good* GM.
+
+**Adjudicate with teeth.**
+- Stakes before dice: before any roll, know what an interesting success AND an interesting failure look like in the fiction. If you can't picture a failure worth narrating, don't roll - just say what happens.
+- Fail forward: a failed roll never dead-ends the story. It costs something - time, position, a resource, a new complication - and the scene keeps moving. Frame failure as bad luck or a capable opponent, never the character being incompetent.
+- Prefer graduated outcomes (success at a cost, partial success) over flat pass/fail, and let a crit or a fumble bend the scene somewhere you didn't plan.
+
+**Keep the world alive.**
+- NPCs want things. Play them pursuing their own goals and viewpoint - they can refuse, lie, misjudge, or change their mind. They are not quest-dispensers.
+- Don't be a yes-man: when the world or an NPC would resist the player's plan, let it resist. Real stakes need real friction and the genuine possibility of failure.
+- Consequences persist and compound. A wound, a lie, a favor, a burned bridge carries into later scenes - make the player's last action visibly matter instead of quietly resetting.
+- Reincorporate earlier NPCs, objects, and details so the world feels authored, not generated turn by turn.
+
+**Narrate with craft.**
+- Show, don't announce - reveal mood, a threat, or a lie through action and one concrete detail, not a label.
+- Be specific: one telling detail beats three vague ones. Vary your phrasing - don't reuse the same openers and images every turn.
+- End on a hook: close on a live decision or open question, never a tidy loop that leaves the player nothing to push against.
 
 ## OUT-OF-CHARACTER (OOC) COMMUNICATION
 You and the player can talk OOC by wrapping text in (round brackets).
@@ -1335,7 +1464,7 @@ When using \`create_note\`, always set the \`type\` parameter:
 - The player's character sheet and game rules are in the pinned notes - reference them
 
 Write immersive prose. The player should experience the story, not see game mechanics.
-Keep every turn tight and short: one action, one consequence, then stop and hand control back - never decide what the player character does next, and never write more than the moment calls for.`;
+Keep every turn tight and short: one action, one consequence, then stop and hand control back - never decide what the player character does next, and never write more than the moment calls for.${gmAdviceSection}`;
 
   // Use tools + state tools
   const legacyToolNames = [
@@ -1449,6 +1578,24 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
   // Add NPCs
   if (npcList) {
     stateMessage += `## 👥 NPCs Summary (read their notes for more details)\n- ${npcList}\n\n`;
+  }
+
+  // Player archetype - how the player wants to be engaged (advisory)
+  if (gmArchetypeSection) {
+    stateMessage += gmArchetypeSection + "\n\n";
+  }
+
+  // Active goals + story threads - the GM's own open objectives/plotlines
+  if (gmGoalsSection) {
+    stateMessage += gmGoalsSection + "\n\n";
+  }
+  if (gmThreadsSection) {
+    stateMessage += gmThreadsSection + "\n\n";
+  }
+
+  // Oracle/chaos state
+  if (gmOracleSection) {
+    stateMessage += gmOracleSection + "\n\n";
   }
 
   // Add combat state
@@ -1713,11 +1860,13 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
   const playerActionMessage = `> ${userChoice.replace(
     /^>\s*/,
     "",
-  )}\n\n**INSTRUCTIONS:**
-1. First, read through the Game Mechanics Notes if needed.
-2. Use reasoning and planning before talking back to the player.
-3. **Call the tool(s)** with correct parameters. You MUST call at least one tool or as many as you need to handle the player's action properly. Do not skip tool calls! *Remember:* You have to edit the player character sheets when their stats change.
-4. Finally, write the story prose the player will see, based on the tool results.
+  )}\n\n**HOW TO HANDLE THIS TURN:**
+1. In <thinking>, plan the outcome. Read any titles-only Game Mechanics or notes this action actually touches first.
+2. Decide whether a tool is even needed:
+   - Call a dice/oracle tool ONLY if the outcome is uncertain AND a failure would change the fiction.
+   - Call a state tool ONLY if something must actually change (edit the character sheet after a real stat change, update an NPC's attitude, adjust HP in combat, record a new note, etc.).
+   - If neither is true, DON'T call a tool - a quiet, descriptive, or foregone-conclusion beat just gets narrated.
+3. Write the short prose the player sees, reflecting any tool results.
 
 **CRITICAL:** Keep private reasoning inside <thinking>...</thinking> tags. Everything else you write is shown to the player as-is - do not wrap it in any tag.`;
 
@@ -1726,8 +1875,16 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     content: cleanString(playerActionMessage),
   });
 
-  // Add prefill for tool calling (may be stripped by API for some providers)
-  messages.push({ role: "assistant", content: GM_STAGE_AFFIRMATION });
+  // Add the <thinking> prefill ONLY for non-reasoning models. It nudges them
+  // to externalize reasoning in the content channel before answering.
+  // Reasoning-tier models emit their chain of thought in a native `reasoning`
+  // field, so prefilling the content channel with an open <thinking> tag just
+  // competes with that and risks leaking half-thoughts into player-facing
+  // prose - skip it and let them answer cleanly. (May still be stripped by
+  // some providers regardless.)
+  if (!usesNativeReasoning) {
+    messages.push({ role: "assistant", content: GM_STAGE_AFFIRMATION });
+  }
 
   // Count how many parts have GM history (new or legacy format)
   const partsWithGMHistory = partsToInclude.filter(
@@ -1777,12 +1934,12 @@ export function buildStoryContinuationPrompt(
 Keep it tight and hand the mic back - this is a back-and-forth roleplay, not a monologue. ${paragraphs} End the instant the player has something to react to; never write what the player character does next.${pacingFeedbackLine}`;
 
   const narratorGuidelines = `
-Write immersive prose - show, don't tell. No dice results or mechanical language.
-Use vivid sensory details, but stay within the length above.`;
+Write immersive prose - show, don't tell, and no dice results or mechanical language.
+Reveal through one concrete, specific detail rather than a label or a pile of adjectives. Vary your phrasing - don't reuse images or sentence openers from earlier turns. Stay within the length above and end on something the player can react to.`;
 
   const dmGuidelines = `
 Write as a Dungeon Master narrating to the player. You may reference dice results naturally.
-Use second person ("You swing your sword..."), but stay within the length above.`;
+Use second person ("You swing your sword..."). Favor concrete, specific detail over generic flourish, don't recycle phrasing from earlier turns, and stay within the length above.`;
 
   return (
     basePrompt + (storytellerMode === "dm" ? dmGuidelines : narratorGuidelines)

@@ -8,11 +8,6 @@
 import { TTSModelKey } from "@/app/misc/ai_prices";
 import { getProviderFetch } from "@/app/misc/platformFetch";
 
-// DeepInfra TTS endpoints
-const KOKORO_ENDPOINT = "https://api.deepinfra.com/v1/inference/hexgrad/Kokoro-82M";
-const ORPHEUS_ENDPOINT =
-  "https://api.deepinfra.com/v1/inference/canopylabs/orpheus-3b-0.1-ft";
-
 // Cartesia TTS endpoint - see https://docs.cartesia.ai/api-reference/tts/bytes
 const CARTESIA_ENDPOINT = "https://api.cartesia.ai/tts/bytes";
 const CARTESIA_VERSION = "2025-11-04";
@@ -21,49 +16,30 @@ const CARTESIA_VERSION = "2025-11-04";
 // https://elevenlabs.io/docs/api-reference/text-to-speech/convert
 const ELEVENLABS_ENDPOINT_BASE = "https://api.elevenlabs.io/v1/text-to-speech";
 
-// Kokoro voices (multi-language support)
-export const KOKORO_VOICES = {
-  af_heart: "Heart (American Female)",
-  af_bella: "Bella (American Female)",
-  af_nicole: "Nicole (American Female)",
-  af_sarah: "Sarah (American Female)",
-  af_sky: "Sky (American Female)",
-  am_adam: "Adam (American Male)",
-  am_michael: "Michael (American Male)",
-  am_fenrir: "Fenrir (American Male)",
-  bf_emma: "Emma (British Female)",
-  bf_isabella: "Isabella (British Female)",
-  bm_george: "George (British Male)",
-  bm_daniel: "Daniel (British Male)",
-} as const;
-
-// Orpheus voices
-export const ORPHEUS_VOICES = {
-  tara: "Tara",
-  leah: "Leah",
-  jess: "Jess",
-  mia: "Mia",
-  zoe: "Zoe",
-  leo: "Leo",
-  dan: "Dan",
-  zac: "Zac",
-} as const;
-
-// A couple of well-known Cartesia library voice IDs as convenience defaults -
-// Cartesia's voice library is large and UUID-keyed, so most users will pick
-// their own from https://play.cartesia.ai and add it as a custom voice.
+// A handful of well-known Cartesia library voice IDs as convenience defaults
+// - Cartesia's voice library is large, dynamic, and UUID-keyed by design
+// (see the /voices endpoint in their API docs), so most users will still
+// pick their own from https://play.cartesia.ai and add it as a custom voice.
+// Katie/Skylar/Jameson are commonly-cited featured voices as of writing;
+// swap them out if they ever stop resolving.
 export const CARTESIA_VOICES = {
   "a0e99841-438c-4a64-b679-ae501e7d6091": "Barbershop Man",
   "156fb8d2-335b-4950-9cb3-a2d33befec77": "Helpful Woman",
+  "f786b574-daa5-4673-aa0c-cbe3e8534c02": "Katie (American Female)",
+  "db6b0ed5-d5d3-463d-ae85-518a07d3c2b4": "Skylar (American Female)",
+  "a5136bf9-224c-4d76-b823-52bd5efcffcc": "Jameson (American Male)",
 } as const;
 
-// A couple of well-known ElevenLabs premade voice IDs as convenience defaults
-// - full library at https://elevenlabs.io/app/voice-library, add more as
-// custom voices.
+// ElevenLabs' classic premade voices as convenience defaults - full library
+// at https://elevenlabs.io/app/voice-library, add more as custom voices.
 export const ELEVENLABS_VOICES = {
   "21m00Tcm4TlvDq8ikWAM": "Rachel (Female)",
   EXAVITQu4vr4xnSDxMaL: "Bella (Female)",
   ErXwobaYiN019PkySvjV: "Antoni (Male)",
+  pNInz6obpgDQGcFmaJgB: "Adam (Male)",
+  TxGEqnHWrfWFTfGW9XjX: "Josh (Male)",
+  yoZ06aMxZJJ28mfd3POQ: "Sam (Male)",
+  AZnzlk1XvdvUeBnXmlld: "Domi (Female)",
 } as const;
 
 const MAX_TEXT_LENGTH = 10000;
@@ -175,7 +151,6 @@ export interface TTSRequestBody {
   text: string;
   voiceId?: string;
   model?: TTSModelKey;
-  deepinfraKey?: string;
   cartesiaKey?: string;
   elevenlabsKey?: string;
 }
@@ -266,31 +241,17 @@ function splitTextIntoChunks(text: string, maxChunkSize: number): string[] {
   return chunks.filter((chunk) => chunk.length > 0);
 }
 
-// atob/btoa-based decode rather than Node's Buffer, so this runs unmodified
-// in the browser (standalone build) as well as on the server (web build).
-function base64ToArrayBuffer(base64: string): ArrayBuffer {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) {
-    bytes[i] = binary.charCodeAt(i);
-  }
-  return bytes.buffer;
-}
-
 const PROVIDER_KEY_NAMES: Record<
   TTSModelKey,
-  { key: "deepinfraKey" | "cartesiaKey" | "elevenlabsKey"; label: string }
+  { key: "cartesiaKey" | "elevenlabsKey"; label: string }
 > = {
-  kokoro: { key: "deepinfraKey", label: "DeepInfra" },
-  orpheus: { key: "deepinfraKey", label: "DeepInfra" },
   cartesia: { key: "cartesiaKey", label: "Cartesia" },
   elevenlabs: { key: "elevenlabsKey", label: "ElevenLabs" },
 };
 
-// Fetches one chunk of audio from the provider implied by `ttsModel`, both
-// the DeepInfra models (JSON response with base64 `audio`) and Cartesia/
-// ElevenLabs (raw audio bytes as the response body) return a plain
-// ArrayBuffer here so the caller doesn't need to branch on response shape.
+// Fetches one chunk of audio from the provider implied by `ttsModel` - both
+// Cartesia and ElevenLabs return raw audio bytes as the response body, so
+// this returns a plain ArrayBuffer either way.
 async function fetchChunkAudio(
   ttsModel: TTSModelKey,
   chunk: string,
@@ -364,51 +325,15 @@ async function fetchChunkAudio(
     return response.arrayBuffer();
   }
 
-  const isOrpheus = ttsModel === "orpheus";
-  const endpoint = isOrpheus ? ORPHEUS_ENDPOINT : KOKORO_ENDPOINT;
-  const requestBody: Record<string, unknown> = isOrpheus
-    ? { input: chunk, voice: voiceId, response_format: "mp3", max_tokens: 3000 }
-    : { text: chunk, preset: voiceId, output_format: "mp3" };
-
-  const response = await providerFetch(endpoint, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    console.error("DeepInfra TTS error:", { status: response.status, error: errorText });
-    if (response.status === 429) throw new Error("RATE_LIMIT");
-    if (response.status === 401 || response.status === 403) throw new Error("AUTH_FAILED");
-    throw new Error(`DeepInfra API error: ${response.status} - ${errorText}`);
-  }
-
-  const data = await response.json();
-  if (data.audio) {
-    let base64Data = data.audio;
-    if (base64Data.startsWith("data:")) {
-      base64Data = base64Data.split(",")[1];
-    }
-    return base64ToArrayBuffer(base64Data);
-  }
-  console.error("No audio data in DeepInfra response", {
-    output_format: data.output_format,
-    inference_status: data.inference_status,
-  });
-  return null;
+  throw new Error(`Unsupported TTS model: ${ttsModel}`);
 }
 
 export async function generateTTSAudioStream(
   body: TTSRequestBody,
 ): Promise<TTSStreamResult | TTSError> {
-  const { text, voiceId = "af_heart", model = "kokoro" } = body;
+  const { text, voiceId = "21m00Tcm4TlvDq8ikWAM", model = "elevenlabs" } = body;
 
-  const ttsModel: TTSModelKey =
-    model === "orpheus" || model === "cartesia" || model === "elevenlabs" ? model : "kokoro";
+  const ttsModel: TTSModelKey = model === "cartesia" ? "cartesia" : "elevenlabs";
   const { key: apiKeyField, label: providerLabel } = PROVIDER_KEY_NAMES[ttsModel];
   const apiKey = body[apiKeyField];
 
@@ -424,20 +349,11 @@ export async function generateTTSAudioStream(
   }
 
   let finalVoiceId = voiceId;
-  if (ttsModel === "orpheus") {
-    if (!Object.keys(ORPHEUS_VOICES).includes(voiceId)) finalVoiceId = "tara";
-  } else if (ttsModel === "kokoro") {
-    if (
-      !Object.keys(KOKORO_VOICES).includes(voiceId) &&
-      !voiceId.match(/^[a-z]{2}_[a-z]+$/)
-    ) {
-      finalVoiceId = "af_heart";
-    }
-  } else if (ttsModel === "cartesia") {
+  if (ttsModel === "cartesia") {
     // Any UUID is treated as a user-supplied custom Cartesia voice ID (from
     // their voice library) and passed through as-is; anything else (e.g. a
-    // stale Kokoro/Orpheus voice ID left over from switching models) falls
-    // back to the bundled default.
+    // stale ElevenLabs voice ID left over from switching models) falls back
+    // to the bundled default.
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(voiceId)) {
       finalVoiceId = "a0e99841-438c-4a64-b679-ae501e7d6091";
     }
@@ -459,7 +375,7 @@ export async function generateTTSAudioStream(
   // generating in parallel behind it (see the Promise-per-chunk dispatch
   // below), so shrinking chunk size mainly buys lower time-to-first-audio,
   // not total generation time.
-  const chunkSize = ttsModel === "orpheus" ? 200 : 500;
+  const chunkSize = 500;
   const chunks = splitTextIntoChunks(cleanText, chunkSize);
   const providerFetch = getProviderFetch();
 

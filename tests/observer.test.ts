@@ -1,9 +1,12 @@
 /**
- * Layer 5 hardening, active variant: checkResponseLength is deterministic
- * (same PACING_BANDS pacingFeedback.ts already uses, just applied to a
- * single turn instead of a trailing average). checkPlayerAgencyViolation
- * and runObserver hit /api/generate - mocked the same way reflection.test.ts
- * mocks callReflectionApi's fetch call.
+ * Layer 5 hardening, active variant: checkResponseLength's word-count trip
+ * is deterministic (same PACING_BANDS pacingFeedback.ts already uses, just
+ * applied to a single turn instead of a trailing average), but a trip is
+ * now followed by an LLM justification pass before it becomes a flag - see
+ * the "with a justification judge" describe block below. checkResponseLength
+ * (when apiOptions is passed), checkPlayerAgencyViolation, and runObserver
+ * hit /api/generate - mocked the same way reflection.test.ts mocks
+ * callReflectionApi's fetch call.
  */
 import { describe, it, expect, vi, afterEach } from "vitest";
 import {
@@ -25,70 +28,242 @@ function checkSettings(overrides: Partial<ObserverCheckSettings> = {}): Observer
 }
 
 describe("checkResponseLength", () => {
-  it("does not flag narration within the reply-length ceiling", () => {
+  // No apiOptions passed in this block - the justification judge is skipped
+  // entirely (see the dedicated describe block below), so these exercise
+  // only the deterministic word-count trip, same as before that judge
+  // existed.
+
+  it("does not flag narration within the reply-length ceiling", async () => {
     const narration = "You duck behind the crate as the guard's light sweeps past.";
-    expect(checkResponseLength(narration, "short")).toBeNull();
+    expect(await checkResponseLength(narration, "", "short")).toBeNull();
   });
 
-  it("does not flag empty narration", () => {
-    expect(checkResponseLength("", "medium")).toBeNull();
-    expect(checkResponseLength("   ", "medium")).toBeNull();
+  it("does not flag empty narration", async () => {
+    expect(await checkResponseLength("", "", "medium")).toBeNull();
+    expect(await checkResponseLength("   ", "", "medium")).toBeNull();
   });
 
-  it("flags a single turn that blows way past the medium ceiling", () => {
+  it("flags a single turn that blows way past the medium ceiling", async () => {
     // PACING_BANDS.medium.high = 170, multiplier = 2 -> ceiling 340.
     const narration = Array(400).fill("word").join(" ");
-    const flag = checkResponseLength(narration, "medium");
+    const flag = await checkResponseLength(narration, "", "medium");
     expect(flag).not.toBeNull();
     expect(flag?.type).toBe("response_length");
     expect(flag?.severity).toBe("major");
     expect(flag?.detail).toContain("400 words");
   });
 
-  it("does not flag a turn that's long but still under the hard ceiling", () => {
-    // Under 2x the "long" band's high (300), e.g. a legitimate climax beat.
-    const narration = Array(280).fill("word").join(" ");
-    expect(checkResponseLength(narration, "long")).toBeNull();
+  it("includes the flagged narration itself in the corrective prompt", async () => {
+    const narration = `The lantern flickers wildly. ${Array(400).fill("word").join(" ")}`;
+    const flag = await checkResponseLength(narration, "", "medium");
+    expect(flag?.correctivePrompt).toContain(narration);
+    expect(flag?.correctivePrompt).toContain("what you wrote last time");
   });
 
-  it("scales the ceiling to the short reply-length setting", () => {
+  it("does not flag a turn that's long but still under the hard ceiling", async () => {
+    // Under 2x the "long" band's high (300), e.g. a legitimate climax beat.
+    const narration = Array(280).fill("word").join(" ");
+    expect(await checkResponseLength(narration, "", "long")).toBeNull();
+  });
+
+  it("scales the ceiling to the short reply-length setting", async () => {
     // PACING_BANDS.short.high = 85, multiplier = 2 -> ceiling 170.
     const narration = Array(200).fill("word").join(" ");
-    const flag = checkResponseLength(narration, "short");
+    const flag = await checkResponseLength(narration, "", "short");
     expect(flag).not.toBeNull();
     expect(flag?.detail).toContain("~85 words");
   });
 
-  it("does not flag anything when disabled, even a huge blowout", () => {
+  it("does not flag anything when disabled, even a huge blowout", async () => {
     const narration = Array(1000).fill("word").join(" ");
     expect(
-      checkResponseLength(narration, "medium", checkSettings({ enabled: false })),
+      await checkResponseLength(
+        narration,
+        "",
+        "medium",
+        undefined,
+        checkSettings({ enabled: false }),
+      ),
     ).toBeNull();
   });
 
-  it("higher sensitivity flags a smaller overage", () => {
+  it("higher sensitivity flags a smaller overage", async () => {
     // PACING_BANDS.medium.high = 170. At sensitivity 5 (default) the
     // ceiling is 2x = 340, so 250 words doesn't flag; at sensitivity 10
     // the multiplier drops to 1x = 170, so the same 250 words should flag.
     const narration = Array(250).fill("word").join(" ");
     expect(
-      checkResponseLength(narration, "medium", checkSettings({ sensitivity: 5 })),
+      await checkResponseLength(
+        narration,
+        "",
+        "medium",
+        undefined,
+        checkSettings({ sensitivity: 5 }),
+      ),
     ).toBeNull();
     expect(
-      checkResponseLength(narration, "medium", checkSettings({ sensitivity: 10 })),
+      await checkResponseLength(
+        narration,
+        "",
+        "medium",
+        undefined,
+        checkSettings({ sensitivity: 10 }),
+      ),
     ).not.toBeNull();
   });
 
-  it("lower sensitivity requires a bigger overage to flag", () => {
+  it("lower sensitivity requires a bigger overage to flag", async () => {
     // At sensitivity 0 the multiplier is 3x = 510 - 400 words shouldn't
     // flag even though it would at the default sensitivity of 5 (2x = 340).
     const narration = Array(400).fill("word").join(" ");
     expect(
-      checkResponseLength(narration, "medium", checkSettings({ sensitivity: 5 })),
+      await checkResponseLength(
+        narration,
+        "",
+        "medium",
+        undefined,
+        checkSettings({ sensitivity: 5 }),
+      ),
     ).not.toBeNull();
     expect(
-      checkResponseLength(narration, "medium", checkSettings({ sensitivity: 0 })),
+      await checkResponseLength(
+        narration,
+        "",
+        "medium",
+        undefined,
+        checkSettings({ sensitivity: 0 }),
+      ),
     ).toBeNull();
+  });
+});
+
+describe("checkResponseLength with a justification judge", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("does not flag an overage the judge says was justified", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          justified: true,
+          reason: "This is the opening session-zero scene establishing the world.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const narration = Array(400).fill("word").join(" ");
+    const flag = await checkResponseLength(narration, "", "medium", {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(flag).toBeNull();
+  });
+
+  it("still flags an overage the judge says was not justified", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          justified: false,
+          reason: "The turn just restates the same beat several times.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const narration = Array(400).fill("word").join(" ");
+    const flag = await checkResponseLength(narration, "", "medium", {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flag).not.toBeNull();
+    expect(flag?.type).toBe("response_length");
+  });
+
+  it("skips the judge call entirely when the turn is within the ceiling", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const narration = "A short, unremarkable reply.";
+    const flag = await checkResponseLength(narration, "", "medium", {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flag).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("fails open to the mechanical flag when the judge API call errors", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("network down"));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const narration = Array(400).fill("word").join(" ");
+    const flag = await checkResponseLength(narration, "", "medium", {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flag).not.toBeNull();
+    expect(flag?.type).toBe("response_length");
+  });
+
+  it("fails open to the mechanical flag when the judge response isn't ok", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const narration = Array(400).fill("word").join(" ");
+    const flag = await checkResponseLength(narration, "", "medium", {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flag).not.toBeNull();
+  });
+
+  it("fails open to the mechanical flag when the judge's JSON can't be parsed", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "not json at all" }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const narration = Array(400).fill("word").join(" ");
+    const flag = await checkResponseLength(narration, "", "medium", {
+      model: "test-model",
+      token: "tok",
+    });
+
+    expect(flag).not.toBeNull();
+  });
+
+  it("passes the player's declared action to the judge for context", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ justified: false, reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const narration = Array(400).fill("word").join(" ");
+    await checkResponseLength(narration, "I open the ancient door", "medium", {
+      model: "test-model",
+      token: "tok",
+    });
+
+    const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const userMessage = sentBody.messages[1].content;
+    expect(userMessage).toContain("I open the ancient door");
   });
 });
 

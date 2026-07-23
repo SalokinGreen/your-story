@@ -361,6 +361,13 @@ export interface ScenePart {
   // that triggered a reset does NOT appear here, since that turn was
   // discarded entirely - see GenerationCallbacks.onObserverReset instead.
   observerFlags?: ObserverFlag[];
+  // Layer 3 periodic story-progress check-in (see storyProgressObserver.ts):
+  // a GM-facing note on how the overall story is pacing (dragging, rushed,
+  // or on track), produced every N turns rather than every turn. Never shown
+  // to the player - read back by generateStoryTurn the same way
+  // observerFlags feeds buildObserverWarningNote, to carry the note forward
+  // into the next turn's prompt.
+  storyProgressNote?: string;
   npcReactions?: NPCReaction[]; // NPC reactions to show as notifications (e.g., "Lisa liked this")
   endChapter?: boolean;
   endStory?: boolean;
@@ -950,6 +957,14 @@ export interface StoryData {
     threadSpotlight?: Record<string, number>; // StoryThread.id -> turns since spotlighted
     npcSpotlight?: Record<string, number>; // NPC.name -> turns since spotlighted
   };
+
+  // Layer 3 periodic story-progress check-in (see storyProgressObserver.ts):
+  // counts accepted turns since the last check-in, reset to 0 whenever one
+  // runs. Compared against getStoryProgressCheckInterval() (layerSettings.ts,
+  // default 10) to decide when the next one is due. Deliberately a plain
+  // counter rather than piggybacking on agmtState.sceneCount - this fires on
+  // a turn cadence, not a scene cadence, since scenes vary wildly in length.
+  turnsSinceStoryProgressCheck?: number;
 }
 
 // Advanced RPG Tools state tracking

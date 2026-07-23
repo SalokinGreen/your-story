@@ -18,6 +18,7 @@ import {
   DEFAULT_OBSERVER_SETTINGS,
 } from "./observer";
 import { ObserverFlagType } from "./structs";
+import { DEFAULT_STORY_PROGRESS_CHECK_INTERVAL } from "./storyProgressObserver";
 
 export const LAYER_SETTINGS_CHANGED_EVENT = "layer-settings-changed";
 
@@ -63,6 +64,7 @@ const OBSERVER_MODEL_KEY = "observerModelOverride";
 const MEMORY_KEEPER_MODEL_KEY = "memoryKeeperModelOverride";
 const REFLECTION_MODEL_KEY = "reflectionModelOverride";
 const DIRECTOR_ASSISTANT_MODEL_KEY = "directorAssistantModelOverride";
+const STORY_PROGRESS_OBSERVER_MODEL_KEY = "storyProgressObserverModelOverride";
 
 export const getObserverModelOverride = (): ModelEffortOverride | null =>
   getOverride(OBSERVER_MODEL_KEY);
@@ -89,6 +91,54 @@ export const getDirectorAssistantModelOverride = (): ModelEffortOverride | null 
 export const setDirectorAssistantModelOverride = (
   override: ModelEffortOverride | null,
 ): void => setOverride(DIRECTOR_ASSISTANT_MODEL_KEY, override);
+
+// Story Progress Observer (storyProgressObserver.ts, Layer 3 periodic
+// pacing/momentum check-in) - same override shape/precedent as the Director
+// Assistant above.
+export const getStoryProgressObserverModelOverride = (): ModelEffortOverride | null =>
+  getOverride(STORY_PROGRESS_OBSERVER_MODEL_KEY);
+export const setStoryProgressObserverModelOverride = (
+  override: ModelEffortOverride | null,
+): void => setOverride(STORY_PROGRESS_OBSERVER_MODEL_KEY, override);
+
+// ============================================================
+// STORY PROGRESS OBSERVER CADENCE
+// ============================================================
+// How many accepted turns pass between story-progress check-ins (see
+// storyProgressObserver.ts's runStoryProgressObserver). A plain positive
+// integer, not a { enabled, ... } bag like the Observer's per-flag settings
+// - there's only one dial here. Persisted the same way as everything else
+// in this file: localStorage, no backend.
+
+const STORY_PROGRESS_CHECK_INTERVAL_KEY = "storyProgressCheckInterval";
+const MIN_STORY_PROGRESS_CHECK_INTERVAL = 2;
+const MAX_STORY_PROGRESS_CHECK_INTERVAL = 50;
+
+export function getStoryProgressCheckInterval(): number {
+  if (typeof window === "undefined") return DEFAULT_STORY_PROGRESS_CHECK_INTERVAL;
+  try {
+    const raw = localStorage.getItem(STORY_PROGRESS_CHECK_INTERVAL_KEY);
+    if (!raw) return DEFAULT_STORY_PROGRESS_CHECK_INTERVAL;
+    const parsed = parseInt(raw, 10);
+    if (!Number.isFinite(parsed)) return DEFAULT_STORY_PROGRESS_CHECK_INTERVAL;
+    return Math.max(
+      MIN_STORY_PROGRESS_CHECK_INTERVAL,
+      Math.min(MAX_STORY_PROGRESS_CHECK_INTERVAL, parsed),
+    );
+  } catch {
+    return DEFAULT_STORY_PROGRESS_CHECK_INTERVAL;
+  }
+}
+
+export function setStoryProgressCheckInterval(turns: number): void {
+  if (typeof window === "undefined") return;
+  const clamped = Math.max(
+    MIN_STORY_PROGRESS_CHECK_INTERVAL,
+    Math.min(MAX_STORY_PROGRESS_CHECK_INTERVAL, Math.round(turns)),
+  );
+  localStorage.setItem(STORY_PROGRESS_CHECK_INTERVAL_KEY, String(clamped));
+  notifyChanged();
+}
 
 /**
  * Resolves a stage's { model, reasoningEffort } for its API call: the

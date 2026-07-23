@@ -5,9 +5,17 @@ import { useNotification } from "../misc/NotificationContext";
 import { useAPIKeys } from "../misc/APIKeysContext";
 import { DynamicIcon } from "./DynamicIcon";
 import { ttsFetch } from "../misc/ttsFetch";
+import { cleanTextForSpeech } from "../misc/ai";
 import { TTSModelKey } from "../misc/ai_prices";
 
 interface TTSControlsProps {
+  // Raw (uncleaned) narration text - cleaning happens inside this component,
+  // once per finalized sentence during live narration, rather than by the
+  // caller. See feedLiveText for why: cleanTextForSpeech isn't prefix-stable
+  // (e.g. a ||spoiler|| tag that hasn't closed yet leaves the raw markers in
+  // place, then disappears retroactively once it closes), so re-cleaning the
+  // whole growing text on every chunk and slicing by absolute offset would
+  // desync and silently drop everything after the first such tag.
   text: string;
   disabled?: boolean;
   // Narrower than `disabled`: true once `text` reflects the final,
@@ -19,28 +27,25 @@ interface TTSControlsProps {
 }
 
 const getSelectedVoice = (): string => {
-  if (typeof window === "undefined") return "af_heart";
-  return localStorage.getItem("ttsLastVoice") || "af_heart";
+  if (typeof window === "undefined") return "21m00Tcm4TlvDq8ikWAM";
+  return localStorage.getItem("ttsLastVoice") || "21m00Tcm4TlvDq8ikWAM";
 };
 
 const getSelectedModel = (): TTSModelKey => {
-  if (typeof window === "undefined") return "kokoro";
+  if (typeof window === "undefined") return "elevenlabs";
   const model = localStorage.getItem("ttsModel");
-  if (model === "orpheus" || model === "cartesia" || model === "elevenlabs") return model;
-  return "kokoro";
+  if (model === "cartesia") return "cartesia";
+  return "elevenlabs";
 };
 
 const getProviderKeyForModel = (
   model: TTSModelKey,
-): "deepinfraKey" | "cartesiaKey" | "elevenlabsKey" => {
+): "cartesiaKey" | "elevenlabsKey" => {
   if (model === "cartesia") return "cartesiaKey";
-  if (model === "elevenlabs") return "elevenlabsKey";
-  return "deepinfraKey";
+  return "elevenlabsKey";
 };
 
 const PROVIDER_LABELS: Record<TTSModelKey, string> = {
-  kokoro: "DeepInfra",
-  orpheus: "DeepInfra",
   cartesia: "Cartesia",
   elevenlabs: "ElevenLabs",
 };
@@ -170,6 +175,18 @@ export function extractCompleteSentences(
   return { sentences, remainder: remaining };
 }
 
+// A "||" spoiler tag that hasn't closed yet must not be spoken past (its
+// contents may include punctuation that looks like a sentence end, and
+// cleanTextForSpeech can't strip it until the closing "||" shows up) - this
+// holds back everything from an odd (unclosed) "||" onward so the caller
+// only ever extracts sentences from text with no dangling spoiler markers.
+export function withholdOpenSpoiler(pending: string): { safe: string; held: string } {
+  const markerCount = (pending.match(/\|\|/g) || []).length;
+  if (markerCount % 2 === 0) return { safe: pending, held: "" };
+  const lastMarker = pending.lastIndexOf("||");
+  return { safe: pending.slice(0, lastMarker), held: pending.slice(lastMarker) };
+}
+
 export default function TTSControls({
   text,
   disabled = false,
@@ -259,6 +276,41 @@ export default function TTSControls({
     return audioRef.current;
   }, []);
 
+  // Auto-narrate's first playback attempt for a turn is never itself inside
+  // a click handler (it's kicked off by the streaming-text effect below, or
+  // by onChunkArrived once network audio lands) - without ever having played
+  // as a direct result of a gesture, that first `play()` call is exactly the
+  // case browsers block. Unlock the persistent element on the very first
+  // pointer/key interaction anywhere on the page, so by the time a turn's
+  // audio is ready to play (the player necessarily had to click a choice or
+  // type something to trigger that turn in the first place) it's already
+  // eligible - without requiring a manual press of this button first.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const unlock = () => {
+      const audio = getAudioElement();
+      // Only stomp the element's src if nothing real has ever been queued
+      // on it yet - avoids clobbering an actual TTS chunk in the (very
+      // unlikely) case this first-ever page interaction lands in the brief
+      // async window between playChunkAt setting a real src and playback
+      // actually starting (audio.paused stays true until then).
+      if (audio.paused && audioUrlsRef.current.length === 0) {
+        audio.src = SILENT_AUDIO_DATA_URI;
+        audio.play().catch(() => {
+          // Ignore - this is just a best-effort unlock attempt.
+        });
+      }
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, [getAudioElement]);
+
   // Forwarding ref so playChunkAt's onended handler can call the latest
   // advanceToNextChunk without the two useCallbacks needing to reference
   // each other before they're defined.
@@ -281,6 +333,13 @@ export default function TTSControls({
 
       audio.play().catch((err) => {
         console.error("TTS playback error:", err);
+        // A rejected play() (e.g. the browser's autoplay policy blocking a
+        // call that isn't tied to a user gesture) leaves nothing actually
+        // audible - don't leave the button showing "Stop" for playback that
+        // never started. The audio is still cached (hasAudio/audioUrlsRef),
+        // so the next real click (canReplay) will play it as a genuine
+        // gesture instead.
+        setIsPlaying(false);
       });
     },
     [getAudioElement, addNotification],
@@ -356,7 +415,6 @@ export default function TTSControls({
           text: textToSpeak,
           voiceId: selectedVoice,
           model: selectedModel,
-          deepinfraKey: providerKey === "deepinfraKey" ? apiKey : undefined,
           cartesiaKey: providerKey === "cartesiaKey" ? apiKey : undefined,
           elevenlabsKey: providerKey === "elevenlabsKey" ? apiKey : undefined,
         },
@@ -370,7 +428,7 @@ export default function TTSControls({
 
       return streamChunksToPlayer(response, onChunkArrived, signal);
     },
-    [apiKeys.deepinfraKey, apiKeys.cartesiaKey, apiKeys.elevenlabsKey, onChunkArrived],
+    [apiKeys.cartesiaKey, apiKeys.elevenlabsKey, onChunkArrived],
   );
 
   // Drains liveDispatchQueueRef one sentence at a time (sequential, not
@@ -421,25 +479,39 @@ export default function TTSControls({
       });
   };
 
-  // Consumes newly-arrived streaming text: splits off every complete
-  // sentence since the last call and queues it for audio. `flush` (called
-  // once narration finishes) also queues whatever trailing partial
-  // sentence is left, even without closing punctuation.
-  const feedLiveText = useCallback((fullText: string, flush: boolean) => {
-    const pending = fullText.slice(liveSentCharsRef.current);
-    const { sentences, remainder } = extractCompleteSentences(pending);
+  // Consumes newly-arrived RAW streaming text: splits off every complete
+  // sentence since the last call and queues it for audio, cleaning each
+  // sentence individually (once, right before it's queued) rather than
+  // re-cleaning the whole growing text and slicing by absolute offset - the
+  // latter breaks as soon as a ||spoiler|| tag closes, since cleaning the
+  // fuller text then retroactively shrinks it and desyncs the offset,
+  // silently dropping everything spoken after that point. `flush` (called
+  // once narration finishes) also queues whatever trailing partial sentence
+  // is left, even without closing punctuation.
+  const feedLiveText = useCallback((fullRawText: string, flush: boolean) => {
+    const pending = fullRawText.slice(liveSentCharsRef.current);
+
+    // Don't split sentences out of an unclosed ||spoiler|| span - hold that
+    // part back until its closing "||" arrives, so it's never spoken
+    // half-hidden and its internal punctuation never gets mistaken for a
+    // sentence boundary.
+    const { safe, held } = flush
+      ? { safe: pending, held: "" }
+      : withholdOpenSpoiler(pending);
+    const { sentences, remainder } = extractCompleteSentences(safe);
 
     for (const sentence of sentences) {
-      liveDispatchQueueRef.current.push(sentence);
+      const spoken = cleanTextForSpeech(sentence).trim();
+      if (spoken) liveDispatchQueueRef.current.push(spoken);
     }
-    liveSentCharsRef.current = fullText.length - remainder.length;
+    liveSentCharsRef.current = fullRawText.length - (remainder.length + held.length);
 
     if (flush) {
-      const trimmedRemainder = remainder.trim();
+      const trimmedRemainder = cleanTextForSpeech(remainder).trim();
       if (trimmedRemainder) {
         liveDispatchQueueRef.current.push(trimmedRemainder);
       }
-      liveSentCharsRef.current = fullText.length;
+      liveSentCharsRef.current = fullRawText.length;
     }
 
     if (liveDispatchQueueRef.current.length > 0) {
@@ -580,7 +652,10 @@ export default function TTSControls({
       waitingForNextRef.current = false;
       isStreamingRef.current = true;
 
-      const chunkCount = await generateAndQueueAudio(text, controller.signal);
+      const chunkCount = await generateAndQueueAudio(
+        cleanTextForSpeech(text),
+        controller.signal,
+      );
       isStreamingRef.current = false;
 
       if (controller.signal.aborted) {

@@ -9,13 +9,11 @@ import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
 import NetStatusBadge from "../components/NetStatusBadge";
 import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
-import STTButton from "../components/STTButton";
 import PlayerBubbles from "../components/PlayerBubbles";
 import CombatDisplay from "../components/CombatDisplay";
 import { ChapterNav } from "../components/ChapterNav";
 import { ObjectivesStrip } from "../components/ObjectivesStrip";
 import type { SyncStatus } from "../misc/localStoryManager";
-import { cleanTextForSpeech } from "../misc/ai";
 import {
   type TimelineBlock,
   buildSavedTimeline,
@@ -29,6 +27,13 @@ import {
   buildMentionMatcher,
   splitTextWithMentions,
 } from "../misc/noteMentions";
+
+// Solo play has no CouchPlayer of its own (see structs.ts) - this stands in
+// for PlayerBubbles' `players` prop so voice input still gets a bubble
+// outside of couch co-op/multiplayer.
+const SOLO_VOICE_PLAYER: CouchPlayer[] = [
+  { id: "solo", name: "You", color: "#8b5cf6" },
+];
 
 interface StoryProps {
   storyData: StoryData;
@@ -441,23 +446,6 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       () => composerRef.current as HTMLTextAreaElement,
     );
 
-    // STT state
-    const [sttEnabled, setSttEnabled] = React.useState(false);
-    React.useEffect(() => {
-      if (typeof window !== "undefined") {
-        setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
-      }
-      const handleStorageChange = () => {
-        setSttEnabled(localStorage.getItem("sttEnabled") !== "false");
-      };
-      window.addEventListener("storage", handleStorageChange);
-      const interval = setInterval(handleStorageChange, 500);
-      return () => {
-        window.removeEventListener("storage", handleStorageChange);
-        clearInterval(interval);
-      };
-    }, []);
-
     // Couch co-op: which player the next typed line belongs to
     const [activeSpeakerId, setActiveSpeakerId] = React.useState<
       string | null
@@ -474,24 +462,18 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
       el.style.height = Math.min(el.scrollHeight, 140) + "px";
     };
 
-    // Shared freeform submit path (composer + STT): submit the action as a
-    // plain Choice - the GM stage determines mechanics (skill checks, items,
-    // tables) during generation, so no client-side analysis step happens here.
-    const submitFreeformAction = (text: string, isStt = false) => {
+    // Shared freeform submit path: submit the action as a plain Choice - the
+    // GM stage determines mechanics (skill checks, items, tables) during
+    // generation, so no client-side analysis step happens here.
+    const submitFreeformAction = (text: string) => {
       const trimmed = text.trim();
       if (!trimmed) return;
-      const sttFlag = isStt || undefined;
 
       if (onActionConfirm) {
-        onActionConfirm({ text: trimmed, stt_input: sttFlag });
+        onActionConfirm({ text: trimmed });
       } else if (onCustomInput) {
         onCustomInput(trimmed);
       }
-    };
-
-    // Handle STT transcript - same path as the composer, flagged as voice input
-    const handleSTTTranscript = async (text: string) => {
-      await submitFreeformAction(text, true);
     };
 
     const handleComposerSubmit = async () => {
@@ -601,16 +583,9 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
           </div>
         )}
 
-        {/* Input row */}
+        {/* Input row - full width; voice input is the always-on bubble
+            (see PlayerBubbles below) instead of a mic button here. */}
         <div className="flex items-end gap-2">
-          {sttEnabled && (
-            <STTButton
-              onTranscript={handleSTTTranscript}
-              disabled={loading || !!loadingStage || composerBusy}
-              className="shrink-0 self-stretch"
-            />
-          )}
-
           <div className="relative flex-1">
             <textarea
               ref={composerRef}
@@ -1416,7 +1391,7 @@ export default function Story({
                 auto-narrate (if enabled) starts reading live as the GM
                 streams instead of waiting - see storyTextReady prop. */}
             <TTSControls
-              text={cleanTextForSpeech(storyText)}
+              text={storyText}
               disabled={loading || !storyTextReady}
               storyTextReady={storyTextReady}
             />
@@ -1439,21 +1414,22 @@ export default function Story({
         )}
       </div>
 
-      {/* Couch co-op player bubbles: tap to speak a turn via voice input */}
-      {storyData.multiplayer?.enabled &&
-        (storyData.multiplayer?.couchPlayers?.length ?? 0) > 0 &&
-        onCustomInput && (
-          <PlayerBubbles
-            players={storyData.multiplayer.couchPlayers!}
-            onSubmit={(text, speakerIds) =>
-              onCustomInput(text, undefined, speakerIds, "voice")
-            }
-            disabled={loading || !!loadingStage}
-            myPlayerId={myPlayerId}
-            remoteActivity={remoteActivity}
-            onLocalActivity={onLocalActivity}
-          />
-        )}
+      {/* Voice input bubble(s): tap to speak a turn - the default voice
+          input UI now, replacing the old composer mic button. Couch
+          co-op/multiplayer get one bubble per player; solo play gets a
+          single default bubble instead. */}
+      {onCustomInput && (
+        <PlayerBubbles
+          players={couchPlayers.length > 0 ? couchPlayers : SOLO_VOICE_PLAYER}
+          onSubmit={(text, speakerIds) =>
+            onCustomInput(text, undefined, speakerIds, "voice")
+          }
+          disabled={loading || !!loadingStage}
+          myPlayerId={myPlayerId}
+          remoteActivity={remoteActivity}
+          onLocalActivity={onLocalActivity}
+        />
+      )}
 
       {/* Choices Modal */}
       <ChoicesModal

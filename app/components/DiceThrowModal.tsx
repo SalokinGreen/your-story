@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import type DiceBox from "@3d-dice/dice-box";
+import type { DieResult } from "@3d-dice/dice-box";
 import type { DiceThrowRequest } from "../misc/gmExecutor";
 import { DynamicIcon } from "./DynamicIcon";
 
@@ -22,31 +23,52 @@ const SUPPORTED_SIDES = new Set([4, 6, 8, 10, 12, 20, 100]);
 interface DragState {
   startX: number;
   startY: number;
-  startTime: number;
+  // Tray's bounding rect at drag-start, so the visual throw-vector line can
+  // be drawn in tray-local coordinates without re-measuring on every move.
+  rectLeft: number;
+  rectTop: number;
 }
 
-// Converts a screen-space drag gesture into a world-space throw. Tuned by
-// eye against the default dice-box camera/tray - see app/dev/dice-spike
-// for how this was validated against the patched physics worker.
-function throwFromDrag(dx: number, dy: number, dtMs: number) {
-  const dtSec = Math.max(dtMs, 16) / 1000;
-  const dist = Math.hypot(dx, dy) || 1;
-  const speed = Math.min(dist / dtSec, 4000); // px/sec, clamped
-  const dirX = dx / dist;
-  const dirZ = dy / dist;
-  const forceScale = speed / 200;
+interface DragVisual {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+}
 
-  const velocity: [number, number, number] = [
-    dirX * forceScale,
-    2 + forceScale * 0.3,
-    dirZ * forceScale,
-  ];
-  const spin: [number, number, number] = [
-    forceScale,
-    forceScale * 0.6,
-    forceScale,
-  ];
-  return { velocity, spin };
+// dice-box's own rollDie() already produces a good throw: it launches the
+// die *inward* from its spawn edge (velocity proportional to -startPosition)
+// and *downward* from the starting height, so it always lands in-bounds and
+// tumbles to a stop. All the gesture needs to control is how *hard* that
+// throw is, via dice-box's throwForce/spinForce config knobs (defaults 5/6).
+//
+// An earlier version instead fed a fully custom velocity vector (patched in
+// via scripts/patchDiceBox.mjs) built straight from the drag direction with
+// an upward Y. Because the die respawns at a random edge at height 8, a
+// drag pointing toward that same edge launched it up and over the wall -
+// the "teleports to a corner and flies off a random way" bug. Driving only
+// the force magnitude and letting dice-box aim the throw fixes that.
+//
+// Power comes from how FAR the player dragged, not how fast: a slow,
+// deliberate drag should throw as hard as a quick flick across the same
+// distance (a speed-based version scored near-zero force on a real ~1s
+// human drag). Distances are in CSS px; the constants below are tuned by
+// eye against the tray - see app/dev/dice-spike.
+const MIN_DRAG_PX = 20; // below this it's a tap, not a throw
+const FULL_POWER_PX = 220; // drag length that maps to a full-strength throw
+
+function throwForceFromDrag(dx: number, dy: number) {
+  const dist = Math.hypot(dx, dy);
+  const power = Math.min(
+    Math.max((dist - MIN_DRAG_PX) / (FULL_POWER_PX - MIN_DRAG_PX), 0),
+    1
+  );
+  // Gentle floor so even a short flick still visibly tumbles, up to roughly
+  // dice-box's own defaults at full power.
+  return {
+    throwForce: 2 + power * 3.5, // ~2 (soft) .. ~5.5 (firm)
+    spinForce: 3 + power * 4, // ~3 .. ~7
+  };
 }
 
 type Phase = "loading" | "aiming" | "rolling" | "settled";
@@ -54,8 +76,10 @@ type Phase = "loading" | "aiming" | "rolling" | "settled";
 /**
  * Physical dice mode: the GM's formula_roll/opposed_formula/
  * formula_challenge_check can be thrown on a 3D dice tray instead of
- * resolved silently. Drag anywhere on the tray and release to throw - the
- * result comes from @3d-dice/dice-box's real physics (see
+ * resolved silently. The dice spawn in and settle as soon as the tray
+ * opens, sitting visible at rest; drag anywhere on the tray (a line shows
+ * the throw vector) and release to re-throw them for the actual result -
+ * the result comes from @3d-dice/dice-box's real physics (see
  * scripts/patchDiceBox.mjs for how the throw itself is gesture-driven
  * rather than the library's own randomized toss).
  *
@@ -70,12 +94,18 @@ export default function DiceThrowModal({
   const diceBoxRef = useRef<DiceBox | null>(null);
   const initPromiseRef = useRef<Promise<DiceBox> | null>(null);
   const dragRef = useRef<DragState | null>(null);
+  // The dice currently sitting in the tray (from the initial spawn-in toss,
+  // then replaced by each reroll's results) - passed back into reroll() so
+  // the player's throw gesture re-tosses those same dice rather than
+  // spawning a new set on top of them.
+  const diceGroupRef = useRef<DieResult[] | null>(null);
   // Guards against a stale throw resolving after the request changed
   // (e.g. the player skipped while dice were mid-air) or the modal closed.
   const requestTokenRef = useRef(0);
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [settledFaces, setSettledFaces] = useState<number[] | null>(null);
+  const [dragVisual, setDragVisual] = useState<DragVisual | null>(null);
 
   async function getDiceBox(): Promise<DiceBox> {
     if (diceBoxRef.current) return diceBoxRef.current;
@@ -110,8 +140,9 @@ export default function DiceThrowModal({
     }
 
     setPhase("loading");
+    diceGroupRef.current = null;
     getDiceBox()
-      .then(() => {
+      .then(async (diceBox) => {
         if (requestTokenRef.current !== token) return;
         // dice-box only reads the container's real size for its physics
         // worker's bounds during init() - the Babylon camera/canvas itself
@@ -122,6 +153,26 @@ export default function DiceThrowModal({
         // back for a later roll), so nudge it every time the tray opens
         // rather than waiting on an incidental real resize.
         window.dispatchEvent(new Event("resize"));
+        // Let the resize handler's debounce and the resulting layout pass
+        // land before dice spawn in, so they drop into a correctly-sized
+        // tray instead of the stale/default bounds.
+        await new Promise(requestAnimationFrame);
+        if (requestTokenRef.current !== token) return;
+
+        // Show the dice sitting in the tray immediately, before the player
+        // does anything - a gentle toss-in (soft force so they settle near
+        // the middle rather than scattering to the corners). The player's
+        // own drag/release later re-throws this same group via reroll()
+        // rather than spawning a second set on top of it.
+        await diceBox.updateConfig({
+          throwForce: 2.5,
+          spinForce: 3,
+          customThrowVelocity: null,
+          customThrowSpin: null,
+        });
+        const results = await diceBox.roll(`${request.count}d${request.sides}`);
+        if (requestTokenRef.current !== token) return;
+        diceGroupRef.current = results;
         setPhase("aiming");
       })
       .catch((err) => {
@@ -137,18 +188,47 @@ export default function DiceThrowModal({
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (phase !== "aiming") return;
-    dragRef.current = { startX: e.clientX, startY: e.clientY, startTime: performance.now() };
+    e.currentTarget.setPointerCapture(e.pointerId);
+    const rect = e.currentTarget.getBoundingClientRect();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      rectLeft: rect.left,
+      rectTop: rect.top,
+    };
+    setDragVisual({
+      x1: e.clientX - rect.left,
+      y1: e.clientY - rect.top,
+      x2: e.clientX - rect.left,
+      y2: e.clientY - rect.top,
+    });
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag || phase !== "aiming") return;
+    setDragVisual({
+      x1: drag.startX - drag.rectLeft,
+      y1: drag.startY - drag.rectTop,
+      x2: e.clientX - drag.rectLeft,
+      y2: e.clientY - drag.rectTop,
+    });
+  };
+
+  const cancelDrag = () => {
+    dragRef.current = null;
+    setDragVisual(null);
   };
 
   const onPointerUp = async (e: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
     dragRef.current = null;
+    setDragVisual(null);
     if (!drag || phase !== "aiming" || !request) return;
 
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
-    const dtMs = performance.now() - drag.startTime;
-    if (Math.hypot(dx, dy) < 20) return; // require an actual drag, not a tap
+    if (Math.hypot(dx, dy) < MIN_DRAG_PX) return; // require a drag, not a tap
 
     const token = requestTokenRef.current;
     try {
@@ -156,14 +236,26 @@ export default function DiceThrowModal({
       if (requestTokenRef.current !== token) return;
 
       setPhase("rolling");
-      const { velocity, spin } = throwFromDrag(dx, dy, dtMs);
+      // Drive dice-box's own throw with a drag-scaled force, and make sure
+      // any leftover custom-velocity override from an older code path is
+      // cleared so the natural (in-bounds, downward, inward) throw runs.
+      const { throwForce, spinForce } = throwForceFromDrag(dx, dy);
       await diceBox.updateConfig({
-        customThrowVelocity: velocity,
-        customThrowSpin: spin,
+        throwForce,
+        spinForce,
+        customThrowVelocity: null,
+        customThrowSpin: null,
       });
-      const results = await diceBox.roll(`${request.count}d${request.sides}`);
+      const group = diceGroupRef.current;
+      // Let dice-box pick a fresh random spawn edge (newStartPoint default)
+      // so each throw tumbles in from the rim like a real toss; its velocity
+      // is aimed inward from that edge, so the die always stays in the tray.
+      const results = group
+        ? await diceBox.reroll(group, { remove: true })
+        : await diceBox.roll(`${request.count}d${request.sides}`);
       if (requestTokenRef.current !== token) return;
 
+      diceGroupRef.current = results;
       const faces = results.map((r) => r.value);
       setSettledFaces(faces);
       setPhase("settled");
@@ -215,23 +307,57 @@ export default function DiceThrowModal({
         </div>
       )}
 
-      {/* Dice tray */}
+      {/* Dice tray - dice-box appends its own <canvas> into this container.
+          The canvas ships no sizing CSS of its own (only an opacity
+          transition), so without the rule below it renders at the browser's
+          default 300x150 in the corner instead of filling the tray. */}
       <div
         id="dice-throw-canvas"
         onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        className="flex-1 relative"
+        onPointerCancel={cancelDrag}
+        // min-h-0 overrides the flex default of min-height:auto - without it,
+        // a <canvas> child's intrinsic size (its width/height attributes,
+        // which dice-box sets to match this container's last measured size)
+        // becomes this flex item's content-based minimum, so it never
+        // shrinks back down when the footer grows on settle (the result
+        // line + bigger Continue button), pushing the footer off the
+        // bottom of the screen.
+        className="flex-1 min-h-0 relative"
         style={{ touchAction: "none", cursor: phase === "aiming" ? "grab" : "default" }}
       >
+        <style jsx>{`
+          #dice-throw-canvas :global(canvas) {
+            width: 100% !important;
+            height: 100% !important;
+            display: block;
+          }
+        `}</style>
         {request && phase === "loading" && (
           <div className="absolute inset-0 flex items-center justify-center text-blue-200/70 text-sm">
             Loading dice...
           </div>
         )}
-        {request && phase === "aiming" && (
+        {request && phase === "aiming" && !dragVisual && (
           <div className="absolute inset-x-0 bottom-6 text-center text-blue-200/60 text-sm pointer-events-none">
             Drag and release to throw
           </div>
+        )}
+        {dragVisual && (
+          <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
+            <line
+              x1={dragVisual.x1}
+              y1={dragVisual.y1}
+              x2={dragVisual.x2}
+              y2={dragVisual.y2}
+              stroke="rgb(196 181 253)"
+              strokeWidth={4}
+              strokeLinecap="round"
+            />
+            <circle cx={dragVisual.x1} cy={dragVisual.y1} r={7} fill="rgb(196 181 253)" fillOpacity={0.6} />
+            <circle cx={dragVisual.x2} cy={dragVisual.y2} r={11} fill="rgb(196 181 253)" fillOpacity={0.35} />
+          </svg>
         )}
       </div>
 

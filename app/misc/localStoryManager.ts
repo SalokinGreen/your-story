@@ -10,7 +10,13 @@ import { ARCHETYPE_INFO } from "./gmAdvice";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
-const DB_VERSION = 2; // Bumped for sync metadata
+const UNDO_STORE_NAME = "undo_snapshots";
+const DB_VERSION = 3; // Bumped for undo_snapshots store
+
+// Bounded so a long session's Undo/Retry history can't grow IndexedDB usage
+// unboundedly - only the most recent turns are ever undoable, matching the
+// UI's "misread input" framing rather than a full campaign-length history.
+export const MAX_UNDO_STACK_SIZE = 8;
 
 // NOTE: Storage limits are not enforced currently since stories are just text.
 // If storage becomes an issue, consider limiting to N most recent stories
@@ -62,6 +68,10 @@ function openDB(): Promise<IDBDatabase> {
             store.createIndex("syncStatus", "syncStatus", { unique: false });
           }
         }
+      }
+
+      if (!db.objectStoreNames.contains(UNDO_STORE_NAME)) {
+        db.createObjectStore(UNDO_STORE_NAME, { keyPath: "storyId" });
       }
     };
   });
@@ -490,12 +500,61 @@ export async function listLocalStories(): Promise<LocalStory[]> {
 export async function deleteLocalStory(storyId: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const transaction = db.transaction([STORE_NAME], "readwrite");
-    const store = transaction.objectStore(STORE_NAME);
-    const request = store.delete(storyId);
+    const transaction = db.transaction(
+      [STORE_NAME, UNDO_STORE_NAME],
+      "readwrite",
+    );
+    transaction.objectStore(STORE_NAME).delete(storyId);
+    transaction.objectStore(UNDO_STORE_NAME).delete(storyId);
 
-    request.onsuccess = () => resolve();
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+interface UndoStackRecord {
+  storyId: string;
+  snapshots: StoryData[];
+}
+
+// Undo/Retry's pre-turn state history - kept out of the StoryData blob
+// itself (and out of Supabase sync) since it's a purely local, session-
+// spanning convenience: it must survive a page reload (hence IndexedDB,
+// not a React ref) but has no reason to sync across devices or bloat the
+// synced story record.
+export async function getUndoStack(storyId: string): Promise<StoryData[]> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([UNDO_STORE_NAME], "readonly");
+    const store = transaction.objectStore(UNDO_STORE_NAME);
+    const request = store.get(storyId);
+
+    request.onsuccess = () => {
+      const record = request.result as UndoStackRecord | undefined;
+      resolve(record?.snapshots || []);
+    };
     request.onerror = () => reject(request.error);
+  });
+}
+
+export async function saveUndoStack(
+  storyId: string,
+  snapshots: StoryData[],
+): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([UNDO_STORE_NAME], "readwrite");
+    const store = transaction.objectStore(UNDO_STORE_NAME);
+    const trimmed = snapshots.slice(-MAX_UNDO_STACK_SIZE);
+
+    if (trimmed.length === 0) {
+      store.delete(storyId);
+    } else {
+      store.put({ storyId, snapshots: trimmed } as UndoStackRecord);
+    }
+
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
   });
 }
 

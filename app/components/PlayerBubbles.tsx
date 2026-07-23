@@ -497,7 +497,7 @@ function Bubble({
         dragState.current = null;
       }}
       disabled={disabled}
-      className="fixed z-40 flex flex-col items-center gap-1 touch-none select-none"
+      className="fixed z-50 flex flex-col items-center gap-1 touch-none select-none"
       style={{
         left: `${pos.xPct}%`,
         top: `${pos.yPct}%`,
@@ -569,7 +569,7 @@ function GenerateBubble({
       type="button"
       onClick={onTap}
       disabled={disabled}
-      className="fixed z-40 flex flex-col items-center gap-1 touch-none select-none"
+      className="fixed z-50 flex flex-col items-center gap-1 touch-none select-none"
       style={{
         left: "50%",
         bottom: "1.25rem",
