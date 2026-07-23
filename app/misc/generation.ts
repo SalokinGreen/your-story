@@ -113,6 +113,7 @@ import {
   applyTierEscalation,
   TOP_TIER,
 } from "@/app/misc/reasoningTiers";
+import { isPlanAwaitingNextBeat } from "@/app/misc/campaignPlan";
 import { getCustomModelIfUUID, CustomModel } from "@/app/misc/user_settings";
 
 // ============================================================
@@ -1608,6 +1609,10 @@ async function generateStoryTurnOnce(
         let isComplete = false;
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
         const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
+        // Phase 2 campaign-plan gate (mirror of the M2 roll gate below): its
+        // own counter + cap so it fails open independently of the M2 gate.
+        let noPlanAdvancePrompts = 0;
+        const MAX_PLAN_ADVANCE_PROMPTS = 2;
         // Set by the M2 roll-invariant gate (search "M2 roll-invariant gate"
         // below) when it forces a retry round - makes that one round require
         // a tool call outright rather than relying on prose alone to ask for
@@ -2277,6 +2282,35 @@ async function generateStoryTurnOnce(
                 role: "user",
                 content:
                   "This scene requires a roll before the turn can end - combat or a challenge is active, or you declared high/deadly stakes earlier this scene. Resolve the pending action with formula_roll, opposed_formula, formula_challenge_check, fate_question, or npc_roll, then continue.",
+              });
+              forceToolChoiceNextRound = "required";
+              continue gmRoundLoop;
+            }
+
+            // Campaign-plan re-planning gate (Phase 2, docs/gm-plan-notes-design.md,
+            // campaignPlan.ts): mirror of the M2 gate for the campaign plan.
+            // When the GM marked the current beat complete (advance_plan
+            // complete_current) but hasn't yet detailed and moved to the next
+            // beat, don't let the turn end on prose - force a round that
+            // writes the next beat, keeping the plan exactly one beat ahead.
+            // Same fail-open cap posture as M2.
+            if (
+              isPlanAwaitingNextBeat(storyData) &&
+              !isRepetitive &&
+              noPlanAdvancePrompts < MAX_PLAN_ADVANCE_PROMPTS
+            ) {
+              noPlanAdvancePrompts++;
+              logger.action(
+                "Plan gate: beat marked complete but next beat not written - forcing another round",
+                {
+                  noPlanAdvancePrompts,
+                  currentBeatIndex: storyData.planState?.currentBeatIndex,
+                },
+              );
+              conversationHistory.push({
+                role: "user",
+                content:
+                  "You marked the current campaign beat complete but have not written the next beat yet - write the next beat before the turn can end. Call advance_plan with action \"write_next\", giving the next beat's name and its full writeup (goal + [ ] checklist + advance-when), then continue.",
               });
               forceToolChoiceNextRound = "required";
               continue gmRoundLoop;

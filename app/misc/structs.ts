@@ -842,6 +842,20 @@ export interface CouchPlayer {
   archetype?: PlayerArchetype;
 }
 
+// Phase 2 campaign-plan tracking (docs/gm-plan-notes-design.md,
+// campaignPlan.ts). A lightweight pointer into the fixed dramatic spine, kept
+// separate from the readable plan (which lives in the gm_plan note) so the
+// deterministic re-planning gate has stable, parse-free state to key off.
+export interface PlanState {
+  beats: string[]; // Fixed spine beat names, in order (CAMPAIGN_SPINE_BEATS)
+  currentBeatIndex: number; // Which beat is being run now
+  // True once the GM marks the current beat complete (advance_plan
+  // complete_current) but before it details & moves to the next beat
+  // (advance_plan write_next). The gate fires while this is true.
+  awaitingNextBeat?: boolean;
+  spineNoteTitle?: string; // Title of the gm_plan note that is the spine
+}
+
 export interface StoryData {
   story_name: string;
   premise: string;
@@ -915,6 +929,12 @@ export interface StoryData {
   // the GM stage foregrounds that beat over the main campaign spine; cleared
   // by close_side_beat. See docs/gm-plan-notes-design.md.
   activeSideBeatTitle?: string;
+  // Phase 2 campaign-plan tracking (docs/gm-plan-notes-design.md,
+  // campaignPlan.ts). Lightweight pointer into the fixed beat spine that
+  // powers the deterministic re-planning gate; the readable plan itself lives
+  // in the gm_plan note, not here. Auto-initialized when the spine note is
+  // created; undefined for stories that never establish a plan.
+  planState?: PlanState;
   timers?: CountdownTimer[]; // Countdown timers for deadlines/events
   combatState?: CombatState; // Active tactical combat state (turn-based combat tracking)
   threads?: StoryThread[]; // Active story threads/plotlines (independent of AGMT)

@@ -1142,7 +1142,17 @@ export function buildGMStagePrompt({
   // story advances. See docs/gm-plan-notes-design.md.
   if (gmPlanLore.length > 0) {
     const activeSideBeat = storyData.activeSideBeatTitle;
-    loreSection += `\n## 📌 CAMPAIGN PLAN\nYour living plan for this campaign. Follow it, and keep it current with edit_note.\n- Detail ONLY the current beat in full; future beats stay one-liners until you reach them.\n- Tick checklist items ([ ] -> [x]) as they happen; when the current beat's "advance-when" is met, write the NEXT beat before moving on.\n`;
+    const plan = storyData.planState;
+    loreSection += `\n## 📌 CAMPAIGN PLAN\nYour living plan for this campaign. Follow it, and keep it current with edit_note.\n- Detail ONLY the current beat in full; future beats stay one-liners until you reach them.\n- Tick checklist items ([ ] -> [x]) as they happen. When the current beat's "advance-when" is met: call \`advance_plan\` (complete_current), then \`advance_plan\` (write_next) with the next beat detailed - do both before narrating onward.\n`;
+    if (plan) {
+      const beatName = plan.beats[plan.currentBeatIndex] ?? "?";
+      loreSection += `- Current beat: **${beatName}** (${
+        plan.currentBeatIndex + 1
+      }/${plan.beats.length}).\n`;
+      if (plan.awaitingNextBeat) {
+        loreSection += `- ⏭ You marked this beat COMPLETE. You must call \`advance_plan\` (write_next) with the next beat detailed before this turn can end.\n`;
+      }
+    }
     if (activeSideBeat) {
       loreSection += `- ⚡ FOCUS: side beat "${activeSideBeat}" is active - run it now; the main spine beat is paused until you call close_side_beat.\n`;
     }
@@ -1507,7 +1517,7 @@ When using \`create_note\`, always set the \`type\` parameter:
 You keep a living plan the way a showrunner keeps a writers'-room board - a spine of beats with only the CURRENT one written in detail. It's the single \`gm_plan\` note titled "Campaign Plan", plus one \`gm_plan\` arc note per player. All of it is loaded in full above and visible to the player.
 - **Create it once, early.** During setup / Session 0, after the character(s) exist, \`create_note({ type: "gm_plan", title: "Campaign Plan", ... })\` with the premise and a spine using these FIXED beat names, in order: **Opening Image (Session 0)**, **Inciting Incident (Session 1)**, **Rising Complications**, **Midpoint Turn**, **Crisis**, **Climax**, **Resolution**. At creation, detail ONLY "Opening Image" (goal: establish/create the character(s) and their ordinary world); leave the rest as one-line placeholders. Do not plan further yet.
 - **One beat ahead, never more.** The current beat gets a short goal, a \`[ ]\` checklist, and an "advance-when" line. Future beats stay one-liners. Never script beats the player hasn't reached.
-- **Advance at the boundary.** Tick \`[ ]\` -> \`[x]\` with \`edit_note\` as things happen. When the current beat's advance-when is satisfied, write the NEXT beat in detail (and refresh arc directions) BEFORE narrating onward. Ending Session 0 specifically: write one \`gm_plan\` arc note per player (current state + 2-3 candidate directions + active hooks) and detail the Inciting Incident.
+- **Advance at the boundary.** Tick \`[ ]\` -> \`[x]\` with \`edit_note\` as things happen. When the current beat's advance-when is satisfied, call \`advance_plan\` (action "complete_current"), then \`advance_plan\` (action "write_next") with the next beat detailed - and refresh arc directions - BEFORE narrating onward. (If you mark a beat complete but don't write the next one, the turn won't be allowed to end until you do.) Ending Session 0 specifically: write one \`gm_plan\` arc note per player (current state + 2-3 candidate directions + active hooks) and detail the Inciting Incident.
 - **Arcs are possibilities, not scripts.** Hold 2-3 candidate directions per player and let their choices collapse them - don't steer toward a predetermined one.
 - **Don't duplicate threads/goals.** The plan is your private intent; when a beat or arc goes live, spawn the concrete \`create_thread\`/\`create_goal\` for it rather than restating it here.
 - **Side beats = detours.** To pull focus off the spine for a side quest or character detour, call \`open_side_beat\` (it creates the beat and marks it the active focus); run it; call \`close_side_beat\` when it resolves to return to the paused spine beat. Use these instead of quietly wandering off-plan.
@@ -1591,6 +1601,8 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     // Campaign plan focus: open/close a side beat (side quest / detour)
     "open_side_beat",
     "close_side_beat",
+    // Campaign plan: advance the spine one beat (Phase 2 re-planning gate)
+    "advance_plan",
     // Memory: add_memory deliberately NOT whitelisted here - a dedicated
     // memory agent (memoryAgent.ts) now decides what's worth persisting
     // after each turn instead of the GM calling this itself mid-generation.

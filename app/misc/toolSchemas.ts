@@ -1226,6 +1226,44 @@ const closeSideBeatTool: ToolSchema = {
   },
 };
 
+const advancePlanTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "advance_plan",
+    description: `Advance the campaign plan through its fixed dramatic spine (docs/gm-plan-notes-design.md). Two actions, meant to be used together the moment a beat wraps:
+- action "complete_current": mark the CURRENT beat done, once its advance-when condition is satisfied. After this, the turn will NOT be allowed to end until you write the next beat - so follow it with write_next this same turn.
+- action "write_next": detail the NEXT beat and move focus onto it. Provide the next beat's name and its full writeup (goal + a [ ] checklist + an advance-when line). This keeps the plan exactly one beat ahead - never write beats further out than the next one.
+Beat names are fixed and advance in order: Opening Image (Session 0), Inciting Incident (Session 1), Rising Complications, Midpoint Turn, Crisis, Climax, Resolution.`,
+    parameters: {
+      type: "object",
+      properties: {
+        action: {
+          type: "string",
+          enum: ["complete_current", "write_next"],
+          description:
+            "complete_current: mark the current beat finished. write_next: detail and move to the next beat.",
+        },
+        summary: {
+          type: "string",
+          description:
+            "For complete_current: how the current beat resolved / what it accomplished.",
+        },
+        next_beat: {
+          type: "string",
+          description:
+            "For write_next: the name of the next beat (should match the next fixed spine beat).",
+        },
+        detail: {
+          type: "string",
+          description:
+            "For write_next: the full writeup of the next beat - its goal, a [ ] checklist, and an advance-when line.",
+        },
+      },
+      required: ["action"],
+    },
+  },
+};
+
 // Export all tools as array
 export const TOOL_SCHEMAS: ToolSchema[] = [
   // Goal Management (5 tools)
@@ -1259,6 +1297,9 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   // Campaign Plan focus (2 tools) - see docs/gm-plan-notes-design.md
   openSideBeatTool,
   closeSideBeatTool,
+
+  // Campaign Plan advance (1 tool) - Phase 2 re-planning gate
+  advancePlanTool,
 
   // NPC Management (1 tool - creates lore for NPCs)
   addNpcTool,

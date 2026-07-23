@@ -2,11 +2,13 @@
 
 ## Status
 
-**Phase 1 implemented.** Prompt-only enforcement, per the decision on record:
-ship the prompt-only version first, add a deterministic gate later (Phase 2)
-only if the GM drifts. The `gm_plan` note type, the GM-stage injection, the
-`open_side_beat`/`close_side_beat` tools, the player-facing lore UI entry, and
-tests are all in. Phase 2 (the re-planning gate) remains deferred.
+**Phase 1 + Phase 2 implemented.** Phase 1 (prompt-only): the `gm_plan` note
+type, the GM-stage injection, the `open_side_beat`/`close_side_beat` tools, the
+player-facing lore UI entry. Phase 2 (deterministic re-planning gate):
+structured `PlanState`, the `advance_plan` tool (`complete_current` →
+`write_next`), and a boundary gate in the GM-stage loop that mirrors the M2
+roll gate — when the GM marks a beat complete but hasn't written the next one,
+the turn can't end on prose until it does. Both phases are covered by tests.
 
 ## The problem this solves
 
@@ -222,21 +224,33 @@ weakness is compliance: like any un-gated instruction, the note can drift
 (GM forgets to advance, or over-writes future beats). We accept that risk for
 Phase 1 and watch for it.
 
-### Phase 2 — deterministic gate (later, only if needed)
+### Phase 2 — deterministic gate (implemented)
 
-Only build this if Phase 1 shows real drift. Shape it like the M2 gate:
+Shaped like the M2 roll gate, and living in the same GM-stage round loop
+(`generation.ts`). Pieces:
 
-- Track `planStage` (and per-beat checklist completion) as structured state,
-  advanced through a small `advance_plan` tool or by piggybacking
-  `increment_scene`.
-- At a scene/session boundary, if the current beat is marked done but no next
-  beat has been written, force a re-prompt requiring the GM to write it before
-  narrating on. Non-blocking otherwise — never overrides player choice, only
-  ensures the plan stays one beat ahead.
+- **Structured state** (`StoryData.planState`, `structs.ts`): `{ beats,
+  currentBeatIndex, awaitingNextBeat, spineNoteTitle }`. A parse-free pointer
+  into the fixed spine — the readable plan stays in the `gm_plan` note; this is
+  only what the gate keys off. Auto-initialized when the spine note ("Campaign
+  Plan") is created via `create_note`, so it layers onto the Phase 1 bootstrap
+  with no extra setup step.
+- **`advance_plan` tool** (`toolSchemas.ts` / `toolExecutor.ts`), two actions:
+  `complete_current` marks the current beat done and sets `awaitingNextBeat`;
+  `write_next` details the next beat (writing it into the note), advances
+  `currentBeatIndex`, and clears the flag. At the final beat, `write_next`
+  records "campaign spine complete" without overrunning the array.
+- **The gate** (`campaignPlan.ts` `isPlanAwaitingNextBeat` + the loop in
+  `generation.ts`): when a zero-tool-call round ends while `awaitingNextBeat`
+  is true, push a re-prompt and force one more round with
+  `toolChoice: "required"`, capped at 2 (`MAX_PLAN_ADVANCE_PROMPTS`) then
+  fail-open — never a hard block, matching M2 and this codebase's "warn, don't
+  block" posture. Its own counter, independent of the M2 gate's.
 
-Deferred deliberately: gates add cost and can misfire (see the frontier doc's
-history of reverted mechanisms), so we earn it with evidence rather than
-building it speculatively.
+The beat **names are fixed** (`CAMPAIGN_SPINE_BEATS`), which is what gives the
+gate stable identifiers to advance through. Chose a dedicated `advance_plan`
+tool over piggybacking `increment_scene` because beat completion and scene
+increment are different rhythms — a beat can span many scenes.
 
 ## Cost / budget
 
@@ -293,3 +307,19 @@ a fresh prompt, so the plan is only *added* in the GM stage (not in
 `buildInfoMessage`/Choices). The pacing note in "Player visibility" stands: the
 plan lives in the GM system prompt the narration continues from, and the
 continuation prompt is what keeps the narrator on the current beat.
+
+## Phased implementation checklist (Phase 2) — done
+
+- [x] `PlanState` interface + `planState?` on `StoryData` — `structs.ts`
+- [x] `campaignPlan.ts` — `CAMPAIGN_SPINE_BEATS`, `findSpinePlanNote`,
+      `initPlanState`, `currentBeatName`, `isPlanAwaitingNextBeat`
+- [x] `advance_plan` schema (`toolSchemas.ts`) + executor (`toolExecutor.ts`)
+      + GM-stage whitelist (`ai_staged.ts`)
+- [x] Auto-init `planState` on spine-note creation — `toolExecutor.ts`
+      (`create_note`)
+- [x] Plan progress + awaiting-next-beat surfaced in the GM injection, and the
+      discipline section updated to use `advance_plan` — `ai_staged.ts`
+- [x] Boundary gate in the GM-stage loop (own counter + cap, fail-open) —
+      `generation.ts`
+- [x] Tests — `tests/campaignPlan.test.ts` (helpers + executor) and
+      `tests/generation.planGate.test.ts` (loop integration)
