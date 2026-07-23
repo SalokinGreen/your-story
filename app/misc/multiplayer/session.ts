@@ -13,7 +13,7 @@
 // irrelevant since broadcast already reaches just the host/guests as
 // appropriate).
 import { getLocalPlayerId } from "@/app/misc/localPlayerId";
-import type { StoryData } from "@/app/misc/structs";
+import type { PlayerArchetype, StoryData } from "@/app/misc/structs";
 import type { MultiplayerTransport } from "./transport";
 import { createTransport, generateRoomCode } from "./transports";
 import type {
@@ -24,6 +24,48 @@ import type {
   RoomId,
   WireMessage,
 } from "./types";
+
+// The full profile a guest claims when joining - either an existing saved
+// profile (resumed from the host's story) or a freshly-created one. Carried on
+// presence_join so the host can rebuild a complete CouchPlayer.
+export interface ClaimedProfile {
+  profileId: string;
+  name: string;
+  color: string;
+  archetype?: PlayerArchetype | null;
+  personalityTags?: string[] | null;
+  wishTags?: string[] | null;
+}
+
+// Broadcast to guests each collection round (see turnBatch.ts).
+export interface TurnStatus {
+  phase: "collecting" | "generating";
+  submittedPlayerIds: string[];
+  passedPlayerIds: string[];
+  expectedPlayerIds: string[];
+}
+
+// A relayed slice of the host's live narration.
+export interface StoryStreamUpdate {
+  turnId: string;
+  text: string;
+  stage: "gm" | "story" | "choices" | null;
+  done: boolean;
+}
+
+// One relayed MP3 chunk of the host's TTS narration.
+export interface TTSAudioChunk {
+  turnId: string;
+  index: number;
+  dataB64: string;
+  done: boolean;
+}
+
+// Host-authoritative party-voice floor snapshot.
+export interface FloorSnapshot {
+  holderId: string | null;
+  lockedOutIds: string[];
+}
 
 export interface NetSessionInfo {
   role: MPRole;
@@ -61,6 +103,9 @@ export interface GuestJoinedInfo {
   localPlayerId: string;
   displayName: string;
   color: string;
+  archetype?: PlayerArchetype | null;
+  personalityTags?: string[] | null;
+  wishTags?: string[] | null;
 }
 
 // Out-of-character chat between online players - never touches StoryData or
@@ -77,11 +122,27 @@ export class NetSession {
   readonly role: MPRole;
   readonly backend: MPBackend;
   readonly roomId: RoomId;
-  readonly myLocalPlayerId: string;
 
   private readonly transport: MultiplayerTransport;
-  private readonly displayName: string;
-  private readonly color: string;
+  private displayName: string;
+  private color: string;
+  // Guest-only: the profile this device has claimed (via announceProfile).
+  // Until a guest picks/creates a profile, presence_join isn't sent and this
+  // stays null, so the guest's effective id falls back to the device id. The
+  // host never picks a profile - it keeps its device id (getLocalPlayerId).
+  private announcedProfile: ClaimedProfile | null = null;
+  // Captured once at construction so a session's fallback identity stays
+  // stable for its whole lifetime, independent of any later getLocalPlayerId()
+  // change.
+  private readonly deviceId: string = getLocalPlayerId();
+
+  // The id this session acts as on the wire. For a guest that has claimed a
+  // saved/created profile, that's the profile id (so the same profile can be
+  // resumed from any device); otherwise the stable per-device id. Exposed as a
+  // property getter so existing `.myLocalPlayerId` reads stay unchanged.
+  get myLocalPlayerId(): string {
+    return this.announcedProfile?.profileId ?? this.deviceId;
+  }
   // Trust map: transport-level peerId -> the localPlayerId that peer proved
   // ownership of via presence_join. Host-only. player_action's own
   // claimedSpeakerIds/playerId are never trusted directly - see
@@ -114,6 +175,22 @@ export class NetSession {
     (result: DiceThrowRelayResult) => void
   >();
   private readonly oocChatListeners = new Set<(message: OOCChatMessage) => void>();
+  // Host-only: a guest's player_pass, seat-validated.
+  private readonly guestPassListeners = new Set<(localPlayerId: string) => void>();
+  // Host-only: a fresh transport peer connected (before it has announced a
+  // profile) - the React layer uses this to push a snapshot so the joiner has
+  // the saved-profile list to pick from.
+  private readonly hostPeerConnectedListeners = new Set<() => void>();
+  // Guest-only: the host's turn-collection status / live narration / relayed
+  // TTS / party-voice floor.
+  private readonly turnStatusListeners = new Set<(status: TurnStatus) => void>();
+  private readonly storyStreamListeners = new Set<(u: StoryStreamUpdate) => void>();
+  private readonly ttsAudioListeners = new Set<(c: TTSAudioChunk) => void>();
+  private readonly floorStateListeners = new Set<(f: FloorSnapshot) => void>();
+  // Host-only: a guest asking for / releasing the party-voice floor,
+  // seat-validated.
+  private readonly floorTakeListeners = new Set<(localPlayerId: string) => void>();
+  private readonly floorReleaseListeners = new Set<(localPlayerId: string) => void>();
 
   private constructor(
     role: MPRole,
@@ -129,22 +206,24 @@ export class NetSession {
     this.transport = transport;
     this.displayName = displayName;
     this.color = color;
-    this.myLocalPlayerId = getLocalPlayerId();
 
     this.transport.onMessage((peerId, msg) => this.handleMessage(peerId, msg));
 
     if (role === "guest") {
-      // Re-announced on every new mesh peer (not just the host) - redundant
-      // in Trystero's full-mesh rooms when there are 3+ participants, but
-      // harmless (host-side Map.set is idempotent) and keeps this adapter-
-      // agnostic rather than trying to guess which peerId is the host.
+      // presence_join is deferred until the player picks/creates a profile
+      // (announceProfile) - so a joiner first receives the host's snapshot and
+      // chooses a saved profile before claiming a seat. Once announced, we
+      // re-announce on every new mesh peer (redundant-but-harmless in
+      // Trystero's full mesh; needed so a late-arriving peer learns this
+      // seat), rather than guessing which peerId is the host.
       this.transport.onPeerJoin(() => {
-        this.transport.send({
-          type: "presence_join",
-          playerId: this.myLocalPlayerId,
-          name: this.displayName,
-          color: this.color,
-        });
+        if (this.announcedProfile) this.sendPresenceJoin();
+      });
+    } else {
+      // Host: a fresh peer connecting is the cue to push current state so the
+      // joiner can pick a profile. The React layer supplies the snapshot.
+      this.transport.onPeerJoin(() => {
+        this.hostPeerConnectedListeners.forEach((cb) => cb());
       });
     }
 
@@ -230,6 +309,36 @@ export class NetSession {
     };
   }
 
+  private sendPresenceJoin(): void {
+    const profile = this.announcedProfile;
+    if (!profile) return;
+    this.transport.send({
+      type: "presence_join",
+      playerId: profile.profileId,
+      name: profile.name,
+      color: profile.color,
+      archetype: profile.archetype ?? null,
+      personalityTags: profile.personalityTags ?? null,
+      wishTags: profile.wishTags ?? null,
+    });
+  }
+
+  // Guest-only: claim a profile (a saved one resumed from the host's story, or
+  // a freshly-created one) and announce it, taking a seat. Safe to call again
+  // to switch profiles before acting. No-op on the host, which already owns
+  // its own seat from room creation.
+  announceProfile(profile: ClaimedProfile): void {
+    if (this.role !== "guest") return;
+    this.announcedProfile = profile;
+    this.displayName = profile.name;
+    this.color = profile.color;
+    this.sendPresenceJoin();
+  }
+
+  hasAnnouncedProfile(): boolean {
+    return this.announcedProfile !== null;
+  }
+
   onSnapshot(cb: (data: StoryData) => void): () => void {
     this.snapshotListeners.add(cb);
     return () => this.snapshotListeners.delete(cb);
@@ -285,6 +394,50 @@ export class NetSession {
     return () => this.backendSwitchListeners.delete(cb);
   }
 
+  // Host-only: a guest passed this collection round.
+  onGuestPass(cb: (localPlayerId: string) => void): () => void {
+    this.guestPassListeners.add(cb);
+    return () => this.guestPassListeners.delete(cb);
+  }
+
+  // Host-only: a fresh peer connected (before announcing a profile).
+  onHostPeerConnected(cb: () => void): () => void {
+    this.hostPeerConnectedListeners.add(cb);
+    return () => this.hostPeerConnectedListeners.delete(cb);
+  }
+
+  // Guest-only feeds from the host.
+  onTurnStatus(cb: (status: TurnStatus) => void): () => void {
+    this.turnStatusListeners.add(cb);
+    return () => this.turnStatusListeners.delete(cb);
+  }
+
+  onStoryStream(cb: (u: StoryStreamUpdate) => void): () => void {
+    this.storyStreamListeners.add(cb);
+    return () => this.storyStreamListeners.delete(cb);
+  }
+
+  onTTSAudio(cb: (c: TTSAudioChunk) => void): () => void {
+    this.ttsAudioListeners.add(cb);
+    return () => this.ttsAudioListeners.delete(cb);
+  }
+
+  onFloorState(cb: (f: FloorSnapshot) => void): () => void {
+    this.floorStateListeners.add(cb);
+    return () => this.floorStateListeners.delete(cb);
+  }
+
+  // Host-only: a guest asking for / releasing the party-voice floor.
+  onFloorTake(cb: (localPlayerId: string) => void): () => void {
+    this.floorTakeListeners.add(cb);
+    return () => this.floorTakeListeners.delete(cb);
+  }
+
+  onFloorRelease(cb: (localPlayerId: string) => void): () => void {
+    this.floorReleaseListeners.add(cb);
+    return () => this.floorReleaseListeners.delete(cb);
+  }
+
   broadcastSnapshot(storyData: StoryData): void {
     if (this.role !== "host") return;
     this.transport.send({
@@ -338,6 +491,72 @@ export class NetSession {
     });
   }
 
+  // Guest-only: I have nothing to add this round.
+  sendPass(): void {
+    if (this.role !== "guest") return;
+    this.transport.send({ type: "player_pass", playerId: this.myLocalPlayerId });
+  }
+
+  // Host-only: broadcast the current collection status / batched-turn phase.
+  broadcastTurnStatus(status: TurnStatus): void {
+    if (this.role !== "host") return;
+    this.transport.send({
+      type: "turn_status",
+      phase: status.phase,
+      submittedPlayerIds: status.submittedPlayerIds,
+      passedPlayerIds: status.passedPlayerIds,
+      expectedPlayerIds: status.expectedPlayerIds,
+      seq: this.nextSeq++,
+    });
+  }
+
+  // Host-only: relay a slice of the live narration to guests.
+  broadcastStoryStream(update: StoryStreamUpdate): void {
+    if (this.role !== "host") return;
+    this.transport.send({
+      type: "story_stream",
+      turnId: update.turnId,
+      text: update.text,
+      stage: update.stage,
+      done: update.done,
+      seq: this.nextSeq++,
+    });
+  }
+
+  // Host-only: relay one MP3 chunk of the host's TTS narration.
+  broadcastTTSAudio(chunk: TTSAudioChunk): void {
+    if (this.role !== "host") return;
+    this.transport.send({
+      type: "tts_audio",
+      turnId: chunk.turnId,
+      index: chunk.index,
+      dataB64: chunk.dataB64,
+      done: chunk.done,
+    });
+  }
+
+  // Host-only: broadcast the authoritative party-voice floor state.
+  broadcastFloorState(floor: FloorSnapshot): void {
+    if (this.role !== "host") return;
+    this.transport.send({
+      type: "floor_state",
+      holderId: floor.holderId,
+      lockedOutIds: floor.lockedOutIds,
+      seq: this.nextSeq++,
+    });
+  }
+
+  // Guest-only: request / release the party-voice floor.
+  sendFloorTake(): void {
+    if (this.role !== "guest") return;
+    this.transport.send({ type: "floor_take", playerId: this.myLocalPlayerId });
+  }
+
+  sendFloorRelease(): void {
+    if (this.role !== "guest") return;
+    this.transport.send({ type: "floor_release", playerId: this.myLocalPlayerId });
+  }
+
   sendOOCChat(text: string): void {
     this.transport.send({
       type: "ooc_chat",
@@ -384,10 +603,21 @@ export class NetSession {
     if (this.role === "host") {
       this.transport.send({ type: "backend_switch", to });
     }
+    const claimed = this.announcedProfile;
     await this.leave();
-    return this.role === "host"
-      ? NetSession.createHost(to, this.displayName, this.color, this.roomId)
-      : NetSession.joinAsGuest(to, this.roomId, this.displayName, this.color);
+    if (this.role === "host") {
+      return NetSession.createHost(to, this.displayName, this.color, this.roomId);
+    }
+    const next = await NetSession.joinAsGuest(
+      to,
+      this.roomId,
+      this.displayName,
+      this.color,
+    );
+    // Re-claim the same profile across the swap so the guest keeps their seat
+    // rather than being sent back to the profile picker.
+    if (claimed) next.announceProfile(claimed);
+    return next;
   }
 
   private handleMessage(peerId: string, msg: WireMessage): void {
@@ -452,8 +682,29 @@ export class NetSession {
       if (msg.type === "presence_join") {
         this.seatOwners.set(peerId, msg.playerId);
         this.guestJoinedListeners.forEach((cb) =>
-          cb({ localPlayerId: msg.playerId, displayName: msg.name, color: msg.color }),
+          cb({
+            localPlayerId: msg.playerId,
+            displayName: msg.name,
+            color: msg.color,
+            archetype: msg.archetype ?? null,
+            personalityTags: msg.personalityTags ?? null,
+            wishTags: msg.wishTags ?? null,
+          }),
         );
+      } else if (msg.type === "player_pass") {
+        // Seat-trusted exactly like player_action: the pass counts for the
+        // seat this peer proved via presence_join, not its self-reported id.
+        const localPlayerId = this.seatOwners.get(peerId);
+        if (!localPlayerId) return;
+        this.guestPassListeners.forEach((cb) => cb(localPlayerId));
+      } else if (msg.type === "floor_take") {
+        const localPlayerId = this.seatOwners.get(peerId);
+        if (!localPlayerId) return;
+        this.floorTakeListeners.forEach((cb) => cb(localPlayerId));
+      } else if (msg.type === "floor_release") {
+        const localPlayerId = this.seatOwners.get(peerId);
+        if (!localPlayerId) return;
+        this.floorReleaseListeners.forEach((cb) => cb(localPlayerId));
       } else if (msg.type === "player_action") {
         // The sender's real identity is whatever presence_join proved for
         // this transport connection - never msg.playerId/claimedSpeakerIds,
@@ -483,6 +734,32 @@ export class NetSession {
       }
     } else if (msg.type === "state_snapshot") {
       this.snapshotListeners.forEach((cb) => cb(msg.storyData));
+    } else if (msg.type === "turn_status") {
+      this.turnStatusListeners.forEach((cb) =>
+        cb({
+          phase: msg.phase,
+          submittedPlayerIds: msg.submittedPlayerIds,
+          passedPlayerIds: msg.passedPlayerIds,
+          expectedPlayerIds: msg.expectedPlayerIds,
+        }),
+      );
+    } else if (msg.type === "story_stream") {
+      this.storyStreamListeners.forEach((cb) =>
+        cb({ turnId: msg.turnId, text: msg.text, stage: msg.stage, done: msg.done }),
+      );
+    } else if (msg.type === "tts_audio") {
+      this.ttsAudioListeners.forEach((cb) =>
+        cb({
+          turnId: msg.turnId,
+          index: msg.index,
+          dataB64: msg.dataB64,
+          done: msg.done,
+        }),
+      );
+    } else if (msg.type === "floor_state") {
+      this.floorStateListeners.forEach((cb) =>
+        cb({ holderId: msg.holderId, lockedOutIds: msg.lockedOutIds }),
+      );
     }
   }
 }
