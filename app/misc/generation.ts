@@ -44,6 +44,7 @@ import {
   buildObserverWarningNote,
   rewriteFlaggedNarration,
   settingsFor,
+  canObserverTriggerReset,
   ObserverSettings,
 } from "@/app/misc/observer";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
@@ -345,6 +346,19 @@ export interface GenerationCallbacks {
   // back to its pre-turn snapshot by the time this fires - the UI should
   // clear anything it displayed/streamed for the discarded attempt.
   onObserverReset?: (flags: ObserverFlag[], triggeringFlag: ObserverFlag) => void;
+  // Fired when the observer ran in the BACKGROUND (see generateStoryTurn's
+  // resetPossible gate) and found flags after the turn had already completed
+  // and handed control back to the player. Only reachable when the current
+  // settings make a reset impossible (canObserverTriggerReset false), so
+  // these flags are always advisory - never a rewrite/reset, just something
+  // to surface to the player the way onComplete's observerFlags normally are.
+  onBackgroundObserverFlags?: (flags: ObserverFlag[]) => void;
+  // Fired once the fire-and-forget background wave (memory agent, director
+  // assistant, story progress observer, and the observer itself when
+  // deferred) finishes, regardless of whether any of it changed anything -
+  // lets the UI re-render/persist storyData now that those side effects
+  // (which were mutated in place, not returned) have landed.
+  onBackgroundLayersUpdate?: () => void;
   onComplete?: (result: GenerationResult) => void;
   onError?: (error: Error) => void;
 }
@@ -840,334 +854,422 @@ export async function generateStoryTurn(
     // judges the completed turn against this).
     const tierUsedThisTurn = storyData.reasoningTierState?.currentTier;
 
+    // Whether the CURRENT settings make an automatic reset-and-retry even
+    // possible (observer.ts's canObserverTriggerReset - true iff at least
+    // one flag type is both enabled and allowed to trigger a reset). If
+    // not, nothing the observer could find this turn will ever force a
+    // rewrite, so there's no reason to make the player wait on it: its
+    // checks run in the background wave below instead, and the turn
+    // completes immediately. If a reset IS possible, the observer keeps
+    // blocking exactly as it always has - a rewrite really might happen,
+    // and the player needs to see the corrected result, not the flagged one.
+    const resetPossible = canObserverTriggerReset(observerSettings);
+
     let flags: ObserverFlag[] = [];
-    try {
-      flags = await runObserver({
-        narration: result.content,
-        playerChoice: userChoice,
-        replyLength: options.replyLength,
-        toolNames: (result.gmResults || []).map((r) => r.toolName),
-        rollResults: (result.gmResults || []).map((r) => ({
-          toolName: r.toolName,
-          success: r.success,
-          contextForStory: r.contextForStory,
-        })),
-        tierUsed: tierUsedThisTurn,
-        settings: observerSettings,
-        apiOptions: observerApiOptions,
-      });
-    } catch (observerError) {
-      // Fail open - an observer infra failure should never block the turn.
-      logger.action("Observer check failed, treating as pass (fail open)", {
-        error:
-          observerError instanceof Error
-            ? observerError.message
-            : String(observerError),
-      });
-      flags = [];
-    }
-
-    // Log every check result, not just the failure/reset paths below - this
-    // is the only record of a flag that never becomes a reset (minor
-    // severity, or a type with triggersReset off), which otherwise only
-    // ever reached the player as a toast and never showed up in Debug Logs.
-    if (flags.length > 0) {
-      logger.action("Observer: turn flagged", {
-        flags: flags.map((f) => ({
-          type: f.type,
-          severity: f.severity,
-          detail: f.detail,
-        })),
-      });
-    }
-
-    // A flag only resets when it's both "major" severity (decided per-
-    // instance by the check itself) AND that flag type's triggersReset is
-    // on (decided by config - defaults to true for the three checks that
-    // can naturally be major, false for the two tool-usage-gap checks,
-    // reproducing exactly what shipped before this setting existed).
-    const majorFlag = flags.find(
-      (f) =>
-        f.severity === "major" &&
-        settingsFor(observerSettings, f.type).triggersReset,
-    );
-
-    if (majorFlag && resetAttempts < MAX_OBSERVER_RESETS) {
-      resetAttempts++;
-      logger.action("Observer flagged turn - attempting a targeted rewrite", {
-        type: majorFlag.type,
-        detail: majorFlag.detail,
-        attempt: resetAttempts,
-      });
-
-      // Rewrite first (see observer.ts's rewriteFlaggedNarration): every
-      // check that can reach here is a complaint about the narration TEXT,
-      // never about which tools were called or what a roll resolved to - so
-      // the GM is shown the exact narration it wrote plus the specific
-      // reason it was flagged, and asked to rewrite just the prose. The
-      // turn's dice rolls/tool calls/state changes are ground truth and
-      // stay untouched. Only falls back to the old full-turn reset
-      // (rollback + a completely fresh blind attempt, which can reroll dice
-      // into a different outcome) if the rewrite call itself fails.
-      //
-      // tier_escalation_missed is the one exception: it's a complaint that
-      // the turn ran at too low a reasoning tier, not about the narration
-      // text - rewriting the prose at the same (insufficient) tier wouldn't
-      // add any brainpower, so it skips straight to the full-turn reset
-      // below, which also forces the retry onto a higher tier.
-      let rewrittenNarration: string | null = null;
-      if (majorFlag.type !== "tier_escalation_missed") {
-        try {
-          rewrittenNarration = await rewriteFlaggedNarration({
-            narration: result.content,
-            playerChoice: userChoice,
-            gmStoryContext: result.gmStoryContext,
-            flag: majorFlag,
-            replyLength: options.replyLength,
-            storytellerMode: options.storytellerMode,
-            apiOptions: sideCallApiOptions,
-          });
-        } catch (rewriteError) {
-          logger.action(
-            "Observer rewrite call failed, falling back to full-turn reset",
-            {
-              error:
-                rewriteError instanceof Error
-                  ? rewriteError.message
-                  : String(rewriteError),
-            },
-          );
-        }
+    if (resetPossible) {
+      try {
+        flags = await runObserver({
+          narration: result.content,
+          playerChoice: userChoice,
+          replyLength: options.replyLength,
+          toolNames: (result.gmResults || []).map((r) => r.toolName),
+          rollResults: (result.gmResults || []).map((r) => ({
+            toolName: r.toolName,
+            success: r.success,
+            contextForStory: r.contextForStory,
+          })),
+          tierUsed: tierUsedThisTurn,
+          settings: observerSettings,
+          apiOptions: observerApiOptions,
+        });
+      } catch (observerError) {
+        // Fail open - an observer infra failure should never block the turn.
+        logger.action("Observer check failed, treating as pass (fail open)", {
+          error:
+            observerError instanceof Error
+              ? observerError.message
+              : String(observerError),
+        });
+        flags = [];
       }
 
-      if (rewrittenNarration) {
-        logger.action(
-          "Observer rewrite succeeded, keeping tool calls/rolls and replacing narration",
-          { type: majorFlag.type },
-        );
-        result.content = rewrittenNarration;
-        result.scenePart = {
-          ...result.scenePart,
-          content: rewrittenNarration,
-        };
-        callbacks.onObserverRewrite?.(flags, majorFlag, rewrittenNarration);
+      // Log every check result, not just the failure/reset paths below - this
+      // is the only record of a flag that never becomes a reset (minor
+      // severity, or a type with triggersReset off), which otherwise only
+      // ever reached the player as a toast and never showed up in Debug Logs.
+      if (flags.length > 0) {
+        logger.action("Observer: turn flagged", {
+          flags: flags.map((f) => ({
+            type: f.type,
+            severity: f.severity,
+            detail: f.detail,
+          })),
+        });
+      }
 
-        // Choices were parsed from the flagged narration - regenerate them
-        // off the corrected text. Best-effort: keep the original choices if
-        // this fails rather than losing the whole turn over a side call.
-        try {
-          callbacks.onChoicesStart?.();
-          const { content: rawChoicesContent, meta: rewrittenChoicesMeta } =
-            await generateChoicesWithRetry(
+      // A flag only resets when it's both "major" severity (decided per-
+      // instance by the check itself) AND that flag type's triggersReset is
+      // on (decided by config - defaults to true for the three checks that
+      // can naturally be major, false for the two tool-usage-gap checks,
+      // reproducing exactly what shipped before this setting existed).
+      const majorFlag = flags.find(
+        (f) =>
+          f.severity === "major" &&
+          settingsFor(observerSettings, f.type).triggersReset,
+      );
+
+      if (majorFlag && resetAttempts < MAX_OBSERVER_RESETS) {
+        resetAttempts++;
+        logger.action("Observer flagged turn - attempting a targeted rewrite", {
+          type: majorFlag.type,
+          detail: majorFlag.detail,
+          attempt: resetAttempts,
+        });
+
+        // Rewrite first (see observer.ts's rewriteFlaggedNarration): every
+        // check that can reach here is a complaint about the narration TEXT,
+        // never about which tools were called or what a roll resolved to - so
+        // the GM is shown the exact narration it wrote plus the specific
+        // reason it was flagged, and asked to rewrite just the prose. The
+        // turn's dice rolls/tool calls/state changes are ground truth and
+        // stay untouched. Only falls back to the old full-turn reset
+        // (rollback + a completely fresh blind attempt, which can reroll dice
+        // into a different outcome) if the rewrite call itself fails.
+        //
+        // tier_escalation_missed is the one exception: it's a complaint that
+        // the turn ran at too low a reasoning tier, not about the narration
+        // text - rewriting the prose at the same (insufficient) tier wouldn't
+        // add any brainpower, so it skips straight to the full-turn reset
+        // below, which also forces the retry onto a higher tier.
+        let rewrittenNarration: string | null = null;
+        if (majorFlag.type !== "tier_escalation_missed") {
+          try {
+            rewrittenNarration = await rewriteFlaggedNarration({
+              narration: result.content,
+              playerChoice: userChoice,
+              gmStoryContext: result.gmStoryContext,
+              flag: majorFlag,
+              replyLength: options.replyLength,
+              storytellerMode: options.storytellerMode,
+              apiOptions: sideCallApiOptions,
+            });
+          } catch (rewriteError) {
+            logger.action(
+              "Observer rewrite call failed, falling back to full-turn reset",
               {
-                storyData,
-                storyContent: rewrittenNarration,
-                usePrefill: options.usePrefill !== false,
-              },
-              {
-                token: null,
-                model: sideCallApiOptions.model,
-                openRouterKey: options.openRouterKey,
-                deepseekKey: options.deepseekKey,
-                googleKey: options.googleKey,
-                mistralKey: options.mistralKey,
-                deepinfraKey: options.deepinfraKey,
-                abortSignal: options.abortSignal,
+                error:
+                  rewriteError instanceof Error
+                    ? rewriteError.message
+                    : String(rewriteError),
               },
             );
-          const cleanedChoicesContent =
-            options.usePrefill !== false
-              ? stripAffirmationPrefill(rawChoicesContent, CHOICES_AFFIRMATION)
-              : rawChoicesContent;
-          const rewrittenChoices = parseChoices(
-            cleanedChoicesContent,
-            storyData,
+          }
+        }
+
+        if (rewrittenNarration) {
+          logger.action(
+            "Observer rewrite succeeded, keeping tool calls/rolls and replacing narration",
+            { type: majorFlag.type },
           );
-          result.choices = rewrittenChoices;
+          result.content = rewrittenNarration;
           result.scenePart = {
             ...result.scenePart,
-            choices: rewrittenChoices,
+            content: rewrittenNarration,
           };
-          callbacks.onChoicesComplete?.(
-            rewrittenChoices,
-            rewrittenChoicesMeta?.usage || {
-              promptTokens: 0,
-              completionTokens: 0,
-              totalTokens: 0,
-            },
-          );
-        } catch (choicesError) {
-          logger.action(
-            "Failed to regenerate choices after observer rewrite, keeping original choices",
-            {
-              error:
-                choicesError instanceof Error
-                  ? choicesError.message
-                  : String(choicesError),
-            },
-          );
-        }
+          callbacks.onObserverRewrite?.(flags, majorFlag, rewrittenNarration);
 
-        // Any OTHER flags from this turn (the one just fixed aside) still
-        // get surfaced to the player, same as a turn that finishes with
-        // surviving minor flags normally would.
-        flags = flags.filter((f) => f !== majorFlag);
-      } else if (preTurnSnapshot) {
-        // Full state rollback, restored in place (delete-all-keys +
-        // Object.assign) so every closure over storyData (the caller, other
-        // callbacks already fired this turn) keeps seeing the same object -
-        // same idiom as page.tsx's handleUndo.
-        for (const key of Object.keys(storyData)) {
-          delete (storyData as unknown as Record<string, unknown>)[key];
-        }
-        Object.assign(storyData, preTurnSnapshot);
+          // Choices were parsed from the flagged narration - regenerate them
+          // off the corrected text. Best-effort: keep the original choices if
+          // this fails rather than losing the whole turn over a side call.
+          try {
+            callbacks.onChoicesStart?.();
+            const { content: rawChoicesContent, meta: rewrittenChoicesMeta } =
+              await generateChoicesWithRetry(
+                {
+                  storyData,
+                  storyContent: rewrittenNarration,
+                  usePrefill: options.usePrefill !== false,
+                },
+                {
+                  token: null,
+                  model: sideCallApiOptions.model,
+                  openRouterKey: options.openRouterKey,
+                  deepseekKey: options.deepseekKey,
+                  googleKey: options.googleKey,
+                  mistralKey: options.mistralKey,
+                  deepinfraKey: options.deepinfraKey,
+                  abortSignal: options.abortSignal,
+                },
+              );
+            const cleanedChoicesContent =
+              options.usePrefill !== false
+                ? stripAffirmationPrefill(rawChoicesContent, CHOICES_AFFIRMATION)
+                : rawChoicesContent;
+            const rewrittenChoices = parseChoices(
+              cleanedChoicesContent,
+              storyData,
+            );
+            result.choices = rewrittenChoices;
+            result.scenePart = {
+              ...result.scenePart,
+              choices: rewrittenChoices,
+            };
+            callbacks.onChoicesComplete?.(
+              rewrittenChoices,
+              rewrittenChoicesMeta?.usage || {
+                promptTokens: 0,
+                completionTokens: 0,
+                totalTokens: 0,
+              },
+            );
+          } catch (choicesError) {
+            logger.action(
+              "Failed to regenerate choices after observer rewrite, keeping original choices",
+              {
+                error:
+                  choicesError instanceof Error
+                    ? choicesError.message
+                    : String(choicesError),
+              },
+            );
+          }
 
-        if (majorFlag.type === "tier_escalation_missed") {
-          const requestedTier = Math.min(
-            TOP_TIER,
-            (tierUsedThisTurn ?? SCENE_BASELINE_TIER) + 1,
-          );
-          const escalation = applyTierEscalation(
-            storyData,
-            requestedTier,
-            majorFlag.detail,
-          );
-          forcedStartingTier = escalation.grantedTier;
-          logger.action("Observer forced a reasoning-tier escalation for retry", {
-            previousTier: tierUsedThisTurn,
-            grantedTier: escalation.grantedTier,
-            capped: escalation.capped,
-          });
-        }
+          // Any OTHER flags from this turn (the one just fixed aside) still
+          // get surfaced to the player, same as a turn that finishes with
+          // surviving minor flags normally would.
+          flags = flags.filter((f) => f !== majorFlag);
+        } else if (preTurnSnapshot) {
+          // Full state rollback, restored in place (delete-all-keys +
+          // Object.assign) so every closure over storyData (the caller, other
+          // callbacks already fired this turn) keeps seeing the same object -
+          // same idiom as page.tsx's handleUndo.
+          for (const key of Object.keys(storyData)) {
+            delete (storyData as unknown as Record<string, unknown>)[key];
+          }
+          Object.assign(storyData, preTurnSnapshot);
 
-        observerNote = majorFlag.correctivePrompt;
-        callbacks.onObserverReset?.(flags, majorFlag);
-        continue;
+          if (majorFlag.type === "tier_escalation_missed") {
+            const requestedTier = Math.min(
+              TOP_TIER,
+              (tierUsedThisTurn ?? SCENE_BASELINE_TIER) + 1,
+            );
+            const escalation = applyTierEscalation(
+              storyData,
+              requestedTier,
+              majorFlag.detail,
+            );
+            forcedStartingTier = escalation.grantedTier;
+            logger.action("Observer forced a reasoning-tier escalation for retry", {
+              previousTier: tierUsedThisTurn,
+              grantedTier: escalation.grantedTier,
+              capped: escalation.capped,
+            });
+          }
+
+          observerNote = majorFlag.correctivePrompt;
+          callbacks.onObserverReset?.(flags, majorFlag);
+          continue;
+        }
+      }
+
+      if (flags.length > 0) {
+        result.scenePart = { ...result.scenePart, observerFlags: flags };
       }
     }
 
-    if (flags.length > 0) {
-      result.scenePart = { ...result.scenePart, observerFlags: flags };
-    }
+    // Everything past this point is best-effort side-channel work that
+    // never changes what the player is about to read: when resetPossible is
+    // false, the observer itself can only log flags, never rewrite/reset
+    // (see above), and the memory agent/director assistant/story progress
+    // observer were never in the reset business to begin with - they just
+    // write memory/thread/pacing data storyData carries forward. None of
+    // that is worth blocking the player's next action on, so it all runs as
+    // one fire-and-forget wave AFTER onComplete, instead of before it.
+    // backgroundPartIndex is captured now (before anything here yields) so a
+    // mid-flight undo/retry that reshapes storyData.scene.parts can't cause
+    // a late-arriving result to land on the wrong turn's part.
+    const backgroundPartIndex = storyData.scene.parts.length - 1;
 
-    // Layer 4: the memory agent (memoryAgent.ts) decides what from this
-    // turn is worth persisting, now that the turn is final and won't be
-    // reset again. Mutates storyData.memory directly; best-effort, same
-    // fail-open posture as the observer above.
-    try {
-      const memoryKeeperApiOptions = {
-        ...sideCallApiOptions,
-        ...resolveSideCallModel(
-          getMemoryKeeperModelOverride(),
-          sideCallApiOptions.model,
-        ),
-      };
-      await runMemoryAgent(
-        storyData,
-        result.content,
-        userChoice,
-        memoryKeeperApiOptions,
-      );
-    } catch (memoryAgentError) {
-      logger.action("Memory agent failed, skipping (fail open)", {
-        error:
-          memoryAgentError instanceof Error
-            ? memoryAgentError.message
-            : String(memoryAgentError),
-      });
-    }
+    const runBackgroundLayers = async () => {
+      if (!resetPossible) {
+        try {
+          const backgroundFlags = await runObserver({
+            narration: result.content,
+            playerChoice: userChoice,
+            replyLength: options.replyLength,
+            toolNames: (result.gmResults || []).map((r) => r.toolName),
+            rollResults: (result.gmResults || []).map((r) => ({
+              toolName: r.toolName,
+              success: r.success,
+              contextForStory: r.contextForStory,
+            })),
+            tierUsed: tierUsedThisTurn,
+            settings: observerSettings,
+            apiOptions: observerApiOptions,
+          });
+          if (backgroundFlags.length > 0) {
+            logger.action(
+              "Observer: turn flagged (background, non-blocking)",
+              {
+                flags: backgroundFlags.map((f) => ({
+                  type: f.type,
+                  severity: f.severity,
+                  detail: f.detail,
+                })),
+              },
+            );
+            const part = storyData.scene.parts[backgroundPartIndex];
+            if (part && !part.user && part.role === "assistant") {
+              storyData.scene.parts[backgroundPartIndex] = {
+                ...part,
+                observerFlags: backgroundFlags,
+              };
+            }
+            callbacks.onBackgroundObserverFlags?.(backgroundFlags);
+          }
+        } catch (observerError) {
+          // Fail open - same posture as the blocking path above.
+          logger.action(
+            "Background observer check failed, skipping (fail open)",
+            {
+              error:
+                observerError instanceof Error
+                  ? observerError.message
+                  : String(observerError),
+            },
+          );
+        }
+      }
 
-    // Layer 3: the Director Assistant (directorAssistant.ts) updates the
-    // thread/NPC spotlight ledger selectDirectorMove reads, gated to only
-    // run on scene increments - the same cadence AGMTState.tension/
-    // chaosFactor already update at, rather than every single turn.
-    // Best-effort, same fail-open posture as the observer/memory agent above.
-    if ((result.gmResults || []).some((r) => r.toolName === "increment_scene")) {
+      // Layer 4: the memory agent (memoryAgent.ts) decides what from this
+      // turn is worth persisting, now that the turn is final and won't be
+      // reset again. Mutates storyData.memory directly; best-effort, same
+      // fail-open posture as the observer above.
       try {
-        const directorAssistantApiOptions = {
+        const memoryKeeperApiOptions = {
           ...sideCallApiOptions,
           ...resolveSideCallModel(
-            getDirectorAssistantModelOverride(),
+            getMemoryKeeperModelOverride(),
             sideCallApiOptions.model,
           ),
         };
-        await runDirectorAssistant(
+        await runMemoryAgent(
           storyData,
           result.content,
           userChoice,
-          directorAssistantApiOptions,
+          memoryKeeperApiOptions,
         );
-      } catch (directorAssistantError) {
-        logger.action("Director assistant failed, skipping (fail open)", {
+      } catch (memoryAgentError) {
+        logger.action("Memory agent failed, skipping (fail open)", {
           error:
-            directorAssistantError instanceof Error
-              ? directorAssistantError.message
-              : String(directorAssistantError),
+            memoryAgentError instanceof Error
+              ? memoryAgentError.message
+              : String(memoryAgentError),
         });
       }
-    }
 
-    // Layer 3: the Story Progress Observer (storyProgressObserver.ts)
-    // advances its own turn-count cadence and, once every N accepted turns
-    // (getStoryProgressCheckInterval, default 10), reads back a holistic
-    // "how's the story's pacing/momentum going" note for the GM. Unlike
-    // pacingFeedback.ts's per-turn word-count trend or the Director
-    // Assistant's per-scene spotlight ledger, this fires on a plain turn
-    // cadence and judges narrative momentum, not turn length or spotlight
-    // fairness. Best-effort, same fail-open posture as the other side calls
-    // above - an infra failure just means no note this cycle.
-    try {
-      const storyProgressApiOptions = {
-        ...sideCallApiOptions,
-        ...resolveSideCallModel(
-          getStoryProgressObserverModelOverride(),
-          sideCallApiOptions.model,
-        ),
-      };
-      const progressResult = await runStoryProgressObserver(
-        storyData,
-        result.content,
-        storyProgressApiOptions,
-        getStoryProgressCheckInterval(),
-      );
-      if (progressResult.note) {
-        result.scenePart = {
-          ...result.scenePart,
-          storyProgressNote: progressResult.note,
-        };
+      // Layer 3: the Director Assistant (directorAssistant.ts) updates the
+      // thread/NPC spotlight ledger selectDirectorMove reads, gated to only
+      // run on scene increments - the same cadence AGMTState.tension/
+      // chaosFactor already update at, rather than every single turn.
+      // Best-effort, same fail-open posture as the observer/memory agent above.
+      if ((result.gmResults || []).some((r) => r.toolName === "increment_scene")) {
+        try {
+          const directorAssistantApiOptions = {
+            ...sideCallApiOptions,
+            ...resolveSideCallModel(
+              getDirectorAssistantModelOverride(),
+              sideCallApiOptions.model,
+            ),
+          };
+          await runDirectorAssistant(
+            storyData,
+            result.content,
+            userChoice,
+            directorAssistantApiOptions,
+          );
+        } catch (directorAssistantError) {
+          logger.action("Director assistant failed, skipping (fail open)", {
+            error:
+              directorAssistantError instanceof Error
+                ? directorAssistantError.message
+                : String(directorAssistantError),
+          });
+        }
       }
-      if (progressResult.repetitionNote) {
-        result.scenePart = {
-          ...result.scenePart,
-          repetitionNote: progressResult.repetitionNote,
+
+      // Layer 3: the Story Progress Observer (storyProgressObserver.ts)
+      // advances its own turn-count cadence and, once every N accepted turns
+      // (getStoryProgressCheckInterval, default 10), reads back a holistic
+      // "how's the story's pacing/momentum going" note for the GM. Unlike
+      // pacingFeedback.ts's per-turn word-count trend or the Director
+      // Assistant's per-scene spotlight ledger, this fires on a plain turn
+      // cadence and judges narrative momentum, not turn length or spotlight
+      // fairness. Best-effort, same fail-open posture as the other side calls
+      // above - an infra failure just means no note this cycle. Attached
+      // directly to storyData.scene.parts (rather than the now-abandoned
+      // result.scenePart) so the next turn's lastAssistantPart lookup in
+      // generateStoryTurn actually finds it.
+      try {
+        const storyProgressApiOptions = {
+          ...sideCallApiOptions,
+          ...resolveSideCallModel(
+            getStoryProgressObserverModelOverride(),
+            sideCallApiOptions.model,
+          ),
         };
-      }
-      if (progressResult.knowledgeNote) {
-        result.scenePart = {
-          ...result.scenePart,
-          knowledgeNote: progressResult.knowledgeNote,
-        };
-      }
-      // Log the check-in itself (not just infra failures below) - this note
-      // is GM-facing only and never shown to the player, so Debug Logs is
-      // otherwise the only place to see it fired at all.
-      if (progressResult.ran) {
-        logger.action("Story progress observer: checked in", {
-          status: progressResult.status,
-          note: progressResult.note,
-          repeatedPhrases: progressResult.repeatedPhrases,
-          repetitionNote: progressResult.repetitionNote,
-          knowledgeNote: progressResult.knowledgeNote,
+        const progressResult = await runStoryProgressObserver(
+          storyData,
+          result.content,
+          storyProgressApiOptions,
+          getStoryProgressCheckInterval(),
+        );
+        if (
+          progressResult.note ||
+          progressResult.repetitionNote ||
+          progressResult.knowledgeNote
+        ) {
+          const part = storyData.scene.parts[backgroundPartIndex];
+          if (part && !part.user && part.role === "assistant") {
+            storyData.scene.parts[backgroundPartIndex] = {
+              ...part,
+              ...(progressResult.note && {
+                storyProgressNote: progressResult.note,
+              }),
+              ...(progressResult.repetitionNote && {
+                repetitionNote: progressResult.repetitionNote,
+              }),
+              ...(progressResult.knowledgeNote && {
+                knowledgeNote: progressResult.knowledgeNote,
+              }),
+            };
+          }
+        }
+        // Log the check-in itself (not just infra failures below) - this note
+        // is GM-facing only and never shown to the player, so Debug Logs is
+        // otherwise the only place to see it fired at all.
+        if (progressResult.ran) {
+          logger.action("Story progress observer: checked in", {
+            status: progressResult.status,
+            note: progressResult.note,
+            repeatedPhrases: progressResult.repeatedPhrases,
+            repetitionNote: progressResult.repetitionNote,
+            knowledgeNote: progressResult.knowledgeNote,
+          });
+        }
+      } catch (storyProgressError) {
+        logger.action("Story progress observer failed, skipping (fail open)", {
+          error:
+            storyProgressError instanceof Error
+              ? storyProgressError.message
+              : String(storyProgressError),
         });
       }
-    } catch (storyProgressError) {
-      logger.action("Story progress observer failed, skipping (fail open)", {
-        error:
-          storyProgressError instanceof Error
-            ? storyProgressError.message
-            : String(storyProgressError),
-      });
-    }
+
+      callbacks.onBackgroundLayersUpdate?.();
+    };
+
+    void runBackgroundLayers();
 
     callbacks.onComplete?.(result);
     return result;

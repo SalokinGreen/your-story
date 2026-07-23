@@ -234,6 +234,46 @@ function handleObserverReset(
   );
 }
 
+// Fired via GenerationCallbacks.onBackgroundObserverFlags - only reachable
+// when the observer ran in the background (generateStoryTurn's
+// resetPossible was false, so a rewrite/reset was never on the table) and
+// found something worth flagging after the turn already completed and
+// control was already handed back to the player. storyData.scene.parts was
+// already patched in place by generateStoryTurn itself (same object
+// reference), so this just needs to re-render/persist/notify - mirrors the
+// observerFlags branch inside onComplete below, just arriving later.
+function handleBackgroundObserverFlags(
+  storyData: StoryData,
+  flags: ObserverFlag[],
+  setStoryData: (data: StoryData) => void,
+  saveProgress: (data: StoryData, immediate?: boolean) => void,
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "info" | "warning",
+  ) => void,
+) {
+  setStoryData({ ...storyData });
+  saveProgress(storyData, true);
+  addNotification(
+    `GM response flagged: ${flags[0].detail} - use Edit to fix the text, or Retry to regenerate.`,
+    "warning",
+  );
+}
+
+// Fired via GenerationCallbacks.onBackgroundLayersUpdate once the
+// fire-and-forget memory agent/director assistant/story progress observer
+// wave (and the observer itself, when deferred) finishes - they mutate
+// storyData in place rather than returning anything, so this just
+// re-renders/persists whatever they wrote.
+function handleBackgroundLayersUpdate(
+  storyData: StoryData,
+  setStoryData: (data: StoryData) => void,
+  saveProgress: (data: StoryData, immediate?: boolean) => void,
+) {
+  setStoryData({ ...storyData });
+  saveProgress(storyData, true);
+}
+
 // Layer 5 hardening: fired via GenerationCallbacks.onObserverRewrite when
 // rewriteFlaggedNarration (observer.ts) successfully rewrote a flagged
 // turn's narration in place. Unlike handleObserverReset above, the turn's
@@ -1852,6 +1892,18 @@ function StoryPageContent() {
               addNotification,
             );
           },
+          onBackgroundObserverFlags: (flags) => {
+            handleBackgroundObserverFlags(
+              storyData,
+              flags,
+              setStoryData,
+              saveProgress,
+              addNotification,
+            );
+          },
+          onBackgroundLayersUpdate: () => {
+            handleBackgroundLayersUpdate(storyData, setStoryData, saveProgress);
+          },
           onComplete: (result) => {
             if (result.meta.totalTokenCost) {
               addNotification(
@@ -2345,6 +2397,18 @@ function StoryPageContent() {
               setLoadingStage,
               addNotification,
             );
+          },
+          onBackgroundObserverFlags: (flags) => {
+            handleBackgroundObserverFlags(
+              storyData,
+              flags,
+              setStoryData,
+              saveProgress,
+              addNotification,
+            );
+          },
+          onBackgroundLayersUpdate: () => {
+            handleBackgroundLayersUpdate(storyData, setStoryData, saveProgress);
           },
           onComplete: (result) => {
             if (partialPart.content.includes("!!!ENDCHAPTER!!!")) {
@@ -3251,6 +3315,18 @@ function StoryPageContent() {
               setLoadingStage,
               addNotification,
             );
+          },
+          onBackgroundObserverFlags: (flags) => {
+            handleBackgroundObserverFlags(
+              storyData,
+              flags,
+              setStoryData,
+              saveProgress,
+              addNotification,
+            );
+          },
+          onBackgroundLayersUpdate: () => {
+            handleBackgroundLayersUpdate(storyData, setStoryData, saveProgress);
           },
           onComplete: (result) => {
             // Check for chapter completion
