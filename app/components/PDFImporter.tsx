@@ -688,9 +688,15 @@ type ProcessingStep =
   | "complete"
   | "error";
 
-// Chunk status for tracking individual chunk processing
+// Chunk status for tracking individual chunk processing. `chunkIndex` is
+// only unique *within* a file (0-based page-range chunk, or always 0 for a
+// file small enough to skip chunking) - `fileIndex` is what disambiguates
+// entries across a multi-file import so two files' "chunk 0" don't collide
+// in the shared `chunkStatuses` list below.
 interface ChunkStatus {
   chunkIndex: number;
+  fileIndex: number;
+  fileName: string;
   pageStart: number;
   pageEnd: number;
   status: "pending" | "ocr" | "summarizing" | "complete" | "failed";
@@ -814,14 +820,22 @@ export default function PDFImporter({
   const [showSavedImports, setShowSavedImports] = useState(false);
   const [expandedImport, setExpandedImport] = useState<string | null>(null);
 
-  // Chunk tracking state for large PDFs
+  // Chunk tracking state - covers both page-range chunks of large PDFs and
+  // (as of the multi-file preview fix) a single whole-file entry for files
+  // small enough to skip chunking, so every file in a multi-file import
+  // gets a row in the preview panel below.
   const [chunkStatuses, setChunkStatuses] = useState<ChunkStatus[]>([]);
   const [showChunkDetails, setShowChunkDetails] = useState(false);
-  // Which chunk (by index) currently has its live preview (raw OCR text
-  // and/or extracted notes) expanded in the chunk status panel.
+  // Which chunk currently has its live preview (raw OCR text and/or
+  // extracted notes) expanded in the chunk status panel. `chunkIndex` alone
+  // isn't unique across files (each file's chunks start at 0), so the
+  // owning file is tracked alongside it.
   const [expandedChunkIndex, setExpandedChunkIndex] = useState<number | null>(
     null,
   );
+  const [expandedChunkFileIndex, setExpandedChunkFileIndex] = useState<
+    number | null
+  >(null);
   // Whether the expanded chunk's preview is showing raw OCR markdown
   // ("text") or extracted notes ("notes"). Only meaningful while
   // expandedChunkIndex is set.
@@ -840,6 +854,7 @@ export default function PDFImporter({
   // JSON Repair Modal state - for manual fixing of broken chunk output
   const [repairModalOpen, setRepairModalOpen] = useState(false);
   const [repairChunkIndex, setRepairChunkIndex] = useState<number | null>(null);
+  const [repairFileIndex, setRepairFileIndex] = useState<number | null>(null);
   const [repairContent, setRepairContent] = useState("");
   const [repairError, setRepairError] = useState("");
 
@@ -960,10 +975,14 @@ export default function PDFImporter({
     [onImportComplete, addNotification, closeModal],
   );
 
-  // Retry a failed chunk
+  // Retry a failed chunk. `chunkIndex` is only unique within a file, so
+  // `fileIndex` is required to identify the right entry in `chunkStatuses`
+  // when a multi-file import has several files' "chunk 0" etc. side by side.
   const retryChunk = useCallback(
-    async (chunkIndex: number) => {
-      const chunk = chunkStatuses.find((cs) => cs.chunkIndex === chunkIndex);
+    async (fileIndex: number, chunkIndex: number) => {
+      const matches = (cs: ChunkStatus) =>
+        cs.fileIndex === fileIndex && cs.chunkIndex === chunkIndex;
+      const chunk = chunkStatuses.find(matches);
       if (!chunk) return;
 
       let ocrMarkdown = chunk.ocrMarkdown;
@@ -973,16 +992,21 @@ export default function PDFImporter({
       // document before summarizing.
       if (!ocrMarkdown) {
         const source = chunkedPdfSourceRef.current;
-        if (!source) {
-          addNotification("Cannot retry: OCR data not available", "warning");
+        // The retained source document is only ever the most recently
+        // chunked file - if this chunk belongs to an earlier file (or the
+        // whole-file entry of a non-chunked file, which has no OCR retry
+        // path at all), there's nothing to re-run OCR against.
+        if (!source || source.fileName !== chunk.fileName) {
+          addNotification(
+            "Cannot retry: OCR data for this file is no longer available (only the most recently processed file can be retried)",
+            "warning",
+          );
           return;
         }
 
         setChunkStatuses((prev) =>
           prev.map((cs) =>
-            cs.chunkIndex === chunkIndex
-              ? { ...cs, status: "ocr", error: undefined }
-              : cs,
+            matches(cs) ? { ...cs, status: "ocr", error: undefined } : cs,
           ),
         );
 
@@ -1004,9 +1028,7 @@ export default function PDFImporter({
             err instanceof Error ? err.message : "OCR processing failed";
           setChunkStatuses((prev) =>
             prev.map((cs) =>
-              cs.chunkIndex === chunkIndex
-                ? { ...cs, status: "failed", error: message }
-                : cs,
+              matches(cs) ? { ...cs, status: "failed", error: message } : cs,
             ),
           );
           addNotification(`Retry failed: ${message}`, "failure");
@@ -1016,9 +1038,7 @@ export default function PDFImporter({
         const markdown = ocrMarkdown;
         setChunkStatuses((prev) =>
           prev.map((cs) =>
-            cs.chunkIndex === chunkIndex
-              ? { ...cs, ocrMarkdown: markdown }
-              : cs,
+            matches(cs) ? { ...cs, ocrMarkdown: markdown } : cs,
           ),
         );
       }
@@ -1026,7 +1046,7 @@ export default function PDFImporter({
       // Update status to summarizing
       setChunkStatuses((prev) =>
         prev.map((cs) =>
-          cs.chunkIndex === chunkIndex
+          matches(cs)
             ? { ...cs, status: "summarizing", error: undefined }
             : cs,
         ),
@@ -1061,9 +1081,7 @@ export default function PDFImporter({
           );
           setChunkStatuses((prev) =>
             prev.map((cs) =>
-              cs.chunkIndex === chunkIndex
-                ? { ...cs, status: "failed", error: errorMsg }
-                : cs,
+              matches(cs) ? { ...cs, status: "failed", error: errorMsg } : cs,
             ),
           );
           addNotification(`Retry failed: ${errorMsg}`, "failure");
@@ -1077,7 +1095,7 @@ export default function PDFImporter({
         } catch {
           setChunkStatuses((prev) =>
             prev.map((cs) =>
-              cs.chunkIndex === chunkIndex
+              matches(cs)
                 ? {
                     ...cs,
                     status: "failed",
@@ -1097,7 +1115,7 @@ export default function PDFImporter({
         // Success - update chunk status
         setChunkStatuses((prev) =>
           prev.map((cs) =>
-            cs.chunkIndex === chunkIndex
+            matches(cs)
               ? {
                   ...cs,
                   status: "complete",
@@ -1120,7 +1138,7 @@ export default function PDFImporter({
         );
         setChunkStatuses((prev) =>
           prev.map((cs) =>
-            cs.chunkIndex === chunkIndex
+            matches(cs)
               ? {
                   ...cs,
                   status: "failed",
@@ -1142,14 +1160,18 @@ export default function PDFImporter({
     ],
   );
 
-  // Open repair modal for a failed chunk
+  // Open repair modal for a failed chunk. `chunkIndex` alone isn't unique
+  // across files in a multi-file import, so `fileIndex` disambiguates.
   const openRepairModal = useCallback(
-    (chunkIndex: number) => {
-      const chunk = chunkStatuses.find((cs) => cs.chunkIndex === chunkIndex);
+    (fileIndex: number, chunkIndex: number) => {
+      const chunk = chunkStatuses.find(
+        (cs) => cs.fileIndex === fileIndex && cs.chunkIndex === chunkIndex,
+      );
       if (!chunk || !chunk.rawSummarizeOutput) {
         addNotification("No raw output available to repair", "warning");
         return;
       }
+      setRepairFileIndex(fileIndex);
       setRepairChunkIndex(chunkIndex);
       setRepairContent(chunk.rawSummarizeOutput);
       setRepairError(chunk.error || "JSON parse error");
@@ -1161,7 +1183,7 @@ export default function PDFImporter({
   // Handle repair save - apply manually fixed JSON
   const handleRepairSave = useCallback(
     (fixedContent: string) => {
-      if (repairChunkIndex === null) return;
+      if (repairChunkIndex === null || repairFileIndex === null) return;
 
       try {
         const result = JSON.parse(fixedContent);
@@ -1169,6 +1191,7 @@ export default function PDFImporter({
         // Update chunk status with parsed results
         setChunkStatuses((prev) =>
           prev.map((cs) =>
+            cs.fileIndex === repairFileIndex &&
             cs.chunkIndex === repairChunkIndex
               ? {
                   ...cs,
@@ -1188,6 +1211,7 @@ export default function PDFImporter({
         // Close modal
         setRepairModalOpen(false);
         setRepairChunkIndex(null);
+        setRepairFileIndex(null);
         setRepairContent("");
         setRepairError("");
 
@@ -1202,7 +1226,7 @@ export default function PDFImporter({
         );
       }
     },
-    [repairChunkIndex, addNotification],
+    [repairChunkIndex, repairFileIndex, addNotification],
   );
 
   // Collect all chunk results (for completing import after fixing)
@@ -1234,12 +1258,8 @@ export default function PDFImporter({
     ).length;
     const failedChunks = chunkStatuses.filter((cs) => cs.status === "failed");
     const failedCount = failedChunks.length;
-    const sourceFileName =
-      chunkedPdfSourceRef.current?.fileName ||
-      selectedFiles[0]?.name ||
-      "document";
     const failedPages: FailedPageRange[] = failedChunks.map((cs) => ({
-      fileName: sourceFileName,
+      fileName: cs.fileName,
       pageStart: cs.pageStart,
       pageEnd: cs.pageEnd,
       reason: cs.error || "Unknown error",
@@ -1288,7 +1308,6 @@ export default function PDFImporter({
   }, [
     collectChunkResults,
     chunkStatuses,
-    selectedFiles,
     applyMergePass,
     saveImport,
     onImportComplete,
@@ -1393,6 +1412,7 @@ export default function PDFImporter({
     async (
       chunkPlan: PDFChunkPlan,
       fileName: string,
+      fileIndex: number,
       sourceBytes: ArrayBuffer,
       initialStatuses: ChunkStatus[],
       progressStart: number,
@@ -1419,7 +1439,13 @@ export default function PDFImporter({
       // Retain the parsed document so failed chunks can re-run OCR from
       // the chunk panel after the import finishes.
       chunkedPdfSourceRef.current = { pdfDoc, fileName };
-      setChunkStatuses(initialStatuses);
+      // Append this file's chunks rather than replacing the whole list, so
+      // a multi-file import keeps every earlier file's preview/status
+      // visible instead of each new file wiping out the previous one's.
+      setChunkStatuses((prev) => [
+        ...prev.filter((cs) => cs.fileIndex !== fileIndex),
+        ...initialStatuses,
+      ]);
 
       const persistedStatuses: PersistedChunkStatus[] = initialStatuses.map(
         (cs) => ({
@@ -1551,7 +1577,7 @@ export default function PDFImporter({
           const range = ranges[chunkIdx];
           setChunkStatuses((prev) =>
             prev.map((cs) =>
-              cs.chunkIndex === chunkIdx ? { ...cs, status: "ocr" } : cs,
+              cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx ? { ...cs, status: "ocr" } : cs,
             ),
           );
 
@@ -1578,7 +1604,7 @@ export default function PDFImporter({
             );
             setChunkStatuses((prev) =>
               prev.map((cs) =>
-                cs.chunkIndex === chunkIdx
+                cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx
                   ? { ...cs, status: "failed", error: message }
                   : cs,
               ),
@@ -1603,7 +1629,7 @@ export default function PDFImporter({
 
           setChunkStatuses((prev) =>
             prev.map((cs) =>
-              cs.chunkIndex === chunkIdx
+              cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx
                 ? { ...cs, ocrMarkdown, status: "summarizing" }
                 : cs,
             ),
@@ -1646,7 +1672,7 @@ export default function PDFImporter({
               );
               setChunkStatuses((prev) =>
                 prev.map((cs) =>
-                  cs.chunkIndex === chunkIdx
+                  cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx
                     ? { ...cs, status: "failed", error: errorMsg }
                     : cs,
                 ),
@@ -1678,7 +1704,7 @@ export default function PDFImporter({
               // Store raw output for manual repair
               setChunkStatuses((prev) =>
                 prev.map((cs) =>
-                  cs.chunkIndex === chunkIdx
+                  cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx
                     ? {
                         ...cs,
                         status: "failed",
@@ -1709,7 +1735,7 @@ export default function PDFImporter({
 
             setChunkStatuses((prev) =>
               prev.map((cs) =>
-                cs.chunkIndex === chunkIdx
+                cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx
                   ? {
                       ...cs,
                       status: "complete",
@@ -1757,7 +1783,7 @@ export default function PDFImporter({
             );
             setChunkStatuses((prev) =>
               prev.map((cs) =>
-                cs.chunkIndex === chunkIdx
+                cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx
                   ? { ...cs, status: "failed", error: message }
                   : cs,
               ),
@@ -1949,6 +1975,8 @@ export default function PDFImporter({
           const initialStatuses: ChunkStatus[] = chunkPlan.ranges.map(
             (range, idx) => ({
               chunkIndex: idx,
+              fileIndex: i,
+              fileName: file.name,
               pageStart: range.pageStart,
               pageEnd: range.pageEnd,
               status: "pending",
@@ -1958,6 +1986,7 @@ export default function PDFImporter({
           const chunkResult = await processChunkedRanges(
             chunkPlan,
             file.name,
+            i,
             sourceBytes,
             initialStatuses,
             fileProgressStart,
@@ -1977,26 +2006,153 @@ export default function PDFImporter({
           allFailedPages.push(...chunkResult.failedPages);
           totalPagesProcessed += chunkResult.totalPagesProcessed;
         } else {
-          // Small file or non-PDF: Use original single-request approach
-          if (isTextImportFile(file)) {
-            setStep("summarizing");
+          // Small file or non-PDF: Use original single-request approach.
+          // Track this file as a single whole-file entry in chunkStatuses
+          // so it shows up in the same live preview panel as chunked
+          // files - previously only chunked (large) PDFs got any preview
+          // at all, so a multi-file import of ordinary-sized files showed
+          // no notes/tables preview for any of them.
+          setChunkStatuses((prev) => [
+            ...prev,
+            {
+              chunkIndex: 0,
+              fileIndex: i,
+              fileName: file.name,
+              pageStart: 1,
+              pageEnd: 1,
+              status: "ocr",
+            },
+          ]);
+          const updateFileChunk = (patch: Partial<ChunkStatus>) => {
+            setChunkStatuses((prev) =>
+              prev.map((cs) =>
+                cs.fileIndex === i && cs.chunkIndex === 0
+                  ? { ...cs, ...patch }
+                  : cs,
+              ),
+            );
+          };
+
+          try {
+            if (isTextImportFile(file)) {
+              setStep("summarizing");
+              updateFileChunk({ status: "summarizing" });
+              setProgress(fileProgressStart + fileProgressRange * 0.4);
+              setStatusMessage(
+                `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`,
+              );
+
+              const textContent = await file.text();
+              combinedMarkdown = textContent;
+              combinedTotalPages = 0;
+              updateFileChunk({ ocrMarkdown: textContent });
+
+              const summarizeResponse = await fetchWithRetry(
+                "/api/ocr/summarize",
+                {
+                  markdown: combinedMarkdown,
+                  focus: ["all"],
+                  customInstructions:
+                    (customInstructions || "") +
+                    `\n\nNote: This content was imported from a text file (${file.name}).`,
+                  model: getSelectedModel().model,
+                  provider: getSelectedModel().provider,
+                  maxTokens: maxOutputTokens,
+                  openRouterKey: keys.openRouterKey,
+                  deepseekKey: keys.deepseekKey,
+                  mistralKey: keys.mistralKey,
+                  googleKey: keys.googleKey,
+                  deepinfraKey: keys.deepinfraKey,
+                },
+                SUMMARIZE_TIMEOUT_MS,
+                MAX_RETRIES,
+              );
+
+              if (!summarizeResponse.ok) {
+                const errorMsg = await extractErrorMessage(
+                  summarizeResponse,
+                  "Note extraction failed",
+                );
+                throw new Error(`${file.name}: ${errorMsg}`);
+              }
+
+              const summarizeResult = await summarizeResponse.json();
+              const fileResult = {
+                lore: summarizeResult.lore || [],
+                mechanicNotes: summarizeResult.mechanicNotes || [],
+                customTables: summarizeResult.customTables || [],
+              };
+              allLore.push(...fileResult.lore);
+              allMechanicNotes.push(...fileResult.mechanicNotes);
+              allCustomTables.push(...fileResult.customTables);
+              updateFileChunk({ status: "complete", result: fileResult });
+              setProgress(fileProgressEnd);
+              continue;
+            }
+
+            setStep("uploading");
+            setProgress(fileProgressStart + fileProgressRange * 0.1);
+            setStatusMessage(
+              `Preparing ${file.name} (${i + 1}/${totalFiles})...`,
+            );
+
+            const arrayBuffer = await file.arrayBuffer();
+            const base64 = bytesToBase64(new Uint8Array(arrayBuffer));
+
+            const ocrPayload: {
+              base64Data?: string;
+              fileName?: string;
+              mimeType?: string;
+            } = {
+              base64Data: base64,
+              fileName: file.name,
+              mimeType: file.type,
+            };
+            setProgress(fileProgressStart + fileProgressRange * 0.2);
+
+            // OCR Processing
+            setStep("ocr");
+            setStatusMessage(
+              `Extracting text from ${file.name} (${i + 1}/${totalFiles})...`,
+            );
+
+            const ocrResponse = await ocrFetch("/api/ocr/process", {
+              ...ocrPayload,
+              includeImages: false,
+              mistralKey: keys.mistralKey,
+            });
+
+            if (!ocrResponse.ok) {
+              const errorMsg = await extractErrorMessage(
+                ocrResponse,
+                "OCR processing failed",
+              );
+              throw new Error(`${file.name}: ${errorMsg}`);
+            }
+
+            const ocrResult: OCRProcessResult = await ocrResponse.json();
+
+            combinedMarkdown = ocrResult.markdown;
+            combinedTotalPages = ocrResult.totalPages;
+
+            totalPagesProcessed += combinedTotalPages;
             setProgress(fileProgressStart + fileProgressRange * 0.4);
+            updateFileChunk({
+              ocrMarkdown: combinedMarkdown,
+              pageEnd: Math.max(1, combinedTotalPages),
+              status: "summarizing",
+            });
+
+            // Step 3: AI Summarization - Extract all notes (only for non-chunked files)
+            setStep("summarizing");
             setStatusMessage(
               `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`,
             );
 
-            const textContent = await file.text();
-            combinedMarkdown = textContent;
-            combinedTotalPages = 0;
-
-            const summarizeResponse = await fetchWithRetry(
-              "/api/ocr/summarize",
-              {
+            const summarizeResponse = await ocrFetch("/api/ocr/summarize", {
                 markdown: combinedMarkdown,
                 focus: ["all"],
-                customInstructions:
-                  (customInstructions || "") +
-                  `\n\nNote: This content was imported from a text file (${file.name}).`,
+                customInstructions,
                 model: getSelectedModel().model,
                 provider: getSelectedModel().provider,
                 maxTokens: maxOutputTokens,
@@ -2005,10 +2161,7 @@ export default function PDFImporter({
                 mistralKey: keys.mistralKey,
                 googleKey: keys.googleKey,
                 deepinfraKey: keys.deepinfraKey,
-              },
-              SUMMARIZE_TIMEOUT_MS,
-              MAX_RETRIES,
-            );
+            });
 
             if (!summarizeResponse.ok) {
               const errorMsg = await extractErrorMessage(
@@ -2019,94 +2172,29 @@ export default function PDFImporter({
             }
 
             const summarizeResult = await summarizeResponse.json();
-            allLore.push(...(summarizeResult.lore || []));
-            allMechanicNotes.push(...(summarizeResult.mechanicNotes || []));
-            allCustomTables.push(...(summarizeResult.customTables || []));
+            const fileResult = {
+              lore: summarizeResult.lore || [],
+              mechanicNotes: summarizeResult.mechanicNotes || [],
+              customTables: summarizeResult.customTables || [],
+            };
+            allLore.push(...fileResult.lore);
+            allMechanicNotes.push(...fileResult.mechanicNotes);
+            allCustomTables.push(...fileResult.customTables);
+            updateFileChunk({ status: "complete", result: fileResult });
             setProgress(fileProgressEnd);
-            continue;
+          } catch (err) {
+            // Any failure above (including ones not yet reflected in the
+            // chunk status, e.g. a thrown network error) should leave this
+            // file's preview entry visibly failed rather than stuck on
+            // "ocr"/"summarizing" forever - then propagate so the existing
+            // outer error handling (message + toast) still runs.
+            updateFileChunk({
+              status: "failed",
+              error:
+                err instanceof Error ? err.message : "Import failed",
+            });
+            throw err;
           }
-
-          setStep("uploading");
-          setProgress(fileProgressStart + fileProgressRange * 0.1);
-          setStatusMessage(
-            `Preparing ${file.name} (${i + 1}/${totalFiles})...`,
-          );
-
-          const arrayBuffer = await file.arrayBuffer();
-          const base64 = bytesToBase64(new Uint8Array(arrayBuffer));
-
-          const ocrPayload: {
-            base64Data?: string;
-            fileName?: string;
-            mimeType?: string;
-          } = {
-            base64Data: base64,
-            fileName: file.name,
-            mimeType: file.type,
-          };
-          setProgress(fileProgressStart + fileProgressRange * 0.2);
-
-          // OCR Processing
-          setStep("ocr");
-          setStatusMessage(
-            `Extracting text from ${file.name} (${i + 1}/${totalFiles})...`,
-          );
-
-          const ocrResponse = await ocrFetch("/api/ocr/process", {
-            ...ocrPayload,
-            includeImages: false,
-            mistralKey: keys.mistralKey,
-          });
-
-          if (!ocrResponse.ok) {
-            const errorMsg = await extractErrorMessage(
-              ocrResponse,
-              "OCR processing failed",
-            );
-            throw new Error(`${file.name}: ${errorMsg}`);
-          }
-
-          const ocrResult: OCRProcessResult = await ocrResponse.json();
-
-          combinedMarkdown = ocrResult.markdown;
-          combinedTotalPages = ocrResult.totalPages;
-
-          totalPagesProcessed += combinedTotalPages;
-          setProgress(fileProgressStart + fileProgressRange * 0.4);
-
-          // Step 3: AI Summarization - Extract all notes (only for non-chunked files)
-          setStep("summarizing");
-          setStatusMessage(
-            `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`,
-          );
-
-          const summarizeResponse = await ocrFetch("/api/ocr/summarize", {
-              markdown: combinedMarkdown,
-              focus: ["all"],
-              customInstructions,
-              model: getSelectedModel().model,
-              provider: getSelectedModel().provider,
-              maxTokens: maxOutputTokens,
-              openRouterKey: keys.openRouterKey,
-              deepseekKey: keys.deepseekKey,
-              mistralKey: keys.mistralKey,
-              googleKey: keys.googleKey,
-              deepinfraKey: keys.deepinfraKey,
-          });
-
-          if (!summarizeResponse.ok) {
-            const errorMsg = await extractErrorMessage(
-              summarizeResponse,
-              "Note extraction failed",
-            );
-            throw new Error(`${file.name}: ${errorMsg}`);
-          }
-
-          const summarizeResult = await summarizeResponse.json();
-          allLore.push(...(summarizeResult.lore || []));
-          allMechanicNotes.push(...(summarizeResult.mechanicNotes || []));
-          allCustomTables.push(...(summarizeResult.customTables || []));
-          setProgress(fileProgressEnd);
         }
       }
 
@@ -2372,6 +2460,8 @@ export default function PDFImporter({
       const initialStatuses: ChunkStatus[] = interruptedImport.chunkStatuses.map(
         (cs) => ({
           chunkIndex: cs.chunkIndex,
+          fileIndex: 0,
+          fileName: interruptedImport.fileName,
           pageStart: cs.pageStart,
           pageEnd: cs.pageEnd,
           status: cs.status,
@@ -2384,6 +2474,7 @@ export default function PDFImporter({
       const chunkResult = await processChunkedRanges(
         { pdfDoc, ranges },
         interruptedImport.fileName,
+        0,
         interruptedImport.fileBytes,
         initialStatuses,
         0,
@@ -2480,9 +2571,12 @@ export default function PDFImporter({
     setCurrentFileIndex(0);
     setChunkStatuses([]);
     setShowChunkDetails(false);
+    setExpandedChunkIndex(null);
+    setExpandedChunkFileIndex(null);
     chunkedPdfSourceRef.current = null;
     setRepairModalOpen(false);
     setRepairChunkIndex(null);
+    setRepairFileIndex(null);
     setRepairContent("");
     setRepairError("");
     if (fileInputRef.current) {
@@ -2738,14 +2832,26 @@ export default function PDFImporter({
                       <div className="p-3 pt-0 space-y-2 max-h-96 overflow-y-auto">
                         {chunkStatuses.map((chunk) => {
                           const isExpanded =
-                            expandedChunkIndex === chunk.chunkIndex;
+                            expandedChunkIndex === chunk.chunkIndex &&
+                            expandedChunkFileIndex === chunk.fileIndex;
                           const canPreviewText = !!chunk.ocrMarkdown;
                           const canPreviewNotes = !!chunk.result;
                           const canPreview =
                             canPreviewText || canPreviewNotes;
+                          // A file that was small enough to skip chunking
+                          // only ever has one entry here - show just its
+                          // name. A file split into page-range chunks gets
+                          // the chunk number/page range alongside its name
+                          // so entries from different files (which each
+                          // restart numbering at "Chunk 1") aren't confused
+                          // for one another.
+                          const isMultiChunkFile =
+                            chunkStatuses.filter(
+                              (cs) => cs.fileIndex === chunk.fileIndex,
+                            ).length > 1;
                           return (
                             <div
-                              key={chunk.chunkIndex}
+                              key={`${chunk.fileIndex}-${chunk.chunkIndex}`}
                               className={`rounded-lg ${
                                 chunk.status === "complete"
                                   ? "bg-green-900/20 border border-green-700/30"
@@ -2787,9 +2893,10 @@ export default function PDFImporter({
                                 </div>
 
                                 <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-white">
-                                    Chunk {chunk.chunkIndex + 1}: Pages{" "}
-                                    {chunk.pageStart}-{chunk.pageEnd}
+                                  <p className="text-sm font-medium text-white truncate">
+                                    {chunk.fileName}
+                                    {isMultiChunkFile &&
+                                      ` — Chunk ${chunk.chunkIndex + 1}: Pages ${chunk.pageStart}-${chunk.pageEnd}`}
                                   </p>
                                   {chunk.status === "complete" &&
                                     chunk.result && (
@@ -2836,6 +2943,9 @@ export default function PDFImporter({
                                       setExpandedChunkIndex(
                                         isExpanded ? null : chunk.chunkIndex,
                                       );
+                                      setExpandedChunkFileIndex(
+                                        isExpanded ? null : chunk.fileIndex,
+                                      );
                                       setChunkPreviewTab(
                                         canPreviewNotes ? "notes" : "text",
                                       );
@@ -2856,7 +2966,10 @@ export default function PDFImporter({
                                   <div className="flex gap-1 shrink-0">
                                     <button
                                       onClick={() =>
-                                        retryChunk(chunk.chunkIndex)
+                                        retryChunk(
+                                          chunk.fileIndex,
+                                          chunk.chunkIndex,
+                                        )
                                       }
                                       className="px-2 py-1 text-xs bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors flex items-center gap-1"
                                       title="Retry this chunk"
@@ -2870,7 +2983,10 @@ export default function PDFImporter({
                                     {chunk.rawSummarizeOutput && (
                                       <button
                                         onClick={() =>
-                                          openRepairModal(chunk.chunkIndex)
+                                          openRepairModal(
+                                            chunk.fileIndex,
+                                            chunk.chunkIndex,
+                                          )
                                         }
                                         className="px-2 py-1 text-xs bg-amber-600/80 hover:bg-amber-600 text-white rounded transition-colors flex items-center gap-1"
                                         title="Manually fix JSON"
@@ -3667,21 +3783,34 @@ export default function PDFImporter({
       )}
 
       {/* JSON Repair Modal - for manually fixing broken chunk output */}
-      {repairModalOpen && repairChunkIndex !== null && (
+      {repairModalOpen && repairChunkIndex !== null && repairFileIndex !== null && (
         <FullScreenView
           title="Fix JSON Output"
-          subtitle={`Chunk ${repairChunkIndex + 1}: Pages ${
-            chunkStatuses.find((cs) => cs.chunkIndex === repairChunkIndex)
-              ?.pageStart
+          subtitle={`${
+            chunkStatuses.find(
+              (cs) =>
+                cs.fileIndex === repairFileIndex &&
+                cs.chunkIndex === repairChunkIndex,
+            )?.fileName
+          } — Chunk ${repairChunkIndex + 1}: Pages ${
+            chunkStatuses.find(
+              (cs) =>
+                cs.fileIndex === repairFileIndex &&
+                cs.chunkIndex === repairChunkIndex,
+            )?.pageStart
           }-${
-            chunkStatuses.find((cs) => cs.chunkIndex === repairChunkIndex)
-              ?.pageEnd
+            chunkStatuses.find(
+              (cs) =>
+                cs.fileIndex === repairFileIndex &&
+                cs.chunkIndex === repairChunkIndex,
+            )?.pageEnd
           }`}
           icon="Wrench"
           className="z-70"
           onClose={() => {
             setRepairModalOpen(false);
             setRepairChunkIndex(null);
+            setRepairFileIndex(null);
             setRepairContent("");
             setRepairError("");
           }}
@@ -3715,6 +3844,7 @@ export default function PDFImporter({
                   onClick={() => {
                     setRepairModalOpen(false);
                     setRepairChunkIndex(null);
+                    setRepairFileIndex(null);
                     setRepairContent("");
                     setRepairError("");
                   }}
