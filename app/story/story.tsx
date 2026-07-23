@@ -32,6 +32,19 @@ import {
   getObserverSettings,
   LAYER_SETTINGS_CHANGED_EVENT,
 } from "../misc/layerSettings";
+import {
+  type ResolvedTier,
+  getTierModelDisplayName,
+} from "../misc/reasoningTiers";
+
+// Display-only shape for the reasoning-tier badge next to "Game Master" -
+// covers both a saved ScenePart's stored fields and a live in-progress
+// ResolvedTier (see generation.ts:onReasoningTierResolved).
+interface ReasoningTierDisplay {
+  tier: number;
+  modelKey: string;
+  effort: string;
+}
 
 // Solo play has no CouchPlayer of its own (see structs.ts) - this stands in
 // for PlayerBubbles' `players` prop so voice input still gets a bubble
@@ -99,6 +112,10 @@ interface StoryProps {
   // whole GM stage (thinking + tool calls + narration) to finish, which is
   // otherwise all storyText itself reflects until the turn completes.
   liveNarrationText?: string;
+  // Live reasoning-tier indicator for the turn currently generating - see
+  // generation.ts:onReasoningTierResolved. Rendered as a small "T{n}" badge
+  // next to "Game Master" alongside the saved per-turn badge below.
+  liveReasoningTier?: ResolvedTier | null;
   // Re-measure the page's keyboard-aware viewport height (see page.tsx) -
   // called on composer focus/blur since iOS can scroll/resize the visual
   // viewport asynchronously, after the initial resize event.
@@ -264,6 +281,11 @@ interface ChatMessageProps {
   // The story stage's own native reasoning (ScenePart.reasoning) - see
   // turnTimeline.ts:buildSavedTimeline
   storyReasoning?: string;
+  // Reasoning tier that adjudicated this turn (see reasoningTiers.ts) -
+  // rendered as a small "T{n}" badge next to displayName. Undefined for
+  // turns generated before this was tracked, and for the player's own
+  // messages (isUser).
+  reasoningTier?: ReasoningTierDisplay;
   // Live timeline for the turn currently generating - undefined for
   // historical messages (which rebuild their timeline from gmConversation).
   liveTimeline?: TimelineBlock[];
@@ -285,6 +307,7 @@ function ChatMessage({
   gmConversation,
   toolResults,
   storyReasoning,
+  reasoningTier,
   liveTimeline,
   isStreaming = false,
   mentionMatcher,
@@ -364,6 +387,14 @@ function ChatMessage({
         >
           {displayName}
         </span>
+        {!isUser && reasoningTier && (
+          <span
+            className="text-[10px] font-mono text-purple-300/60 border border-purple-400/20 rounded px-1 leading-tight cursor-default"
+            title={`${getTierModelDisplayName(reasoningTier.modelKey)} · ${reasoningTier.effort} effort`}
+          >
+            T{reasoningTier.tier}
+          </span>
+        )}
         {isUser && isComment && (
           <span className="text-[10px] text-blue-300/50">comment</span>
         )}
@@ -704,6 +735,7 @@ export default function Story({
   pendingUserChoice,
   liveGMEntries,
   liveNarrationText,
+  liveReasoningTier,
   myPlayerId,
   remoteActivity,
   onLocalActivity,
@@ -1040,6 +1072,7 @@ export default function Story({
         gmConversation: [],
         toolResults: new Map(),
         storyReasoning: undefined,
+        reasoningTier: undefined as ReasoningTierDisplay | undefined,
       };
 
     // Build toolResults map from gmToolCalls (keyed by toolCallId)
@@ -1063,6 +1096,14 @@ export default function Story({
       gmConversation: part.gmConversation || [],
       toolResults,
       storyReasoning: part.reasoning,
+      reasoningTier:
+        part.reasoningTier !== undefined
+          ? ({
+              tier: part.reasoningTier,
+              modelKey: part.reasoningTierModelKey || "",
+              effort: part.reasoningTierEffort || "none",
+            } as ReasoningTierDisplay)
+          : undefined,
     };
   };
 
@@ -1236,6 +1277,9 @@ export default function Story({
                   storyReasoning={
                     getGMDataForPart(exchange.gmMsg.partIndex).storyReasoning
                   }
+                  reasoningTier={
+                    getGMDataForPart(exchange.gmMsg.partIndex).reasoningTier
+                  }
                   mentionMatcher={mentionMatcher}
                   onMentionClick={handleMentionClick}
                 />
@@ -1279,6 +1323,10 @@ export default function Story({
                       getGMDataForPart(exchange.gmMsg.partIndex)
                         .storyReasoning
                     }
+                    reasoningTier={
+                      getGMDataForPart(exchange.gmMsg.partIndex)
+                        .reasoningTier
+                    }
                     mentionMatcher={mentionMatcher}
                     onMentionClick={handleMentionClick}
                   />
@@ -1313,6 +1361,15 @@ export default function Story({
               fontSettings={fontSettings}
               liveTimeline={liveGMEntries || []}
               isStreaming={true}
+              reasoningTier={
+                liveReasoningTier
+                  ? {
+                      tier: liveReasoningTier.tier,
+                      modelKey: String(liveReasoningTier.modelKey),
+                      effort: liveReasoningTier.reasoningEffort,
+                    }
+                  : undefined
+              }
               mentionMatcher={mentionMatcher}
               onMentionClick={handleMentionClick}
             />

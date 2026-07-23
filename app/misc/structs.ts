@@ -385,6 +385,16 @@ export interface ScenePart {
   endStory?: boolean;
   gameOver?: boolean;
   raw?: string; // Raw AI output before parsing, used for alternative context building
+  // Reasoning-tier router (see reasoningTiers.ts): the final tier (0-based)
+  // that adjudicated this turn, after any mid-turn self-escalation or
+  // model-unavailable fallback. modelKey/effort are the resolved values at
+  // generation time, captured alongside the tier so a UI tooltip stays
+  // accurate even if the user later edits their tier overrides. Undefined
+  // on turns generated before this was tracked, and on retried turns that
+  // reuse a precomputed GM conversation (no tier router run that turn).
+  reasoningTier?: number;
+  reasoningTierModelKey?: string;
+  reasoningTierEffort?: "none" | "low" | "normal" | "high" | "xhigh";
 }
 export type ConsistencyWarningType = "status_contradiction";
 
