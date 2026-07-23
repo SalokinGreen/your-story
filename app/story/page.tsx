@@ -31,7 +31,10 @@ import {
   type Likelihood,
   type ElementCategory,
 } from "../misc/mythic";
-import { NARRATION_MODEL_KEY } from "../misc/reasoningTiers";
+import {
+  NARRATION_MODEL_KEY,
+  type ResolvedTier,
+} from "../misc/reasoningTiers";
 import Story from "./story";
 import LorePage from "./lore";
 import GoalsPage from "./goals";
@@ -632,6 +635,13 @@ function StoryPageContent() {
   // calls + narration) to finish, which is the only thing storyText itself
   // reflects on the common path (GM's own final round writes the story).
   const [liveNarrationText, setLiveNarrationText] = useState("");
+  // Live reasoning-tier indicator (see generation.ts:onReasoningTierResolved)
+  // - the tier currently driving the in-progress turn, updated as the GM
+  // stage resolves/re-resolves it (initial pick, mid-turn self-escalation,
+  // model-unavailable fallback). Reset to null at the start of each new
+  // generation so a stale tier from the previous turn can't linger.
+  const [liveReasoningTier, setLiveReasoningTier] =
+    useState<ResolvedTier | null>(null);
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
   // Deep-link auto-host: opens the Menu tab's Story Editor straight to the
@@ -1556,8 +1566,10 @@ function StoryPageContent() {
             setLoadingStage("gm");
             setLiveGMEntries([]);
             setLiveNarrationText("");
+            setLiveReasoningTier(null);
             logger.action("GM stage started (custom input)");
           },
+          onReasoningTierResolved: (resolved) => setLiveReasoningTier(resolved),
           onAskForRoll: requestManualRoll,
           onAskQuestion: requestPlayerAnswer,
           onRequestDiceThrow:
@@ -1826,6 +1838,19 @@ function StoryPageContent() {
               };
             }
 
+            // Copy the reasoning tier that adjudicated this turn (see
+            // generation.ts:reasoningTierRanThisTurn) - undefined on the
+            // retry path, which reuses a precomputed GM conversation and
+            // never re-runs the tier router.
+            if (lastIdx >= 0 && result.scenePart?.reasoningTier !== undefined) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                reasoningTier: result.scenePart.reasoningTier,
+                reasoningTierModelKey: result.scenePart.reasoningTierModelKey,
+                reasoningTierEffort: result.scenePart.reasoningTierEffort,
+              };
+            }
+
             // Copy and surface consistency-check warnings (§2.5 state-error
             // path, see docs/research-paper-ttrpg-theory-gap-analysis.md).
             // checkNarrationConsistency runs after streaming completes, so
@@ -2071,8 +2096,10 @@ function StoryPageContent() {
             // Reset live GM entries for new generation
             setLiveGMEntries([]);
             setLiveNarrationText("");
+            setLiveReasoningTier(null);
             logger.action("GM stage started - determining mechanics");
           },
+          onReasoningTierResolved: (resolved) => setLiveReasoningTier(resolved),
           onAskForRoll: requestManualRoll,
           onAskQuestion: requestPlayerAnswer,
           onRequestDiceThrow:
@@ -2299,6 +2326,19 @@ function StoryPageContent() {
                 ...storyData.scene.parts[lastIdx],
                 reasoning: result.scenePart.reasoning,
                 reasoning_details: result.scenePart.reasoning_details,
+              };
+            }
+
+            // Copy the reasoning tier that adjudicated this turn (see
+            // generation.ts:reasoningTierRanThisTurn) - undefined on the
+            // retry path, which reuses a precomputed GM conversation and
+            // never re-runs the tier router.
+            if (lastIdx >= 0 && result.scenePart?.reasoningTier !== undefined) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                reasoningTier: result.scenePart.reasoningTier,
+                reasoningTierModelKey: result.scenePart.reasoningTierModelKey,
+                reasoningTierEffort: result.scenePart.reasoningTierEffort,
               };
             }
 
@@ -2932,9 +2972,12 @@ function StoryPageContent() {
     // onLiveNarrationUpdate (no GM round loop to fire it), but Story's
     // ttsText prop still prefers it over storyText while storyTextReady is
     // false - a stale value from an earlier inline-narrated turn would
-    // otherwise shadow the storyText this path streams normally.
+    // otherwise shadow the storyText this path streams normally. Same for
+    // liveReasoningTier: retry never fires onReasoningTierResolved either
+    // (no tier router run), so a stale tier badge would otherwise linger.
     setLiveGMEntries([]);
     setLiveNarrationText("");
+    setLiveReasoningTier(null);
 
     // Re-add the user choice part before generation (matching normal flow)
     // The prompt builder will deduplicate this when building the context
@@ -3126,6 +3169,19 @@ function StoryPageContent() {
                 ...storyData.scene.parts[lastIdx],
                 reasoning: result.scenePart.reasoning,
                 reasoning_details: result.scenePart.reasoning_details,
+              };
+            }
+
+            // Copy the reasoning tier that adjudicated this turn (see
+            // generation.ts:reasoningTierRanThisTurn) - undefined on the
+            // retry path, which reuses a precomputed GM conversation and
+            // never re-runs the tier router.
+            if (lastIdx >= 0 && result.scenePart?.reasoningTier !== undefined) {
+              storyData.scene.parts[lastIdx] = {
+                ...storyData.scene.parts[lastIdx],
+                reasoningTier: result.scenePart.reasoningTier,
+                reasoningTierModelKey: result.scenePart.reasoningTierModelKey,
+                reasoningTierEffort: result.scenePart.reasoningTierEffort,
               };
             }
 
@@ -4020,6 +4076,7 @@ function StoryPageContent() {
             pendingUserChoice={pendingUserChoice}
             liveGMEntries={liveGMEntries}
             liveNarrationText={liveNarrationText}
+            liveReasoningTier={liveReasoningTier}
             myPlayerId={netSession ? netSession.myLocalPlayerId : undefined}
             remoteActivity={netActivity}
             onLocalActivity={sendNetActivity}

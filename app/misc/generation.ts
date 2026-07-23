@@ -92,6 +92,7 @@ import { chaosFactorTemperatureDelta } from "@/app/misc/mythic";
 import {
   SCENE_BASELINE_TIER,
   ReasoningEffort,
+  ResolvedTier,
   resolveTier,
   hardRuleFloor,
   classifyTier,
@@ -253,6 +254,12 @@ export interface GenerationCallbacks {
   onChoicesStart?: () => void;
   onChoicesComplete?: (choices: Choice[], usage: TokenUsage) => void;
   onGMStageStart?: () => void;
+  // Fired whenever the reasoning-tier router (re)resolves a tier for the GM
+  // stage this turn - initial pick, each round's re-derived tier (picks up
+  // mid-turn self-escalation), and any model-unavailable fallback to a
+  // lower tier. Lets the UI show a live "T{n}" indicator while the turn is
+  // still generating, matching what's later saved on the ScenePart.
+  onReasoningTierResolved?: (resolved: ResolvedTier) => void;
   // NEW: Stream GM content as it generates (thinking text)
   onGMContent?: (content: string, fullContent: string) => void;
   // Live narration text for TTS/auto-narrate purposes: the player-visible
@@ -1189,6 +1196,12 @@ async function generateStoryTurnOnce(
       }
     }
 
+    // True once the reasoning-tier router actually resolves a tier this
+    // turn (the precomputed-GM-conversation/retry branch below never runs
+    // it) - gates whether the final ScenePart gets stamped with
+    // reasoningTier/reasoningTierModelKey/reasoningTierEffort.
+    let reasoningTierRanThisTurn = false;
+
     // Use a precomputed GM conversation if provided (retry flow: reuse the
     // popped turn's saved gmConversation instead of re-running the GM
     // stage's tool-calling loop). Rebuilding the base prompt here is cheap
@@ -1308,6 +1321,8 @@ async function generateStoryTurnOnce(
               : 0,
           lastSceneKey: sceneKey,
         };
+        reasoningTierRanThisTurn = true;
+        callbacks.onReasoningTierResolved?.(initialResolvedTier);
 
         gmModel = initialResolvedTier.modelKey;
         let gmReasoningEffort: ReasoningEffort =
@@ -1461,6 +1476,7 @@ async function generateStoryTurnOnce(
           logger.action(`GM stage round ${gmRound}`, {
             describe: describeTier(roundTier),
           });
+          callbacks.onReasoningTierResolved?.(roundTier);
 
           if (needsGMPromptRebuild) {
             // GM Stage receives customMaxContext (Memory Size slider) for context allocation
@@ -1593,6 +1609,7 @@ async function generateStoryTurnOnce(
                 ...getTierState(storyData),
                 currentTier: fallbackResolved.tier,
               };
+              callbacks.onReasoningTierResolved?.(fallbackResolved);
               gmResponse = await providerFetch(
                 "/api/generate-stream",
                 buildGmRequestBody(gmModel, gmReasoningEffort),
@@ -2667,6 +2684,13 @@ async function generateStoryTurnOnce(
       });
     }
 
+    // Final tier reached this turn (after any mid-turn self-escalation or
+    // fallback) - undefined on the retry/precomputed-conversation path,
+    // where the tier router never runs (see reasoningTierRanThisTurn).
+    const finalResolvedTier = reasoningTierRanThisTurn
+      ? resolveTier(getTierState(storyData).currentTier)
+      : undefined;
+
     const scenePart: ScenePart = {
       content: storyContent,
       raw: rawStoryContent || undefined,
@@ -2676,6 +2700,11 @@ async function generateStoryTurnOnce(
       reasoning: storyReasoning || undefined,
       reasoning_details:
         storyReasoningDetails.length > 0 ? storyReasoningDetails : undefined,
+      ...(finalResolvedTier && {
+        reasoningTier: finalResolvedTier.tier,
+        reasoningTierModelKey: String(finalResolvedTier.modelKey),
+        reasoningTierEffort: finalResolvedTier.reasoningEffort,
+      }),
       choices,
       toolCalls: allToolCalls.length > 0 ? allToolCalls : undefined,
       toolResponses: allToolResponses.length > 0 ? allToolResponses : undefined,

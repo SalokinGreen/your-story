@@ -430,14 +430,18 @@ export function applyTierEscalation(
 // FALLBACK RESOLUTION
 // ============================================================
 
+/** Human-readable model name for a resolved tier's modelKey - shared by describeTier and any UI tooltip. */
+export function getTierModelDisplayName(modelKey: AnyModelKey): string {
+  const customModel = getCustomModelIfUUID(modelKey);
+  return (
+    customModel?.name ?? AI_MODELS[modelKey as AIModelKey]?.name ?? modelKey
+  );
+}
+
 /** Model name/provider for logging — matches the AI_MODELS entry shown in generation logs. */
 export function describeTier(resolved: ResolvedTier): string {
   const config = getModelConfig(resolved.modelKey);
-  const customModel = getCustomModelIfUUID(resolved.modelKey);
-  const displayName =
-    customModel?.name ??
-    AI_MODELS[resolved.modelKey as AIModelKey]?.name ??
-    resolved.modelKey;
+  const displayName = getTierModelDisplayName(resolved.modelKey);
   return `tier ${resolved.tier} (${displayName}, ${config.provider}, effort=${resolved.reasoningEffort})`;
 }
 
