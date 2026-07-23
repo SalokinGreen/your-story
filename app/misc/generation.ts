@@ -195,6 +195,14 @@ export interface GenerationOptions {
   // and this is replayed as history, same as the normal
   // "continue GM conversation" narration call.
   precomputedGMConversation?: GMConversationMessage[];
+  // Companion to precomputedGMConversation: the already-executed GM tool
+  // results (dice rolls, increment_scene, etc.) from the attempt whose
+  // narration is being reworded. Without this, gmResults stays empty
+  // whenever a fresh GM stage is skipped, which silently blinds the
+  // outcome-mismatch/tool-usage-gap observer checks (generateStoryTurn) and
+  // the Director Assistant's increment_scene gate to a roll/tool call that
+  // genuinely happened - they'd just never have anything to look at.
+  precomputedGMResults?: GMToolResult[];
   // Sampling settings (for story stage only, Coins mode)
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
@@ -1199,6 +1207,12 @@ async function generateStoryTurnOnce(
     // narration call.
     if (options.precomputedGMConversation) {
       gmConversationHistory = options.precomputedGMConversation;
+      // Carry the reused attempt's actual tool results through to this
+      // attempt's result.gmResults - see precomputedGMResults's doc comment.
+      // Skipping this left every reword-only retry looking, to the observer
+      // and the Director Assistant, exactly like a turn that called no
+      // tools at all.
+      gmResults = options.precomputedGMResults || [];
       const gmPrompt = buildGMStagePrompt({
         storyData,
         userChoice: gmUserChoice,

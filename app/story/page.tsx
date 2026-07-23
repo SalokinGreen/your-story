@@ -2978,6 +2978,13 @@ function StoryPageContent() {
           // rolls, tool results, reasoning) from the popped part instead
           enableGMStage: false, // Don't re-run GM stage
           precomputedGMConversation: savedGMConversation,
+          // Also carry the reused tool results through so the observer's
+          // outcome-mismatch/tool-usage-gap checks and the Director
+          // Assistant still have something to look at (see
+          // precomputedGMResults's doc comment in generation.ts) - without
+          // this, generateStoryTurn saw an empty gmResults for every
+          // reword-only retry and those checks silently never fired.
+          precomputedGMResults: savedGMToolCalls,
           abortSignal: generationAbortRef.current.signal,
         },
         {
