@@ -502,8 +502,15 @@ function StoryPageContent() {
       } else if (action.text) {
         // freeform and voice (voice arrives as already-transcribed text -
         // see PlayerBubbles wiring) both land here as a custom input
-        // attributed to the sending guest's seat.
-        handleCustomInput(action.text, undefined, [action.localPlayerId]);
+        // attributed to the sending guest's seat. Forward action.kind so a
+        // guest's voice input still gets the transcription-error marker
+        // that handleCustomInput adds for inputKind "voice".
+        handleCustomInput(
+          action.text,
+          undefined,
+          [action.localPlayerId],
+          action.kind === "voice" ? "voice" : "freeform",
+        );
       }
     },
     onSnapshot: (incoming) => {
@@ -1355,8 +1362,12 @@ function StoryPageContent() {
     setStoryTextReady(false);
 
     //Adduser'scustominputtoscene
+    let customContent = ">" + customText;
+    if (inputKind === "voice") {
+      customContent += "\n[Voice Input - may contain transcription errors]";
+    }
     storyData.scene.parts.push({
-      content: ">" + customText,
+      content: customContent,
       imageUrl: "",
       user: true,
       role: "user",
