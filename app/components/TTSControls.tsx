@@ -204,12 +204,27 @@ export default function TTSControls({
   // again, rather than throwing away work just because they wanted a
   // moment of quiet. See handleToggle and onChunkArrived.
   const [isMuted, setIsMuted] = useState(false);
+  // Mirror currentChunkIndexRef/audioUrlsRef.length into state purely so the
+  // prev/next sentence buttons and progress bar can react to them - the refs
+  // stay the source of truth (see setCurrentChunkIndex below).
+  const [chunkIndex, setChunkIndexState] = useState(0);
+  const [chunkCount, setChunkCountState] = useState(0);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   // Object URLs for each chunk received so far, in order - populated
   // progressively as the stream arrives, and replayed from index 0 on
   // "Replay" without re-fetching.
   const audioUrlsRef = useRef<string[]>([]);
   const currentChunkIndexRef = useRef<number>(0);
+  // True once playback has run all the way to the end of the narration with
+  // nothing left generating - distinguishes "finished, next Play should
+  // restart from sentence 0" from "paused mid-way, next Play should resume
+  // at the current sentence" in handleToggle.
+  const finishedRef = useRef<boolean>(true);
+
+  const setCurrentChunkIndex = useCallback((index: number) => {
+    currentChunkIndexRef.current = index;
+    setChunkIndexState(index);
+  }, []);
   const isStreamingRef = useRef<boolean>(false);
   // True when playback has caught up to a chunk that hasn't arrived yet -
   // onChunkArrived plays it immediately once it lands.
@@ -337,8 +352,7 @@ export default function TTSControls({
         // call that isn't tied to a user gesture) leaves nothing actually
         // audible - don't leave the button showing "Stop" for playback that
         // never started. The audio is still cached (hasAudio/audioUrlsRef),
-        // so the next real click (canReplay) will play it as a genuine
-        // gesture instead.
+        // so the next real click will play it as a genuine gesture instead.
         setIsPlaying(false);
       });
     },
@@ -346,21 +360,50 @@ export default function TTSControls({
   );
 
   const advanceToNextChunk = useCallback(() => {
-    currentChunkIndexRef.current += 1;
-    const nextUrl = audioUrlsRef.current[currentChunkIndexRef.current];
+    const nextIndex = currentChunkIndexRef.current + 1;
+    setCurrentChunkIndex(nextIndex);
+    const nextUrl = audioUrlsRef.current[nextIndex];
 
     if (nextUrl) {
-      playChunkAt(currentChunkIndexRef.current);
+      playChunkAt(nextIndex);
     } else if (!isStreamingRef.current) {
       setIsPlaying(false);
+      finishedRef.current = true;
     } else {
       waitingForNextRef.current = true;
     }
-  }, [playChunkAt]);
+  }, [playChunkAt, setCurrentChunkIndex]);
 
   useEffect(() => {
     advanceToNextChunkRef.current = advanceToNextChunk;
   }, [advanceToNextChunk]);
+
+  // Jumps playback directly to a given chunk (sentence) - shared by the
+  // prev/next sentence buttons. Clamped to the chunks actually buffered so
+  // far; does nothing if none have arrived yet.
+  const skipToChunk = useCallback(
+    (index: number) => {
+      const maxIndex = audioUrlsRef.current.length - 1;
+      if (maxIndex < 0) return;
+      const clamped = Math.max(0, Math.min(index, maxIndex));
+      waitingForNextRef.current = false;
+      finishedRef.current = false;
+      playbackMutedRef.current = false;
+      setIsMuted(false);
+      setCurrentChunkIndex(clamped);
+      setIsPlaying(true);
+      playChunkAt(clamped);
+    },
+    [playChunkAt, setCurrentChunkIndex],
+  );
+
+  const handleSkipBack = useCallback(() => {
+    skipToChunk(currentChunkIndexRef.current - 1);
+  }, [skipToChunk]);
+
+  const handleSkipForward = useCallback(() => {
+    skipToChunk(currentChunkIndexRef.current + 1);
+  }, [skipToChunk]);
 
   // Called as each chunk finishes streaming in - whether from a single
   // whole-text generation or one of many live per-sentence requests, both
@@ -374,8 +417,10 @@ export default function TTSControls({
       const url = URL.createObjectURL(blob);
       audioUrlsRef.current.push(url);
       const idx = audioUrlsRef.current.length - 1;
+      setChunkCountState(audioUrlsRef.current.length);
 
       if (idx === 0) {
+        finishedRef.current = false;
         setHasAudio(true);
         setIsLoading(false);
         if (!playbackMutedRef.current) {
@@ -474,6 +519,7 @@ export default function TTSControls({
           if (waitingForNextRef.current) {
             waitingForNextRef.current = false;
             setIsPlaying(false);
+            finishedRef.current = true;
           }
         }
       });
@@ -521,6 +567,7 @@ export default function TTSControls({
       if (waitingForNextRef.current) {
         waitingForNextRef.current = false;
         setIsPlaying(false);
+        finishedRef.current = true;
       }
     }
   }, []);
@@ -543,7 +590,9 @@ export default function TTSControls({
     }
     audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
     audioUrlsRef.current = [];
-    currentChunkIndexRef.current = 0;
+    setCurrentChunkIndex(0);
+    setChunkCountState(0);
+    finishedRef.current = true;
     isStreamingRef.current = false;
     waitingForNextRef.current = false;
     isGeneratingRef.current = false;
@@ -552,7 +601,7 @@ export default function TTSControls({
     setIsPlaying(false);
     setIsLoading(false);
     setIsMuted(false);
-  }, []);
+  }, [setCurrentChunkIndex]);
 
   // Single toggle button behavior:
   // - idle, nothing cached -> activate: turn on auto-narrate (so future
@@ -603,18 +652,23 @@ export default function TTSControls({
         setIsLoading(true);
         return;
       }
-      currentChunkIndexRef.current = 0;
+      // Resume from wherever playback had gotten to when muted, rather than
+      // restarting - muting only ever happens mid-generation, so this is
+      // never a "finished" session.
       waitingForNextRef.current = false;
       setIsPlaying(true);
-      playChunkAt(0);
+      playChunkAt(currentChunkIndexRef.current);
       return;
     }
 
     if (hasAudio && audioUrlsRef.current.length > 0) {
-      currentChunkIndexRef.current = 0;
+      // Paused mid-way -> resume at the current sentence; finished
+      // naturally -> Play restarts from the top, like a podcast player.
+      const resumeIndex = finishedRef.current ? 0 : currentChunkIndexRef.current;
+      setCurrentChunkIndex(resumeIndex);
       waitingForNextRef.current = false;
       setIsPlaying(true);
-      playChunkAt(0);
+      playChunkAt(resumeIndex);
       return;
     }
 
@@ -648,11 +702,12 @@ export default function TTSControls({
 
       audioUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
       audioUrlsRef.current = [];
-      currentChunkIndexRef.current = 0;
+      setChunkCountState(0);
+      setCurrentChunkIndex(0);
       waitingForNextRef.current = false;
       isStreamingRef.current = true;
 
-      const chunkCount = await generateAndQueueAudio(
+      const generatedChunkCount = await generateAndQueueAudio(
         cleanTextForSpeech(text),
         controller.signal,
       );
@@ -664,7 +719,7 @@ export default function TTSControls({
         return;
       }
 
-      if (chunkCount === 0) {
+      if (generatedChunkCount === 0) {
         throw new Error("No audio generated");
       }
 
@@ -674,6 +729,7 @@ export default function TTSControls({
       if (waitingForNextRef.current) {
         waitingForNextRef.current = false;
         setIsPlaying(false);
+        finishedRef.current = true;
       }
     } catch (error: unknown) {
       if (controller.signal.aborted) {
@@ -709,6 +765,7 @@ export default function TTSControls({
     playChunkAt,
     addNotification,
     getAudioElement,
+    setCurrentChunkIndex,
   ]);
 
   // Drives four things off changes to `text`/`storyTextReady`:
@@ -788,54 +845,107 @@ export default function TTSControls({
 
   const isActive = isPlaying || isLoading;
   const isGeneratingOnly = isLoading && !isPlaying && !isMuted;
-  const canReplay = !isActive && !isMuted && hasAudio;
+  // Once there's been any audio for this turn (playing, paused-with-cached-
+  // audio, or muted mid-generation), show the full transport bar instead of
+  // the plain activation button.
+  const hasController = isActive || isMuted || hasAudio;
   // `disabled` blocks starting something new (text isn't ready yet), but
   // never blocks stopping something already active, and never blocks
   // resuming a muted session - both must stay clickable even while
   // narration is still streaming, since that's exactly when they apply.
   const buttonDisabled = (disabled || !text.trim()) && !isActive && !isMuted;
+  const canSkipBack = hasController && chunkIndex > 0;
+  const canSkipForward = hasController && chunkIndex < chunkCount - 1;
+  const progressPct = chunkCount > 0 ? ((chunkIndex + 1) / chunkCount) * 100 : 0;
+
+  const centerTitle = isGeneratingOnly
+    ? "Generating..."
+    : isPlaying
+      ? "Pause"
+      : isMuted
+        ? "Resume playback"
+        : finishedRef.current
+          ? "Replay"
+          : "Resume";
+
+  if (!hasController) {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleToggle}
+          disabled={buttonDisabled}
+          className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+            buttonDisabled
+              ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
+              : "bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-950/40"
+          }`}
+          title="Read aloud"
+        >
+          <DynamicIcon name="Play" className="w-4 h-4" />
+          <span className="hidden sm:inline">TTS</span>
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-full pl-1 pr-2.5 py-1">
+      <button
+        onClick={handleSkipBack}
+        disabled={!canSkipBack}
+        className={`w-7 h-7 shrink-0 rounded-full flex items-center justify-center transition-colors ${
+          canSkipBack
+            ? "text-blue-100/80 hover:bg-white/10 hover:text-white"
+            : "text-blue-300/25 cursor-not-allowed"
+        }`}
+        title="Previous sentence"
+      >
+        <DynamicIcon name="SkipBack" className="w-4 h-4" />
+      </button>
+
       <button
         onClick={handleToggle}
         disabled={buttonDisabled}
-        className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-all ${
+        className={`w-8 h-8 shrink-0 rounded-full flex items-center justify-center transition-all shadow-md ${
           buttonDisabled
             ? "bg-white/5 text-blue-300/40 cursor-not-allowed"
-            : isActive
-              ? "bg-linear-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white shadow-md shadow-red-950/40"
-              : "bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-md shadow-purple-950/40"
+            : "bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-950/40"
         }`}
-        title={isActive ? "Stop" : isMuted ? "Resume playback" : canReplay ? "Replay" : "Read aloud"}
+        title={centerTitle}
       >
         {isGeneratingOnly ? (
-          <>
-            <DynamicIcon name="Loader2" className="animate-spin h-4 w-4" />
-            <span className="hidden sm:inline">Generating...</span>
-          </>
-        ) : isActive ? (
-          <>
-            <DynamicIcon name="Square" className="w-4 h-4" />
-            <span className="hidden sm:inline">Stop</span>
-          </>
-        ) : isMuted ? (
-          <>
-            <DynamicIcon name="Play" className="w-4 h-4" />
-            <span className="hidden sm:inline">Resume</span>
-          </>
-        ) : canReplay ? (
-          <>
-            <DynamicIcon name="RotateCcw" className="w-4 h-4" />
-            <span className="hidden sm:inline">Replay</span>
-          </>
+          <DynamicIcon name="Loader2" className="animate-spin w-4 h-4" />
+        ) : isPlaying ? (
+          <DynamicIcon name="Pause" className="w-4 h-4" />
         ) : (
-          <>
-            <DynamicIcon name="Play" className="w-4 h-4" />
-            <span className="hidden sm:inline">TTS</span>
-          </>
+          <DynamicIcon name="Play" className="w-4 h-4 ml-0.5" />
         )}
       </button>
+
+      <button
+        onClick={handleSkipForward}
+        disabled={!canSkipForward}
+        className={`w-7 h-7 shrink-0 rounded-full flex items-center justify-center transition-colors ${
+          canSkipForward
+            ? "text-blue-100/80 hover:bg-white/10 hover:text-white"
+            : "text-blue-300/25 cursor-not-allowed"
+        }`}
+        title="Next sentence"
+      >
+        <DynamicIcon name="SkipForward" className="w-4 h-4" />
+      </button>
+
+      {chunkCount > 1 && (
+        <div
+          className="w-10 h-1 rounded-full bg-white/10 overflow-hidden ml-0.5"
+          aria-hidden="true"
+        >
+          <div
+            className="h-full bg-purple-400/80 transition-[width]"
+            style={{ width: `${progressPct}%` }}
+          />
+        </div>
+      )}
     </div>
   );
 }
