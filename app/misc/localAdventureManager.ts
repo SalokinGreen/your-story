@@ -60,6 +60,13 @@ export async function saveLocalAdventure(
   options?: {
     serverUpdatedAt?: string;
     markAsSynced?: boolean;
+    // Overrides the stored `updatedAt` instead of stamping "now". Used by
+    // syncManager.ts when writing a pulled/merged item locally, so this
+    // device's copy keeps the timestamp that actually won the merge rather
+    // than looking artificially newer just because it happened to sync at
+    // this moment - otherwise a later, genuinely newer edit from another
+    // device could lose to this device's stale content in a future merge.
+    updatedAt?: Date;
   }
 ): Promise<void> {
   const db = await openDB();
@@ -92,7 +99,7 @@ export async function saveLocalAdventure(
       id: adventureId,
       title: adventure.title || "Untitled Adventure",
       description: adventure.shortDescription || "",
-      updatedAt: now,
+      updatedAt: options?.updatedAt ?? now,
       adventureData: adventure,
       // Sync metadata
       syncStatus,

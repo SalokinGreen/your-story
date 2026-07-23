@@ -250,6 +250,57 @@ describe("syncManager", () => {
     expect(c.listFolders().map((f) => f.name)).toEqual(["Keeper"]);
   });
 
+  it("doesn't let a passive pull's local write time shadow a genuinely newer offline edit from a third device", async () => {
+    installFakeServer();
+    const key = "test-key-passive-pull-timestamp";
+
+    vi.useFakeTimers({ toFake: ["Date"] });
+    try {
+      vi.setSystemTime(0);
+      const a = new Device(key);
+      await a.saveStory("shared", makeStoryData("Original"));
+      await a.sync(); // pushes with the real edit timestamp, t=0
+
+      // C is offline and edits the same story at t=5 - a real, later edit -
+      // but doesn't sync yet, so nobody else knows about it.
+      vi.setSystemTime(5);
+      const c = new Device(key);
+      await c.saveStory("shared", makeStoryData("Edited by C"));
+
+      // B links up later, at t=10, and just pulls A's (still-current) copy.
+      // B makes no edit of its own - this is a passive sync.
+      vi.setSystemTime(10);
+      const b = new Device(key);
+      await b.sync();
+      expect((await b.getStory("shared"))?.storyData.story_name).toBe(
+        "Original",
+      );
+
+      // C comes online at t=20 and pushes its real t=5 edit.
+      vi.setSystemTime(20);
+      await c.sync();
+
+      // B syncs again at t=30. If B's earlier passive pull had stamped its
+      // local copy with t=10 (the pull time) instead of preserving the
+      // original t=0, B's untouched copy would incorrectly look newer than
+      // C's genuine t=5 edit and win the merge, silently discarding it (and
+      // pushing the stale content back over C's on the server).
+      vi.setSystemTime(30);
+      await b.sync();
+      expect((await b.getStory("shared"))?.storyData.story_name).toBe(
+        "Edited by C",
+      );
+
+      // A syncs too and must also converge on C's edit, not B's stale copy.
+      await a.sync();
+      expect((await a.getStory("shared"))?.storyData.story_name).toBe(
+        "Edited by C",
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("resolves a same-item edit conflict by newest-updatedAt while an untouched sibling survives", async () => {
     installFakeServer();
     const key = "test-key-edit-conflict";

@@ -340,6 +340,7 @@ const storiesAdapter: MergeAdapter<LocalStory> = {
       await saveLocalStory(s.id, s.storyData, s.folder_id ?? undefined, {
         serverUpdatedAt: s.serverUpdatedAt,
         markAsSynced: true,
+        updatedAt: new Date(item.updatedAt),
       });
     }
     for (const before of localItemsBefore) {
@@ -367,6 +368,7 @@ const adventuresAdapter: MergeAdapter<LocalAdventure> = {
       await saveLocalAdventure(a.id, a.adventureData, {
         serverUpdatedAt: a.serverUpdatedAt,
         markAsSynced: true,
+        updatedAt: new Date(item.updatedAt),
       });
     }
     for (const before of localItemsBefore) {

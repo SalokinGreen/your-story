@@ -98,6 +98,13 @@ export async function saveLocalStory(
     serverUpdatedAt?: string;
     markAsSynced?: boolean;
     isLocalEdit?: boolean;
+    // Overrides the stored `updatedAt` instead of stamping "now". Used by
+    // syncManager.ts when writing a pulled/merged item locally, so this
+    // device's copy keeps the timestamp that actually won the merge rather
+    // than looking artificially newer just because it happened to sync at
+    // this moment - otherwise a later, genuinely newer edit from another
+    // device could lose to this device's stale content in a future merge.
+    updatedAt?: Date;
   },
 ): Promise<void> {
   const db = await openDB();
@@ -136,7 +143,7 @@ export async function saveLocalStory(
         storyData.scene.parts[
           storyData.scene.parts.length - 1
         ]?.content.substring(0, 100) + "..." || "",
-      updatedAt: now,
+      updatedAt: options?.updatedAt ?? now,
       storyData: storyData,
       folder_id: folderId !== undefined ? folderId : existing?.folder_id,
       // Sync metadata
