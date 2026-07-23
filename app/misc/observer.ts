@@ -147,6 +147,26 @@ export function settingsFor(
   return override ? { ...defaults, ...override } : defaults;
 }
 
+/**
+ * True if the current config makes an automatic reset-and-retry (see
+ * runObserver/generateStoryTurn) possible at all - i.e. at least one flag
+ * type is both enabled and allowed to trigger a reset. Mirrors the gate
+ * generateStoryTurn actually applies (`majorFlag` + `settingsFor(...).
+ * triggersReset`), so the UI can warn the player a turn might get reset
+ * only when that's actually true, and stay silent when every check is off
+ * or none of them can reset.
+ */
+export function canObserverTriggerReset(
+  settings: ObserverSettings | undefined,
+): boolean {
+  return (Object.keys(DEFAULT_OBSERVER_SETTINGS) as ObserverFlagType[]).some(
+    (type) => {
+      const s = settingsFor(settings, type);
+      return s.enabled && s.triggersReset;
+    },
+  );
+}
+
 function clampSensitivity(sensitivity: number): number {
   return Math.max(0, Math.min(10, sensitivity));
 }
