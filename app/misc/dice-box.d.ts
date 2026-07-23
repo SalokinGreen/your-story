@@ -16,7 +16,16 @@ declare module "@3d-dice/dice-box" {
   }
 
   export interface DiceBoxConfigUpdate {
+    // Upstream dice-box physics knobs (read by its rollDie()): how hard the
+    // die is launched inward from its spawn edge, and how much angular spin
+    // it gets. Scaling these by the drag distance is how the throw gesture
+    // controls power while keeping dice-box's own (in-bounds, downward,
+    // inward) throw direction.
+    throwForce?: number;
+    spinForce?: number;
     // Patched in via scripts/patchDiceBox.mjs - not part of upstream dice-box.
+    // No longer used to drive the throw (the natural throwForce/spinForce
+    // path above does), but kept so a leftover value can be cleared to null.
     customThrowVelocity?: [number, number, number] | null;
     customThrowSpin?: [number, number, number] | null;
   }

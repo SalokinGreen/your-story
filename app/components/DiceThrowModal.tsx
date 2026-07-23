@@ -36,32 +36,39 @@ interface DragVisual {
   y2: number;
 }
 
-// Converts a screen-space drag gesture into a world-space throw. Power
-// comes from how FAR the player dragged, not how fast - a slow, deliberate
-// drag-and-release should throw just as hard as a quick flick across the
-// same distance. (An earlier speed-based version - dist/elapsedTime -
-// looked fine against synthetic test gestures that move instantly, but a
-// real ~1s human drag scored a forceScale near 1, weak enough that the
-// dice barely left the ground.) Tuned by eye against the default dice-box
-// camera/tray - see app/dev/dice-spike for how this was validated against
-// the patched physics worker.
-function throwFromDrag(dx: number, dy: number) {
-  const dist = Math.hypot(dx, dy) || 1;
-  const dirX = dx / dist;
-  const dirZ = dy / dist;
-  const forceScale = Math.min(Math.max(dist / 25, 4), 16);
+// dice-box's own rollDie() already produces a good throw: it launches the
+// die *inward* from its spawn edge (velocity proportional to -startPosition)
+// and *downward* from the starting height, so it always lands in-bounds and
+// tumbles to a stop. All the gesture needs to control is how *hard* that
+// throw is, via dice-box's throwForce/spinForce config knobs (defaults 5/6).
+//
+// An earlier version instead fed a fully custom velocity vector (patched in
+// via scripts/patchDiceBox.mjs) built straight from the drag direction with
+// an upward Y. Because the die respawns at a random edge at height 8, a
+// drag pointing toward that same edge launched it up and over the wall -
+// the "teleports to a corner and flies off a random way" bug. Driving only
+// the force magnitude and letting dice-box aim the throw fixes that.
+//
+// Power comes from how FAR the player dragged, not how fast: a slow,
+// deliberate drag should throw as hard as a quick flick across the same
+// distance (a speed-based version scored near-zero force on a real ~1s
+// human drag). Distances are in CSS px; the constants below are tuned by
+// eye against the tray - see app/dev/dice-spike.
+const MIN_DRAG_PX = 20; // below this it's a tap, not a throw
+const FULL_POWER_PX = 220; // drag length that maps to a full-strength throw
 
-  const velocity: [number, number, number] = [
-    dirX * forceScale,
-    2 + forceScale * 0.3,
-    dirZ * forceScale,
-  ];
-  const spin: [number, number, number] = [
-    forceScale,
-    forceScale * 0.6,
-    forceScale,
-  ];
-  return { velocity, spin };
+function throwForceFromDrag(dx: number, dy: number) {
+  const dist = Math.hypot(dx, dy);
+  const power = Math.min(
+    Math.max((dist - MIN_DRAG_PX) / (FULL_POWER_PX - MIN_DRAG_PX), 0),
+    1
+  );
+  // Gentle floor so even a short flick still visibly tumbles, up to roughly
+  // dice-box's own defaults at full power.
+  return {
+    throwForce: 2 + power * 3.5, // ~2 (soft) .. ~5.5 (firm)
+    spinForce: 3 + power * 4, // ~3 .. ~7
+  };
 }
 
 type Phase = "loading" | "aiming" | "rolling" | "settled";
@@ -153,10 +160,16 @@ export default function DiceThrowModal({
         if (requestTokenRef.current !== token) return;
 
         // Show the dice sitting in the tray immediately, before the player
-        // does anything - a plain toss-in with no gesture-driven velocity.
-        // The player's own drag/release later re-throws this same group via
-        // reroll() rather than spawning a second set on top of it.
-        await diceBox.updateConfig({ customThrowVelocity: null, customThrowSpin: null });
+        // does anything - a gentle toss-in (soft force so they settle near
+        // the middle rather than scattering to the corners). The player's
+        // own drag/release later re-throws this same group via reroll()
+        // rather than spawning a second set on top of it.
+        await diceBox.updateConfig({
+          throwForce: 2.5,
+          spinForce: 3,
+          customThrowVelocity: null,
+          customThrowSpin: null,
+        });
         const results = await diceBox.roll(`${request.count}d${request.sides}`);
         if (requestTokenRef.current !== token) return;
         diceGroupRef.current = results;
@@ -215,7 +228,7 @@ export default function DiceThrowModal({
 
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
-    if (Math.hypot(dx, dy) < 20) return; // require an actual drag, not a tap
+    if (Math.hypot(dx, dy) < MIN_DRAG_PX) return; // require a drag, not a tap
 
     const token = requestTokenRef.current;
     try {
@@ -223,18 +236,22 @@ export default function DiceThrowModal({
       if (requestTokenRef.current !== token) return;
 
       setPhase("rolling");
-      const { velocity, spin } = throwFromDrag(dx, dy);
+      // Drive dice-box's own throw with a drag-scaled force, and make sure
+      // any leftover custom-velocity override from an older code path is
+      // cleared so the natural (in-bounds, downward, inward) throw runs.
+      const { throwForce, spinForce } = throwForceFromDrag(dx, dy);
       await diceBox.updateConfig({
-        customThrowVelocity: velocity,
-        customThrowSpin: spin,
+        throwForce,
+        spinForce,
+        customThrowVelocity: null,
+        customThrowSpin: null,
       });
       const group = diceGroupRef.current;
-      // newStartPoint:false keeps the dice launching from the same edge
-      // point the initial resting toss already used (validated to land
-      // reasonably centered) instead of dice-box re-rolling a brand new
-      // random edge, which could be a much more awkward spot.
+      // Let dice-box pick a fresh random spawn edge (newStartPoint default)
+      // so each throw tumbles in from the rim like a real toss; its velocity
+      // is aimed inward from that edge, so the die always stays in the tray.
       const results = group
-        ? await diceBox.reroll(group, { remove: true, newStartPoint: false })
+        ? await diceBox.reroll(group, { remove: true })
         : await diceBox.roll(`${request.count}d${request.sides}`);
       if (requestTokenRef.current !== token) return;
 
