@@ -196,6 +196,14 @@ export interface GenerationOptions {
   // and this is replayed as history, same as the normal
   // "continue GM conversation" narration call.
   precomputedGMConversation?: GMConversationMessage[];
+  // Companion to precomputedGMConversation: the already-executed GM tool
+  // results (dice rolls, increment_scene, etc.) from the attempt whose
+  // narration is being reworded. Without this, gmResults stays empty
+  // whenever a fresh GM stage is skipped, which silently blinds the
+  // outcome-mismatch/tool-usage-gap observer checks (generateStoryTurn) and
+  // the Director Assistant's increment_scene gate to a roll/tool call that
+  // genuinely happened - they'd just never have anything to look at.
+  precomputedGMResults?: GMToolResult[];
   // Sampling settings (for story stage only, Coins mode)
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
@@ -779,6 +787,7 @@ export async function generateStoryTurn(
     // judge. generateStoryTurnOnce throws rather than returning on failure,
     // so a successfully-returned result always has success: true here.
     if (!result.content.trim()) {
+      callbacks.onComplete?.(result);
       return result;
     }
 
@@ -1113,6 +1122,7 @@ export async function generateStoryTurn(
       });
     }
 
+    callbacks.onComplete?.(result);
     return result;
   }
 }
@@ -1210,6 +1220,12 @@ async function generateStoryTurnOnce(
     // narration call.
     if (options.precomputedGMConversation) {
       gmConversationHistory = options.precomputedGMConversation;
+      // Carry the reused attempt's actual tool results through to this
+      // attempt's result.gmResults - see precomputedGMResults's doc comment.
+      // Skipping this left every reword-only retry looking, to the observer
+      // and the Director Assistant, exactly like a turn that called no
+      // tools at all.
+      gmResults = options.precomputedGMResults || [];
       const gmPrompt = buildGMStagePrompt({
         storyData,
         userChoice: gmUserChoice,
@@ -2741,7 +2757,15 @@ async function generateStoryTurnOnce(
       },
     };
 
-    callbacks.onComplete?.(result);
+    // onComplete is NOT fired here - this is one attempt inside
+    // generateStoryTurn's while loop, and the observer (observer.ts) still
+    // needs to review this attempt's narration and potentially rewrite or
+    // fully reset it before the turn is actually final. Firing onComplete
+    // this early made the UI (page.tsx) finalize/save/clear its loading
+    // state on the FLAGGED narration, so by the time onObserverRewrite fired
+    // afterward the "not final yet" warning had already vanished and the
+    // corrected text had nowhere left to land. generateStoryTurn calls
+    // onComplete itself, once, after the observer has had its say.
     return result;
   } catch (error: any) {
     logger.error("Generation failed", { error: error.message });
