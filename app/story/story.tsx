@@ -27,6 +27,11 @@ import {
   buildMentionMatcher,
   splitTextWithMentions,
 } from "../misc/noteMentions";
+import { canObserverTriggerReset } from "../misc/observer";
+import {
+  getObserverSettings,
+  LAYER_SETTINGS_CHANGED_EVENT,
+} from "../misc/layerSettings";
 
 // Solo play has no CouchPlayer of its own (see structs.ts) - this stands in
 // for PlayerBubbles' `players` prop so voice input still gets a bubble
@@ -704,6 +709,20 @@ export default function Story({
   const [isHovering, setIsHovering] = React.useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
+  // Whether the Observer's current settings make an automatic reset-and-
+  // retry possible at all (see observer.ts's canObserverTriggerReset) - used
+  // to warn the player, while narration is streaming, that this response
+  // isn't final yet. Re-read on the same change event ArchitectureSettingsTab
+  // fires when the player edits these settings mid-session.
+  const [observerCanReset, setObserverCanReset] = React.useState(() =>
+    canObserverTriggerReset(getObserverSettings()),
+  );
+  useEffect(() => {
+    const update = () => setObserverCanReset(canObserverTriggerReset(getObserverSettings()));
+    window.addEventListener(LAYER_SETTINGS_CHANGED_EVENT, update);
+    return () => window.removeEventListener(LAYER_SETTINGS_CHANGED_EVENT, update);
+  }, []);
+
   // Show hidden messages setting - persisted to localStorage
   const [showHiddenMessages, setShowHiddenMessages] = React.useState(() => {
     if (typeof window === "undefined") return false;
@@ -1284,6 +1303,18 @@ export default function Story({
               mentionMatcher={mentionMatcher}
               onMentionClick={handleMentionClick}
             />
+          )}
+
+          {/* Reset warning: the Observer (observer.ts) reviews narration
+              only after it finishes streaming, and can silently discard and
+              regenerate it if flagged - jarring if the player has no idea
+              that's possible. Only shown while narration is actually
+              streaming, and only when the current settings make a reset
+              possible at all. */}
+          {loadingStage === "story" && observerCanReset && (
+            <p className="px-1 text-xs text-blue-200/40 italic">
+              Not final yet - the Observer may flag and rewrite this response. Don&apos;t get too attached.
+            </p>
           )}
         </div>
 
