@@ -71,6 +71,117 @@ function clampPct(v: number, min: number, max: number) {
 
 interface RecordingSession {
   stopped: boolean;
+  // Set by cancelRecording() - tells mediaRecorder.onstop to discard the
+  // take instead of transcribing it.
+  discard: boolean;
+}
+
+const WAVEFORM_BAR_COUNT = 24;
+
+// Draws a live mic-level waveform by writing bar heights straight to the DOM
+// on every animation frame instead of through React state, so a recording
+// session doesn't force 60fps re-renders of the whole bubble tree.
+function LiveWaveform({
+  analyserRef,
+}: {
+  analyserRef: React.RefObject<AnalyserNode | null>;
+}) {
+  const barsRef = useRef<(HTMLDivElement | null)[]>([]);
+  const frameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const analyser = analyserRef.current;
+    if (!analyser) return;
+    const bufferLength = analyser.frequencyBinCount;
+    const dataArray = new Uint8Array(bufferLength);
+    const bucketSize = Math.max(1, Math.floor(bufferLength / WAVEFORM_BAR_COUNT));
+
+    const tick = () => {
+      analyser.getByteFrequencyData(dataArray);
+      for (let i = 0; i < WAVEFORM_BAR_COUNT; i++) {
+        const start = i * bucketSize;
+        let sum = 0;
+        for (let j = 0; j < bucketSize; j++) sum += dataArray[start + j] || 0;
+        const avg = sum / bucketSize; // 0-255
+        const pct = Math.min(100, 14 + (avg / 255) * 86);
+        const bar = barsRef.current[i];
+        if (bar) bar.style.height = `${pct}%`;
+      }
+      frameRef.current = requestAnimationFrame(tick);
+    };
+    frameRef.current = requestAnimationFrame(tick);
+
+    return () => {
+      if (frameRef.current) cancelAnimationFrame(frameRef.current);
+    };
+  }, [analyserRef]);
+
+  return (
+    <div className="flex items-center gap-[3px] h-8 flex-1 min-w-0 justify-center px-1">
+      {Array.from({ length: WAVEFORM_BAR_COUNT }).map((_, i) => (
+        <div
+          key={i}
+          ref={(el) => {
+            barsRef.current[i] = el;
+          }}
+          className="w-[3px] rounded-full bg-white/70 shrink-0"
+          style={{ height: "14%" }}
+        />
+      ))}
+    </div>
+  );
+}
+
+function RecordingOverlay({
+  player,
+  analyserRef,
+  onCancel,
+  onConfirm,
+}: {
+  player: CouchPlayer;
+  analyserRef: React.RefObject<AnalyserNode | null>;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed z-50 left-1/2 -translate-x-1/2 bottom-6 w-[min(26rem,calc(100vw-2rem))] flex items-center gap-2 rounded-full bg-[#0d1829]/95 backdrop-blur-xl border border-white/10 shadow-2xl shadow-black/50 pl-2 pr-2 py-2"
+      style={{ marginBottom: "env(safe-area-inset-bottom)" }}
+      role="dialog"
+      aria-label={`Recording for ${player.name}`}
+    >
+      <button
+        type="button"
+        onClick={onCancel}
+        className="shrink-0 w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:scale-95 flex items-center justify-center transition-all touch-manipulation"
+        title="Cancel recording"
+      >
+        <DynamicIcon name="X" className="w-4 h-4 text-white/80" />
+      </button>
+
+      <span className="relative flex h-2.5 w-2.5 shrink-0">
+        <span
+          className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75"
+          style={{ backgroundColor: player.color }}
+        />
+        <span
+          className="relative inline-flex rounded-full h-2.5 w-2.5"
+          style={{ backgroundColor: player.color }}
+        />
+      </span>
+
+      <LiveWaveform analyserRef={analyserRef} />
+
+      <button
+        type="button"
+        onClick={onConfirm}
+        className="shrink-0 w-9 h-9 rounded-full flex items-center justify-center transition-all active:scale-95 touch-manipulation bg-linear-to-br from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-md shadow-purple-950/40"
+        title="Stop & transcribe"
+      >
+        <DynamicIcon name="Check" className="w-4 h-4 text-white" />
+      </button>
+    </div>
+  );
 }
 
 type ActivityState = "recording" | "processing" | "idle";
@@ -228,6 +339,25 @@ export default function PlayerBubbles({
     teardownAudio();
   }, [teardownAudio]);
 
+  // Like stopRecording, but marks the take to be discarded once the
+  // MediaRecorder actually stops (see onstop in beginRecording) instead of
+  // sending it off for transcription - the "X" on the recording overlay.
+  const cancelRecording = useCallback(() => {
+    const session = sessionRef.current;
+    if (!session) return;
+    session.stopped = true;
+    session.discard = true;
+    sessionRef.current = null;
+
+    if (
+      mediaRecorderRef.current &&
+      mediaRecorderRef.current.state !== "inactive"
+    ) {
+      mediaRecorderRef.current.stop();
+    }
+    teardownAudio();
+  }, [teardownAudio]);
+
   const watchSilence = useCallback((session: RecordingSession) => {
     const analyser = analyserRef.current;
     if (!analyser) return;
@@ -296,13 +426,18 @@ export default function PlayerBubbles({
         const mediaRecorder = new MediaRecorder(stream, { mimeType });
         mediaRecorderRef.current = mediaRecorder;
 
-        const session: RecordingSession = { stopped: false };
+        const session: RecordingSession = { stopped: false, discard: false };
         sessionRef.current = session;
 
         mediaRecorder.ondataavailable = (e) => {
           if (e.data.size > 0) chunks.push(e.data);
         };
         mediaRecorder.onstop = () => {
+          if (session.discard) {
+            setActivePlayerId((cur) => (cur === player.id ? null : cur));
+            onLocalActivity?.("idle");
+            return;
+          }
           handleRecordingStopped(player, mimeType, chunks);
         };
         mediaRecorder.onerror = () => {
@@ -376,6 +511,13 @@ export default function PlayerBubbles({
 
   if (players.length === 0) return null;
 
+  // activePlayerId only ever reflects this device's own recording (remote
+  // players' state comes through remoteActivity instead), so it's always
+  // safe to surface the waveform overlay for whichever player it names.
+  const recordingPlayer = activePlayerId
+    ? players.find((p) => p.id === activePlayerId) || null
+    : null;
+
   return (
     <>
       {players.map((player, index) => {
@@ -397,6 +539,15 @@ export default function PlayerBubbles({
           />
         );
       })}
+
+      {recordingPlayer && (
+        <RecordingOverlay
+          player={recordingPlayer}
+          analyserRef={analyserRef}
+          onCancel={cancelRecording}
+          onConfirm={stopRecording}
+        />
+      )}
 
       {pendingLines.length > 0 && (
         <PendingLinesPanel lines={pendingLines} onRemove={removePendingLine} />
