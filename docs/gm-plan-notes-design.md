@@ -2,10 +2,11 @@
 
 ## Status
 
-Design spec, not yet implemented. Written for review before any code changes,
-per the repo's discuss-first workflow. Decision on record: **ship the
-prompt-only version first (Phase 1), add a deterministic gate later (Phase 2)
-only if the GM drifts.**
+**Phase 1 implemented.** Prompt-only enforcement, per the decision on record:
+ship the prompt-only version first, add a deterministic gate later (Phase 2)
+only if the GM drifts. The `gm_plan` note type, the GM-stage injection, the
+`open_side_beat`/`close_side_beat` tools, the player-facing lore UI entry, and
+tests are all in. Phase 2 (the re-planning gate) remains deferred.
 
 ## The problem this solves
 
@@ -112,33 +113,26 @@ the GM fills in each beat's content but does not rename the spine.
 
 ## Player visibility
 
-The player *can* see the plan (decided) — but not all of it, because the full
-note contains future beats and the candidate arc directions the GM is weighing,
-and revealing those spoils the story and telegraphs the GM's hand. So player
-visibility is a **redacted projection**, not the raw note:
+**Fully transparent (decided).** The player can open the plan notes and read
+them verbatim, future beats and candidate arc directions included. The product
+call is that the see-behind-the-curtain transparency is worth more here than
+preserving mystery — the player is a co-author, not an audience.
 
-| Part of the plan | Player sees | Rationale |
-|---|---|---|
-| Premise | ✅ yes | It's the pitch; no spoiler. |
-| Spine — completed + current beat (name only) | ✅ yes | A "campaign so far" sense of progress. |
-| Spine — future beats | ❌ no | Spoils the story. |
-| Current-beat checklist / advance-when | ❌ no | GM bookkeeping; telegraphs the seams. |
-| Own arc — current state + active hooks | ✅ yes (own only) | Reflects what they already know about their character. |
-| Own arc — candidate directions | ❌ no | These are possibilities the GM is holding open; showing them collapses the mystery. |
-| Another player's arc note | ❌ no | Each player sees only their own arc. |
-
-Mechanically this is three tiers, and the codebase already has the pieces:
+Mechanically:
 
 - **GM stage**: full plan text, pinned every turn.
-- **Narrator stage**: excluded (spoiler firewall), same as `dm_instructions`.
-- **Player UI**: a projection rendered in the story UI (e.g. a "Campaign"
-  panel) that pulls only the ✅ rows above. Per-player scoping reuses
-  `ownerCouchPlayerId`.
+- **Narrator stage**: still excluded — not as a spoiler firewall (the player
+  sees it anyway) but for **pacing and tokens**. The narrator's job is to
+  render the *current* beat's prose; feeding it the whole forward plan invites
+  it to pre-write beats that haven't happened. Same exclusion `dm_instructions`
+  already gets.
+- **Player UI**: the `gm_plan` notes surface in the normal notes/lore view so
+  the player can read them. In co-op, arc notes still carry
+  `ownerCouchPlayerId` for attribution, but visibility is not gated per player.
 
-The one thing to confirm: this redacted model, versus showing the whole note
-verbatim. I recommend the redaction — a fully-visible plan would spoil future
-beats and make the GM's candidate arcs feel like a menu. Flag if you'd rather
-ship it fully transparent.
+Because there's nothing to redact, there's no separate projection layer to
+build — the notes render through the existing lore UI like any other note,
+which makes this simpler than the redacted alternative would have been.
 
 ## Side beats (focus detours / side quests)
 
@@ -258,9 +252,8 @@ Following the repo's `tests/*.test.ts` + seeded-`Math.random` conventions:
 
 - `gm_plan` is recognized as a pinned type and injected into the GM prompt but
   **absent** from the narrator/story prompt (visibility regression).
-- The player-facing projection includes the ✅ rows and **excludes** future
-  beats, checklists, and candidate arc directions (redaction regression).
-- Per-player scoping: player A's projection excludes player B's arc note.
+- `gm_plan` notes surface in the player-facing lore view (visibility: the
+  player can read them).
 - `create_note` accepts `type: "gm_plan"` and round-trips through
   `toolExecutor`.
 - `open_side_beat` sets `activeSideBeatTitle` and foregrounds the side beat in
@@ -276,28 +269,27 @@ Following the repo's `tests/*.test.ts` + seeded-`Math.random` conventions:
 
 - One campaign-spine note + **one arc note per player** (via `ownerCouchPlayerId`).
 - **Fixed** beat names.
-- **Player-visible** via a redacted projection (recommended), not the raw note.
+- **Fully transparent** to the player (notes render through the normal lore UI).
 - A **side-beat tool pair** (`open_side_beat` / `close_side_beat`) for focus detours.
 
-## Open question remaining
+## Phased implementation checklist (Phase 1) — done
 
-1. **Redacted projection vs. fully-transparent plan.** Spec recommends
-   redaction (hide future beats + candidate arc directions). Confirm, or say
-   you want the whole note shown verbatim.
+- [x] `LoreType` union — `app/misc/structs.ts`
+- [x] `activeSideBeatTitle?` on `StoryData` — `structs.ts`
+- [x] Pinned-type list (`BASE_PINNED_NOTE_TYPES`) — `ai_staged.ts`
+- [x] GM-stage injection: spine + per-player arcs + active side beat, with the
+      active side beat foregrounded — `buildGMStagePrompt`
+- [x] `gm_plan` renders in the player lore view (`TYPE_CONFIG` + filter +
+      create/edit dropdowns) — `app/story/lore.tsx`
+- [x] `create_note` enum — `toolSchemas.ts`
+- [x] `open_side_beat` / `close_side_beat` schemas (`toolSchemas.ts`) +
+      executors (`toolExecutor.ts`) + GM-stage whitelist (`ai_staged.ts`)
+- [x] `freshStorySetupBlock` extension + CAMPAIGN PLAN discipline section —
+      `ai_staged.ts`
+- [x] Tests — `tests/gmPlanNotes.test.ts` (9 tests)
 
-## Phased implementation checklist (Phase 1)
-
-- [ ] `LoreType` union — `app/misc/structs.ts:159`
-- [ ] `activeSideBeatTitle?` on `StoryData` — `structs.ts`
-- [ ] Pinned-type list + `isPinnedNoteType` — `ai_staged.ts:388`
-- [ ] GM-stage injection: spine + active player's arc + active side beat —
-      `buildGMStagePrompt` (~`ai_staged.ts:1064`)
-- [ ] Exclude from narrator/story stage
-- [ ] Redacted player projection + "Campaign" panel in the story UI
-- [ ] `create_note` enum — `toolSchemas.ts:343`
-- [ ] `open_side_beat` / `close_side_beat` schemas (`toolSchemas.ts`) +
-      executors (`toolExecutor.ts`)
-- [ ] `freshStorySetupBlock` extension — `ai_staged.ts:1307`
-- [ ] Prompt guidance (create spine + per-player arcs / one-beat-ahead /
-      checklist / advance-when / side beats)
-- [ ] Tests per above
+The narrator/story stage continues the GM conversation rather than rebuilding
+a fresh prompt, so the plan is only *added* in the GM stage (not in
+`buildInfoMessage`/Choices). The pacing note in "Player visibility" stands: the
+plan lives in the GM system prompt the narration continues from, and the
+continuation prompt is what keeps the narrator on the current beat.

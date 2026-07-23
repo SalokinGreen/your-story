@@ -825,6 +825,116 @@ export function executeTools(
         continue;
       }
 
+      // Campaign Plan focus: open a side beat (side quest / detour) and make
+      // it the active focus. See docs/gm-plan-notes-design.md.
+      if (toolCall.function.name === "open_side_beat") {
+        logger.action("Special handling: open_side_beat", {
+          toolCallId: toolId,
+          title: args.title,
+        });
+
+        if (storyData.activeSideBeatTitle) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `A side beat ("${storyData.activeSideBeatTitle}") is already active - resolve it with close_side_beat before opening another.`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!storyData.lore) storyData.lore = [];
+        const existingBeat = storyData.lore.find(
+          (l) => l.title === args.title,
+        );
+        if (!existingBeat) {
+          const beatBody = [
+            `**Side Beat** (detour off the main spine)`,
+            ``,
+            `- Goal: ${args.goal}`,
+            args.return_when ? `- Return when: ${args.return_when}` : null,
+            args.owner ? `- Focus on: ${args.owner}` : null,
+            ``,
+            `## Checklist`,
+            `- [ ] `,
+          ]
+            .filter((line) => line !== null)
+            .join("\n");
+          storyData.lore.push({
+            title: args.title,
+            content: beatBody,
+            relatedCharacters: [],
+            relatedLocations: [],
+            secrtet: false,
+            keys: [],
+            type: "gm_plan",
+            on: true,
+            alwaysOn: true,
+            on_triggers: [],
+            off_triggers: [],
+            embedded: false,
+            ownerCouchPlayerId: args.owner || undefined,
+          });
+          storyData.loreEmbeddingsDirty = true;
+        }
+
+        storyData.activeSideBeatTitle = args.title;
+
+        const stateChange = `⚡ Opened side beat "${args.title}" (main story paused)`;
+        stateChanges.push(stateChange);
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Campaign Plan focus: resolve the active side beat and return focus to
+      // the paused main-spine beat. See docs/gm-plan-notes-design.md.
+      if (toolCall.function.name === "close_side_beat") {
+        logger.action("Special handling: close_side_beat", {
+          toolCallId: toolId,
+        });
+
+        const activeTitle = storyData.activeSideBeatTitle;
+        if (!activeTitle) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `No side beat is active - nothing to close.`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const beat = (storyData.lore || []).find(
+          (l) => l.title === activeTitle,
+        );
+        if (beat) {
+          beat.content = `${beat.content}\n\n**Resolved:** ${args.resolution}`;
+          beat.embedded = false;
+          storyData.loreEmbeddingsDirty = true;
+        }
+
+        storyData.activeSideBeatTitle = undefined;
+
+        const stateChange = `✅ Closed side beat "${activeTitle}" (back to the main story)`;
+        stateChanges.push(stateChange);
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
       // Special handling for create_goal (description may contain | characters)
       if (toolCall.function.name === "create_goal") {
         logger.action("Special handling: create_goal", {

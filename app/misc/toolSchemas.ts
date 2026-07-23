@@ -351,6 +351,7 @@ const createNoteTool: ToolSchema = {
             "dm_instructions",
             "character_sheet",
             "mechanics",
+            "gm_plan",
           ],
           description: "Category for the note (defaults to 'lore')",
         },
@@ -1172,6 +1173,59 @@ Long rests involve a time skip. Use when narratively appropriate (safe haven, en
   },
 };
 
+const openSideBeatTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "open_side_beat",
+    description: `Pull focus off the main campaign spine into a self-contained side beat - a side quest, a character-focused detour, a one-off episode - and make it the active focus. Creates a \`gm_plan\` note for the side beat (its own short goal + checklist + a "return_when" condition) and marks it active; the main spine beat is paused (not lost) until you call close_side_beat. Use this instead of quietly wandering off-plan, so the detour is tracked and has a way back. Only ONE side beat is active at a time.`,
+    parameters: {
+      type: "object",
+      properties: {
+        title: {
+          type: "string",
+          description:
+            "Short title for the side beat, e.g. 'Side Beat — The Missing Caravan'. Becomes the gm_plan note title.",
+        },
+        goal: {
+          type: "string",
+          description:
+            "What this detour is about and what it's meant to accomplish in the fiction.",
+        },
+        return_when: {
+          type: "string",
+          description:
+            "The condition that means the side beat is done and focus should return to the main spine.",
+        },
+        owner: {
+          type: "string",
+          description:
+            "Optional: in co-op, the player/character this detour is focused on (matches a character's ownerCouchPlayerId). Omit for a party-wide side beat.",
+        },
+      },
+      required: ["title", "goal"],
+    },
+  },
+};
+
+const closeSideBeatTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "close_side_beat",
+    description: `Resolve the active side beat and return focus to the paused main campaign spine beat. Records the outcome on the side beat's gm_plan note and clears the active focus. Call this when the side beat's return_when condition is met (or the detour is otherwise done).`,
+    parameters: {
+      type: "object",
+      properties: {
+        resolution: {
+          type: "string",
+          description:
+            "How the side beat resolved / what came of it, for the record.",
+        },
+      },
+      required: ["resolution"],
+    },
+  },
+};
+
 // Export all tools as array
 export const TOOL_SCHEMAS: ToolSchema[] = [
   // Goal Management (5 tools)
@@ -1201,6 +1255,10 @@ export const TOOL_SCHEMAS: ToolSchema[] = [
   mergeLoreTool,
   duplicateLoreTool,
   searchNotesTool,
+
+  // Campaign Plan focus (2 tools) - see docs/gm-plan-notes-design.md
+  openSideBeatTool,
+  closeSideBeatTool,
 
   // NPC Management (1 tool - creates lore for NPCs)
   addNpcTool,

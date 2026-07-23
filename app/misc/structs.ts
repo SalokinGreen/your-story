@@ -151,6 +151,9 @@ export interface CommandResponse {
 //   - dm_instructions: GM guidance (how to run the adventure) - read every turn
 //   - character_sheet: Player character details - read every turn
 //   - mechanics: Game rules - read every turn
+//   - gm_plan: The campaign plan/spine + per-player character arcs - read every
+//     turn so the GM stays on the beat it's currently running (see
+//     docs/gm-plan-notes-design.md). Player-visible.
 // FOLDER types show only titles (use read_notes tool to view content):
 //   - lore: General world-building (default)
 //   - secret: Hidden from player (GM-only notes)
@@ -163,6 +166,7 @@ export type LoreType =
   | "story_instructions" // 📌 Story Stage only - narrator guidance for prose style
   | "mechanics" // 📌 GM Stage only - Game rules for dice/checks
   | "character_sheet" // 📌 Both stages - Player character details for voice and mechanics
+  | "gm_plan" // 📌 GM Stage - campaign spine + per-player arcs, one beat ahead (docs/gm-plan-notes-design.md)
   // Legacy types (backward compat - treated as "lore" for display)
   | "gm_notes" // Alias for dm_instructions (deprecated)
   | "npc" // Non-player characters
@@ -906,6 +910,11 @@ export interface StoryData {
   npcs: NPC[]; // NPC tracking system (enhanced relationships)
   gameOver?: GameOver; // Game over state if the player has permanently died/lost
   activeChallenge?: SceneChallenge; // Current scene challenge (progress clock)
+  // Title of the gm_plan note for the side beat that currently holds focus
+  // (a side quest / character detour opened via open_side_beat). While set,
+  // the GM stage foregrounds that beat over the main campaign spine; cleared
+  // by close_side_beat. See docs/gm-plan-notes-design.md.
+  activeSideBeatTitle?: string;
   timers?: CountdownTimer[]; // Countdown timers for deadlines/events
   combatState?: CombatState; // Active tactical combat state (turn-based combat tracking)
   threads?: StoryThread[]; // Active story threads/plotlines (independent of AGMT)

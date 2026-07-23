@@ -390,6 +390,9 @@ const BASE_PINNED_NOTE_TYPES = [
   "dm_instructions",
   "character_sheet",
   "gm_notes",
+  // The campaign plan/spine + per-player arcs. Pinned so the GM re-reads the
+  // beat it's currently running every turn (see docs/gm-plan-notes-design.md).
+  "gm_plan",
 ];
 
 // Shared pinned-note-type check, parameterized so the GM-Stage/other-stage
@@ -1074,6 +1077,12 @@ export function buildGMStagePrompt({
     (l) => l.enabled !== false && l.type === "mechanics",
   );
 
+  // 📌 Campaign Plan - Always loaded in full (spine + per-player arcs + any
+  // open side beat). See docs/gm-plan-notes-design.md.
+  const gmPlanLore = (storyData.lore || []).filter(
+    (l) => l.enabled !== false && l.type === "gm_plan",
+  );
+
   // Categorize notes by type for better organization
   const categorizeNotes = (notes: typeof storyData.lore) => {
     const categories: Record<string, typeof notes> = {
@@ -1124,6 +1133,22 @@ export function buildGMStagePrompt({
     loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\nTo update: edit_note("title", content="new content") - Keep stats, HP, XP, etc. current!\n`;
     for (const l of characterSheetLore) {
       loreSection += `\n### ${l.title}.md\n${cleanString(l.content)}\n`;
+    }
+  }
+
+  // Campaign Plan: Full content. This is the GM's living plan - the campaign
+  // spine (only the current beat detailed, future beats one-liners) plus one
+  // arc note per player. The GM follows it one beat ahead and edits it as the
+  // story advances. See docs/gm-plan-notes-design.md.
+  if (gmPlanLore.length > 0) {
+    const activeSideBeat = storyData.activeSideBeatTitle;
+    loreSection += `\n## 📌 CAMPAIGN PLAN\nYour living plan for this campaign. Follow it, and keep it current with edit_note.\n- Detail ONLY the current beat in full; future beats stay one-liners until you reach them.\n- Tick checklist items ([ ] -> [x]) as they happen; when the current beat's "advance-when" is met, write the NEXT beat before moving on.\n`;
+    if (activeSideBeat) {
+      loreSection += `- ⚡ FOCUS: side beat "${activeSideBeat}" is active - run it now; the main spine beat is paused until you call close_side_beat.\n`;
+    }
+    for (const l of gmPlanLore) {
+      const focusMark = l.title === activeSideBeat ? " ⚡ (ACTIVE FOCUS)" : "";
+      loreSection += `\n### ${l.title}.md${focusMark}\n${cleanString(l.content)}\n`;
     }
   }
 
@@ -1309,7 +1334,7 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
       ? `\n## 🆕 FRESH STORY - SETUP NEEDED
 This is a brand-new story with no established setting or character yet - the player skipped adventure creation to talk to you directly.
 - If the player's message doesn't give you enough to go on (genre, tone, character concept), ask up to 1-3 concise, friendly questions before creating anything. Do NOT narrate a full opening scene yet - just respond conversationally (use OOC round-brackets or plain text).
-- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (name, starting stats/resources/abilities fitting the genre and tone) and a \`mechanics\` note (dice system + core resolution rules), then narrate the opening scene.
+- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (name, starting stats/resources/abilities fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + the fixed beat spine with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section), then narrate the opening scene.
 - Keep the interview short - one or two exchanges at most before diving in.
 `
       : "";
@@ -1472,10 +1497,20 @@ When using \`create_note\`, always set the \`type\` parameter:
 | \`dm_instructions\` | 📌 GM guidance (always loaded) | "Combat Rules", "Session Guidelines" |
 | \`character_sheet\` | 📌 Player character (always loaded) | "Hero Stats", "Character Background" |
 | \`mechanics\` | 📌 Game rules (always loaded) | "Magic System", "Dice Formulas" |
+| \`gm_plan\` | 📌 Campaign spine + per-player arcs (always loaded) | "Campaign Plan", "Arc — Kael" |
 
 **📌 Pinned types** are loaded in FULL every turn - use sparingly!
 
 **Example:** \`create_note({ title: "Captain Aldric", content: "...", type: "npc" })\`
+
+## 📋 CAMPAIGN PLAN (follow it, one beat ahead)
+You keep a living plan the way a showrunner keeps a writers'-room board - a spine of beats with only the CURRENT one written in detail. It's the single \`gm_plan\` note titled "Campaign Plan", plus one \`gm_plan\` arc note per player. All of it is loaded in full above and visible to the player.
+- **Create it once, early.** During setup / Session 0, after the character(s) exist, \`create_note({ type: "gm_plan", title: "Campaign Plan", ... })\` with the premise and a spine using these FIXED beat names, in order: **Opening Image (Session 0)**, **Inciting Incident (Session 1)**, **Rising Complications**, **Midpoint Turn**, **Crisis**, **Climax**, **Resolution**. At creation, detail ONLY "Opening Image" (goal: establish/create the character(s) and their ordinary world); leave the rest as one-line placeholders. Do not plan further yet.
+- **One beat ahead, never more.** The current beat gets a short goal, a \`[ ]\` checklist, and an "advance-when" line. Future beats stay one-liners. Never script beats the player hasn't reached.
+- **Advance at the boundary.** Tick \`[ ]\` -> \`[x]\` with \`edit_note\` as things happen. When the current beat's advance-when is satisfied, write the NEXT beat in detail (and refresh arc directions) BEFORE narrating onward. Ending Session 0 specifically: write one \`gm_plan\` arc note per player (current state + 2-3 candidate directions + active hooks) and detail the Inciting Incident.
+- **Arcs are possibilities, not scripts.** Hold 2-3 candidate directions per player and let their choices collapse them - don't steer toward a predetermined one.
+- **Don't duplicate threads/goals.** The plan is your private intent; when a beat or arc goes live, spawn the concrete \`create_thread\`/\`create_goal\` for it rather than restating it here.
+- **Side beats = detours.** To pull focus off the spine for a side quest or character detour, call \`open_side_beat\` (it creates the beat and marks it the active focus); run it; call \`close_side_beat\` when it resolves to return to the paused spine beat. Use these instead of quietly wandering off-plan.
 
 ## IMPORTANT BEHAVIORS
 - Look up notes BEFORE making assumptions about enemy stats or NPC details
@@ -1553,6 +1588,9 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "edit_lore_insert",
     "merge_lore",
     "duplicate_lore",
+    // Campaign plan focus: open/close a side beat (side quest / detour)
+    "open_side_beat",
+    "close_side_beat",
     // Memory: add_memory deliberately NOT whitelisted here - a dedicated
     // memory agent (memoryAgent.ts) now decides what's worth persisting
     // after each turn instead of the GM calling this itself mid-generation.

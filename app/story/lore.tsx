@@ -83,6 +83,12 @@ const TYPE_CONFIG: Record<
     color: "text-cyan-300",
     bgColor: "bg-cyan-500/20",
   },
+  gm_plan: {
+    label: "Campaign Plan",
+    icon: "ClipboardList",
+    color: "text-teal-300",
+    bgColor: "bg-teal-500/20",
+  },
   lore: {
     label: "Lore",
     icon: "Globe",
@@ -455,6 +461,7 @@ export default function LorePage(props: LorePageProps) {
                         "faction",
                         "event",
                         "mechanics",
+                        "gm_plan",
                         "lore",
                         "secrets",
                       ] as const
@@ -892,6 +899,7 @@ export default function LorePage(props: LorePageProps) {
                         <option value="character_sheet">
                           👤 Character Sheet
                         </option>
+                        <option value="gm_plan">📋 Campaign Plan</option>
                         <option value="npc">🧑 NPC</option>
                         <option value="item">🗡️ Item</option>
                         <option value="location">📍 Location</option>
@@ -1098,6 +1106,7 @@ export default function LorePage(props: LorePageProps) {
                   </option>
                   <option value="mechanics">⚙️ Mechanics</option>
                   <option value="character_sheet">👤 Character Sheet</option>
+                  <option value="gm_plan">📋 Campaign Plan</option>
                   <option value="npc">🧑 NPC</option>
                   <option value="item">🗡️ Item</option>
                   <option value="location">📍 Location</option>
