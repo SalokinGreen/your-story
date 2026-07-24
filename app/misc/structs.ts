@@ -865,6 +865,12 @@ export interface PlanState {
 export interface StoryData {
   story_name: string;
   premise: string;
+  // True only for a brand-new story, until the GM calls start_game to wrap
+  // up session zero (premise/character setup). While true, hardRuleFloor
+  // (reasoningTiers.ts) forces the reasoning tier to TOP_TIER regardless of
+  // the normal classifier, since campaign-shaping decisions belong there.
+  // Old saves: undefined behaves as false (no session zero to run).
+  sessionZeroActive?: boolean;
   player_name: string;
   player_summary: string;
   // Custom display settings for chat-like story view (multiplayer-ready)

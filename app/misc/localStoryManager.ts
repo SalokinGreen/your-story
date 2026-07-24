@@ -370,6 +370,7 @@ export async function startFreeformStoryLocally(
 
   const newStoryData = {
     story_name: "New Story",
+    sessionZeroActive: true,
     premise: "",
     player_name: resolvedPlayerName,
     player_summary: "",

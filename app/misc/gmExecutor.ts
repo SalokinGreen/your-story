@@ -74,6 +74,7 @@ import {
   GM_TOOL_MAP,
   SetReasoningTierParams,
   DelegateTaskParams,
+  StartGameParams,
 } from "./gmTools";
 import {
   runDelegateTask,
@@ -98,6 +99,7 @@ import {
   applyTierEscalation,
   stakesFloor,
   computeSceneKey,
+  SCENE_BASELINE_TIER,
 } from "./reasoningTiers";
 import {
   getRPGSystem,
@@ -149,6 +151,7 @@ export interface GMToolResult {
     | GMRequestContinuationResult
     | GMEndGmThinkingResult
     | GMSetReasoningTierResult
+    | GMStartGameResult
     | GMStateChangeResult
     // Timer results
     | GMCreateTimerResult
@@ -404,6 +407,12 @@ export interface GMSetReasoningTierResult {
   grantedTier: number;
   capped: boolean;
   reason: string;
+}
+
+export interface GMStartGameResult {
+  type: "start_game";
+  story_name: string;
+  premise?: string;
 }
 
 // ============================================
@@ -1108,6 +1117,13 @@ export async function executeGMTools(
           result = executeSetReasoningTier(
             call.id,
             params as SetReasoningTierParams,
+            modified
+          );
+          break;
+        case "start_game":
+          result = executeStartGame(
+            call.id,
+            params as StartGameParams,
             modified
           );
           break;
@@ -3336,6 +3352,46 @@ function executeSetReasoningTier(
       reason,
     } as GMSetReasoningTierResult,
     contextForStory,
+  };
+}
+
+/**
+ * Session zero -> real play handoff. Names the story (replacing the
+ * "New Story" placeholder), optionally records the agreed premise, and
+ * clears sessionZeroActive so the reasoning-tier router's hard floor
+ * (hardRuleFloor, reasoningTiers.ts) stops forcing TOP_TIER. Also resets
+ * reasoningTierState to baseline immediately, rather than letting it decay
+ * down over subsequent turns - session zero ending is a hard cut back to
+ * normal pacing, not a gradual one.
+ */
+function executeStartGame(
+  toolCallId: string,
+  params: StartGameParams,
+  storyData: StoryData
+): GMToolResult {
+  storyData.story_name = params.story_name;
+  if (params.premise) {
+    storyData.premise = params.premise;
+  }
+  storyData.sessionZeroActive = false;
+  storyData.reasoningTierState = {
+    currentTier: SCENE_BASELINE_TIER,
+    tier3CallsInScene: 0,
+    lastSceneKey: computeSceneKey(storyData),
+  };
+
+  return {
+    toolName: "start_game",
+    toolCallId,
+    success: true,
+    result: {
+      type: "start_game",
+      story_name: params.story_name,
+      premise: params.premise,
+    } as GMStartGameResult,
+    contextForStory: `[Session zero complete - story named "${params.story_name}"${
+      params.premise ? `. Premise: ${params.premise}` : ""
+    }]`,
   };
 }
 

@@ -67,6 +67,7 @@ const TOOL_LABELS: Record<string, string> = {
   // Flow control
   request_continuation: "Continuing",
   end_gm_thinking: "Wrapping up",
+  start_game: "Starting the game",
 };
 
 /** Present-tense label for a tool call, for a live-progress indicator. */
