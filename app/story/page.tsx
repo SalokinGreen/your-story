@@ -64,7 +64,6 @@ import { StoryTabBar } from "./StoryTabBar";
 import LogViewer from "./LogViewer";
 import ContextViewer from "./ContextViewer";
 import OOCChatPanel from "../components/OOCChatPanel";
-import TurnLobbyOverlay from "../components/TurnLobbyOverlay";
 import ProfilePickerModal from "../components/ProfilePickerModal";
 import ManualRollModal from "../components/ManualRollModal";
 import DiceThrowModal from "../components/DiceThrowModal";
@@ -4699,21 +4698,11 @@ function StoryPageContent() {
             }
             ttsRelayMode={netSession?.role === "guest"}
             ttsRelayHandleRef={ttsRelayRef}
+            turnLobby={turnLobby}
+            onTurnLobbyStartNow={hostForceStartTurn}
+            onTurnLobbyPass={passThisRound}
           />
           </div>
-        )}
-        {/* Collect-all-then-generate lobby: shown while the host is waiting on
-            the table (host sees "Start now" / "Pass"; guests see who we're
-            waiting on and can pass their own turn). */}
-        {netSession && turnLobby && (
-          <TurnLobbyOverlay
-            status={turnLobby}
-            couchPlayers={storyData?.multiplayer?.couchPlayers ?? []}
-            myPlayerId={netSession.myLocalPlayerId}
-            isHost={netSession.role === "host"}
-            onStartNow={hostForceStartTurn}
-            onPass={passThisRound}
-          />
         )}
         {/* Host timed out / dropped: let the guest re-join the same room
             rather than being silently stranded. */}

@@ -5,7 +5,7 @@ import { CouchPlayer, PlayerArchetype } from "../misc/structs";
 import { DynamicIcon } from "./DynamicIcon";
 import { ARCHETYPE_INFO } from "../misc/gmAdvice";
 import { PALETTE } from "../story/menu/CouchPlayersEditor";
-import { PERSONALITY_TAGS } from "./GuidedStoryStart";
+import { PERSONALITY_TAGS, WISH_TAGS } from "./GuidedStoryStart";
 import type { ClaimedProfile } from "../misc/multiplayer/session";
 
 const ARCHETYPE_OPTIONS = Object.entries(ARCHETYPE_INFO) as [
@@ -48,6 +48,7 @@ export default function ProfilePickerModal({
   const [color, setColor] = useState(defaultColor);
   const [archetype, setArchetype] = useState<PlayerArchetype | "">("");
   const [personalityTags, setPersonalityTags] = useState<string[]>([]);
+  const [wishTags, setWishTags] = useState<string[]>([]);
 
   if (!isOpen) return null;
 
@@ -58,6 +59,12 @@ export default function ProfilePickerModal({
         : prev.length < MAX_PERSONALITY_TAGS
           ? [...prev, tag]
           : prev,
+    );
+  };
+
+  const toggleWish = (tag: string) => {
+    setWishTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag],
     );
   };
 
@@ -81,7 +88,7 @@ export default function ProfilePickerModal({
       color,
       archetype: archetype || null,
       personalityTags: personalityTags.length ? personalityTags : null,
-      wishTags: null,
+      wishTags: wishTags.length ? wishTags : null,
     });
   };
 
@@ -215,26 +222,6 @@ export default function ProfilePickerModal({
 
                 <div>
                   <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-1.5">
-                    Player type
-                  </label>
-                  <select
-                    value={archetype}
-                    onChange={(e) =>
-                      setArchetype((e.target.value || "") as PlayerArchetype | "")
-                    }
-                    className="w-full px-3 py-2.5 bg-blue-900/20 border border-blue-700/40 rounded-xl text-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">No player type</option>
-                    {ARCHETYPE_OPTIONS.map(([key, info]) => (
-                      <option key={key} value={key}>
-                        {info.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-1.5">
                     Personality{" "}
                     <span className="text-blue-300/40 normal-case font-normal">
                       (up to {MAX_PERSONALITY_TAGS})
@@ -250,6 +237,64 @@ export default function ProfilePickerModal({
                           className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
                             selected
                               ? "bg-purple-600 border-purple-400 text-white"
+                              : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40"
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-1.5">
+                    What kind of player are you?{" "}
+                    <span className="text-blue-300/40 normal-case font-normal">
+                      (optional)
+                    </span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {ARCHETYPE_OPTIONS.map(([key, info]) => {
+                      const selected = archetype === key;
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setArchetype(selected ? "" : key)}
+                          title={info.description}
+                          className={`px-3 py-2 rounded-lg text-left text-xs font-medium border transition-all ${
+                            selected
+                              ? "bg-purple-600 border-purple-400 text-white shadow-md"
+                              : "bg-blue-900/20 border-blue-700/40 text-blue-200/70 hover:border-purple-500/50 hover:text-white"
+                          }`}
+                        >
+                          <span className="block font-semibold">
+                            {info.label}
+                          </span>
+                          <span className="block text-[10px] opacity-70 truncate">
+                            {info.description}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-1.5">
+                    What do you want from this story?
+                  </label>
+                  <div className="flex flex-wrap gap-1.5">
+                    {WISH_TAGS.map((tag) => {
+                      const selected = wishTags.includes(tag);
+                      return (
+                        <button
+                          key={tag}
+                          onClick={() => toggleWish(tag)}
+                          className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${
+                            selected
+                              ? "bg-linear-to-r from-purple-600 to-blue-600 border-transparent text-white shadow-md shadow-purple-950/40"
                               : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40"
                           }`}
                         >
