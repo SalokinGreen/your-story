@@ -80,7 +80,7 @@ describe("gm_plan injection into the GM stage", () => {
     expect(names).toContain("close_side_beat");
   });
 
-  it("instructs the GM to read existing lore/mechanics before creating the plan", () => {
+  it("instructs the GM to read existing lore/mechanics before creating the plan, and notes it's enforced", () => {
     const { messages } = buildGMStagePrompt({
       storyData: createTestStory(),
       userChoice: "Look around",
@@ -88,6 +88,19 @@ describe("gm_plan injection into the GM stage", () => {
     const combined = messages.map((m) => m.content).join("\n");
     expect(combined).toContain("Read before you plan");
     expect(combined).toMatch(/lore.*mechanics.*dm_instructions/);
+    expect(combined).toContain("ENFORCED");
+    expect(combined).toContain("will refuse to create");
+  });
+
+  it("points the GM at the oracle (fate_question/roll_table) for uncertain plan elements", () => {
+    const { messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    const combined = messages.map((m) => m.content).join("\n");
+    expect(combined).toContain("fate_question");
+    expect(combined).toContain("roll_table");
+    expect(combined.toLowerCase()).toContain("candidate arc direction");
   });
 
   it("documents the short/medium/long spine length presets and planSpineLength", () => {

@@ -973,6 +973,10 @@ export async function executeGMTools(
             params as ReadNotesParams,
             modified
           );
+          // Phase 4 grounding gate (toolExecutor.ts create_note,
+          // docs/gm-plan-notes-design.md): mark that notes were read this
+          // turn so the Campaign Plan spine note can be created.
+          modified.notesReadThisTurn = true;
           break;
         case "search_memory":
           result = await executeSearchMemory(

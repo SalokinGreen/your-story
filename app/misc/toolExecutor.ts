@@ -795,6 +795,40 @@ export function executeTools(
         }
 
         const noteType = args.type || "lore";
+
+        // Phase 4 grounding gate (docs/gm-plan-notes-design.md): refuse to
+        // create the gm_plan "Campaign Plan" spine note until the GM has
+        // called read_notes/search_notes THIS turn, but only when there's
+        // something to ground against - a story with no existing
+        // lore/mechanics/dm_instructions notes has nothing to read, so the
+        // gate is a no-op there. Prompt-only nudging for this (Phase 3)
+        // didn't hold up in practice, so this mirrors the Phase 2
+        // advance_plan gate in being an actual block, not just advice.
+        if (
+          noteType === "gm_plan" &&
+          /campaign plan/i.test(args.title) &&
+          !storyData.notesReadThisTurn
+        ) {
+          const groundingNoteExists = storyData.lore.some(
+            (l) =>
+              l.enabled !== false &&
+              ["lore", "mechanics", "dm_instructions"].includes(
+                l.type || "lore",
+              ),
+          );
+          if (groundingNoteExists) {
+            responses.push({
+              command: toolCall.function.name,
+              success: false,
+              message:
+                "Cannot create the Campaign Plan spine note yet - this story has existing lore/mechanics/dm_instructions notes you haven't read this turn. Call read_notes or search_notes on them first, then retry create_note for the Campaign Plan.",
+              timestamp: Date.now(),
+              toolCallId: toolCall.id,
+            });
+            continue;
+          }
+        }
+
         storyData.lore.push({
           title: args.title,
           content: args.content,
@@ -1802,6 +1836,11 @@ export function executeTools(
           toolCallId: toolId,
           args,
         });
+
+        // Phase 4 grounding gate (campaignPlan.ts / docs/gm-plan-notes-design.md):
+        // mark that the GM has looked at existing notes this turn, whatever
+        // the search finds - the point is the GM made the effort to check.
+        storyData.notesReadThisTurn = true;
 
         if (!storyData.lore || storyData.lore.length === 0) {
           responses.push({

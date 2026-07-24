@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
+import { executeGMTools } from "@/app/misc/gmExecutor";
 import {
   CAMPAIGN_SPINE_BEATS,
   CAMPAIGN_SPINE_SHORT,
@@ -201,6 +202,178 @@ describe("create_note initializes plan state for the spine note", () => {
       story,
     );
     expect(story.planState).toBeUndefined();
+  });
+});
+
+describe("grounding gate (Phase 4): read notes before creating the plan", () => {
+  it("rejects creating the Campaign Plan note when grounding notes exist and haven't been read", () => {
+    const story = createTestStory({
+      lore: [
+        {
+          title: "The Sunken City",
+          content: "An old ruin.",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          type: "lore",
+        } as StoryLore,
+      ],
+    });
+    const { responses } = executeTools(
+      [
+        call("create_note", {
+          title: "Campaign Plan",
+          content: "premise + spine",
+          type: "gm_plan",
+        }),
+      ],
+      story,
+    );
+    expect(responses[0].success).toBe(false);
+    expect(responses[0].message).toMatch(/read_notes|search_notes/);
+    expect(story.planState).toBeUndefined();
+    expect(story.lore.find((l) => l.title === "Campaign Plan")).toBeUndefined();
+  });
+
+  it("allows creating the Campaign Plan note once notesReadThisTurn is true", () => {
+    const story = createTestStory({
+      lore: [
+        {
+          title: "The Sunken City",
+          content: "An old ruin.",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          type: "lore",
+        } as StoryLore,
+      ],
+      notesReadThisTurn: true,
+    });
+    const { responses } = executeTools(
+      [
+        call("create_note", {
+          title: "Campaign Plan",
+          content: "premise + spine",
+          type: "gm_plan",
+        }),
+      ],
+      story,
+    );
+    expect(responses[0].success).toBe(true);
+    expect(story.planState).toBeDefined();
+  });
+
+  it("does not gate when there are no existing lore/mechanics/dm_instructions notes to read", () => {
+    const story = createTestStory({ lore: [] });
+    const { responses } = executeTools(
+      [
+        call("create_note", {
+          title: "Campaign Plan",
+          content: "premise + spine",
+          type: "gm_plan",
+        }),
+      ],
+      story,
+    );
+    expect(responses[0].success).toBe(true);
+    expect(story.planState).toBeDefined();
+  });
+
+  it("search_notes sets notesReadThisTurn, unblocking a subsequent Campaign Plan creation", () => {
+    const story = createTestStory({
+      lore: [
+        {
+          title: "The Sunken City",
+          content: "An old ruin.",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          type: "lore",
+        } as StoryLore,
+      ],
+    });
+    executeTools([call("search_notes", { query: "Sunken" })], story);
+    expect(story.notesReadThisTurn).toBe(true);
+
+    const { responses } = executeTools(
+      [
+        call("create_note", {
+          title: "Campaign Plan",
+          content: "premise + spine",
+          type: "gm_plan",
+        }),
+      ],
+      story,
+    );
+    expect(responses[0].success).toBe(true);
+  });
+
+  it("executeGMTools' read_notes sets notesReadThisTurn on the returned storyData", async () => {
+    const story = createTestStory({
+      lore: [
+        {
+          title: "The Sunken City",
+          content: "An old ruin.",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          type: "lore",
+        } as StoryLore,
+      ],
+    });
+    const gmCall = {
+      id: "call_1",
+      function: {
+        name: "read_notes",
+        arguments: JSON.stringify({ titles: ["The Sunken City"] }),
+      },
+    };
+    const { modifiedStoryData } = await executeGMTools([gmCall], story);
+    expect(modifiedStoryData.notesReadThisTurn).toBe(true);
+  });
+
+  it("a same-round read_notes followed by create_note unblocks plan creation", async () => {
+    const story = createTestStory({
+      lore: [
+        {
+          title: "The Sunken City",
+          content: "An old ruin.",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          type: "lore",
+        } as StoryLore,
+      ],
+    });
+    const gmCalls = [
+      {
+        id: "call_1",
+        function: {
+          name: "read_notes",
+          arguments: JSON.stringify({ titles: ["The Sunken City"] }),
+        },
+      },
+      {
+        id: "call_2",
+        function: {
+          name: "create_note",
+          arguments: JSON.stringify({
+            title: "Campaign Plan",
+            content: "premise + spine",
+            type: "gm_plan",
+          }),
+        },
+      },
+    ];
+    const { results, modifiedStoryData } = await executeGMTools(gmCalls, story);
+    const createResult = results.find((r) => r.toolName === "create_note");
+    expect(createResult?.success).toBe(true);
+    expect(modifiedStoryData.planState).toBeDefined();
   });
 });
 

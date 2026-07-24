@@ -1597,6 +1597,12 @@ async function generateStoryTurnOnce(
           });
         }
 
+        // Phase 4 grounding gate (structs.ts StoryData.notesReadThisTurn,
+        // toolExecutor.ts create_note, docs/gm-plan-notes-design.md): reset at
+        // the start of every turn so a read_notes/search_notes call from a
+        // previous turn doesn't stale-satisfy this turn's gate.
+        storyData.notesReadThisTurn = false;
+
         // GM stage loop - continues until no more tool calls (AI writes final story)
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         let gmRound = 0;
