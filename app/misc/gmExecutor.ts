@@ -40,6 +40,7 @@ import {
   FormulaChallengeCheckParams,
   FateQuestionParams,
   RollTableParams,
+  GenerateNameParams,
   ReadNotesParams,
   SearchMemoryParams,
   GetGameStateParams,
@@ -96,6 +97,12 @@ import {
 } from "./mythic";
 import { getTableByName, rollOnCustomTable } from "./tableRoller";
 import {
+  collectUsedInitials,
+  formatNamePointers,
+  generateNamePointers,
+  NamePointers,
+} from "./nameGenerator";
+import {
   applyTierEscalation,
   stakesFloor,
   computeSceneKey,
@@ -145,6 +152,7 @@ export interface GMToolResult {
     | GMFormulaChallengeResult
     | GMFateQuestionResult
     | GMRollTableResult
+    | GMGenerateNameResult
     | GMReadNotesResult
     | GMSearchMemoryResult
     | GMGetGameStateResult
@@ -365,6 +373,12 @@ export interface GMRollTableResult {
   reason: string;
   displayName?: string;
   tableNotFound?: boolean;
+}
+
+export interface GMGenerateNameResult {
+  type: "generate_name";
+  pointers: NamePointers;
+  reason?: string;
 }
 
 export interface GMReadNotesResult {
@@ -973,6 +987,13 @@ export async function executeGMTools(
           result = executeRollTable(
             call.id,
             params as RollTableParams,
+            modified
+          );
+          break;
+        case "generate_name":
+          result = executeGenerateName(
+            call.id,
+            params as GenerateNameParams,
             modified
           );
           break;
@@ -2818,6 +2839,42 @@ function executeRollTable(
       tableNotFound: true,
     } as GMRollTableResult,
     contextForStory: `[${displayName}: Table "${params.table_name}" not found]`,
+  };
+}
+
+/**
+ * Roll naming pointers (starting letters, syllable counts, seed sounds) for
+ * an entity the GM is about to name. Read-only: it inspects the story's
+ * existing names to steer initials away from letters already in play, but
+ * changes no state - the name itself is written by the GM in narration and
+ * recorded through add_npc/create_note like any other name.
+ */
+function executeGenerateName(
+  toolCallId: string,
+  params: GenerateNameParams,
+  storyData: StoryData
+): GMToolResult {
+  const pointers = generateNamePointers(
+    {
+      kind: params.kind,
+      parts: params.parts,
+      flavor: params.flavor,
+      starts_with: params.starts_with,
+      syllables: params.syllables,
+    },
+    collectUsedInitials(storyData)
+  );
+
+  return {
+    toolName: "generate_name",
+    toolCallId,
+    success: true,
+    result: {
+      type: "generate_name",
+      pointers,
+      reason: params.reason,
+    } as GMGenerateNameResult,
+    contextForStory: formatNamePointers(pointers, params.reason),
   };
 }
 
