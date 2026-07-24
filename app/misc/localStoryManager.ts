@@ -504,6 +504,36 @@ export async function listLocalStories(): Promise<LocalStory[]> {
   });
 }
 
+/**
+ * Clear folder_id on every story that references a given folder.
+ * Used when a shared LocalFolder is deleted (from any tab) so stories
+ * become uncategorized instead of pointing at a dangling folder id.
+ */
+export async function unassignFolderFromStories(folderId: string): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+    const request = store.openCursor();
+
+    request.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest).result;
+      if (cursor) {
+        const story = cursor.value as LocalStory;
+        if (story.folder_id === folderId) {
+          story.folder_id = null;
+          cursor.update(story);
+        }
+        cursor.continue();
+      }
+    };
+    request.onerror = () => reject(request.error);
+
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
 export async function deleteLocalStory(storyId: string): Promise<void> {
   const db = await openDB();
   return new Promise((resolve, reject) => {
