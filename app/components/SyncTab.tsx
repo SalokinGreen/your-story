@@ -25,6 +25,7 @@ const BUCKET_LABELS: Record<SyncBucket, string> = {
   stories: "Stories",
   adventures: "Adventures",
   notes: "Notes",
+  tables: "Tables",
   folders: "Folders",
   settings: "Settings",
 };
