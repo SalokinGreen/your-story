@@ -973,9 +973,9 @@ export default function AIConfigTab() {
           <div className="grid grid-cols-3 gap-2">
             {(
               [
-                { value: "short", label: "Short", hint: "1-2 sentences" },
-                { value: "medium", label: "Medium", hint: "~1 paragraph" },
-                { value: "long", label: "Long", hint: "2-4 paragraphs" },
+                { value: "short", label: "Short", hint: "1 sentence" },
+                { value: "medium", label: "Medium", hint: "1-2 sentences" },
+                { value: "long", label: "Long", hint: "~1 paragraph" },
               ] as const
             ).map((opt) => {
               const active = replyLength === opt.value;

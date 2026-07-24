@@ -47,7 +47,7 @@ describe("checkResponseLength", () => {
   });
 
   it("flags a single turn that blows way past the medium ceiling", async () => {
-    // PACING_BANDS.medium.high = 170, multiplier = 2 -> ceiling 340.
+    // PACING_BANDS.medium.high = 85, multiplier = 2 -> ceiling 170.
     const narration = Array(400).fill("word").join(" ");
     const flag = await checkResponseLength(narration, "", "medium");
     expect(flag).not.toBeNull();
@@ -64,17 +64,17 @@ describe("checkResponseLength", () => {
   });
 
   it("does not flag a turn that's long but still under the hard ceiling", async () => {
-    // Under 2x the "long" band's high (300), e.g. a legitimate climax beat.
+    // Under 2x the "long" band's high (170 -> ceiling 340), e.g. a climax beat.
     const narration = Array(280).fill("word").join(" ");
     expect(await checkResponseLength(narration, "", "long")).toBeNull();
   });
 
   it("scales the ceiling to the short reply-length setting", async () => {
-    // PACING_BANDS.short.high = 85, multiplier = 2 -> ceiling 170.
+    // PACING_BANDS.short.high = 45, multiplier = 2 -> ceiling 90.
     const narration = Array(200).fill("word").join(" ");
     const flag = await checkResponseLength(narration, "", "short");
     expect(flag).not.toBeNull();
-    expect(flag?.detail).toContain("~85 words");
+    expect(flag?.detail).toContain("~45 words");
   });
 
   it("does not flag anything when disabled, even a huge blowout", async () => {
@@ -91,10 +91,10 @@ describe("checkResponseLength", () => {
   });
 
   it("higher sensitivity flags a smaller overage", async () => {
-    // PACING_BANDS.medium.high = 170. At sensitivity 5 (default) the
-    // ceiling is 2x = 340, so 250 words doesn't flag; at sensitivity 10
-    // the multiplier drops to 1x = 170, so the same 250 words should flag.
-    const narration = Array(250).fill("word").join(" ");
+    // PACING_BANDS.medium.high = 85. At sensitivity 5 (default) the
+    // ceiling is 2x = 170, so 130 words doesn't flag; at sensitivity 10
+    // the multiplier drops to 1x = 85, so the same 130 words should flag.
+    const narration = Array(130).fill("word").join(" ");
     expect(
       await checkResponseLength(
         narration,
@@ -116,9 +116,9 @@ describe("checkResponseLength", () => {
   });
 
   it("lower sensitivity requires a bigger overage to flag", async () => {
-    // At sensitivity 0 the multiplier is 3x = 510 - 400 words shouldn't
-    // flag even though it would at the default sensitivity of 5 (2x = 340).
-    const narration = Array(400).fill("word").join(" ");
+    // At sensitivity 0 the multiplier is 3x = 255 - 220 words shouldn't
+    // flag even though it would at the default sensitivity of 5 (2x = 170).
+    const narration = Array(220).fill("word").join(" ");
     expect(
       await checkResponseLength(
         narration,
