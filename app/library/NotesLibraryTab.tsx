@@ -5,7 +5,7 @@ import { useNotification } from "@/app/misc/NotificationContext";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import FullScreenView from "@/app/components/FullScreenView";
-import { IconPicker } from "@/app/components/IconPicker";
+import NewFolderDialog from "@/app/components/NewFolderDialog";
 import { DraggableScroll } from "../components/DraggableScroll";
 import { LibrarySkeleton } from "@/app/components/Skeleton";
 import PDFImporter from "@/app/components/PDFImporter";
@@ -17,7 +17,6 @@ import {
   deleteLibraryNote,
   bulkDeleteLibraryNotes,
   bulkMoveLibraryNotes,
-  unassignFolderFromNotes,
   LibraryNote,
 } from "@/app/misc/localNotesLibraryManager";
 import {
@@ -27,15 +26,9 @@ import {
   deleteLibraryTable,
   bulkDeleteLibraryTables,
   bulkMoveLibraryTables,
-  unassignFolderFromTables,
   LibraryTable,
 } from "@/app/misc/localTablesLibraryManager";
-import {
-  createLocalFolder,
-  updateLocalFolder,
-  deleteLocalFolder,
-  LocalFolder,
-} from "@/app/misc/localFolderManager";
+import { createLocalFolder, LocalFolder } from "@/app/misc/localFolderManager";
 import {
   downloadLibraryNotes,
   readLibraryNotesFile,
@@ -109,10 +102,6 @@ export default function NotesLibraryTab({
   const [showMassMoveDropdown, setShowMassMoveDropdown] = useState(false);
 
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
-  const [newFolderName, setNewFolderName] = useState("");
-  const [newFolderIcon, setNewFolderIcon] = useState("Folder");
-  const [newFolderColor, setNewFolderColor] = useState("#9333ea");
-  const [editingFolder, setEditingFolder] = useState<LocalFolder | null>(null);
   const [movingNote, setMovingNote] = useState<string | null>(null);
   const [movingTable, setMovingTable] = useState<string | null>(null);
 
@@ -407,73 +396,15 @@ export default function NotesLibraryTab({
   // Folder management (shared LocalFolder store)
   // ============================================
 
-  const handleCreateFolder = async () => {
-    if (!newFolderName.trim()) {
-      addNotification("Please enter a folder name", "warning");
-      return;
-    }
+  const handleCreateFolder = (name: string, icon: string, color: string) => {
     try {
-      const folder = createLocalFolder(newFolderName, newFolderIcon, newFolderColor);
+      const folder = createLocalFolder(name, icon, color);
       setFolders((prev) => [...prev, folder]);
-      setNewFolderName("");
-      setNewFolderIcon("Folder");
-      setNewFolderColor("#9333ea");
       setShowNewFolderDialog(false);
       addNotification("Folder created successfully", "success");
     } catch (error: any) {
       addNotification(`Failed to create folder: ${error.message}`, "failure");
     }
-  };
-
-  const handleUpdateFolder = async (
-    folderId: string,
-    updates: Partial<Pick<LocalFolder, "name" | "icon" | "color">>,
-  ) => {
-    try {
-      const folder = updateLocalFolder(folderId, updates);
-      if (!folder) throw new Error("Folder not found");
-      setFolders((prev) => prev.map((f) => (f.id === folderId ? folder : f)));
-      setEditingFolder(null);
-      addNotification("Folder updated successfully", "success");
-    } catch (error: any) {
-      addNotification(`Failed to update folder: ${error.message}`, "failure");
-    }
-  };
-
-  const handleDeleteFolder = async (folderId: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Delete Folder?",
-      message: "Are you sure? Notes in this folder will not be deleted, just uncategorized.",
-      icon: "Folder",
-      confirmText: "Delete Folder",
-      confirmButtonClass: "bg-orange-600 hover:bg-orange-700",
-      onConfirm: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        try {
-          deleteLocalFolder(folderId);
-          setFolders((prev) => prev.filter((f) => f.id !== folderId));
-          setSelectedFolder((prev) => (prev === folderId ? null : prev));
-          await Promise.all([
-            unassignFolderFromNotes(folderId),
-            unassignFolderFromTables(folderId),
-          ]);
-          setNotes((prev) =>
-            prev.map((n) =>
-              n.folderId === folderId ? { ...n, folderId: undefined } : n,
-            ),
-          );
-          setTables((prev) =>
-            prev.map((t) =>
-              t.folderId === folderId ? { ...t, folderId: undefined } : t,
-            ),
-          );
-          addNotification("Folder deleted successfully", "success");
-        } catch (error: any) {
-          addNotification(`Failed to delete folder: ${error.message}`, "failure");
-        }
-      },
-    });
   };
 
   // ============================================
@@ -1479,128 +1410,11 @@ export default function NotesLibraryTab({
         </FullScreenView>
       )}
 
-      {/* Folder Dialogs */}
-      {showNewFolderDialog && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Create Folder</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-blue-200/70 mb-1">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreateFolder()}
-                  className="w-full px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500"
-                  placeholder="My Folder"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <IconPicker label="Icon" value={newFolderIcon} onChange={setNewFolderIcon} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-blue-200/70 mb-1">
-                  Color
-                </label>
-                <input
-                  type="color"
-                  value={newFolderColor}
-                  onChange={(e) => setNewFolderColor(e.target.value)}
-                  className="w-full h-10 rounded-lg cursor-pointer bg-blue-900/50"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setShowNewFolderDialog(false);
-                  setNewFolderName("");
-                  setNewFolderIcon("Folder");
-                  setNewFolderColor("#9333ea");
-                }}
-                className="flex-1 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateFolder}
-                disabled={!newFolderName.trim()}
-                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-50"
-              >
-                Create
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {editingFolder && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Edit Folder</h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-blue-200/70 mb-1">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  className="w-full px-3 py-2 bg-blue-900/50 border border-blue-700/50 rounded-lg text-white placeholder-blue-300/50 focus:outline-none focus:border-purple-500"
-                  placeholder="My Folder"
-                  autoFocus
-                />
-              </div>
-              <div>
-                <IconPicker label="Icon" value={newFolderIcon} onChange={setNewFolderIcon} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-blue-200/70 mb-1">
-                  Color
-                </label>
-                <input
-                  type="color"
-                  value={newFolderColor}
-                  onChange={(e) => setNewFolderColor(e.target.value)}
-                  className="w-full h-10 rounded-lg cursor-pointer bg-blue-900/50"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  setEditingFolder(null);
-                  setNewFolderName("");
-                  setNewFolderIcon("Folder");
-                  setNewFolderColor("#9333ea");
-                }}
-                className="flex-1 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() =>
-                  editingFolder &&
-                  handleUpdateFolder(editingFolder.id, {
-                    name: newFolderName,
-                    icon: newFolderIcon,
-                    color: newFolderColor,
-                  })
-                }
-                disabled={!newFolderName.trim()}
-                className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 font-semibold rounded-lg transition-colors disabled:opacity-50"
-              >
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <NewFolderDialog
+        isOpen={showNewFolderDialog}
+        onClose={() => setShowNewFolderDialog(false)}
+        onCreate={handleCreateFolder}
+      />
 
       {movingNote && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
