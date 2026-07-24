@@ -7,6 +7,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { executeGMTools } from "@/app/misc/gmExecutor";
+import { buildGMStagePrompt } from "@/app/misc/ai_staged";
 import { StoryData } from "@/app/misc/structs";
 import {
   hardRuleFloor,
@@ -116,5 +117,27 @@ describe("start_game", () => {
     );
 
     expect(result.results[0].success).toBe(false);
+  });
+});
+
+describe("start_game is offered to the GM stage", () => {
+  // Regression: the prompt (fresh-story-setup + START OF PLAY blocks) tells the
+  // GM to call start_game, but the tool was never in the GM-stage whitelist, so
+  // the model was instructed to call a tool it didn't have. It must be present
+  // in the tools buildGMStagePrompt hands to the model.
+  it("whitelists start_game so the model can actually call it", () => {
+    const storyData = createMockStoryData({
+      chapters: [],
+      quests: [],
+      relationships: [],
+      npcs: [],
+      threads: [],
+    } as Partial<StoryData>);
+    const { tools } = buildGMStagePrompt({
+      storyData,
+      userChoice: "Use the start game tool",
+    });
+    const names = tools.map((t) => t.function.name);
+    expect(names).toContain("start_game");
   });
 });
