@@ -65,8 +65,8 @@ describe("computePacingFeedback", () => {
     expect(fb.message).toMatch(/terse|texture|more/i);
   });
 
-  it("stays quiet when on target (medium ~1 paragraph)", () => {
-    const parts = [assistant(60), assistant(70), assistant(65)];
+  it("stays quiet when on target (medium ~1-2 sentences)", () => {
+    const parts = [assistant(40), assistant(50), assistant(45)];
     const fb = computePacingFeedback(parts, "medium");
     expect(fb.status).toBe("ok");
     expect(fb.message).toBeUndefined();
@@ -95,8 +95,8 @@ describe("computePacingFeedback", () => {
   });
 
   it("uses per-setting bands: same length reads differently", () => {
-    const parts = [assistant(100), assistant(100), assistant(100)];
-    // ~100 words/turn is over the Short ceiling but fine for Medium.
+    const parts = [assistant(60), assistant(60), assistant(60)];
+    // ~60 words/turn is over the Short ceiling but fine for Medium.
     expect(computePacingFeedback(parts, "short").status).toBe("long");
     expect(computePacingFeedback(parts, "medium").status).toBe("ok");
   });

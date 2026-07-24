@@ -931,7 +931,7 @@ export type ReplyLength = "short" | "medium" | "long";
  * Central source of truth for how long narration should run. Shared by the GM
  * stage prompt (word ceilings) and the story-continuation prompt (paragraph
  * guidance) so the two stages never contradict each other. Default is
- * "medium": 1 paragraph typical, 2 when the moment needs it, 3 for big beats.
+ * "medium": 1-2 sentences typical, a short paragraph when the moment needs it.
  */
 export function getLengthGuidance(replyLength: ReplyLength = "medium"): {
   routine: string;
@@ -942,27 +942,28 @@ export function getLengthGuidance(replyLength: ReplyLength = "medium"): {
   switch (replyLength) {
     case "short":
       return {
-        routine: "1-2 sentences (roughly 15-45 words)",
-        notable: "a short paragraph (up to ~90 words)",
-        climax: "1-2 tight paragraphs (up to ~130 words)",
+        routine: "1 short sentence (roughly 8-25 words)",
+        notable: "1-2 sentences (up to ~45 words)",
+        climax: "a short paragraph (up to ~80 words)",
         paragraphs:
-          "Keep it to a single short paragraph - a sentence or two is often enough. Use a second paragraph only for a genuinely big moment.",
+          "Keep it to one or two sentences. Only a genuinely big beat earns a short paragraph - never more than that.",
       };
     case "long":
-      return {
-        routine: "1-2 paragraphs (40-100 words)",
-        notable: "2-3 paragraphs (100-200 words)",
-        climax: "3-4 paragraphs (200-320 words)",
-        paragraphs: "2-4 paragraphs.",
-      };
-    case "medium":
-    default:
       return {
         routine: "1 paragraph (roughly 40-90 words)",
         notable: "up to 2 paragraphs (90-160 words)",
         climax: "up to 3 paragraphs (160-260 words)",
         paragraphs:
           "Write 1 paragraph by default. Use a second only if the moment really needs it, and a third only for a big beat like a combat climax or major reveal.",
+      };
+    case "medium":
+    default:
+      return {
+        routine: "1-2 sentences (roughly 15-45 words)",
+        notable: "a short paragraph (up to ~90 words)",
+        climax: "1-2 tight paragraphs (up to ~130 words)",
+        paragraphs:
+          "Keep it to a single short paragraph - a sentence or two is often enough. Use a second paragraph only for a genuinely big moment.",
       };
   }
 }

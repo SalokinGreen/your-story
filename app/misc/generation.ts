@@ -34,7 +34,10 @@ import {
   computeGMStageBudget,
   CHOICES_STAGE_TOKEN_BUDGET,
 } from "@/app/misc/ai_staged";
-import { computePacingFeedback } from "@/app/misc/pacingFeedback";
+import {
+  computePacingFeedback,
+  countNarrationWords,
+} from "@/app/misc/pacingFeedback";
 import { isContextOverflowError } from "@/app/misc/apiErrors";
 import { ensureStoryCompacted } from "@/app/misc/compaction";
 import { ensureStoryReflected } from "@/app/misc/reflection";
@@ -1922,6 +1925,31 @@ async function generateStoryTurnOnce(
           };
 
           logger.action(`GM stage round ${gmRound} raw response`, gmResult);
+
+          // Length diagnostic: distinguish "the model chose to write long"
+          // (finishReason "stop"/"end_turn" - a verbosity/prompt problem) from
+          // "the provider cut the response off at max_tokens" (finishReason
+          // "length" - a truncation problem, a different fix entirely). Also
+          // reports the player-visible prose word count for this round so the
+          // per-round accumulation across a multi-round turn is visible in the
+          // logs. `truncatedAtCap` is the signal to watch.
+          {
+            const finishReason = gmResult.meta?.finishReason ?? "unknown";
+            const maxTokensCap = Math.min(
+              options.customMaxOutput || 12000,
+              getModelConfig(gmModel).maxOutputTokens || 4000,
+            );
+            logger.action(`GM stage round ${gmRound} finish diagnostic`, {
+              finishReason,
+              truncatedAtCap: finishReason === "length",
+              hadToolCalls: (gmResult.toolCalls?.length ?? 0) > 0,
+              proseWordsThisRound: countNarrationWords(
+                extractVisibleText(gmContent),
+              ),
+              completionTokens: gmResult.meta?.usage?.completionTokens,
+              maxTokensCap,
+            });
+          }
 
           if (gmResult.meta) {
             // Accumulate meta across rounds

@@ -25,16 +25,16 @@ export const PACING_MIN_HISTORY = 2;
  * Per-setting acceptable band for the trailing average words-per-turn. Below
  * `low` reads as consistently terse; above `high` reads as consistently
  * long-winded. The midpoints line up with getLengthGuidance() in ai_staged.ts
- * (Short ~1-2 sentences, Medium ~1 paragraph, Long ~2-4 paragraphs); the bands
+ * (Short ~1 sentence, Medium ~1-2 sentences, Long ~1 paragraph); the bands
  * are deliberately wide so normal moment-to-moment variation stays in "ok".
  */
 export const PACING_BANDS: Record<
   ReplyLength,
   { low: number; high: number }
 > = {
-  short: { low: 12, high: 85 },
-  medium: { low: 30, high: 170 },
-  long: { low: 80, high: 300 },
+  short: { low: 6, high: 45 },
+  medium: { low: 12, high: 85 },
+  long: { low: 30, high: 170 },
 };
 
 export type PacingStatus = "ok" | "long" | "short";
