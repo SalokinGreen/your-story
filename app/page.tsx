@@ -21,6 +21,7 @@ import {
 import LandingAuthSection from "./components/LandingAuthSection";
 import QuickStartGenres from "./components/QuickStartGenres";
 import GuidedStoryStart from "./components/GuidedStoryStart";
+import LastPlayedStories from "./components/LastPlayedStories";
 import InfoTabs from "./components/InfoTabs";
 
 // Enable ISR with 5 minute revalidation for the entire page
@@ -135,6 +136,9 @@ export default async function Home() {
 
         {/* Guided freeform story - the default way to play - Client component */}
         <GuidedStoryStart />
+
+        {/* Last played stories - Client component */}
+        <LastPlayedStories />
 
         {/* Quick Start Genres (pre-generated adventures) - Client component */}
         <QuickStartGenres />
