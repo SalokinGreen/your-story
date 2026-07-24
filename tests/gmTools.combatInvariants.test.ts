@@ -183,6 +183,30 @@ describe("npc_roll - turn ownership", () => {
     ).toContain("not");
   });
 
+  it("rejects a roll for the player's own combatant, even on their turn", async () => {
+    const player = combatant({ id: "p1", name: "Hero", type: "player", stats: { HP: 10 } });
+    const goblin = combatant({ id: "g1", name: "Goblin", stats: { HP: 10 } });
+    const storyData = createMockStoryData({
+      combatState: combatWith([player, goblin], 0), // player's turn
+    });
+
+    const result = await executeGMTools(
+      [
+        createToolCall("npc_roll", {
+          combatant: "Hero",
+          formula: "1d20+5",
+          reason: "attack roll",
+        }),
+      ],
+      storyData
+    );
+
+    expect(result.results[0].success).toBe(false);
+    expect(
+      result.results[0].contextForStory ?? JSON.stringify(result.results[0])
+    ).toContain("formula_roll");
+  });
+
   it("allows repeated rolls for the same current-turn combatant (attack then damage)", async () => {
     const goblin = combatant({ id: "g1", name: "Goblin", stats: { HP: 10 } });
     const storyData = createMockStoryData({

@@ -1834,6 +1834,11 @@ Use for:
 Similar to formula_roll but specifically for NPCs. Rolls are always
 resolved silently - never shown to the player as an animation.
 
+NOT for the player's own combatant, even on their turn in the initiative
+order - use formula_roll for anything the player character does, in or out
+of combat, so it's rolled visibly. Calling this on the player's combatant
+is rejected.
+
 The roll result is returned and logged to combat log.
 Use update_combatant_stat to apply damage after calculating.
 
