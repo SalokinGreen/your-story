@@ -883,6 +883,18 @@ function StoryPageContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storyText, liveNarrationText, storyTextReady, loadingStage, netSession]);
 
+  // Host-only: if a guest disconnects mid-collection, the remaining seats may
+  // now all be in - re-evaluate readiness so a departed player doesn't stall
+  // the turn (the host can also always force it via "Start now").
+  useEffect(() => {
+    if (netSession?.role !== "host") return;
+    if (turnBatchRef.current.inputs.size === 0) return;
+    if (isBatchReady(turnBatchRef.current, expectedSeatIds())) {
+      startBatchedTurn();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [netPeers, netSession]);
+
   const [pendingChoice, setPendingChoice] = useState<number | null>(null);
   const [loadingStory, setLoadingStory] = useState(true);
   // Deep-link auto-host: opens the Menu tab's Story Editor straight to the
