@@ -805,6 +805,16 @@ export default function Story({
     return () => window.removeEventListener(LAYER_SETTINGS_CHANGED_EVENT, update);
   }, []);
 
+  // Set when the Observer rewrote the latest turn and the GM's original draft
+  // is still stored on the part (ScenePart.observerRewriteOriginal). No button
+  // of its own - it just relabels Undo, which peels the revision off first
+  // (see page.tsx's handleUndo) before undoing the turn itself.
+  const observerRewriteOriginal = React.useMemo(() => {
+    const parts = storyData?.scene?.parts || [];
+    const last = parts[parts.length - 1];
+    return last && !last.user ? last.observerRewriteOriginal : undefined;
+  }, [storyData]);
+
   // Show hidden messages setting - persisted to localStorage
   const [showHiddenMessages, setShowHiddenMessages] = React.useState(() => {
     if (typeof window === "undefined") return false;
@@ -1436,11 +1446,13 @@ export default function Story({
               that's possible. Only shown while narration is actually
               streaming, and only when the current settings make a reset
               possible at all. */}
-          {loadingStage === "story" && observerCanReset && (
-            <p className="px-1 text-xs text-blue-200/40 italic">
-              Not final yet - the Observer may flag and rewrite this response. Don&apos;t get too attached.
-            </p>
-          )}
+          {loadingStage === "story" &&
+            observerCanReset &&
+            !storyData.sessionZeroActive && (
+              <p className="px-1 text-xs text-blue-200/40 italic">
+                Not final yet - the Observer may flag and rewrite this response. Don&apos;t get too attached.
+              </p>
+            )}
         </div>
 
         {/* Edit Mode */}
@@ -1503,10 +1515,16 @@ export default function Story({
                   onClick={onUndo}
                   disabled={loading || !!loadingStage}
                   className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                  title="Undo last action"
+                  title={
+                    observerRewriteOriginal
+                      ? `The Observer revised this response (${observerRewriteOriginal.flag.detail}) - undo puts the GM's original back`
+                      : "Undo last action"
+                  }
                 >
                   <DynamicIcon name="Undo2" className="w-5 h-5 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Undo</span>
+                  <span className="hidden sm:inline">
+                    {observerRewriteOriginal ? "Undo revision" : "Undo"}
+                  </span>
                 </button>
               )}
               {canRetry && onRetry && (

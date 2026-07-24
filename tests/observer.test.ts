@@ -16,6 +16,10 @@ import {
   checkToolUsageGaps,
   checkTierEscalation,
   runObserver,
+  observerSuspensionReason,
+  hasCharacterSheetNote,
+  buildObserverCharacterContext,
+  formatCharacterContextBlock,
   buildObserverWarningNote,
   buildObserverCorrectionNote,
   reconcileGmConversationAfterRewrite,
@@ -25,7 +29,11 @@ import {
   DEFAULT_OBSERVER_SETTINGS,
   ObserverCheckSettings,
 } from "../app/misc/observer";
-import type { ObserverFlag, GMConversationMessage } from "../app/misc/structs";
+import type {
+  ObserverFlag,
+  GMConversationMessage,
+  StoryData,
+} from "../app/misc/structs";
 import { extractVisibleText } from "../app/misc/turnTimeline";
 import { TOP_TIER } from "../app/misc/reasoningTiers";
 
@@ -886,6 +894,251 @@ describe("checkTierEscalation", () => {
   });
 });
 
+describe("observerSuspensionReason", () => {
+  it("suspends every check while session zero is still active", () => {
+    expect(observerSuspensionReason({ sessionZeroActive: true })).toContain(
+      "session zero",
+    );
+  });
+
+  it("suspends the start_game turn itself, even once the flag has flipped", () => {
+    // start_game sets sessionZeroActive false mid-turn, so by the time the
+    // observer runs the flag is already down - the tool name is what keeps
+    // the wrap-up turn (the longest, most setup-heavy of the campaign) out
+    // of the judges' hands.
+    expect(
+      observerSuspensionReason({
+        sessionZeroActive: false,
+        toolNames: ["create_note", "start_game"],
+      }),
+    ).toContain("start_game");
+  });
+
+  it("suspends a story that has no character sheet yet, whatever created it", () => {
+    // startAdventureLocally never sets sessionZeroActive, so an adventure
+    // still in character creation has only this signal to protect it - the
+    // same "FRESH STORY - SETUP NEEDED" condition the GM's own prompt uses.
+    expect(
+      observerSuspensionReason({
+        sessionZeroActive: false,
+        toolNames: ["create_note"],
+        hasCharacterSheet: false,
+      }),
+    ).toContain("character sheet");
+  });
+
+  it("does not suspend an ordinary turn of play", () => {
+    expect(
+      observerSuspensionReason({
+        sessionZeroActive: false,
+        toolNames: ["formula_roll", "increment_scene"],
+        hasCharacterSheet: true,
+      }),
+    ).toBeNull();
+    expect(observerSuspensionReason({})).toBeNull();
+  });
+});
+
+describe("hasCharacterSheetNote", () => {
+  function story(lore: unknown[]): StoryData {
+    return { lore } as unknown as StoryData;
+  }
+
+  it("is true only for an enabled, non-empty character sheet note", () => {
+    expect(
+      hasCharacterSheetNote(
+        story([{ title: "Sheet", content: "Traits: bold", type: "character_sheet" }]),
+      ),
+    ).toBe(true);
+    expect(hasCharacterSheetNote(story([]))).toBe(false);
+    expect(
+      hasCharacterSheetNote(
+        story([{ title: "Sheet", content: "   ", type: "character_sheet" }]),
+      ),
+    ).toBe(false);
+    expect(
+      hasCharacterSheetNote(
+        story([
+          { title: "Sheet", content: "Traits", type: "character_sheet", enabled: false },
+        ]),
+      ),
+    ).toBe(false);
+    expect(
+      hasCharacterSheetNote(story([{ title: "Town", content: "A town", type: "lore" }])),
+    ).toBe(false);
+  });
+});
+
+describe("buildObserverCharacterContext", () => {
+  function storyWith(overrides: Partial<StoryData> = {}): StoryData {
+    return {
+      player_name: "Kira Vance",
+      player_summary: "A disgraced ranger hunting the thing that took her sister",
+      lore: [
+        {
+          title: "Kira Vance",
+          content: "Traits: reckless, loyal. Bond: her sister Mira.",
+          type: "character_sheet",
+        },
+        { title: "The Ashen Court", content: "A hidden faction", type: "faction" },
+      ],
+      npcs: [{ name: "Bram" }, { name: "Sister Oleth" }],
+      ...overrides,
+    } as unknown as StoryData;
+  }
+
+  it("pulls the player character, their sheet, and the NPC roster out of StoryData", () => {
+    const context = buildObserverCharacterContext(storyWith());
+    expect(context.playerName).toBe("Kira Vance");
+    expect(context.playerSummary).toContain("disgraced ranger");
+    expect(context.characterSheet).toContain("Bond: her sister Mira.");
+    expect(context.characterSheet).not.toContain("The Ashen Court");
+    expect(context.npcNames).toEqual(["Bram", "Sister Oleth"]);
+  });
+
+  it("skips disabled character sheet notes", () => {
+    const context = buildObserverCharacterContext(
+      storyWith({
+        lore: [
+          {
+            title: "Old Sheet",
+            content: "Stale character data",
+            type: "character_sheet",
+            enabled: false,
+          },
+        ] as unknown as StoryData["lore"],
+      }),
+    );
+    expect(context.characterSheet).toBeUndefined();
+  });
+
+  it("truncates a very long character sheet rather than blowing up the judge prompt", () => {
+    const context = buildObserverCharacterContext(
+      storyWith({
+        lore: [
+          {
+            title: "Sheet",
+            content: Array(2000).fill("trait").join(" "),
+            type: "character_sheet",
+          },
+        ] as unknown as StoryData["lore"],
+      }),
+    );
+    expect(context.characterSheet!.length).toBeLessThan(1600);
+    expect(context.characterSheet!.endsWith("...")).toBe(true);
+  });
+
+  it("treats couch co-op players as additional player characters", () => {
+    const context = buildObserverCharacterContext(
+      storyWith({
+        multiplayer: {
+          enabled: true,
+          couchPlayers: [{ id: "a", name: "Ren" }, { id: "b", name: "Sol" }],
+        } as unknown as StoryData["multiplayer"],
+      }),
+    );
+    expect(context.playerAliases).toEqual(["Ren", "Sol"]);
+  });
+});
+
+describe("formatCharacterContextBlock", () => {
+  it("returns nothing when there is no character data to give", () => {
+    expect(formatCharacterContextBlock(undefined)).toBe("");
+    expect(formatCharacterContextBlock({})).toBe("");
+  });
+
+  it("names the player character and separates them from the NPCs", () => {
+    const block = formatCharacterContextBlock({
+      playerName: "Kira Vance",
+      playerSummary: "A disgraced ranger",
+      npcNames: ["Bram", "Sister Oleth"],
+    });
+    expect(block).toContain("PLAYER CHARACTER is **Kira Vance**");
+    expect(block).toContain("Bram, Sister Oleth");
+    expect(block).toContain("NOT a violation");
+  });
+
+  it("lists every player character in couch co-op", () => {
+    const block = formatCharacterContextBlock({
+      playerName: "Kira",
+      playerAliases: ["Kira", "Ren"],
+    });
+    expect(block).toContain("PLAYER CHARACTERS are **Kira**, **Ren**");
+  });
+});
+
+describe("character context reaches the judges", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  function mockJudge(payload: Record<string, unknown>) {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: JSON.stringify(payload) }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    return fetchMock;
+  }
+
+  it("tells the agency judge who the player character is and who the NPCs are", async () => {
+    const fetchMock = mockJudge({ violation: false, severity: "minor", reason: "" });
+
+    await checkPlayerAgencyViolation(
+      "I ask Bram about the road north",
+      "Bram spits into the fire. 'Nobody takes that road twice,' he says.",
+      { model: "test-model", token: "tok" },
+      checkSettings(),
+      {
+        playerName: "Kira Vance",
+        npcNames: ["Bram"],
+        characterSheet: "Traits: reckless, loyal.",
+      },
+    );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const userMessage = body.messages[1].content;
+    expect(userMessage).toContain("Kira Vance");
+    expect(userMessage).toContain("Bram");
+    expect(userMessage).toContain("Traits: reckless, loyal.");
+  });
+
+  it("gives the length judge the turn's mechanical results as context", async () => {
+    const fetchMock = mockJudge({ justified: false, reason: "" });
+
+    await checkResponseLength(
+      Array(400).fill("word").join(" "),
+      "I fight the whole patrol",
+      "medium",
+      { model: "test-model", token: "tok" },
+      checkSettings(),
+      { playerName: "Kira Vance" },
+      "formula_roll: 18 vs DC 14 - SUCCESS\nnpc_roll: 7 vs DC 12 - FAILURE",
+    );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const userMessage = body.messages[1].content;
+    expect(userMessage).toContain("Kira Vance");
+    expect(userMessage).toContain("18 vs DC 14");
+    expect(body.messages[0].content).toContain("Answering the player out-of-character");
+  });
+
+  it("prompts identically to before when no character context is available", async () => {
+    const fetchMock = mockJudge({ violation: false, severity: "minor", reason: "" });
+
+    await checkPlayerAgencyViolation("I wait", "The rain keeps falling.", {
+      model: "test-model",
+      token: "tok",
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages[1].content).not.toContain("WHO IS WHO");
+  });
+});
+
 describe("runObserver", () => {
   const originalFetch = global.fetch;
 
@@ -915,6 +1168,78 @@ describe("runObserver", () => {
     });
 
     expect(flags.map((f) => f.type).sort()).toEqual(["player_agency", "response_length"]);
+  });
+
+  it("judges nothing during session zero, not even the free length check", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: Array(800).fill("word").join(" "), // a setup dump, legitimately huge
+      playerChoice: "A grim lighthouse mystery, please",
+      replyLength: "medium",
+      sessionZeroActive: true,
+      tierUsed: 0,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(flags).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("judges nothing on the start_game turn", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: Array(800).fill("word").join(" "),
+      playerChoice: "Let's begin",
+      replyLength: "medium",
+      sessionZeroActive: false,
+      toolNames: ["create_note", "start_game"],
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(flags).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("judges nothing while the story still has no character sheet", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: Array(800).fill("word").join(" "),
+      playerChoice: "Something gothic, I think",
+      replyLength: "medium",
+      hasCharacterSheet: false,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(flags).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("resumes judging on the first turn after the game has started", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ justified: false, violation: false, severity: "minor", reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: Array(400).fill("word").join(" "),
+      playerChoice: "I head for the cliffs",
+      replyLength: "medium",
+      sessionZeroActive: false,
+      toolNames: ["formula_roll"],
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(fetchMock).toHaveBeenCalled();
+    expect(flags.some((f) => f.type === "response_length")).toBe(true);
   });
 
   it("returns an empty array when neither check flags anything", async () => {
@@ -1288,6 +1613,88 @@ describe("rewriteFlaggedNarration", () => {
     expect(userMessage).toContain("I'm sorry it has to be this way");
     expect(userMessage).toContain(flag.detail);
     expect(userMessage).toContain("formula_roll: SUCCESS");
+  });
+
+  it("continues the turn's own conversation when one is handed over", async () => {
+    // The whole point: a rewrite prompted from scratch knows nothing about
+    // the premise, the scene, the notes, or who anyone is, so it writes prose
+    // for a story it can't see. Continuing the conversation that produced the
+    // turn gives it all of that for free.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword, saying nothing." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const conversation = [
+      { role: "system" as const, content: "You ARE the Game Master. [premise, lore, notes]" },
+      { role: "user" as const, content: "CURRENT GAME STATE: the lighthouse, Bram, the storm" },
+      { role: "assistant" as const, content: "You draw your sword and apologize." },
+    ];
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      conversationMessages: conversation,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    // Original conversation preserved in order, correction appended last.
+    expect(body.messages).toHaveLength(4);
+    expect(body.messages.slice(0, 3)).toEqual(conversation);
+    expect(body.messages[3].role).toBe("user");
+    expect(body.messages[3].content).toContain(flag.detail);
+    expect(body.messages[3].content).toContain("You draw your sword and apologize.");
+    // No second system prompt competing with the GM's own.
+    expect(body.messages.filter((m: { role: string }) => m.role === "system")).toHaveLength(1);
+  });
+
+  it("forbids the rewrite from advancing the story instead of rewriting the beat", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      conversationMessages: [
+        { role: "system" as const, content: "You ARE the Game Master." },
+      ],
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const instruction = body.messages[body.messages.length - 1].content;
+    expect(instruction).toContain("Same moment, same scene");
+    expect(instruction).toContain("Do NOT advance the story");
+  });
+
+  it("falls back to the standalone prompt when no conversation is available", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      gmStoryContext: "formula_roll: SUCCESS",
+      flag,
+      characterContext: { playerName: "Kira Vance" },
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].role).toBe("system");
+    expect(body.messages[1].content).toContain("Kira Vance");
+    expect(body.messages[1].content).toContain("formula_roll: SUCCESS");
   });
 
   it("returns null (fail open) when the API call fails", async () => {

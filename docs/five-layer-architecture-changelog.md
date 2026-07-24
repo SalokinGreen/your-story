@@ -258,6 +258,88 @@ trusting its "mostly solid" reputation:
   PaSSAGE-style play-style classifier the way every other form of player
   input does. Not fixed in this phase — flagged for a future one.
 
+## Phase 4 (later session): the observer learns who the player character is
+
+Three related complaints about Layer 5 in practice — the observer flagging
+turns that were long for a reason, mis-attributing dialogue, and having no
+appeal — plus the GM-side cause of the second one.
+
+### Layer 5 (Adjudication) — scoped, informed, and reversible
+
+- **Setup is never judged** (`observerSuspensionReason`). While the GM is
+  interviewing the player, writing the character sheet / mechanics / campaign
+  plan, and narrating an opening, it legitimately runs far past any
+  reply-length band and legitimately proposes things about the player
+  character. Every check there was a false positive waiting to happen, and the
+  correction it triggered damaged the one turn the whole campaign is built on.
+  Three signals, because no one of them covers every way a story starts:
+  `sessionZeroActive`; a `start_game` call this turn (the flag flips false
+  mid-turn when the tool executes, so `generateStoryTurn` reads it off the
+  **pre-turn snapshot** and checks tool names too — otherwise the wrap-up turn
+  would be the single part of session zero that still got judged); and the
+  absence of a `character_sheet` note, which is the same condition
+  `buildGMStagePrompt` uses for its "FRESH STORY — SETUP NEEDED" block and the
+  only thing covering adventure-started stories (`startAdventureLocally` never
+  sets `sessionZeroActive`) mid character creation. Suspension skips the
+  blocking *and* background passes, so it costs no API calls.
+- **The judges are told who the player character is**
+  (`buildObserverCharacterContext` / `formatCharacterContextBlock`). Every
+  LLM-backed check previously saw exactly two things: the player's declared
+  action and the narration. `checkPlayerAgencyViolation`'s entire verdict
+  rests on telling the player character apart from an NPC, which that input
+  cannot support — in practice it both excused real violations ("that was
+  just a character talking") and invented false ones from NPC dialogue. The
+  judges now get the PC's name, summary, sheet, and the known NPC roster, and
+  the agency prompt makes the who-is-who call an explicit first step. The
+  same context goes to `rewriteFlaggedNarration`, so corrections keep the
+  cast straight too.
+- **The length judge got sharper criteria and the turn's mechanical
+  results.** The justification pass added after Phase 3 now enumerates what earns extra
+  words — setup, an out-of-character rules/mechanics answer, a major reveal,
+  several rolls resolving at once, a requested time skip — against what
+  doesn't (padding, restating a beat, narrating past the player's turn), and
+  sees `gmStoryContext` so a turn narrating five roll results isn't judged
+  against the same yardstick as one narrating a single line of dialogue.
+- **Rewrites are grounded in the turn they're rewriting.**
+  `rewriteFlaggedNarration` used to be a standalone two-message prompt holding
+  the player's action, the flagged text, and the roll results — no premise, no
+  scene history, no notes, no character sheet. It was being asked to rewrite
+  prose for a story it could not see, and it showed: rewrites came back
+  reading like they belonged to a different game. It now **continues the
+  turn's own conversation** (`GenerationResult.gmPromptMessages`, the same
+  base-messages-plus-history array the story stage continues via
+  `buildStoryContinuationPrompt`), with the correction appended as the final
+  user turn, and the instruction pins it to the same moment: same scene, same
+  events, same outcome, no advancing the story, no new characters or places.
+  The old standalone prompt survives as the fallback when no conversation is
+  available.
+- **Rewrites are reversible** (`ScenePart.observerRewriteOriginal`). The
+  observer is a judge, not an oracle: a turn it cut for length may have been
+  the long explanation the player wanted. The discarded draft — prose, the
+  choices parsed from it, and the GM history as it stood before
+  `reconcileGmConversationAfterRewrite` — is stored on the scene part, and the
+  **existing Undo button** puts all three back: Undo peels off the revision
+  first, and a second press undoes the whole turn the normal way. (No separate
+  button — Undo already means "walk back the most recent change".) Restoring
+  clears `correctedObserverFlags`, so the next turn's prompt doesn't scold the
+  GM for prose that is back in play; editing the turn by hand clears the
+  stored original for the same reason.
+
+### GM prompt — the character sheet as live input, not an opening handout
+
+`buildGMStagePrompt`'s state message never contained `player_name`,
+`player_summary`, or the profile tags picked at story start: the GM stage —
+the layer that decides rolls, NPC reactions, and what the world does — knew
+the player character only through whatever the `character_sheet` note spelled
+out, and the curated personality/wish tags were durable state read *only* by
+the director layer's `spotlight_tag` move. That is why the GM drifted off the
+player's chosen traits after the opening scene. A `PLAYER CHARACTER` block now
+leads the state message (name, summary, couch roster, personality tags, wish
+tags), the character-sheet header asks for the sheet to decide something
+concrete every turn rather than be read once, and the PLAYER AGENCY rules
+point at the block by name so "who am I not allowed to speak for" is stated,
+not inferred.
+
 ## Deliberately not done
 
 - **H6 (content-safety layer):** explicitly skipped by product decision —

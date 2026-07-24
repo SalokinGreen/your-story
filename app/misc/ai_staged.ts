@@ -1131,7 +1131,7 @@ export function buildGMStagePrompt({
     }
   }
   if (characterSheetLore.length > 0) {
-    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details. Reference these for abilities, background, and personality.\nTo update: edit_note("title", content="new content") - Keep stats, HP, XP, etc. current!\n`;
+    loreSection += `\n## 📌 CHARACTER SHEET\nThe player's character details - traits, background, abilities, resources.\nThis is not opening-scene set dressing: the player picked these, and they expect them to keep mattering. Every turn, let the sheet decide something concrete - which skill/stat a roll uses and at what difficulty, whether an NPC recognises a title or a reputation, what a flaw or bond costs them right now, what their background lets them notice that someone else wouldn't. If a turn could have gone the same way for any character at all, you didn't use it.\nTo update: edit_note("title", content="new content") - Keep stats, HP, XP, etc. current!\n`;
     for (const l of characterSheetLore) {
       loreSection += `\n### ${l.title}.md\n${cleanString(l.content)}\n`;
     }
@@ -1295,6 +1295,64 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
       )}`
     : "";
 
+  // 🧍 Who the player character IS. The GM stage - the "brain" that decides
+  // rolls, NPC reactions, and what the world does - never saw player_name or
+  // player_summary at all: the only identity signal it got was whatever the
+  // character_sheet note happened to spell out, which is why the GM would
+  // drift into calling the PC by a generic label, or forget the traits the
+  // player chose after the opening scene. The profile tags (curated at story
+  // start, GuidedStoryStart.tsx) are here for the same reason: they were
+  // durable state read only by the director layer's spotlight_tag move, so
+  // the GM itself never knew what the player said they wanted out of play.
+  const gmPlayerLines: string[] = [];
+  const gmPlayerName = cleanString(storyData.player_name || "").trim();
+  if (gmPlayerName) {
+    gmPlayerLines.push(
+      `- **${gmPlayerName}** is the player character. You never speak, think, or decide for them.`,
+    );
+  }
+  if (storyData.player_summary?.trim()) {
+    gmPlayerLines.push(`- Summary: ${cleanString(storyData.player_summary)}`);
+  }
+  const gmCouchRoster = (storyData.multiplayer?.couchPlayers || []).filter(
+    (p) => p.name?.trim(),
+  );
+  if (gmCouchRoster.length > 0) {
+    gmPlayerLines.push(
+      `- At the table: ${gmCouchRoster
+        .map((p) => cleanString(p.name))
+        .join(", ")} - each one is a player character, not an NPC.`,
+    );
+  }
+  // Tags: couch players carry their own; solo play keeps them on StoryData.
+  const gmPersonalityTags = gmCouchRoster.length
+    ? gmCouchRoster.flatMap((p) =>
+        (p.personalityTags || []).map((t) => `${cleanString(p.name)}: ${t}`),
+      )
+    : storyData.playerPersonalityTags || [];
+  const gmWishTags = gmCouchRoster.length
+    ? gmCouchRoster.flatMap((p) =>
+        (p.wishTags || []).map((t) => `${cleanString(p.name)}: ${t}`),
+      )
+    : storyData.playerWishTags || [];
+  if (gmPersonalityTags.length > 0) {
+    gmPlayerLines.push(
+      `- Character traits the player chose: ${gmPersonalityTags.join(
+        ", ",
+      )} - give these something to bite on, don't just let them sit on the sheet.`,
+    );
+  }
+  if (gmWishTags.length > 0) {
+    gmPlayerLines.push(
+      `- What the player wants out of this story: ${gmWishTags.join(
+        ", ",
+      )} - steer toward this when you have a free choice about what happens next.`,
+    );
+  }
+  const gmPlayerSection = gmPlayerLines.length
+    ? `## 🧍 PLAYER CHARACTER\n${gmPlayerLines.join("\n")}`
+    : "";
+
   // Active goals + story threads: the GM creates and updates these, so it
   // must see the live set every turn. Previously absent from the GM stage's
   // state message entirely (only the Choices/story info message had them),
@@ -1409,6 +1467,8 @@ ${freshStorySetupBlock}${sessionZeroStartGameReminder}
 ## PLAYER AGENCY (NON-NEGOTIABLE)
 - NEVER decide what the player character says, thinks, feels, or does next. You resolve outcomes for the action they already declared - you don't invent their next action.
 - You control NPCs, monsters, the environment, and dice/table results. Everything about the player character's choices belongs to the player.
+- Know which one is which: the player character is named in the PLAYER CHARACTER section of the game state below, and "you" in your narration always means them. Give NPCs all the dialogue and initiative you like - that's your job - but the moment a line puts words, a decision, or a next move into the player character's mouth, you've taken their turn for them.
+- Use the character sheet and their chosen traits every turn (see the CHARACTER SHEET section): pick difficulties from it, let NPCs react to who they actually are, and give their traits, flaws, and background something to push against. Referencing what a character IS is not the same as deciding what they DO.
 - Resolve ONE beat at a time: the current action and its immediate consequence. Don't chain a second unrequested event, enemy turn, or complication onto the same turn "for free" - stop and hand control back at the next decision point.
 - Only call \`request_continuation\` to chain mechanically-linked rolls (e.g. attack succeeded, now roll damage) - never to skip ahead narratively past the point where the player should act.${observerNoteBlock}${storyProgressNoteBlock}${repetitionNoteBlock}${knowledgeNoteBlock}
 
@@ -1693,6 +1753,12 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
   // silently disappearing.
   if (storyData.scene.summary) {
     stateMessage += `\n## 📖 STORY SO FAR (summary of earlier events, no longer shown in full below)\n${storyData.scene.summary}\n`;
+  }
+
+  // Who the player character is - first, before the notes, because every
+  // other section is read in relation to them.
+  if (gmPlayerSection) {
+    stateMessage += "\n" + gmPlayerSection + "\n\n";
   }
 
   // Add lore/notes section
