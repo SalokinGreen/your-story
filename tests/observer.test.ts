@@ -18,12 +18,15 @@ import {
   runObserver,
   buildObserverWarningNote,
   buildObserverCorrectionNote,
+  reconcileGmConversationAfterRewrite,
+  reconcileGmThinkingAfterRewrite,
   rewriteFlaggedNarration,
   settingsFor,
   DEFAULT_OBSERVER_SETTINGS,
   ObserverCheckSettings,
 } from "../app/misc/observer";
-import type { ObserverFlag } from "../app/misc/structs";
+import type { ObserverFlag, GMConversationMessage } from "../app/misc/structs";
+import { extractVisibleText } from "../app/misc/turnTimeline";
 import { TOP_TIER } from "../app/misc/reasoningTiers";
 
 function checkSettings(overrides: Partial<ObserverCheckSettings> = {}): ObserverCheckSettings {
@@ -1073,6 +1076,123 @@ describe("buildObserverCorrectionNote", () => {
     ]);
     expect(note).toContain("First issue.");
     expect(note).toContain("Second issue.");
+  });
+});
+
+describe("reconcileGmConversationAfterRewrite", () => {
+  const flag: ObserverFlag = {
+    type: "response_length",
+    severity: "major",
+    detail: "This turn ran 900 words, well past the ceiling.",
+    correctivePrompt: "unused",
+  };
+
+  it("returns the input untouched when there's no conversation", () => {
+    expect(
+      reconcileGmConversationAfterRewrite(undefined, "short prose", flag),
+    ).toBeUndefined();
+    expect(
+      reconcileGmConversationAfterRewrite([], "short prose", flag),
+    ).toEqual([]);
+  });
+
+  it("drops the discarded draft prose and splices in the corrected narration", () => {
+    const convo: GMConversationMessage[] = [
+      {
+        role: "assistant",
+        content:
+          "<thinking>The guard is distracted; DC 12.</thinking>\n\nA long, overwrought paragraph of the original draft that ran way too long and needs cutting.",
+      },
+    ];
+    const out = reconcileGmConversationAfterRewrite(convo, "You slip past.", flag)!;
+    // The original long draft prose is gone...
+    expect(out[0].content).not.toContain("overwrought");
+    // ...the reasoning is preserved...
+    expect(out[0].content).toContain("The guard is distracted; DC 12.");
+    // ...and the corrected narration is the only visible (non-thinking) text.
+    expect(extractVisibleText(out[0].content)).toBe("You slip past.");
+  });
+
+  it("keeps the correction marker inside <thinking> so it never renders as narration", () => {
+    const convo: GMConversationMessage[] = [
+      { role: "assistant", content: "The long original draft prose." },
+    ];
+    const out = reconcileGmConversationAfterRewrite(convo, "You slip past.", flag)!;
+    // Marker text is present for the model to read as context...
+    expect(out[0].content).toContain("OBSERVER CORRECTION");
+    expect(out[0].content).toContain(flag.detail);
+    // ...but only the corrected prose is player-visible - the marker is hidden.
+    expect(extractVisibleText(out[0].content)).toBe("You slip past.");
+  });
+
+  it("strips prose from every assistant round but attaches the fix to the last one", () => {
+    const convo: GMConversationMessage[] = [
+      {
+        role: "assistant",
+        content: "<thinking>Roll to hit.</thinking>\n\nDraft narration round one.",
+        tool_calls: [
+          { id: "abc123xyz", type: "function", function: { name: "formula_roll", arguments: "{}" } },
+        ],
+      },
+      { role: "tool", content: "[formula_roll] 15 vs DC 12 - success", tool_call_id: "abc123xyz" },
+      { role: "assistant", content: "Draft narration round two, the long finish." },
+    ];
+    const out = reconcileGmConversationAfterRewrite(convo, "The blade lands.", flag)!;
+    // Same length / same tool message, pairing preserved.
+    expect(out).toHaveLength(3);
+    expect(out[1]).toEqual(convo[1]);
+    // Tool-round assistant keeps its reasoning + tool_calls, loses its prose.
+    expect(out[0].content).toContain("Roll to hit.");
+    expect(extractVisibleText(out[0].content)).toBe("");
+    expect(out[0].tool_calls).toEqual(convo[0].tool_calls);
+    // Only the final assistant round carries the corrected narration.
+    expect(extractVisibleText(out[2].content)).toBe("The blade lands.");
+    expect(out[2].content).toContain("OBSERVER CORRECTION");
+  });
+
+  it("preserves native reasoning when content was pure prose (reasoning-tier model)", () => {
+    const convo: GMConversationMessage[] = [
+      {
+        role: "assistant",
+        content: "Pure prose draft with no thinking tags, quite long.",
+        reasoning: "native chain of thought",
+      },
+    ];
+    const out = reconcileGmConversationAfterRewrite(convo, "Done.", flag)!;
+    expect(out[0].reasoning).toBe("native chain of thought");
+    expect(extractVisibleText(out[0].content)).toBe("Done.");
+    expect(out[0].content).not.toContain("Pure prose draft");
+  });
+});
+
+describe("reconcileGmThinkingAfterRewrite", () => {
+  const flag: ObserverFlag = {
+    type: "response_length",
+    severity: "major",
+    detail: "This turn ran 900 words, well past the ceiling.",
+    correctivePrompt: "unused",
+  };
+
+  it("passes through empty input", () => {
+    expect(reconcileGmThinkingAfterRewrite(undefined, "x", flag)).toBeUndefined();
+    expect(reconcileGmThinkingAfterRewrite([], "x", flag)).toEqual([]);
+  });
+
+  it("strips the draft, keeps array length, and appends the fix to the last entry", () => {
+    const thinking = [
+      "<thinking>Round one reasoning.</thinking>\n\nRound one draft prose.",
+      "<thinking>Round two reasoning.</thinking>\n\nThe long round two draft.",
+    ];
+    const out = reconcileGmThinkingAfterRewrite(thinking, "You escape.", flag)!;
+    expect(out).toHaveLength(2);
+    expect(extractVisibleText(out[0])).toBe(""); // prose gone
+    expect(out[0]).toContain("Round one reasoning.");
+    expect(extractVisibleText(out[1])).toBe("You escape."); // corrected prose only
+    expect(out[1]).toContain("OBSERVER CORRECTION");
+    // The discarded draft prose is gone from every entry (the word "draft"
+    // still appears in the marker copy, so assert on the draft's actual text).
+    expect(out.join("\n")).not.toContain("Round one draft prose");
+    expect(out.join("\n")).not.toContain("The long round two draft");
   });
 });
 

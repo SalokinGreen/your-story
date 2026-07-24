@@ -71,9 +71,10 @@
  * config existed.
  */
 
-import { ObserverFlag, ObserverFlagType } from "./structs";
+import { ObserverFlag, ObserverFlagType, GMConversationMessage } from "./structs";
 import { ReplyLength, getLengthGuidance } from "./ai_staged";
 import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
+import { parseTaggedContent } from "./turnTimeline";
 import { getCustomModelIfUUID } from "./user_settings";
 import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
 
@@ -1079,4 +1080,110 @@ export function buildObserverCorrectionNote(
 
   const lines = flags.map((f) => `- ${f.detail}`);
   return `Your previous turn's first draft had to be corrected by the observer before it reached the player - the version in your history is already fixed, but you should still avoid the habit that caused this:\n${lines.join("\n")}`;
+}
+
+// ============================================================
+// REWRITE HISTORY RECONCILIATION
+// ============================================================
+// When rewriteFlaggedNarration replaces a flagged turn's narration, the
+// player-visible ScenePart.content is swapped for the corrected prose - but
+// the GM's own saved history (ScenePart.gmConversation, and the legacy
+// gmThinking fallback) still holds the ORIGINAL discarded draft in its
+// assistant-message content. Left as-is, the next turn replays that draft as
+// if the GM had written it (buildGMStagePrompt in ai_staged.ts), so the GM
+// keeps seeing - and imitating - exactly the prose the observer just rejected,
+// while buildObserverCorrectionNote's "the version in your history is already
+// fixed" claim is quietly false. These helpers make it true: they strip the
+// discarded draft out of the saved history and splice in the corrected prose
+// plus a marker naming why it was rewritten.
+
+/** The private reasoning (text inside <thinking>...</thinking>) of a raw GM
+ *  content string, with the visible narration - the discarded draft - dropped.
+ *  Returns "" when the string carried no reasoning (e.g. a reasoning-tier
+ *  model whose chain of thought lived in the separate `reasoning` field and
+ *  whose `content` was pure prose). */
+function extractGmReasoning(raw: string | undefined): string {
+  if (!raw) return "";
+  return parseTaggedContent(raw)
+    .filter((b) => b.kind === "thinking")
+    .map((b) => b.content ?? "")
+    .join("\n\n")
+    .trim();
+}
+
+/** Explains, inside the replayed history, that this turn's narration was
+ *  rewritten and why. Kept INSIDE <thinking> tags by the callers below so the
+ *  GM reads it as context but it never renders as player-facing narration
+ *  (parseTaggedContent classifies it as reasoning, not story text). */
+function observerRewriteMarker(flag: ObserverFlag): string {
+  return `[OBSERVER CORRECTION: this turn's first-draft narration was rewritten before the player saw it. Reason: ${flag.detail} The narration that follows is the corrected version the player actually saw - treat it as what you wrote here, and don't slip back into the original draft's habit.]`;
+}
+
+/**
+ * Rebuilds a rewritten turn's gmConversation so the discarded draft no longer
+ * survives in replayed history: every assistant message keeps its private
+ * <thinking> reasoning and any tool calls but loses its visible prose, and the
+ * final assistant message gets the correction marker (folded into <thinking>)
+ * plus the corrected narration as its visible text. Non-assistant (tool)
+ * messages pass through untouched. Positions/counts are preserved so the
+ * assistant/tool pairing the replay relies on is unchanged.
+ */
+export function reconcileGmConversationAfterRewrite(
+  gmConversation: GMConversationMessage[] | undefined,
+  rewrittenNarration: string,
+  flag: ObserverFlag,
+): GMConversationMessage[] | undefined {
+  if (!gmConversation || gmConversation.length === 0) return gmConversation;
+  const rewritten = rewrittenNarration.trim();
+  const marker = observerRewriteMarker(flag);
+
+  let lastAssistantIdx = -1;
+  for (let i = gmConversation.length - 1; i >= 0; i--) {
+    if (gmConversation[i].role === "assistant") {
+      lastAssistantIdx = i;
+      break;
+    }
+  }
+
+  return gmConversation.map((msg, i) => {
+    if (msg.role !== "assistant") return msg;
+    const reasoning = extractGmReasoning(msg.content);
+    if (i !== lastAssistantIdx) {
+      return { ...msg, content: reasoning ? `<thinking>\n${reasoning}\n</thinking>` : "" };
+    }
+    const inner = [reasoning, marker].filter(Boolean).join("\n\n");
+    return {
+      ...msg,
+      content: `<thinking>\n${inner}\n</thinking>\n\n${rewritten}`,
+    };
+  });
+}
+
+/**
+ * Legacy-fallback mirror of reconcileGmConversationAfterRewrite for the
+ * gmThinking string[] (only replayed for old saves that predate
+ * gmConversation - see ai_staged.ts). Strips each round's discarded prose to
+ * its reasoning and appends the marker + corrected narration to the last
+ * entry, keeping the array length so the gmThinking<->gmToolCalls round
+ * pairing is unchanged.
+ */
+export function reconcileGmThinkingAfterRewrite(
+  gmThinking: string[] | undefined,
+  rewrittenNarration: string,
+  flag: ObserverFlag,
+): string[] | undefined {
+  if (!gmThinking || gmThinking.length === 0) return gmThinking;
+  const rewritten = rewrittenNarration.trim();
+  const marker = observerRewriteMarker(flag);
+
+  const stripped = gmThinking.map((entry) => {
+    const reasoning = extractGmReasoning(entry);
+    return reasoning ? `<thinking>\n${reasoning}\n</thinking>` : "";
+  });
+
+  const lastIdx = stripped.length - 1;
+  const lastReasoning = extractGmReasoning(gmThinking[lastIdx]);
+  const inner = [lastReasoning, marker].filter(Boolean).join("\n\n");
+  stripped[lastIdx] = `<thinking>\n${inner}\n</thinking>\n\n${rewritten}`;
+  return stripped;
 }
