@@ -60,6 +60,10 @@ const SOLO_VOICE_PLAYER: CouchPlayer[] = [
 
 interface StoryProps {
   storyData: StoryData;
+  // Local story id (see localStoryManager.ts) - scopes the persistent TTS
+  // audio cache (ttsAudioCache.ts) to this story. Omitted only for the
+  // handful of placeholder/setup flows that never render TTSControls.
+  storyId?: string;
   storyText: string;
   choices: Choices;
   input: Record<string, boolean>;
@@ -732,6 +736,7 @@ const StoryComposer = React.forwardRef<HTMLTextAreaElement, StoryComposerProps>(
 
 export default function Story({
   storyData,
+  storyId,
   storyText,
   choices,
   input,
@@ -1559,6 +1564,7 @@ export default function Story({
               onAudioEnd={onTTSAudioEnd}
               relayMode={ttsRelayMode}
               relayHandleRef={ttsRelayHandleRef}
+              storyId={storyId}
             />
           </div>
         )}

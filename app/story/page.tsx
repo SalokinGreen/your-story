@@ -4700,6 +4700,7 @@ function StoryPageContent() {
           >
           <Story
             storyData={storyData}
+            storyId={storyDbId || undefined}
             storyText={storyText}
             choices={choices}
             input={input}
