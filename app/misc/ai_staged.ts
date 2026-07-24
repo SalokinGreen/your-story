@@ -1612,6 +1612,11 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "npc_reaction",
     // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
     "manage_timer",
+    // Session-zero -> real-play handoff: names the story and clears
+    // sessionZeroActive. The START OF PLAY / fresh-story-setup prompt blocks
+    // instruct the GM to call this, so it MUST be offered here - without it the
+    // model is told to call a tool it doesn't have.
+    "start_game",
     // Reasoning-tier self-escalation
     "set_reasoning_tier",
   ];
