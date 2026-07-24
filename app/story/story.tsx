@@ -8,7 +8,12 @@ import ChoicesModal from "../components/ChoicesModal";
 import { DynamicIcon } from "../components/DynamicIcon";
 import SyncIndicator from "../components/SyncIndicator";
 import NetStatusBadge from "../components/NetStatusBadge";
-import type { GuestJoinedInfo, NetSessionInfo } from "../misc/multiplayer/session";
+import type {
+  GuestJoinedInfo,
+  NetSessionInfo,
+  TurnStatus,
+} from "../misc/multiplayer/session";
+import TurnLobbyOverlay from "../components/TurnLobbyOverlay";
 import PlayerBubbles from "../components/PlayerBubbles";
 import CombatDisplay from "../components/CombatDisplay";
 import { ChapterNav } from "../components/ChapterNav";
@@ -132,6 +137,13 @@ interface StoryProps {
   // called on composer focus/blur since iOS can scroll/resize the visual
   // viewport asynchronously, after the initial resize event.
   onViewportRecalc?: () => void;
+  // Collect-all-then-generate lobby (networked co-op only): who's submitted/
+  // passed/still pending this round. Rendered inline right above the
+  // composer (see TurnLobbyOverlay) rather than as a viewport-fixed overlay
+  // so it can never cover the chat input on small screens.
+  turnLobby?: TurnStatus | null;
+  onTurnLobbyStartNow?: () => void;
+  onTurnLobbyPass?: () => void;
 }
 
 // Font settings interface
@@ -764,6 +776,9 @@ export default function Story({
   ttsRelayMode,
   ttsRelayHandleRef,
   onViewportRecalc,
+  turnLobby,
+  onTurnLobbyStartNow,
+  onTurnLobbyPass,
 }: StoryProps) {
   const [showChoicesModal, setShowChoicesModal] = React.useState(false);
   const [editMode, setEditMode] = React.useState(false);
@@ -1546,6 +1561,21 @@ export default function Story({
               relayHandleRef={ttsRelayHandleRef}
             />
           </div>
+        )}
+
+        {/* Collect-all-then-generate lobby: shown while the host is waiting
+            on the table (host sees "Start now" / "Pass"; guests see who
+            we're waiting on and can pass their own turn). Rendered directly
+            above the composer, in normal flow, so it can never cover it. */}
+        {netSession && turnLobby && onTurnLobbyStartNow && onTurnLobbyPass && (
+          <TurnLobbyOverlay
+            status={turnLobby}
+            couchPlayers={couchPlayers}
+            myPlayerId={netSession.myLocalPlayerId}
+            isHost={netSession.role === "host"}
+            onStartNow={onTurnLobbyStartNow}
+            onPass={onTurnLobbyPass}
+          />
         )}
 
         {/* Composer: suggested choices, player switcher, and chat input */}
