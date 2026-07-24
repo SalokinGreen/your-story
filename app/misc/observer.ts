@@ -16,6 +16,17 @@
  * fresh, blind attempt. Same fail-open posture as the M2 roll-invariant gate
  * (reasoningTiers.ts/generation.ts): never block play indefinitely.
  *
+ * Two things scope every check below:
+ * - Suspension (observerSuspensionReason): session zero - a brand-new story
+ *   up to and including the turn that calls start_game - is never judged.
+ *   Setup turns legitimately run long and legitimately propose character
+ *   details, so every check there is a false positive waiting to happen.
+ * - Character context (buildObserverCharacterContext /
+ *   formatCharacterContextBlock): the judges are told who the player
+ *   character is, what their sheet says, and which names are NPCs. Without
+ *   it checkPlayerAgencyViolation was guessing at the single distinction its
+ *   whole verdict rests on.
+ *
  * Five checks, two severities:
  *
  * Major (can trigger generateStoryTurn's rewrite-or-reset correction):
@@ -71,7 +82,12 @@
  * config existed.
  */
 
-import { ObserverFlag, ObserverFlagType, GMConversationMessage } from "./structs";
+import {
+  ObserverFlag,
+  ObserverFlagType,
+  GMConversationMessage,
+  StoryData,
+} from "./structs";
 import { ReplyLength, getLengthGuidance } from "./ai_staged";
 import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
 import { parseTaggedContent } from "./turnTimeline";
@@ -207,12 +223,160 @@ function sensitivityInstruction(sensitivity: number): string {
 // triggersReset is also on.
 const TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD = 8;
 
+// ============================================================
+// WHO IS WHO (character context for the judges)
+// ============================================================
+// Every LLM-backed check here used to see exactly two things: the player's
+// declared action and the narration. That's not enough to judge the one rule
+// that matters most - checkPlayerAgencyViolation cannot tell the player
+// character apart from an NPC without being told who the player character
+// IS, so it flagged NPC dialogue as "the GM spoke for the player" and waved
+// through real violations as "that was just a character talking". This block
+// is the missing half of that prompt: the PC's name/aliases, their sheet (so
+// the judge can recognise them by trait/title as well as by name), and the
+// known NPC names the GM legitimately controls.
+
+export interface ObserverCharacterContext {
+  /** The player character's name (StoryData.player_name). */
+  playerName?: string;
+  /** One-line character summary (StoryData.player_summary). */
+  playerSummary?: string;
+  /** The character_sheet lore note(s), truncated - traits/bonds/flaws the judge should recognise as the PC's. */
+  characterSheet?: string;
+  /** Extra names that also refer to a player character (couch co-op players). */
+  playerAliases?: string[];
+  /** Names the GM legitimately speaks and acts for - everyone who is NOT the player character. */
+  npcNames?: string[];
+}
+
+const CHARACTER_SHEET_CONTEXT_LIMIT = 1500;
+
+/**
+ * Pulls the observer's "who is who" context out of StoryData. Cheap and
+ * synchronous - built once per turn in generation.ts and handed to every
+ * judge, so they all reason about the same cast.
+ */
+export function buildObserverCharacterContext(
+  storyData: StoryData,
+): ObserverCharacterContext {
+  const sheet = (storyData.lore || [])
+    .filter((l) => l.enabled !== false && l.type === "character_sheet")
+    .map((l) => `${l.title}\n${l.content}`.trim())
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+
+  const couchNames = (storyData.multiplayer?.couchPlayers || [])
+    .map((p) => p.name?.trim())
+    .filter((name): name is string => Boolean(name));
+
+  return {
+    playerName: storyData.player_name?.trim() || undefined,
+    playerSummary: storyData.player_summary?.trim() || undefined,
+    characterSheet: sheet
+      ? sheet.length > CHARACTER_SHEET_CONTEXT_LIMIT
+        ? `${sheet.slice(0, CHARACTER_SHEET_CONTEXT_LIMIT).trim()}...`
+        : sheet
+      : undefined,
+    playerAliases: couchNames.length ? couchNames : undefined,
+    npcNames: (storyData.npcs || [])
+      .map((npc) => npc.name?.trim())
+      .filter((name): name is string => Boolean(name)),
+  };
+}
+
+/**
+ * Renders the context above into a prompt block. Returns "" when there's
+ * nothing to say, so a story with no character data prompts exactly as it
+ * did before this existed.
+ */
+export function formatCharacterContextBlock(
+  context: ObserverCharacterContext | undefined,
+): string {
+  if (!context) return "";
+
+  const lines: string[] = [];
+  const names = [
+    ...(context.playerName ? [context.playerName] : []),
+    ...(context.playerAliases || []),
+  ].filter((name, i, all) => all.indexOf(name) === i);
+
+  if (names.length === 1) {
+    lines.push(
+      `- The PLAYER CHARACTER is **${names[0]}**${
+        context.playerSummary ? ` - ${context.playerSummary}` : ""
+      }. Second-person narration ("you") also refers to this character.`,
+    );
+  } else if (names.length > 1) {
+    lines.push(
+      `- The PLAYER CHARACTERS are ${names
+        .map((n) => `**${n}**`)
+        .join(", ")}. Second-person narration ("you") refers to them.`,
+    );
+  } else if (context.playerSummary) {
+    lines.push(
+      `- The PLAYER CHARACTER (unnamed) is: ${context.playerSummary}. Second-person narration ("you") refers to this character.`,
+    );
+  }
+
+  if (context.npcNames?.length) {
+    lines.push(
+      `- These are NPCs the GM legitimately controls, speaks for, and acts for - dialogue or actions from them are NOT a violation: ${context.npcNames.join(
+        ", ",
+      )}.`,
+    );
+  }
+
+  if (lines.length === 0 && !context.characterSheet) return "";
+
+  const sheetBlock = context.characterSheet
+    ? `\n\nThe player character's sheet (traits, bonds, flaws - these belong to the player, and the GM may reference them but may not decide how the character acts on them):\n"""\n${context.characterSheet}\n"""`
+    : "";
+
+  return `\n\nWHO IS WHO (use this to tell the player character apart from NPCs):\n${lines.join(
+    "\n",
+  )}${sheetBlock}`;
+}
+
+// ============================================================
+// SUSPENSION (turns the observer must not judge)
+// ============================================================
+
+/**
+ * Why the observer should sit this turn out entirely, or null if it should
+ * run normally. Session zero (StoryData.sessionZeroActive - true from a
+ * brand-new story until the GM calls start_game) is setup, not play: the GM
+ * is interviewing the player, writing the character sheet/mechanics/campaign
+ * plan, and narrating an opening that legitimately needs far more room than
+ * any reply-length band allows. Judging it produces nothing but false
+ * positives - a length flag on a setup dump, an agency flag on the GM
+ * proposing a character concept - and the correction it triggers actively
+ * damages the one turn the whole campaign is built on. The start_game turn
+ * itself is included: sessionZeroActive flips false the moment the tool
+ * executes, mid-turn, so without this the wrap-up turn would be the one turn
+ * of session zero that DID get judged.
+ */
+export function observerSuspensionReason(params: {
+  sessionZeroActive?: boolean;
+  toolNames?: string[];
+}): string | null {
+  if (params.sessionZeroActive) {
+    return "session zero is still active (the GM hasn't called start_game yet)";
+  }
+  if ((params.toolNames || []).includes("start_game")) {
+    return "this turn called start_game (the session-zero wrap-up turn)";
+  }
+  return null;
+}
+
 export async function checkResponseLength(
   narration: string,
   playerChoice: string = "",
   replyLength: ReplyLength = "medium",
   apiOptions?: ObserverApiOptions,
   settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.response_length,
+  characterContext?: ObserverCharacterContext,
+  gmStoryContext?: string,
 ): Promise<ObserverFlag | null> {
   if (!settings.enabled) return null;
 
@@ -238,6 +402,8 @@ export async function checkResponseLength(
       band.high,
       apiOptions,
       settings.sensitivity,
+      characterContext,
+      gmStoryContext,
     );
     if (judgment?.justified) return null;
   }
@@ -259,6 +425,8 @@ export interface RewriteNarrationParams {
   flag: ObserverFlag;
   replyLength?: ReplyLength;
   storytellerMode?: "narrator" | "dm";
+  /** Who the player character is (and who the NPCs are) - the rewrite has to keep the same cast straight the judge did. */
+  characterContext?: ObserverCharacterContext;
   apiOptions: ObserverApiOptions;
 }
 
@@ -305,7 +473,13 @@ Output ONLY the corrected narration prose - no meta-commentary, no explanation o
     ? `\n\nMechanical results this turn (ground truth, do not contradict):\n"""\n${gmStoryContext.trim()}\n"""`
     : "";
 
-  const user = `Player's declared action:\n"""\n${playerChoice.trim() || "(none - opening scene)"}\n"""${contextBlock}\n\nYour previous narration (FLAGGED - do not repeat this):\n"""\n${narration.trim()}\n"""\n\nWhat was wrong: ${flag.detail}\n\nRewrite the narration now.`;
+  const user = `Player's declared action:\n"""\n${
+    playerChoice.trim() || "(none - opening scene)"
+  }\n"""${formatCharacterContextBlock(
+    params.characterContext,
+  )}${contextBlock}\n\nYour previous narration (FLAGGED - do not repeat this):\n"""\n${narration.trim()}\n"""\n\nWhat was wrong: ${
+    flag.detail
+  }\n\nRewrite the narration now.`;
 
   try {
     const response = await fetch("/api/generate", {
@@ -367,19 +541,37 @@ async function callLengthJustificationApi(
   ceilingWords: number,
   apiOptions: ObserverApiOptions,
   sensitivity: number,
+  characterContext?: ObserverCharacterContext,
+  gmStoryContext?: string,
 ): Promise<LengthJustificationResult | null> {
   const system = `You are a strict but fair reviewer for a tabletop-style interactive fiction game. The Game Master AI you're reviewing was given a "${replyLength}" reply-length setting with a usual ceiling of ~${ceilingWords} words for a turn, and this turn ran to ${words} words - well past that ceiling.
 
-Running long isn't automatically wrong: some turns genuinely need the room - an opening/"session zero" scene establishing the setting, character, and premise; a major reveal; dense but necessary exposition; a pivotal climax. Others are just unfocused padding, restating the same beat, or over-describing a routine action - exactly what the ceiling exists to catch.
+Running long is NOT automatically wrong. The ceiling is a pacing default for ordinary back-and-forth play, and a good GM breaks it when the moment earns it. Treat the overage as JUSTIFIED when the turn is doing work that genuinely takes words, for example:
+- Setup/session-zero material: establishing the setting, the character, the premise, or the house rules.
+- Answering the player out-of-character: explaining a rule, a mechanic, the dice math, or their options. A real question deserves a real answer, and a truncated explanation is worse than a long one.
+- A major reveal, a turning point, or a pivotal climax the whole campaign has been building toward.
+- Resolving several mechanical results at once (multiple rolls, a combat round with several combatants, a challenge wrapping up) - each result needs its own beat of narration.
+- A time skip, montage, or transition the player explicitly asked for.
+- Necessary exposition the player asked for or could not act without.
 
-Given the player's declared action and the GM's narration, decide whether running this long was narratively justified by what the turn was actually doing, or whether it should have been trimmed.
+Treat it as UNJUSTIFIED when the extra words are doing no work, for example: padding and flourish around a routine action, restating a beat already narrated, incidental scenery or banter nobody asked about, or narrating past the point where the player should have gotten control back (chaining a second scene or unrequested event onto the turn).
+
+The question is what the words are DOING, not whether the prose is good. Given the player's declared action and the GM's narration, decide whether running this long was earned by the content of the turn.
 
 ${sensitivityInstruction(sensitivity)}
 
 Respond with ONLY a JSON object, no other text:
 {"justified": true|false, "reason": "<one sentence, empty string if not justified>"}`;
 
-  const user = `Player's declared action:\n"""\n${playerChoice.trim() || "(none - opening scene)"}\n"""\n\nGM's narration (${words} words, vs. a ~${ceilingWords} word ceiling):\n"""\n${narration.trim()}\n"""`;
+  const contextBlock = gmStoryContext?.trim()
+    ? `\n\nMechanical results this turn (each one legitimately needs narrating):\n"""\n${gmStoryContext.trim()}\n"""`
+    : "";
+
+  const user = `Player's declared action:\n"""\n${
+    playerChoice.trim() || "(none - opening scene)"
+  }\n"""${formatCharacterContextBlock(
+    characterContext,
+  )}${contextBlock}\n\nGM's narration (${words} words, vs. a ~${ceilingWords} word ceiling):\n"""\n${narration.trim()}\n"""`;
 
   try {
     const response = await fetch("/api/generate", {
@@ -468,21 +660,34 @@ async function callAgencyCheckApi(
   narration: string,
   apiOptions: ObserverApiOptions,
   sensitivity: number,
+  characterContext?: ObserverCharacterContext,
 ): Promise<AgencyCheckResult | null> {
   const system = `You are a strict but fair reviewer for a tabletop-style interactive fiction game. The Game Master AI you're reviewing was given this non-negotiable rule:
 
 "NEVER decide what the player character says, thinks, feels, or does next. You resolve outcomes for the action they already declared - you don't invent their next action."
 
-Given the player's declared action and the GM's narration written in response, decide whether the GM violated this rule by putting new dialogue, thoughts, feelings, or actions into the player character that the player didn't declare. Resolving the CONSEQUENCES of the player's stated action (what happens around them, how NPCs react, dice outcomes) is fine and expected - that is not a violation.
+Given the player's declared action and the GM's narration written in response, decide whether the GM violated this rule by putting new dialogue, thoughts, feelings, or actions into the player character that the player didn't declare.
+
+IDENTIFY WHO IS WHO FIRST. The "WHO IS WHO" block below names the player character; everyone else in the scene is an NPC. This distinction decides the whole judgment, so make it explicitly before you rule:
+- Dialogue, thoughts, feelings, and actions belonging to an NPC are the GM's job. They are NEVER a violation, no matter how much of the turn they take up.
+- Dialogue, thoughts, feelings, or decisions attributed to the PLAYER CHARACTER - by name, or in second person ("you say...", "you decide...", "you feel...") - that the player did not declare ARE a violation.
+- Do not excuse a violation on the grounds that the line "sounds like a character talking": if the speaker is the player character, it is a violation regardless of how in-character it reads. Equally, do not flag a line just because it is emotive or first-person-sounding when the speaker is an NPC.
+- If the player's declared action itself includes dialogue or intent, the GM restating or lightly rephrasing it is not a violation.
+
+Resolving the CONSEQUENCES of the player's stated action (what happens around them, how NPCs react, dice outcomes) is fine and expected - that is not a violation. Describing involuntary physical results the world imposes on the player character (taking a hit, being shoved, losing their footing) is also fine; deciding how they CHOOSE to respond is not.
 
 ${sensitivityInstruction(sensitivity)}
 
 Respond with ONLY a JSON object, no other text:
-{"violation": true|false, "severity": "minor"|"major", "reason": "<one sentence, empty string if no violation>"}
+{"violation": true|false, "severity": "minor"|"major", "reason": "<one sentence naming who was spoken/acted for, empty string if no violation>"}
 
 "major" = the GM clearly wrote new dialogue, a new decision, or a new action for the player character that the player never declared. "minor" = borderline/ambiguous phrasing that leans that way but could reasonably be read as just narrating the player's own stated action.`;
 
-  const user = `Player's declared action:\n"""\n${playerChoice.trim() || "(none - opening scene)"}\n"""\n\nGM's narration in response:\n"""\n${narration.trim()}\n"""`;
+  const user = `Player's declared action:\n"""\n${
+    playerChoice.trim() || "(none - opening scene)"
+  }\n"""${formatCharacterContextBlock(
+    characterContext,
+  )}\n\nGM's narration in response:\n"""\n${narration.trim()}\n"""`;
 
   try {
     const response = await fetch("/api/generate", {
@@ -527,6 +732,7 @@ export async function checkPlayerAgencyViolation(
   narration: string,
   apiOptions: ObserverApiOptions,
   settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.player_agency,
+  characterContext?: ObserverCharacterContext,
 ): Promise<ObserverFlag | null> {
   if (!settings.enabled || !narration.trim()) return null;
 
@@ -535,6 +741,7 @@ export async function checkPlayerAgencyViolation(
     narration,
     apiOptions,
     settings.sensitivity,
+    characterContext,
   );
   if (!result || !result.violation) return null;
 
@@ -976,6 +1183,12 @@ export interface ObserverParams {
   rollResults?: RollOutcomeForCheck[];
   /** Tier the GM stage actually ran at this turn (see reasoningTiers.ts) - omit to skip checkTierEscalation entirely. */
   tierUsed?: number;
+  /** The turn's executed tool/roll results, joined - context for the length judge (several results legitimately take more words to narrate). */
+  gmStoryContext?: string;
+  /** Who the player character is vs. who the NPCs are (see buildObserverCharacterContext) - handed to every judge that has to tell them apart. */
+  characterContext?: ObserverCharacterContext;
+  /** StoryData.sessionZeroActive as of the START of this turn - suspends every check (see observerSuspensionReason). */
+  sessionZeroActive?: boolean;
   apiOptions: ObserverApiOptions;
   /** Per-flag-type enable/reset/sensitivity config - defaults to DEFAULT_OBSERVER_SETTINGS (today's shipped behavior) for any type a partial/future config omits. */
   settings?: ObserverSettings;
@@ -985,9 +1198,19 @@ export interface ObserverParams {
  * Runs all checks for a completed turn. Safe to call every turn - the
  * length check is free, and every LLM-backed check fails open (returns no
  * flag) on any API error rather than blocking the turn on observer infra
- * issues.
+ * issues. Returns no flags at all for a suspended turn (session zero - see
+ * observerSuspensionReason), without spending a single API call on it.
  */
 export async function runObserver(params: ObserverParams): Promise<ObserverFlag[]> {
+  if (
+    observerSuspensionReason({
+      sessionZeroActive: params.sessionZeroActive,
+      toolNames: params.toolNames,
+    })
+  ) {
+    return [];
+  }
+
   const flags: ObserverFlag[] = [];
 
   const lengthFlag = await checkResponseLength(
@@ -996,6 +1219,8 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
     params.replyLength,
     params.apiOptions,
     settingsFor(params.settings, "response_length"),
+    params.characterContext,
+    params.gmStoryContext,
   );
   if (lengthFlag) flags.push(lengthFlag);
 
@@ -1004,6 +1229,7 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
     params.narration,
     params.apiOptions,
     settingsFor(params.settings, "player_agency"),
+    params.characterContext,
   );
   if (agencyFlag) flags.push(agencyFlag);
 

@@ -18,6 +18,7 @@ import {
   Adventure,
   CouchPlayer,
   ObserverFlag,
+  ObserverRewriteOriginal,
 } from "../misc/structs";
 import { useNetSession } from "../misc/multiplayer/useNetSession";
 import type { MPBackend } from "../misc/multiplayer/types";
@@ -307,6 +308,7 @@ function handleObserverRewrite(
   flags: ObserverFlag[],
   triggeringFlag: ObserverFlag,
   rewrittenNarration: string,
+  original: ObserverRewriteOriginal,
   setStoryText: (text: string) => void,
   setStoryData: (data: StoryData) => void,
   addNotification: (
@@ -315,6 +317,10 @@ function handleObserverRewrite(
   ) => void,
 ) {
   partialPart.content = rewrittenNarration;
+  // Keep the discarded draft on the part so the player can put it back (see
+  // handleRestoreObserverOriginal) - stored here rather than in onComplete
+  // because every generation flow routes rewrites through this one handler.
+  partialPart.observerRewriteOriginal = original;
 
   // storyData.scene.parts[lastIndex] may no longer be the same object as
   // partialPart by now - STAGE 3 choices generation (generation.ts) already
@@ -328,6 +334,7 @@ function handleObserverRewrite(
     storyData.scene.parts[lastIndex] = {
       ...storyData.scene.parts[lastIndex],
       content: rewrittenNarration,
+      observerRewriteOriginal: original,
     };
   }
 
@@ -340,7 +347,10 @@ function handleObserverRewrite(
     totalFlags: flags.length,
   });
 
-  addNotification(`Narration revised: ${triggeringFlag.detail}`, "warning");
+  addNotification(
+    `Narration revised: ${triggeringFlag.detail} Use "Undo revision" to keep the original.`,
+    "warning",
+  );
 }
 
 enum StoryState {
@@ -2241,13 +2251,19 @@ function StoryPageContent() {
               usage,
             });
           },
-          onObserverRewrite: (flags, triggeringFlag, rewrittenNarration) => {
+          onObserverRewrite: (
+            flags,
+            triggeringFlag,
+            rewrittenNarration,
+            original,
+          ) => {
             handleObserverRewrite(
               storyData,
               partialPart,
               flags,
               triggeringFlag,
               rewrittenNarration,
+              original,
               setStoryText,
               setStoryData,
               addNotification,
@@ -2760,13 +2776,19 @@ function StoryPageContent() {
               usage,
             });
           },
-          onObserverRewrite: (flags, triggeringFlag, rewrittenNarration) => {
+          onObserverRewrite: (
+            flags,
+            triggeringFlag,
+            rewrittenNarration,
+            original,
+          ) => {
             handleObserverRewrite(
               storyData,
               partialPart,
               flags,
               triggeringFlag,
               rewrittenNarration,
+              original,
               setStoryText,
               setStoryData,
               addNotification,
@@ -3739,13 +3761,19 @@ function StoryPageContent() {
               usage,
             });
           },
-          onObserverRewrite: (flags, triggeringFlag, rewrittenNarration) => {
+          onObserverRewrite: (
+            flags,
+            triggeringFlag,
+            rewrittenNarration,
+            original,
+          ) => {
             handleObserverRewrite(
               storyData,
               partialPart,
               flags,
               triggeringFlag,
               rewrittenNarration,
+              original,
               setStoryText,
               setStoryData,
               addNotification,
@@ -3983,6 +4011,62 @@ function StoryPageContent() {
     await saveProgress(storyData, true);
   }
 
+  // Undo an observer rewrite (see observer.ts's rewriteFlaggedNarration and
+  // ScenePart.observerRewriteOriginal): put the GM's original draft back,
+  // exactly as it was before the observer replaced it. The observer's
+  // judgement is a heuristic - "too long" in particular is often the long
+  // explanation the player actually wanted - so the player gets the last
+  // word. Restores the prose, the choices parsed from it, and the GM history
+  // together, since the rewrite changed all three.
+  async function handleRestoreObserverOriginal() {
+    if (!storyData || loading || loadingStage) return;
+
+    const lastIdx = storyData.scene.parts.length - 1;
+    const lastPart = lastIdx >= 0 ? storyData.scene.parts[lastIdx] : undefined;
+    const original = lastPart?.observerRewriteOriginal;
+    if (!lastPart || !original) {
+      addNotification("No observer revision to undo", "warning");
+      return;
+    }
+
+    logger.action("User restored the pre-observer-rewrite narration", {
+      type: original.flag.type,
+      detail: original.flag.detail,
+    });
+
+    storyData.scene.parts[lastIdx] = {
+      ...lastPart,
+      content: original.content,
+      // `raw` is left alone: the rewrite never overwrote it, so it still
+      // holds this same original draft (thinking tags and all).
+      gmConversation: original.gmConversation ?? lastPart.gmConversation,
+      gmThinking: original.gmThinking ?? lastPart.gmThinking,
+      choices: original.choices ?? lastPart.choices,
+      observerRewriteOriginal: undefined,
+      // buildObserverCorrectionNote (observer.ts) turns this into a "your
+      // draft had to be corrected" note in the next turn's prompt. The player
+      // just ruled the draft fine, so the note has to go with it - otherwise
+      // the GM gets told off for prose that's back in the story.
+      correctedObserverFlags: undefined,
+    };
+
+    const restoredPart = storyData.scene.parts[lastIdx];
+    setStoryText(restoredPart.content);
+    if (restoredPart.choices) {
+      setChoices({ choices: restoredPart.choices });
+      setInput(
+        restoredPart.choices.reduce(
+          (acc, choice) => ({ ...acc, [choice.text]: false }),
+          {} as Record<string, boolean>,
+        ),
+      );
+    }
+    setStoryData({ ...storyData });
+
+    await saveProgress(storyData, true);
+    addNotification("Restored the GM's original response", "success");
+  }
+
   async function handleEdit(editedText: string, partIndex: number) {
     if (!storyData || loading) return;
 
@@ -4018,6 +4102,10 @@ function StoryPageContent() {
         ...partToEdit,
         ...parsedPart,
         raw: editedText, // Store the edited raw text
+        // The player's own text supersedes both the Observer's rewrite and
+        // the draft it replaced - restoring an older draft over an edit
+        // would silently throw that edit away.
+        observerRewriteOriginal: undefined,
       };
 
       // Update UI if this is the current/last part
@@ -4033,6 +4121,7 @@ function StoryPageContent() {
         ...partToEdit,
         content: editedText,
         raw: editedText,
+        observerRewriteOriginal: undefined,
       };
 
       // Update UI if this is the current/last part
@@ -4719,6 +4808,7 @@ function StoryPageContent() {
             canUndo={canUndo}
             onStop={handleStop}
             onEdit={handleEdit}
+            onRestoreObserverOriginal={handleRestoreObserverOriginal}
             viewingPartIndex={viewingPartIndex}
             onNavigateLeft={handleNavigateLeft}
             onNavigateRight={handleNavigateRight}

@@ -374,6 +374,12 @@ export interface ScenePart {
   // otherwise the corrected history gives no signal that a mistake (e.g.
   // running too long) keeps happening.
   correctedObserverFlags?: ObserverFlag[];
+  // The turn as it read BEFORE that rewrite (see ObserverRewriteOriginal),
+  // kept so the player can put it back. The observer is a judge, not an
+  // oracle: a turn it shortened may have been the long explanation the
+  // player actually wanted. Set alongside correctedObserverFlags whenever a
+  // rewrite lands, cleared when the player restores the original.
+  observerRewriteOriginal?: ObserverRewriteOriginal;
   // Layer 3 periodic story-progress check-in (see storyProgressObserver.ts):
   // a GM-facing note on how the overall story is pacing (dragging, rushed,
   // or on track), produced every N turns rather than every turn. Never shown
@@ -436,6 +442,21 @@ export interface ObserverFlag {
   severity: ObserverSeverity;
   detail: string; // Human-readable explanation, for logging/notification display
   correctivePrompt: string; // Instruction injected into the GM's retry prompt when this flag triggers a reset
+}
+
+// A rewritten turn's discarded first draft (see observer.ts's
+// rewriteFlaggedNarration and ScenePart.observerRewriteOriginal). Everything
+// the rewrite touched is captured here so restoring is a straight swap back:
+// the prose the player saw stream, the choices that were parsed from it, and
+// the GM history as it stood before reconcileGmConversationAfterRewrite
+// spliced the correction marker in.
+export interface ObserverRewriteOriginal {
+  content: string;
+  /** The flag that triggered the rewrite - shown on the restore button so the player knows what the observer objected to. */
+  flag: ObserverFlag;
+  gmConversation?: GMConversationMessage[];
+  gmThinking?: string[];
+  choices?: Choice[];
 }
 
 export interface Choice {

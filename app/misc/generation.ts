@@ -21,6 +21,7 @@ import {
   GMConversationMessage,
   ReasoningDetail,
   ObserverFlag,
+  ObserverRewriteOriginal,
 } from "@/app/misc/structs";
 import {
   buildChoicesPrompt,
@@ -51,6 +52,8 @@ import {
   reconcileGmThinkingAfterRewrite,
   settingsFor,
   canObserverTriggerReset,
+  buildObserverCharacterContext,
+  observerSuspensionReason,
   ObserverSettings,
 } from "@/app/misc/observer";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
@@ -341,10 +344,15 @@ export interface GenerationCallbacks {
   // onChoicesStart/onChoicesComplete pair as choices are re-derived from it)
   // rather than clearing tool call/state displays the way onObserverReset
   // below does.
+  // `original` is the discarded first draft (prose, choices, and GM history
+  // as they stood before the rewrite) - the UI stores it on the scene part so
+  // the player can restore it, since a rewrite the observer thought was an
+  // improvement isn't always one.
   onObserverRewrite?: (
     flags: ObserverFlag[],
     triggeringFlag: ObserverFlag,
     rewrittenNarration: string,
+    original: ObserverRewriteOriginal,
   ) => void;
   // Layer 5 hardening (see observer.ts): fired only when a major violation's
   // targeted rewrite (onObserverRewrite above) itself failed, and
@@ -868,6 +876,31 @@ export async function generateStoryTurn(
     // judges the completed turn against this).
     const tierUsedThisTurn = storyData.reasoningTierState?.currentTier;
 
+    const turnToolNames = (result.gmResults || []).map((r) => r.toolName);
+
+    // Session zero is setup, not play, and the observer sits it out entirely
+    // (see observerSuspensionReason). sessionZeroActive is read from the
+    // PRE-TURN snapshot on purpose: start_game flips it false mid-turn, so
+    // reading it live would leave the wrap-up turn - the single longest,
+    // most setup-heavy turn of the campaign - as the only part of session
+    // zero that still got judged. The tool-name check covers the same turn
+    // when no snapshot could be taken.
+    const suspensionReason = observerSuspensionReason({
+      sessionZeroActive:
+        preTurnSnapshot?.sessionZeroActive ?? storyData.sessionZeroActive,
+      toolNames: turnToolNames,
+    });
+    if (suspensionReason) {
+      logger.action("Observer suspended for this turn", {
+        reason: suspensionReason,
+      });
+    }
+
+    // Who the player character is, what their sheet says, and which names
+    // are NPCs - built once and shared by every judge and by the rewrite
+    // call (see observer.ts's formatCharacterContextBlock).
+    const observerCharacterContext = buildObserverCharacterContext(storyData);
+
     // Whether the CURRENT settings make an automatic reset-and-retry even
     // possible (observer.ts's canObserverTriggerReset - true iff at least
     // one flag type is both enabled and allowed to trigger a reset). If
@@ -877,7 +910,9 @@ export async function generateStoryTurn(
     // completes immediately. If a reset IS possible, the observer keeps
     // blocking exactly as it always has - a rewrite really might happen,
     // and the player needs to see the corrected result, not the flagged one.
-    const resetPossible = canObserverTriggerReset(observerSettings);
+    // A suspended turn can't produce a flag at all, so it never blocks either.
+    const resetPossible =
+      !suspensionReason && canObserverTriggerReset(observerSettings);
 
     let flags: ObserverFlag[] = [];
     if (resetPossible) {
@@ -886,13 +921,15 @@ export async function generateStoryTurn(
           narration: result.content,
           playerChoice: userChoice,
           replyLength: options.replyLength,
-          toolNames: (result.gmResults || []).map((r) => r.toolName),
+          toolNames: turnToolNames,
           rollResults: (result.gmResults || []).map((r) => ({
             toolName: r.toolName,
             success: r.success,
             contextForStory: r.contextForStory,
           })),
           tierUsed: tierUsedThisTurn,
+          gmStoryContext: result.gmStoryContext,
+          characterContext: observerCharacterContext,
           settings: observerSettings,
           apiOptions: observerApiOptions,
         });
@@ -965,6 +1002,7 @@ export async function generateStoryTurn(
               flag: majorFlag,
               replyLength: options.replyLength,
               storytellerMode: options.storytellerMode,
+              characterContext: observerCharacterContext,
               apiOptions: sideCallApiOptions,
             });
           } catch (rewriteError) {
@@ -985,6 +1023,21 @@ export async function generateStoryTurn(
             "Observer rewrite succeeded, keeping tool calls/rolls and replacing narration",
             { type: majorFlag.type },
           );
+
+          // Snapshot the draft the observer is about to replace, BEFORE any
+          // of it is overwritten - the player can put it back with one click
+          // (see ScenePart.observerRewriteOriginal and page.tsx's
+          // handleRestoreObserverOriginal). The observer is a judge, not an
+          // oracle: the turn it just shortened may have been the long
+          // explanation the player actually wanted.
+          const rewriteOriginal: ObserverRewriteOriginal = {
+            content: result.content,
+            flag: majorFlag,
+            gmConversation: result.scenePart.gmConversation,
+            gmThinking: result.scenePart.gmThinking,
+            choices: result.choices,
+          };
+
           result.content = rewrittenNarration;
           result.scenePart = {
             ...result.scenePart,
@@ -1005,7 +1058,12 @@ export async function generateStoryTurn(
               majorFlag,
             ),
           };
-          callbacks.onObserverRewrite?.(flags, majorFlag, rewrittenNarration);
+          callbacks.onObserverRewrite?.(
+            flags,
+            majorFlag,
+            rewrittenNarration,
+            rewriteOriginal,
+          );
 
           // Choices were parsed from the flagged narration - regenerate them
           // off the corrected text. Best-effort: keep the original choices if
@@ -1075,6 +1133,7 @@ export async function generateStoryTurn(
           result.scenePart = {
             ...result.scenePart,
             correctedObserverFlags: [majorFlag],
+            observerRewriteOriginal: rewriteOriginal,
           };
         } else if (preTurnSnapshot) {
           // Full state rollback, restored in place (delete-all-keys +
@@ -1129,19 +1188,21 @@ export async function generateStoryTurn(
     const backgroundPartIndex = storyData.scene.parts.length - 1;
 
     const runBackgroundLayers = async () => {
-      if (!resetPossible) {
+      if (!resetPossible && !suspensionReason) {
         try {
           const backgroundFlags = await runObserver({
             narration: result.content,
             playerChoice: userChoice,
             replyLength: options.replyLength,
-            toolNames: (result.gmResults || []).map((r) => r.toolName),
+            toolNames: turnToolNames,
             rollResults: (result.gmResults || []).map((r) => ({
               toolName: r.toolName,
               success: r.success,
               contextForStory: r.contextForStory,
             })),
             tierUsed: tierUsedThisTurn,
+            gmStoryContext: result.gmStoryContext,
+            characterContext: observerCharacterContext,
             settings: observerSettings,
             apiOptions: observerApiOptions,
           });
