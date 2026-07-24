@@ -13,6 +13,7 @@ import { DynamicIcon } from "./DynamicIcon";
 import { ttsFetch } from "../misc/ttsFetch";
 import { cleanTextForSpeech } from "../misc/ai";
 import { TTSModelKey } from "../misc/ai_prices";
+import { getCachedTTSAudio, saveCachedTTSAudio } from "../misc/ttsAudioCache";
 
 // Imperative handle a networked guest uses to feed the host's relayed audio
 // chunks straight into this player's playback queue (see relayMode). The host
@@ -69,6 +70,11 @@ interface TTSControlsProps {
   // only plays chunks pushed in through relayHandleRef (the host's narration).
   relayMode?: boolean;
   relayHandleRef?: React.Ref<TTSRelayHandle>;
+  // Enables the persistent (IndexedDB) audio cache for this story's manual/
+  // auto-generate playback - see ttsAudioCache.ts. Omitted callers (or the
+  // live per-sentence auto-narration path, which never uses it) just skip
+  // caching and always generate fresh, as before.
+  storyId?: string;
 }
 
 const getSelectedVoice = (): string => {
@@ -249,6 +255,7 @@ export default function TTSControls({
   onAudioEnd,
   relayMode = false,
   relayHandleRef,
+  storyId,
 }: TTSControlsProps) {
   const { addNotification } = useNotification();
   const { keys: apiKeys } = useAPIKeys();
@@ -750,10 +757,38 @@ export default function TTSControls({
   // pipeline: resolves the selected voice/model/key, requests audio for
   // `textToSpeak`, and streams the resulting chunk(s) into the playback
   // queue via onChunkArrived. Returns the chunk count.
+  //
+  // When `useCache` is true (manual/auto-generate path only - the live
+  // per-sentence pipeline never passes it), a cache hit plays back
+  // previously-generated audio for this exact text/voice/model with no
+  // network call, and a miss saves the freshly-generated audio for next
+  // time. Checked before the API key requirement so a cache hit still works
+  // even without a configured TTS key.
   const generateAndQueueAudio = useCallback(
-    async (textToSpeak: string, signal?: AbortSignal): Promise<number> => {
+    async (
+      textToSpeak: string,
+      signal?: AbortSignal,
+      useCache?: boolean,
+    ): Promise<number> => {
       const selectedVoice = getSelectedVoice();
       const selectedModel = getSelectedModel();
+
+      if (useCache && storyId) {
+        const cached = await getCachedTTSAudio(
+          storyId,
+          textToSpeak,
+          selectedVoice,
+          selectedModel,
+        );
+        if (cached && cached.length > 0) {
+          for (const blob of cached) {
+            if (signal?.aborted) return 0;
+            onChunkArrived(blob);
+          }
+          return cached.length;
+        }
+      }
+
       const providerKey = getProviderKeyForModel(selectedModel);
       const apiKey = apiKeys[providerKey];
       if (!apiKey) {
@@ -778,9 +813,33 @@ export default function TTSControls({
         throw new Error(error.error || "Failed to generate speech");
       }
 
-      return streamChunksToPlayer(response, onChunkArrived, signal);
+      if (!useCache || !storyId) {
+        return streamChunksToPlayer(response, onChunkArrived, signal);
+      }
+
+      const generatedChunks: Blob[] = [];
+      const count = await streamChunksToPlayer(
+        response,
+        (blob) => {
+          generatedChunks.push(blob);
+          onChunkArrived(blob);
+        },
+        signal,
+      );
+
+      if (!signal?.aborted && generatedChunks.length > 0) {
+        saveCachedTTSAudio(
+          storyId,
+          textToSpeak,
+          selectedVoice,
+          selectedModel,
+          generatedChunks,
+        ).catch((err) => console.error("Failed to cache TTS audio:", err));
+      }
+
+      return count;
     },
-    [apiKeys.cartesiaKey, apiKeys.elevenlabsKey, onChunkArrived],
+    [apiKeys.cartesiaKey, apiKeys.elevenlabsKey, onChunkArrived, storyId],
   );
 
   // Drains liveDispatchQueueRef one sentence at a time (sequential, not
@@ -1047,6 +1106,7 @@ export default function TTSControls({
       const generatedChunkCount = await generateAndQueueAudio(
         cleanTextForSpeech(text),
         controller.signal,
+        true,
       );
       isStreamingRef.current = false;
 

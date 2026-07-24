@@ -7,6 +7,7 @@ import {
   StoryLore,
 } from "./structs";
 import { ARCHETYPE_INFO } from "./gmAdvice";
+import { clearCachedTTSAudioForStory } from "./ttsAudioCache";
 
 const DB_NAME = "YourStoryDB";
 const STORE_NAME = "local_stories";
@@ -537,7 +538,7 @@ export async function unassignFolderFromStories(folderId: string): Promise<void>
 
 export async function deleteLocalStory(storyId: string): Promise<void> {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
+  await new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(
       [STORE_NAME, UNDO_STORE_NAME],
       "readwrite",
@@ -547,6 +548,12 @@ export async function deleteLocalStory(storyId: string): Promise<void> {
 
     transaction.oncomplete = () => resolve();
     transaction.onerror = () => reject(transaction.error);
+  });
+
+  // Separate database (see ttsAudioCache.ts) - cleaned up independently so
+  // deleting a story doesn't leave its cached audio orphaned.
+  await clearCachedTTSAudioForStory(storyId).catch((error) => {
+    console.error("Failed to clear cached TTS audio for deleted story:", error);
   });
 }
 
