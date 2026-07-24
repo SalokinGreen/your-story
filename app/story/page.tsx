@@ -1973,8 +1973,14 @@ function StoryPageContent() {
       // GM Stage is always enabled - legacy tool calling is deprecated
       const gmStageEnabled = true;
 
-      // Track parallel completion of tools and choices
-      let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
+      // Track parallel completion of tools and choices. Tool calls now run
+      // inside the GM stage itself (before narration even starts) rather
+      // than as a separate async stage, so there's nothing left for
+      // onToolsComplete (a leftover pre-GM-stage callback) to ever fire -
+      // treat tools as already done instead of waiting on a callback that
+      // never comes, which used to strand loadingStage/the loading UI until
+      // the whole turn (including the Observer's blocking check) resolved.
+      let toolsComplete = true;
       let choicesComplete = !storyData.autoGenerateChoices;
 
       const checkBothComplete = () => {
@@ -2529,7 +2535,7 @@ function StoryPageContent() {
     const gmStageEnabled = true;
 
     // Track parallel completion of tools and choices
-    let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
+    let toolsComplete = true; // Tools already ran inside the GM stage before this point - no separate async tools stage to wait on; onToolsComplete is dead code (see generation.ts)
     let choicesComplete = !storyData.autoGenerateChoices;
 
     const checkBothComplete = () => {
@@ -3510,7 +3516,7 @@ function StoryPageContent() {
     const gmStageEnabled = true;
 
     // Track parallel completion of tools and choices
-    let toolsComplete = !toolCallingEnabled; // If tools disabled, mark as complete
+    let toolsComplete = true; // Tools already ran inside the GM stage before this point - no separate async tools stage to wait on; onToolsComplete is dead code (see generation.ts)
     let choicesComplete = !storyData.autoGenerateChoices;
 
     const checkBothComplete = () => {
