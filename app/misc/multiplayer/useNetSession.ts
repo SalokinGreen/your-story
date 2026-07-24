@@ -9,12 +9,17 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { StoryData } from "@/app/misc/structs";
 import {
+  ClaimedProfile,
   DiceThrowRelayRequest,
   DiceThrowRelayResult,
+  FloorSnapshot,
   GuestJoinedInfo,
   NetSession,
   NetSessionInfo,
   OOCChatMessage,
+  StoryStreamUpdate,
+  TTSAudioChunk,
+  TurnStatus,
   ValidatedGuestAction,
 } from "./session";
 import type { MPBackend, PresenceActivityState, RoomId } from "./types";
@@ -34,6 +39,19 @@ interface UseNetSessionParams {
   onDiceThrowRequest?: (request: DiceThrowRelayRequest) => void;
   // Host-only: a targeted guest's throw settled (or they skipped it).
   onDiceThrowResult?: (result: DiceThrowRelayResult) => void;
+  // Host-only: a guest passed the current collection round.
+  onGuestPass?: (localPlayerId: string) => void;
+  // Guest-only: the host's live turn-collection status.
+  onTurnStatus?: (status: TurnStatus) => void;
+  // Guest-only: a relayed slice of the host's live narration.
+  onStoryStream?: (update: StoryStreamUpdate) => void;
+  // Guest-only: a relayed MP3 chunk of the host's TTS narration.
+  onTTSAudio?: (chunk: TTSAudioChunk) => void;
+  // Guest-only: the host-authoritative party-voice floor changed.
+  onFloorState?: (floor: FloorSnapshot) => void;
+  // Host-only: a guest asked for / released the party-voice floor.
+  onFloorTake?: (localPlayerId: string) => void;
+  onFloorRelease?: (localPlayerId: string) => void;
 }
 
 export function useNetSession({
@@ -45,6 +63,13 @@ export function useNetSession({
   onPeerLeft,
   onDiceThrowRequest,
   onDiceThrowResult,
+  onGuestPass,
+  onTurnStatus,
+  onStoryStream,
+  onTTSAudio,
+  onFloorState,
+  onFloorTake,
+  onFloorRelease,
 }: UseNetSessionParams) {
   const sessionRef = useRef<NetSession | null>(null);
   const [netSession, setNetSession] = useState<NetSessionInfo | null>(null);
@@ -71,6 +96,20 @@ export function useNetSession({
   const onPeerLeftRef = useRef(onPeerLeft);
   const onDiceThrowRequestRef = useRef(onDiceThrowRequest);
   const onDiceThrowResultRef = useRef(onDiceThrowResult);
+  const onGuestPassRef = useRef(onGuestPass);
+  const onTurnStatusRef = useRef(onTurnStatus);
+  const onStoryStreamRef = useRef(onStoryStream);
+  const onTTSAudioRef = useRef(onTTSAudio);
+  const onFloorStateRef = useRef(onFloorState);
+  const onFloorTakeRef = useRef(onFloorTake);
+  const onFloorReleaseRef = useRef(onFloorRelease);
+  // Latest storyData, so the host-peer-connected handler can push a current
+  // snapshot to a freshly-joined guest without re-subscribing. Synced in an
+  // effect (not during render) per React's rules on refs.
+  const storyDataRef = useRef(storyData);
+  useEffect(() => {
+    storyDataRef.current = storyData;
+  }, [storyData]);
   useEffect(() => {
     onGuestActionRef.current = onGuestAction;
     onSnapshotRef.current = onSnapshot;
@@ -78,6 +117,13 @@ export function useNetSession({
     onPeerLeftRef.current = onPeerLeft;
     onDiceThrowRequestRef.current = onDiceThrowRequest;
     onDiceThrowResultRef.current = onDiceThrowResult;
+    onGuestPassRef.current = onGuestPass;
+    onTurnStatusRef.current = onTurnStatus;
+    onStoryStreamRef.current = onStoryStream;
+    onTTSAudioRef.current = onTTSAudio;
+    onFloorStateRef.current = onFloorState;
+    onFloorTakeRef.current = onFloorTake;
+    onFloorReleaseRef.current = onFloorRelease;
   }, [
     onGuestAction,
     onSnapshot,
@@ -85,6 +131,13 @@ export function useNetSession({
     onPeerLeft,
     onDiceThrowRequest,
     onDiceThrowResult,
+    onGuestPass,
+    onTurnStatus,
+    onStoryStream,
+    onTTSAudio,
+    onFloorState,
+    onFloorTake,
+    onFloorRelease,
   ]);
 
   // attach() calls itself (indirectly, via this ref) when a guest needs to
@@ -116,6 +169,19 @@ export function useNetSession({
     });
     session.onDiceThrowRequest((request) => onDiceThrowRequestRef.current?.(request));
     session.onDiceThrowResult((result) => onDiceThrowResultRef.current?.(result));
+    session.onGuestPass((localPlayerId) => onGuestPassRef.current?.(localPlayerId));
+    session.onTurnStatus((status) => onTurnStatusRef.current?.(status));
+    session.onStoryStream((update) => onStoryStreamRef.current?.(update));
+    session.onTTSAudio((chunk) => onTTSAudioRef.current?.(chunk));
+    session.onFloorState((floor) => onFloorStateRef.current?.(floor));
+    session.onFloorTake((localPlayerId) => onFloorTakeRef.current?.(localPlayerId));
+    session.onFloorRelease((localPlayerId) => onFloorReleaseRef.current?.(localPlayerId));
+    // Host-only: a fresh peer connected - push current state so the joiner has
+    // the saved-profile roster to pick from before it claims a seat.
+    session.onHostPeerConnected(() => {
+      const current = storyDataRef.current;
+      if (current) session.broadcastSnapshot(current);
+    });
     session.onBackendSwitch(async (to) => {
       try {
         const next = await session.switchBackend(to);
@@ -227,6 +293,46 @@ export function useNetSession({
     [],
   );
 
+  // Guest-only: claim a profile (saved or freshly created) and take a seat.
+  const announceProfile = useCallback((profile: ClaimedProfile) => {
+    const session = sessionRef.current;
+    if (!session) return;
+    session.announceProfile(profile);
+    setNetSession(session.info());
+  }, []);
+
+  const hasAnnouncedProfile = useCallback((): boolean => {
+    return sessionRef.current?.hasAnnouncedProfile() ?? false;
+  }, []);
+
+  const sendPass = useCallback(() => {
+    sessionRef.current?.sendPass();
+  }, []);
+
+  const broadcastTurnStatus = useCallback((status: TurnStatus) => {
+    sessionRef.current?.broadcastTurnStatus(status);
+  }, []);
+
+  const broadcastStoryStream = useCallback((update: StoryStreamUpdate) => {
+    sessionRef.current?.broadcastStoryStream(update);
+  }, []);
+
+  const broadcastTTSAudio = useCallback((chunk: TTSAudioChunk) => {
+    sessionRef.current?.broadcastTTSAudio(chunk);
+  }, []);
+
+  const broadcastFloorState = useCallback((floor: FloorSnapshot) => {
+    sessionRef.current?.broadcastFloorState(floor);
+  }, []);
+
+  const sendFloorTake = useCallback(() => {
+    sessionRef.current?.sendFloorTake();
+  }, []);
+
+  const sendFloorRelease = useCallback(() => {
+    sessionRef.current?.sendFloorRelease();
+  }, []);
+
   useEffect(() => {
     if (!netSession || netSession.role !== "host" || loading || !storyData) return;
     sessionRef.current?.broadcastSnapshot(storyData);
@@ -255,5 +361,14 @@ export function useNetSession({
     sendOOCChat,
     sendDiceThrowRequest,
     sendDiceThrowResult,
+    announceProfile,
+    hasAnnouncedProfile,
+    sendPass,
+    broadcastTurnStatus,
+    broadcastStoryStream,
+    broadcastTTSAudio,
+    broadcastFloorState,
+    sendFloorTake,
+    sendFloorRelease,
   };
 }

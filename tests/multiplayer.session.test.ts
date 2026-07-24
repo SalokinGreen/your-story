@@ -123,6 +123,10 @@ async function createHostAndGuest(hostId: string, guestId: string) {
   const host = await NetSession.createHost("manual", "Host Name", "#111111");
   setLocalPlayerId(guestId);
   const guest = await NetSession.joinAsGuest("manual", "TESTROOM", "Guest Name", "#222222");
+  // presence_join is deferred until a profile is claimed - claim one keyed by
+  // the guest's id so the host establishes the seat (mirroring the old
+  // auto-announce behavior these tests were written against).
+  guest.announceProfile({ profileId: guestId, name: "Guest Name", color: "#222222" });
   return { host, guest };
 }
 
@@ -150,12 +154,65 @@ describe("NetSession", () => {
     host.onGuestJoined(joined);
 
     setLocalPlayerId("guest-1");
-    await NetSession.joinAsGuest("manual", "TESTROOM", "Guest Name", "#222222");
+    const guest = await NetSession.joinAsGuest("manual", "TESTROOM", "Guest Name", "#222222");
+    // Deferred: the host learns the seat only once the guest claims a profile.
+    expect(joined).not.toHaveBeenCalled();
+    guest.announceProfile({
+      profileId: "guest-1",
+      name: "Guest Name",
+      color: "#222222",
+    });
 
     expect(joined).toHaveBeenCalledWith({
       localPlayerId: "guest-1",
       displayName: "Guest Name",
       color: "#222222",
+      archetype: null,
+      personalityTags: null,
+      wishTags: null,
+    });
+  });
+
+  it("carries a claimed profile's full fields to the host on join", async () => {
+    const [hostTransport, guestTransport] = createFakeTransportPair();
+    createTransport.mockImplementationOnce(() => hostTransport).mockImplementationOnce(() => guestTransport);
+
+    setLocalPlayerId("host-1");
+    const host = await NetSession.createHost("manual", "Host Name", "#111111");
+    const joined = vi.fn();
+    host.onGuestJoined(joined);
+
+    setLocalPlayerId("device-xyz");
+    const guest = await NetSession.joinAsGuest("manual", "TESTROOM", "Temp", "#000000");
+    // Resume a *saved* profile whose id differs from this device's id - the
+    // seat should be keyed by the claimed profile id, not the device.
+    guest.announceProfile({
+      profileId: "saved-hero",
+      name: "Aria",
+      color: "#22c55e",
+      archetype: "storyteller",
+      personalityTags: ["curious"],
+      wishTags: ["mystery"],
+    });
+
+    expect(joined).toHaveBeenCalledWith({
+      localPlayerId: "saved-hero",
+      displayName: "Aria",
+      color: "#22c55e",
+      archetype: "storyteller",
+      personalityTags: ["curious"],
+      wishTags: ["mystery"],
+    });
+
+    // Actions from this peer now attribute to the claimed profile id.
+    const action = vi.fn();
+    host.onGuestAction(action);
+    guest.sendChoice(1);
+    expect(action).toHaveBeenCalledWith({
+      localPlayerId: "saved-hero",
+      kind: "choice",
+      choiceIndex: 1,
+      text: null,
     });
   });
 
@@ -443,5 +500,114 @@ describe("NetSession", () => {
     guest.sendDiceThrowResult("never-requested", [1]);
 
     expect(result).not.toHaveBeenCalled();
+  });
+
+  it("delivers a guest's pass to the host with the trusted seat id", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const passed = vi.fn();
+    host.onGuestPass(passed);
+
+    guest.sendPass();
+
+    expect(passed).toHaveBeenCalledWith("guest-1");
+  });
+
+  it("ignores a pass / floor request from an unseated peer", async () => {
+    const [hostTransport, rogueTransport] = createFakeTransportPair();
+    createTransport.mockImplementationOnce(() => hostTransport);
+    setLocalPlayerId("host-1");
+    const host = await NetSession.createHost("manual", "Host", "#111111");
+
+    const passed = vi.fn();
+    const took = vi.fn();
+    host.onGuestPass(passed);
+    host.onFloorTake(took);
+
+    rogueTransport.send({ type: "player_pass", playerId: "impostor" });
+    rogueTransport.send({ type: "floor_take", playerId: "impostor" });
+
+    expect(passed).not.toHaveBeenCalled();
+    expect(took).not.toHaveBeenCalled();
+  });
+
+  it("relays party-voice floor take/release to the host, seat-trusted", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const took = vi.fn();
+    const released = vi.fn();
+    host.onFloorTake(took);
+    host.onFloorRelease(released);
+
+    guest.sendFloorTake();
+    guest.sendFloorRelease();
+
+    expect(took).toHaveBeenCalledWith("guest-1");
+    expect(released).toHaveBeenCalledWith("guest-1");
+  });
+
+  it("broadcasts turn status, story stream, tts audio and floor state to guests", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const turnStatus = vi.fn();
+    const storyStream = vi.fn();
+    const ttsAudio = vi.fn();
+    const floorState = vi.fn();
+    guest.onTurnStatus(turnStatus);
+    guest.onStoryStream(storyStream);
+    guest.onTTSAudio(ttsAudio);
+    guest.onFloorState(floorState);
+
+    host.broadcastTurnStatus({
+      phase: "collecting",
+      submittedPlayerIds: ["host-1"],
+      passedPlayerIds: [],
+      expectedPlayerIds: ["host-1", "guest-1"],
+    });
+    host.broadcastStoryStream({
+      turnId: "t1",
+      text: "The door creaks open",
+      stage: "story",
+      done: false,
+    });
+    host.broadcastTTSAudio({ turnId: "t1", index: 0, dataB64: "AAAA", done: false });
+    host.broadcastFloorState({ holderId: "guest-1", lockedOutIds: ["host-1"] });
+
+    expect(turnStatus).toHaveBeenCalledWith({
+      phase: "collecting",
+      submittedPlayerIds: ["host-1"],
+      passedPlayerIds: [],
+      expectedPlayerIds: ["host-1", "guest-1"],
+    });
+    expect(storyStream).toHaveBeenCalledWith({
+      turnId: "t1",
+      text: "The door creaks open",
+      stage: "story",
+      done: false,
+    });
+    expect(ttsAudio).toHaveBeenCalledWith({
+      turnId: "t1",
+      index: 0,
+      dataB64: "AAAA",
+      done: false,
+    });
+    expect(floorState).toHaveBeenCalledWith({
+      holderId: "guest-1",
+      lockedOutIds: ["host-1"],
+    });
+  });
+
+  it("won't let a guest broadcast host-only feeds or a host send guest-only ones", async () => {
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const guestTurnStatus = vi.fn();
+    const hostFloorTake = vi.fn();
+    guest.onTurnStatus(guestTurnStatus);
+    host.onFloorTake(hostFloorTake);
+
+    // Guest can't broadcast a host-authoritative feed...
+    guest.broadcastFloorState({ holderId: "guest-1", lockedOutIds: [] });
+    // ...and a host can't send a guest-only floor request.
+    host.sendFloorTake();
+    host.sendPass();
+
+    expect(guestTurnStatus).not.toHaveBeenCalled();
+    expect(hostFloorTake).not.toHaveBeenCalled();
   });
 });

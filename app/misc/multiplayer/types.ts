@@ -2,7 +2,7 @@
 // Kept out of structs.ts because these describe transient connection state,
 // not persisted StoryData.
 
-import { StoryData, ScenePart } from "@/app/misc/structs";
+import { StoryData, ScenePart, PlayerArchetype } from "@/app/misc/structs";
 
 export type MPBackend = "torrent" | "nostr" | "mqtt" | "peerjs" | "manual";
 export type MPRole = "host" | "guest";
@@ -49,8 +49,79 @@ export type WireMessage =
       playerId: string;
       state: PresenceActivityState;
     }
-  | { type: "presence_join"; playerId: string; name: string; color: string }
+  | {
+      type: "presence_join";
+      // The CLAIMED player-profile id, which a guest picks when joining: either
+      // an existing saved profile's id (resuming that seat from any device) or
+      // a freshly-generated id for a brand-new profile. Not necessarily the
+      // guest's device id - see NetSession.announceProfile / getLocalPlayerId.
+      playerId: string;
+      name: string;
+      color: string;
+      // Full profile fields so the host can rebuild a complete CouchPlayer
+      // (bubble + director-layer data), not just a bare name/color seat. Only
+      // sent for guest-created profiles; omitted when resuming a saved one the
+      // host already has.
+      archetype?: PlayerArchetype | null;
+      personalityTags?: string[] | null;
+      wishTags?: string[] | null;
+    }
   | { type: "backend_switch"; to: MPBackend }
+  // Host -> guests: who has submitted / passed for the current collection
+  // round, and who's still expected. Lets guests show a "waiting on N players"
+  // lobby instead of a blind spinner while the host batches everyone's input
+  // into a single turn (see turnBatch.ts). "generating" means the batched turn
+  // has started; "collecting" means the host is still waiting on inputs.
+  | {
+      type: "turn_status";
+      phase: "collecting" | "generating";
+      submittedPlayerIds: string[];
+      passedPlayerIds: string[];
+      expectedPlayerIds: string[];
+      seq: number;
+    }
+  // Guest -> host: this player has nothing to add this round; count them ready
+  // so the turn can fire without waiting on them. Seat-trusted like
+  // player_action (the host re-derives the real speaker from its seat map).
+  | { type: "player_pass"; playerId: string }
+  // Host -> guests: the host's narration as it streams, so guests watch the
+  // story being written live (and can TTS it) instead of only seeing the final
+  // snapshot. `done` flips true on the last chunk of a turn; the authoritative
+  // StoryData still arrives via state_snapshot afterward. turnId lets a guest
+  // discard late chunks from a previous turn.
+  | {
+      type: "story_stream";
+      turnId: string;
+      text: string;
+      stage: "gm" | "story" | "choices" | null;
+      done: boolean;
+      seq: number;
+    }
+  // Host -> guests: one relayed MP3 chunk of the host's TTS narration, so
+  // guests hear exactly what the host hears without needing their own TTS key.
+  // Bytes are base64 to stay JSON-safe across both transports; `index` is the
+  // chunk's play order, and a new turnId resets the guest's relay buffer.
+  | {
+      type: "tts_audio";
+      turnId: string;
+      index: number;
+      dataB64: string;
+      done: boolean;
+    }
+  // Host -> guests: party-voice floor state. Only one player holds the mic at a
+  // time; a just-interrupted player is briefly locked out so they can't steal
+  // it straight back (see floorControl.ts). Host is authoritative.
+  | {
+      type: "floor_state";
+      holderId: string | null;
+      lockedOutIds: string[];
+      seq: number;
+    }
+  // Guest -> host: I tapped my mic and want the floor (last-presser-wins). Host
+  // arbitrates and answers with floor_state. Seat-trusted like player_action.
+  | { type: "floor_take"; playerId: string }
+  // Guest -> host: I released the floor (finished/cancelled my recording).
+  | { type: "floor_release"; playerId: string }
   // Physical dice mode: host asks a specific guest (the one whose freeform/
   // voice action triggered this turn) to throw the dice themselves, rather
   // than the host throwing locally on their behalf.

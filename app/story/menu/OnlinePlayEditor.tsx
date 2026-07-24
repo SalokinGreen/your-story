@@ -110,6 +110,46 @@ export default function OnlinePlayEditor({
     }
   }
 
+  // Re-establish the same room (same code + backend) after a drop/timeout,
+  // rather than minting a new code. Reuses switchBackend's leave-and-rejoin,
+  // which preserves roomId/identity (and re-claims the guest's profile).
+  async function handleReestablish() {
+    if (!netSession) return;
+    setSwitching(true);
+    try {
+      await switchBackend(netSession.backend);
+      addNotification(
+        netSession.role === "host" ? "Room re-established" : "Reconnected",
+        "success",
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Couldn't re-establish the room";
+      addNotification(message, "failure");
+    } finally {
+      setSwitching(false);
+    }
+  }
+
+  function buildInviteLink(): string {
+    if (!netSession || typeof window === "undefined") return "";
+    const url = new URL(window.location.origin);
+    url.searchParams.set("join", netSession.roomId);
+    url.searchParams.set("provider", netSession.backend);
+    return url.toString();
+  }
+
+  async function copyInviteLink() {
+    const link = buildInviteLink();
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      addNotification("Invite link copied - anyone can join from it", "success");
+    } catch {
+      addNotification("Couldn't copy the link", "failure");
+    }
+  }
+
   if (netSession) {
     return (
       <div className="p-4 bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 space-y-3">
@@ -142,6 +182,16 @@ export default function OnlinePlayEditor({
             <DynamicIcon name="Copy" className="w-4 h-4" />
           </button>
         </div>
+
+        <button
+          type="button"
+          onClick={copyInviteLink}
+          className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all bg-white/5 hover:bg-white/10 text-blue-100 border border-white/10 flex items-center justify-center gap-2"
+          title="Copy a link that opens straight to the join screen (code + connection built in)"
+        >
+          <DynamicIcon name="Link" className="w-4 h-4" />
+          Copy invite link
+        </button>
 
         {netSession.role === "host" ? (
           <div className="space-y-1.5">
@@ -186,6 +236,17 @@ export default function OnlinePlayEditor({
             ))}
           </div>
         )}
+
+        <button
+          type="button"
+          onClick={handleReestablish}
+          disabled={switching || busy}
+          className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg transition-all bg-white/5 hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed text-blue-100 border border-white/10 flex items-center justify-center gap-2"
+          title="Reconnect using the same room code (use this if the connection dropped or timed out)"
+        >
+          {switching && <DynamicIcon name="Loader2" className="w-4 h-4 animate-spin" />}
+          {netSession.role === "host" ? "Re-establish room" : "Reconnect"}
+        </button>
 
         <button
           type="button"
