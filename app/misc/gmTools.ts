@@ -289,6 +289,18 @@ export interface SetReasoningTierParams {
   reason: string; // One line: why this needs more reasoning
 }
 
+/**
+ * Start Game - called once, when session zero (premise/character setup)
+ * wraps up and real play begins. Names the story (replacing the generic
+ * "New Story" default) and optionally records the agreed premise. Also the
+ * signal the reasoning-tier router uses to drop back out of the forced
+ * top-tier session-zero mode (see sessionZeroActive in structs.ts).
+ */
+export interface StartGameParams {
+  story_name: string;
+  premise?: string;
+}
+
 // ============================================
 // COMBAT SYSTEM INTERFACES
 // ============================================
@@ -634,7 +646,8 @@ export type GMToolParams =
   | { name: "npc_reaction"; params: NPCReactionParams }
   | { name: "reaction_check"; params: ReactionCheckParams }
   | { name: "negotiate_price"; params: NegotiatePriceParams }
-  | { name: "delegate_task"; params: DelegateTaskParams };
+  | { name: "delegate_task"; params: DelegateTaskParams }
+  | { name: "start_game"; params: StartGameParams };
 
 // ============================================
 // GM TOOL SCHEMAS
@@ -1403,6 +1416,32 @@ const setReasoningTierTool: ToolSchema = {
         },
       },
       required: ["tier", "reason"],
+    },
+  },
+};
+
+const startGameTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "start_game",
+    description: `Call this ONCE, when session zero (premise-building, character creation, setting/tone discussion) is done and real play is about to begin.
+
+This names the story - replacing the generic placeholder it starts with - and hands off from session zero into the game proper. Do not call this while you're still working out premise/character details with the player; call it right when you're about to narrate the opening scene.`,
+    parameters: {
+      type: "object",
+      properties: {
+        story_name: {
+          type: "string",
+          description:
+            "A short, evocative title for this story (e.g. 'Ashes of the Ninth Legion'), based on the premise and setting agreed during session zero.",
+        },
+        premise: {
+          type: "string",
+          description:
+            "Optional: a 1-3 sentence summary of the agreed premise/setup, for the story's records.",
+        },
+      },
+      required: ["story_name"],
     },
   },
 };
@@ -2490,6 +2529,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   endGmThinkingTool,
   // Reasoning-tier self-escalation
   setReasoningTierTool,
+  // Session zero -> real play handoff
+  startGameTool,
 ];
 
 /**

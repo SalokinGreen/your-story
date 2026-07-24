@@ -1344,10 +1344,19 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
       ? `\n## 🆕 FRESH STORY - SETUP NEEDED
 This is a brand-new story with no established setting or character yet - the player skipped adventure creation to talk to you directly.
 - If the player's message doesn't give you enough to go on (genre, tone, character concept), ask up to 1-3 concise, friendly questions before creating anything. Do NOT narrate a full opening scene yet - just respond conversationally (use OOC round-brackets or plain text).
-- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (name, starting stats/resources/abilities fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + a beat spine sized to the campaign's scope, with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section for the length presets and how to pick one), then narrate the opening scene.
+- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (name, starting stats/resources/abilities fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + a beat spine sized to the campaign's scope, with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section for the length presets and how to pick one). Then call \`start_game\` with a title for the story and a short premise summary, and narrate the opening scene.
 - If ANY lore/mechanics/dm_instructions notes already exist on this story (e.g. from an adventure template), \`read_notes\` or \`search_notes\` them before writing the character sheet, mechanics, or plan notes - ground what you create in what's already established instead of inventing a setting from scratch. This is ENFORCED for the plan: \`create_note\` will refuse to create the "Campaign Plan" note until you've called \`read_notes\`/\`search_notes\` this turn, if any such notes exist.
 - Keep the interview short - one or two exchanges at most before diving in.
 `
+      : "";
+
+  // Session zero already done via the creation wizard (character_sheet note
+  // exists), but the story hasn't formally started yet - freshStorySetupBlock
+  // above doesn't fire in this case, so this is the only nudge telling the GM
+  // to call start_game before narrating the opening scene.
+  const sessionZeroStartGameReminder =
+    storyData.sessionZeroActive && characterSheetLore.length > 0
+      ? `\n## 🎬 START OF PLAY\nThis story already has its setup (character sheet/premise) from the creation wizard, but hasn't formally started yet. Before narrating the opening scene, call \`start_game\` with a title for the story (and a short premise summary if useful) to kick off play.\n`
       : "";
 
   // 🎲 Manual dice mode: the players roll physical dice at the table. The
@@ -1381,7 +1390,7 @@ The players roll REAL dice at the table. For ANY roll a player character makes:
   );
 
   const systemPrompt = `You ARE the Game Master. Run this like a real tabletop session.
-${freshStorySetupBlock}
+${freshStorySetupBlock}${sessionZeroStartGameReminder}
 ## CORE STANCE (read this first)
 1. **You resolve, the player decides.** Never narrate what the player character says, thinks, feels, chooses, or does next - only the outcome of the action they already declared. (Full agency rules below.)
 2. **Roll only when it matters.** Call a dice or oracle tool ONLY when the outcome is genuinely uncertain AND a failure would change the fiction. Casual talk, description, simple movement, and foregone conclusions need no roll - just narrate them. Never invent a check to look busy or call a tool every turn out of habit.

@@ -201,6 +201,9 @@ function isBossFight(combatState: CombatState): boolean {
 
 /** Hard floor — rules win regardless of classifier/decay/self-escalation. */
 export function hardRuleFloor(state: StoryData): number {
+  // Session zero (premise/character setup, before the GM calls start_game)
+  // is inherently campaign-shaping - always run it at the top tier.
+  if (state.sessionZeroActive) return TOP_TIER;
   if (state.combatState?.active) {
     return isBossFight(state.combatState) ? 3 : 2;
   }
