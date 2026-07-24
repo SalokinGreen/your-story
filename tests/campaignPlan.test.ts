@@ -9,9 +9,13 @@ import { describe, it, expect } from "vitest";
 import { executeTools, ToolCall } from "@/app/misc/toolExecutor";
 import {
   CAMPAIGN_SPINE_BEATS,
+  CAMPAIGN_SPINE_SHORT,
+  CAMPAIGN_SPINE_MEDIUM,
+  CAMPAIGN_SPINE_LONG,
   isPlanAwaitingNextBeat,
   findSpinePlanNote,
   currentBeatName,
+  initPlanState,
 } from "@/app/misc/campaignPlan";
 import type { StoryData, StoryLore } from "@/app/misc/structs";
 
@@ -98,6 +102,39 @@ describe("campaignPlan helpers", () => {
   });
 });
 
+describe("spine length presets", () => {
+  it("defaults initPlanState to the medium preset", () => {
+    const plan = initPlanState("Campaign Plan");
+    expect(plan.beats).toEqual([...CAMPAIGN_SPINE_MEDIUM]);
+    expect(plan.spineLength).toBe("medium");
+  });
+
+  it("initPlanState honors an explicit short/long preset", () => {
+    expect(initPlanState("Campaign Plan", "short").beats).toEqual([
+      ...CAMPAIGN_SPINE_SHORT,
+    ]);
+    expect(initPlanState("Campaign Plan", "long").beats).toEqual([
+      ...CAMPAIGN_SPINE_LONG,
+    ]);
+  });
+
+  it("initPlanState falls back to medium for an unrecognized length value", () => {
+    // Defensive fallback (the executor path is guarded by enum validation
+    // upstream, but the helper itself should never produce an empty spine).
+    const plan = initPlanState("Campaign Plan", "epic" as never);
+    expect(plan.beats).toEqual([...CAMPAIGN_SPINE_MEDIUM]);
+  });
+
+  it("the long preset has meaningfully more beats than short/medium", () => {
+    expect(CAMPAIGN_SPINE_LONG.length).toBeGreaterThan(
+      CAMPAIGN_SPINE_MEDIUM.length,
+    );
+    expect(CAMPAIGN_SPINE_MEDIUM.length).toBeGreaterThan(
+      CAMPAIGN_SPINE_SHORT.length,
+    );
+  });
+});
+
 describe("create_note initializes plan state for the spine note", () => {
   it("initializes planState when a gm_plan 'Campaign Plan' note is created", () => {
     const story = createTestStory();
@@ -115,6 +152,40 @@ describe("create_note initializes plan state for the spine note", () => {
     expect(story.planState?.currentBeatIndex).toBe(0);
     expect(story.planState?.beats).toEqual([...CAMPAIGN_SPINE_BEATS]);
     expect(story.planState?.spineNoteTitle).toBe("Campaign Plan");
+  });
+
+  it("initializes planState with the requested spine length preset", () => {
+    const story = createTestStory();
+    executeTools(
+      [
+        call("create_note", {
+          title: "Campaign Plan",
+          content: "premise + spine",
+          type: "gm_plan",
+          planSpineLength: "long",
+        }),
+      ],
+      story,
+    );
+    expect(story.planState?.spineLength).toBe("long");
+    expect(story.planState?.beats).toEqual([...CAMPAIGN_SPINE_LONG]);
+  });
+
+  it("rejects create_note with a planSpineLength outside the enum", () => {
+    const story = createTestStory();
+    const { responses } = executeTools(
+      [
+        call("create_note", {
+          title: "Campaign Plan",
+          content: "premise + spine",
+          type: "gm_plan",
+          planSpineLength: "epic",
+        }),
+      ],
+      story,
+    );
+    expect(responses[0].success).toBe(false);
+    expect(story.planState).toBeUndefined();
   });
 
   it("does NOT initialize planState for a non-spine gm_plan note (e.g. an arc)", () => {
