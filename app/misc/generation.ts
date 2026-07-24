@@ -47,6 +47,8 @@ import {
   buildObserverWarningNote,
   buildObserverCorrectionNote,
   rewriteFlaggedNarration,
+  reconcileGmConversationAfterRewrite,
+  reconcileGmThinkingAfterRewrite,
   settingsFor,
   canObserverTriggerReset,
   ObserverSettings,
@@ -987,6 +989,21 @@ export async function generateStoryTurn(
           result.scenePart = {
             ...result.scenePart,
             content: rewrittenNarration,
+            // Reconcile the GM's saved history so the next turn replays the
+            // corrected narration + why, not the discarded draft (see
+            // reconcileGmConversationAfterRewrite). gmConversation is the live
+            // replay path; gmThinking is the legacy fallback, reconciled too
+            // so the two never disagree.
+            gmConversation: reconcileGmConversationAfterRewrite(
+              result.scenePart.gmConversation,
+              rewrittenNarration,
+              majorFlag,
+            ),
+            gmThinking: reconcileGmThinkingAfterRewrite(
+              result.scenePart.gmThinking,
+              rewrittenNarration,
+              majorFlag,
+            ),
           };
           callbacks.onObserverRewrite?.(flags, majorFlag, rewrittenNarration);
 
