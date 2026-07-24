@@ -266,18 +266,22 @@ appeal — plus the GM-side cause of the second one.
 
 ### Layer 5 (Adjudication) — scoped, informed, and reversible
 
-- **Session zero is never judged** (`observerSuspensionReason`). A brand-new
-  story, up to *and including* the turn that calls `start_game`, is setup, not
-  play: the GM is interviewing the player, writing the character sheet /
-  mechanics / campaign plan, and narrating an opening that legitimately runs
-  far past any reply-length band. Every check there was a false positive
-  waiting to happen, and the correction it triggered damaged the one turn the
-  whole campaign is built on. The `start_game` turn is included deliberately —
-  `sessionZeroActive` flips false mid-turn when the tool executes, so
-  `generateStoryTurn` reads the flag off the **pre-turn snapshot** and also
-  checks the turn's tool names; otherwise the wrap-up turn would have been the
-  single part of session zero that still got judged. Suspension skips the
-  blocking *and* background observer passes, so it costs no API calls.
+- **Setup is never judged** (`observerSuspensionReason`). While the GM is
+  interviewing the player, writing the character sheet / mechanics / campaign
+  plan, and narrating an opening, it legitimately runs far past any
+  reply-length band and legitimately proposes things about the player
+  character. Every check there was a false positive waiting to happen, and the
+  correction it triggered damaged the one turn the whole campaign is built on.
+  Three signals, because no one of them covers every way a story starts:
+  `sessionZeroActive`; a `start_game` call this turn (the flag flips false
+  mid-turn when the tool executes, so `generateStoryTurn` reads it off the
+  **pre-turn snapshot** and checks tool names too — otherwise the wrap-up turn
+  would be the single part of session zero that still got judged); and the
+  absence of a `character_sheet` note, which is the same condition
+  `buildGMStagePrompt` uses for its "FRESH STORY — SETUP NEEDED" block and the
+  only thing covering adventure-started stories (`startAdventureLocally` never
+  sets `sessionZeroActive`) mid character creation. Suspension skips the
+  blocking *and* background passes, so it costs no API calls.
 - **The judges are told who the player character is**
   (`buildObserverCharacterContext` / `formatCharacterContextBlock`). Every
   LLM-backed check previously saw exactly two things: the player's declared
@@ -296,15 +300,30 @@ appeal — plus the GM-side cause of the second one.
   doesn't (padding, restating a beat, narrating past the player's turn), and
   sees `gmStoryContext` so a turn narrating five roll results isn't judged
   against the same yardstick as one narrating a single line of dialogue.
-- **Rewrites are reversible** (`ScenePart.observerRewriteOriginal`, the "Undo
-  revision" button in `story.tsx`). The observer is a judge, not an oracle: a
-  turn it cut for length may have been the long explanation the player wanted.
-  The discarded draft — prose, the choices parsed from it, and the GM history
-  as it stood before `reconcileGmConversationAfterRewrite` — is stored on the
-  scene part, and one click puts all three back. Restoring also clears
-  `correctedObserverFlags`, so the next turn's prompt doesn't scold the GM for
-  prose that is back in play. Editing the turn by hand clears the stored
-  original for the same reason.
+- **Rewrites are grounded in the turn they're rewriting.**
+  `rewriteFlaggedNarration` used to be a standalone two-message prompt holding
+  the player's action, the flagged text, and the roll results — no premise, no
+  scene history, no notes, no character sheet. It was being asked to rewrite
+  prose for a story it could not see, and it showed: rewrites came back
+  reading like they belonged to a different game. It now **continues the
+  turn's own conversation** (`GenerationResult.gmPromptMessages`, the same
+  base-messages-plus-history array the story stage continues via
+  `buildStoryContinuationPrompt`), with the correction appended as the final
+  user turn, and the instruction pins it to the same moment: same scene, same
+  events, same outcome, no advancing the story, no new characters or places.
+  The old standalone prompt survives as the fallback when no conversation is
+  available.
+- **Rewrites are reversible** (`ScenePart.observerRewriteOriginal`). The
+  observer is a judge, not an oracle: a turn it cut for length may have been
+  the long explanation the player wanted. The discarded draft — prose, the
+  choices parsed from it, and the GM history as it stood before
+  `reconcileGmConversationAfterRewrite` — is stored on the scene part, and the
+  **existing Undo button** puts all three back: Undo peels off the revision
+  first, and a second press undoes the whole turn the normal way. (No separate
+  button — Undo already means "walk back the most recent change".) Restoring
+  clears `correctedObserverFlags`, so the next turn's prompt doesn't scold the
+  GM for prose that is back in play; editing the turn by hand clears the
+  stored original for the same reason.
 
 ### GM prompt — the character sheet as live input, not an opening handout
 

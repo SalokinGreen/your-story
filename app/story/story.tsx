@@ -111,10 +111,6 @@ interface StoryProps {
   canUndo?: boolean;
   onStop?: () => void;
   onEdit?: (rawText: string, partIndex: number) => void;
-  // Puts back the GM's original draft after the Observer rewrote a turn (see
-  // ScenePart.observerRewriteOriginal). Only offered when the last part
-  // actually carries a stored original.
-  onRestoreObserverOriginal?: () => void;
   viewingPartIndex?: number | null;
   onNavigateLeft?: () => void;
   onNavigateRight?: () => void;
@@ -759,7 +755,6 @@ export default function Story({
   canUndo,
   onStop,
   onEdit,
-  onRestoreObserverOriginal,
   viewingPartIndex,
   onNavigateLeft,
   onNavigateRight,
@@ -811,9 +806,9 @@ export default function Story({
   }, []);
 
   // Set when the Observer rewrote the latest turn and the GM's original draft
-  // is still stored on the part (ScenePart.observerRewriteOriginal) - drives
-  // the "Undo revision" button below. Cleared the moment the player restores
-  // it or a new turn is generated.
+  // is still stored on the part (ScenePart.observerRewriteOriginal). No button
+  // of its own - it just relabels Undo, which peels the revision off first
+  // (see page.tsx's handleUndo) before undoing the turn itself.
   const observerRewriteOriginal = React.useMemo(() => {
     const parts = storyData?.scene?.parts || [];
     const last = parts[parts.length - 1];
@@ -1520,10 +1515,16 @@ export default function Story({
                   onClick={onUndo}
                   disabled={loading || !!loadingStage}
                   className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-blue-200/70 hover:text-white hover:bg-white/10 active:bg-white/15 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                  title="Undo last action"
+                  title={
+                    observerRewriteOriginal
+                      ? `The Observer revised this response (${observerRewriteOriginal.flag.detail}) - undo puts the GM's original back`
+                      : "Undo last action"
+                  }
                 >
                   <DynamicIcon name="Undo2" className="w-5 h-5 sm:w-4 sm:h-4" />
-                  <span className="hidden sm:inline">Undo</span>
+                  <span className="hidden sm:inline">
+                    {observerRewriteOriginal ? "Undo revision" : "Undo"}
+                  </span>
                 </button>
               )}
               {canRetry && onRetry && (
@@ -1538,25 +1539,6 @@ export default function Story({
                     className="w-5 h-5 sm:w-4 sm:h-4"
                   />
                   <span className="hidden sm:inline">Retry</span>
-                </button>
-              )}
-              {/* Undo an Observer revision: the Observer rewrote this turn,
-                  but its judgement is a heuristic - a turn it cut for length
-                  may have been the long answer the player wanted. One click
-                  puts the GM's original draft (and the choices that came
-                  with it) back. */}
-              {observerRewriteOriginal && onRestoreObserverOriginal && (
-                <button
-                  onClick={onRestoreObserverOriginal}
-                  disabled={loading || !!loadingStage}
-                  className="px-3 py-2.5 sm:px-2 sm:py-1.5 text-sm font-medium text-emerald-300 hover:bg-emerald-500/15 active:bg-emerald-500/20 rounded-lg transition-colors flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed touch-manipulation"
-                  title={`The Observer revised this response (${observerRewriteOriginal.flag.detail}) - click to restore the GM's original`}
-                >
-                  <DynamicIcon
-                    name="History"
-                    className="w-5 h-5 sm:w-4 sm:h-4"
-                  />
-                  <span className="hidden sm:inline">Undo revision</span>
                 </button>
               )}
               {onEdit && !loading && !loadingStage && (

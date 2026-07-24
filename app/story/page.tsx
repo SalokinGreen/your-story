@@ -1160,10 +1160,18 @@ function StoryPageContent() {
     // state), but every push/pop site below also calls setStoryData or
     // setCanUndo directly afterward, so this effect re-reads a fresh value
     // whenever it matters.
+    // An Observer revision is undoable without a snapshot - restoring the
+    // GM's original draft only touches the scene part's own text/choices/GM
+    // history, never mechanical state, so it doesn't need one.
+    const hasObserverRevision = Boolean(
+      hasAIPart && lastPart.observerRewriteOriginal,
+    );
+
     setCanUndo(
-      storyData.scene.parts.length > 1 &&
-        hasAIPart &&
-        undoStackRef.current.length > 0,
+      hasObserverRevision ||
+        (storyData.scene.parts.length > 1 &&
+          hasAIPart &&
+          undoStackRef.current.length > 0),
     );
 
     // Can retry if we have at least 1 part and last part is from AI
@@ -3937,6 +3945,18 @@ function StoryPageContent() {
   async function handleUndo() {
     if (!storyData || loading) return;
 
+    // An Observer revision is the newest thing that happened to this turn, so
+    // Undo peels that off first: one click puts the GM's original draft back,
+    // and a second click undoes the whole turn the normal way. No separate
+    // button - Undo just walks back the most recent change, whatever it was.
+    if (
+      storyData.scene.parts[storyData.scene.parts.length - 1]
+        ?.observerRewriteOriginal
+    ) {
+      await restoreObserverOriginal();
+      return;
+    }
+
     // Check if there are at least 2 parts: user choice + AI response
     if (storyData.scene.parts.length < 2) {
       addNotification("Nothing to undo", "warning");
@@ -4017,8 +4037,9 @@ function StoryPageContent() {
   // judgement is a heuristic - "too long" in particular is often the long
   // explanation the player actually wanted - so the player gets the last
   // word. Restores the prose, the choices parsed from it, and the GM history
-  // together, since the rewrite changed all three.
-  async function handleRestoreObserverOriginal() {
+  // together, since the rewrite changed all three. Reached through the normal
+  // Undo button (handleUndo), not a button of its own.
+  async function restoreObserverOriginal() {
     if (!storyData || loading || loadingStage) return;
 
     const lastIdx = storyData.scene.parts.length - 1;
@@ -4064,7 +4085,10 @@ function StoryPageContent() {
     setStoryData({ ...storyData });
 
     await saveProgress(storyData, true);
-    addNotification("Restored the GM's original response", "success");
+    addNotification(
+      "Undid the Observer's revision - the GM's original response is back",
+      "success",
+    );
   }
 
   async function handleEdit(editedText: string, partIndex: number) {
@@ -4808,7 +4832,6 @@ function StoryPageContent() {
             canUndo={canUndo}
             onStop={handleStop}
             onEdit={handleEdit}
-            onRestoreObserverOriginal={handleRestoreObserverOriginal}
             viewingPartIndex={viewingPartIndex}
             onNavigateLeft={handleNavigateLeft}
             onNavigateRight={handleNavigateRight}

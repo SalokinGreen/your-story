@@ -89,6 +89,7 @@ import {
   StoryData,
 } from "./structs";
 import { ReplyLength, getLengthGuidance } from "./ai_staged";
+import { ChatMessage } from "./chatMessage";
 import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
 import { parseTaggedContent } from "./turnTimeline";
 import { getCustomModelIfUUID } from "./user_settings";
@@ -252,6 +253,21 @@ export interface ObserverCharacterContext {
 const CHARACTER_SHEET_CONTEXT_LIMIT = 1500;
 
 /**
+ * Whether this story has a character_sheet note with anything in it - the
+ * same "has setup happened yet?" test buildGMStagePrompt uses to decide
+ * between its FRESH STORY setup block and normal play. See
+ * observerSuspensionReason, which treats a missing sheet as "still in setup".
+ */
+export function hasCharacterSheetNote(storyData: StoryData): boolean {
+  return (storyData.lore || []).some(
+    (l) =>
+      l.enabled !== false &&
+      l.type === "character_sheet" &&
+      Boolean(l.content?.trim()),
+  );
+}
+
+/**
  * Pulls the observer's "who is who" context out of StoryData. Cheap and
  * synchronous - built once per turn in generation.ts and handed to every
  * judge, so they all reason about the same cast.
@@ -344,27 +360,40 @@ export function formatCharacterContextBlock(
 
 /**
  * Why the observer should sit this turn out entirely, or null if it should
- * run normally. Session zero (StoryData.sessionZeroActive - true from a
- * brand-new story until the GM calls start_game) is setup, not play: the GM
- * is interviewing the player, writing the character sheet/mechanics/campaign
- * plan, and narrating an opening that legitimately needs far more room than
- * any reply-length band allows. Judging it produces nothing but false
- * positives - a length flag on a setup dump, an agency flag on the GM
- * proposing a character concept - and the correction it triggers actively
- * damages the one turn the whole campaign is built on. The start_game turn
- * itself is included: sessionZeroActive flips false the moment the tool
- * executes, mid-turn, so without this the wrap-up turn would be the one turn
- * of session zero that DID get judged.
+ * run normally. Setup is not play: while the GM is interviewing the player,
+ * writing the character sheet/mechanics/campaign plan, and narrating an
+ * opening, it legitimately needs far more room than any reply-length band
+ * allows and legitimately proposes things about the player character.
+ * Judging that produces nothing but false positives - a length flag on a
+ * setup dump, an agency flag on a character concept - and the correction it
+ * triggers damages the one turn the whole campaign is built on.
+ *
+ * Three signals, because no single one covers every way a story starts:
+ * - `sessionZeroActive` (StoryData) - set by the guided freeform flow, true
+ *   until the GM calls start_game.
+ * - a `start_game` call this turn - the flag flips false the moment the tool
+ *   executes, mid-turn, so without this the wrap-up turn would be the one
+ *   turn of session zero that DID get judged.
+ * - no character_sheet note yet (`hasCharacterSheet: false`) - the same
+ *   condition buildGMStagePrompt uses for its "FRESH STORY - SETUP NEEDED"
+ *   block. This is what covers stories started from an adventure
+ *   (startAdventureLocally never sets sessionZeroActive) and any older save:
+ *   if the GM's own prompt still considers this setup, the observer has no
+ *   business grading it.
  */
 export function observerSuspensionReason(params: {
   sessionZeroActive?: boolean;
   toolNames?: string[];
+  hasCharacterSheet?: boolean;
 }): string | null {
   if (params.sessionZeroActive) {
     return "session zero is still active (the GM hasn't called start_game yet)";
   }
   if ((params.toolNames || []).includes("start_game")) {
     return "this turn called start_game (the session-zero wrap-up turn)";
+  }
+  if (params.hasCharacterSheet === false) {
+    return "this story has no character sheet yet (still in setup/character creation)";
   }
   return null;
 }
@@ -427,6 +456,16 @@ export interface RewriteNarrationParams {
   storytellerMode?: "narrator" | "dm";
   /** Who the player character is (and who the NPCs are) - the rewrite has to keep the same cast straight the judge did. */
   characterContext?: ObserverCharacterContext;
+  /**
+   * The exact conversation that produced this turn (GM system prompt + game
+   * state + scene history + this turn's tool calls and results - see
+   * GenerationResult.gmPromptMessages). When present the rewrite CONTINUES
+   * that conversation instead of being prompted from scratch, which is the
+   * difference between "rewrite this paragraph" and "write a paragraph about
+   * something, good luck". Omitted only when a caller has no conversation to
+   * hand over, in which case the old standalone prompt is used.
+   */
+  conversationMessages?: ChatMessage[];
   apiOptions: ObserverApiOptions;
 }
 
@@ -442,6 +481,16 @@ export interface RewriteNarrationParams {
  * specific reason it was flagged, and asks it to rewrite only the prose.
  * The turn's mechanical results (gmStoryContext) are passed through as
  * ground truth the rewrite must stay consistent with, not redone.
+ *
+ * It runs as a CONTINUATION of the turn's own conversation whenever the
+ * caller hands one over (conversationMessages), exactly like the story
+ * stage's buildStoryContinuationPrompt path. It used to be a standalone
+ * two-message prompt holding nothing but the player's action, the flagged
+ * text, and the roll results - no premise, no scene history, no lore, no
+ * character sheet - so a rewrite could only guess at everything the draft
+ * had been grounded in, and produced prose that read like it belonged to a
+ * different story. The standalone prompt survives as the fallback for
+ * callers with no conversation to give.
  *
  * Returns null (fail open) on any API error or empty response - the caller
  * falls back to the old full-turn reset rather than silently keeping
@@ -461,25 +510,57 @@ export async function rewriteFlaggedNarration(
       ? `Write as a Dungeon Master narrating to the player. You may reference dice results naturally. Use second person ("You swing your sword...").`
       : `Write immersive prose - show, don't tell. No dice results or mechanical language.`;
 
-  const system = `You are the Game Master for a tabletop-style interactive fiction game. You just wrote a turn of narration in response to the player's action, but an automated reviewer flagged it for a specific problem - see below.
+  // The rules every rewrite has to obey, whether it runs as a continuation of
+  // the turn's own conversation or from the standalone fallback prompt. The
+  // "same moment" clause is load-bearing: a rewrite that quietly advances the
+  // story, invents a new scene, or introduces people who weren't there is a
+  // worse outcome than the flag it was fixing.
+  const rewriteRules = `Rewrite that narration to fix exactly that problem, and nothing else.
+- Same moment, same scene, same events, same outcome. Do NOT advance the story, start a new scene, skip time, or introduce people, places, or events that weren't already in it.
+- Any dice rolls, checks, and state changes this turn already resolved are ground truth - the rewrite must stay consistent with them. They are NOT re-rolled.
+- Keep everything that was already correct (the tone, the details, the beat it lands on). Fix only what was flagged.
+- ${paragraphs} ${voiceGuidance}
+- Output ONLY the corrected narration prose - no meta-commentary, no explanation of what you changed, no notes to yourself, no tool calls.`;
 
-Rewrite the narration to fix that exact problem. Keep everything that was already correct (the events, the tone, the outcome) - fix only what's wrong. Any mechanical results given below are ground truth and must not change.
+  const flaggedBlock = `Your previous narration for this turn was flagged by an automated reviewer.
 
-${paragraphs} ${voiceGuidance}
+What you wrote (FLAGGED - do not repeat it as-is):
+"""
+${narration.trim()}
+"""
 
-Output ONLY the corrected narration prose - no meta-commentary, no explanation of what you changed, no notes to yourself.`;
+What was wrong: ${flag.detail}
 
-  const contextBlock = gmStoryContext?.trim()
-    ? `\n\nMechanical results this turn (ground truth, do not contradict):\n"""\n${gmStoryContext.trim()}\n"""`
-    : "";
+${rewriteRules}`;
 
-  const user = `Player's declared action:\n"""\n${
-    playerChoice.trim() || "(none - opening scene)"
-  }\n"""${formatCharacterContextBlock(
-    params.characterContext,
-  )}${contextBlock}\n\nYour previous narration (FLAGGED - do not repeat this):\n"""\n${narration.trim()}\n"""\n\nWhat was wrong: ${
-    flag.detail
-  }\n\nRewrite the narration now.`;
+  // Preferred path: continue the conversation that produced the turn, so the
+  // rewrite still has the premise, the scene history, the notes, the character
+  // sheet, and this turn's own tool results in front of it.
+  const conversation = params.conversationMessages || [];
+  const messages: ChatMessage[] = conversation.length
+    ? [...conversation, { role: "user" as const, content: flaggedBlock }]
+    : (() => {
+        // Fallback for callers with no conversation: the old standalone
+        // prompt, which has to restate everything it can from the flag alone.
+        const system = `You are the Game Master for a tabletop-style interactive fiction game. You just wrote a turn of narration in response to the player's action, but an automated reviewer flagged it for a specific problem - see below.
+
+${rewriteRules}`;
+
+        const contextBlock = gmStoryContext?.trim()
+          ? `\n\nMechanical results this turn (ground truth, do not contradict):\n"""\n${gmStoryContext.trim()}\n"""`
+          : "";
+
+        const user = `Player's declared action:\n"""\n${
+          playerChoice.trim() || "(none - opening scene)"
+        }\n"""${formatCharacterContextBlock(
+          params.characterContext,
+        )}${contextBlock}\n\n${flaggedBlock}`;
+
+        return [
+          { role: "system" as const, content: system },
+          { role: "user" as const, content: user },
+        ];
+      })();
 
   try {
     const response = await fetch("/api/generate", {
@@ -489,10 +570,7 @@ Output ONLY the corrected narration prose - no meta-commentary, no explanation o
         Authorization: `Bearer ${apiOptions.token}`,
       },
       body: JSON.stringify({
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: user },
-        ],
+        messages,
         model: apiOptions.model,
         maxTokens: Math.max(400, Math.ceil(band.high * 3)),
         temperature: 0.7,
@@ -1189,6 +1267,8 @@ export interface ObserverParams {
   characterContext?: ObserverCharacterContext;
   /** StoryData.sessionZeroActive as of the START of this turn - suspends every check (see observerSuspensionReason). */
   sessionZeroActive?: boolean;
+  /** Whether the story has a character_sheet note yet - false means it's still in setup, which also suspends every check. */
+  hasCharacterSheet?: boolean;
   apiOptions: ObserverApiOptions;
   /** Per-flag-type enable/reset/sensitivity config - defaults to DEFAULT_OBSERVER_SETTINGS (today's shipped behavior) for any type a partial/future config omits. */
   settings?: ObserverSettings;
@@ -1206,6 +1286,7 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
     observerSuspensionReason({
       sessionZeroActive: params.sessionZeroActive,
       toolNames: params.toolNames,
+      hasCharacterSheet: params.hasCharacterSheet,
     })
   ) {
     return [];

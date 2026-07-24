@@ -17,6 +17,7 @@ import {
   checkTierEscalation,
   runObserver,
   observerSuspensionReason,
+  hasCharacterSheetNote,
   buildObserverCharacterContext,
   formatCharacterContextBlock,
   buildObserverWarningNote,
@@ -913,14 +914,58 @@ describe("observerSuspensionReason", () => {
     ).toContain("start_game");
   });
 
+  it("suspends a story that has no character sheet yet, whatever created it", () => {
+    // startAdventureLocally never sets sessionZeroActive, so an adventure
+    // still in character creation has only this signal to protect it - the
+    // same "FRESH STORY - SETUP NEEDED" condition the GM's own prompt uses.
+    expect(
+      observerSuspensionReason({
+        sessionZeroActive: false,
+        toolNames: ["create_note"],
+        hasCharacterSheet: false,
+      }),
+    ).toContain("character sheet");
+  });
+
   it("does not suspend an ordinary turn of play", () => {
     expect(
       observerSuspensionReason({
         sessionZeroActive: false,
         toolNames: ["formula_roll", "increment_scene"],
+        hasCharacterSheet: true,
       }),
     ).toBeNull();
     expect(observerSuspensionReason({})).toBeNull();
+  });
+});
+
+describe("hasCharacterSheetNote", () => {
+  function story(lore: unknown[]): StoryData {
+    return { lore } as unknown as StoryData;
+  }
+
+  it("is true only for an enabled, non-empty character sheet note", () => {
+    expect(
+      hasCharacterSheetNote(
+        story([{ title: "Sheet", content: "Traits: bold", type: "character_sheet" }]),
+      ),
+    ).toBe(true);
+    expect(hasCharacterSheetNote(story([]))).toBe(false);
+    expect(
+      hasCharacterSheetNote(
+        story([{ title: "Sheet", content: "   ", type: "character_sheet" }]),
+      ),
+    ).toBe(false);
+    expect(
+      hasCharacterSheetNote(
+        story([
+          { title: "Sheet", content: "Traits", type: "character_sheet", enabled: false },
+        ]),
+      ),
+    ).toBe(false);
+    expect(
+      hasCharacterSheetNote(story([{ title: "Town", content: "A town", type: "lore" }])),
+    ).toBe(false);
   });
 });
 
@@ -1152,6 +1197,22 @@ describe("runObserver", () => {
       replyLength: "medium",
       sessionZeroActive: false,
       toolNames: ["create_note", "start_game"],
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    expect(flags).toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("judges nothing while the story still has no character sheet", async () => {
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flags = await runObserver({
+      narration: Array(800).fill("word").join(" "),
+      playerChoice: "Something gothic, I think",
+      replyLength: "medium",
+      hasCharacterSheet: false,
       apiOptions: { model: "test-model", token: "tok" },
     });
 
@@ -1552,6 +1613,88 @@ describe("rewriteFlaggedNarration", () => {
     expect(userMessage).toContain("I'm sorry it has to be this way");
     expect(userMessage).toContain(flag.detail);
     expect(userMessage).toContain("formula_roll: SUCCESS");
+  });
+
+  it("continues the turn's own conversation when one is handed over", async () => {
+    // The whole point: a rewrite prompted from scratch knows nothing about
+    // the premise, the scene, the notes, or who anyone is, so it writes prose
+    // for a story it can't see. Continuing the conversation that produced the
+    // turn gives it all of that for free.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword, saying nothing." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const conversation = [
+      { role: "system" as const, content: "You ARE the Game Master. [premise, lore, notes]" },
+      { role: "user" as const, content: "CURRENT GAME STATE: the lighthouse, Bram, the storm" },
+      { role: "assistant" as const, content: "You draw your sword and apologize." },
+    ];
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      conversationMessages: conversation,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    // Original conversation preserved in order, correction appended last.
+    expect(body.messages).toHaveLength(4);
+    expect(body.messages.slice(0, 3)).toEqual(conversation);
+    expect(body.messages[3].role).toBe("user");
+    expect(body.messages[3].content).toContain(flag.detail);
+    expect(body.messages[3].content).toContain("You draw your sword and apologize.");
+    // No second system prompt competing with the GM's own.
+    expect(body.messages.filter((m: { role: string }) => m.role === "system")).toHaveLength(1);
+  });
+
+  it("forbids the rewrite from advancing the story instead of rewriting the beat", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      conversationMessages: [
+        { role: "system" as const, content: "You ARE the Game Master." },
+      ],
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const instruction = body.messages[body.messages.length - 1].content;
+    expect(instruction).toContain("Same moment, same scene");
+    expect(instruction).toContain("Do NOT advance the story");
+  });
+
+  it("falls back to the standalone prompt when no conversation is available", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      gmStoryContext: "formula_roll: SUCCESS",
+      flag,
+      characterContext: { playerName: "Kira Vance" },
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages).toHaveLength(2);
+    expect(body.messages[0].role).toBe("system");
+    expect(body.messages[1].content).toContain("Kira Vance");
+    expect(body.messages[1].content).toContain("formula_roll: SUCCESS");
   });
 
   it("returns null (fail open) when the API call fails", async () => {

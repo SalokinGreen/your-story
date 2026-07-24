@@ -54,6 +54,7 @@ import {
   canObserverTriggerReset,
   buildObserverCharacterContext,
   observerSuspensionReason,
+  hasCharacterSheetNote,
   ObserverSettings,
 } from "@/app/misc/observer";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
@@ -406,6 +407,13 @@ export interface GenerationResult {
   gmStoryContext?: string;
   gmThinking?: string[]; // GM's "[GM]" reasoning text from each round
   gmConversation?: GMConversationMessage[]; // Full GM conversation for context preservation
+  // The complete message array that produced this turn - the GM system
+  // prompt, the game-state message (lore, notes, character sheet, scene
+  // history) and this turn's own assistant/tool round trips. Not persisted:
+  // it exists so a same-turn side call can CONTINUE this conversation rather
+  // than prompt from scratch (see observer.ts's rewriteFlaggedNarration,
+  // which produced context-free prose until it got this).
+  gmPromptMessages?: ChatMessage[];
   meta: {
     storyMeta?: GenerationMeta;
     toolsMeta?: GenerationMeta;
@@ -885,21 +893,27 @@ export async function generateStoryTurn(
     // most setup-heavy turn of the campaign - as the only part of session
     // zero that still got judged. The tool-name check covers the same turn
     // when no snapshot could be taken.
+    // Who the player character is, what their sheet says, and which names
+    // are NPCs - built once and shared by every judge and by the rewrite
+    // call (see observer.ts's formatCharacterContextBlock).
+    const observerCharacterContext = buildObserverCharacterContext(storyData);
+
     const suspensionReason = observerSuspensionReason({
       sessionZeroActive:
         preTurnSnapshot?.sessionZeroActive ?? storyData.sessionZeroActive,
       toolNames: turnToolNames,
+      // No character sheet yet = the GM is still in setup/character creation
+      // (the same condition its own prompt uses), whatever creation path this
+      // story came from. Read from the pre-turn snapshot for the same reason
+      // sessionZeroActive is: the setup turn that WRITES the sheet would
+      // otherwise be judged as if setup were already over.
+      hasCharacterSheet: hasCharacterSheetNote(preTurnSnapshot ?? storyData),
     });
     if (suspensionReason) {
       logger.action("Observer suspended for this turn", {
         reason: suspensionReason,
       });
     }
-
-    // Who the player character is, what their sheet says, and which names
-    // are NPCs - built once and shared by every judge and by the rewrite
-    // call (see observer.ts's formatCharacterContextBlock).
-    const observerCharacterContext = buildObserverCharacterContext(storyData);
 
     // Whether the CURRENT settings make an automatic reset-and-retry even
     // possible (observer.ts's canObserverTriggerReset - true iff at least
@@ -1003,6 +1017,10 @@ export async function generateStoryTurn(
               replyLength: options.replyLength,
               storytellerMode: options.storytellerMode,
               characterContext: observerCharacterContext,
+              // Continue the turn's own conversation - the rewrite needs the
+              // premise, scene history, notes and roll results the draft was
+              // grounded in, or it writes prose for a story it can't see.
+              conversationMessages: result.gmPromptMessages,
               apiOptions: sideCallApiOptions,
             });
           } catch (rewriteError) {
@@ -3060,6 +3078,10 @@ async function generateStoryTurnOnce(
       gmResults: gmResults.length > 0 ? gmResults : undefined,
       gmStoryContext: gmStoryContext || undefined,
       gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
+      gmPromptMessages:
+        gmBaseMessages.length > 0
+          ? [...gmBaseMessages, ...gmConversationHistory]
+          : undefined,
       meta: {
         storyMeta,
         toolsMeta,
