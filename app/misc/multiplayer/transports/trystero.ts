@@ -24,6 +24,19 @@ const joinRoomByStrategy: Record<TrysteroStrategy, typeof joinTorrent> = {
 const APP_ID = "your-story-mp-v1";
 const ACTION_NAMESPACE = "mp";
 
+// Trystero's built-in redundancy (how many of its default relays/trackers it
+// actually contacts) varies a lot by strategy: nostr tries 5 of ~15 (shuffled
+// per appId), mqtt tries 4 of 5, but the torrent strategy only tries a fixed
+// 3 of its 5 known public WebTorrent trackers - always the same three, never
+// shuffled. Public WSS trackers flake/overload individually often enough
+// that this made "torrent" (our default backend) unreliable while the other
+// strategies stayed fine. Force it to use all 5 known trackers instead.
+const relayConfigByStrategy: Partial<
+  Record<TrysteroStrategy, { redundancy: number }>
+> = {
+  torrent: { redundancy: 5 },
+};
+
 // Trystero's makeAction<T> requires T to structurally satisfy its JsonValue
 // bound, which StoryData (many optional fields, deep tree) doesn't cleanly
 // satisfy under strict mode. We know every WireMessage we construct is
@@ -48,7 +61,10 @@ export function createTrysteroTransport(
     backend: strategy,
 
     async join(roomId) {
-      room = joinRoomByStrategy[strategy]({ appId: APP_ID }, roomId);
+      room = joinRoomByStrategy[strategy](
+        { appId: APP_ID, relayConfig: relayConfigByStrategy[strategy] },
+        roomId,
+      );
       action = room.makeAction(ACTION_NAMESPACE) as unknown as TypedAction;
       action.onMessage = (data, { peerId }) => {
         for (const cb of messageCbs) cb(peerId, data);
