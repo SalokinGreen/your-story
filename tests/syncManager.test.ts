@@ -5,6 +5,7 @@ import * as syncManager from "@/app/misc/syncManager";
 import * as storyManager from "@/app/misc/localStoryManager";
 import * as folderManager from "@/app/misc/localFolderManager";
 import * as notesManager from "@/app/misc/localNotesLibraryManager";
+import * as tablesManager from "@/app/misc/localTablesLibraryManager";
 
 class MemoryStorage {
   private map = new Map<string, string>();
@@ -98,9 +99,9 @@ class Device {
     this.activate();
     return syncManager.syncAll();
   }
-  saveStory(id: string, data: StoryData) {
+  saveStory(id: string, data: StoryData, folderId?: string | null) {
     this.activate();
-    return storyManager.saveLocalStory(id, data);
+    return storyManager.saveLocalStory(id, data, folderId);
   }
   getStory(id: string) {
     this.activate();
@@ -142,6 +143,31 @@ class Device {
   listNotes() {
     this.activate();
     return notesManager.listLibraryNotes();
+  }
+  createTable(name: string) {
+    this.activate();
+    return tablesManager.createLibraryTable({
+      name,
+      description: "",
+      entries: [{ text: "Result", weight: 1 }],
+      tags: [],
+      source: "manual",
+    });
+  }
+  updateTable(
+    id: string,
+    updates: Partial<Omit<tablesManager.LibraryTable, "id" | "createdAt">>,
+  ) {
+    this.activate();
+    return tablesManager.updateLibraryTable(id, updates);
+  }
+  deleteTable(id: string) {
+    this.activate();
+    return tablesManager.deleteLibraryTable(id);
+  }
+  listTables() {
+    this.activate();
+    return tablesManager.listLibraryTables();
   }
   setSetting(key: string, value: string) {
     this.activate();
@@ -396,6 +422,94 @@ describe("syncManager", () => {
     expect((await a.listNotes()).map((n) => n.title)).toEqual([
       "Untouched Note",
     ]);
+  });
+
+  it("keeps both devices' independently-created tables after syncing (no data loss)", async () => {
+    installFakeServer();
+    const key = "test-key-tables-concurrent-create";
+
+    const a = new Device(key);
+    await a.createTable("From A");
+    await a.sync();
+
+    const b = new Device(key);
+    await b.createTable("From B");
+    await b.sync();
+    expect((await b.listTables()).map((t) => t.name).sort()).toEqual([
+      "From A",
+      "From B",
+    ]);
+
+    await a.sync();
+    expect((await a.listTables()).map((t) => t.name).sort()).toEqual([
+      "From A",
+      "From B",
+    ]);
+  });
+
+  it("resolves a same-table edit conflict by newest-updatedAt and propagates table deletions", async () => {
+    installFakeServer();
+    const key = "test-key-tables-edit-conflict";
+
+    const a = new Device(key);
+    const table = await a.createTable("Shared Table");
+    await a.createTable("Untouched Table");
+    await a.sync();
+
+    const b = new Device(key);
+    await b.sync(); // pulls both tables
+
+    await a.updateTable(table.id, { description: "Edited by A" });
+    await a.sync();
+
+    await new Promise((r) => setTimeout(r, 5));
+    await b.updateTable(table.id, { description: "Edited by B" });
+    await b.sync();
+
+    const bTables = await b.listTables();
+    expect(bTables.find((t) => t.id === table.id)?.description).toBe(
+      "Edited by B",
+    );
+    expect(
+      bTables.find((t) => t.name === "Untouched Table")?.description,
+    ).toBe("");
+
+    await a.sync();
+    const aTables = await a.listTables();
+    expect(aTables.find((t) => t.id === table.id)?.description).toBe(
+      "Edited by B",
+    );
+
+    // B deletes the shared table; A should pick up the deletion.
+    await b.deleteTable(table.id);
+    await b.sync();
+    await a.sync();
+    expect((await a.listTables()).map((t) => t.name)).toEqual([
+      "Untouched Table",
+    ]);
+  });
+
+  it("preserves an explicit unfiled folder_id (null) across a story merge instead of resurrecting the other device's stale folder", async () => {
+    installFakeServer();
+    const key = "test-key-story-unfile-merge";
+
+    const a = new Device(key);
+    const folder = a.createFolder("Old Folder");
+    await a.saveStory("shared_story", makeStoryData("Original"), folder.id);
+    await a.sync();
+
+    const b = new Device(key);
+    await b.sync(); // pulls the story, already filed under "Old Folder"
+    expect((await b.getStory("shared_story"))?.folder_id).toBe(folder.id);
+
+    // A unfiles the story (explicit null, not "leave as-is").
+    await a.saveStory("shared_story", makeStoryData("Original"), null);
+    await a.sync();
+
+    await b.sync();
+    // B must pick up the unfiling, not keep resolving to its own stale
+    // folder_id just because the merged payload's null got coerced away.
+    expect((await b.getStory("shared_story"))?.folder_id).toBeNull();
   });
 
   it("merges settings per key so two devices changing different keys both survive, and clearing a key propagates as a deletion", async () => {

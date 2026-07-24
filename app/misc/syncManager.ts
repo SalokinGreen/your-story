@@ -35,6 +35,12 @@ import {
   saveLibraryNote,
   deleteLibraryNote,
 } from "./localNotesLibraryManager";
+import {
+  LibraryTable,
+  listLibraryTables,
+  saveLibraryTable,
+  deleteLibraryTable,
+} from "./localTablesLibraryManager";
 import { SYNCABLE_SETTINGS_KEYS } from "./syncableSettingsKeys";
 import { getProviderFetch } from "./platformFetch";
 
@@ -42,12 +48,14 @@ export type SyncBucket =
   | "stories"
   | "adventures"
   | "notes"
+  | "tables"
   | "folders"
   | "settings";
 const BUCKETS: SyncBucket[] = [
   "stories",
   "adventures",
   "notes",
+  "tables",
   "folders",
   "settings",
 ];
@@ -382,7 +390,12 @@ const storiesAdapter: MergeAdapter<LocalStory> = {
       const before = localMap.get(item.id);
       if (before && before.updatedAt === item.updatedAt) continue;
       const s = item.payload;
-      await saveLocalStory(s.id, s.storyData, s.folder_id ?? undefined, {
+      // Pass folder_id through as-is (string | null | undefined) - collapsing
+      // an explicit `null` (unfiled) to `undefined` via `??` would make
+      // saveLocalStory treat it as "no info, keep this device's existing
+      // folder" instead of clearing it, so a story unfiled on another device
+      // could come back re-filed into a stale folder here after merging.
+      await saveLocalStory(s.id, s.storyData, s.folder_id, {
         serverUpdatedAt: s.serverUpdatedAt,
         markAsSynced: true,
         updatedAt: new Date(item.updatedAt),
@@ -437,6 +450,25 @@ const notesAdapter: MergeAdapter<LibraryNote> = {
     }
     for (const before of localItemsBefore) {
       if (!mergedIds.has(before.id)) await deleteLibraryNote(before.id);
+    }
+  },
+};
+
+const tablesAdapter: MergeAdapter<LibraryTable> = {
+  collectLocalItems: async () => {
+    const tables = await listLibraryTables();
+    return tables.map((t) => ({ id: t.id, updatedAt: t.updatedAt, payload: t }));
+  },
+  applyMerged: async (merged, localItemsBefore) => {
+    const localMap = new Map(localItemsBefore.map((i) => [i.id, i]));
+    const mergedIds = new Set(merged.map((i) => i.id));
+    for (const item of merged) {
+      const before = localMap.get(item.id);
+      if (before && before.updatedAt === item.updatedAt) continue;
+      await saveLibraryTable(item.payload);
+    }
+    for (const before of localItemsBefore) {
+      if (!mergedIds.has(before.id)) await deleteLibraryTable(before.id);
     }
   },
 };
@@ -522,6 +554,7 @@ const adapters: { [B in SyncBucket]: MergeAdapter<unknown> } = {
   stories: storiesAdapter as MergeAdapter<unknown>,
   adventures: adventuresAdapter as MergeAdapter<unknown>,
   notes: notesAdapter as MergeAdapter<unknown>,
+  tables: tablesAdapter as MergeAdapter<unknown>,
   folders: foldersAdapter as MergeAdapter<unknown>,
   settings: settingsAdapter as MergeAdapter<unknown>,
 };

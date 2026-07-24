@@ -3,7 +3,7 @@ export interface Env {
   ALLOWED_ORIGINS: string;
 }
 
-const BUCKETS = ["stories", "adventures", "notes", "folders", "settings"] as const;
+const BUCKETS = ["stories", "adventures", "notes", "tables", "folders", "settings"] as const;
 type Bucket = (typeof BUCKETS)[number];
 
 interface StoredBlob {
