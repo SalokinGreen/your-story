@@ -1494,6 +1494,12 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Built-in AGMT tables** are always available as a fallback (character traits, locations, plot twists, magic items, and more - see the \`roll_table\` tool description for the full list).
 - Only improvise freely when no matching table exists. Tables keep the world feeling alive and unpredictable instead of relying on the same GM instincts every time.
 
+### Naming (DON'T REACH FOR THE FIRST NAME THAT COMES TO MIND)
+- **Before naming any new NPC, place, faction, creature or notable object**, call \`generate_name\` and build the name from the pointers it gives you. The first name that surfaces on its own is almost always one you've used a hundred times before - Elara, Kael, Lyra, Thorne, Ravenwood - and a cast of those reads as generic no matter how good the prose around it is.
+- The pointers are a starting letter and syllable count per part (**binding** - the name you write must match them), plus seed sounds (**inspiration only** - reshape them completely if that's what the setting needs).
+- The roll deliberately steers away from letters already used in this story, so the cast stays distinguishable. Pass \`flavor\` to keep the result in the right cultural register, and \`starts_with\` only when a letter genuinely must be fixed (a sibling of an existing NPC, a clan naming convention).
+- A name the player already knows is a name that exists - don't re-roll established NPCs or places, only new ones.
+
 ### State Changes
 - **Player Stats:** Update their character sheet with \`edit_note\` as needed
 - **NPC Status:** Use \`update_npc\` to change attitudes, relationships, or conditions, or \`edit_note\` for detailed changes on their note
@@ -1584,6 +1590,7 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "opposed_formula",
     "fate_question",
     "roll_table",
+    "generate_name",
     // Calculator
     "calculate",
     // Lookup

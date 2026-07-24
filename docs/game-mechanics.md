@@ -89,6 +89,33 @@ narrative and the adventure's `mechanics` note.
   tab) or a built-in element table (character traits, locations, plot
   twists, atmosphere, and more) for on-the-fly inspiration.
 
+## Naming
+
+`generate_name` exists because models have a strong attractor toward the
+same handful of names (Elara, Kael, Lyra, Thorne...), and a curated name
+list only postpones the problem. So the usual split is inverted: instead of
+the engine producing a finished name, it rolls the **constraints** a name
+has to satisfy and the GM writes a name that fits them.
+
+Per name part it returns a **starting letter** and a **syllable count**
+(binding — the GM's name must match) plus a few **seed syllables**
+(inspiration only, meant to be reshaped so the name lands in the
+adventure's language and genre). Rolled initials deliberately steer away
+from letters already used by NPCs, combatants, world-note titles and the
+characters/locations notes point at, so a campaign's cast doesn't fill up
+with names sharing three initials; scaffolding notes ("Mechanics",
+"Campaign Plan", the character sheet) are excluded from that scan since
+their titles name nobody. When most of the alphabet is spoken for,
+avoidance drops rather than squeezing every later name into the leftovers.
+
+The GM can pass `kind` (person/place/faction/creature/object), `parts` (1-3,
+covering middle names), a free-text `flavor` hint that is echoed back
+untouched, and `starts_with` to lock a letter when a collision is
+deliberate (a sibling of an existing NPC, a clan naming convention) —
+locked letters bypass the avoidance check. The tool is read-only; the name
+is recorded through `add_npc`/`create_note` like any other. Logic lives in
+`app/misc/nameGenerator.ts`.
+
 ## Combat
 
 Turn-based tactical combat is tracked via `start_combat`, `add_combatant`,

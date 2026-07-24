@@ -199,6 +199,21 @@ export interface RollTableParams {
 }
 
 /**
+ * Generate Name - roll the *constraints* for a new name, not the name itself.
+ * The engine picks starting letters (steering clear of initials already in
+ * play), syllable counts and seed sounds; the GM writes a name that fits.
+ * See nameGenerator.ts for why the split falls this way.
+ */
+export interface GenerateNameParams {
+  kind?: "person" | "place" | "faction" | "creature" | "object";
+  parts?: number; // How many name parts to roll (1-3)
+  flavor?: string; // Style hint, echoed back untouched ("Norse-ish", "corpo surname")
+  starts_with?: string[]; // Per-part locked initials; omit/"?" to roll that part
+  syllables?: number[]; // Per-part locked syllable counts
+  reason?: string; // What's being named
+}
+
+/**
  * Request Continuation - Ask for another GM round after seeing results
  * Use when you need to chain actions (e.g., attack roll → damage roll)
  */
@@ -620,6 +635,7 @@ export type GMToolParams =
   | { name: "formula_challenge_check"; params: FormulaChallengeCheckParams }
   | { name: "fate_question"; params: FateQuestionParams }
   | { name: "roll_table"; params: RollTableParams }
+  | { name: "generate_name"; params: GenerateNameParams }
   | { name: "read_notes"; params: ReadNotesParams }
   | { name: "search_memory"; params: SearchMemoryParams }
   | { name: "get_game_state"; params: GetGameStateParams }
@@ -1296,6 +1312,66 @@ Adventure-specific custom tables take priority over built-in tables with the sam
         },
       },
       required: ["table_name", "reason"],
+    },
+  },
+};
+
+const generateNameTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "generate_name",
+    description: `Roll pointers for a name you're about to invent - a starting letter, a syllable count and a few seed sounds per part. You write the actual name from those pointers.
+
+Use when:
+- You're naming a new NPC, place, faction, creature, ship, weapon, inn, etc.
+- Any time you're about to reach for a name and the first one that comes to mind feels familiar (Elara, Kael, Lyra, Thorne, Ravenwood...) - that's the reflex this tool exists to break
+
+How it works:
+- The engine rolls a starting letter per part, steering AWAY from letters already used by NPCs, locations and notes in this story, so the cast doesn't fill up with names that all start with the same few letters.
+- It also rolls how many syllables each part should have, plus seed sounds as raw inspiration.
+- The starting letters and syllable counts are BINDING - the name you write must match them. The seed sounds are NOT: reshape them freely so the name fits this world's language, culture and tone. "N, 3 syllables, sounds like ni-kor-las" can become Nicolas, Nikolai, Nemora or Ni'Khalas - whatever suits the setting.
+
+Parameters:
+- Use \`parts: 2\` for a given + family name, \`parts: 3\` when they'd have a middle name too, \`parts: 1\` for mononyms and most places/factions.
+- Use \`flavor\` to say what register the name should sit in ("Norse-ish", "Japanese", "corpo surname", "orcish", "backwater village") - it's passed back to you, it doesn't change the roll.
+- Use \`starts_with\` only when a letter genuinely must be fixed (this NPC is the brother of Nicolas; this dwarf clan all use V). Locked letters skip the avoidance check. Leave it out otherwise and let the roll surprise you.`,
+    parameters: {
+      type: "object",
+      properties: {
+        kind: {
+          type: "string",
+          enum: ["person", "place", "faction", "creature", "object"],
+          description: "What's being named (default: person)",
+        },
+        parts: {
+          type: "number",
+          description:
+            "How many parts the name has, 1-3 (default: 2 for a person, 1 otherwise)",
+        },
+        flavor: {
+          type: "string",
+          description:
+            "Style/culture hint for the name, echoed back to you unchanged (e.g. 'Norse-ish', 'corpo surname')",
+        },
+        starts_with: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional locked starting letters, one per part in order. Use '?' or omit an entry to let the engine roll that part.",
+        },
+        syllables: {
+          type: "array",
+          items: { type: "number" },
+          description:
+            "Optional locked syllable counts (1-4), one per part in order. Omit to let the engine roll them.",
+        },
+        reason: {
+          type: "string",
+          description:
+            "What this name is for (e.g. 'the innkeeper who just spoke up')",
+        },
+      },
+      required: [],
     },
   },
 };
@@ -2500,6 +2576,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Oracle & utility tools
   fateQuestionTool,
   rollTableTool,
+  generateNameTool,
   // Note & memory lookup tools
   readNotesTool,
   searchMemoryTool,
