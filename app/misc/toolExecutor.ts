@@ -41,6 +41,7 @@ import {
   generateEventMeaning,
 } from "@/app/misc/mythic";
 import { selectGMAdviceForScene, formatGMAdviceNote } from "@/app/misc/gmAdvice";
+import { findSpinePlanNote, initPlanState } from "@/app/misc/campaignPlan";
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
 import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
@@ -808,6 +809,18 @@ export function executeTools(
         // Mark lore embeddings as dirty for re-sync
         storyData.loreEmbeddingsDirty = true;
 
+        // Phase 2: auto-initialize the campaign-plan tracker when the spine
+        // note is created (a gm_plan note titled like "Campaign Plan"), so the
+        // structured re-planning gate layers onto the prompt-driven Phase 1
+        // bootstrap with no extra setup step. See campaignPlan.ts.
+        if (
+          noteType === "gm_plan" &&
+          !storyData.planState &&
+          /campaign plan/i.test(args.title)
+        ) {
+          storyData.planState = initPlanState(args.title);
+        }
+
         logger.action("New note created via direct tool handling", {
           title: args.title,
         });
@@ -819,6 +832,219 @@ export function executeTools(
           command: toolCall.function.name,
           success: true,
           message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Campaign Plan focus: open a side beat (side quest / detour) and make
+      // it the active focus. See docs/gm-plan-notes-design.md.
+      if (toolCall.function.name === "open_side_beat") {
+        logger.action("Special handling: open_side_beat", {
+          toolCallId: toolId,
+          title: args.title,
+        });
+
+        if (storyData.activeSideBeatTitle) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `A side beat ("${storyData.activeSideBeatTitle}") is already active - resolve it with close_side_beat before opening another.`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (!storyData.lore) storyData.lore = [];
+        const existingBeat = storyData.lore.find(
+          (l) => l.title === args.title,
+        );
+        if (!existingBeat) {
+          const beatBody = [
+            `**Side Beat** (detour off the main spine)`,
+            ``,
+            `- Goal: ${args.goal}`,
+            args.return_when ? `- Return when: ${args.return_when}` : null,
+            args.owner ? `- Focus on: ${args.owner}` : null,
+            ``,
+            `## Checklist`,
+            `- [ ] `,
+          ]
+            .filter((line) => line !== null)
+            .join("\n");
+          storyData.lore.push({
+            title: args.title,
+            content: beatBody,
+            relatedCharacters: [],
+            relatedLocations: [],
+            secrtet: false,
+            keys: [],
+            type: "gm_plan",
+            on: true,
+            alwaysOn: true,
+            on_triggers: [],
+            off_triggers: [],
+            embedded: false,
+            ownerCouchPlayerId: args.owner || undefined,
+          });
+          storyData.loreEmbeddingsDirty = true;
+        }
+
+        storyData.activeSideBeatTitle = args.title;
+
+        const stateChange = `⚡ Opened side beat "${args.title}" (main story paused)`;
+        stateChanges.push(stateChange);
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Campaign Plan focus: resolve the active side beat and return focus to
+      // the paused main-spine beat. See docs/gm-plan-notes-design.md.
+      if (toolCall.function.name === "close_side_beat") {
+        logger.action("Special handling: close_side_beat", {
+          toolCallId: toolId,
+        });
+
+        const activeTitle = storyData.activeSideBeatTitle;
+        if (!activeTitle) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `No side beat is active - nothing to close.`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        const beat = (storyData.lore || []).find(
+          (l) => l.title === activeTitle,
+        );
+        if (beat) {
+          beat.content = `${beat.content}\n\n**Resolved:** ${args.resolution}`;
+          beat.embedded = false;
+          storyData.loreEmbeddingsDirty = true;
+        }
+
+        storyData.activeSideBeatTitle = undefined;
+
+        const stateChange = `✅ Closed side beat "${activeTitle}" (back to the main story)`;
+        stateChanges.push(stateChange);
+        responses.push({
+          command: toolCall.function.name,
+          success: true,
+          message: stateChange,
+          timestamp: Date.now(),
+          toolCallId: toolCall.id,
+        });
+        continue;
+      }
+
+      // Campaign Plan (Phase 2): advance the plan through its fixed spine.
+      // complete_current marks the current beat done (the gate then requires
+      // the next beat before the turn can end); write_next details and moves
+      // to the next beat. See docs/gm-plan-notes-design.md, campaignPlan.ts.
+      if (toolCall.function.name === "advance_plan") {
+        logger.action("Special handling: advance_plan", {
+          toolCallId: toolId,
+          action: args.action,
+        });
+
+        const spineNote = findSpinePlanNote(storyData);
+        if (!spineNote) {
+          responses.push({
+            command: toolCall.function.name,
+            success: false,
+            message: `No campaign plan exists yet - create a gm_plan note titled "Campaign Plan" before advancing it.`,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Late-init the tracker for plans created before Phase 2 / by hand.
+        if (!storyData.planState) {
+          storyData.planState = initPlanState(spineNote.title);
+        }
+        const plan = storyData.planState;
+        const curName = plan.beats[plan.currentBeatIndex] ?? "the current beat";
+
+        if (args.action === "complete_current") {
+          plan.awaitingNextBeat = true;
+          spineNote.content = `${spineNote.content}\n\n✓ **${curName} — complete.** ${
+            args.summary || ""
+          }`.trimEnd();
+          spineNote.embedded = false;
+          storyData.loreEmbeddingsDirty = true;
+
+          const stateChange = `✓ Beat complete: ${curName} — now write the next beat (advance_plan write_next)`;
+          stateChanges.push(stateChange);
+          responses.push({
+            command: toolCall.function.name,
+            success: true,
+            message: stateChange,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        if (args.action === "write_next") {
+          const atLastBeat = plan.currentBeatIndex >= plan.beats.length - 1;
+          plan.awaitingNextBeat = false;
+
+          if (atLastBeat) {
+            // Resolution reached - nothing after it. Record and stop.
+            spineNote.content =
+              `${spineNote.content}\n\n🏁 **Campaign spine complete.** ${args.detail || ""}`.trimEnd();
+            spineNote.embedded = false;
+            storyData.loreEmbeddingsDirty = true;
+
+            const stateChange = `🏁 Campaign spine complete (${curName} was the final beat)`;
+            stateChanges.push(stateChange);
+            responses.push({
+              command: toolCall.function.name,
+              success: true,
+              message: stateChange,
+              timestamp: Date.now(),
+              toolCallId: toolCall.id,
+            });
+            continue;
+          }
+
+          plan.currentBeatIndex += 1;
+          const newName = plan.beats[plan.currentBeatIndex];
+          spineNote.content = `${spineNote.content}\n\n## Current beat — ${newName}\n${
+            args.detail || ""
+          }`.trimEnd();
+          spineNote.embedded = false;
+          storyData.loreEmbeddingsDirty = true;
+
+          const stateChange = `⏭ Advanced to beat: ${newName}`;
+          stateChanges.push(stateChange);
+          responses.push({
+            command: toolCall.function.name,
+            success: true,
+            message: stateChange,
+            timestamp: Date.now(),
+            toolCallId: toolCall.id,
+          });
+          continue;
+        }
+
+        // Unknown action (schema enum should prevent this, but be explicit).
+        responses.push({
+          command: toolCall.function.name,
+          success: false,
+          message: `Unknown advance_plan action "${args.action}" - use "complete_current" or "write_next".`,
           timestamp: Date.now(),
           toolCallId: toolCall.id,
         });
