@@ -2,7 +2,14 @@
 
 ## Status
 
-**Phase 1 + Phase 2 + Phase 3 + Phase 4 implemented.** Phase 1 (prompt-only):
+**Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5a/5b implemented.** Phase 5
+(the "situation, not plot" reframe) landed its prompt/convention core (5a) and
+its structured-reflection handoff (5b); **Phase 5c** (typed `steps?` on
+`StoryThread`, dedicated boundary digest) remains deferred until a demonstrated
+need. See the "Phase 5" section at the bottom for the full design and the
+sub-plan checklist.
+
+Phase 1 (prompt-only):
 the `gm_plan` note type, the GM-stage injection, the `open_side_beat`/
 `close_side_beat` tools, the player-facing lore UI entry. Phase 2
 (deterministic re-planning gate): structured `PlanState`, the `advance_plan`
@@ -546,3 +553,368 @@ continuation prompt is what keeps the narrator on the current beat.
       and same-round ordering), `tests/gmPlanNotes.test.ts` (prompt content),
       `tests/generation.planGate.test.ts` (full `generateStoryTurn`
       integration: rejection and same-round unblock)
+
+---
+
+# Phase 5 (DESIGN-ONLY): Situations, not plots — Fronts, triggers, floating clues, structured handoff
+
+> **Status: 5a + 5b implemented; 5c deferred.** This section is the agreed
+> design from the "campaign plan outline" discussion. It was written doc-first
+> by request, then implemented after sign-off. The decisions locked were
+> (1) **doc-first**, implement after review; (2) **keep the dramatic spine** —
+> Phase 5 *demotes and reframes* it, it does not replace it; (3) **Front
+> escalation steps as markdown** in the thread description (no `StoryThread`
+> schema change); and (4) **structured handoff by extending `reflection.ts`
+> with category tags** (option 1). See the sub-plan checklist at the end for
+> exactly what shipped.
+
+## The problem Phase 5 addresses
+
+Phases 1–4 make the campaign plan reliable, but reliable *at being a linear
+beat sheet*. The spine (`Opening Image → Inciting Incident → Rising
+Complications → Midpoint → Crisis → Climax → Resolution`) is a Save-the-Cat
+screenplay structure, and each beat advances on a narrative **advance-when**
+condition — the GM prompt literally says "when the current beat's advance-when
+is satisfied" (`ai_staged.ts`, CAMPAIGN PLAN section). That is the exact
+railroad pattern flagged in the design critique that opened this discussion
+("Advance When: Ryan has settled in…"): a *predetermined narrative event* the
+players must arrive at for the story to progress. If they don't produce it,
+the plan stalls or the GM nudges them toward it.
+
+The critique's prescription is the standard modern-TTRPG one — **write
+situations, not plots**: independent factions with their own agendas
+(*Fronts*, PbtA), doom clocks that advance on their own (*Progress Clocks*,
+Blades), clues decoupled from any specific route (*Secrets & Clues*, Lazy GM),
+and **action/time triggers** instead of narrative ones. A plot dictates what
+*will* happen; a situation establishes what *is* happening and lets play
+decide the outcome.
+
+## The insight: most of this machinery already exists — it's just not wired to the plan
+
+The campaign-plan *layer* is beat-linear, but the rest of the engine is
+already situation/clock-oriented. Phase 5 is mostly **connective**, not
+net-new subsystems:
+
+| Framework from the critique | Already in the codebase |
+|---|---|
+| **Progress Clocks** (Blades) | `CountdownTimer` (`manage_timer`, `autoAdvance`, `visibility`, `status`) — `structs.ts:596`; `SceneChallenge` is even commented "progress clock" |
+| **Fronts / doom tracks** (PbtA) | `StoryThread` already carries a "Front/clock wrapper (Blades-style)": `linkedTimerId` + `threshold` + `priority: "main"|"side"|"background"` — `structs.ts:1166`. Built, and currently **unused by the plan.** |
+| **Threat escalation (Step 1→2→3)** | A `CountdownTimer` with `autoAdvance` + the director's `announce_future_badness` / `tick_a_clock` moves — `structs.ts:1103` |
+| **Time / consequence triggers** | `selectDirectorMove()` already fires PbtA moves deterministically |
+| **Floating clues / secrets** | the notes / lore / secrets + memory systems |
+| **Player-facing objectives** | `Goal` — `structs.ts:502` |
+| **Session summaries for re-planning** | `reflection.ts` synthesizes higher-level insights from memory batches |
+
+So Phase 5 does **not** add a parallel faction engine. It promotes the dormant
+`StoryThread` Front-wrapper into a real Fronts layer, reframes the plan's
+trigger language, adds a clues list to the note template, and tightens the
+session-boundary handoff. The spine stays — demoted from *track* to
+*prediction*.
+
+## Piece 1 — Demote the spine from "track" to "prediction"
+
+Keep `campaignPlan.ts`, the `PlanState` gate, and `advance_plan` unchanged in
+*mechanism*. Change what the spine *means* in the GM prompt:
+
+- The spine is the GM's **current best guess** at where the drama is heading,
+  useful mainly as a **tone/pacing target for the narrator** — not a set of
+  gates the players must trip.
+- It is explicitly a **prediction players can invalidate.** When play diverges
+  from a predicted beat, the correct response is to *rewrite the remaining
+  spine*, never to steer players back toward it.
+- The gate's job is unchanged and still valuable: it stops the plan from
+  falling silently behind itself (one beat ahead, always current). It enforces
+  *bookkeeping discipline*, not *plot adherence* — an important distinction to
+  state in the prompt so the model doesn't read the gate as "make the players
+  hit this beat."
+
+No struct or gate change here; this is prompt wording in `ai_staged.ts` plus
+the `advance_plan` tool description.
+
+## Piece 2 — Action / time triggers replace narrative advance-when
+
+The single railroady field is the beat's `advance-when: <narrative event>`.
+Replace it with the two trigger types the critique names, both of which the
+engine can actually reason about:
+
+- **Action triggers** — advance / escalate when the players *do* one of
+  several things: *"advance when the players decode the broadcast **or**
+  destroy the antenna."* Crucially **OR'd alternatives**, not one required
+  event — this is the Three-Clue-Rule spirit applied to progression: multiple
+  routes to the same state change, so no single missed action stalls the game.
+- **Time triggers** — advance / escalate as a **consequence** of time passing
+  or player *in*action: *"if the players spend the session ignoring the
+  broadcast, the Front advances a step."* This is where Fronts (Piece 3) do
+  their work — the world moves whether or not the players engage.
+
+Template-wise, a beat's `advance-when:` line becomes an `advance-on:` block
+listing action-trigger alternatives and any time-trigger. This is a
+note-template + prompt change; the `PlanState` gate keys off beat *identity*,
+not the trigger text, so it is unaffected.
+
+## Piece 3 — Promote the dormant Front-wrapper into a real Fronts layer
+
+This is the one piece with genuine (light) state plumbing. `StoryThread`
+already has everything a Front needs except a place to write the escalation
+steps and a convention for using it:
+
+- A **Front** = a `StoryThread` (its `title` + `description` carry the Front's
+  **motive and cast**) with `priority: "background"` (it advances off-screen)
+  and a `linkedTimerId` pointing at a `CountdownTimer` that is its **doom
+  clock**. The clock's `description` already documents "what happens when the
+  timer reaches 0."
+- **Escalation steps (Step 1→2→3)** live as a checklist in the thread's
+  `description` (or a small typed `steps?: string[]` addition on `StoryThread`
+  — decision below), each step tied to a clock threshold. The existing
+  `threshold?` field already lets a thread mark a clock position as
+  significant; multi-step needs either several thresholds or the typed array.
+- **Advancing a Front is already possible**: `manage_timer` ticks the clock,
+  the director's `tick_a_clock` move can drive it, and `announce_future_badness`
+  telegraphs the next step. What's missing is the *convention and prompt
+  guidance* that ties "Front" together as a first-class concept the GM creates
+  during planning and the plan note references.
+
+The plan note gains a **Fronts** section (see template below) that names each
+active Front, its motive, its current step, and its clock. The Fronts
+themselves live as `StoryThread` + `CountdownTimer` state (tool-mediated,
+player-visible via the existing threads/timers UI) — the plan note only
+*indexes* them, the same way it indexes threads/goals today rather than
+restating them.
+
+**Open decision (Piece 3):** typed `steps?: { text: string; atTick: number;
+done: boolean }[]` on `StoryThread` vs. keeping steps as markdown in
+`description`. Typed is cleaner for a future "which step is live" readout and
+for the director; markdown is zero-schema-change and consistent with how the
+spine keeps its own checklist in note prose. Leaning **markdown first**
+(Phase 5a), typed only if a demonstrated need appears (same "don't build ahead
+of need" posture as the frontier doc) — but flagging it as the main
+struct-level decision to lock.
+
+## Piece 4 — A floating-clues / secrets list (Lazy GM)
+
+Add a **Secrets & Clues** section to the plan note: 5–10 disconnected facts the
+players *could* discover, written **decoupled from how they're found.** The
+prompt guidance is the load-bearing part: a clue like *"the tapes emit a
+low-frequency hum"* can surface via an audiophile NPC, breaking into the
+station, or examining a tape — the GM must not pre-bind it to one route. When a
+clue is delivered, the GM ticks it off and (if it matters mechanically) spawns
+the corresponding `Goal`/`StoryThread`. Pure note-template + prompt change.
+
+## Piece 5 — Structured session handoff feeding `advance_plan`
+
+This is the robustness improvement raised in the discussion, and it's the
+cleanest lever in Phase 5. Today the session boundary is where `advance_plan`
+`write_next` invents the next horizon, and its only structured input is the
+prose in memory/reflection. `reflection.ts` currently emits a **flat list of
+plain-text insight lines** (`buildReflectionPrompt`, `applyReflection`) — good
+for memory recall, but the GM has to re-parse prose to figure out what
+actually changed in the world before it can re-plan.
+
+**Proposal: give the re-planning boundary a *categorized* world-state delta
+instead of a prose blob**, so `advance_plan` / Front-advance get clean
+parameters. Concretely, emit a small typed digest — the categories the
+discussion suggested, generalized:
+
+- **Neutralized / changed assets** — Fronts or NPCs the players defused,
+  killed, allied with, or otherwise took off the board (⇒ which Fronts/clocks
+  to *stop* or rewrite).
+- **Ticking clocks** — Fronts/timers that advanced or are now imminent (⇒
+  which escalation steps are live next horizon).
+- **New / shifted goals & hooks** — objectives the players adopted or arcs that
+  collapsed toward one candidate direction (⇒ what the next beat should serve).
+- **Open questions the oracle should seed** — uncertain facts the next horizon
+  depends on (⇒ where to call `fate_question`/`roll_table` when writing it).
+
+Two implementation shapes, to decide at implementation time:
+
+1. **Extend `reflection.ts`** to tag each insight with a category (smallest
+   change; reflection already runs on importance-threshold batches, so the
+   categories accumulate as a running delta the boundary reads). Caveat:
+   reflection fires mid-session on a `REFLECTION_IMPORTANCE_THRESHOLD` batch,
+   **not** on session boundaries — so this makes it a *continuous* categorized
+   feed, not a per-session digest.
+2. **A dedicated boundary "handoff digest"** function, a sibling to
+   `reflection.ts`/`compaction.ts` (same pure-planner + prompt-builder +
+   API-orchestrator shape), run when a beat/session boundary is crossed, that
+   emits the typed digest above from the memories since the last boundary.
+
+Leaning toward **(1) as Phase 5's first cut** (reuses the existing, tested
+reflection pass; no new orchestration) with (2) noted as the fuller version if
+the continuous feed proves too noisy to re-plan from. Either way the *output
+contract* — the four categories above — is the durable part, and it is what
+turns "the AI rewrites a prose outline" into "the AI updates typed world-state
+that `advance_plan` reads."
+
+### Invariant: a tag is an INPUT to write_next, not a TRIGGER for it
+
+Option (1)'s caveat — the categorized feed is *continuous*, firing on
+importance-threshold batches mid-session, not on session boundaries — creates
+one specific hazard: a `[Neutralized]` tag can land *mid-beat*, the instant the
+players defuse something, and a naive GM could read "a Neutralized signal
+appeared" as "advance the plan now," collapsing the horizon prematurely and
+re-introducing the very whiplash Phase 5 removes. The design forbids this with
+a hard separation, enforced in the GM prompt (`ai_staged.ts`) and the
+`advance_plan` tool description (`toolSchemas.ts`):
+
+1. **Tags are inputs consumed *by* `write_next`, never causes *of* it.** They
+   accumulate in memory mid-beat and are read at the boundary. Seeing one is
+   explicitly *not* a reason to call `advance_plan`.
+2. **The spine advances only on the current beat's own `advance-on` condition.**
+   If a player action both satisfies that condition and neutralizes an asset,
+   it's the *trigger* firing that advances the beat — not the tag. If the
+   condition isn't met, the spine stays put no matter what tags arrive.
+3. **Mid-beat neutralization is handled on the Front, not the spine.** The GM
+   reacts in real time on the *Front's own state* (rewrite / `resolve_thread` /
+   `abandon_thread` its steps, adjust its `manage_timer` clock) — correct to do
+   mid-beat, and it doesn't touch the spine. The `[Neutralized]` tag from that
+   moment just waits in memory for the next `write_next`.
+
+This is what keeps "the world reacts immediately" (Fronts are live state) and
+"the horizon is rewritten only at the boundary" (the spine is a prediction
+re-drawn one beat at a time) from colliding. Covered by a `gmPlanNotes` test
+asserting the guard language is present.
+
+## The two design questions this resolves
+
+Both questions the critique posed have clean answers under this design, and
+recording them is half the point of the doc:
+
+**Q: What happens when players completely derail an established Front or Clock?**
+Nothing routes them back. A Front is *independent state*: its clock keeps
+ticking, freezes, or is removed based on what the players did to its *cause*,
+not on what the spine predicted. Derailment isn't an error condition — it's the
+Front reacting. If the players blow up the antenna during Step 1, the Front
+doesn't limp toward Step 3; the GM **rewrites the Front's remaining steps** (or
+resolves/abandons the thread) at the next boundary, exactly the way it rewrites
+the spine. The structured handoff (Piece 5) is what makes this legible: a
+neutralized asset is a *category*, so re-planning sees "this Front is off the
+board" as data, not buried in prose.
+
+**Q: Does the AI rewrite its vague future outline, or route players back to the
+original plan?** **Rewrite — always.** The "one beat / one step ahead"
+discipline already forbids scripting far out; Phase 5 extends it to Fronts. The
+session/beat boundary is the re-planning point, the structured handoff is its
+input, and `advance_plan write_next` (+ Front-advance) only ever writes the
+*next* horizon. Routing players back toward an invalidated prediction is the
+specific failure Phase 5 exists to remove.
+
+## Session-to-session data pipeline (how it all connects)
+
+```
+   during play:  memory accrues ──▶ reflection.ts (Piece 5: categorized delta)
+                                          │
+   Fronts tick:  manage_timer / director tick_a_clock ──▶ clocks advance
+                                          │
+   at boundary:  advance_plan complete_current
+                     │  reads categorized delta + current Front/clock state
+                     ▼
+                 advance_plan write_next  ──▶ next spine beat (prediction)
+                 + rewrite/advance Fronts  ──▶ next escalation step(s)
+                 + refresh candidate arcs  ──▶ collapse toward what players did
+                     │
+                     ▼
+                 only the NEXT horizon is detailed; everything past it stays
+                 one-liners. Derailed predictions are rewritten here, never
+                 enforced against the players.
+```
+
+## Note template with Phase 5 sections (illustrative)
+
+```markdown
+# Campaign Plan
+
+## Premise (1-2 sentences, stable)
+
+## Spine  (PREDICTION, not a track — the current beat detailed, future = one-liners)
+- [x] Session 0 — Opening Image: <done>
+- [ ] Session 1 — Inciting Incident: <one line>
+- [ ] ...
+
+## Current beat — <name>
+Goal: <what has to become true in the fiction before we advance>
+- [ ] concrete checklist item
+advance-on:
+  - action: players decode the broadcast OR destroy the antenna
+  - time: if the session ends with the broadcast ignored, Front "The Signal" ticks a step
+
+## Fronts  (independent threats — each is a StoryThread(background) + doom clock)
+### The Signal  — clock: "Rift opens" [▓▓░░░░] 2/6
+Motive: <what it wants>   Cast: <key NPCs>
+- Step 1: broadcast infiltrates the local forum   ← current
+- Step 2: a forum member is abducted
+- Step 3: the rift opens on Rodenbecker Street
+
+## Secrets & Clues  (decoupled from HOW they're found)
+- [ ] The tapes emit a low-frequency hum
+- [ ] The baron secretly funds the bandits
+- ...
+
+## Character arcs  (per player; 2-3 candidate directions, not scripts)
+### <Name>  — current state / candidate directions / active hooks
+```
+
+## Relationship to existing systems (do not duplicate)
+
+- **Fronts vs. Threads:** a Front *is* a `StoryThread` (background priority +
+  linked doom clock), not a new type. Ordinary threads (main/side plotlines the
+  players are actively pulling on) are unchanged. The distinction is
+  `priority` + whether a doom clock is attached and advancing off-screen.
+- **Fronts vs. the spine:** the spine is *authorial prediction about drama*;
+  Fronts are *world state that advances regardless of drama*. They coexist —
+  the spine predicts how the players' collision with the Fronts will feel; the
+  Fronts don't care whether that prediction holds.
+- **Fronts vs. the director:** the director still picks the per-turn move;
+  Fronts give `tick_a_clock` / `announce_future_badness` a concrete thing to
+  advance and telegraph. No director-policy change required for Phase 5a.
+- **Clues vs. Goals/Threads:** a clue is latent information; when discovered and
+  it matters, it *spawns* a `Goal` or `StoryThread`. The clue list is not a
+  second objective tracker.
+
+## Phased sub-plan for Phase 5
+
+- **Phase 5a — prompt + template + Front convention (done):**
+  - [x] Reframe the spine as a "prediction, not a track" in the CAMPAIGN PLAN
+        prompt section and the `advance_plan` tool description — `ai_staged.ts`,
+        `toolSchemas.ts`.
+  - [x] Replace `advance-when` with an `advance-on` action/time-trigger block
+        in the note template + prompt guidance — `ai_staged.ts` (both the
+        CAMPAIGN PLAN section and the per-turn plan injection).
+  - [x] Add **Fronts** and **Secrets & Clues** sections to the plan guidance,
+        with Fronts built as `create_thread` (priority "background") +
+        `manage_timer` doom clock and clues floated decoupled from route —
+        `ai_staged.ts`.
+  - [x] Guidance tying `manage_timer` to Front escalation steps (steps as
+        markdown in the thread description for 5a — no `StoryThread` schema
+        change).
+  - [x] Tests — `tests/gmPlanNotes.test.ts`: prompt asserts the prediction
+        framing + `advance-on` + Three-Clue Rule, and the Fronts (doom clock /
+        escalation steps / `create_thread` / `manage_timer`) + Secrets & Clues
+        sections. Existing plan/regression suites still green.
+- **Phase 5b — structured handoff (Piece 5), option (1):**
+  - [x] Extend `reflection.ts` to tag insights that are world-state changes
+        with `[Neutralized]` / `[Clock]` / `[Goal]` / `[Arc]`, leaving ordinary
+        pattern insights untagged; the tags ride the existing flat-string
+        memory entries (no parsing/storage change — the strip regex leaves a
+        leading `[` intact).
+  - [x] `advance_plan` (write_next) description tells the GM to ground the next
+        beat in recent `[Neutralized]/[Clock]/[Goal]/[Arc]` insights + current
+        Fronts/clocks — `toolSchemas.ts`.
+  - [x] Tests — `tests/reflection.test.ts`: a tagged-insight round-trip
+        confirming `[Neutralized]`/`[Clock]` prefixes survive and a `- ` before
+        a tag is still cleaned off.
+- **Phase 5c — deferred until a demonstrated need:**
+  - [ ] Typed `steps?` on `StoryThread` (Piece 3 open decision) and/or a
+        dedicated boundary digest function (Piece 5 option 2). Not built — 5a's
+        markdown steps and 5b's continuous tagged feed cover the need for now.
+
+## Decisions to lock before implementing Phase 5
+
+- **Keep the spine, demoted to prediction** — locked (per this discussion).
+- **Doc-first, implement after review** — locked (this document).
+- **Fronts reuse `StoryThread` + `CountdownTimer`, not a new struct** —
+  proposed; the only open struct question is typed `steps?` vs. markdown
+  (leaning markdown for 5a).
+- **Structured handoff = extend `reflection.ts` with categories (option 1)**
+  vs. dedicated boundary digest (option 2) — proposed option 1 first.
+- **Trigger reframe: `advance-when` → OR'd action triggers + time triggers** —
+  proposed.

@@ -114,6 +114,51 @@ describe("gm_plan injection into the GM stage", () => {
     expect(combined).toContain("long");
   });
 
+  it("frames the spine as a prediction and teaches advance-on action/time triggers (Phase 5)", () => {
+    const { messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    const combined = messages.map((m) => m.content).join("\n");
+    // Spine is a prediction, not a track.
+    expect(combined).toContain("PREDICTION");
+    expect(combined.toLowerCase()).toContain("rewrite the remaining");
+    // Triggers are player action (OR'd) or time/consequence, not a scripted moment.
+    expect(combined).toContain("advance-on");
+    expect(combined).toContain("Three-Clue Rule");
+  });
+
+  it("teaches Fronts (background thread + doom clock) and a floating Secrets & Clues list (Phase 5)", () => {
+    const { messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    const combined = messages.map((m) => m.content).join("\n");
+    // Fronts built from existing tools, advancing on their own.
+    expect(combined).toContain("Fronts");
+    expect(combined).toContain("doom clock");
+    expect(combined).toContain("escalation steps");
+    expect(combined).toContain("create_thread");
+    expect(combined).toContain("manage_timer");
+    // Floating clues decoupled from how they're found.
+    expect(combined).toContain("Secrets & Clues");
+    expect(combined.toLowerCase()).toContain("decoupled from how they're found");
+  });
+
+  it("guards against premature advance: a reflection tag is an input, not an advance trigger (Phase 5b)", () => {
+    const { messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    const combined = messages.map((m) => m.content).join("\n");
+    // A [Neutralized]/[Clock]/... tag must not itself trigger advance_plan.
+    expect(combined).toContain("A tag is NOT a trigger");
+    expect(combined.toLowerCase()).toContain("own advance-on");
+    // Mid-beat neutralization routes to the Front, not the spine.
+    expect(combined).toContain("Mid-beat neutralization");
+    expect(combined).toMatch(/resolve_thread|abandon_thread/);
+  });
+
   it("foregrounds the active side beat over the main spine", () => {
     const storyData = createTestStory({
       lore: [

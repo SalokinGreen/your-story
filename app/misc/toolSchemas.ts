@@ -1236,9 +1236,10 @@ const advancePlanTool: ToolSchema = {
   type: "function",
   function: {
     name: "advance_plan",
-    description: `Advance the campaign plan through its fixed dramatic spine (docs/gm-plan-notes-design.md). Two actions, meant to be used together the moment a beat wraps:
-- action "complete_current": mark the CURRENT beat done, once its advance-when condition is satisfied. After this, the turn will NOT be allowed to end until you write the next beat - so follow it with write_next this same turn.
-- action "write_next": detail the NEXT beat and move focus onto it. Provide the next beat's name and its full writeup (goal + a [ ] checklist + an advance-when line). This keeps the plan exactly one beat ahead - never write beats further out than the next one.
+    description: `Advance the campaign plan through its fixed dramatic spine (docs/gm-plan-notes-design.md). The spine is a PREDICTION of the drama, not a track the players must follow - use these to keep it current, rewriting the next beat to fit what actually happened rather than what was forecast. Two actions, meant to be used together the moment a beat wraps:
+- action "complete_current": mark the CURRENT beat done, once its advance-on trigger (a player ACTION, or a TIME/consequence trigger) is satisfied. After this, the turn will NOT be allowed to end until you write the next beat - so follow it with write_next this same turn.
+- action "write_next": detail the NEXT beat and move focus onto it. Provide the next beat's name and its full writeup (goal + a [ ] checklist + an advance-on block: OR'd action triggers and/or a time trigger). Ground it in what changed since the last boundary - recent reflection insights tagged [Neutralized]/[Clock]/[Goal]/[Arc], current Fronts and their clocks, and where the players actually went. This keeps the plan exactly one beat ahead - never write beats further out than the next one.
+IMPORTANT: those tags are INPUTS you read here, not reasons to call this tool. A [Neutralized]/[Clock]/[Goal]/[Arc] insight appearing mid-beat is NOT an advance trigger - do not call complete_current just because you saw one. Only advance when the current beat's own advance-on condition is met. Neutralizing a threat mid-beat is handled on the Front itself (resolve/abandon its thread, adjust its timer), not by advancing the spine.
 Beat names are fixed and advance in order: Opening Image (Session 0), Inciting Incident (Session 1), Rising Complications, Midpoint Turn, Crisis, Climax, Resolution.`,
     parameters: {
       type: "object",
@@ -1262,7 +1263,7 @@ Beat names are fixed and advance in order: Opening Image (Session 0), Inciting I
         detail: {
           type: "string",
           description:
-            "For write_next: the full writeup of the next beat - its goal, a [ ] checklist, and an advance-when line.",
+            "For write_next: the full writeup of the next beat - its goal, a [ ] checklist, and an advance-on block (OR'd action triggers and/or a time trigger).",
         },
       },
       required: ["action"],

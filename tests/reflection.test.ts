@@ -237,6 +237,33 @@ describe("ensureStoryReflected", () => {
     ]);
   });
 
+  it("preserves category tags (e.g. [Neutralized]) on structured insights for the re-planning handoff", async () => {
+    const storyData = createMockStoryData({ memory: highImportanceMemories() });
+
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content:
+          "[Neutralized] The players destroyed the antenna, defusing the Signal front.\n- [Clock] The ritual clock is now one tick from completion.\nThe player still prefers negotiation.",
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await ensureStoryReflected(storyData, {
+      model: "test-model",
+      token: "tok",
+    });
+
+    // The [Tag] prefix survives the bullet/numbering strip (only leading
+    // -,*,digits,.,),whitespace are removed - "[" stops the strip), while a
+    // "- " before a tag is still cleaned off.
+    expect(result.insights).toEqual([
+      "[Neutralized] The players destroyed the antenna, defusing the Signal front.",
+      "[Clock] The ritual clock is now one tick from completion.",
+      "The player still prefers negotiation.",
+    ]);
+  });
+
   it("is non-fatal when the API call fails", async () => {
     const storyData = createMockStoryData({ memory: highImportanceMemories() });
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
