@@ -145,6 +145,20 @@ describe("gm_plan injection into the GM stage", () => {
     expect(combined.toLowerCase()).toContain("decoupled from how they're found");
   });
 
+  it("guards against premature advance: a reflection tag is an input, not an advance trigger (Phase 5b)", () => {
+    const { messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    const combined = messages.map((m) => m.content).join("\n");
+    // A [Neutralized]/[Clock]/... tag must not itself trigger advance_plan.
+    expect(combined).toContain("A tag is NOT a trigger");
+    expect(combined.toLowerCase()).toContain("own advance-on");
+    // Mid-beat neutralization routes to the Front, not the spine.
+    expect(combined).toContain("Mid-beat neutralization");
+    expect(combined).toMatch(/resolve_thread|abandon_thread/);
+  });
+
   it("foregrounds the active side beat over the main spine", () => {
     const storyData = createTestStory({
       lore: [

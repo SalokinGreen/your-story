@@ -745,6 +745,35 @@ contract* — the four categories above — is the durable part, and it is what
 turns "the AI rewrites a prose outline" into "the AI updates typed world-state
 that `advance_plan` reads."
 
+### Invariant: a tag is an INPUT to write_next, not a TRIGGER for it
+
+Option (1)'s caveat — the categorized feed is *continuous*, firing on
+importance-threshold batches mid-session, not on session boundaries — creates
+one specific hazard: a `[Neutralized]` tag can land *mid-beat*, the instant the
+players defuse something, and a naive GM could read "a Neutralized signal
+appeared" as "advance the plan now," collapsing the horizon prematurely and
+re-introducing the very whiplash Phase 5 removes. The design forbids this with
+a hard separation, enforced in the GM prompt (`ai_staged.ts`) and the
+`advance_plan` tool description (`toolSchemas.ts`):
+
+1. **Tags are inputs consumed *by* `write_next`, never causes *of* it.** They
+   accumulate in memory mid-beat and are read at the boundary. Seeing one is
+   explicitly *not* a reason to call `advance_plan`.
+2. **The spine advances only on the current beat's own `advance-on` condition.**
+   If a player action both satisfies that condition and neutralizes an asset,
+   it's the *trigger* firing that advances the beat — not the tag. If the
+   condition isn't met, the spine stays put no matter what tags arrive.
+3. **Mid-beat neutralization is handled on the Front, not the spine.** The GM
+   reacts in real time on the *Front's own state* (rewrite / `resolve_thread` /
+   `abandon_thread` its steps, adjust its `manage_timer` clock) — correct to do
+   mid-beat, and it doesn't touch the spine. The `[Neutralized]` tag from that
+   moment just waits in memory for the next `write_next`.
+
+This is what keeps "the world reacts immediately" (Fronts are live state) and
+"the horizon is rewritten only at the boundary" (the spine is a prediction
+re-drawn one beat at a time) from colliding. Covered by a `gmPlanNotes` test
+asserting the guard language is present.
+
 ## The two design questions this resolves
 
 Both questions the critique posed have clean answers under this design, and
