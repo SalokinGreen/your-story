@@ -216,3 +216,101 @@ describe("campaign-plan gate - generateStoryTurn integration", () => {
     }
   });
 });
+
+describe("grounding gate (Phase 4) - generateStoryTurn integration", () => {
+  it("rejects creating the Campaign Plan note when the GM skips read_notes", async () => {
+    const storyData = createTestStory({
+      lore: [
+        {
+          title: "The Sunken City",
+          content: "An old ruin beneath the tide.",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          type: "lore",
+        } as StoryLore,
+      ],
+    });
+
+    const { fetchMock, gmStageCalls } = createMockGMFetch([
+      {
+        toolCalls: [
+          {
+            name: "create_note",
+            arguments: {
+              title: "Campaign Plan",
+              content: "premise + spine",
+              type: "gm_plan",
+            },
+          },
+        ],
+      },
+      { content: "You settle into the quiet evening." },
+    ]);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await generateStoryTurn(
+      storyData,
+      "Let's begin",
+      baseOptions,
+      {},
+    );
+
+    expect(result.success).toBe(true);
+    expect(storyData.planState).toBeUndefined();
+    const createResult = result.gmResults?.find(
+      (r) => r.toolName === "create_note",
+    );
+    expect(createResult?.success).toBe(false);
+    expect(gmStageCalls()).toHaveLength(2);
+  });
+
+  it("allows creating the Campaign Plan note in the same round after read_notes", async () => {
+    const storyData = createTestStory({
+      lore: [
+        {
+          title: "The Sunken City",
+          content: "An old ruin beneath the tide.",
+          relatedCharacters: [],
+          relatedLocations: [],
+          secrtet: false,
+          keys: [],
+          type: "lore",
+        } as StoryLore,
+      ],
+    });
+
+    const { fetchMock } = createMockGMFetch([
+      {
+        toolCalls: [
+          { name: "read_notes", arguments: { titles: ["The Sunken City"] } },
+          {
+            name: "create_note",
+            arguments: {
+              title: "Campaign Plan",
+              content: "premise + spine",
+              type: "gm_plan",
+            },
+          },
+        ],
+      },
+      { content: "You settle into the quiet evening." },
+    ]);
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await generateStoryTurn(
+      storyData,
+      "Let's begin",
+      baseOptions,
+      {},
+    );
+
+    expect(result.success).toBe(true);
+    expect(storyData.planState).toBeDefined();
+    const createResult = result.gmResults?.find(
+      (r) => r.toolName === "create_note",
+    );
+    expect(createResult?.success).toBe(true);
+  });
+});

@@ -941,6 +941,13 @@ export interface StoryData {
   // in the gm_plan note, not here. Auto-initialized when the spine note is
   // created; undefined for stories that never establish a plan.
   planState?: PlanState;
+  // Phase 4 grounding gate (docs/gm-plan-notes-design.md): true once
+  // read_notes/search_notes has been called during the CURRENT turn. Reset to
+  // false at the start of every turn (generation.ts); used only to gate
+  // creating the gm_plan "Campaign Plan" spine note when existing
+  // lore/mechanics/dm_instructions notes haven't been read yet. Turn-scoped
+  // bookkeeping, not meaningful once the turn ends - don't read it elsewhere.
+  notesReadThisTurn?: boolean;
   timers?: CountdownTimer[]; // Countdown timers for deadlines/events
   combatState?: CombatState; // Active tactical combat state (turn-based combat tracking)
   threads?: StoryThread[]; // Active story threads/plotlines (independent of AGMT)

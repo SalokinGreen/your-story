@@ -2,18 +2,25 @@
 
 ## Status
 
-**Phase 1 + Phase 2 + Phase 3 implemented.** Phase 1 (prompt-only): the
-`gm_plan` note type, the GM-stage injection, the `open_side_beat`/
+**Phase 1 + Phase 2 + Phase 3 + Phase 4 implemented.** Phase 1 (prompt-only):
+the `gm_plan` note type, the GM-stage injection, the `open_side_beat`/
 `close_side_beat` tools, the player-facing lore UI entry. Phase 2
 (deterministic re-planning gate): structured `PlanState`, the `advance_plan`
 tool (`complete_current` → `write_next`), and a boundary gate in the GM-stage
 loop that mirrors the M2 roll gate — when the GM marks a beat complete but
 hasn't written the next one, the turn can't end on prose until it does. Phase
-3 (spine presets + grounding): the single fixed 7-beat spine was replaced with
-three fixed presets keyed by campaign length (short/medium/long — see "Spine
-length presets" below), and the prompt now tells the GM to read existing
-lore/mechanics/dm_instructions notes before creating the plan so it isn't
-invented in a vacuum. All three phases are covered by tests.
+3 (spine presets + grounding *instruction*): the single fixed 7-beat spine was
+replaced with three fixed presets keyed by campaign length (short/medium/long
+— see "Spine length presets" below), and the prompt told the GM to read
+existing lore/mechanics/dm_instructions notes before creating the plan.
+**Phase 4 (grounding *enforcement* + oracle in planning)**: Phase 3's
+grounding instruction was prompt-only and didn't reliably hold up in practice
+(same failure mode Phase 2 was built to fix for beat-advancing), so it's now
+an actual gate - `create_note` refuses to create the "Campaign Plan" spine
+note until `read_notes`/`search_notes` has been called that turn, when there's
+something to read. Phase 4 also adds guidance to reach for `fate_question`/
+`roll_table` when the plan itself invents something uncertain. All four
+phases are covered by tests.
 
 ## The problem this solves
 
@@ -157,20 +164,86 @@ unaffected — it just operates over a longer or shorter `beats` array.
 `CAMPAIGN_SPINE_BEATS` is kept as a deprecated alias for `CAMPAIGN_SPINE_MEDIUM`
 for backward compatibility with anything still importing the old name.
 
-### Read before you plan (grounding)
+### Read before you plan (grounding) — Phase 3 instruction, Phase 4 enforcement
 
 Phase 1-2 let the GM invent the spine and character arcs from nothing. Phase 3
-adds an explicit instruction: before creating the `gm_plan` spine note (or the
-character sheet/mechanics notes alongside it, in the fresh-story setup path),
-the GM must `read_notes`/`search_notes` any existing `lore`, `mechanics`, and
-`dm_instructions` notes for the adventure. This matters most for adventures
-built from a template (`Adventure.storyTemplate`) that ship their own lore —
-without this, the GM could draft a plan that ignores or contradicts
-established setting/rules it hasn't actually read yet. This is a prompt-only
-nudge (see "How strictly should this be enforced" below), not a gate — it's
-enforced the same way the rest of Phase 1 is: through prompt text in
-`buildGMStagePrompt`'s fresh-story-setup block and the CAMPAIGN PLAN section,
-not through code.
+added an explicit instruction: before creating the `gm_plan` spine note (or
+the character sheet/mechanics notes alongside it, in the fresh-story setup
+path), the GM should `read_notes`/`search_notes` any existing `lore`,
+`mechanics`, and `dm_instructions` notes for the adventure. This matters most
+for adventures built from a template (`Adventure.storyTemplate`) that ship
+their own lore — without this, the GM could draft a plan that ignores or
+contradicts established setting/rules it hasn't actually read yet.
+
+Phase 3 shipped this as a prompt-only nudge, on the theory that Phase 2's gate
+machinery was overkill for what looked like a simple instruction-following
+problem. In practice it didn't hold up — the instruction competes with dozens
+of others in a long system prompt and nothing stopped the GM from creating the
+plan without ever calling `read_notes`. Phase 4 makes it an actual gate,
+described in "Grounding enforcement" below.
+
+## Grounding enforcement (Phase 4)
+
+`toolExecutor.ts`'s `create_note` handler now refuses to create the `gm_plan`
+note titled "Campaign Plan" unless `StoryData.notesReadThisTurn` is true — but
+*only* when there's something worth reading: if the story has no existing
+`lore`/`mechanics`/`dm_instructions` notes, the gate is a no-op (nothing to
+ground against, so requiring a `read_notes` call would just be busywork). The
+rejection returns `success: false` with a message telling the GM what to do
+(`read_notes`/`search_notes`, then retry `create_note`); no separate
+round-forcing gate is needed the way M2/Phase 2 need one, because the GM
+stage's round loop already continues to another round whenever a round made
+any tool call, and it naturally sees the failed response there.
+
+`notesReadThisTurn` (`structs.ts`) is deliberately turn-scoped, not persistent
+plan state like `PlanState` — it means "has the GM looked at existing notes
+in the current turn," and is:
+
+- **Reset to `false`** at the very start of `generateStoryTurnOnce`
+  (`generation.ts`), so a `read_notes` call from a previous turn can't
+  stale-satisfy this turn's gate.
+- **Set to `true`** wherever `read_notes` or `search_notes` executes —
+  `search_notes` is handled directly in `toolExecutor.ts`, `read_notes` in
+  `gmExecutor.ts`'s own dispatch (it isn't delegated to `toolExecutor.ts`) —
+  regardless of whether the search finds anything; the point is that the GM
+  made the effort to check, not that it found something.
+- **Visible to the same round's later calls**: the GM stage doesn't batch all
+  of a round's tool calls through one `toolExecutor.executeTools` call —
+  `gmExecutor.ts` dispatches them one at a time against a single
+  `structuredClone`d `StoryData` (`modified`) shared across that loop, so a
+  `read_notes` call earlier in the same round already flips the flag by the
+  time a later `create_note` call in that same round checks it. Cross-round
+  persistence works the same way: `modified` becomes next round's `storyData`
+  via `Object.assign`, carrying the flag forward.
+
+This intentionally scopes the *hard* gate to plan creation only — the
+character sheet and mechanics notes created alongside it at Session 0 keep
+Phase 3's prompt-only nudge. The plan is the piece most likely to silently
+contradict established lore if invented blind (it's the thing this whole
+design exists to keep coherent over a long campaign), so it's the piece that
+gets the harder guarantee.
+
+## Oracle in planning (Phase 4)
+
+Plan-writing routinely means inventing something the GM doesn't actually know
+yet — who the antagonist really is, how a beat's tension resolves, which of a
+character's 2-3 candidate arc directions the fiction is leaning toward. The
+CORE STANCE section of the GM prompt already has a rule against "manufactured
+certainty" — deciding an uncertain fact by what feels safe or pleasant instead
+of consulting `fate_question`/`roll_table` — but it was written for in-scene
+narration, not plan-writing, and nothing pointed the GM at the oracle while
+drafting or revising the plan. The CAMPAIGN PLAN section of the GM prompt
+(`ai_staged.ts`) now carries the same discipline explicitly for plan content:
+when inventing an uncertain premise detail, beat outcome, or candidate arc
+direction, call `fate_question` (with an honestly calibrated likelihood) or
+`roll_table` instead of defaulting to the first idea.
+
+This is prompt guidance only, not a gate — unlike the read-notes case, there's
+no reliable way to detect "the GM invented something uncertain here" in code,
+so a structural requirement (e.g. "call the oracle at least once during
+Session-0 setup") would either force oracle calls on plans with nothing
+actually uncertain in them, or be trivially satisfiable with an irrelevant
+roll. Better to point at the existing discipline than fake enforcement of it.
 
 ## Player visibility
 
@@ -372,6 +445,16 @@ Following the repo's `tests/*.test.ts` + seeded-`Math.random` conventions:
   out-of-enum value outright (schema validation); the GM prompt contains the
   "read before you plan" grounding instruction and documents all three
   `planSpineLength` presets.
+- Phase 4: `create_note` rejects creating "Campaign Plan" when grounding notes
+  (`lore`/`mechanics`/`dm_instructions`) exist and `notesReadThisTurn` is
+  falsy, allows it once the flag is true, and doesn't gate when there are no
+  grounding notes to read; `search_notes` (`toolExecutor.ts`) and `read_notes`
+  (`gmExecutor.ts`, via `executeGMTools`) both set the flag, including the
+  same-round-ordering case (`read_notes` then `create_note` in one round); the
+  GM prompt marks the instruction "ENFORCED" and states what `create_note`
+  will do, and separately documents pointing at `fate_question`/`roll_table`
+  for uncertain plan content. A `generateStoryTurn` integration test covers
+  both the rejection and the same-round unblock end-to-end.
 
 ## Decisions locked
 
@@ -381,7 +464,12 @@ Following the repo's `tests/*.test.ts` + seeded-`Math.random` conventions:
 - **Fully transparent** to the player (notes render through the normal lore UI).
 - A **side-beat tool pair** (`open_side_beat` / `close_side_beat`) for focus detours.
 - The GM must **read existing lore/mechanics/dm_instructions notes before
-  creating the plan** (Phase 3), enforced as a prompt-only nudge, not a gate.
+  creating the plan**. Introduced as a prompt-only nudge in Phase 3; upgraded
+  to an actual gate in Phase 4 after the nudge didn't hold up in practice.
+- **Oracle guidance for plan content** (Phase 4): prompt-only, pointing the GM
+  at `fate_question`/`roll_table` for uncertain plan elements — not a
+  structural requirement, since there's no reliable way to detect "this beat
+  needed the oracle and didn't get it" in code.
 
 ## Phased implementation checklist (Phase 1) — done
 
@@ -438,3 +526,23 @@ continuation prompt is what keeps the narrator on the current beat.
 - [x] Tests — `tests/campaignPlan.test.ts` (preset selection, fallback,
       validation rejection) and `tests/gmPlanNotes.test.ts` (prompt content:
       grounding instruction, preset documentation)
+
+## Phased implementation checklist (Phase 4) — done
+
+- [x] `StoryData.notesReadThisTurn?: boolean` (turn-scoped, documented as such)
+      — `structs.ts`
+- [x] Reset to `false` at the start of every turn — `generation.ts`
+      (`generateStoryTurnOnce`)
+- [x] `search_notes` sets it — `toolExecutor.ts`
+- [x] `read_notes` sets it (on the shared cloned `StoryData`) — `gmExecutor.ts`
+- [x] `create_note` gate: refuses "Campaign Plan" creation when grounding
+      notes exist and the flag is unset; no-ops when no grounding notes exist
+      — `toolExecutor.ts`
+- [x] GM prompt: "ENFORCED" wording + what `create_note` will do; oracle
+      guidance (`fate_question`/`roll_table`) for uncertain plan content —
+      `ai_staged.ts`
+- [x] Tests — `tests/campaignPlan.test.ts` (gate rejection/allow/no-op,
+      `search_notes` flag-setting, `executeGMTools` `read_notes` flag-setting
+      and same-round ordering), `tests/gmPlanNotes.test.ts` (prompt content),
+      `tests/generation.planGate.test.ts` (full `generateStoryTurn`
+      integration: rejection and same-round unblock)
