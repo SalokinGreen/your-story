@@ -2,11 +2,12 @@
 
 ## Status
 
-**Phase 1 + Phase 2 + Phase 3 + Phase 4 implemented. Phase 5 is DESIGN-ONLY
-(this document) — no code written yet.** Phase 5 (the "situation, not plot"
-reframe: Fronts, action/time triggers, floating clues, and a structured
-session handoff) is specified in the "Phase 5" section at the bottom and is
-awaiting sign-off before any implementation. Everything above it ships today.
+**Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5a/5b implemented.** Phase 5
+(the "situation, not plot" reframe) landed its prompt/convention core (5a) and
+its structured-reflection handoff (5b); **Phase 5c** (typed `steps?` on
+`StoryThread`, dedicated boundary digest) remains deferred until a demonstrated
+need. See the "Phase 5" section at the bottom for the full design and the
+sub-plan checklist.
 
 Phase 1 (prompt-only):
 the `gm_plan` note type, the GM-stage injection, the `open_side_beat`/
@@ -557,12 +558,15 @@ continuation prompt is what keeps the narrator on the current beat.
 
 # Phase 5 (DESIGN-ONLY): Situations, not plots — Fronts, triggers, floating clues, structured handoff
 
-> **Status: proposed, not implemented.** This section is the agreed design
-> from the "campaign plan outline" discussion. It is doc-first by request:
-> nothing below is wired into code yet. The two decisions locked before
-> writing it were (1) **doc-first**, implement after review, and (2) **keep
-> the dramatic spine** — Phase 5 *demotes and reframes* it, it does not
-> replace it.
+> **Status: 5a + 5b implemented; 5c deferred.** This section is the agreed
+> design from the "campaign plan outline" discussion. It was written doc-first
+> by request, then implemented after sign-off. The decisions locked were
+> (1) **doc-first**, implement after review; (2) **keep the dramatic spine** —
+> Phase 5 *demotes and reframes* it, it does not replace it; (3) **Front
+> escalation steps as markdown** in the thread description (no `StoryThread`
+> schema change); and (4) **structured handoff by extending `reflection.ts`
+> with category tags** (option 1). See the sub-plan checklist at the end for
+> exactly what shipped.
 
 ## The problem Phase 5 addresses
 
@@ -837,35 +841,42 @@ Motive: <what it wants>   Cast: <key NPCs>
   it matters, it *spawns* a `Goal` or `StoryThread`. The clue list is not a
   second objective tracker.
 
-## Phased sub-plan for Phase 5 (proposed, all unchecked)
+## Phased sub-plan for Phase 5
 
-- **Phase 5a — prompt + template + Front convention (low risk, reversible):**
-  - [ ] Reframe the spine as a "prediction, not a track" in the CAMPAIGN PLAN
+- **Phase 5a — prompt + template + Front convention (done):**
+  - [x] Reframe the spine as a "prediction, not a track" in the CAMPAIGN PLAN
         prompt section and the `advance_plan` tool description — `ai_staged.ts`,
         `toolSchemas.ts`.
-  - [ ] Replace `advance-when` with an `advance-on:` action/time-trigger block
-        in the note template + prompt guidance — `ai_staged.ts`.
-  - [ ] Add **Fronts** and **Secrets & Clues** sections to the plan note
-        template + prompt guidance for creating Fronts as
-        `StoryThread(background) + CountdownTimer` and floating the clues —
+  - [x] Replace `advance-when` with an `advance-on` action/time-trigger block
+        in the note template + prompt guidance — `ai_staged.ts` (both the
+        CAMPAIGN PLAN section and the per-turn plan injection).
+  - [x] Add **Fronts** and **Secrets & Clues** sections to the plan guidance,
+        with Fronts built as `create_thread` (priority "background") +
+        `manage_timer` doom clock and clues floated decoupled from route —
         `ai_staged.ts`.
-  - [ ] Guidance tying `manage_timer` / director moves to Front escalation
-        steps (steps as markdown in the thread description for 5a).
-  - [ ] Tests: prompt contains the reframed language, trigger block, Fronts +
-        clues sections; a regression scenario where a "Front" thread+timer is
-        created and advanced without the spine gate interfering.
-- **Phase 5b — structured handoff (Piece 5), option (1) first:**
-  - [ ] Extend `reflection.ts` to categorize insights (neutralized assets /
-        ticking clocks / new goals & hooks / oracle questions); surface the
-        running delta to the re-planning boundary.
-  - [ ] `advance_plan write_next` prompt guidance to consume the categorized
-        delta.
-  - [ ] Tests: reflection emits categorized output; a boundary integration test
-        that a neutralized-asset delta leads to a rewritten (not re-enforced)
-        Front/spine.
-- **Phase 5c — only if demonstrated need:**
+  - [x] Guidance tying `manage_timer` to Front escalation steps (steps as
+        markdown in the thread description for 5a — no `StoryThread` schema
+        change).
+  - [x] Tests — `tests/gmPlanNotes.test.ts`: prompt asserts the prediction
+        framing + `advance-on` + Three-Clue Rule, and the Fronts (doom clock /
+        escalation steps / `create_thread` / `manage_timer`) + Secrets & Clues
+        sections. Existing plan/regression suites still green.
+- **Phase 5b — structured handoff (Piece 5), option (1):**
+  - [x] Extend `reflection.ts` to tag insights that are world-state changes
+        with `[Neutralized]` / `[Clock]` / `[Goal]` / `[Arc]`, leaving ordinary
+        pattern insights untagged; the tags ride the existing flat-string
+        memory entries (no parsing/storage change — the strip regex leaves a
+        leading `[` intact).
+  - [x] `advance_plan` (write_next) description tells the GM to ground the next
+        beat in recent `[Neutralized]/[Clock]/[Goal]/[Arc]` insights + current
+        Fronts/clocks — `toolSchemas.ts`.
+  - [x] Tests — `tests/reflection.test.ts`: a tagged-insight round-trip
+        confirming `[Neutralized]`/`[Clock]` prefixes survive and a `- ` before
+        a tag is still cleaned off.
+- **Phase 5c — deferred until a demonstrated need:**
   - [ ] Typed `steps?` on `StoryThread` (Piece 3 open decision) and/or a
-        dedicated boundary digest function (Piece 5 option 2).
+        dedicated boundary digest function (Piece 5 option 2). Not built — 5a's
+        markdown steps and 5b's continuous tagged feed cover the need for now.
 
 ## Decisions to lock before implementing Phase 5
 

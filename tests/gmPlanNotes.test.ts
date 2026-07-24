@@ -114,6 +114,37 @@ describe("gm_plan injection into the GM stage", () => {
     expect(combined).toContain("long");
   });
 
+  it("frames the spine as a prediction and teaches advance-on action/time triggers (Phase 5)", () => {
+    const { messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    const combined = messages.map((m) => m.content).join("\n");
+    // Spine is a prediction, not a track.
+    expect(combined).toContain("PREDICTION");
+    expect(combined.toLowerCase()).toContain("rewrite the remaining");
+    // Triggers are player action (OR'd) or time/consequence, not a scripted moment.
+    expect(combined).toContain("advance-on");
+    expect(combined).toContain("Three-Clue Rule");
+  });
+
+  it("teaches Fronts (background thread + doom clock) and a floating Secrets & Clues list (Phase 5)", () => {
+    const { messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    const combined = messages.map((m) => m.content).join("\n");
+    // Fronts built from existing tools, advancing on their own.
+    expect(combined).toContain("Fronts");
+    expect(combined).toContain("doom clock");
+    expect(combined).toContain("escalation steps");
+    expect(combined).toContain("create_thread");
+    expect(combined).toContain("manage_timer");
+    // Floating clues decoupled from how they're found.
+    expect(combined).toContain("Secrets & Clues");
+    expect(combined.toLowerCase()).toContain("decoupled from how they're found");
+  });
+
   it("foregrounds the active side beat over the main spine", () => {
     const storyData = createTestStory({
       lore: [

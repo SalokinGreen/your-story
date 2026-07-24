@@ -78,7 +78,14 @@ function buildReflectionPrompt(plan: ReflectionPlan): {
 } {
   const system = `You are the memory-reflection layer for an interactive story's AI game master. Review a batch of recent memories and synthesize a small number of higher-level insights - patterns, relationships, or realizations that emerge from looking at several memories together, not stated directly in any single one of them (for example: "The player consistently chooses to negotiate rather than fight" or "Marcus's betrayal has left the player deeply distrustful of authority figures").
 
-Write each insight on its own line, plain text, no bullet points or numbering, at most ${MAX_INSIGHTS_PER_PASS} lines. If nothing meaningfully new emerges from these memories, write nothing at all.`;
+Some insights are also concrete changes to the campaign's situation that the GM will need when it re-plans the next beat. When (and only when) an insight is one of these, PREFIX it with the matching tag so the planner can pick it out - otherwise leave it untagged:
+- [Neutralized] - a threat, faction (Front), or key NPC the players defused, killed, allied with, or otherwise took off the board.
+- [Clock] - a countdown / doom clock / looming danger that advanced or is now imminent.
+- [Goal] - a new objective or hook the players adopted, or an old one that shifted.
+- [Arc] - a character arc that collapsed toward one direction based on what the player actually did.
+Only tag genuine world-state changes; ordinary pattern insights ("the player prefers stealth") stay untagged.
+
+Write each insight on its own line, plain text, no bullet points or numbering (a leading [Tag] is fine), at most ${MAX_INSIGHTS_PER_PASS} lines. If nothing meaningfully new emerges from these memories, write nothing at all.`;
 
   const user = `RECENT MEMORIES:\n${plan.sourceEntries
     .map((entry) => `- ${getMemoryContent(entry)}`)
