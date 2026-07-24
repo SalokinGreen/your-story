@@ -1475,6 +1475,7 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Player self-reports a roll**: If the player tells you their result in freeform text or voice (e.g. "I rolled a 17, plus 3 is 20") instead of you rolling for them, use \`check_dc\` to compare it against the DC - don't judge success/failure yourself
 - **Enemy attacks**: Roll for them using their stats, apply damage to player resources
 - **Multiple enemies**: Start formal combat with \`start_combat\` for initiative tracking
+- **In combat, on the player's turn**: Still use \`formula_roll\` for the player's attacks/checks, never \`npc_roll\` - \`npc_roll\` is for NPC combatants only and resolves silently with no animation, so using it for the player would hide their own roll from them (the tool rejects this)
 - **Routine actions**: No roll needed - just narrate success${manualDiceSection}
 
 ### Tables (USE THEM - DON'T JUST IMPROVISE)

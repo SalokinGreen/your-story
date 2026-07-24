@@ -96,6 +96,41 @@ describe("diceFormula", () => {
       expect(result.tokens[4].type).toBe("modifier");
     });
 
+    it("parses multiple dice groups added together", () => {
+      // Regression: the tokenizer used to let the "+1" of "+1d6" match as a
+      // bare modifier before it could see the trailing "d6", silently
+      // dropping the second dice group entirely.
+      const result = parseFormula("1d12+1d6");
+      expect(result.tokens).toHaveLength(3);
+      expect(result.tokens[0].type).toBe("dice");
+      expect(result.tokens[0].value).toEqual({
+        count: 1,
+        sides: 12,
+        exploding: false,
+      });
+      expect(result.tokens[1].type).toBe("operator");
+      expect(result.tokens[1].value).toBe("+");
+      expect(result.tokens[2].type).toBe("dice");
+      expect(result.tokens[2].value).toEqual({
+        count: 1,
+        sides: 6,
+        exploding: false,
+      });
+    });
+
+    it("parses multiple dice groups subtracted", () => {
+      const result = parseFormula("2d6-1d4");
+      expect(result.tokens).toHaveLength(3);
+      expect(result.tokens[1].type).toBe("operator");
+      expect(result.tokens[1].value).toBe("-");
+      expect(result.tokens[2].type).toBe("dice");
+      expect(result.tokens[2].value).toEqual({
+        count: 1,
+        sides: 4,
+        exploding: false,
+      });
+    });
+
     it("handles whitespace", () => {
       const result = parseFormula("  1d20 + 5  ");
       expect(result.tokens).toHaveLength(3);
@@ -176,6 +211,19 @@ describe("diceFormula", () => {
       expect(() => rollFormula("1d20+{{UNKNOWN}}")).toThrow(
         "Unknown variable: {{UNKNOWN}}"
       );
+    });
+
+    it("rolls and sums multiple dice groups (e.g. 1d12+1d6)", () => {
+      // 0.5 on a d12 -> 7, 0.5 on a d6 -> 4
+      vi.spyOn(Math, "random").mockReturnValue(0.5);
+
+      const result = rollFormula("1d12+1d6");
+      expect(result.rolls).toHaveLength(2);
+      expect(result.rolls[0].subtotal).toBe(7);
+      expect(result.rolls[1].subtotal).toBe(4);
+      expect(result.total).toBe(11);
+
+      vi.restoreAllMocks();
     });
 
     it("handles keep highest", () => {

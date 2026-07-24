@@ -3306,7 +3306,7 @@ function StoryPageContent() {
   }
 
   // Stop generation (abort ongoing requests)
-  function handleStop() {
+  async function handleStop() {
     // Unblock the GM loop if it's paused waiting for a physical roll
     resolveManualRoll(null);
     resolveDiceThrow(null);
@@ -3316,6 +3316,48 @@ function StoryPageContent() {
       generationAbortRef.current.abort();
       generationAbortRef.current = null;
     }
+
+    // A stopped generation is incomplete, not just paused - any tool calls
+    // that already ran before the abort (start_combat, npc_roll, etc.) stay
+    // applied to storyData otherwise, leaving mechanical state (especially
+    // combat) stuck mid-turn with no way back short of a full reload. Revert
+    // to the pre-turn snapshot, same as Undo, so Stop always leaves a clean,
+    // previously-valid state instead of a half-finished one.
+    if (storyData) {
+      const snapshot = undoStackRef.current[undoStackRef.current.length - 1];
+      if (snapshot) {
+        for (const key of Object.keys(storyData)) {
+          delete (storyData as unknown as Record<string, unknown>)[key];
+        }
+        Object.assign(storyData, snapshot);
+        undoStackRef.current = undoStackRef.current.slice(0, -1);
+        persistUndoStack();
+        setStoryData({ ...storyData });
+
+        if (storyData.scene.parts.length > 0) {
+          const previousPart =
+            storyData.scene.parts[storyData.scene.parts.length - 1];
+          setStoryText(previousPart.content);
+          setChoices({ choices: previousPart.choices || [] });
+          const inputs =
+            previousPart.choices?.reduce(
+              (acc, choice) => ({ ...acc, [choice.text]: false }),
+              {} as Record<string, boolean>,
+            ) || {};
+          setInput(inputs);
+        } else {
+          setChoices({ choices: [] });
+        }
+        setPendingUserChoice("");
+        setCanRetry(false);
+        setCanUndo(
+          undoStackRef.current.length > 0 && storyData.scene.parts.length >= 2,
+        );
+        logger.action("Stop reverted to pre-turn state (mechanics included)");
+        await saveProgress(storyData, true);
+      }
+    }
+
     setLoading(false);
     setLoadingStage(null);
     setStoryTextReady(true);
@@ -3383,6 +3425,12 @@ function StoryPageContent() {
       currentTurnSpeakerIdsRef.current = savedSpeakerIds;
 
       processLoreTriggers(storyData, addNotification);
+
+      // Reflect the restored pre-turn state immediately, same as Undo -
+      // otherwise the UI shows the previous (mutated) state until
+      // runTurnGeneration's own setStoryData calls catch up, which doesn't
+      // happen at all if generation fails before its first update.
+      setStoryData({ ...storyData });
 
       addNotification("Rerolling turn...", "info");
       logger.action("User requested full reroll retry", {
@@ -3900,6 +3948,12 @@ function StoryPageContent() {
     undoStackRef.current = undoStackRef.current.slice(0, -1);
     persistUndoStack();
     logger.action("Undo restored full pre-turn state (mechanics included)");
+
+    // Mutating storyData in place doesn't trigger a re-render on its own -
+    // without this, the restored state (combat, NPCs, stats, etc.) is
+    // correct in memory but the UI keeps showing what was on screen before
+    // Undo was clicked.
+    setStoryData({ ...storyData });
 
     // Update state to previous scene part
     if (storyData.scene.parts.length > 0) {

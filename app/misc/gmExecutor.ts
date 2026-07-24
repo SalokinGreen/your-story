@@ -4160,6 +4160,27 @@ function executeNPCRoll(
     };
   }
 
+  // npc_roll is for NPCs only - it resolves silently and is never shown to
+  // the player as an animation. The player's own combatant (type "player")
+  // must go through formula_roll instead, same as any other player action,
+  // so their rolls stay player-facing during combat.
+  if (combatant.type === "player") {
+    return {
+      toolName: "npc_roll",
+      toolCallId,
+      success: false,
+      result: {
+        type: "npc_roll",
+        combatant: combatant.name,
+        formula: params.formula,
+        rolls: [],
+        total: 0,
+        reason: params.reason,
+      } as GMNPCRollResult,
+      contextForStory: `[Combat Error: "${combatant.name}" is the player's own combatant - use formula_roll for the player's actions, npc_roll is for NPCs only]`,
+    };
+  }
+
   // Turn-order invariant: npc_roll represents a combatant's action for
   // their turn, so it's only valid for whoever's turn it currently is -
   // otherwise nothing stops the same combatant acting repeatedly in a

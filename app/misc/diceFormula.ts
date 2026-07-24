@@ -98,8 +98,13 @@ const VARIABLE_PATTERN = /^\{\{([a-zA-Z_][a-zA-Z0-9_]*)\}\}$/;
 const MODIFIER_PATTERN = /^[+-]?\d+$/;
 
 // Tokenizer pattern - splits formula into parts
+// The dice alternative allows an optional leading sign so a dice group that
+// follows another token (e.g. the "+1d6" in "1d12+1d6") is matched whole -
+// otherwise the plain-modifier alternative below greedily consumes the sign
+// and digit as a flat "+1" before the tokenizer can see the trailing "d6",
+// silently dropping the second dice group.
 const TOKENIZER_PATTERN =
-  /(\d+d\d+(?:kh\d+|kl\d+)?!?|\{\{[a-zA-Z_][a-zA-Z0-9_]*\}\}|[+-]?\d+|[+-])/gi;
+  /([+-]?\d+d\d+(?:kh\d+|kl\d+)?!?|\{\{[a-zA-Z_][a-zA-Z0-9_]*\}\}|[+-]?\d+|[+-])/gi;
 
 // ============================================
 // PARSER
@@ -138,8 +143,16 @@ export function parseFormula(formula: string): ParsedFormula {
       continue;
     }
 
-    // Try to parse as dice
-    const diceMatch = match.match(DICE_PATTERN);
+    // Try to parse as dice (optionally signed, e.g. "+1d6", "-2d4" - the
+    // sign is split off into its own operator token, same convention as
+    // signed modifiers below, since a DiceRoll can't carry a negative count)
+    let diceSign: "+" | "-" | null = null;
+    let diceCandidate = match;
+    if (diceCandidate[0] === "+" || diceCandidate[0] === "-") {
+      diceSign = diceCandidate[0];
+      diceCandidate = diceCandidate.slice(1);
+    }
+    const diceMatch = diceCandidate.match(DICE_PATTERN);
     if (diceMatch) {
       const count = parseInt(diceMatch[1], 10);
       const sides = parseInt(diceMatch[2], 10);
@@ -175,8 +188,10 @@ export function parseFormula(formula: string): ParsedFormula {
         }
       }
 
-      // Add implicit + if needed
-      if (expectOperator && tokens.length > 0) {
+      if (diceSign) {
+        tokens.push({ type: "operator", value: diceSign, raw: diceSign });
+      } else if (expectOperator && tokens.length > 0) {
+        // Add implicit + if needed
         tokens.push({ type: "operator", value: "+", raw: "+" });
       }
 
