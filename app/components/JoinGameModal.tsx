@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DynamicIcon } from "./DynamicIcon";
 import { useNotification } from "@/app/misc/NotificationContext";
@@ -36,6 +36,18 @@ export default function JoinGameModal({
   const [color, setColor] = useState(PALETTE[0]);
   const [backend, setBackend] = useState<MPBackend>(initialBackend ?? "torrent");
   const [busy, setBusy] = useState(false);
+
+  // This modal is mounted once and toggled via `isOpen`, while `initialCode`/
+  // `initialBackend` often arrive a tick later (parsed from the URL in an
+  // effect on mount) - so the useState initializers above miss them. Sync
+  // reactively whenever the prefill values change.
+  useEffect(() => {
+    if (initialCode) setRoomCode(initialCode.toUpperCase());
+  }, [initialCode]);
+
+  useEffect(() => {
+    if (initialBackend) setBackend(initialBackend);
+  }, [initialBackend]);
 
   if (!isOpen) return null;
 
