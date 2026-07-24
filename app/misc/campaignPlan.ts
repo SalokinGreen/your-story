@@ -1,5 +1,6 @@
 /**
- * Campaign Plan — Phase 2 (deterministic re-planning gate).
+ * Campaign Plan — Phase 2 (deterministic re-planning gate) + Phase 3 (spine
+ * presets by campaign length).
  *
  * Phase 1 (docs/gm-plan-notes-design.md) is prompt-only: the GM is *told* to
  * keep its `gm_plan` spine one beat ahead. Phase 2 adds the structural
@@ -10,14 +11,26 @@
  * loop refuses to end the turn on prose alone until `advance_plan` writes the
  * next beat. Fail-open, same as M2: it nudges, it never hard-blocks play.
  *
- * The beat NAMES are fixed (a product decision - see the design doc) so the
- * gate has stable identifiers to advance through, and so campaigns share a
- * recognizable dramatic spine instead of bespoke per-story naming.
+ * The beat NAMES within a preset are fixed (a product decision - see the
+ * design doc) so the gate has stable identifiers to advance through, and so
+ * campaigns of a given length share a recognizable dramatic spine instead of
+ * bespoke per-story naming. Phase 3 adds three presets (short/medium/long) so
+ * a one-shot and a long campaign don't share the same beat count - the GM
+ * picks one at spine-note creation time based on the campaign's scope.
  */
-import type { StoryData, StoryLore, PlanState } from "./structs";
+import type { StoryData, StoryLore, PlanState, SpineLength } from "./structs";
 
-/** The fixed campaign spine, in order. Mirrored in ai_staged.ts's prompt. */
-export const CAMPAIGN_SPINE_BEATS = [
+/** One-shot / short-arc spine: a few sessions, no room for a slow build. */
+export const CAMPAIGN_SPINE_SHORT = [
+  "Opening Image (Session 0)",
+  "Inciting Incident",
+  "Rising Action",
+  "Climax",
+  "Resolution",
+] as const;
+
+/** Default spine for an ordinary multi-session campaign. */
+export const CAMPAIGN_SPINE_MEDIUM = [
   "Opening Image (Session 0)",
   "Inciting Incident (Session 1)",
   "Rising Complications",
@@ -26,6 +39,36 @@ export const CAMPAIGN_SPINE_BEATS = [
   "Climax",
   "Resolution",
 ] as const;
+
+/** Extended-campaign spine: a fuller Save-the-Cat-style beat sheet, for
+ * long-form campaigns that need more medium-horizon texture than the medium
+ * preset's single "Rising Complications" catch-all beat provides. */
+export const CAMPAIGN_SPINE_LONG = [
+  "Opening Image (Session 0)",
+  "Setup / Ordinary World",
+  "Theme Stated",
+  "Inciting Incident (Session 1)",
+  "Debate",
+  "Break Into Rising Action",
+  "B-Story (Allies & Relationships)",
+  "Fun and Games (Early Wins)",
+  "Midpoint Turn",
+  "Bad Guys Close In (Escalating Complications)",
+  "All Is Lost",
+  "Dark Night of the Soul",
+  "Break Into Finale",
+  "Climax",
+  "Resolution (Final Image)",
+] as const;
+
+/** @deprecated Use CAMPAIGN_SPINE_MEDIUM (same beats) or CAMPAIGN_SPINE_PRESETS. */
+export const CAMPAIGN_SPINE_BEATS = CAMPAIGN_SPINE_MEDIUM;
+
+export const CAMPAIGN_SPINE_PRESETS: Record<SpineLength, readonly string[]> = {
+  short: CAMPAIGN_SPINE_SHORT,
+  medium: CAMPAIGN_SPINE_MEDIUM,
+  long: CAMPAIGN_SPINE_LONG,
+};
 
 /** The gm_plan note that is the campaign spine (as opposed to a per-player arc
  * note or a side-beat note). Prefers the title captured in planState, then a
@@ -47,12 +90,19 @@ export function findSpinePlanNote(state: StoryData): StoryLore | undefined {
   return plans.find((l) => l.title !== state.activeSideBeatTitle);
 }
 
-/** Build a fresh PlanState anchored to a spine note. */
-export function initPlanState(spineNoteTitle: string): PlanState {
+/** Build a fresh PlanState anchored to a spine note, using the beat preset
+ * for the given campaign length (defaults to "medium" when unspecified or
+ * unrecognized). */
+export function initPlanState(
+  spineNoteTitle: string,
+  spineLength: SpineLength = "medium",
+): PlanState {
+  const beats = CAMPAIGN_SPINE_PRESETS[spineLength] ?? CAMPAIGN_SPINE_MEDIUM;
   return {
-    beats: [...CAMPAIGN_SPINE_BEATS],
+    beats: [...beats],
     currentBeatIndex: 0,
     spineNoteTitle,
+    spineLength,
   };
 }
 

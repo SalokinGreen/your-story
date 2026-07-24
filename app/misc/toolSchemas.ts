@@ -361,6 +361,12 @@ const createNoteTool: ToolSchema = {
           description:
             "Two-Pass Visibility state, independent of `type`. Set 'hidden' or 'to_be_revealed' for anything the Narrator must not be able to describe until you explicitly reveal it (a trap, a hidden villain, a secret motive) - the content is stripped from the Narrator's context entirely until you flip it to 'always_reveal' via edit_note. Use 'check_per_turn' for something that might be noticed passively each turn without the player specifically looking (e.g. a nearby patrol). Omit for ordinary, immediately-narratable content.",
         },
+        planSpineLength: {
+          type: "string",
+          enum: ["short", "medium", "long"],
+          description:
+            "ONLY used when creating the gm_plan note titled \"Campaign Plan\" - picks how granular the campaign's beat spine is. 'short' (~5 beats) for a one-shot/short arc, 'medium' (~7 beats, default) for an ordinary multi-session campaign, 'long' (~15 beats, full save-the-cat-style structure) for an extended campaign. Judge this from the premise, adventure length/scope, and the player's stated intent - ignored for every other note type.",
+        },
       },
       required: ["title", "content"],
     },

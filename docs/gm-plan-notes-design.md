@@ -2,13 +2,18 @@
 
 ## Status
 
-**Phase 1 + Phase 2 implemented.** Phase 1 (prompt-only): the `gm_plan` note
-type, the GM-stage injection, the `open_side_beat`/`close_side_beat` tools, the
-player-facing lore UI entry. Phase 2 (deterministic re-planning gate):
-structured `PlanState`, the `advance_plan` tool (`complete_current` →
-`write_next`), and a boundary gate in the GM-stage loop that mirrors the M2
-roll gate — when the GM marks a beat complete but hasn't written the next one,
-the turn can't end on prose until it does. Both phases are covered by tests.
+**Phase 1 + Phase 2 + Phase 3 implemented.** Phase 1 (prompt-only): the
+`gm_plan` note type, the GM-stage injection, the `open_side_beat`/
+`close_side_beat` tools, the player-facing lore UI entry. Phase 2
+(deterministic re-planning gate): structured `PlanState`, the `advance_plan`
+tool (`complete_current` → `write_next`), and a boundary gate in the GM-stage
+loop that mirrors the M2 roll gate — when the GM marks a beat complete but
+hasn't written the next one, the turn can't end on prose until it does. Phase
+3 (spine presets + grounding): the single fixed 7-beat spine was replaced with
+three fixed presets keyed by campaign length (short/medium/long — see "Spine
+length presets" below), and the prompt now tells the GM to read existing
+lore/mechanics/dm_instructions notes before creating the plan so it isn't
+invented in a vacuum. All three phases are covered by tests.
 
 ## The problem this solves
 
@@ -66,9 +71,13 @@ A new `LoreType`, following the identical pattern to `mechanics` /
   per-player arc notes reuse that exact field so a co-op story can hold one arc
   note per participant. Single-player is the common case: one spine note + one
   arc note.
-- **Fixed beat names** (decided): the spine uses the fixed template below, not
-  GM-invented names. Consistency across campaigns beats bespoke naming, and it
-  gives the Phase 2 gate stable beat identifiers to key off.
+- **Fixed beat names per preset** (decided, revised in Phase 3): the spine
+  uses one of three fixed templates below, not GM-invented names — but which
+  template depends on campaign length (see "Spine length presets"). A single
+  7-beat spine was too coarse for long campaigns and too padded for one-shots;
+  three presets keep beat names consistent *within* a given campaign's scope
+  while giving the Phase 2 gate stable identifiers to key off, whichever
+  preset is in play.
 
 ### Structure / template
 
@@ -109,9 +118,59 @@ non-linear — exactly the user's original framing. The GM tracks 2–3 live
 possibilities per character and lets play collapse them; it does not pick one
 and steer.
 
-The beats above are a light TTRPG reframing of a standard dramatic spine
-(story-circle / Save-the-Cat family). The beat **names are fixed** (decided);
-the GM fills in each beat's content but does not rename the spine.
+The beats above are the `medium` preset — a light TTRPG reframing of a
+standard dramatic spine (story-circle / Save-the-Cat family), and the default
+when the GM doesn't specify a length. The beat **names within the chosen
+preset are fixed** (decided); the GM fills in each beat's content but does not
+rename the spine. See "Spine length presets" for the other two presets and how
+the GM picks one.
+
+## Spine length presets (Phase 3)
+
+The original design shipped one fixed 7-beat spine for every campaign. In
+practice that was too coarse for long campaigns (one "Rising Complications"
+beat has to cover everything between the midpoint and the crisis, however
+many sessions that spans) and too padded for one-shots. Phase 3 replaces it
+with three fixed presets, keyed by a new `SpineLength` (`"short" | "medium" |
+"long"`, `structs.ts`):
+
+- **`short`** (~5 beats) — a one-shot or short arc: Opening Image (Session 0),
+  Inciting Incident, Rising Action, Climax, Resolution.
+- **`medium`** (~7 beats, default) — an ordinary multi-session campaign: the
+  original spine (Opening Image, Inciting Incident, Rising Complications,
+  Midpoint Turn, Crisis, Climax, Resolution).
+- **`long`** (~15 beats) — an extended, multi-arc campaign: a fuller
+  Save-the-Cat-style beat sheet (Opening Image, Setup / Ordinary World, Theme
+  Stated, Inciting Incident, Debate, Break Into Rising Action, B-Story, Fun
+  and Games, Midpoint Turn, Bad Guys Close In, All Is Lost, Dark Night of the
+  Soul, Break Into Finale, Climax, Resolution).
+
+The GM judges which preset fits from the premise, any adventure-length hints,
+and what the player has said they want, then passes it as `planSpineLength`
+on the `create_note` call that creates the spine note (`toolSchemas.ts`);
+`campaignPlan.ts`'s `initPlanState(spineNoteTitle, spineLength)` picks the
+matching array from `CAMPAIGN_SPINE_PRESETS` (falling back to `medium` if
+omitted or unrecognized — enforced both by the tool schema's enum and
+defensively inside `initPlanState`). Beat names stay fixed **within** whichever
+preset is chosen, so the Phase 2 gate's stable-identifier property is
+unaffected — it just operates over a longer or shorter `beats` array.
+`CAMPAIGN_SPINE_BEATS` is kept as a deprecated alias for `CAMPAIGN_SPINE_MEDIUM`
+for backward compatibility with anything still importing the old name.
+
+### Read before you plan (grounding)
+
+Phase 1-2 let the GM invent the spine and character arcs from nothing. Phase 3
+adds an explicit instruction: before creating the `gm_plan` spine note (or the
+character sheet/mechanics notes alongside it, in the fresh-story setup path),
+the GM must `read_notes`/`search_notes` any existing `lore`, `mechanics`, and
+`dm_instructions` notes for the adventure. This matters most for adventures
+built from a template (`Adventure.storyTemplate`) that ship their own lore —
+without this, the GM could draft a plan that ignores or contradicts
+established setting/rules it hasn't actually read yet. This is a prompt-only
+nudge (see "How strictly should this be enforced" below), not a gate — it's
+enforced the same way the rest of Phase 1 is: through prompt text in
+`buildGMStagePrompt`'s fresh-story-setup block and the CAMPAIGN PLAN section,
+not through code.
 
 ## Player visibility
 
@@ -173,10 +232,12 @@ The existing `freshStorySetupBlock` (`ai_staged.ts:1307`) already nudges the GM
 to create a `character_sheet` + `mechanics` note on a fresh story. Extend the
 lifecycle:
 
-1. **Setup / Session 0**: when the GM establishes character(s), it also creates
-   a `gm_plan` note containing **only** the Premise + a Session-0 beat
-   ("establish/create the characters"). The spine's later beats are blank
-   one-liners; the arc section is empty. It does *not* plan ahead yet.
+1. **Setup / Session 0**: the GM first reads any existing `lore`/`mechanics`/
+   `dm_instructions` notes (Phase 3 grounding step, above), then establishes
+   character(s), then creates a `gm_plan` note containing **only** the Premise
+   + a Session-0 beat ("establish/create the characters") sized by whichever
+   `planSpineLength` it judged fits the campaign. The spine's later beats are
+   blank one-liners; the arc section is empty. It does *not* plan ahead yet.
 2. **End of Session 0**: the GM's job for the beat is to get the player(s) into
    character and established. When that beat's checklist is done, the GM writes
    the **Character Arcs** section and drafts **only** Session 1 (the inciting
@@ -230,11 +291,12 @@ Shaped like the M2 roll gate, and living in the same GM-stage round loop
 (`generation.ts`). Pieces:
 
 - **Structured state** (`StoryData.planState`, `structs.ts`): `{ beats,
-  currentBeatIndex, awaitingNextBeat, spineNoteTitle }`. A parse-free pointer
-  into the fixed spine — the readable plan stays in the `gm_plan` note; this is
-  only what the gate keys off. Auto-initialized when the spine note ("Campaign
-  Plan") is created via `create_note`, so it layers onto the Phase 1 bootstrap
-  with no extra setup step.
+  currentBeatIndex, awaitingNextBeat, spineNoteTitle, spineLength }`. A
+  parse-free pointer into the fixed spine — the readable plan stays in the
+  `gm_plan` note; this is only what the gate keys off. Auto-initialized when
+  the spine note ("Campaign Plan") is created via `create_note`, so it layers
+  onto the Phase 1 bootstrap with no extra setup step. (`spineLength` added in
+  Phase 3 — see below.)
 - **`advance_plan` tool** (`toolSchemas.ts` / `toolExecutor.ts`), two actions:
   `complete_current` marks the current beat done and sets `awaitingNextBeat`;
   `write_next` details the next beat (writing it into the note), advances
@@ -247,10 +309,36 @@ Shaped like the M2 roll gate, and living in the same GM-stage round loop
   fail-open — never a hard block, matching M2 and this codebase's "warn, don't
   block" posture. Its own counter, independent of the M2 gate's.
 
-The beat **names are fixed** (`CAMPAIGN_SPINE_BEATS`), which is what gives the
-gate stable identifiers to advance through. Chose a dedicated `advance_plan`
-tool over piggybacking `increment_scene` because beat completion and scene
-increment are different rhythms — a beat can span many scenes.
+The beat **names are fixed within whichever preset is active**
+(`CAMPAIGN_SPINE_PRESETS[spineLength]`, since Phase 3), which is what gives
+the gate stable identifiers to advance through. Chose a dedicated
+`advance_plan` tool over piggybacking `increment_scene` because beat
+completion and scene increment are different rhythms — a beat can span many
+scenes.
+
+### Phase 3 — spine presets + grounding (implemented)
+
+Two independent, prompt-level changes (see "Spine length presets" and "Read
+before you plan" above for the full rationale):
+
+- **Three fixed spine presets** instead of one — `CAMPAIGN_SPINE_SHORT` /
+  `CAMPAIGN_SPINE_MEDIUM` / `CAMPAIGN_SPINE_LONG` in `campaignPlan.ts`, keyed
+  by the new `SpineLength` type (`structs.ts`). `initPlanState` takes a
+  `spineLength` parameter (default `"medium"`) and picks the matching preset.
+  `create_note`'s schema gained an optional `planSpineLength` enum
+  (`"short"|"medium"|"long"`), used only when creating the `gm_plan` "Campaign
+  Plan" note; `toolExecutor.ts`'s auto-init reads it (falling back to
+  `"medium"` if omitted or — defensively — unrecognized, though the schema's
+  own enum already rejects anything outside the three values before the
+  executor sees it).
+- **Grounding instruction**: the fresh-story-setup block and the CAMPAIGN PLAN
+  section of `buildGMStagePrompt` (`ai_staged.ts`) both now tell the GM to
+  `read_notes`/`search_notes` existing `lore`/`mechanics`/`dm_instructions`
+  notes before creating the character sheet, mechanics, or plan notes — a
+  prompt-only nudge, no code gate.
+- No change to the Phase 2 gate mechanics themselves — `isPlanAwaitingNextBeat`
+  and `advance_plan` operate on `planState.beats` generically regardless of
+  its length, so they needed no changes.
 
 ## Cost / budget
 
@@ -278,13 +366,22 @@ Following the repo's `tests/*.test.ts` + seeded-`Math.random` conventions:
   turns and asserts the plan notes are created and advanced across a beat
   boundary, that no future beat is written more than one ahead, and that a
   side beat opens and closes returning focus to the spine.
+- Phase 3: `initPlanState` defaults to the medium preset and honors an
+  explicit `short`/`long` `spineLength`; `create_note` threads a valid
+  `planSpineLength` through to `planState.spineLength`/`beats` and rejects an
+  out-of-enum value outright (schema validation); the GM prompt contains the
+  "read before you plan" grounding instruction and documents all three
+  `planSpineLength` presets.
 
 ## Decisions locked
 
 - One campaign-spine note + **one arc note per player** (via `ownerCouchPlayerId`).
-- **Fixed** beat names.
+- **Fixed** beat names within whichever spine-length preset is active (revised
+  in Phase 3 — was a single fixed list, now three: short/medium/long).
 - **Fully transparent** to the player (notes render through the normal lore UI).
 - A **side-beat tool pair** (`open_side_beat` / `close_side_beat`) for focus detours.
+- The GM must **read existing lore/mechanics/dm_instructions notes before
+  creating the plan** (Phase 3), enforced as a prompt-only nudge, not a gate.
 
 ## Phased implementation checklist (Phase 1) — done
 
@@ -323,3 +420,21 @@ continuation prompt is what keeps the narrator on the current beat.
       `generation.ts`
 - [x] Tests — `tests/campaignPlan.test.ts` (helpers + executor) and
       `tests/generation.planGate.test.ts` (loop integration)
+
+## Phased implementation checklist (Phase 3) — done
+
+- [x] `SpineLength` type + `spineLength?` on `PlanState` — `structs.ts`
+- [x] `CAMPAIGN_SPINE_SHORT` / `_MEDIUM` / `_LONG` + `CAMPAIGN_SPINE_PRESETS`
+      (`CAMPAIGN_SPINE_BEATS` kept as a deprecated alias for `_MEDIUM`) —
+      `campaignPlan.ts`
+- [x] `initPlanState(spineNoteTitle, spineLength = "medium")` picks the preset
+      — `campaignPlan.ts`
+- [x] `planSpineLength` enum on `create_note` — `toolSchemas.ts`
+- [x] `create_note` auto-init threads `planSpineLength` through (defaulting to
+      medium) — `toolExecutor.ts`
+- [x] Fresh-story-setup block + CAMPAIGN PLAN section: grounding instruction
+      (read lore/mechanics/dm_instructions first) and the three presets
+      documented, with `planSpineLength` usage — `ai_staged.ts`
+- [x] Tests — `tests/campaignPlan.test.ts` (preset selection, fallback,
+      validation rejection) and `tests/gmPlanNotes.test.ts` (prompt content:
+      grounding instruction, preset documentation)

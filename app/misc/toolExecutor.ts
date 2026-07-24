@@ -16,6 +16,7 @@ import {
   MAX_PENDING_RANDOM_EVENTS,
   PendingRandomEvent,
   MAX_PENDING_DIRECTOR_MOVES,
+  SpineLength,
 } from "@/app/misc/structs";
 import {
   applyCompleteGoal,
@@ -41,7 +42,11 @@ import {
   generateEventMeaning,
 } from "@/app/misc/mythic";
 import { selectGMAdviceForScene, formatGMAdviceNote } from "@/app/misc/gmAdvice";
-import { findSpinePlanNote, initPlanState } from "@/app/misc/campaignPlan";
+import {
+  findSpinePlanNote,
+  initPlanState,
+  CAMPAIGN_SPINE_PRESETS,
+} from "@/app/misc/campaignPlan";
 import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
 import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
@@ -818,7 +823,14 @@ export function executeTools(
           !storyData.planState &&
           /campaign plan/i.test(args.title)
         ) {
-          storyData.planState = initPlanState(args.title);
+          const requestedLength = args.planSpineLength as
+            | SpineLength
+            | undefined;
+          const spineLength =
+            requestedLength && requestedLength in CAMPAIGN_SPINE_PRESETS
+              ? requestedLength
+              : "medium";
+          storyData.planState = initPlanState(args.title, spineLength);
         }
 
         logger.action("New note created via direct tool handling", {

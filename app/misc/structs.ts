@@ -842,18 +842,24 @@ export interface CouchPlayer {
   archetype?: PlayerArchetype;
 }
 
+// Which fixed spine preset a campaign is running (campaignPlan.ts). The GM
+// judges this from the premise/player intent when it creates the spine note;
+// "medium" is the fallback when it doesn't specify.
+export type SpineLength = "short" | "medium" | "long";
+
 // Phase 2 campaign-plan tracking (docs/gm-plan-notes-design.md,
 // campaignPlan.ts). A lightweight pointer into the fixed dramatic spine, kept
 // separate from the readable plan (which lives in the gm_plan note) so the
 // deterministic re-planning gate has stable, parse-free state to key off.
 export interface PlanState {
-  beats: string[]; // Fixed spine beat names, in order (CAMPAIGN_SPINE_BEATS)
+  beats: string[]; // Fixed spine beat names, in order (a CAMPAIGN_SPINE_* preset)
   currentBeatIndex: number; // Which beat is being run now
   // True once the GM marks the current beat complete (advance_plan
   // complete_current) but before it details & moves to the next beat
   // (advance_plan write_next). The gate fires while this is true.
   awaitingNextBeat?: boolean;
   spineNoteTitle?: string; // Title of the gm_plan note that is the spine
+  spineLength?: SpineLength; // Which preset `beats` came from
 }
 
 export interface StoryData {

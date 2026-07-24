@@ -80,6 +80,27 @@ describe("gm_plan injection into the GM stage", () => {
     expect(names).toContain("close_side_beat");
   });
 
+  it("instructs the GM to read existing lore/mechanics before creating the plan", () => {
+    const { messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    const combined = messages.map((m) => m.content).join("\n");
+    expect(combined).toContain("Read before you plan");
+    expect(combined).toMatch(/lore.*mechanics.*dm_instructions/);
+  });
+
+  it("documents the short/medium/long spine length presets and planSpineLength", () => {
+    const { messages } = buildGMStagePrompt({
+      storyData: createTestStory(),
+      userChoice: "Look around",
+    });
+    const combined = messages.map((m) => m.content).join("\n");
+    expect(combined).toContain("planSpineLength");
+    expect(combined).toContain("short");
+    expect(combined).toContain("long");
+  });
+
   it("foregrounds the active side beat over the main spine", () => {
     const storyData = createTestStory({
       lore: [
