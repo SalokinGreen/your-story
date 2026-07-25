@@ -121,6 +121,30 @@ const TYPE_CONFIG: Record<
   },
 };
 
+// Order the type filter is displayed in. Only entries with a non-zero count
+// (plus "all" and the active filter) are actually rendered.
+const FILTER_ORDER: (LoreType | "all" | "secrets")[] = [
+  "all",
+  "character_sheet",
+  "gm_plan",
+  "mechanics",
+  "npc",
+  "location",
+  "faction",
+  "item",
+  "event",
+  "lore",
+  "gm_notes",
+  "dm_instructions",
+  "story_instructions",
+  "secret",
+  "secrets",
+];
+
+// Note types that are always kept at the top of the list - the sheet the
+// player plays from and the GM's campaign plan.
+const AUTO_PINNED_TYPES: LoreType[] = ["character_sheet", "gm_plan"];
+
 export default function LorePage(props: LorePageProps) {
   const { onUpdateLore, initialSelectedTitle, ...storyData } = props;
   const { addNotification } = useNotification();
@@ -150,7 +174,19 @@ export default function LorePage(props: LorePageProps) {
   });
 
   const isAutoPinned = (loreItem: StoryLore): boolean =>
-    (loreItem.type || "lore") === "character_sheet";
+    AUTO_PINNED_TYPES.includes((loreItem.type || "lore") as LoreType);
+
+  // Mobile is a single-pane master/detail: picking a note swaps the list out
+  // for the note itself so there's nothing to scroll past.
+  const selectNote = (loreItem: StoryLore) => {
+    setSelectedLore(loreItem);
+    setIsEditing(false);
+    setShowImageGen(false);
+    setIsTypeDropdownOpen(false);
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
 
   // Add a new note
   const handleAddNote = () => {
@@ -286,12 +322,16 @@ export default function LorePage(props: LorePageProps) {
         )
       );
     });
-    // Sort: pinned notes first, then alphabetically
+    // Sort: auto-pinned notes (character sheet, then campaign plan) first,
+    // then manually pinned notes, then alphabetically.
+    const rank = (l: StoryLore) => {
+      const autoIdx = AUTO_PINNED_TYPES.indexOf((l.type || "lore") as LoreType);
+      if (autoIdx !== -1) return autoIdx;
+      return l.pinned ? AUTO_PINNED_TYPES.length : AUTO_PINNED_TYPES.length + 1;
+    };
     return filtered.sort((a, b) => {
-      const aPinned = !!a.pinned || isAutoPinned(a);
-      const bPinned = !!b.pinned || isAutoPinned(b);
-      if (aPinned && !bPinned) return -1;
-      if (!aPinned && bPinned) return 1;
+      const diff = rank(a) - rank(b);
+      if (diff !== 0) return diff;
       return a.title.localeCompare(b.title);
     });
   }, [storyData.lore, selectedType, searchTerm]);
@@ -307,21 +347,15 @@ export default function LorePage(props: LorePageProps) {
     [filteredLore, currentPage]
   );
 
-  // Count entries by type
+  // Count entries by type. Seeded from TYPE_CONFIG so every filterable type
+  // gets its own bucket (gm_plan etc. used to fall through into `lore`).
   const typeCounts = useMemo(() => {
-    const counts: Record<string, number> = {
-      all: 0,
-      character_sheet: 0,
-      gm_notes: 0,
-      npc: 0,
-      item: 0,
-      location: 0,
-      faction: 0,
-      event: 0,
-      mechanics: 0,
-      lore: 0,
-      secrets: 0,
-    };
+    const counts: Record<string, number> = {};
+    (Object.keys(TYPE_CONFIG) as (LoreType | "all" | "secrets")[]).forEach(
+      (key) => {
+        counts[key] = 0;
+      }
+    );
 
     storyData.lore.forEach((item) => {
       if (item.secrtet) {
@@ -340,6 +374,17 @@ export default function LorePage(props: LorePageProps) {
     return counts;
   }, [storyData.lore]);
 
+  // Only offer filters that would actually return something (plus "All" and
+  // whatever is currently selected, so the active chip never disappears).
+  const visibleFilters = useMemo(
+    () =>
+      FILTER_ORDER.filter(
+        (type) =>
+          type === "all" || type === selectedType || typeCounts[type] > 0
+      ),
+    [typeCounts, selectedType]
+  );
+
   // Get type badge for a lore item
   const getTypeBadge = (loreItem: StoryLore) => {
     const type = loreItem.type || "lore";
@@ -349,7 +394,7 @@ export default function LorePage(props: LorePageProps) {
         className={`text-xs px-1.5 py-0.5 rounded ${config.bgColor} ${config.color} flex items-center gap-1`}
       >
         <DynamicIcon name={config.icon} className="w-3 h-3" />
-        <span className="hidden sm:inline">{config.label}</span>
+        <span>{config.label}</span>
       </span>
     );
   };
@@ -389,12 +434,17 @@ export default function LorePage(props: LorePageProps) {
 
   return (
     <div className="w-full space-y-4">
-      {/* Header Section */}
-      <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-4 shadow-[0_4px_24px_rgba(0,0,0,0.3)]">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4">
-          <div>
-            <h2 className="text-xl font-bold text-white flex items-center gap-2">
-              <div className="p-2 bg-purple-500/10 ring-1 ring-purple-400/20 rounded-lg">
+      {/* Header Section - collapsed away on mobile while reading a note so the
+          note starts at the top of the screen */}
+      <div
+        className={`bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-3 sm:p-4 shadow-[0_4px_24px_rgba(0,0,0,0.3)] ${
+          selectedLore ? "hidden lg:block" : ""
+        }`}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h2 className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
+              <div className="p-2 bg-purple-500/10 ring-1 ring-purple-400/20 rounded-lg shrink-0">
                 <DynamicIcon
                   name="BookOpen"
                   className="w-5 h-5 text-purple-300"
@@ -402,143 +452,125 @@ export default function LorePage(props: LorePageProps) {
               </div>
               Story Notes
             </h2>
-            <p className="text-xs text-blue-200/50 mt-1 ml-11">
+            <p className="hidden sm:block text-xs text-blue-200/50 mt-1 ml-11">
               Discover the world, characters, and secrets
             </p>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Add Note Button */}
-            {onUpdateLore && (
-              <button
-                onClick={() => setIsAddingNote(true)}
-                className="flex items-center gap-2 px-3 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-lg text-sm text-white font-medium shadow-md shadow-emerald-950/40 transition-all"
-              >
-                <DynamicIcon name="Plus" className="w-4 h-4" />
-                <span className="hidden sm:inline">Add Note</span>
-              </button>
-            )}
-
-            {/* Type Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-sm text-white transition-all"
-              >
-                <DynamicIcon
-                  name={TYPE_CONFIG[selectedType].icon}
-                  className={`w-4 h-4 ${TYPE_CONFIG[selectedType].color}`}
-                />
-                <span>{TYPE_CONFIG[selectedType].label}</span>
-                <span
-                  className={`px-1.5 py-0.5 rounded text-xs ${TYPE_CONFIG[selectedType].bgColor}`}
-                >
-                  {selectedType === "all"
-                    ? typeCounts.all
-                    : typeCounts[selectedType]}
-                </span>
-                <DynamicIcon
-                  name={isTypeDropdownOpen ? "ChevronUp" : "ChevronDown"}
-                  className="w-4 h-4 text-blue-300"
-                />
-              </button>
-
-              {isTypeDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsTypeDropdownOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-2 w-56 bg-[#0d1829]/95 backdrop-blur-2xl border border-white/10 rounded-xl shadow-2xl shadow-black/50 z-50 overflow-hidden max-h-96 overflow-y-auto">
-                    {(
-                      [
-                        "all",
-                        "character_sheet",
-                        "gm_notes",
-                        "npc",
-                        "item",
-                        "location",
-                        "faction",
-                        "event",
-                        "mechanics",
-                        "gm_plan",
-                        "lore",
-                        "secrets",
-                      ] as const
-                    ).map((type) => (
-                      <button
-                        key={type}
-                        onClick={() => {
-                          setSelectedType(type);
-                          setIsTypeDropdownOpen(false);
-                          setSelectedLore(null);
-                          setPage(1);
-                        }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 text-sm transition-all ${
-                          selectedType === type
-                            ? "bg-white/10 text-white"
-                            : "text-blue-100 hover:bg-white/5"
-                        }`}
-                      >
-                        <div
-                          className={`p-1.5 rounded-lg ${TYPE_CONFIG[type].bgColor}`}
-                        >
-                          <DynamicIcon
-                            name={TYPE_CONFIG[type].icon}
-                            className={`w-4 h-4 ${TYPE_CONFIG[type].color}`}
-                          />
-                        </div>
-                        <span className="flex-1 text-left">
-                          {TYPE_CONFIG[type].label}
-                        </span>
-                        <span
-                          className={`px-2 py-0.5 rounded-full text-xs ${TYPE_CONFIG[type].bgColor} ${TYPE_CONFIG[type].color}`}
-                        >
-                          {typeCounts[type]}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Search Bar */}
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Search notes..."
-            value={searchTerm}
-            onChange={(e) => {
-              setSearchTerm(e.target.value);
-              setPage(1);
-            }}
-            className="w-full px-4 py-2.5 pl-10 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-all"
-          />
-          <DynamicIcon
-            name="Search"
-            className="absolute left-3 top-3 h-4 w-4 text-blue-300/50"
-          />
-          {searchTerm && (
+          {/* Add Note Button */}
+          {onUpdateLore && (
             <button
-              onClick={() => {
-                setSearchTerm("");
-                setPage(1);
-              }}
-              className="absolute right-3 top-2.5 p-0.5 hover:bg-white/10 rounded"
+              onClick={() => setIsAddingNote(true)}
+              className="shrink-0 flex items-center gap-2 px-3 py-2 bg-linear-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 rounded-lg text-sm text-white font-medium shadow-md shadow-emerald-950/40 transition-all"
+              title="Add note"
             >
-              <DynamicIcon name="X" className="h-4 w-4 text-blue-300/50" />
+              <DynamicIcon name="Plus" className="w-4 h-4" />
+              <span className="hidden sm:inline">Add Note</span>
             </button>
           )}
         </div>
+
+        {/* Search + type filter toggle */}
+        <div className="flex items-center gap-2 mt-3">
+          <div className="relative flex-1 min-w-0">
+            <input
+              type="text"
+              placeholder="Search notes..."
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
+              className="w-full px-4 py-2.5 pl-10 bg-white/5 border border-white/10 rounded-xl text-white text-sm placeholder-blue-300/40 focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-all"
+            />
+            <DynamicIcon
+              name="Search"
+              className="absolute left-3 top-3 h-4 w-4 text-blue-300/50"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => {
+                  setSearchTerm("");
+                  setPage(1);
+                }}
+                className="absolute right-3 top-2.5 p-0.5 hover:bg-white/10 rounded"
+              >
+                <DynamicIcon name="X" className="h-4 w-4 text-blue-300/50" />
+              </button>
+            )}
+          </div>
+
+          {/* Filter toggle - expands an inline panel below instead of an
+              overlay dropdown, which used to be painted under the note cards. */}
+          <button
+            onClick={() => setIsTypeDropdownOpen(!isTypeDropdownOpen)}
+            aria-expanded={isTypeDropdownOpen}
+            className={`shrink-0 flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm text-white border transition-all ${
+              isTypeDropdownOpen || selectedType !== "all"
+                ? "bg-white/10 border-purple-400/40"
+                : "bg-white/5 border-white/10 hover:bg-white/10"
+            }`}
+            title="Filter by type"
+          >
+            <DynamicIcon
+              name={TYPE_CONFIG[selectedType].icon}
+              className={`w-4 h-4 ${TYPE_CONFIG[selectedType].color}`}
+            />
+            <span className="hidden sm:inline">
+              {TYPE_CONFIG[selectedType].label}
+            </span>
+            <DynamicIcon
+              name={isTypeDropdownOpen ? "ChevronUp" : "ChevronDown"}
+              className="w-4 h-4 text-blue-300"
+            />
+          </button>
+        </div>
+
+        {isTypeDropdownOpen && (
+          <div className="mt-3 pt-3 border-t border-white/10 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-2">
+            {visibleFilters.map((type) => (
+              <button
+                key={type}
+                onClick={() => {
+                  setSelectedType(type);
+                  setIsTypeDropdownOpen(false);
+                  setSelectedLore(null);
+                  setPage(1);
+                }}
+                className={`flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs sm:text-sm border transition-all ${
+                  selectedType === type
+                    ? "bg-white/10 border-purple-400/40 text-white"
+                    : "bg-white/[0.03] border-white/10 text-blue-100 hover:bg-white/[0.07]"
+                }`}
+              >
+                <div className={`p-1.5 rounded-lg shrink-0 ${TYPE_CONFIG[type].bgColor}`}>
+                  <DynamicIcon
+                    name={TYPE_CONFIG[type].icon}
+                    className={`w-4 h-4 ${TYPE_CONFIG[type].color}`}
+                  />
+                </div>
+                <span className="flex-1 text-left truncate">
+                  {TYPE_CONFIG[type].label}
+                </span>
+                <span
+                  className={`px-2 py-0.5 rounded-full text-xs shrink-0 ${TYPE_CONFIG[type].bgColor} ${TYPE_CONFIG[type].color}`}
+                >
+                  {typeCounts[type]}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Main Content - Two Column Layout */}
+      {/* Main Content - two columns on desktop, single pane on mobile */}
       <div className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        {/* Lore List */}
-        <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-3 lg:col-span-1 xl:col-span-2">
+        {/* Lore List - hidden on mobile while a note is open */}
+        <div
+          className={`bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 p-3 lg:col-span-1 xl:col-span-2 ${
+            selectedLore ? "hidden lg:block" : ""
+          }`}
+        >
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-blue-100 flex items-center gap-2">
               <DynamicIcon
@@ -582,13 +614,14 @@ export default function LorePage(props: LorePageProps) {
             </div>
           )}
 
-          <div className="space-y-1 max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-blue-800/50 scrollbar-track-transparent">
+          <div className="space-y-1 max-h-[65vh] lg:max-h-[500px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-blue-800/50 scrollbar-track-transparent">
             {paginatedLore.map((loreItem, index) => {
               const itemType = loreItem.type || "lore";
               const isSecret = loreItem.secrtet;
               const isSelected = selectedLore?.title === loreItem.title;
               const isInactive = loreItem.on === false;
-              const isPinned = !!loreItem.pinned || itemType === "character_sheet";
+              const autoPinned = isAutoPinned(loreItem);
+              const isPinned = !!loreItem.pinned || autoPinned;
 
               return (
                 <div
@@ -609,14 +642,11 @@ export default function LorePage(props: LorePageProps) {
                       : "hover:shadow-[0_4px_16px_rgba(147,51,234,0.12)]"
                   }`}
                 >
-                  <div
-                    className="flex items-center gap-2 cursor-pointer"
-                    onClick={() => {
-                      setSelectedLore(loreItem);
-                      setIsEditing(false);
-                      setShowImageGen(false);
-                    }}
-                  >
+                  <div className="flex items-center gap-2">
+                    <div
+                      className="flex items-center gap-2 flex-1 min-w-0 cursor-pointer"
+                      onClick={() => selectNote(loreItem)}
+                    >
                     {loreItem.thumbnailUrl ? (
                       <img
                         src={loreItem.thumbnailUrl}
@@ -673,24 +703,27 @@ export default function LorePage(props: LorePageProps) {
                         />
                       </span>
                     )}
+                    </div>
+
+                    {/* Pin button - inline so it doesn't add a dead row of
+                        height on touch devices, where there is no hover. */}
+                    {onUpdateLore && !autoPinned && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleTogglePin(loreItem);
+                        }}
+                        className={`shrink-0 p-1.5 rounded transition-colors ${
+                          isPinned
+                            ? "text-yellow-400 hover:bg-yellow-500/15"
+                            : "text-blue-400/40 hover:text-blue-300 hover:bg-white/10 lg:opacity-0 lg:group-hover:opacity-100"
+                        }`}
+                        title={isPinned ? "Unpin note" : "Pin note to top"}
+                      >
+                        <DynamicIcon name="Pin" className="w-3.5 h-3.5" />
+                      </button>
+                    )}
                   </div>
-                  {/* Pin button */}
-                  {onUpdateLore && itemType !== "character_sheet" && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleTogglePin(loreItem);
-                      }}
-                      className={`mt-1 p-1 rounded transition-colors ${
-                        isPinned
-                          ? "text-yellow-400 hover:bg-yellow-500/15"
-                          : "text-blue-400/40 hover:text-blue-300 hover:bg-white/10 opacity-0 group-hover:opacity-100"
-                      }`}
-                      title={isPinned ? "Unpin note" : "Pin note to top"}
-                    >
-                      <DynamicIcon name="Pin" className="w-3.5 h-3.5" />
-                    </button>
-                  )}
                 </div>
               );
             })}
@@ -721,8 +754,12 @@ export default function LorePage(props: LorePageProps) {
           )}
         </div>
 
-        {/* Lore Detail */}
-        <div className="bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 lg:col-span-2 xl:col-span-4 flex flex-col">
+        {/* Lore Detail - on mobile this replaces the list entirely */}
+        <div
+          className={`bg-white/[0.04] backdrop-blur-xl rounded-2xl border border-white/10 lg:col-span-2 xl:col-span-4 flex-col ${
+            selectedLore ? "flex" : "hidden lg:flex"
+          }`}
+        >
           {!selectedLore ? (
             <div className="flex-1 flex items-center justify-center p-8">
               <div className="text-center">
@@ -744,7 +781,21 @@ export default function LorePage(props: LorePageProps) {
             <>
               {/* Detail Header */}
               <div className="p-4 border-b border-white/10">
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start justify-between gap-2 sm:gap-3">
+                  {/* Back to list - mobile only, where the list is swapped out */}
+                  <button
+                    onClick={() => {
+                      setSelectedLore(null);
+                      setIsEditing(false);
+                      setShowImageGen(false);
+                    }}
+                    className="lg:hidden shrink-0 -ml-1 mt-0.5 p-2 rounded-lg text-blue-300 hover:bg-white/10 hover:text-white transition-colors"
+                    title="Back to notes"
+                    aria-label="Back to notes"
+                  >
+                    <DynamicIcon name="ArrowLeft" className="w-5 h-5" />
+                  </button>
+
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       {selectedLore.secrtet && (
