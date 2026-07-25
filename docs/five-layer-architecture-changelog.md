@@ -340,6 +340,57 @@ concrete every turn rather than be read once, and the PLAYER AGENCY rules
 point at the block by name so "who am I not allowed to speak for" is stated,
 not inferred.
 
+## Phase 5 (later session): the observer stops making the player wait
+
+Layer 5's correctness was fine; its *cost in wall-clock time* was not. On a
+turn flagged for length, everything between "narration finished streaming" and
+"choices appear" was serial: five observer checks one after another, then the
+rewrite, then a choices regeneration — up to seven sequential round trips the
+player sat through. Nothing here changes a single verdict; it changes when the
+calls happen.
+
+### Layer 5 (Adjudication) — the same corrections, overlapped
+
+- **The checks run concurrently** (`runObserver`). The five are fully
+  independent — each reads only the finished turn and its own settings, none
+  mutates anything, each already fails open on its own — so awaiting them in
+  sequence only ever bought latency. They're a `Promise.all` now, with flags
+  still collected in the same fixed order (length, agency, outcome,
+  tool-usage, tier), because `generateStoryTurn` corrects the *first* major
+  flag and that choice must not become a race between judges.
+- **The shortened rewrite starts before the verdict is in** (the speculative
+  rewrite in `generateStoryTurn`). `checkResponseLength` has two halves: a
+  free, deterministic word-count trip, and an LLM justification judge that
+  decides whether the overage was *earned*. The flag's text depends only on
+  the first half — so the moment the counter trips, the app already knows
+  exactly what a length rewrite would be asked to do, and the only open
+  question is whether it will be wanted. That half is now split out as
+  `prospectiveLengthFlag`, and the rewrite is fired immediately, concurrently
+  with the observer:
+  - judge says **unjustified** → the flag is real and the shortened version is
+    already in flight; it's awaited instead of started, so the rewrite's
+    latency hides entirely behind the judge's.
+  - judge says **justified**, or a different major flag wins → the speculation
+    is aborted and discarded, and the original narration stands exactly as it
+    would have before.
+
+  Gated on a rewrite being reachable at all (the check enabled and
+  reset-eligible, the reset budget unspent), so a speculation is never fired
+  for a correction that could not happen. The accepted cost is one wasted
+  ~400-token call on turns the judge ends up justifying; the default ceiling
+  is already 2× the band's high, so most trips are genuine.
+- **A speculative rewrite carries the other reviewers' complaints
+  conditionally** (`RewriteNarrationParams.alsoFixIfPresent`). A turn gets one
+  rewrite (`MAX_OBSERVER_RESETS`), and the speculation starts before the other
+  judges have answered — so it's told what they look for, phrased as "fix this
+  too, *if* it's genuinely true here, and do not invent a problem to fix".
+  Only the text-based checks get a clause (`player_agency`,
+  `outcome_narration_mismatch`); the tool-usage and tier checks are complaints
+  about tool calls and reasoning tier, which no amount of rewriting the prose
+  addresses. Nothing re-judges the corrected text, so a preventive clause is
+  never treated as proof of a fix: any flag the other judges *do* raise is
+  still attached to the turn.
+
 ## Deliberately not done
 
 - **H6 (content-safety layer):** explicitly skipped by product decision —

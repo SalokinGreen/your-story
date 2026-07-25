@@ -16,6 +16,7 @@ import {
   checkToolUsageGaps,
   checkTierEscalation,
   runObserver,
+  prospectiveLengthFlag,
   observerSuspensionReason,
   hasCharacterSheetNote,
   buildObserverCharacterContext,
@@ -148,6 +149,87 @@ describe("checkResponseLength", () => {
         checkSettings({ sensitivity: 0 }),
       ),
     ).toBeNull();
+  });
+});
+
+describe("prospectiveLengthFlag", () => {
+  // The deterministic half of checkResponseLength, split out so generation.ts
+  // can know what a length flag WOULD say before the justification judge has
+  // answered - that's what makes the speculative shortened rewrite possible.
+  // It must never make an API call and must agree exactly with the flag
+  // checkResponseLength ends up returning on an unjustified overage.
+
+  it("returns null for narration within the ceiling", () => {
+    expect(
+      prospectiveLengthFlag("You duck behind the crate.", "short"),
+    ).toBeNull();
+  });
+
+  it("returns null for empty narration", () => {
+    expect(prospectiveLengthFlag("", "medium")).toBeNull();
+    expect(prospectiveLengthFlag("   ", "medium")).toBeNull();
+  });
+
+  it("returns null when the check is disabled", () => {
+    expect(
+      prospectiveLengthFlag(
+        Array(400).fill("word").join(" "),
+        "medium",
+        checkSettings({ enabled: false }),
+      ),
+    ).toBeNull();
+  });
+
+  it("returns a major response_length flag once the turn blows past the ceiling", () => {
+    const flag = prospectiveLengthFlag(Array(400).fill("word").join(" "), "medium");
+    expect(flag?.type).toBe("response_length");
+    expect(flag?.severity).toBe("major");
+    expect(flag?.detail).toContain("400 words");
+  });
+
+  it("respects sensitivity the same way the check does", () => {
+    // medium band high = 85; sensitivity 0 => 3x (255), sensitivity 10 => 1x (85)
+    const narration = Array(200).fill("word").join(" ");
+    expect(
+      prospectiveLengthFlag(narration, "medium", checkSettings({ sensitivity: 0 })),
+    ).toBeNull();
+    expect(
+      prospectiveLengthFlag(narration, "medium", checkSettings({ sensitivity: 10 })),
+    ).not.toBeNull();
+  });
+
+  it("makes no API call", () => {
+    const fetchMock = vi.fn();
+    const originalFetch = global.fetch;
+    global.fetch = fetchMock as unknown as typeof fetch;
+    try {
+      prospectiveLengthFlag(Array(400).fill("word").join(" "), "medium");
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("produces exactly the flag checkResponseLength returns for an unjustified overage", async () => {
+    const originalFetch = global.fetch;
+    global.fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ justified: false, reason: "" }),
+      }),
+    }) as unknown as typeof fetch;
+
+    try {
+      const narration = Array(400).fill("word").join(" ");
+      const judged = await checkResponseLength(narration, "I look around", "medium", {
+        model: "test-model",
+        token: "tok",
+      });
+      expect(judged).toEqual(prospectiveLengthFlag(narration, "medium"));
+    } finally {
+      global.fetch = originalFetch;
+      vi.restoreAllMocks();
+    }
   });
 });
 
@@ -1170,6 +1252,116 @@ describe("runObserver", () => {
     expect(flags.map((f) => f.type).sort()).toEqual(["player_agency", "response_length"]);
   });
 
+  it("issues every check's API call concurrently, not one after another", async () => {
+    // The five checks are independent and each fails open on its own, so
+    // awaiting them in sequence only ever stacked round trips between the end
+    // of narration and the choices the player is waiting on. Every call should
+    // be in flight before any of them has resolved.
+    const resolvers: Array<(value: unknown) => void> = [];
+    const fetchMock = vi.fn().mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const pending = runObserver({
+      narration: Array(400).fill("word").join(" "),
+      playerChoice: "I draw my sword",
+      replyLength: "medium",
+      toolNames: ["formula_roll"],
+      rollResults: [
+        {
+          toolName: "formula_roll",
+          success: true,
+          contextForStory: "Roll: 14 vs DC 12 - SUCCESS",
+        },
+      ],
+      tierUsed: 1,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    // Nothing has been allowed to resolve yet: length judge, agency, outcome,
+    // tool-usage and tier should all already have fired.
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+
+    const passing = {
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          justified: true,
+          violation: false,
+          severity: "minor",
+          reason: "",
+          contradicts: false,
+          missed_oracle_or_table: false,
+          missed_scene_increment: false,
+          should_escalate: false,
+        }),
+      }),
+    };
+    for (const resolve of resolvers) resolve(passing);
+
+    expect(await pending).toEqual([]);
+  });
+
+  it("keeps flag order fixed no matter which judge answers first", async () => {
+    // generateStoryTurn corrects the FIRST major flag, so the order has to be
+    // deterministic rather than a race between judges. Here the agency judge
+    // answers long before the length judge, and the length flag must still
+    // come first.
+    let releaseLengthJudge: (() => void) | null = null;
+    const lengthJudgeGate = new Promise<void>((resolve) => {
+      releaseLengthJudge = resolve;
+    });
+
+    const fetchMock = vi.fn().mockImplementation(async (_url, init) => {
+      const system = JSON.parse(init.body).messages[0].content as string;
+      if (system.includes("usual ceiling of ~")) {
+        await lengthJudgeGate;
+        return {
+          ok: true,
+          json: async () => ({
+            content: JSON.stringify({ justified: false, reason: "" }),
+          }),
+        };
+      }
+      return {
+        ok: true,
+        json: async () => ({
+          content: JSON.stringify({
+            violation: true,
+            severity: "major",
+            reason: "Spoke for the player.",
+            contradicts: false,
+            missed_oracle_or_table: false,
+            missed_scene_increment: false,
+            should_escalate: false,
+          }),
+        }),
+      };
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const pending = runObserver({
+      narration: Array(400).fill("word").join(" "),
+      playerChoice: "I draw my sword",
+      replyLength: "medium",
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    // Let every other judge settle before the length judge is unblocked.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    releaseLengthJudge!();
+
+    const flags = await pending;
+    expect(flags.map((f) => f.type)).toEqual([
+      "response_length",
+      "player_agency",
+    ]);
+  });
+
   it("judges nothing during session zero, not even the free length check", async () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -1613,6 +1805,93 @@ describe("rewriteFlaggedNarration", () => {
     expect(userMessage).toContain("I'm sorry it has to be this way");
     expect(userMessage).toContain(flag.detail);
     expect(userMessage).toContain("formula_roll: SUCCESS");
+  });
+
+  it("adds conditional 'fix this too' clauses for the checks named in alsoFixIfPresent", async () => {
+    // The speculative rewrite starts before the other reviewers have answered,
+    // and the turn only gets one rewrite - so their complaints ride along
+    // conditionally rather than being lost.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword, saying nothing." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await rewriteFlaggedNarration({
+      narration: Array(400).fill("word").join(" "),
+      playerChoice: "I draw my sword",
+      flag: {
+        type: "response_length",
+        severity: "major",
+        detail: "This turn ran 400 words.",
+        correctivePrompt: "Shorter.",
+      },
+      alsoFixIfPresent: ["player_agency", "outcome_narration_mismatch"],
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const prompt = body.messages
+      .map((m: { content: string }) => m.content)
+      .join("\n");
+    expect(prompt).toContain("beyond what the player actually declared");
+    expect(prompt).toContain("contradicts what a roll or check mechanically");
+    // Conditional, never asserted as found - a clean narration must not be
+    // "corrected" for a problem it doesn't have.
+    expect(prompt).toContain("have NOT necessarily been found here");
+    expect(prompt).toContain("Do not invent a problem to fix");
+  });
+
+  it("skips alsoFixIfPresent entries a rewrite could not fix, and the flag's own type", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword, saying nothing." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      // The tool-usage and tier checks are complaints about tool calls and
+      // reasoning tier, not about the prose - no clause exists for them.
+      // player_agency is the flag being fixed already.
+      alsoFixIfPresent: [
+        "player_agency",
+        "missing_oracle_or_table",
+        "missing_scene_increment",
+        "tier_escalation_missed",
+      ],
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const prompt = body.messages
+      .map((m: { content: string }) => m.content)
+      .join("\n");
+    expect(prompt).not.toContain("have NOT necessarily been found here");
+  });
+
+  it("produces the unchanged prompt when alsoFixIfPresent is omitted", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword, saying nothing." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const prompt = body.messages
+      .map((m: { content: string }) => m.content)
+      .join("\n");
+    expect(prompt).not.toContain("have NOT necessarily been found here");
+    expect(prompt).toContain("Fix only what was flagged.");
   });
 
   it("continues the turn's own conversation when one is handed over", async () => {
