@@ -15,6 +15,7 @@
 import { StoryData, ScenePart } from "./structs";
 import { getPartsWithinTokenBudget, cleanString } from "./ai_staged";
 import { estimateTokens } from "./tokenCounter";
+import { recordSideCall } from "./turnCost";
 
 // Below this many uncovered tokens, summarizing isn't worth an extra LLM
 // call yet - wait for more to accumulate.
@@ -329,6 +330,7 @@ async function callSummarizeApi(
   if (!response.ok) return null;
 
   const data = await response.json();
+  recordSideCall("compaction", "History summarization", apiOptions.model, data);
   const summary = (data.content || "").trim();
   return summary || null;
 }

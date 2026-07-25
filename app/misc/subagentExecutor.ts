@@ -15,6 +15,7 @@ import { DelegateTaskParams } from "./gmTools";
 import { AnyModelKey, ReasoningEffort, resolveTier, fallbackTier } from "./reasoningTiers";
 import { logger } from "./logger";
 import { webSearchFetch } from "./webSearchFetch";
+import { recordSideCall } from "./turnCost";
 
 export interface SubagentApiKeys {
   openRouterKey?: string;
@@ -176,6 +177,7 @@ async function callGenerate(
   }
 
   const data = await response.json();
+  recordSideCall("subagent", "Delegated sub-agent task", String(model), data);
   return data.content || "";
 }
 

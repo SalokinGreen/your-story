@@ -27,6 +27,8 @@ import {
 import { logger, LogEntry } from "@/app/misc/logger";
 import SamplingSettingsTab from "./SamplingSettingsTab";
 import ModelSelect from "./ModelSelect";
+import TurnCostPanel from "./TurnCostPanel";
+import { notifyTurnCostInputsChanged } from "@/app/misc/turnCost";
 
 // Maps an AI_MODELS provider string to the APIKeys field that must be
 // configured for that provider - used to flag tiers with a missing key.
@@ -328,6 +330,9 @@ export default function AIConfigTab() {
   useEffect(() => {
     if (typeof window !== "undefined" && hasLoadedSettings) {
       localStorage.setItem("customMaxContext", customMaxContext.toString());
+      // Every GM round resends this whole budget, so it's the biggest single
+      // lever on a turn's cost - let the cost panel above re-price itself.
+      notifyTurnCostInputsChanged();
       const timeoutId = setTimeout(() => {
         const aiConfig: AIConfig = {
           currentPreset: "auto", // reasoning-tier router manages model selection now
@@ -393,6 +398,11 @@ export default function AIConfigTab() {
       </div>
 
       {/* Reasoning Tier Ladder */}
+      {/* What the configuration above and below actually costs to play.
+          Sits between the narration voice and the tier ladder on purpose -
+          every control on this tab moves this number. */}
+      <TurnCostPanel />
+
       <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg space-y-3">
         <div className="flex items-center justify-between">
           <h4 className="text-sm font-medium text-white flex items-center gap-2">
@@ -846,6 +856,7 @@ export default function AIConfigTab() {
                 setMaxToolLoops(newValue);
                 if (typeof window !== "undefined") {
                   localStorage.setItem("maxToolLoops", String(newValue));
+                  notifyTurnCostInputsChanged();
                 }
               }}
               disabled={maxToolLoops <= 1}
@@ -862,6 +873,7 @@ export default function AIConfigTab() {
                 setMaxToolLoops(newValue);
                 if (typeof window !== "undefined") {
                   localStorage.setItem("maxToolLoops", String(newValue));
+                  notifyTurnCostInputsChanged();
                 }
               }}
               disabled={maxToolLoops >= 50}
