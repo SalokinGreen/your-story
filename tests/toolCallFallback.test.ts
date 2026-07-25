@@ -86,4 +86,41 @@ describe("extractFallbackToolCalls", () => {
     const calls = extractFallbackToolCalls(content);
     expect(calls![0].id).toMatch(/^fallback_/);
   });
+
+  it("recovers a leaked <|DSML|invoke> tool call", () => {
+    const content =
+      '<|DSML|tool_calls><|DSML|invoke name="generate_name"><|DSML|parameter name="flavor" string="true">mythological ring artifact</|DSML|parameter></|DSML|invoke></|DSML|tool_calls>';
+    const calls = extractFallbackToolCalls(content);
+    expect(calls).not.toBeNull();
+    expect(calls).toHaveLength(1);
+    expect(calls![0].function.name).toBe("generate_name");
+    expect(JSON.parse(calls![0].function.arguments)).toEqual({
+      flavor: "mythological ring artifact",
+    });
+  });
+
+  it("recovers a leaked <|DSML|invoke> call without the tool_calls wrapper", () => {
+    const content =
+      '<|DSML|invoke name="formula_roll"><|DSML|parameter name="formula" string="true">1d20+5</|DSML|parameter><|DSML|parameter name="dc">15</|DSML|parameter></|DSML|invoke>';
+    const calls = extractFallbackToolCalls(content);
+    expect(calls).not.toBeNull();
+    expect(calls![0].function.name).toBe("formula_roll");
+    expect(JSON.parse(calls![0].function.arguments)).toEqual({
+      formula: "1d20+5",
+      dc: 15,
+    });
+  });
+
+  it("recovers multiple leaked <|DSML|invoke> tool calls", () => {
+    const content =
+      '<|DSML|tool_calls>' +
+      '<|DSML|invoke name="add_memory"><|DSML|parameter name="entry" string="true">Owes 50g</|DSML|parameter></|DSML|invoke>' +
+      '<|DSML|invoke name="skip_tools"><|DSML|parameter name="reason" string="true">done</|DSML|parameter></|DSML|invoke>' +
+      '</|DSML|tool_calls>';
+    const calls = extractFallbackToolCalls(content);
+    expect(calls).not.toBeNull();
+    expect(calls).toHaveLength(2);
+    expect(calls![0].function.name).toBe("add_memory");
+    expect(calls![1].function.name).toBe("skip_tools");
+  });
 });
