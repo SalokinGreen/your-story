@@ -1021,7 +1021,11 @@ export async function generateStoryTurn(
               // premise, scene history, notes and roll results the draft was
               // grounded in, or it writes prose for a story it can't see.
               conversationMessages: result.gmPromptMessages,
-              apiOptions: sideCallApiOptions,
+              // Same model/effort the Observer was just judged with (the
+              // Architecture tab's override, if the user pinned one) - not
+              // sideCallApiOptions, or the rewrite would silently fall back
+              // to whichever model generated the flagged turn.
+              apiOptions: observerApiOptions,
             });
           } catch (rewriteError) {
             logger.action(
