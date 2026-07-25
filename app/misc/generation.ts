@@ -76,7 +76,10 @@ import {
   extractThinkingTags,
   detectRepetition,
 } from "@/app/misc/ai";
-import { extractVisibleText } from "@/app/misc/turnTimeline";
+import {
+  extractVisibleText,
+  extractThinkingText,
+} from "@/app/misc/turnTimeline";
 import { deAiifyText } from "@/app/misc/deAiify";
 import {
   executeGMTools,
@@ -429,6 +432,16 @@ export interface GenerationResult {
   // than prompt from scratch (see observer.ts's rewriteFlaggedNarration,
   // which produced context-free prose until it got this).
   gmPromptMessages?: ChatMessage[];
+  /**
+   * The reasoning behind this turn's narration, gathered from wherever the
+   * model happened to put it: the story stage's native reasoning stream, the
+   * reasoning attached to the GM's terminal assistant message (when that round
+   * wrote the prose itself), and any inline <thinking> segments. Not persisted
+   * - like gmPromptMessages it exists for same-turn side calls, specifically
+   * the observer's rewrite, which needs to know which parts of the draft were
+   * deliberate before it starts cutting.
+   */
+  narrationThoughts?: string;
   meta: {
     storyMeta?: GenerationMeta;
     toolsMeta?: GenerationMeta;
@@ -1031,6 +1044,10 @@ export async function generateStoryTurn(
         storytellerMode: options.storytellerMode,
         characterContext: observerCharacterContext,
         conversationMessages: result.gmPromptMessages,
+        // What the draft was going for, so the shortening pass cuts the
+        // scenery and keeps the plant. Free - it was already collected during
+        // the turn, so passing it adds no latency to the speculation.
+        narrationThoughts: result.narrationThoughts,
         // The other reviewers are still deciding while this runs, and the turn
         // only ever gets one rewrite - so their complaints ride along as
         // conditional instructions ("fix this too, if it's also true here").
@@ -1196,6 +1213,9 @@ export async function generateStoryTurn(
               // premise, scene history, notes and roll results the draft was
               // grounded in, or it writes prose for a story it can't see.
               conversationMessages: result.gmPromptMessages,
+              // ...and what it was trying to do with them, so the fix keeps
+              // the deliberate parts of the draft intact.
+              narrationThoughts: result.narrationThoughts,
               // Same model/effort the Observer was just judged with (the
               // Architecture tab's override, if the user pinned one) - not
               // sideCallApiOptions, or the rewrite would silently fall back
@@ -1622,6 +1642,19 @@ async function generateStoryTurnOnce(
   let choicesMeta: GenerationMeta | undefined;
   let storyReasoning = "";
   let storyReasoningDetails: ReasoningDetail[] = [];
+  // The story stage's own two messages (the continuation prompt, and the
+  // narration it produced), appended to gmPromptMessages so the observer's
+  // rewrite continues a conversation that actually contains the text it's
+  // being asked to rewrite. Only populated on the separate-narration-call
+  // path: when the GM's terminal round wrote the prose itself, that assistant
+  // message is already the last entry in gmConversationHistory and adding it
+  // again would show the rewrite the draft twice.
+  //
+  // Deliberately kept OUT of gmConversationForStorage/ScenePart.gmConversation
+  // below - that one is replayed as precomputedGMConversation on retries, and
+  // a narration turn sitting in it would prime the replayed GM stage to
+  // narrate again instead of adjudicating.
+  let narrationTurnMessages: ChatMessage[] = [];
 
   try {
     // ========================================
@@ -3096,6 +3129,28 @@ async function generateStoryTurnOnce(
         storyContent = deAiifyText(storyContent);
       }
 
+      // Record the story stage as part of the turn's conversation. Without
+      // this, gmPromptMessages ended at the last GM round - so the observer's
+      // rewrite continued a conversation that stopped immediately before the
+      // narration, and saw the flagged prose only as text quoted at it, with
+      // no reasoning behind it. Reasoning rides along on the assistant message
+      // for the providers that accept it (sanitizeMessages forwards it to
+      // OpenRouter/Google only); rewriteFlaggedNarration also pastes it into
+      // the prompt as text so it survives the providers that don't.
+      if (storyContent.trim()) {
+        narrationTurnMessages = [
+          { role: "user", content: storyContinuationPrompt },
+          {
+            role: "assistant",
+            content: storyContent,
+            ...(storyReasoning ? { reasoning: storyReasoning } : {}),
+            ...(storyReasoningDetails.length > 0
+              ? { reasoning_details: storyReasoningDetails }
+              : {}),
+          },
+        ];
+      }
+
       callbacks.onStoryComplete?.(
         storyContent,
         storyMeta?.usage || {
@@ -3259,6 +3314,31 @@ async function generateStoryTurnOnce(
         ...(entry.tool_call_id && { tool_call_id: entry.tool_call_id }),
       }));
 
+    // The reasoning behind the narration, collected from all three places it
+    // can land depending on the model and which path wrote the prose:
+    //  - storyReasoning: the story stage's native reasoning stream.
+    //  - the terminal GM assistant message's reasoning: on a turn where the
+    //    GM's last round wrote the prose itself, there was no story call, so
+    //    storyReasoning is empty and the CoT is attached back there.
+    //  - inline <thinking> segments: models that ignore the native reasoning
+    //    channel and think in `content` instead.
+    // Handed to the observer's rewrite (see GenerationResult.narrationThoughts)
+    // as prompt text, because the message-level reasoning fields only reach
+    // OpenRouter and Google - sanitizeMessages drops them everywhere else.
+    const terminalAssistantReasoning = [...gmConversationHistory]
+      .reverse()
+      .find((entry) => entry.role === "assistant" && entry.content?.trim())
+      ?.reasoning?.trim();
+
+    const narrationThoughts =
+      [
+        storyReasoning.trim() || terminalAssistantReasoning || "",
+        extractThinkingText(rawStoryContent),
+      ]
+        .filter(Boolean)
+        .join("\n\n")
+        .trim() || undefined;
+
     // Layer-5 consistency check (see consistencyCheck.ts): narration has
     // already streamed to the client by this point, so this is recorded
     // for display/debugging and eval-harness metrics, never a live gate.
@@ -3321,8 +3401,13 @@ async function generateStoryTurnOnce(
       gmThinking: gmThinking.length > 0 ? gmThinking : undefined,
       gmPromptMessages:
         gmBaseMessages.length > 0
-          ? [...gmBaseMessages, ...gmConversationHistory]
+          ? [
+              ...gmBaseMessages,
+              ...gmConversationHistory,
+              ...narrationTurnMessages,
+            ]
           : undefined,
+      narrationThoughts,
       meta: {
         storyMeta,
         toolsMeta,
