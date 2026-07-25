@@ -24,6 +24,7 @@
 
 import { StoryData } from "./structs";
 import { getCustomModelIfUUID } from "./user_settings";
+import { recordSideCall, SideCallCostContext } from "./turnCost";
 
 const SYSTEM_PROMPT = `You are the spotlight-tracking layer for an interactive story's AI game master. Read one completed turn (the player's action and the GM's narration) plus a list of the story's currently active plot threads and tracked NPCs.
 
@@ -35,7 +36,7 @@ Respond with ONLY a JSON object, no other text:
 {"threads": ["<exact thread title>", ...], "npcs": ["<exact NPC name>", ...]}
 Return empty arrays if nothing on the lists meaningfully advanced this turn.`;
 
-export interface DirectorAssistantApiOptions {
+export interface DirectorAssistantApiOptions extends SideCallCostContext {
   model: string;
   token: string | null;
   openRouterKey?: string;
@@ -125,6 +126,13 @@ async function callDirectorAssistantApi(
     if (!response.ok) return null;
 
     const data = await response.json();
+    recordSideCall(
+      "director",
+      "Director Assistant",
+      apiOptions.model,
+      data,
+      apiOptions,
+    );
     const content = (data.content || "").trim();
     if (!content) return null;
 

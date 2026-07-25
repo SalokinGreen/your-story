@@ -107,6 +107,8 @@ export interface GenerateSuccess {
       completionTokens: number;
       totalTokens: number;
     };
+    /** Provider-reported cost in dollars, when the provider sends one. */
+    estimatedCost?: number;
   };
 }
 
@@ -589,6 +591,9 @@ export async function generateNonStreaming(
           completionTokens: usage.completion_tokens,
           totalTokens: usage.total_tokens,
         },
+        ...(usage.estimated_cost !== undefined && {
+          estimatedCost: usage.estimated_cost,
+        }),
       },
     };
   } catch (error: any) {
@@ -933,6 +938,12 @@ export function generateStream(body: GenerateRequestBody): ReadableStream<Uint8A
               completionTokens,
               totalTokens: promptTokens + completionTokens,
             },
+            // The provider's own dollar figure when it reports one (DeepInfra
+            // does). Until now this was parsed off the usage chunk and then
+            // dropped on the floor here - forwarding it lets the client's
+            // per-turn cost ledger (turnCost.ts) prefer a real billed amount
+            // over our list-price arithmetic.
+            ...(estimatedCost !== undefined && { estimatedCost }),
           },
         });
 

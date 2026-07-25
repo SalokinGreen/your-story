@@ -101,6 +101,12 @@ import {
 } from "@/app/misc/samplingSettings";
 import { chaosFactorTemperatureDelta } from "@/app/misc/mythic";
 import {
+  beginTurnCost,
+  recordAICall,
+  logTurnCost,
+  recordTurnCostCalibration,
+} from "@/app/misc/turnCost";
+import {
   SCENE_BASELINE_TIER,
   ReasoningEffort,
   ResolvedTier,
@@ -392,6 +398,14 @@ export interface GenerationMeta {
   usage: TokenUsage;
   tokenCost: number;
   balance: number;
+  /**
+   * The provider's own cost figure for this call, in dollars, when it
+   * reports one (DeepInfra does - see providerCall.ts). Preferred over
+   * list-price arithmetic by the per-turn cost ledger (turnCost.ts).
+   */
+  estimatedCost?: number;
+  /** Provider's stop reason - "length" means the response was cut off. */
+  finishReason?: string;
 }
 
 export interface GenerationResult {
@@ -421,6 +435,13 @@ export interface GenerationResult {
     gmMeta?: GenerationMeta;
     totalTokenCost: number;
     balance: number;
+    /**
+     * Ledger id for this turn's real API spend (turnCost.ts). Pass it to
+     * getTurnCostReport() for the per-stage dollar breakdown - the report
+     * keeps filling in for a few seconds after the turn returns, as the
+     * background layers land.
+     */
+    costTurnId?: string;
   };
 }
 
@@ -772,6 +793,14 @@ export async function generateStoryTurn(
   options: GenerationOptions,
   callbacks: GenerationCallbacks,
 ): Promise<GenerationResult> {
+  // Opens this turn's cost ledger (turnCost.ts). Every AI call the turn
+  // makes - GM rounds, narration, choices, and the Observer/Memory Keeper/
+  // Director/Progress side calls - reports into it, so Debug Logs can answer
+  // "what did that turn actually cost". Held in a local rather than read back
+  // from the module because the background layer wave deliberately outlives
+  // this turn and must keep billing to it after the next turn has opened.
+  const costTurnId = beginTurnCost();
+
   let preTurnSnapshot: StoryData | null = null;
   try {
     preTurnSnapshot = structuredClone(storyData);
@@ -845,9 +874,14 @@ export async function generateStoryTurn(
     // judge. generateStoryTurnOnce throws rather than returning on failure,
     // so a successfully-returned result always has success: true here.
     if (!result.content.trim()) {
+      result.meta.costTurnId = costTurnId;
+      const emptyTurnReport = logTurnCost(costTurnId, "final");
+      if (emptyTurnReport) recordTurnCostCalibration(emptyTurnReport);
       callbacks.onComplete?.(result);
       return result;
     }
+
+    result.meta.costTurnId = costTurnId;
 
     // Shared by the observer and the memory agent below - both are
     // best-effort side calls for the turn that just completed, using
@@ -860,6 +894,9 @@ export async function generateStoryTurn(
         result.meta.gmMeta?.model ||
         options.storyModel,
       token: null,
+      // Bill every side call to THIS turn even when it lands after the
+      // player has already started the next one (see runBackgroundLayers).
+      costTurnId,
       openRouterKey: options.openRouterKey,
       deepseekKey: options.deepseekKey,
       googleKey: options.googleKey,
@@ -1110,6 +1147,18 @@ export async function generateStoryTurn(
                   abortSignal: options.abortSignal,
                 },
               );
+            if (rewrittenChoicesMeta) {
+              recordAICall({
+                stage: "choices",
+                label: "Choices (re-derived after observer rewrite)",
+                modelKey: String(sideCallApiOptions.model),
+                promptTokens: rewrittenChoicesMeta.usage?.promptTokens || 0,
+                completionTokens:
+                  rewrittenChoicesMeta.usage?.completionTokens || 0,
+                providerReportedUsd: rewrittenChoicesMeta.estimatedCost,
+                costTurnId,
+              });
+            }
             const cleanedChoicesContent =
               options.usePrefill !== false
                 ? stripAffirmationPrefill(rawChoicesContent, CHOICES_AFFIRMATION)
@@ -1388,9 +1437,22 @@ export async function generateStoryTurn(
       }
 
       callbacks.onBackgroundLayersUpdate?.();
+
+      // Final word on what this turn cost, now that the background layers
+      // have actually billed. The "Turn cost" entry logged below fires while
+      // this wave is still in flight and therefore always understates it -
+      // this one is the number to trust, and it's what feeds the estimator's
+      // calibration (turnCost.ts) so future predictions converge on this
+      // adventure's real cost rather than staying on generic defaults.
+      const finalReport = logTurnCost(costTurnId, "final");
+      if (finalReport) recordTurnCostCalibration(finalReport);
     };
 
     void runBackgroundLayers();
+
+    // Logged before the background wave lands on purpose: this is the cost
+    // of everything the player actually waited on.
+    logTurnCost(costTurnId, "turn");
 
     callbacks.onComplete?.(result);
     return result;
@@ -1581,6 +1643,15 @@ async function generateStoryTurnOnce(
                 customModel: getCustomModelIfUUID(classifierModel),
               },
             );
+            recordAICall({
+              stage: "classifier",
+              label: "Tier classification",
+              modelKey: String(classifierModel),
+              promptTokens: classifierResult.meta?.usage?.promptTokens || 0,
+              completionTokens:
+                classifierResult.meta?.usage?.completionTokens || 0,
+              providerReportedUsd: classifierResult.meta?.estimatedCost,
+            });
             startingTier = Math.max(
               startingTier,
               classificationLabelToTier(classifierResult.content || ""),
@@ -2052,6 +2123,18 @@ async function generateStoryTurnOnce(
           }
 
           if (gmResult.meta) {
+            recordAICall({
+              stage: "gm",
+              // gmModel/gmReasoningEffort rather than roundTier, so a round
+              // that failed over to a lower tier is billed to the model that
+              // actually answered it.
+              label: `GM round ${gmRound} (effort ${gmReasoningEffort})`,
+              modelKey: String(gmModel),
+              promptTokens: gmResult.meta.usage?.promptTokens || 0,
+              completionTokens: gmResult.meta.usage?.completionTokens || 0,
+              providerReportedUsd: gmResult.meta.estimatedCost,
+            });
+
             // Accumulate meta across rounds
             if (!gmMeta) {
               gmMeta = gmResult.meta;
@@ -2790,6 +2873,14 @@ async function generateStoryTurnOnce(
         }
         if (event.type === "done" && event.meta) {
           storyMeta = event.meta;
+          recordAICall({
+            stage: "narration",
+            label: "Narration",
+            modelKey: String(narrationModel),
+            promptTokens: event.meta.usage?.promptTokens || 0,
+            completionTokens: event.meta.usage?.completionTokens || 0,
+            providerReportedUsd: event.meta.estimatedCost,
+          });
           totalTokenCost += event.meta.tokenCost;
           finalBalance = event.meta.balance;
         }
@@ -2912,6 +3003,14 @@ async function generateStoryTurnOnce(
       let choicesContent = rawChoicesContent;
       if (choicesResultMeta) {
         choicesMeta = choicesResultMeta;
+        recordAICall({
+          stage: "choices",
+          label: "Choices",
+          modelKey: String(narrationModel),
+          promptTokens: choicesResultMeta.usage?.promptTokens || 0,
+          completionTokens: choicesResultMeta.usage?.completionTokens || 0,
+          providerReportedUsd: choicesResultMeta.estimatedCost,
+        });
         totalTokenCost += choicesResultMeta.tokenCost;
         finalBalance = choicesResultMeta.balance;
       }

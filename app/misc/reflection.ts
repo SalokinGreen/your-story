@@ -17,6 +17,7 @@
  */
 
 import { StoryData, MemoryEntry, getMemoryContent } from "./structs";
+import { recordSideCall, SideCallCostContext } from "./turnCost";
 
 // Cumulative importance (sum of each new memory's 0-10 importance, or a
 // mid-value default for memories with no self-rated importance) that must
@@ -124,7 +125,7 @@ export function applyReflection(
   }
 }
 
-export interface ReflectionApiOptions {
+export interface ReflectionApiOptions extends SideCallCostContext {
   model: string;
   token: string | null;
   openRouterKey?: string;
@@ -166,6 +167,7 @@ async function callReflectionApi(
   if (!response.ok) return null;
 
   const data = await response.json();
+  recordSideCall("reflection", "Reflection", apiOptions.model, data, apiOptions);
   const content = (data.content || "").trim();
   if (!content) return [];
 

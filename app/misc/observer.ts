@@ -93,6 +93,7 @@ import { ChatMessage } from "./chatMessage";
 import { PACING_BANDS, countNarrationWords } from "./pacingFeedback";
 import { parseTaggedContent } from "./turnTimeline";
 import { getCustomModelIfUUID } from "./user_settings";
+import { recordSideCall, SideCallCostContext } from "./turnCost";
 import { getEffectiveTiers, ReasoningTier, TOP_TIER } from "./reasoningTiers";
 
 // ============================================================
@@ -588,6 +589,13 @@ ${rewriteRules}`;
     if (!response.ok) return null;
 
     const data = await response.json();
+    recordSideCall(
+      "observer_rewrite",
+      "Narration rewrite",
+      apiOptions.model,
+      data,
+      apiOptions,
+    );
     const content = (data.content || "").trim();
     return content || null;
   } catch {
@@ -680,6 +688,13 @@ Respond with ONLY a JSON object, no other text:
     if (!response.ok) return null;
 
     const data = await response.json();
+    recordSideCall(
+      "observer",
+      "response_length judge",
+      apiOptions.model,
+      data,
+      apiOptions,
+    );
     const content = (data.content || "").trim();
     if (!content) return null;
 
@@ -689,7 +704,7 @@ Respond with ONLY a JSON object, no other text:
   }
 }
 
-export interface ObserverApiOptions {
+export interface ObserverApiOptions extends SideCallCostContext {
   model: string;
   token: string | null;
   openRouterKey?: string;
@@ -796,6 +811,13 @@ Respond with ONLY a JSON object, no other text:
     if (!response.ok) return null;
 
     const data = await response.json();
+    recordSideCall(
+      "observer",
+      "player_agency judge",
+      apiOptions.model,
+      data,
+      apiOptions,
+    );
     const content = (data.content || "").trim();
     if (!content) return null;
 
@@ -911,6 +933,13 @@ Respond with ONLY a JSON object, no other text:
     if (!response.ok) return null;
 
     const data = await response.json();
+    recordSideCall(
+      "observer",
+      "outcome_narration_mismatch judge",
+      apiOptions.model,
+      data,
+      apiOptions,
+    );
     const content = (data.content || "").trim();
     if (!content) return null;
 
@@ -1042,6 +1071,13 @@ Given the GM's narration below, judge only the question(s) above. Respond with O
     if (!response.ok) return null;
 
     const data = await response.json();
+    recordSideCall(
+      "observer",
+      "tool-usage-gap judge",
+      apiOptions.model,
+      data,
+      apiOptions,
+    );
     const content = (data.content || "").trim();
     if (!content) return null;
 
@@ -1198,6 +1234,13 @@ Respond with ONLY a JSON object, no other text:
     if (!response.ok) return null;
 
     const data = await response.json();
+    recordSideCall(
+      "observer",
+      "tier_escalation judge",
+      apiOptions.model,
+      data,
+      apiOptions,
+    );
     const content = (data.content || "").trim();
     if (!content) return null;
 

@@ -27,6 +27,7 @@
 import { StoryData } from "./structs";
 import { countNameMentions } from "./compaction";
 import { getCustomModelIfUUID } from "./user_settings";
+import { recordSideCall, SideCallCostContext } from "./turnCost";
 
 // Mirrors the guidance the GM's own add_memory tool used to carry
 // (toolSchemas.ts) - kept in sync in spirit, not literally imported, since
@@ -47,7 +48,7 @@ Respond with ONLY a JSON array, no other text. Return an empty array if nothing 
 
 const MAX_ENTRIES_PER_TURN = 3;
 
-export interface MemoryAgentApiOptions {
+export interface MemoryAgentApiOptions extends SideCallCostContext {
   model: string;
   token: string | null;
   openRouterKey?: string;
@@ -135,6 +136,13 @@ async function callMemoryAgentApi(
     if (!response.ok) return null;
 
     const data = await response.json();
+    recordSideCall(
+      "memory_keeper",
+      "Memory Keeper",
+      apiOptions.model,
+      data,
+      apiOptions,
+    );
     const content = (data.content || "").trim();
     if (!content) return [];
 

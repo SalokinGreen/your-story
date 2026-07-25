@@ -54,6 +54,7 @@
 
 import { StoryData } from "./structs";
 import { getCustomModelIfUUID } from "./user_settings";
+import { recordSideCall, SideCallCostContext } from "./turnCost";
 import { storyProgress, targetTensionForProgress } from "./mythic";
 
 /** Turns between check-ins when no interval is explicitly configured (see layerSettings.ts). */
@@ -162,7 +163,7 @@ export function findRepeatedPhrases(turns: string[]): RepeatedPhraseCandidate[] 
 
 export type StoryProgressStatus = "on_track" | "dragging" | "rushing";
 
-export interface StoryProgressApiOptions {
+export interface StoryProgressApiOptions extends SideCallCostContext {
   model: string;
   token: string | null;
   openRouterKey?: string;
@@ -344,6 +345,13 @@ async function callStoryProgressApi(
     if (!response.ok) return null;
 
     const data = await response.json();
+    recordSideCall(
+      "progress_observer",
+      "Story Progress Observer",
+      apiOptions.model,
+      data,
+      apiOptions,
+    );
     const content = (data.content || "").trim();
     if (!content) return null;
 

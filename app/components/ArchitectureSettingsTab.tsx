@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import ModelSelect from "./ModelSelect";
+import TurnCostPanel from "./TurnCostPanel";
 import { getCustomModels, CustomModel } from "@/app/misc/user_settings";
 import { AnyModelKey, ReasoningEffort } from "@/app/misc/reasoningTiers";
 import { ObserverFlagType } from "@/app/misc/structs";
@@ -328,6 +329,11 @@ export default function ArchitectureSettingsTab() {
 
   return (
     <div className="space-y-6">
+      {/* Every model override on this tab is another AI call per turn, so
+          the running cost belongs at the top of it, not buried in Settings
+          > AI Config. */}
+      <TurnCostPanel defaultExpanded />
+
       {/* Architecture Overview */}
       <div className="space-y-2">
         <h4 className="text-sm font-medium text-white flex items-center gap-2">
