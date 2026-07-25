@@ -5,15 +5,19 @@
 
 import type { PlayerArchetype } from "./structs";
 
-// The primary (device-owner) player's identity from the last GuidedStoryStart
-// wizard run, saved so it can prefill next time instead of being retyped.
-export interface PlayerProfile {
+// A device-local saved player identity from the GuidedStoryStart wizard -
+// the host and any regular couch guests (e.g. a partner who plays every
+// session) - so it can prefill next time instead of being retyped. Not tied
+// to any one story; this is a roster the whole device shares.
+export interface SavedPlayerProfile {
+  id: string;
   name: string;
   color: string;
   personality: string[];
   wishTags: string[];
   wishText: string;
   archetype?: PlayerArchetype;
+  lastUsedAt: number;
 }
 
 export interface CustomModel {
@@ -38,7 +42,7 @@ export interface AIConfig {
 export interface UserSettings {
   custom_models?: CustomModel[]; // Array of custom models
   ai_config?: AIConfig; // AI preset configuration
-  player_profile?: PlayerProfile; // Saved GuidedStoryStart player identity
+  saved_player_profiles?: SavedPlayerProfile[]; // Saved GuidedStoryStart player identities
 }
 
 const STORAGE_KEY = "yourStory_userSettings";
@@ -68,6 +72,52 @@ export async function updateUserSettings(
     console.error("Error updating user settings:", error);
     return { error };
   }
+}
+
+// ============================================================
+// SAVED PLAYER PROFILES (GuidedStoryStart "continue as" roster)
+// ============================================================
+
+const MAX_SAVED_PROFILES = 8;
+
+/** Saved profiles, most recently used first. */
+export async function getSavedPlayerProfiles(): Promise<SavedPlayerProfile[]> {
+  const settings = await getUserSettings();
+  return [...(settings?.saved_player_profiles ?? [])].sort(
+    (a, b) => b.lastUsedAt - a.lastUsedAt,
+  );
+}
+
+/**
+ * Upserts a profile (matched by id, or by case-insensitive name if no id
+ * match) as most-recently-used, capped to MAX_SAVED_PROFILES. Returns the
+ * updated roster, most recently used first.
+ */
+export async function saveSavedPlayerProfile(
+  profile: Omit<SavedPlayerProfile, "lastUsedAt">,
+): Promise<SavedPlayerProfile[]> {
+  const settings = (await getUserSettings()) ?? {};
+  const existing = settings.saved_player_profiles ?? [];
+  const nameLower = profile.name.trim().toLowerCase();
+  const withoutMatch = existing.filter(
+    (p) => p.id !== profile.id && p.name.trim().toLowerCase() !== nameLower,
+  );
+  const updated = [{ ...profile, lastUsedAt: Date.now() }, ...withoutMatch]
+    .sort((a, b) => b.lastUsedAt - a.lastUsedAt)
+    .slice(0, MAX_SAVED_PROFILES);
+  await updateUserSettings({ saved_player_profiles: updated });
+  return updated;
+}
+
+export async function deleteSavedPlayerProfile(
+  id: string,
+): Promise<SavedPlayerProfile[]> {
+  const settings = (await getUserSettings()) ?? {};
+  const updated = (settings.saved_player_profiles ?? []).filter(
+    (p) => p.id !== id,
+  );
+  await updateUserSettings({ saved_player_profiles: updated });
+  return updated;
 }
 
 // ============================================================

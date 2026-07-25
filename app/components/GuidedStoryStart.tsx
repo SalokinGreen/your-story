@@ -13,8 +13,12 @@ import type { CustomTable, DiceMode, PlayerArchetype, StoryLore } from "../misc/
 import type { FreeformPlayerSetup } from "../misc/localStoryManager";
 import type { MPBackend } from "../misc/multiplayer/types";
 import { ARCHETYPE_INFO } from "../misc/gmAdvice";
-import { getUserSettings, updateUserSettings } from "../misc/user_settings";
-import type { PlayerProfile } from "../misc/user_settings";
+import {
+  getSavedPlayerProfiles,
+  saveSavedPlayerProfile,
+  deleteSavedPlayerProfile,
+} from "../misc/user_settings";
+import type { SavedPlayerProfile } from "../misc/user_settings";
 
 // Same palette as CouchPlayersEditor so colors stay consistent across the app
 const PALETTE = [
@@ -75,6 +79,10 @@ interface WizardPlayer {
   wishTags: string[];
   wishText: string;
   archetype?: PlayerArchetype;
+  // Set when this slot was filled from a saved profile (see SavedPlayerProfile) -
+  // lets nextFromPlayer update that same saved entry instead of creating a
+  // duplicate when the player edits their details.
+  profileId?: string;
 }
 
 function makePlayer(index: number): WizardPlayer {
@@ -86,12 +94,21 @@ function makePlayer(index: number): WizardPlayer {
     wishTags: [],
     wishText: "",
     archetype: undefined,
+    profileId: undefined,
   };
 }
 
-// Fills a freshly-made player slot with the device owner's saved profile
-// (name/color/personality/wishes) so they don't retype it every story.
-function applyProfile(player: WizardPlayer, profile: PlayerProfile): WizardPlayer {
+function newProfileId(): string {
+  return `profile_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+// Fills a freshly-made player slot from a saved profile (name/color/
+// personality/wishes) so a returning player - host or regular guest -
+// doesn't retype it every story.
+function applyProfile(
+  player: WizardPlayer,
+  profile: SavedPlayerProfile,
+): WizardPlayer {
   return {
     ...player,
     name: profile.name,
@@ -100,6 +117,7 @@ function applyProfile(player: WizardPlayer, profile: PlayerProfile): WizardPlaye
     wishTags: profile.wishTags,
     wishText: profile.wishText,
     archetype: profile.archetype,
+    profileId: profile.id,
   };
 }
 
@@ -141,13 +159,13 @@ export default function GuidedStoryStart() {
   // join over the internet (they build their own profiles on join), rather than
   // seating a fixed couch party up front.
   const [hostOnlineMode, setHostOnlineMode] = useState(false);
-  // The device owner's saved identity (name/color/personality/wishes) from a
-  // previous story, used to prefill player 1 so it isn't retyped every time.
-  const [savedProfile, setSavedProfile] = useState<PlayerProfile | null>(null);
+  // Device-local roster of saved identities (host + regular couch guests),
+  // most recently used first, so returning players don't retype every time.
+  const [savedProfiles, setSavedProfiles] = useState<SavedPlayerProfile[]>([]);
   const nameInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    getUserSettings().then((s) => setSavedProfile(s?.player_profile ?? null));
+    getSavedPlayerProfiles().then(setSavedProfiles);
   }, []);
 
   const characterAttached = attachedLore.some(
@@ -193,11 +211,15 @@ export default function GuidedStoryStart() {
 
   const chooseCount = (count: number) => {
     setHostOnlineMode(false);
+    // Only the host slot (index 0) is auto-prefilled, from the most recently
+    // used profile - other seats get a "continue as" picker instead, since
+    // any regular guest could be sitting in them.
+    const mostRecent = savedProfiles[0];
     setPlayers(
       Array.from({ length: count }, (_, i) => {
         const player = makePlayer(i);
-        return i === 0 && savedProfile
-          ? applyProfile(player, savedProfile)
+        return i === 0 && mostRecent
+          ? applyProfile(player, mostRecent)
           : player;
       }),
     );
@@ -210,7 +232,8 @@ export default function GuidedStoryStart() {
   const choosePlayOnline = () => {
     setHostOnlineMode(true);
     const player = makePlayer(0);
-    setPlayers([savedProfile ? applyProfile(player, savedProfile) : player]);
+    const mostRecent = savedProfiles[0];
+    setPlayers([mostRecent ? applyProfile(player, mostRecent) : player]);
     setPlayerIndex(0);
     setStep("player");
   };
@@ -223,19 +246,53 @@ export default function GuidedStoryStart() {
 
   const currentPlayer = players[playerIndex];
 
+  // Saved profiles not already claimed by another seat in this session -
+  // offered as "continue as" picks for the current seat.
+  const usedProfileIds = new Set(
+    players
+      .filter((_, i) => i !== playerIndex)
+      .map((p) => p.profileId)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const availableProfiles = savedProfiles.filter(
+    (p) => !usedProfileIds.has(p.id),
+  );
+
+  const pickProfile = (p: SavedPlayerProfile) => {
+    updatePlayer(playerIndex, {
+      name: p.name,
+      color: p.color,
+      personality: p.personality,
+      wishTags: p.wishTags,
+      wishText: p.wishText,
+      archetype: p.archetype,
+      profileId: p.id,
+    });
+  };
+
+  const forgetProfile = (id: string) => {
+    deleteSavedPlayerProfile(id).then(setSavedProfiles);
+    setPlayers((prev) =>
+      prev.map((p) => (p.profileId === id ? { ...p, profileId: undefined } : p)),
+    );
+  };
+
   const nextFromPlayer = () => {
-    // Player 1 is the device owner - remember their identity for next time.
-    if (playerIndex === 0 && currentPlayer.name.trim()) {
-      const profile: PlayerProfile = {
+    // Remember this player's identity for next time - host or couch guest.
+    if (currentPlayer.name.trim()) {
+      const id = currentPlayer.profileId ?? newProfileId();
+      if (!currentPlayer.profileId) {
+        updatePlayer(playerIndex, { profileId: id });
+      }
+      saveSavedPlayerProfile({
+        id,
         name: currentPlayer.name.trim(),
         color: currentPlayer.color,
         personality: currentPlayer.personality,
         wishTags: currentPlayer.wishTags,
         wishText: currentPlayer.wishText.trim(),
         archetype: currentPlayer.archetype,
-      };
-      setSavedProfile(profile);
-      updateUserSettings({ player_profile: profile });
+      }).then(setSavedProfiles);
     }
     if (playerIndex < players.length - 1) {
       setPlayerIndex(playerIndex + 1);
@@ -455,6 +512,55 @@ export default function GuidedStoryStart() {
 
               {step === "player" && currentPlayer && (
                 <div className="space-y-5">
+                  {/* Saved profiles - resume a returning player instead of retyping them */}
+                  {availableProfiles.length > 0 && (
+                    <div>
+                      <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2">
+                        Continue as
+                      </label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {availableProfiles.map((p) => {
+                          const selected = currentPlayer.profileId === p.id;
+                          return (
+                            <div key={p.id} className="relative">
+                              <button
+                                onClick={() => pickProfile(p)}
+                                className={`flex items-center gap-1.5 pl-1.5 pr-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                                  selected
+                                    ? "text-white border-transparent shadow-md"
+                                    : "bg-white/5 border-white/10 text-blue-200/70 hover:border-purple-400/40 hover:text-white"
+                                }`}
+                                style={
+                                  selected
+                                    ? { backgroundColor: p.color }
+                                    : undefined
+                                }
+                              >
+                                <span
+                                  className="w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold shrink-0"
+                                  style={{ backgroundColor: p.color }}
+                                >
+                                  {p.name.trim()[0]?.toUpperCase() || "?"}
+                                </span>
+                                {p.name}
+                              </button>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  forgetProfile(p.id);
+                                }}
+                                title={`Forget ${p.name}`}
+                                className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-950 border border-white/20 text-blue-300/60 hover:text-white hover:bg-red-500/80 opacity-70 hover:opacity-100 transition-opacity flex items-center justify-center"
+                              >
+                                <DynamicIcon name="X" className="w-2.5 h-2.5" />
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Name + color preview */}
                   <div className="flex items-center gap-3">
                     <span
