@@ -8,8 +8,6 @@ import { creatorImageFetch } from "@/app/misc/creatorFetch";
 import {
   DEEPINFRA_IMAGE_MODELS,
   OPENROUTER_IMAGE_MODELS,
-  type DeepInfraImageModelKey,
-  type ImageModelKey,
 } from "@/app/misc/ai_prices";
 
 // LocalStorage keys for persisting settings

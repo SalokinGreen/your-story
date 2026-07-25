@@ -14,7 +14,6 @@ import {
   GenerationStage,
   LegacyStage,
   StageConfig,
-  ContentIterationConfig,
   BigAdventureAutosave,
   BigAdventureResult,
   RegenerateSection,
@@ -25,11 +24,9 @@ import {
   STYLE_PRESETS,
   PromptTemplate,
   PROMPT_TEMPLATES,
-  PromptBuilderQuestion,
   PROMPT_BUILDER_QUESTIONS,
   buildPromptFromAnswers,
   canExtendSection,
-  EXTENDABLE_SECTIONS,
   getStageInfo,
   getParentStage,
   getStagesToRun,
@@ -38,7 +35,6 @@ import {
   DEFAULT_STAGE_CONFIGS,
   DEFAULT_CONTENT_ITERATIONS,
   generateSessionId,
-  saveAutosave,
   loadAutosave,
   clearAutosave,
   saveConfigDraft,
@@ -65,17 +61,11 @@ import {
   OPENROUTER_IMAGE_MODELS,
   DEEPINFRA_IMAGE_MODELS,
   estimateImageCost,
-  calculateDeepInfraImageCost,
 } from "@/app/misc/ai_prices";
 import {
   Adventure,
-  Stat,
-  Resource,
-  Ability,
-  InventoryItem,
   StoryLore,
   Goal,
-  Relationship,
   Variable,
   CustomTable,
 } from "@/app/misc/structs";
@@ -1292,7 +1282,7 @@ function BigAdventureCreatorPage() {
 
   const [result, setResult] = useState<BigAdventureResult | null>(null);
   // partialResults is used for autosave recovery and intermediate state
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+   
   const [partialResults, setPartialResults] = useState<
     Partial<BigAdventureResult>
   >({});

@@ -10,18 +10,15 @@
  * - Understand validation results (fuzzy matching, resource checks, etc.)
  */
 
-import type { StoryData, CommandResponse, LoreType } from "./structs";
+import type { StoryData, CommandResponse } from "./structs";
 import {
   findResourceMatch,
-  findStatMatch,
   findGoalMatch,
-  findRelationshipMatch,
-  findLoreMatch,
   findAbilityMatch,
   findBestMatch,
 } from "./fuzzyMatch";
 import { logger } from "./logger";
-import { ABILITY_GRADE_ORDER, initializeAbility } from "./abilitySystem";
+import { ABILITY_GRADE_ORDER } from "./abilitySystem";
 
 // === DIRECT TYPED TOOL DISPATCH ===
 //

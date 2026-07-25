@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { StoryData, CountdownTimer } from "../app/misc/structs";
 
 // Mock the rpgSystems module functions

@@ -47,7 +47,7 @@ import {
   initPlanState,
   CAMPAIGN_SPINE_PRESETS,
 } from "@/app/misc/campaignPlan";
-import { findBestMatch, findStatMatch } from "@/app/misc/fuzzyMatch";
+import { findBestMatch } from "@/app/misc/fuzzyMatch";
 import { countNameMentions } from "@/app/misc/compaction";
 import { validateToolArgs, formatValidationErrors } from "@/app/misc/toolValidation";
 import { parseChallengeRoundsValue } from "@/app/misc/rpgSystems";

@@ -16,7 +16,7 @@ export function stripThinkingTags(content: string): string {
   // 1. Check for <output> tags (new standard) - STRICT: only return content inside tags
   const outputStartRegex = /<\s*output[^>]*>/i;
   if (outputStartRegex.test(content)) {
-    let outputBlocks: string[] = [];
+    const outputBlocks: string[] = [];
     let lastIndex = 0;
     let match;
 
@@ -46,7 +46,7 @@ export function stripThinkingTags(content: string): string {
   // 2. Check for <story> tags (legacy standard) - STRICT: only return content inside tags
   const storyStartRegex = /<\s*story[^>]*>/i;
   if (storyStartRegex.test(content)) {
-    let storyBlocks: string[] = [];
+    const storyBlocks: string[] = [];
     let lastIndex = 0;
     let match;
 
@@ -308,7 +308,7 @@ export function outputToScenePart(text: string): ScenePart {
       const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
       if (resourceMatch) {
         // Strip DC notation like "(DC 6)" and clean up the name
-        let resourceName = resourceMatch[1]
+        const resourceName = resourceMatch[1]
           .trim()
           .replace(/\s*\(DC\s*\d+\)/gi, "")
           .replace(
@@ -325,7 +325,7 @@ export function outputToScenePart(text: string): ScenePart {
       const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
       if (itemMatch) {
         // Strip DC notation like "(DC 6)" and clean up the name
-        let itemName = itemMatch[1]
+        const itemName = itemMatch[1]
           .trim()
           .replace(/\s*\(DC\s*\d+\)/gi, "")
           .replace(

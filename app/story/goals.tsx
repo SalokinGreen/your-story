@@ -1,6 +1,6 @@
 "use client";
 
-import { StoryData, StoryThread } from "../misc/structs";
+import { StoryData } from "../misc/structs";
 import { useState } from "react";
 import { DynamicIcon } from "../components/DynamicIcon";
 
@@ -74,14 +74,13 @@ export default function GoalsPage(storyData: StoryData) {
                 Active Goals ({ongoingGoals.length})
               </h3>
               <div className="space-y-3">
-                {ongoingGoals.map((goal) => {
+                {ongoingGoals.map((goal, index) => {
                   if (!goal.id) {
                     console.error("Goal missing id:", goal);
-                    goal.id = `goal-${Math.random()}`; // Fallback ID
                   }
                   return (
                     <div
-                      key={goal.id || `goal-${goal.title}-${Math.random()}`}
+                      key={goal.id || `goal-${index}-${goal.title}`}
                       className="flex flex-col gap-3 p-4 rounded-xl border border-blue-400/30 bg-blue-500/[0.06] backdrop-blur-md transition-all card-interactive hover:shadow-[0_4px_16px_rgba(59,130,246,0.15)]"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -141,16 +140,13 @@ export default function GoalsPage(storyData: StoryData) {
                 Completed Goals ({completedGoals.length})
               </h3>
               <div className="space-y-3">
-                {completedGoals.map((goal) => {
+                {completedGoals.map((goal, index) => {
                   if (!goal.id) {
                     console.error("Goal missing id:", goal);
                   }
                   return (
                     <div
-                      key={
-                        goal.id ||
-                        `goal-completed-${goal.title}-${Math.random()}`
-                      }
+                      key={goal.id || `goal-completed-${index}-${goal.title}`}
                       className="flex flex-col gap-3 p-4 rounded-xl border border-green-400/30 bg-green-500/[0.06] backdrop-blur-md transition-all card-interactive hover:shadow-[0_4px_16px_rgba(34,197,94,0.15)]"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -214,16 +210,13 @@ export default function GoalsPage(storyData: StoryData) {
                 Inactive Goals ({inactiveGoals.length})
               </h3>
               <div className="space-y-3">
-                {inactiveGoals.map((goal) => {
+                {inactiveGoals.map((goal, index) => {
                   if (!goal.id) {
                     console.error("Goal missing id:", goal);
                   }
                   return (
                     <div
-                      key={
-                        goal.id ||
-                        `goal-inactive-${goal.title}-${Math.random()}`
-                      }
+                      key={goal.id || `goal-inactive-${index}-${goal.title}`}
                       className="flex flex-col gap-3 p-4 rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-md opacity-70 transition-all card-interactive hover:shadow-[0_4px_12px_rgba(59,130,246,0.08)]"
                     >
                       <div className="flex items-start justify-between gap-3">

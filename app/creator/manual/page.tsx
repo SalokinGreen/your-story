@@ -29,8 +29,6 @@ import {
   AbilityGrade,
   DCTier,
   SkillTree,
-  STARTING_UPGRADES_BY_DIFFICULTY,
-  AdventureDifficulty,
   CharacterSheetTemplate,
   NPC,
   NPCStatus,
@@ -42,7 +40,6 @@ import { compressImage, fileToDataUrl } from "@/app/misc/imageCompression";
 import ConfirmDialog from "@/app/components/ConfirmDialog";
 import {
   DEFAULT_PRESET,
-  getPresetById,
   createPresetFromCurrentSettings,
   applyPreset,
 } from "@/app/misc/presets";
@@ -51,16 +48,13 @@ import { DynamicIcon } from "@/app/components/DynamicIcon";
 import FullScreenView from "@/app/components/FullScreenView";
 import { IconPicker } from "@/app/components/IconPicker";
 import { CustomTablesEditor } from "@/app/components/CustomTablesEditor";
-import { DraggableScroll } from "@/app/components/DraggableScroll";
 import { ClockCategorySelector } from "@/app/components/ClockCategorySelector";
 import LoreImageGenerator from "@/app/components/LoreImageGenerator";
 import MassLoreImageGenerator from "@/app/components/MassLoreImageGenerator";
 import PDFImporter from "@/app/components/PDFImporter";
 import {
   ABILITY_GRADE_CONFIG,
-  ABILITY_GRADE_ORDER,
   initializeAbility,
-  formatAbilityCost,
 } from "@/app/misc/abilitySystem";
 import {
   saveLocalAdventure,
@@ -70,15 +64,12 @@ import {
   OPENROUTER_IMAGE_MODELS,
   DEEPINFRA_IMAGE_MODELS,
   estimateImageCost,
-  calculateDeepInfraImageCost,
 } from "@/app/misc/ai_prices";
-import SkillTreeEditor from "@/app/components/SkillTreeEditor";
 import CharacterSheetTemplateEditor from "@/app/components/CharacterSheetTemplateEditor";
 import {
   createCharacterSheetTemplate,
   DEFAULT_CHARACTER_SHEET_TEMPLATE,
 } from "@/app/misc/characterSheetTemplate";
-import { createEmptyTree } from "@/app/misc/skillTree";
 
 type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 type DeepInfraImageModelKey = keyof typeof DEEPINFRA_IMAGE_MODELS;
@@ -791,7 +782,7 @@ function AdventureCreatorContent() {
     itemType: string,
     identifierKey: "name" | "title" | "id" | "text" = "name",
   ): T[] {
-    let updated = [...existingItems];
+    const updated = [...existingItems];
 
     newItems.forEach((newItem) => {
       const command = newItem._command || "merge"; // Default to merge for backward compatibility

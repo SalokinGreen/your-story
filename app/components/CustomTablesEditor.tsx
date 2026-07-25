@@ -143,6 +143,11 @@ export function CustomTablesEditor({
     if (!table) return;
 
     const totalWeight = table.entries.reduce((sum, e) => sum + e.weight, 0);
+    // testRoll only ever runs from an onClick (see the Test Roll button
+    // below), never during render, so the randomness can't produce unstable
+    // render output. The compiler can't see that for a plain function
+    // declared in the component body.
+    // eslint-disable-next-line react-hooks/purity
     const roll = Math.random() * totalWeight;
     let currentWeight = 0;
 

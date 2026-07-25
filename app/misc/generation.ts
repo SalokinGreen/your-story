@@ -17,7 +17,6 @@ import {
   CommandResponse,
   Choice,
   ScenePart,
-  MemoryEntry,
   GMConversationMessage,
   ReasoningDetail,
   ObserverFlag,
@@ -71,11 +70,7 @@ import {
   getStoryProgressCheckInterval,
   resolveSideCallModel,
 } from "@/app/misc/layerSettings";
-import {
-  outputToScenePart,
-  extractThinkingTags,
-  detectRepetition,
-} from "@/app/misc/ai";
+import { detectRepetition } from "@/app/misc/ai";
 import {
   extractVisibleText,
   extractThinkingText,
@@ -89,20 +84,13 @@ import {
   DiceThrowRequest,
   AskQuestionRequest,
   AskQuestionAnswer,
-  GMExecutionResult,
   resolveCheckPerTurnVisibility,
 } from "@/app/misc/gmExecutor";
-import { executeTools, ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecutor";
+import { ToolCall, STATE_CHANGE_TOOLS } from "@/app/misc/toolExecutor";
 import { logger } from "@/app/misc/logger";
 import { getModelConfig } from "@/app/misc/ai_prices";
-import {
-  syncNewMemories,
-} from "@/app/misc/embeddings";
-import {
-  SamplingSettings,
-  getSamplingSettings,
-  filterSettingsForProvider,
-} from "@/app/misc/samplingSettings";
+import { syncNewMemories } from "@/app/misc/embeddings";
+import { SamplingSettings } from "@/app/misc/samplingSettings";
 import { chaosFactorTemperatureDelta } from "@/app/misc/mythic";
 import {
   beginTurnCost,
@@ -703,7 +691,7 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
       const resourceMatch = metadata.match(/use_resource:\s*([^;]+?)(?:;|$)/i);
       if (resourceMatch) {
         // Strip DC notation like "(DC 6)" and clean up the name
-        let resourceName = resourceMatch[1]
+        const resourceName = resourceMatch[1]
           .trim()
           .replace(/\s*\(DC\s*\d+\)/gi, "")
           .replace(
@@ -720,7 +708,7 @@ function parseChoices(content: string, storyData: StoryData): Choice[] {
       const itemMatch = metadata.match(/use_item:\s*([^;]+?)(?:;|$)/i);
       if (itemMatch) {
         // Strip DC notation like "(DC 6)" and clean up the name
-        let itemName = itemMatch[1]
+        const itemName = itemMatch[1]
           .trim()
           .replace(/\s*\(DC\s*\d+\)/gi, "")
           .replace(
@@ -1633,15 +1621,15 @@ async function generateStoryTurnOnce(
   let finalBalance = 0;
   let storyContent = "";
   let rawStoryContent = "";
-  let allToolCalls: ToolCall[] = [];
-  let allToolResponses: CommandResponse[] = [];
-  let allStateChanges: string[] = [];
+  const allToolCalls: ToolCall[] = [];
+  const allToolResponses: CommandResponse[] = [];
+  const allStateChanges: string[] = [];
   let choices: Choice[] = [];
   let storyMeta: GenerationMeta | undefined;
   let toolsMeta: GenerationMeta | undefined;
   let choicesMeta: GenerationMeta | undefined;
   let storyReasoning = "";
-  let storyReasoningDetails: ReasoningDetail[] = [];
+  const storyReasoningDetails: ReasoningDetail[] = [];
   // The story stage's own two messages (the continuation prompt, and the
   // narration it produced), appended to gmPromptMessages so the observer's
   // rewrite continues a conversation that actually contains the text it's
@@ -1951,12 +1939,12 @@ async function generateStoryTurnOnce(
         // GM stage loop - continues until no more tool calls (AI writes final story)
         const MAX_GM_ROUNDS = options.maxToolLoops || 10; // User-configurable safety limit
         let gmRound = 0;
-        let allGMContextParts: string[] = [];
+        const allGMContextParts: string[] = [];
         // NEW: Accumulate visible prose from ALL rounds (not just the final one)
         // This allows GM to narrate while calling tools, building up the story incrementally
-        let gmAccumulatedStory: string[] = [];
+        const gmAccumulatedStory: string[] = [];
         // Local conversation history (will be copied to outer scope at end)
-        let conversationHistory: ChatMessage[] = [];
+        const conversationHistory: ChatMessage[] = [];
         let isComplete = false;
         let noToolCallPrompts = 0; // Track how many times we've prompted for tool calls
         const MAX_NO_TOOL_PROMPTS = 2; // Max times to prompt before giving up
@@ -2177,7 +2165,7 @@ async function generateStoryTurnOnce(
           // Stream the GM response
           let gmContent = "";
           let gmReasoning = "";
-          let gmReasoningDetails: ReasoningDetail[] = [];
+          const gmReasoningDetails: ReasoningDetail[] = [];
           let gmToolCalls: any[] = [];
           let gmResultMeta: any = null;
 
@@ -3059,7 +3047,7 @@ async function generateStoryTurnOnce(
 
       // Handle any pending content that wasn't emitted
       if (!dividerStripped && pendingContent) {
-        let cleaned = pendingContent
+        const cleaned = pendingContent
           .replace(/^[\s\n]*([-*_]{3,})[\s\n]*/g, "")
           .trimStart();
         storyContent = cleaned || pendingContent.trimStart();

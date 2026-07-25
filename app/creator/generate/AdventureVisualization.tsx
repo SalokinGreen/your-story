@@ -22,19 +22,15 @@ export function RelationshipGraph({
 }: RelationshipGraphProps) {
   const [hoveredRelation, setHoveredRelation] = useState<string | null>(null);
 
-  if (!relationships || relationships.length === 0) {
-    return (
-      <div className="text-center text-blue-300/50 py-8">
-        No relationships to display
-      </div>
-    );
-  }
-
-  // Calculate positions in a circle
+  // Calculate positions in a circle. Must run before the empty-state early
+  // return below - a hook placed after a conditional return changes hook
+  // order the moment `relationships` flips between empty and non-empty.
   const nodePositions = useMemo(() => {
     const centerX = 150;
     const centerY = 150;
     const radius = 100;
+
+    if (!relationships) return [];
 
     return relationships.map((rel, i) => {
       const angle = (i / relationships.length) * 2 * Math.PI - Math.PI / 2;
@@ -45,6 +41,14 @@ export function RelationshipGraph({
       };
     });
   }, [relationships]);
+
+  if (!relationships || relationships.length === 0) {
+    return (
+      <div className="text-center text-blue-300/50 py-8">
+        No relationships to display
+      </div>
+    );
+  }
 
   // Get color based on relationship value
   const getRelationColor = (value: number) => {

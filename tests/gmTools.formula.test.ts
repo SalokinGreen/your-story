@@ -3,7 +3,7 @@
  * Tests formula_roll, opposed_formula, and formula_challenge_check
  */
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   executeGMTools,
   DiceThrowRequest,

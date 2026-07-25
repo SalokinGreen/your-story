@@ -1,31 +1,6 @@
 "use client";
 
-import {
-  StoryData,
-  Stat,
-  Resource,
-  InventoryItem,
-  StoryLore,
-  Relationship,
-  AGMTState,
-  CustomTable,
-  Variable,
-  NumberVariable,
-  BooleanVariable,
-  StringVariable,
-  ListVariable,
-  Ability,
-  AbilityCost,
-  AbilityGrade,
-  MemoryEntry,
-  getMemoryContent,
-  NPC,
-  NPCStatus,
-  NPCAttitude,
-  Adventure,
-  DiceMode,
-  PlayerArchetype,
-} from "../../misc/structs";
+import { DiceMode, PlayerArchetype } from "../../misc/structs";
 import { DynamicIcon } from "../../components/DynamicIcon";
 import { ARCHETYPE_INFO } from "../../misc/gmAdvice";
 

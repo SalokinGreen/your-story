@@ -956,7 +956,7 @@ export default function PDFImporter({
   }, []);
 
   // Use a saved import
-  const useSavedImport = useCallback(
+  const applySavedImport = useCallback(
     (imp: SavedPDFImport) => {
       onImportComplete({
         lore: imp.lore,
@@ -3744,7 +3744,7 @@ export default function PDFImporter({
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation();
-                                          useSavedImport(imp);
+                                          applySavedImport(imp);
                                         }}
                                         className="flex-1 px-3 py-1.5 bg-green-600/80 hover:bg-green-600 text-white text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
                                       >

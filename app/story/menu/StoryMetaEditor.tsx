@@ -1,30 +1,7 @@
 "use client";
 
-import {
-  StoryData,
-  Stat,
-  Resource,
-  InventoryItem,
-  StoryLore,
-  Relationship,
-  AGMTState,
-  CustomTable,
-  Variable,
-  NumberVariable,
-  BooleanVariable,
-  StringVariable,
-  ListVariable,
-  Ability,
-  AbilityCost,
-  AbilityGrade,
-  MemoryEntry,
-  getMemoryContent,
-  NPC,
-  NPCStatus,
-  NPCAttitude,
-  Adventure,
-} from "../../misc/structs";
-import { useState, useEffect } from "react";
+import { StoryData, MemoryEntry, getMemoryContent } from "../../misc/structs";
+import { useState } from "react";
 import { DynamicIcon } from "../../components/DynamicIcon";
 
 export default function StoryMetaEditor({

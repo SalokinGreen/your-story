@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { SYSTEM_3D6 } from "../app/misc/rpgSystems";
 
 describe("Advantage/Disadvantage Stacking System", () => {
   beforeEach(() => {

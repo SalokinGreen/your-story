@@ -1,30 +1,7 @@
 "use client";
 
-import {
-  StoryData,
-  Stat,
-  Resource,
-  InventoryItem,
-  StoryLore,
-  Relationship,
-  AGMTState,
-  CustomTable,
-  Variable,
-  NumberVariable,
-  BooleanVariable,
-  StringVariable,
-  ListVariable,
-  Ability,
-  AbilityCost,
-  AbilityGrade,
-  MemoryEntry,
-  getMemoryContent,
-  NPC,
-  NPCStatus,
-  NPCAttitude,
-  Adventure,
-} from "../../misc/structs";
-import { useState, useEffect } from "react";
+import { NPC, NPCStatus, NPCAttitude } from "../../misc/structs";
+import { useState } from "react";
 import { useNotification } from "../../misc/NotificationContext";
 import { DynamicIcon } from "../../components/DynamicIcon";
 import { IconPicker } from "../../components/IconPicker";

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import type { StoryData, StoryLore } from "@/app/misc/structs";
+import type { StoryData } from "@/app/misc/structs";
 
 // Mock the notification system
 const mockNotifications: Array<{ message: string; type: string }> = [];

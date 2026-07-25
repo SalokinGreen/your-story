@@ -8,14 +8,7 @@
  * - Tree traversal and prerequisite checking
  */
 
-import {
-  StoryData,
-  SkillTree,
-  SkillNode,
-  NodeEffects,
-  Ability,
-  InventoryItem,
-} from "./structs";
+import { StoryData, SkillTree, SkillNode, NodeEffects } from "./structs";
 
 // ============================================
 // NODE STATE HELPERS

@@ -11,11 +11,7 @@ import {
   AbilityGrade,
   AbilityCost,
 } from "../misc/structs";
-import {
-  createEmptyTree,
-  createEmptyNode,
-  validateSkillTree,
-} from "../misc/skillTree";
+import { createEmptyNode, validateSkillTree } from "../misc/skillTree";
 import { DynamicIcon } from "./DynamicIcon";
 import FullScreenView from "./FullScreenView";
 import { IconPicker } from "./IconPicker";
@@ -157,8 +153,14 @@ export default function SkillTreeEditor({
 
   // Add new node at center or clicked position
   const handleAddNode = (type: SkillNode["type"] = "stat") => {
+    // handleAddNode only ever runs from an onClick (see the add-node buttons
+    // below), never during render, so the jitter can't produce unstable
+    // render output. The compiler can't see that for a plain function
+    // declared in the component body.
     const position = {
+      // eslint-disable-next-line react-hooks/purity
       x: 40 + Math.random() * 20,
+      // eslint-disable-next-line react-hooks/purity
       y: 40 + Math.random() * 20,
     };
     const newNode = createEmptyNode(position, type);

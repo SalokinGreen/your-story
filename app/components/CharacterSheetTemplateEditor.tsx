@@ -1,15 +1,11 @@
 "use client";
 
 import { useState, useMemo, useCallback, useEffect } from "react";
-import {
-  CharacterSheetTemplate,
-  CharacterSheetField,
-} from "@/app/misc/structs";
+import { CharacterSheetTemplate } from "@/app/misc/structs";
 import {
   parseTemplateFields,
   validateTemplate,
   fillTemplate,
-  getDefaultValues,
   DEFAULT_CHARACTER_SHEET_TEMPLATE,
   CHARACTER_SHEET_PRESET_TEMPLATES,
 } from "@/app/misc/characterSheetTemplate";

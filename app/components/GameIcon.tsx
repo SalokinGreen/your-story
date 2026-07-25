@@ -64,7 +64,7 @@ export const GameIcon: React.FC<GameIconProps> = ({
         // 1. Remove the black background rectangle (first path with no fill or fill="#000")
         // 2. Change fill="#fff" to fill="currentColor"
 
-        let modifiedSvg = svg
+        const modifiedSvg = svg
           // Remove the black background rectangle (matches "M0 0h512v512H0z" pattern)
           .replace(/<path[^>]*d="M0 0h512v512H0z"[^>]*\/?>/g, "")
           // Also try alternate background patterns

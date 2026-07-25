@@ -1,29 +1,6 @@
 "use client";
 
-import {
-  StoryData,
-  Stat,
-  Resource,
-  InventoryItem,
-  StoryLore,
-  Relationship,
-  AGMTState,
-  CustomTable,
-  Variable,
-  NumberVariable,
-  BooleanVariable,
-  StringVariable,
-  ListVariable,
-  Ability,
-  AbilityCost,
-  AbilityGrade,
-  MemoryEntry,
-  getMemoryContent,
-  NPC,
-  NPCStatus,
-  NPCAttitude,
-  Adventure,
-} from "../misc/structs";
+import { StoryData, Adventure } from "../misc/structs";
 import { useRouter } from "next/navigation";
 import { useState, useEffect, useRef } from "react";
 import { useNotification } from "../misc/NotificationContext";
@@ -31,7 +8,6 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { getLocalPlayerId } from "../misc/localPlayerId";
 import { DynamicIcon } from "../components/DynamicIcon";
 import { CustomTablesEditor } from "../components/CustomTablesEditor";
-import ChatDisplaySettings from "./menu/ChatDisplaySettings";
 import BasicSettings, { BasicSettingsForm } from "./menu/BasicSettings";
 import GoalEditor from "./menu/GoalEditor";
 import AbilitiesEditor from "./menu/AbilitiesEditor";

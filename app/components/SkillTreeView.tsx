@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { SkillTree, SkillNode, StoryData } from "../misc/structs";
-import { getNodeState, NodeState, unlockNode } from "../misc/skillTree";
+import { getNodeState, NodeState } from "../misc/skillTree";
 import { DynamicIcon } from "./DynamicIcon";
 
 interface SkillTreeViewProps {

@@ -1,31 +1,12 @@
 "use client";
 
 import {
-  StoryData,
-  Stat,
-  Resource,
-  InventoryItem,
   StoryLore,
-  Relationship,
-  AGMTState,
   CustomTable,
   Variable,
-  NumberVariable,
-  BooleanVariable,
-  StringVariable,
-  ListVariable,
-  Ability,
-  AbilityCost,
-  AbilityGrade,
-  MemoryEntry,
-  getMemoryContent,
-  NPC,
-  NPCStatus,
-  NPCAttitude,
-  Adventure,
   CouchPlayer,
 } from "../../misc/structs";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNotification } from "../../misc/NotificationContext";
 import { DynamicIcon } from "../../components/DynamicIcon";
 import LoreImageGenerator from "../../components/LoreImageGenerator";

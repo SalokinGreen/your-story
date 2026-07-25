@@ -1,15 +1,11 @@
 "use client";
 
 import {
-  Scene,
   ScenePart,
   StoryData,
   StoryLore,
   Choices,
   Choice,
-  Resource,
-  InventoryItem,
-  Ability,
   Preset,
   CommandResponse,
   getMemoryContent,
@@ -40,7 +36,6 @@ import {
   pruneLockouts,
   releaseFloor,
   takeFloor,
-  FLOOR_STEAL_COOLDOWN_MS,
 } from "../misc/multiplayer/floorControl";
 import {
   askFate,
@@ -52,10 +47,7 @@ import {
   type Likelihood,
   type ElementCategory,
 } from "../misc/mythic";
-import {
-  NARRATION_MODEL_KEY,
-  type ResolvedTier,
-} from "../misc/reasoningTiers";
+import { NARRATION_MODEL_KEY, type ResolvedTier } from "../misc/reasoningTiers";
 import Story from "./story";
 import LorePage from "./lore";
 import GoalsPage from "./goals";
@@ -107,7 +99,6 @@ function getModelsFromPreset() {
 import { DEFAULT_PRESET } from "../misc/presets";
 import ConfirmDialog from "../components/ConfirmDialog";
 import SyncConflictModal from "../components/SyncConflictModal";
-import SyncIndicator from "../components/SyncIndicator";
 import { getModelConfig } from "../misc/ai_prices";
 import { processLoreTriggers } from "../misc/lore";
 import { fillTemplate } from "../misc/characterSheetTemplate";
@@ -1935,7 +1926,7 @@ function StoryPageContent() {
     });
 
     // Track partial scene part as we stream
-    let partialPart: ScenePart = {
+    const partialPart: ScenePart = {
       content: "",
       imageUrl: "",
       user: false,
@@ -3229,7 +3220,7 @@ function StoryPageContent() {
     processLoreTriggers(storyData, addNotification);
 
     // Track partial scene part as we stream
-    let partialPart: ScenePart = {
+    const partialPart: ScenePart = {
       content: "",
       imageUrl: "",
       user: false,
@@ -3243,7 +3234,7 @@ function StoryPageContent() {
   function handleSelect(index: number): void {
     const key = choices.choices[index]?.text;
     if (!key) return;
-    let newInput = input;
+    const newInput = input;
     if (!newInput[key]) {
       newInput[key] = true;
     }
@@ -3473,7 +3464,7 @@ function StoryPageContent() {
         userChoice: userChoiceContent.substring(0, 100),
       });
 
-      let partialPart: ScenePart = {
+      const partialPart: ScenePart = {
         content: "",
         imageUrl: "",
         user: false,
@@ -3537,7 +3528,7 @@ function StoryPageContent() {
 
     // Track partial scene part as we stream
     // Preserve GM context from the popped part - this is the dice rolls and reasoning
-    let partialPart: ScenePart = {
+    const partialPart: ScenePart = {
       content: "",
       imageUrl: "",
       user: false,

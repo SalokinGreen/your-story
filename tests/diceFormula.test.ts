@@ -3,7 +3,6 @@ import {
   parseFormula,
   rollFormula,
   rollFormulaAsync,
-  rollParsedFormula,
   validateFormula,
   extractVariables,
   createCharacterResolver,

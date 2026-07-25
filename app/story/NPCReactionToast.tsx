@@ -133,7 +133,7 @@ export function NPCReactionContainer({
     <div className="fixed bottom-20 right-4 z-50 flex flex-col-reverse gap-3 pointer-events-none">
       {reactions.map((reaction, index) => (
         <NPCReactionToast
-          key={`${reaction.npcId}-${index}-${Date.now()}`}
+          key={`${reaction.npcId}-${index}`}
           reaction={reaction}
           onDismiss={() => onDismissReaction(index)}
         />

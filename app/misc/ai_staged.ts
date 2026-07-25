@@ -11,7 +11,6 @@
   CountdownTimer,
   PendingDirectorMove,
 } from "@/app/misc/structs";
-import { formatResponsesForAI } from "@/app/misc/commandResponses";
 import { getModelConfig } from "@/app/misc/ai_prices";
 import {
   ARCHETYPE_INFO,

@@ -1,7 +1,6 @@
 import {
   StoryData,
   StartingChoice,
-  Ability,
   StoryLore,
   Goal,
   Relationship,

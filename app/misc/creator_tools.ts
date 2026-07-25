@@ -5,21 +5,6 @@
  * tool calls instead of raw JSON output.
  */
 
-import {
-  Stat,
-  Resource,
-  InventoryItem,
-  Ability,
-  StoryLore,
-  Goal,
-  Relationship,
-  Variable,
-  Preset,
-  SkillTree,
-  CustomTable,
-  UpgradeSettings,
-  StartingChoice,
-} from "@/app/misc/structs";
 
 // Tool parameter types
 export interface ToolDefinition {
