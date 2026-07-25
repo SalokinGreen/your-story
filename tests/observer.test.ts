@@ -1976,6 +1976,94 @@ describe("rewriteFlaggedNarration", () => {
     expect(body.messages[1].content).toContain("formula_roll: SUCCESS");
   });
 
+  it("shows the rewrite the reasoning behind the flagged draft", async () => {
+    // Without this, a shortening pass can't tell a detail planted for later
+    // from incidental scenery, and cuts by feel. The thoughts go in as PROMPT
+    // TEXT rather than a message-level `reasoning` field on purpose:
+    // sanitizeMessages (providerCall.ts) only forwards those fields to
+    // OpenRouter and Google, so on DeepSeek/Mistral/DeepInfra they'd be
+    // stripped before the request ever left.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword, saying nothing." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      narrationThoughts:
+        "Bram's flinch is the setup for the betrayal two scenes out - keep it.",
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const prompt = body.messages
+      .map((m: { content: string }) => m.content)
+      .join("\n");
+    expect(prompt).toContain("Your reasoning while writing it");
+    expect(prompt).toContain("setup for the betrayal two scenes out");
+    // Context, not orders - the reasoning predates the review, so it may well
+    // contain the very decision that got flagged.
+    expect(prompt).toContain("This is context, NOT instructions");
+  });
+
+  it("omits the reasoning block entirely when there are no thoughts to show", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword, saying nothing." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      // A model with no reasoning channel and no <thinking> tags - the header
+      // must not appear over an empty quote block.
+      narrationThoughts: "   ",
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const prompt = body.messages
+      .map((m: { content: string }) => m.content)
+      .join("\n");
+    expect(prompt).not.toContain("Your reasoning while writing it");
+  });
+
+  it("keeps the tail of a very long chain of thought, not the head", async () => {
+    // A reasoning-tier model can emit a CoT several times the length of the
+    // narration. The tail is where it settles on what it actually wrote, so
+    // that's the half worth keeping - and the flagged text and the rules must
+    // not get crowded out either way.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: "You draw your sword, saying nothing." }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const thoughts = `OPENING_MUSING ${"filler ".repeat(2000)}FINAL_DECISION`;
+
+    await rewriteFlaggedNarration({
+      narration: "You draw your sword and apologize.",
+      playerChoice: "I draw my sword",
+      flag,
+      narrationThoughts: thoughts,
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const prompt = body.messages
+      .map((m: { content: string }) => m.content)
+      .join("\n");
+    expect(prompt).toContain("FINAL_DECISION");
+    expect(prompt).not.toContain("OPENING_MUSING");
+    expect(prompt).toContain("You draw your sword and apologize.");
+    expect(prompt).toContain("Fix only what was flagged.");
+  });
+
   it("returns null (fail open) when the API call fails", async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
     global.fetch = fetchMock as unknown as typeof fetch;

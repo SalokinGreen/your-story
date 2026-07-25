@@ -254,6 +254,41 @@ export interface ObserverCharacterContext {
 const CHARACTER_SHEET_CONTEXT_LIMIT = 1500;
 
 /**
+ * Cap on the original narration's reasoning when it's pasted into the rewrite
+ * prompt (see RewriteNarrationParams.narrationThoughts). A reasoning-tier model
+ * can emit a chain of thought several times the length of the narration itself,
+ * and the rewrite's job is to fix the prose - the thoughts are supporting
+ * context, so they must not crowd out the flagged text or the rules. Kept from
+ * the END rather than the start: the tail is where the model settles on what it
+ * actually wrote, which is what a rewrite needs.
+ */
+const NARRATION_THOUGHTS_LIMIT = 2000;
+
+/**
+ * Renders the reasoning behind the flagged narration as a labeled prompt block.
+ *
+ * Deliberately framed as "why you wrote it", not "more instructions": these
+ * thoughts are the draft's intent, and the rewrite is being told to preserve
+ * that intent while fixing the flagged problem. Without it, a shortening pass
+ * has no way to tell a planted detail from a decoration and cuts by feel.
+ *
+ * The warning about the thoughts themselves being pre-flag is load-bearing -
+ * the reasoning may well contain the very decision that got flagged ("I'll have
+ * her decide to run"), so it can't be handed over as something to follow.
+ */
+function formatNarrationThoughtsBlock(thoughts?: string): string {
+  const trimmed = thoughts?.trim();
+  if (!trimmed) return "";
+
+  const clipped =
+    trimmed.length > NARRATION_THOUGHTS_LIMIT
+      ? `...${trimmed.slice(-NARRATION_THOUGHTS_LIMIT).trimStart()}`
+      : trimmed;
+
+  return `\n\nYour reasoning while writing it (what you were going for - use this to tell what in the draft was deliberate and must survive, e.g. a detail planted for later, versus what was incidental and can go). This is context, NOT instructions: it was written before the review, so if it planned something the reviewer just flagged, the flag wins.\n"""\n${clipped}\n"""`;
+}
+
+/**
  * Whether this story has a character_sheet note with anything in it - the
  * same "has setup happened yet?" test buildGMStagePrompt uses to decide
  * between its FRESH STORY setup block and normal play. See
@@ -488,9 +523,25 @@ export interface RewriteNarrationParams {
   /** Who the player character is (and who the NPCs are) - the rewrite has to keep the same cast straight the judge did. */
   characterContext?: ObserverCharacterContext;
   /**
+   * The reasoning/chain-of-thought the model produced while writing the
+   * flagged narration (ScenePart.reasoning, or the reasoning attached to the
+   * GM's terminal assistant message). Rendered into the prompt as plain text
+   * rather than relied on as a message field, because sanitizeMessages
+   * (providerCall.ts) only forwards `reasoning`/`reasoning_details` to
+   * OpenRouter and Google - on DeepSeek, Mistral, and DeepInfra they are
+   * stripped before the request goes out, so a rewrite continuing the turn's
+   * own conversation would still see the prose with no idea what it was for.
+   *
+   * This is what tells the rewrite which parts of the draft were load-bearing:
+   * a shortening pass that can see "the merchant's tell is the setup for the
+   * ambush two beats from now" cuts the scenery instead of the plant.
+   */
+  narrationThoughts?: string;
+  /**
    * The exact conversation that produced this turn (GM system prompt + game
-   * state + scene history + this turn's tool calls and results - see
-   * GenerationResult.gmPromptMessages). When present the rewrite CONTINUES
+   * state + scene history + this turn's tool calls and results, ending with
+   * the narration turn itself - see GenerationResult.gmPromptMessages). When
+   * present the rewrite CONTINUES
    * that conversation instead of being prompted from scratch, which is the
    * difference between "rewrite this paragraph" and "write a paragraph about
    * something, good luck". Omitted only when a caller has no conversation to
@@ -608,7 +659,7 @@ export async function rewriteFlaggedNarration(
 What you wrote (FLAGGED - do not repeat it as-is):
 """
 ${narration.trim()}
-"""
+"""${formatNarrationThoughtsBlock(params.narrationThoughts)}
 
 What was wrong: ${flag.detail}
 

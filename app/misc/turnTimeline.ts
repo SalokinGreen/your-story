@@ -136,6 +136,21 @@ export function extractVisibleText(raw: string): string {
     .trim();
 }
 
+/**
+ * The mirror of extractVisibleText: the <thinking> segments only, with the
+ * player-visible prose dropped. Used to recover the reasoning behind a turn
+ * from models that write their thinking inline in `content` rather than in a
+ * native reasoning channel - see generation.ts, which hands it to the
+ * observer's rewrite so the rewrite knows what the draft was trying to do.
+ */
+export function extractThinkingText(raw: string): string {
+  return parseTaggedContent(raw)
+    .filter((b) => b.kind === "thinking")
+    .map((b) => b.content)
+    .join("\n\n")
+    .trim();
+}
+
 function withIds(blocks: Array<Omit<TimelineBlock, "id">>): TimelineBlock[] {
   return blocks.map((b) => ({ id: nextId(), ...b }));
 }

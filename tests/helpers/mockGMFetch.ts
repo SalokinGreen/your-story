@@ -34,6 +34,12 @@ export interface ScriptedToolCall {
 export interface ScriptedGMRound {
   /** GM "thinking"/prose content streamed this round. */
   content?: string;
+  /**
+   * Native reasoning/chain-of-thought streamed this round, i.e. what a
+   * reasoning-tier model emits on its own channel rather than inline in
+   * `content`. generation.ts attaches it to the round's assistant message.
+   */
+  reasoning?: string;
   /** Tool calls the GM makes this round. Omit/empty => a turn-ending round (no tool calls). */
   toolCalls?: ScriptedToolCall[];
   /** Overrides for this round's usage/meta; a minimal valid GenerationMeta fills in the rest. */
@@ -61,6 +67,11 @@ function buildGMRoundStream(round: ScriptedGMRound): ReadableStream<Uint8Array> 
   const encoder = new TextEncoder();
   const frames: string[] = [];
 
+  // Reasoning first - a real provider streams the chain of thought before the
+  // content it produced.
+  if (round.reasoning) {
+    frames.push(sseFrame({ type: "reasoning", content: round.reasoning }));
+  }
   if (round.content) {
     frames.push(sseFrame({ type: "content", content: round.content }));
   }
@@ -88,6 +99,22 @@ function buildGMRoundStream(round: ScriptedGMRound): ReadableStream<Uint8Array> 
       controller.close();
     },
   });
+}
+
+/**
+ * A ready-to-return Response carrying one scripted round in parseSSEStream's
+ * wire format. Exported for the Story stage, which streams from the same
+ * endpoint as the GM stage but without a `tools` array - so a test that needs
+ * the separate-narration-call path has to speak for it itself rather than
+ * through createMockGMFetch's GM-stage script.
+ */
+export function sseStreamResponse(round: ScriptedGMRound): Response {
+  return {
+    ok: true,
+    status: 200,
+    text: async () => "",
+    body: buildGMRoundStream(round),
+  } as unknown as Response;
 }
 
 export interface RecordedRequestBody {

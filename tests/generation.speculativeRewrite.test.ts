@@ -26,7 +26,11 @@
  */
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { generateStoryTurn, GenerationOptions } from "@/app/misc/generation";
-import { createMockGMFetch } from "./helpers/mockGMFetch";
+import {
+  createMockGMFetch,
+  sseStreamResponse,
+  type ScriptedGMRound,
+} from "./helpers/mockGMFetch";
 import { DEFAULT_OBSERVER_SETTINGS } from "@/app/misc/observer";
 import type { StoryData } from "@/app/misc/structs";
 
@@ -111,10 +115,12 @@ function isRewrite(call: ObserverCall): boolean {
  * swallow the GM-stage calls too.
  */
 function createFetchMock(
-  narration: string,
+  narration: string | ScriptedGMRound[],
   respond: (call: ObserverCall) => Promise<unknown>,
 ) {
-  const gm = createMockGMFetch([{ content: narration }]);
+  const gm = createMockGMFetch(
+    typeof narration === "string" ? [{ content: narration }] : narration,
+  );
   const observerCalls: ObserverCall[] = [];
 
   const fetchMock = vi.fn(async (url: unknown, init?: RequestInit) => {
@@ -289,6 +295,44 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
     expect(observerCalls.filter(isLengthJudge)).toHaveLength(0);
   });
 
+  it("hands the rewrite the reasoning behind the draft it's cutting", async () => {
+    // A shortening pass that can't see why the draft said what it said cuts by
+    // feel, and there's no reason for it to be blind: the reasoning was already
+    // collected during the turn. Both channels a model can use are covered -
+    // native reasoning tokens, and thinking written inline in <thinking> tags.
+    const { fetchMock, observerCalls } = createFetchMock(
+      [
+        {
+          reasoning: "NATIVE_COT: Bram's flinch is the betrayal setup - keep it.",
+          content: `<thinking>TAGGED_COT: hold the storm back until scene four.</thinking>${LONG_NARRATION}`,
+        },
+      ],
+      async (call) => {
+        if (isRewrite(call)) return REWRITTEN;
+        if (isLengthJudge(call)) return passingJudgeContent(false);
+        return passingJudgeContent(true);
+      },
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await generateStoryTurn(
+      createTestStory(),
+      "I pick the lock",
+      baseOptions,
+      {},
+    );
+
+    expect(result.content).toBe(REWRITTEN);
+
+    const rewritePrompt = observerCalls
+      .filter(isRewrite)[0]
+      .body.messages.map((m) => m.content)
+      .join("\n");
+    expect(rewritePrompt).toContain("Your reasoning while writing it");
+    expect(rewritePrompt).toContain("NATIVE_COT");
+    expect(rewritePrompt).toContain("TAGGED_COT");
+  });
+
   it("does not reuse the speculation for a different major flag", async () => {
     // The length judge justifies the overage, but the agency judge flags the
     // turn: the corrective prompt is a different complaint entirely, so the
@@ -332,5 +376,178 @@ describe("speculative shortened rewrite - generateStoryTurn integration", () => 
     expect(result.scenePart.correctedObserverFlags?.[0]?.type).toBe(
       "player_agency",
     );
+  });
+});
+
+/**
+ * The other path through Stage 1: the GM's terminal round makes tool calls and
+ * writes no prose, so narration comes from a SEPARATE continuation call
+ * (generation.ts, "Stage 1: Continuing GM conversation for story generation")
+ * rather than from the GM's own output.
+ *
+ * That call used to leave no trace in gmPromptMessages, which was snapshotted
+ * from gmConversationHistory before it ran - so the observer's rewrite
+ * "continued" a conversation that stopped immediately before the narration, and
+ * only ever saw the flagged prose as text quoted at it in the correction
+ * message, with none of the reasoning that produced it.
+ */
+describe("the narration turn in the rewrite's conversation", () => {
+  /**
+   * Speaks for all three stages: the GM stage (via createMockGMFetch's script,
+   * fingerprinted by a `tools` array), the story stage (the same endpoint with
+   * no `tools`), and the observer's non-streaming /api/generate calls.
+   *
+   * The story stage is served exactly once. The post-rewrite choices
+   * regeneration hits the same endpoint the same way, and letting it collect a
+   * second copy of the narration would quietly make this mock lie about what
+   * the story stage returned; generateStoryTurn swallows that failure by
+   * design ("keeping original choices").
+   */
+  function createNarrationStageFetchMock(
+    gmRounds: ScriptedGMRound[],
+    story: ScriptedGMRound,
+    respond: (call: ObserverCall) => Promise<unknown>,
+  ) {
+    const gm = createMockGMFetch(gmRounds);
+    const observerCalls: ObserverCall[] = [];
+    let storyServed = false;
+
+    const fetchMock = vi.fn(async (url: unknown, init?: RequestInit) => {
+      const urlStr = String(url);
+      const body = init?.body ? JSON.parse(init.body as string) : {};
+
+      if (urlStr === "/api/generate") {
+        const call: ObserverCall = {
+          body,
+          signal: init?.signal ?? undefined,
+        };
+        observerCalls.push(call);
+        return {
+          ok: true,
+          json: async () => ({ content: await respond(call) }),
+        } as unknown as Response;
+      }
+
+      if (urlStr.includes("/api/generate-stream") && !body.tools) {
+        if (storyServed) {
+          throw new Error(
+            "unscripted non-GM /api/generate-stream call (the choices stage, most likely)",
+          );
+        }
+        storyServed = true;
+        return sseStreamResponse(story);
+      }
+
+      const gmFetch = gm.fetchMock as unknown as (
+        url: unknown,
+        init?: RequestInit,
+      ) => Promise<Response>;
+      return gmFetch(url, init);
+    });
+
+    return { fetchMock, observerCalls };
+  }
+
+  const gmRounds: ScriptedGMRound[] = [
+    {
+      toolCalls: [
+        {
+          name: "formula_roll",
+          arguments: { formula: "1d20+3", dc: 12, reason: "Pick the lock" },
+        },
+      ],
+    },
+    // Terminal round: tools done, no prose - which is what sends Stage 1 down
+    // the separate-call path.
+    {},
+  ];
+
+  const storyRound: ScriptedGMRound = {
+    reasoning: "STORY_COT: the draft plants the cold draft for the reveal.",
+    content: LONG_NARRATION,
+  };
+
+  afterEach(() => {
+    global.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
+
+  it("ends the rewrite's conversation with the narration it's being asked to rewrite", async () => {
+    const { fetchMock, observerCalls } = createNarrationStageFetchMock(
+      gmRounds,
+      storyRound,
+      async (call) => {
+        if (isRewrite(call)) return REWRITTEN;
+        if (isLengthJudge(call)) return passingJudgeContent(false);
+        return passingJudgeContent(true);
+      },
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const result = await generateStoryTurn(
+      createTestStory(),
+      "I pick the lock",
+      baseOptions,
+      {},
+    );
+
+    expect(result.content).toBe(REWRITTEN);
+
+    const messages = observerCalls.filter(isRewrite)[0].body.messages as {
+      role: string;
+      content: string;
+    }[];
+
+    // Last message is the correction; the two before it are the story stage's
+    // own round trip - the prompt that asked for narration, and the narration.
+    const correction = messages[messages.length - 1];
+    expect(correction.role).toBe("user");
+    expect(correction.content).toContain("flagged by an automated reviewer");
+
+    const narrationTurn = messages[messages.length - 2];
+    expect(narrationTurn.role).toBe("assistant");
+    expect(narrationTurn.content).toBe(LONG_NARRATION);
+    expect(messages[messages.length - 3].role).toBe("user");
+
+    // The turn's tool round trip is still in there ahead of all that - the
+    // narration turn is appended to the conversation, not a replacement for it.
+    expect(
+      messages.some((m) => m.role === "tool" || Boolean((m as { tool_calls?: unknown[] }).tool_calls)),
+    ).toBe(true);
+  });
+
+  it("carries the story stage's own reasoning into the rewrite prompt", async () => {
+    // The narration turn above also carries `reasoning`, but sanitizeMessages
+    // (providerCall.ts) only forwards that field to OpenRouter and Google - so
+    // the prompt text is what actually guarantees delivery.
+    const { fetchMock, observerCalls } = createNarrationStageFetchMock(
+      gmRounds,
+      storyRound,
+      async (call) => {
+        if (isRewrite(call)) return REWRITTEN;
+        if (isLengthJudge(call)) return passingJudgeContent(false);
+        return passingJudgeContent(true);
+      },
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await generateStoryTurn(
+      createTestStory(),
+      "I pick the lock",
+      baseOptions,
+      {},
+    );
+
+    const rewriteCall = observerCalls.filter(isRewrite)[0];
+    const prompt = rewriteCall.body.messages
+      .map((m) => m.content)
+      .join("\n");
+    expect(prompt).toContain("Your reasoning while writing it");
+    expect(prompt).toContain("STORY_COT");
+
+    const narrationTurn = rewriteCall.body.messages[
+      rewriteCall.body.messages.length - 2
+    ] as { reasoning?: string };
+    expect(narrationTurn.reasoning).toContain("STORY_COT");
   });
 });
