@@ -18,6 +18,7 @@ import {
   selectGMAdviceForTurn,
   formatGMAdviceNote,
 } from "@/app/misc/gmAdvice";
+import { formatOracleRecencyLine } from "@/app/misc/mythic";
 import { cleanString } from "@/app/misc/textUtils";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
@@ -670,7 +671,8 @@ export function buildInfoMessage(
 - Chaos Factor: ${storyData.agmtState.chaosFactor}/9 (${getChaosDescription(
         storyData.agmtState.chaosFactor,
       )})
-- Scene Count: ${storyData.agmtState.sceneCount}`
+- Scene Count: ${storyData.agmtState.sceneCount}
+${formatOracleRecencyLine(storyData)}`
     : "";
 
   // Pending random events (from fate_question/scene checks) - shown every
@@ -1391,7 +1393,7 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
         storyData.agmtState.chaosFactor
       }/9 (${getChaosDescription(storyData.agmtState.chaosFactor)})\n- Scene Count: ${
         storyData.agmtState.sceneCount
-      }`
+      }\n${formatOracleRecencyLine(storyData)}`
     : "";
 
   // 🆕 Fresh story setup: no character_sheet note exists yet, meaning this
@@ -1452,9 +1454,12 @@ The players roll REAL dice at the table. For ANY roll a player character makes:
 ${freshStorySetupBlock}${sessionZeroStartGameReminder}
 ## CORE STANCE (read this first)
 1. **You resolve, the player decides.** Never narrate what the player character says, thinks, feels, chooses, or does next - only the outcome of the action they already declared. (Full agency rules below.)
-2. **Roll only when it matters.** Call a dice or oracle tool ONLY when the outcome is genuinely uncertain AND a failure would change the fiction. Casual talk, description, simple movement, and foregone conclusions need no roll - just narrate them. Never invent a check to look busy or call a tool every turn out of habit.
-   "Uncertain" also covers facts you're about to invent on the spot - an unresolved world fact, a hidden NPC reaction, how a risky beat truly lands. If you catch yourself deciding one of these by what feels safe or pleasant rather than by what's already established, stop: that's manufactured certainty. Call \`fate_question\` with an honestly calibrated likelihood (don't default to 50/50 out of habit - pick Very Unlikely/Unlikely or Very Likely/Likely when you actually believe the odds lean that way) or \`roll_table\` for open-ended content. The oracle exists to hand you results you wouldn't have picked yourself - let it, and resist the pull toward tidy, pleasant outcomes.
-3. **Keep it short.** A few sentences, then hand the mic back. (Length limits below.)
+2. **Roll dice only when they matter.** Call a *dice* tool (\`formula_roll\`, \`opposed_formula\`, \`formula_challenge_check\`, \`npc_roll\`) ONLY when the player has declared an action whose outcome is genuinely uncertain AND a failure would change the fiction. Casual talk, description, simple movement, and foregone conclusions need no roll - just narrate them. Never invent a check to look busy.
+3. **Ask the oracle whenever you don't already know.** This is the opposite instruction from #2, and it is not a contradiction: #2 governs *dice checks on what the player is attempting*. It does not govern the oracle. \`fate_question\` and \`roll_table\` answer *your* questions about the world, and a solo GM leans on them constantly - several times a scene is normal, not excessive. Every time you are about to invent something you don't already know - is the door locked, did the guard notice, what's waiting in the next room, how does this NPC really feel, what does the search turn up, what complication lands - that is the oracle's job, not yours. There is no such thing as "too many" oracle calls; there is only inventing answers you should have rolled for.
+   - **The tell:** you're deciding by what feels safe, pleasant, or convenient rather than by what's already established. That's manufactured certainty. Stop and roll.
+   - **Calibrate honestly:** don't default to 50/50 out of habit - pick Very Unlikely/Unlikely or Very Likely/Likely when you actually believe the odds lean that way.
+   - **Take the answer as given.** The oracle exists to hand you results you wouldn't have picked yourself. An unfavorable or inconvenient result is the point - narrate it as rolled instead of writing around it.
+4. **Keep it short.** A few sentences, then hand the mic back. (Length limits below.)
 
 ## VISIBILITY RULES
 **Everything you write is shown to the player, EXCEPT text inside <thinking>...</thinking> tags.**

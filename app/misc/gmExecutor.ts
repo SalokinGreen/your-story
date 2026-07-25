@@ -94,6 +94,7 @@ import {
   generateEventMeaning,
   MYTHIC_TABLE_NAMES,
   ElementCategory,
+  markOracleConsulted,
 } from "./mythic";
 import { getTableByName, rollOnCustomTable } from "./tableRoller";
 import {
@@ -767,6 +768,13 @@ export interface GMExecutionResult {
   dramaticMoment?: boolean;
 }
 
+// Tools whose successful execution counts as "the GM consulted the oracle"
+// for the recency counter in the prompt's Oracle State section. Same pair
+// the observer's missing_oracle_or_table check watches (observer.ts) - both
+// serve the same purpose of letting randomness rather than narrative
+// convenience settle an uncertain question.
+const ORACLE_TOOL_NAMES = new Set(["fate_question", "roll_table"]);
+
 /**
  * Execute GM stage tool calls and return results for the story stage
  */
@@ -1269,6 +1277,14 @@ export async function executeGMTools(
           call.function.name
         } failed - ${errorMessage}]\n[Debug: params=${JSON.stringify(params)}]`,
       };
+    }
+
+    // Stamp oracle recency here rather than inside the two executors:
+    // roll_table returns from three places (custom table, built-in table,
+    // table-not-found) and only the successful ones should count as having
+    // consulted the oracle.
+    if (result.success && ORACLE_TOOL_NAMES.has(result.toolName)) {
+      markOracleConsulted(modified);
     }
 
     results.push(result);
