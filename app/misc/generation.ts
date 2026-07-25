@@ -48,6 +48,7 @@ import {
   buildObserverWarningNote,
   buildObserverCorrectionNote,
   rewriteFlaggedNarration,
+  prospectiveLengthFlag,
   reconcileGmConversationAfterRewrite,
   reconcileGmThinkingAfterRewrite,
   settingsFor,
@@ -965,6 +966,110 @@ export async function generateStoryTurn(
     const resetPossible =
       !suspensionReason && canObserverTriggerReset(observerSettings);
 
+    // ---- SPECULATIVE SHORTENED REWRITE -------------------------------
+    // The response_length check has a free, deterministic trip (the word
+    // counter) followed by an LLM judge that decides whether the overage was
+    // earned. The flag's text depends only on the counter, never on the
+    // judge - so the moment the counter trips we already know exactly what a
+    // length rewrite would be asked to do, and the only open question is
+    // whether it'll be wanted at all.
+    //
+    // Waiting for that answer used to cost the player two full round trips
+    // back to back: the judge, then the rewrite. Instead, start the shortened
+    // version NOW, concurrently with the observer, and let the verdict decide
+    // what to do with it - keep it if the judge confirms the turn was too
+    // long, throw it away (and abort the call) if the judge justifies the
+    // overage or some other flag wins instead. The rewrite's latency hides
+    // behind the judge's, and the turn's behavior is unchanged either way:
+    // nothing is swapped in that the observer didn't ask for.
+    //
+    // Gated on a rewrite actually being reachable - the check being enabled
+    // and reset-eligible, and the reset budget not already spent - so a
+    // speculation is never fired for a correction that could not happen.
+    const lengthCheckSettings = settingsFor(observerSettings, "response_length");
+    const speculativeFlag =
+      resetPossible &&
+      resetAttempts < MAX_OBSERVER_RESETS &&
+      lengthCheckSettings.triggersReset
+        ? prospectiveLengthFlag(
+            result.content,
+            options.replyLength,
+            lengthCheckSettings,
+          )
+        : null;
+
+    let speculativeRewrite: {
+      promise: Promise<string | null>;
+      abort: () => void;
+    } | null = null;
+
+    if (speculativeFlag) {
+      logger.action(
+        "Turn is over the reply-length ceiling - starting a shortened rewrite speculatively",
+        { detail: speculativeFlag.detail },
+      );
+
+      // Its own controller so an unwanted speculation can be cancelled
+      // without touching the turn, chained to the turn's signal so a real
+      // abort (player cancelled) still tears it down.
+      const speculationAbort = new AbortController();
+      const forwardAbort = () => speculationAbort.abort();
+      if (options.abortSignal?.aborted) {
+        speculationAbort.abort();
+      } else {
+        options.abortSignal?.addEventListener("abort", forwardAbort, {
+          once: true,
+        });
+      }
+
+      const promise = rewriteFlaggedNarration({
+        narration: result.content,
+        playerChoice: userChoice,
+        gmStoryContext: result.gmStoryContext,
+        flag: speculativeFlag,
+        replyLength: options.replyLength,
+        storytellerMode: options.storytellerMode,
+        characterContext: observerCharacterContext,
+        conversationMessages: result.gmPromptMessages,
+        // The other reviewers are still deciding while this runs, and the turn
+        // only ever gets one rewrite - so their complaints ride along as
+        // conditional instructions ("fix this too, if it's also true here").
+        // Whichever of them are actually reset-eligible right now: a check
+        // that's off, or that can't reset, has no business steering a rewrite.
+        // Their verdicts still stand on their own afterwards - a flag they DO
+        // raise is still attached to the turn, since nothing here re-judges
+        // the corrected text and a preventive clause is not proof of a fix.
+        alsoFixIfPresent: (
+          ["player_agency", "outcome_narration_mismatch"] as const
+        ).filter((type) => {
+          const s = settingsFor(observerSettings, type);
+          return s.enabled && s.triggersReset;
+        }),
+        apiOptions: { ...observerApiOptions, abortSignal: speculationAbort.signal },
+      })
+        // Attached immediately, before anything awaits this: a speculation
+        // that fails (or is aborted as unwanted) must never surface as an
+        // unhandled rejection, and a failure here is just "no speculation" -
+        // the normal rewrite path takes over.
+        .catch((speculationError) => {
+          logger.action("Speculative shortened rewrite failed", {
+            error:
+              speculationError instanceof Error
+                ? speculationError.message
+                : String(speculationError),
+          });
+          return null;
+        })
+        .finally(() => {
+          options.abortSignal?.removeEventListener("abort", forwardAbort);
+        });
+
+      speculativeRewrite = {
+        promise,
+        abort: () => speculationAbort.abort(),
+      };
+    }
+
     let flags: ObserverFlag[] = [];
     if (resetPossible) {
       try {
@@ -1020,6 +1125,29 @@ export async function generateStoryTurn(
           settingsFor(observerSettings, f.type).triggersReset,
       );
 
+      // The verdict on the speculation fired above. It's only usable when the
+      // flag that actually won is the length flag it was written against - a
+      // justified overage (no flag), or a different major flag whose
+      // corrective prompt says something else entirely, both mean the
+      // shortened version gets thrown away and the original narration stands.
+      const useSpeculativeRewrite = Boolean(
+        speculativeRewrite &&
+          majorFlag?.type === "response_length" &&
+          resetAttempts < MAX_OBSERVER_RESETS,
+      );
+      if (speculativeRewrite && !useSpeculativeRewrite) {
+        logger.action(
+          "Discarding speculative shortened rewrite - the observer didn't ask for one",
+          {
+            reason: majorFlag
+              ? `a ${majorFlag.type} flag won instead`
+              : "the overage was justified",
+          },
+        );
+        speculativeRewrite.abort();
+        speculativeRewrite = null;
+      }
+
       if (majorFlag && resetAttempts < MAX_OBSERVER_RESETS) {
         resetAttempts++;
         logger.action("Observer flagged turn - attempting a targeted rewrite", {
@@ -1044,7 +1172,17 @@ export async function generateStoryTurn(
         // add any brainpower, so it skips straight to the full-turn reset
         // below, which also forces the retry onto a higher tier.
         let rewrittenNarration: string | null = null;
-        if (majorFlag.type !== "tier_escalation_missed") {
+        if (useSpeculativeRewrite && speculativeRewrite) {
+          // Already in flight since before the observer ran - the judge just
+          // confirmed the turn really was too long, so this is the rewrite
+          // that would have been started here anyway, minus the wait.
+          rewrittenNarration = await speculativeRewrite.promise;
+          logger.action(
+            rewrittenNarration
+              ? "Speculative shortened rewrite confirmed by the observer"
+              : "Speculative shortened rewrite came back empty, falling back to full-turn reset",
+          );
+        } else if (majorFlag.type !== "tier_escalation_missed") {
           try {
             rewrittenNarration = await rewriteFlaggedNarration({
               narration: result.content,

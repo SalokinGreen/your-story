@@ -399,6 +399,44 @@ export function observerSuspensionReason(params: {
   return null;
 }
 
+/**
+ * The deterministic half of checkResponseLength: the word count, the ceiling
+ * math, and the exact flag the check WOULD produce if the justification judge
+ * came back "unjustified". Pure, free, and synchronous - it makes no API call
+ * and reads nothing but the narration and the settings.
+ *
+ * Split out because the flag's text depends only on the counter, never on the
+ * judge, so generation.ts can know what a length flag would say before the
+ * judge has been asked. That's what lets it start the shortened rewrite
+ * speculatively, concurrently with the judge, instead of waiting for a verdict
+ * it can already describe (see generateStoryTurn's speculative rewrite).
+ *
+ * Returns null when the check is off, the narration is empty, or the turn came
+ * in under the ceiling - i.e. exactly when checkResponseLength returns null
+ * without spending a call.
+ */
+export function prospectiveLengthFlag(
+  narration: string,
+  replyLength: ReplyLength = "medium",
+  settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.response_length,
+): ObserverFlag | null {
+  if (!settings.enabled) return null;
+
+  const words = countNarrationWords(narration);
+  if (words === 0) return null;
+
+  const band = PACING_BANDS[replyLength] ?? PACING_BANDS.medium;
+  const ceiling = band.high * overageMultiplierForSensitivity(settings.sensitivity);
+  if (words <= ceiling) return null;
+
+  return {
+    type: "response_length",
+    severity: "major",
+    detail: `This turn ran ${words} words, well past the "${replyLength}" reply-length setting's usual ceiling (~${band.high} words).`,
+    correctivePrompt: `Your previous attempt at this turn was reset because it was far too long for the "${replyLength}" reply-length setting (${words} words, vs. a usual ceiling of ~${band.high}). Here is what you wrote last time, so you can see what to cut:\n"""\n${narration.trim()}\n"""\nRewrite this turn much shorter - state the outcome and stop, per the LENGTH & PACING rules you were already given.`,
+  };
+}
+
 export async function checkResponseLength(
   narration: string,
   playerChoice: string = "",
@@ -408,14 +446,11 @@ export async function checkResponseLength(
   characterContext?: ObserverCharacterContext,
   gmStoryContext?: string,
 ): Promise<ObserverFlag | null> {
-  if (!settings.enabled) return null;
-
-  const words = countNarrationWords(narration);
-  if (words === 0) return null;
+  const flag = prospectiveLengthFlag(narration, replyLength, settings);
+  if (!flag) return null;
 
   const band = PACING_BANDS[replyLength] ?? PACING_BANDS.medium;
-  const ceiling = band.high * overageMultiplierForSensitivity(settings.sensitivity);
-  if (words <= ceiling) return null;
+  const words = countNarrationWords(narration);
 
   // Give the GM a chance to justify the overage before treating it as a
   // mistake. If there's no apiOptions to call the judge with, or the judge
@@ -438,12 +473,7 @@ export async function checkResponseLength(
     if (judgment?.justified) return null;
   }
 
-  return {
-    type: "response_length",
-    severity: "major",
-    detail: `This turn ran ${words} words, well past the "${replyLength}" reply-length setting's usual ceiling (~${band.high} words).`,
-    correctivePrompt: `Your previous attempt at this turn was reset because it was far too long for the "${replyLength}" reply-length setting (${words} words, vs. a usual ceiling of ~${band.high}). Here is what you wrote last time, so you can see what to cut:\n"""\n${narration.trim()}\n"""\nRewrite this turn much shorter - state the outcome and stop, per the LENGTH & PACING rules you were already given.`,
-  };
+  return flag;
 }
 
 export interface RewriteNarrationParams {
@@ -467,8 +497,42 @@ export interface RewriteNarrationParams {
    * hand over, in which case the old standalone prompt is used.
    */
   conversationMessages?: ChatMessage[];
+  /**
+   * Other reset-eligible checks whose verdicts aren't in yet, to be fixed
+   * conditionally ("if it's also true of this narration") alongside the flag
+   * that actually triggered the rewrite. See ALSO_FIX_CLAUSES - only the
+   * text-based checks have a clause, since a rewrite can't fix a missing tool
+   * call or too low a reasoning tier.
+   *
+   * This exists for the speculative rewrite (generation.ts): it starts before
+   * the observer has finished, so it knows what the OTHER checks are looking
+   * for but not yet whether any of them fired. Rather than waste the one
+   * rewrite the turn gets on the length problem alone and leave a second
+   * violation standing, it asks for both in the same pass. Purely additive -
+   * an empty/omitted list produces exactly the prompt it always did.
+   */
+  alsoFixIfPresent?: ObserverFlagType[];
   apiOptions: ObserverApiOptions;
 }
+
+/**
+ * The "while you're in there" clause for each check that a prose rewrite could
+ * plausibly fix. Deliberately conditional and self-limiting: the rewrite is
+ * being told what the other reviewers look for, not that they found anything,
+ * so every clause has to be safe to hand to a narration that has no such
+ * problem. Confidently "fixing" a violation that isn't there is worse than
+ * leaving a real one for the next turn's warning note.
+ *
+ * The three types with no entry are excluded on purpose:
+ * missing_oracle_or_table and missing_scene_increment are complaints about
+ * tool calls that didn't happen, and tier_escalation_missed is a complaint
+ * about the reasoning tier the turn ran at - no amount of rewriting the prose
+ * addresses any of them.
+ */
+const ALSO_FIX_CLAUSES: Partial<Record<ObserverFlagType, string>> = {
+  player_agency: `if the narration decides what the player character says, thinks, feels, chooses, or does beyond what the player actually declared, cut that back - describe what the world does and leave the player's response to the player`,
+  outcome_narration_mismatch: `if the narration contradicts what a roll or check mechanically resolved to this turn, correct the narration to match the result - the result is ground truth and never changes to suit the prose`,
+};
 
 /**
  * Layer 5 hardening's answer to "just regenerate and hope for something
@@ -511,6 +575,22 @@ export async function rewriteFlaggedNarration(
       ? `Write as a Dungeon Master narrating to the player. You may reference dice results naturally. Use second person ("You swing your sword...").`
       : `Write immersive prose - show, don't tell. No dice results or mechanical language.`;
 
+  // A rewrite gets one shot per turn (MAX_OBSERVER_RESETS), so when the caller
+  // knows other reviewers are still deciding, their complaints ride along as
+  // conditional instructions - "fix this too, IF it's also true" - instead of
+  // being lost. Nothing here asserts a second problem exists; a clean
+  // narration should come back with only the flagged issue changed.
+  const alsoFixClauses = (params.alsoFixIfPresent || [])
+    .filter((type) => type !== flag.type)
+    .map((type) => ALSO_FIX_CLAUSES[type])
+    .filter((clause): clause is string => Boolean(clause));
+
+  const alsoFixBlock = alsoFixClauses.length
+    ? `\n- The same reviewers also check for the problems below. They have NOT necessarily been found here - check the narration yourself, and only change something if it genuinely applies. Do not invent a problem to fix:\n${alsoFixClauses
+        .map((clause) => `  - ${clause}`)
+        .join("\n")}`
+    : "";
+
   // The rules every rewrite has to obey, whether it runs as a continuation of
   // the turn's own conversation or from the standalone fallback prompt. The
   // "same moment" clause is load-bearing: a rewrite that quietly advances the
@@ -519,7 +599,7 @@ export async function rewriteFlaggedNarration(
   const rewriteRules = `Rewrite that narration to fix exactly that problem, and nothing else.
 - Same moment, same scene, same events, same outcome. Do NOT advance the story, start a new scene, skip time, or introduce people, places, or events that weren't already in it.
 - Any dice rolls, checks, and state changes this turn already resolved are ground truth - the rewrite must stay consistent with them. They are NOT re-rolled.
-- Keep everything that was already correct (the tone, the details, the beat it lands on). Fix only what was flagged.
+- Keep everything that was already correct (the tone, the details, the beat it lands on). Fix only what was flagged.${alsoFixBlock}
 - ${paragraphs} ${voiceGuidance}
 - Output ONLY the corrected narration prose - no meta-commentary, no explanation of what you changed, no notes to yourself, no tool calls.`;
 
@@ -1323,6 +1403,16 @@ export interface ObserverParams {
  * flag) on any API error rather than blocking the turn on observer infra
  * issues. Returns no flags at all for a suspended turn (session zero - see
  * observerSuspensionReason), without spending a single API call on it.
+ *
+ * The checks run CONCURRENTLY. They're fully independent - each reads only
+ * the finished turn and its own settings, none of them mutates anything, and
+ * every one already fails open on its own - so running them one after another
+ * only ever bought latency: up to five sequential API round trips stacked
+ * between the end of narration and the choices the player is waiting on.
+ * Flags are collected in the same fixed order as before (length, agency,
+ * outcome, tool-usage, tier) regardless of which call finishes first, because
+ * generateStoryTurn picks the FIRST major flag to correct and that choice has
+ * to stay deterministic rather than becoming a race between judges.
  */
 export async function runObserver(params: ObserverParams): Promise<ObserverFlag[]> {
   if (
@@ -1335,55 +1425,56 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
     return [];
   }
 
+  const [lengthFlag, agencyFlag, outcomeFlag, toolUsageFlags, tierFlag] =
+    await Promise.all([
+      checkResponseLength(
+        params.narration,
+        params.playerChoice,
+        params.replyLength,
+        params.apiOptions,
+        settingsFor(params.settings, "response_length"),
+        params.characterContext,
+        params.gmStoryContext,
+      ),
+      checkPlayerAgencyViolation(
+        params.playerChoice,
+        params.narration,
+        params.apiOptions,
+        settingsFor(params.settings, "player_agency"),
+        params.characterContext,
+      ),
+      checkOutcomeMismatch(
+        params.narration,
+        params.rollResults || [],
+        params.apiOptions,
+        settingsFor(params.settings, "outcome_narration_mismatch"),
+      ),
+      checkToolUsageGaps(
+        params.narration,
+        params.toolNames || [],
+        params.apiOptions,
+        settingsFor(params.settings, "missing_oracle_or_table"),
+        settingsFor(params.settings, "missing_scene_increment"),
+      ),
+      // Skipped entirely when the caller didn't say which tier the turn ran
+      // at - there's nothing to judge the escalation against.
+      params.tierUsed !== undefined
+        ? checkTierEscalation(
+            params.narration,
+            params.playerChoice,
+            params.tierUsed,
+            params.apiOptions,
+            settingsFor(params.settings, "tier_escalation_missed"),
+          )
+        : Promise.resolve(null),
+    ]);
+
   const flags: ObserverFlag[] = [];
-
-  const lengthFlag = await checkResponseLength(
-    params.narration,
-    params.playerChoice,
-    params.replyLength,
-    params.apiOptions,
-    settingsFor(params.settings, "response_length"),
-    params.characterContext,
-    params.gmStoryContext,
-  );
   if (lengthFlag) flags.push(lengthFlag);
-
-  const agencyFlag = await checkPlayerAgencyViolation(
-    params.playerChoice,
-    params.narration,
-    params.apiOptions,
-    settingsFor(params.settings, "player_agency"),
-    params.characterContext,
-  );
   if (agencyFlag) flags.push(agencyFlag);
-
-  const outcomeFlag = await checkOutcomeMismatch(
-    params.narration,
-    params.rollResults || [],
-    params.apiOptions,
-    settingsFor(params.settings, "outcome_narration_mismatch"),
-  );
   if (outcomeFlag) flags.push(outcomeFlag);
-
-  const toolUsageFlags = await checkToolUsageGaps(
-    params.narration,
-    params.toolNames || [],
-    params.apiOptions,
-    settingsFor(params.settings, "missing_oracle_or_table"),
-    settingsFor(params.settings, "missing_scene_increment"),
-  );
   flags.push(...toolUsageFlags);
-
-  if (params.tierUsed !== undefined) {
-    const tierFlag = await checkTierEscalation(
-      params.narration,
-      params.playerChoice,
-      params.tierUsed,
-      params.apiOptions,
-      settingsFor(params.settings, "tier_escalation_missed"),
-    );
-    if (tierFlag) flags.push(tierFlag);
-  }
+  if (tierFlag) flags.push(tierFlag);
 
   return flags;
 }
