@@ -3,6 +3,19 @@
  * longer has a backend/account system.
  */
 
+import type { PlayerArchetype } from "./structs";
+
+// The primary (device-owner) player's identity from the last GuidedStoryStart
+// wizard run, saved so it can prefill next time instead of being retyped.
+export interface PlayerProfile {
+  name: string;
+  color: string;
+  personality: string[];
+  wishTags: string[];
+  wishText: string;
+  archetype?: PlayerArchetype;
+}
+
 export interface CustomModel {
   id: string; // Unique ID for this custom model
   modelId: string; // OpenRouter model ID
@@ -25,6 +38,7 @@ export interface AIConfig {
 export interface UserSettings {
   custom_models?: CustomModel[]; // Array of custom models
   ai_config?: AIConfig; // AI preset configuration
+  player_profile?: PlayerProfile; // Saved GuidedStoryStart player identity
 }
 
 const STORAGE_KEY = "yourStory_userSettings";

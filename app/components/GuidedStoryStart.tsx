@@ -13,6 +13,8 @@ import type { CustomTable, DiceMode, PlayerArchetype, StoryLore } from "../misc/
 import type { FreeformPlayerSetup } from "../misc/localStoryManager";
 import type { MPBackend } from "../misc/multiplayer/types";
 import { ARCHETYPE_INFO } from "../misc/gmAdvice";
+import { getUserSettings, updateUserSettings } from "../misc/user_settings";
+import type { PlayerProfile } from "../misc/user_settings";
 
 // Same palette as CouchPlayersEditor so colors stay consistent across the app
 const PALETTE = [
@@ -87,6 +89,20 @@ function makePlayer(index: number): WizardPlayer {
   };
 }
 
+// Fills a freshly-made player slot with the device owner's saved profile
+// (name/color/personality/wishes) so they don't retype it every story.
+function applyProfile(player: WizardPlayer, profile: PlayerProfile): WizardPlayer {
+  return {
+    ...player,
+    name: profile.name,
+    color: profile.color,
+    personality: profile.personality,
+    wishTags: profile.wishTags,
+    wishText: profile.wishText,
+    archetype: profile.archetype,
+  };
+}
+
 const ARCHETYPE_OPTIONS = Object.entries(ARCHETYPE_INFO) as [
   PlayerArchetype,
   (typeof ARCHETYPE_INFO)[PlayerArchetype],
@@ -125,7 +141,14 @@ export default function GuidedStoryStart() {
   // join over the internet (they build their own profiles on join), rather than
   // seating a fixed couch party up front.
   const [hostOnlineMode, setHostOnlineMode] = useState(false);
+  // The device owner's saved identity (name/color/personality/wishes) from a
+  // previous story, used to prefill player 1 so it isn't retyped every time.
+  const [savedProfile, setSavedProfile] = useState<PlayerProfile | null>(null);
   const nameInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    getUserSettings().then((s) => setSavedProfile(s?.player_profile ?? null));
+  }, []);
 
   const characterAttached = attachedLore.some(
     (l) => l.type === "character_sheet",
@@ -170,7 +193,14 @@ export default function GuidedStoryStart() {
 
   const chooseCount = (count: number) => {
     setHostOnlineMode(false);
-    setPlayers(Array.from({ length: count }, (_, i) => makePlayer(i)));
+    setPlayers(
+      Array.from({ length: count }, (_, i) => {
+        const player = makePlayer(i);
+        return i === 0 && savedProfile
+          ? applyProfile(player, savedProfile)
+          : player;
+      }),
+    );
     setPlayerIndex(0);
     setStep("player");
   };
@@ -179,7 +209,8 @@ export default function GuidedStoryStart() {
   // that others join over the internet (each builds their own profile on join).
   const choosePlayOnline = () => {
     setHostOnlineMode(true);
-    setPlayers([makePlayer(0)]);
+    const player = makePlayer(0);
+    setPlayers([savedProfile ? applyProfile(player, savedProfile) : player]);
     setPlayerIndex(0);
     setStep("player");
   };
@@ -193,6 +224,19 @@ export default function GuidedStoryStart() {
   const currentPlayer = players[playerIndex];
 
   const nextFromPlayer = () => {
+    // Player 1 is the device owner - remember their identity for next time.
+    if (playerIndex === 0 && currentPlayer.name.trim()) {
+      const profile: PlayerProfile = {
+        name: currentPlayer.name.trim(),
+        color: currentPlayer.color,
+        personality: currentPlayer.personality,
+        wishTags: currentPlayer.wishTags,
+        wishText: currentPlayer.wishText.trim(),
+        archetype: currentPlayer.archetype,
+      };
+      setSavedProfile(profile);
+      updateUserSettings({ player_profile: profile });
+    }
     if (playerIndex < players.length - 1) {
       setPlayerIndex(playerIndex + 1);
     } else {
