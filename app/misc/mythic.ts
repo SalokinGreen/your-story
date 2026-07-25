@@ -320,6 +320,70 @@ export function adjustTension(
   return Math.max(0, Math.min(10, currentTension + delta));
 }
 
+// ============================================
+// ORACLE RECENCY
+// ============================================
+// The oracle used to have no state behind it at all: six places in the
+// prompt told the GM to consult it and nothing tracked whether it ever
+// did. Everything else the engine actually gets compliance on has
+// deterministic pressure behind it (pending random events and director
+// moves persist in context until resolved; the M2 gate forces a
+// re-prompt). This is the cheap end of that spectrum - no LLM call, no
+// gate, just a counter the GM can see climbing.
+
+/**
+ * The story's current turn index. Uses scene part count, the same clock
+ * selectGMAdviceForTurn seeds its rotation from, so "turns" means the same
+ * thing in both places.
+ */
+export function currentTurnIndex(storyData: StoryData): number {
+  return storyData.scene?.parts?.length ?? 0;
+}
+
+/**
+ * Stamps "the oracle was consulted on this turn" onto agmtState. Called by
+ * executeGMTools for any successful fate_question/roll_table - never by the
+ * model. No-op when the story has no agmtState (nothing renders the
+ * counter in that case either).
+ */
+export function markOracleConsulted(storyData: StoryData): void {
+  if (!storyData.agmtState) return;
+  storyData.agmtState.lastOracleTurn = currentTurnIndex(storyData);
+}
+
+// Turn gaps at which the counter stops being a neutral readout and starts
+// pushing back. Three turns is roughly a scene's worth of beats decided
+// without rolling for anything; six is long enough that the GM is near
+// certainly settling uncertain facts by what's convenient.
+export const ORACLE_NUDGE_THRESHOLD = 3;
+export const ORACLE_STRONG_NUDGE_THRESHOLD = 6;
+
+/**
+ * The Oracle State line reporting how long it's been since the GM last
+ * consulted the oracle, escalating in tone with the gap. Pure - returns the
+ * line, the prompt builders decide where it goes.
+ */
+export function formatOracleRecencyLine(storyData: StoryData): string {
+  const turn = currentTurnIndex(storyData);
+  const last = storyData.agmtState?.lastOracleTurn;
+
+  if (last === undefined) {
+    // A brand-new story hasn't had the chance yet - only start pushing once
+    // enough turns have gone by that never having rolled is a real pattern.
+    return turn >= ORACLE_NUDGE_THRESHOLD
+      ? `- Oracle: 🚨 NEVER consulted in this story (${turn} turns). Every uncertain fact so far is one you decided yourself. Roll \`fate_question\` or \`roll_table\` for the next thing you don't already know.`
+      : `- Oracle: not consulted yet`;
+  }
+
+  const gap = Math.max(0, turn - last);
+  if (gap === 0) return `- Turns since you last consulted the oracle: 0 (this turn)`;
+  if (gap < ORACLE_NUDGE_THRESHOLD)
+    return `- Turns since you last consulted the oracle: ${gap}`;
+  if (gap < ORACLE_STRONG_NUDGE_THRESHOLD)
+    return `- Turns since you last consulted the oracle: ${gap} - ⚠️ that's ${gap} turns of world facts, NPC reactions and outcomes you decided on your own. Hand the next uncertain one to \`fate_question\` or \`roll_table\`.`;
+  return `- Turns since you last consulted the oracle: ${gap} - 🚨 you are running on your own instincts alone and almost certainly steering toward what's convenient. Consult the oracle this turn unless genuinely nothing is uncertain.`;
+}
+
 /**
  * How far through the story the campaign currently is, as a 0-1 fraction.
  * Uses currentChapter/max_chapters - the same progress markers already

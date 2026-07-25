@@ -1088,6 +1088,14 @@ export interface AGMTState {
   // scenes with no pressure lower it. Read by selectDirectorMove to bias
   // beat-type/move selection - never set directly by the model.
   tension?: number;
+  // Turn index (scene.parts.length) at the last successful fate_question or
+  // roll_table call, stamped by executeGMTools. Drives the "turns since you
+  // last consulted the oracle" line in the prompt's Oracle State section - a
+  // visible, mounting counter lands harder than the static advice prose that
+  // was the only nudge before it. Undefined means the oracle has never been
+  // consulted in this story. Never set by the model; it only moves when an
+  // oracle tool actually runs.
+  lastOracleTurn?: number;
 }
 
 // Cap on how many unresolved random events accumulate on StoryData - if the

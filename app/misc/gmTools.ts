@@ -1211,21 +1211,25 @@ const fateQuestionTool: ToolSchema = {
   type: "function",
   function: {
     name: "fate_question",
-    description: `Ask a yes/no "fate" question using the Mythic-style oracle system.
+    description: `Ask a yes/no "fate" question using the Mythic-style oracle system. This is your primary tool for anything about the world you don't already know - reach for it often, several times a scene is normal.
 
-Use when:
-- You need to determine an unknown fact about the world
-- The player asks "Is X true?" style questions
+Use when (any of these, not just the dramatic ones):
+- Any unknown fact about the world: is the door locked, is anyone else in the room, does this shop stock what they want, has the body been found yet
+- Any hidden NPC state you haven't established: did the guard notice, does she believe the lie, is he actually working for them, will they take the deal
+- Any "does the bad thing happen" beat: does the rope hold, do reinforcements arrive, is the trail still fresh
+- The player asks "Is X true?" about something you haven't already decided
 - You need random narrative direction with weighted probability
+
+You should NOT use it for things already established in your notes, the character sheet, or earlier narration - look those up instead. Everything else that's genuinely open is fair game.
 
 The chaos factor (from agmtState) affects randomness. Higher chaos = more unexpected results.
 
-LIKELIHOODS (from least to most likely):
+LIKELIHOODS (from least to most likely) - pick the one you honestly believe, don't fall back on 50/50 out of habit:
 - Impossible: Almost certainly no
 - No Way: Very strong no
 - Very Unlikely: Strong no
 - Unlikely: Probably no
-- 50/50: Equal chance (DEFAULT)
+- 50/50: Equal chance
 - Somewhat Likely: Leaning yes
 - Likely: Probably yes
 - Very Likely: Strong yes
@@ -1260,7 +1264,8 @@ May also trigger a Random Event (check the result).`,
             "A Sure Thing",
             "Has To Be",
           ],
-          description: "How likely is a 'yes' answer? Default: 50/50",
+          description:
+            "How likely is a 'yes' answer, in your honest estimate given what's already established? Pick the rung that actually matches - 50/50 is for genuinely even odds, not a fallback.",
         },
         reason: {
           type: "string",
@@ -1276,12 +1281,16 @@ const rollTableTool: ToolSchema = {
   type: "function",
   function: {
     name: "roll_table",
-    description: `Roll on a custom table or built-in AGMT table for random content generation.
+    description: `Roll on a custom table or built-in AGMT table for random content generation. Use it freely - any time you're about to invent open-ended detail, roll for it instead of going with the first idea that comes to mind.
 
-Use when:
-- You need random content from a defined set of options
+Use when (any of these, not just the dramatic ones):
+- You're inventing open-ended content: loot, an encounter, a rumor, weather, a complication, a plot twist, what a room contains
+- You're fleshing out a new NPC (appearance, personality, background, motivation) or a new location
+- You need a detail and your first instinct feels familiar - that's exactly the reflex this tool exists to break
 - The adventure has custom tables (weather, encounters, NPCs, etc.)
 - You want to use built-in element tables for inspiration
+
+Reserve improvising for when no table fits. A rolled result you have to work with produces a stranger, more alive world than one you picked because it was convenient.
 
 BUILT-IN TABLES (always available):
 - Character: character_appearance, character_personality, character_background, character_motivations, character_identity, character_skills, character_traits_flaws
