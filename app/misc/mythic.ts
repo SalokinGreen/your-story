@@ -478,7 +478,7 @@ const TACTICAL_TOOL_NAMES = new Set([
   "update_challenge",
   "resolve_challenge",
   "cancel_challenge",
-  "formula_challenge_check",
+  "record_challenge_result",
   "search_memory",
   "read_notes",
   "roll_table",

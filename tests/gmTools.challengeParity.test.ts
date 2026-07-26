@@ -5,9 +5,11 @@
  * - cancel_challenge gives the live GM-stage tool set a real escape hatch
  *   for a challenge that stops mattering narratively before either side
  *   reaches its threshold (previously: permanently stuck active).
- * - formula_challenge_check brought to parity with formula_roll/
- *   opposed_formula: reverse_dc, stakes, target/forces_choice hardness
- *   dimensions, stat_name integrity checking.
+ * - A challenge check is now three steps (formula_roll -> calculate ->
+ *   record_challenge_result) rather than one formula_challenge_check call
+ *   that rolled, compared against its own `dc`, and advanced progress. That
+ *   bundling only worked for systems where beating a single target number is
+ *   the whole resolution, so the roll and the verdict were split apart.
  */
 
 import { describe, it, expect } from "vitest";
@@ -82,9 +84,8 @@ describe("start_challenge: asymmetric thresholds", () => {
         currentSuccesses: 2,
       }),
     });
-    const toolCall = createToolCall("formula_challenge_check", {
-      formula: "1d20+100", // guaranteed success
-      dc: 15,
+    const toolCall = createToolCall("record_challenge_result", {
+      outcome: "success",
       description: "One more push",
     });
 
@@ -106,9 +107,8 @@ describe("start_challenge: asymmetric thresholds", () => {
         currentFailures: 4,
       }),
     });
-    const toolCall = createToolCall("formula_challenge_check", {
-      formula: "1d1", // always rolls 1
-      dc: 100, // guaranteed failure
+    const toolCall = createToolCall("record_challenge_result", {
+      outcome: "failure",
       description: "Losing ground",
     });
 
@@ -127,9 +127,8 @@ describe("start_challenge: asymmetric thresholds", () => {
       // from before this field existed.
       activeChallenge: activeChallenge({ rounds: 5, currentSuccesses: 1 }),
     });
-    const toolCall = createToolCall("formula_challenge_check", {
-      formula: "1d20+100",
-      dc: 15,
+    const toolCall = createToolCall("record_challenge_result", {
+      outcome: "success",
       description: "Legacy challenge check",
     });
 
@@ -198,52 +197,55 @@ describe("cancel_challenge", () => {
   });
 });
 
-describe("formula_challenge_check parity with formula_roll", () => {
-  it("supports reverse_dc (roll-under)", async () => {
+describe("record_challenge_result: rolling is a separate step", () => {
+  it("advances progress from the reported outcome without rolling anything", async () => {
     const storyData = createMockStoryData({
       activeChallenge: activeChallenge(),
     });
-    const toolCall = createToolCall("formula_challenge_check", {
-      formula: "1d1", // always rolls 1
-      dc: 50,
-      reverse_dc: true,
+    // Whatever the system's resolution looks like - roll-under, dice pools,
+    // beat-both-challenge-dice - the GM has already settled it with
+    // `calculate` by the time it reports here.
+    const toolCall = createToolCall("record_challenge_result", {
+      outcome: "success",
       description: "Sneak past the sentries",
     });
 
     const result = await executeGMTools([toolCall], storyData);
-    const checkResult = result.results[0].result as any;
+    const record = result.results[0].result as any;
 
-    expect(checkResult.reverseDC).toBe(true);
-    expect(checkResult.success).toBe(true); // 1 <= 50 under reverse_dc
+    expect(record.type).toBe("record_challenge_result");
+    expect(record.outcome).toBe("success");
+    expect(record.challengeProgress.successes).toBe(1);
+    // No dice notation in the context - it reports a verdict, not a roll.
+    expect(result.storyContext).not.toMatch(/\dd\d/);
   });
 
-  it("escalates the reasoning tier on high/deadly stakes, same as formula_roll", async () => {
+  it("takes no dc and ignores one passed out of habit", async () => {
     const storyData = createMockStoryData({
       activeChallenge: activeChallenge(),
     });
-    const toolCall = createToolCall("formula_challenge_check", {
-      formula: "1d20+100",
+    const toolCall = createToolCall("record_challenge_result", {
+      outcome: "failure",
+      description: "Missed the ledge",
       dc: 15,
-      description: "The final blow",
-      stakes: "deadly",
+      reverse_dc: true,
     });
 
     const result = await executeGMTools([toolCall], storyData);
-    const context = result.results[0].contextForStory || "";
+    const record = result.results[0].result as any;
 
-    expect(context).toContain("[Stakes: deadly]");
-    expect(
-      result.modifiedStoryData.reasoningTierState?.highStakesSceneKey
-    ).toBeDefined();
+    expect(record.challengeProgress.failures).toBe(1);
+    expect(record.dc).toBeUndefined();
+    expect(record.reverseDC).toBeUndefined();
+    expect(result.storyContext).not.toContain("DC");
   });
 
   it("surfaces the target hardness dimension in contextForStory on failure", async () => {
     const storyData = createMockStoryData({
       activeChallenge: activeChallenge(),
     });
-    const toolCall = createToolCall("formula_challenge_check", {
-      formula: "1d1",
-      dc: 100,
+    const toolCall = createToolCall("record_challenge_result", {
+      outcome: "failure",
       description: "A desperate gambit",
       target: "someone_they_love",
     });
@@ -254,21 +256,45 @@ describe("formula_challenge_check parity with formula_roll", () => {
     expect(context).toContain("[Target:");
   });
 
-  it("flags a stat_name modifier that far exceeds the matched stat's value", async () => {
+  it("does not surface hardness dimensions on a success", async () => {
     const storyData = createMockStoryData({
-      stats: [{ name: "Strength", value: 3, description: "", symbol: "" } as any],
       activeChallenge: activeChallenge(),
     });
-    const toolCall = createToolCall("formula_challenge_check", {
-      formula: "0+50",
-      dc: 15,
-      description: "An implausibly strong heave",
-      stat_name: "Strength",
+    const toolCall = createToolCall("record_challenge_result", {
+      outcome: "success",
+      description: "Stuck the landing",
+      target: "someone_they_love",
+      forces_choice: true,
     });
 
     const result = await executeGMTools([toolCall], storyData);
     const context = result.results[0].contextForStory || "";
 
-    expect(context).toContain("Roll integrity check");
+    expect(context).not.toContain("[Target:");
+    expect(context).not.toContain("Forces a choice");
+  });
+
+  it("escalates the reasoning tier from the roll that precedes it, on high/deadly stakes", async () => {
+    // Stakes live on the dice tool now - a challenge check's roll is an
+    // ordinary formula_roll, and that's what drives H7 escalation.
+    const storyData = createMockStoryData({
+      activeChallenge: activeChallenge(),
+    });
+    const result = await executeGMTools(
+      [
+        createToolCall("formula_roll", {
+          formulas: ["1d20+5"],
+          reason: "The final blow",
+          stakes: "deadly",
+        }),
+      ],
+      storyData
+    );
+    const context = result.results[0].contextForStory || "";
+
+    expect(context).toContain("[Stakes: deadly]");
+    expect(
+      result.modifiedStoryData.reasoningTierState?.highStakesSceneKey
+    ).toBeDefined();
   });
 });

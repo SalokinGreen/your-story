@@ -987,13 +987,17 @@ export interface StoryData {
   newGamePlusCount?: number; // Number of NG+ runs completed
   newGamePlusMode?: boolean; // Whether current run is NG+
   nsfw?: boolean; // Whether the story contains NSFW content
-  reverseDC?: boolean; // If true, success = roll ≤ DC (Call of Cthulhu style)
+  // DEPRECATED: adventure-level roll-under flag. Nothing reads it - no dice
+  // tool takes a DC any more, so whether a system rolls under or over is
+  // described in its mechanics note and applied by the GM's `calculate`
+  // comparison ("38 <= 55"). Kept for backward compatibility on old saves.
+  reverseDC?: boolean;
   difficulty?: AdventureDifficulty; // Adventure difficulty (affects DC/points scaling)
   // Who rolls the player's dice: "ai" (default) = the GM rolls digitally via
   // formula_roll etc.; "manual" = the players roll physical dice at the table
   // and the GM uses ask_for_roll to collect their results; "physical" = the
   // player throws a 3D die on-screen (DiceThrowModal), settled by real
-  // physics, still via formula_roll/opposed_formula/formula_challenge_check.
+  // physics, still via formula_roll/opposed_formula.
   diceMode?: DiceMode;
   // Suggested-action chips: after each turn, run an extra AI call to propose
   // a few tappable next actions (shown above the composer, alongside the

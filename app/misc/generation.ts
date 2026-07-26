@@ -139,16 +139,19 @@ import { getCustomModelIfUUID, CustomModel } from "@/app/misc/user_settings";
 // TYPES
 // ============================================================
 
-// Tools that roll dice against a DC: a "failed" result (success=false) means
-// the character failed the check, not that the tool call itself errored.
-// Only an explicit "ERROR" marker in contextForStory counts as a real failure.
+// Tools where a "failed" result (success=false) means the check didn't pass
+// or the player skipped, not that the tool call itself errored. Only an
+// explicit "ERROR" marker in contextForStory counts as a real failure.
+//
+// `calculate` is on this list because it's now where checks are settled: the
+// dice tools report numbers, and a comparison coming out FALSE is an answer.
 const DICE_TOOLS = [
   "formula_roll",
   "ask_for_roll",
   "opposed_formula",
-  "formula_challenge_check",
   "npc_roll",
-  "group_check",
+  "calculate",
+  "record_challenge_result",
 ];
 
 /**
@@ -325,11 +328,12 @@ export interface GenerationCallbacks {
     request: ManualRollRequest
   ) => Promise<ManualRollAnswer | null>;
   // Physical dice mode: the UI shows a throwable 3D dice tray and resolves
-  // with the settled face values (null = player skipped/cancelled the
-  // throw, falls back to a fully digital roll of the whole formula).
+  // with the settled face values, one array per requested dice group (null =
+  // player skipped/cancelled the throw, falls back to a fully digital roll of
+  // the whole formula).
   onRequestDiceThrow?: (
     request: DiceThrowRequest
-  ) => Promise<number[] | null>;
+  ) => Promise<number[][] | null>;
   // The GM asked the player(s) one or more predefined-choice + free-text
   // questions. The UI shows a prompt and resolves with one answer per
   // question, or null if the whole batch was skipped/cancelled.
@@ -2669,7 +2673,7 @@ async function generateStoryTurnOnce(
               conversationHistory.push({
                 role: "user",
                 content:
-                  "This scene requires a roll before the turn can end - combat or a challenge is active, or you declared high/deadly stakes earlier this scene. Resolve the pending action with formula_roll, opposed_formula, formula_challenge_check, fate_question, or npc_roll, then continue.",
+                  "This scene requires a roll before the turn can end - combat or a challenge is active, or you declared high/deadly stakes earlier this scene. Resolve the pending action with formula_roll, opposed_formula, fate_question, or npc_roll, then continue.",
               });
               forceToolChoiceNextRound = "required";
               continue gmRoundLoop;

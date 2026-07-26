@@ -10,7 +10,7 @@ const TOOL_LABELS: Record<string, string> = {
   ask_for_roll: "Waiting for your roll",
   ask_question: "Asking you a question",
   opposed_formula: "Rolling opposed check",
-  formula_challenge_check: "Rolling challenge check",
+  record_challenge_result: "Recording challenge progress",
   npc_roll: "Rolling for NPC",
   calculate: "Calculating",
   fate_question: "Consulting fate",

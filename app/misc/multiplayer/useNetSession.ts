@@ -287,7 +287,7 @@ export function useNetSession({
   );
 
   const sendDiceThrowResult = useCallback(
-    (requestId: string, faces: number[] | null) => {
+    (requestId: string, faces: number[][] | null) => {
       sessionRef.current?.sendDiceThrowResult(requestId, faces);
     },
     [],
