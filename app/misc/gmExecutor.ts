@@ -131,6 +131,7 @@ import {
   MAX_DICE_SIDES,
 } from "./diceFormula";
 import { executeTools as executeStateTools } from "./toolExecutor";
+import { hasCampaignPlan } from "./campaignPlan";
 
 // ============================================
 // RESULT INTERFACES
@@ -3436,12 +3437,34 @@ function executeSetReasoningTier(
  * reasoningTierState to baseline immediately, rather than letting it decay
  * down over subsequent turns - session zero ending is a hard cut back to
  * normal pacing, not a gradual one.
+ *
+ * Refuses to run without a campaign plan (hasCampaignPlan, campaignPlan.ts):
+ * writing the spine is part of session zero's job, and a campaign that starts
+ * without one never gets one - the one-beat-ahead gate has nothing to
+ * advance, so the whole plan layer stays dark for the rest of the campaign.
+ * Same posture as the Phase 4 grounding gate on create_note: a failed tool
+ * response the GM can act on in the next round, not a blocked turn (the round
+ * loop keeps going, and narration is unaffected either way).
  */
 function executeStartGame(
   toolCallId: string,
   params: StartGameParams,
   storyData: StoryData
 ): GMToolResult {
+  if (!hasCampaignPlan(storyData)) {
+    return {
+      toolName: "start_game",
+      toolCallId,
+      success: false,
+      result: {
+        type: "start_game",
+        story_name: params.story_name,
+        premise: params.premise,
+      } as GMStartGameResult,
+      contextForStory: `[ERROR: Cannot start the game yet - this story has no campaign plan. Session zero isn't over until the spine exists. Create it first: \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the Opening Image beat detailed (later beats stay one-line placeholders) - see the CAMPAIGN PLAN section. If this story has existing lore/mechanics/dm_instructions notes, \`read_notes\`/\`search_notes\` them first; create_note enforces that. Then call start_game again.]`,
+    };
+  }
+
   storyData.story_name = params.story_name;
   if (params.premise) {
     storyData.premise = params.premise;

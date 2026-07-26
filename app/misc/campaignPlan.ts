@@ -17,6 +17,12 @@
  * bespoke per-story naming. Phase 3 adds three presets (short/medium/long) so
  * a one-shot and a long campaign don't share the same beat count - the GM
  * picks one at spine-note creation time based on the campaign's scope.
+ *
+ * Two more gates guard the *start* of the plan's life, since a campaign that
+ * never got a spine can't be kept a beat ahead of anything:
+ * `hasCampaignPlan` is the hard precondition `start_game` checks (no spine =
+ * session zero isn't over), and `getSetupReminder` is the soft, escalating
+ * prompt nudge for a story that's several turns old with setup still unfinished.
  */
 import type { StoryData, StoryLore, PlanState, SpineLength } from "./structs";
 
@@ -121,4 +127,67 @@ export function currentBeatName(state: StoryData): string | undefined {
  */
 export function isPlanAwaitingNextBeat(state: StoryData): boolean {
   return !!state.planState?.awaitingNextBeat;
+}
+
+/**
+ * Does this story have a campaign plan at all? True once the spine note
+ * exists (or once planState was initialized for one - kept as a separate
+ * check so a plan whose note was later renamed/deleted by the player still
+ * counts as "planned", rather than re-blocking a campaign mid-flight).
+ *
+ * This is the precondition for `start_game` (see executeStartGame,
+ * gmExecutor.ts): session zero doesn't end until the spine exists.
+ */
+export function hasCampaignPlan(state: StoryData): boolean {
+  if (state.planState) return true;
+  return !!findSpinePlanNote(state);
+}
+
+/** How many player turns this story is old - the cadence the setup reminders
+ * escalate on. Compaction keeps pruned parts in `scene.parts` (it only adds a
+ * rolling `summary` over the prefix), so this stays monotonic. */
+export function countPlayerTurns(state: StoryData): number {
+  return (state.scene?.parts || []).filter((p) => p.user).length;
+}
+
+/** Turn counts at which the setup reminders start, and at which they escalate
+ * from a nudge to an explicit "do it this turn". */
+export const SETUP_REMINDER_SOFT_TURNS = 5;
+export const SETUP_REMINDER_URGENT_TURNS = 10;
+
+export interface SetupReminder {
+  /** "soft" from SETUP_REMINDER_SOFT_TURNS, "urgent" from SETUP_REMINDER_URGENT_TURNS. */
+  level: "soft" | "urgent";
+  /** Player turns elapsed (countPlayerTurns). */
+  turns: number;
+  /** No spine note / planState yet. */
+  missingPlan: boolean;
+  /** start_game hasn't been called - the story is still in session zero. */
+  missingStart: boolean;
+}
+
+/**
+ * Setup-overdue reminder: several turns into a story, the GM should have both
+ * a campaign plan and a completed session-zero handoff. In practice it
+ * sometimes has neither and just keeps narrating, so the prompt escalates a
+ * reminder (see buildGMStagePrompt) instead of relying on the one-shot
+ * fresh-story/START OF PLAY blocks being noticed on turn one.
+ *
+ * Returns null while nothing is missing, or while the story is still young
+ * enough that setup running long is normal.
+ */
+export function getSetupReminder(state: StoryData): SetupReminder | null {
+  const missingPlan = !hasCampaignPlan(state);
+  const missingStart = state.sessionZeroActive === true;
+  if (!missingPlan && !missingStart) return null;
+
+  const turns = countPlayerTurns(state);
+  if (turns < SETUP_REMINDER_SOFT_TURNS) return null;
+
+  return {
+    level: turns >= SETUP_REMINDER_URGENT_TURNS ? "urgent" : "soft",
+    turns,
+    missingPlan,
+    missingStart,
+  };
 }

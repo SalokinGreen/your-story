@@ -19,6 +19,10 @@ import {
   formatGMAdviceNote,
 } from "@/app/misc/gmAdvice";
 import { formatOracleRecencyLine } from "@/app/misc/mythic";
+import {
+  getSetupReminder,
+  SETUP_REMINDER_URGENT_TURNS,
+} from "@/app/misc/campaignPlan";
 import { cleanString } from "@/app/misc/textUtils";
 import { GM_TOOL_SCHEMAS } from "@/app/misc/gmTools";
 import { TOOL_SCHEMAS } from "@/app/misc/toolSchemas";
@@ -1405,7 +1409,7 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
       ? `\n## 🆕 FRESH STORY - SETUP NEEDED
 This is a brand-new story with no established setting or character yet - the player skipped adventure creation to talk to you directly.
 - If the player's message doesn't give you enough to go on (genre, tone, character concept), ask up to 1-3 concise, friendly questions before creating anything. Do NOT narrate a full opening scene yet - just respond conversationally (use OOC round-brackets or plain text).
-- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (name, starting stats/resources/abilities fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + a beat spine sized to the campaign's scope, with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section for the length presets and how to pick one). Then call \`start_game\` with a title for the story and a short premise summary, and narrate the opening scene.
+- Once you have enough to work with (even a vague idea like "surprise me" or a one-line pitch), use \`create_note\` to establish a \`character_sheet\` note (name, starting stats/resources/abilities fitting the genre and tone), a \`mechanics\` note (dice system + core resolution rules), and a \`gm_plan\` note titled "Campaign Plan" (premise + a beat spine sized to the campaign's scope, with ONLY the Opening Image beat detailed - see the CAMPAIGN PLAN section for the length presets and how to pick one). Then call \`start_game\` with a title for the story and a short premise summary, and narrate the opening scene. The plan note must come BEFORE \`start_game\` - \`start_game\` is blocked until it exists.
 - If ANY lore/mechanics/dm_instructions notes already exist on this story (e.g. from an adventure template), \`read_notes\` or \`search_notes\` them before writing the character sheet, mechanics, or plan notes - ground what you create in what's already established instead of inventing a setting from scratch. This is ENFORCED for the plan: \`create_note\` will refuse to create the "Campaign Plan" note until you've called \`read_notes\`/\`search_notes\` this turn, if any such notes exist.
 - Keep the interview short - one or two exchanges at most before diving in.
 `
@@ -1417,8 +1421,39 @@ This is a brand-new story with no established setting or character yet - the pla
   // to call start_game before narrating the opening scene.
   const sessionZeroStartGameReminder =
     storyData.sessionZeroActive && characterSheetLore.length > 0
-      ? `\n## 🎬 START OF PLAY\nThis story already has its setup (character sheet/premise) from the creation wizard, but hasn't formally started yet. Before narrating the opening scene, call \`start_game\` with a title for the story (and a short premise summary if useful) to kick off play.\n`
+      ? `\n## 🎬 START OF PLAY\nThis story already has its setup (character sheet/premise) from the creation wizard, but hasn't formally started yet. Two things, in this order, before you narrate the opening scene:\n1. Create the campaign spine - \`read_notes\`/\`search_notes\` the existing notes, then \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: ..., ... })\` with ONLY the Opening Image beat detailed (see the CAMPAIGN PLAN section).\n2. Call \`start_game\` with a title for the story (and a short premise summary if useful) to kick off play. **\`start_game\` is BLOCKED until the Campaign Plan note exists** - it will return an error if you call it first.\n`
       : "";
+
+  // ⏳ Setup-overdue reminder (getSetupReminder, campaignPlan.ts): the two
+  // blocks above are one-shot nudges aimed at turn one, and a GM that talks
+  // past them can run a whole campaign with no spine and no start_game (the
+  // bug this exists for). This escalates a reminder every turn instead, from
+  // SETUP_REMINDER_SOFT_TURNS on, so unfinished setup stays in front of it.
+  const setupReminder = getSetupReminder(storyData);
+  const setupOverdueBlock = setupReminder
+    ? `\n## ${
+        setupReminder.level === "urgent"
+          ? `🚨 SETUP OVERDUE - FINISH IT THIS TURN (${setupReminder.turns} turns in)`
+          : `⏳ SETUP UNFINISHED (${setupReminder.turns} turns in)`
+      }\nThis story is ${setupReminder.turns} player turns old and setup still isn't done:
+${
+  setupReminder.missingPlan
+    ? `- **No campaign plan exists.** \`read_notes\`/\`search_notes\` any existing lore/mechanics/dm_instructions notes, then \`create_note({ type: "gm_plan", title: "Campaign Plan", planSpineLength: "short"|"medium"|"long", content: ... })\` with the premise and ONLY the current/Opening Image beat detailed - later beats stay one-line placeholders. See the CAMPAIGN PLAN section.\n`
+    : ""
+}${
+        setupReminder.missingStart
+          ? `- **\`start_game\` has not been called**, so this story is still unnamed and stuck in session zero (which pins your reasoning tier at maximum every turn). Call it with a title once the plan exists.${
+              setupReminder.missingPlan
+                ? " It is BLOCKED until the Campaign Plan note exists, so do the plan first."
+                : ""
+            }\n`
+          : ""
+      }${
+        setupReminder.level === "urgent"
+          ? `Do this NOW, in this turn's tool calls, before any further narration - setup should have been finished by turn ${SETUP_REMINDER_URGENT_TURNS} at the very latest.`
+          : `Handle it this turn alongside your normal narration - don't put it off again.`
+      }\n`
+    : "";
 
   // 🎲 Manual dice mode: the players roll physical dice at the table. The
   // GM collects player-facing rolls through ask_for_roll (which pauses the
@@ -1451,7 +1486,7 @@ The players roll REAL dice at the table. For ANY roll a player character makes:
   );
 
   const systemPrompt = `You ARE the Game Master. Run this like a real tabletop session.
-${freshStorySetupBlock}${sessionZeroStartGameReminder}
+${freshStorySetupBlock}${sessionZeroStartGameReminder}${setupOverdueBlock}
 ## CORE STANCE (read this first)
 1. **You resolve, the player decides.** Never narrate what the player character says, thinks, feels, chooses, or does next - only the outcome of the action they already declared. (Full agency rules below.)
 2. **Roll dice only when they matter.** Call a *dice* tool (\`formula_roll\`, \`opposed_formula\`, \`formula_challenge_check\`, \`npc_roll\`) ONLY when the player has declared an action whose outcome is genuinely uncertain AND a failure would change the fiction. Casual talk, description, simple movement, and foregone conclusions need no roll - just narrate them. Never invent a check to look busy.
@@ -1608,6 +1643,7 @@ You keep a living plan the way a modern tabletop GM does: it describes a **situa
   - **medium** (~7 beats, default when scope is unclear) - an ordinary multi-session campaign: **Opening Image (Session 0)**, **Inciting Incident (Session 1)**, **Rising Complications**, **Midpoint Turn**, **Crisis**, **Climax**, **Resolution**.
   - **long** (~15 beats) - an extended, multi-arc campaign that needs more medium-horizon texture than a single "Rising Complications" beat can hold: **Opening Image (Session 0)**, **Setup / Ordinary World**, **Theme Stated**, **Inciting Incident (Session 1)**, **Debate**, **Break Into Rising Action**, **B-Story (Allies & Relationships)**, **Fun and Games (Early Wins)**, **Midpoint Turn**, **Bad Guys Close In (Escalating Complications)**, **All Is Lost**, **Dark Night of the Soul**, **Break Into Finale**, **Climax**, **Resolution (Final Image)**.
   Use the FIXED beat names for whichever preset you pick, in order - don't rename or reorder them. At creation, detail ONLY the first beat ("Opening Image", goal: establish/create the character(s) and their ordinary world); leave the rest as one-line placeholders. Do not plan further yet.
+- **The spine is a hard prerequisite for \`start_game\` (ENFORCED).** Session zero is not over until the "Campaign Plan" note exists: \`start_game\` returns an error while it's missing. Order is always character(s) -> plan -> \`start_game\` -> narrate the opening scene.
 - **The spine is your best GUESS at where the drama goes - not gates the players must trip.** It exists to give tone and pacing a target for the narration. When play diverges from what a beat predicted, **rewrite the remaining spine** to fit what actually happened - never steer the players back toward it. The one-beat-ahead gate enforces *bookkeeping* (keep the plan current), not *plot adherence*.
 - **One beat ahead, never more.** The current beat gets a short goal, a \`[ ]\` checklist, and an **advance-on** block (below). Future beats stay one-liners. Never script beats the player hasn't reached.
 - **Advance-on triggers, never a scripted "advance-when" moment.** A beat advances on player ACTION or on TIME/consequence - never on the players producing one specific pre-decided event:

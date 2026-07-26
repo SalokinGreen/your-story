@@ -1511,7 +1511,9 @@ const startGameTool: ToolSchema = {
     name: "start_game",
     description: `Call this ONCE, when session zero (premise-building, character creation, setting/tone discussion) is done and real play is about to begin.
 
-This names the story - replacing the generic placeholder it starts with - and hands off from session zero into the game proper. Do not call this while you're still working out premise/character details with the player; call it right when you're about to narrate the opening scene.`,
+This names the story - replacing the generic placeholder it starts with - and hands off from session zero into the game proper. Do not call this while you're still working out premise/character details with the player; call it right when you're about to narrate the opening scene.
+
+PREREQUISITE (enforced): the campaign spine must exist first - a gm_plan note titled "Campaign Plan", with only its Opening Image beat detailed. Writing it is part of session zero's job, so this tool returns an error while it's missing. Order: character(s) -> Campaign Plan note -> start_game -> opening scene.`,
     parameters: {
       type: "object",
       properties: {

@@ -4,16 +4,33 @@
  * optionally records the premise, and clears sessionZeroActive so the
  * reasoning-tier router's hard floor (hardRuleFloor, reasoningTiers.ts)
  * stops forcing TOP_TIER.
+ *
+ * It also refuses to run at all until the campaign spine exists
+ * (hasCampaignPlan, campaignPlan.ts) - writing the plan is part of session
+ * zero's job, and a campaign started without one never gets one.
  */
 import { describe, it, expect } from "vitest";
 import { executeGMTools } from "@/app/misc/gmExecutor";
 import { buildGMStagePrompt } from "@/app/misc/ai_staged";
-import { StoryData } from "@/app/misc/structs";
+import { StoryData, StoryLore } from "@/app/misc/structs";
 import {
   hardRuleFloor,
   SCENE_BASELINE_TIER,
   TOP_TIER,
 } from "@/app/misc/reasoningTiers";
+
+function spineNote(overrides: Partial<StoryLore> = {}): StoryLore {
+  return {
+    title: "Campaign Plan",
+    content: "# Campaign Plan\n## Current beat — Opening Image (Session 0)",
+    relatedCharacters: [],
+    relatedLocations: [],
+    secrtet: false,
+    keys: [],
+    type: "gm_plan",
+    ...overrides,
+  } as StoryLore;
+}
 
 function createMockStoryData(overrides: Partial<StoryData> = {}): StoryData {
   return {
@@ -27,7 +44,9 @@ function createMockStoryData(overrides: Partial<StoryData> = {}): StoryData {
     inventory: [],
     abilities: [],
     achievements: [],
-    lore: [],
+    // start_game is gated on the spine existing, so the happy-path cases
+    // below need one; the gate's own describe block drops it.
+    lore: [spineNote()],
     memory: [],
     ...overrides,
   } as StoryData;
@@ -113,6 +132,78 @@ describe("start_game", () => {
     const storyData = createMockStoryData();
     const result = await executeGMTools(
       [createToolCall("start_game", {})],
+      storyData,
+    );
+
+    expect(result.results[0].success).toBe(false);
+  });
+});
+
+describe("start_game requires a campaign plan", () => {
+  it("refuses to start the game when no gm_plan spine note exists", async () => {
+    const storyData = createMockStoryData({ lore: [] });
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Premature Saga" })],
+      storyData,
+    );
+
+    expect(result.results[0].success).toBe(false);
+    expect(result.results[0].contextForStory).toContain("no campaign plan");
+    expect(result.results[0].contextForStory).toContain("Campaign Plan");
+    // Nothing was mutated - the story stays unnamed and in session zero.
+    expect(result.modifiedStoryData.story_name).toBe("New Story");
+    expect(result.modifiedStoryData.sessionZeroActive).toBe(true);
+  });
+
+  it("still refuses when the only gm_plan note is a side beat", async () => {
+    const storyData = createMockStoryData({
+      lore: [spineNote({ title: "Side beat — The Missing Cat" })],
+      activeSideBeatTitle: "Side beat — The Missing Cat",
+    });
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Cat Quest" })],
+      storyData,
+    );
+
+    expect(result.results[0].success).toBe(false);
+    expect(result.modifiedStoryData.sessionZeroActive).toBe(true);
+  });
+
+  it("allows the start once the spine note exists", async () => {
+    const storyData = createMockStoryData({ lore: [spineNote()] });
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Ready Saga" })],
+      storyData,
+    );
+
+    expect(result.results[0].success).toBe(true);
+    expect(result.modifiedStoryData.sessionZeroActive).toBe(false);
+  });
+
+  it("allows the start on a story whose planState exists but whose note was deleted", async () => {
+    // Mid-campaign edge case: the player renamed/removed the note. The
+    // campaign was planned, so don't re-block it into session zero.
+    const storyData = createMockStoryData({
+      lore: [],
+      planState: {
+        beats: ["Opening Image (Session 0)", "Inciting Incident"],
+        currentBeatIndex: 0,
+      },
+    });
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Salvaged Saga" })],
+      storyData,
+    );
+
+    expect(result.results[0].success).toBe(true);
+  });
+
+  it("ignores a disabled spine note", async () => {
+    const storyData = createMockStoryData({
+      lore: [spineNote({ enabled: false })],
+    });
+    const result = await executeGMTools(
+      [createToolCall("start_game", { story_name: "Disabled Plan Saga" })],
       storyData,
     );
 
