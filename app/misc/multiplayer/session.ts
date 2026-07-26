@@ -87,16 +87,15 @@ export interface ValidatedGuestAction {
 // this fired for - NetSession already filtered by forPlayerId) to throw.
 export interface DiceThrowRelayRequest {
   requestId: string;
-  sides: number;
-  count: number;
+  groups: { sides: number; count: number }[];
   formula: string;
   reason: string;
-  dc?: number;
 }
 
 export interface DiceThrowRelayResult {
   requestId: string;
-  faces: number[] | null;
+  // One face array per requested group, in the same order.
+  faces: number[][] | null;
 }
 
 export interface GuestJoinedInfo {
@@ -586,7 +585,7 @@ export class NetSession {
 
   // Called by whichever guest a dice_throw_request targeted, once their
   // throw settles (or they skip it - faces: null).
-  sendDiceThrowResult(requestId: string, faces: number[] | null): void {
+  sendDiceThrowResult(requestId: string, faces: number[][] | null): void {
     this.transport.send({ type: "dice_throw_result", requestId, faces });
   }
 
@@ -667,11 +666,9 @@ export class NetSession {
         this.diceThrowRequestListeners.forEach((cb) =>
           cb({
             requestId: msg.requestId,
-            sides: msg.sides,
-            count: msg.count,
+            groups: msg.groups,
             formula: msg.formula,
             reason: msg.reason,
-            dc: msg.dc,
           }),
         );
       }

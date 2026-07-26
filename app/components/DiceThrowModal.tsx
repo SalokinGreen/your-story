@@ -9,9 +9,10 @@ import { DynamicIcon } from "./DynamicIcon";
 interface DiceThrowModalProps {
   // The pending physical dice request, or null when nothing is being asked
   request: DiceThrowRequest | null;
-  // Called with the settled face values, or null if the player skipped -
-  // the GM executor falls back to a fully digital roll in that case.
-  onResolve: (faces: number[] | null) => void;
+  // Called with the settled face values - one array per requested group, in
+  // the same order - or null if the player skipped, in which case the GM
+  // executor falls back to a fully digital roll.
+  onResolve: (faces: number[][] | null) => void;
 }
 
 // dice-box ships models for these standard die sizes only. A formula can
@@ -19,6 +20,56 @@ interface DiceThrowModalProps {
 // note) - those can't be thrown physically, so fall straight back to a
 // digital roll rather than showing a tray that can't render the die.
 const SUPPORTED_SIDES = new Set([4, 6, 8, 10, 12, 20, 100]);
+
+// Every group in a request is thrown together, so dice-box gets one notation
+// per group: ["2d6", "1d4"]. It returns a flat DieResult[] carrying each
+// die's own `sides`, which is what splitFacesByGroup below matches back up.
+function notationFor(groups: { sides: number; count: number }[]): string[] {
+  return groups.map((g) => `${g.count}d${g.sides}`);
+}
+
+/**
+ * Regroups dice-box's flat results back into one face array per requested
+ * group, so "2d6+1d4" comes home as [[3, 5], [2]] rather than one merged
+ * list. Every die carries the groupId of the notation entry it came from, so
+ * bucketing by that in first-seen order lines the results up with the
+ * requested groups.
+ *
+ * If the groupIds don't come back cleanly (an older dice-box, or a reroll
+ * that reshuffled them), fall back to matching each requested group against
+ * dice of the same size - the sizes are what the caller actually needs to be
+ * right, since a group short of faces fails the roll in rollDiceGroupAsync.
+ */
+function splitFacesByGroup(
+  groups: { sides: number; count: number }[],
+  results: DieResult[]
+): number[][] {
+  const buckets = new Map<number, number[]>();
+  for (const die of results) {
+    if (typeof die.groupId !== "number") continue;
+    const bucket = buckets.get(die.groupId);
+    if (bucket) bucket.push(die.value);
+    else buckets.set(die.groupId, [die.value]);
+  }
+
+  const byGroupId = [...buckets.values()];
+  const groupIdsUsable =
+    byGroupId.length === groups.length &&
+    groups.every((group, i) => byGroupId[i].length >= group.count);
+  if (groupIdsUsable) return byGroupId;
+
+  const remaining = [...results];
+  return groups.map((group) => {
+    const faces: number[] = [];
+    for (let i = 0; i < group.count; i++) {
+      const at = remaining.findIndex((r) => Number(r.sides) === group.sides);
+      // Take the next die of any size rather than leaving the group short.
+      const die = remaining.splice(at === -1 ? 0 : at, 1)[0];
+      if (die) faces.push(die.value);
+    }
+    return faces;
+  });
+}
 
 interface DragState {
   startX: number;
@@ -74,14 +125,19 @@ function throwForceFromDrag(dx: number, dy: number) {
 type Phase = "loading" | "aiming" | "rolling" | "settled";
 
 /**
- * Physical dice mode: the GM's formula_roll/opposed_formula/
- * formula_challenge_check can be thrown on a 3D dice tray instead of
- * resolved silently. The dice spawn in and settle as soon as the tray
- * opens, sitting visible at rest; drag anywhere on the tray (a line shows
- * the throw vector) and release to re-throw them for the actual result -
- * the result comes from @3d-dice/dice-box's real physics (see
- * scripts/patchDiceBox.mjs for how the throw itself is gesture-driven
- * rather than the library's own randomized toss).
+ * Physical dice mode: the GM's formula_roll/opposed_formula rolls can be
+ * thrown on a 3D dice tray instead of resolved silently. The dice spawn in
+ * and settle as soon as the tray opens, sitting visible at rest; drag
+ * anywhere on the tray (a line shows the throw vector) and release to
+ * re-throw them for the actual result - the result comes from
+ * @3d-dice/dice-box's real physics (see scripts/patchDiceBox.mjs for how the
+ * throw itself is gesture-driven rather than the library's own randomized
+ * toss).
+ *
+ * Every pool in the roll is thrown in the same toss: "2d6+1d4" puts three
+ * dice in the tray at once, and Starforged's 1d6 action die lands alongside
+ * its 2d10 challenge dice - the way a real handful works. Faces are split
+ * back out per pool on the way home (splitFacesByGroup).
  *
  * The dice-box/Babylon.js instance is created once and kept alive across
  * requests (re-initializing WebGL/physics per roll would be slow and
@@ -104,7 +160,8 @@ export default function DiceThrowModal({
   const requestTokenRef = useRef(0);
 
   const [phase, setPhase] = useState<Phase>("loading");
-  const [settledFaces, setSettledFaces] = useState<number[] | null>(null);
+  // Settled faces per requested group, matching DiceThrowRequest.groups.
+  const [settledFaces, setSettledFaces] = useState<number[][] | null>(null);
   const [dragVisual, setDragVisual] = useState<DragVisual | null>(null);
 
   async function getDiceBox(): Promise<DiceBox> {
@@ -132,9 +189,14 @@ export default function DiceThrowModal({
     const token = ++requestTokenRef.current;
     setSettledFaces(null);
 
-    if (!SUPPORTED_SIDES.has(request.sides)) {
-      // Can't render this die type - skip straight to a digital fallback
-      // rather than showing a tray that can't display the roll.
+    if (
+      request.groups.length === 0 ||
+      !request.groups.every((g) => SUPPORTED_SIDES.has(g.sides))
+    ) {
+      // Can't render one of these die types - skip straight to a digital
+      // fallback rather than showing a tray that can't display the roll.
+      // All-or-nothing on purpose: half the handful thrown physically and
+      // half rolled in code would be worse than either.
       onResolve(null);
       return;
     }
@@ -170,7 +232,7 @@ export default function DiceThrowModal({
           customThrowVelocity: null,
           customThrowSpin: null,
         });
-        const results = await diceBox.roll(`${request.count}d${request.sides}`);
+        const results = await diceBox.roll(notationFor(request.groups));
         if (requestTokenRef.current !== token) return;
         diceGroupRef.current = results;
         setPhase("aiming");
@@ -252,12 +314,11 @@ export default function DiceThrowModal({
       // is aimed inward from that edge, so the die always stays in the tray.
       const results = group
         ? await diceBox.reroll(group, { remove: true })
-        : await diceBox.roll(`${request.count}d${request.sides}`);
+        : await diceBox.roll(notationFor(request.groups));
       if (requestTokenRef.current !== token) return;
 
       diceGroupRef.current = results;
-      const faces = results.map((r) => r.value);
-      setSettledFaces(faces);
+      setSettledFaces(splitFacesByGroup(request.groups, results));
       setPhase("settled");
     } catch (err) {
       console.error("[DiceThrowModal] throw failed:", err);
@@ -294,15 +355,17 @@ export default function DiceThrowModal({
           <p className="text-sm text-blue-100 max-w-sm mx-auto">
             {request.reason}
           </p>
-          <div className="flex items-center justify-center gap-2 text-sm mt-2">
-            <span className="px-3 py-1.5 rounded-lg bg-purple-900/60 border border-purple-600/40 text-purple-100 font-mono font-semibold">
-              🎲 {request.count}d{request.sides}
-            </span>
-            {request.dc !== undefined && (
-              <span className="px-3 py-1.5 rounded-lg bg-blue-900/60 border border-blue-600/40 text-blue-100 font-semibold">
-                vs DC {request.dc}
+          {/* One chip per pool, so a multi-pool roll reads as the separate
+              handfuls it is rather than a single summed formula. */}
+          <div className="flex items-center justify-center flex-wrap gap-2 text-sm mt-2">
+            {request.groups.map((group, i) => (
+              <span
+                key={`${group.count}d${group.sides}-${i}`}
+                className="px-3 py-1.5 rounded-lg bg-purple-900/60 border border-purple-600/40 text-purple-100 font-mono font-semibold"
+              >
+                🎲 {group.count}d{group.sides}
               </span>
-            )}
+            ))}
           </div>
         </div>
       )}
@@ -365,10 +428,22 @@ export default function DiceThrowModal({
       {request && (
         <div className="px-5 pb-5 pt-3 bg-linear-to-t from-blue-950 to-transparent">
           {phase === "settled" && settledFaces && (
-            <div className="text-center mb-3">
-              <span className="text-white font-bold text-lg">
-                [{settledFaces.join(", ")}]
-              </span>
+            <div className="text-center mb-3 flex items-center justify-center flex-wrap gap-x-3 gap-y-1">
+              {settledFaces.map((faces, i) => (
+                <span
+                  key={i}
+                  className="text-white font-bold text-lg"
+                  // Each pool keeps its own bracket - the whole point of
+                  // separate pools is that their numbers don't merge.
+                >
+                  {request.groups.length > 1 && (
+                    <span className="text-blue-300/60 font-normal text-sm mr-1 font-mono">
+                      {request.groups[i]?.count}d{request.groups[i]?.sides}
+                    </span>
+                  )}
+                  [{faces.join(", ")}]
+                </span>
+              ))}
             </div>
           )}
           {phase === "settled" ? (

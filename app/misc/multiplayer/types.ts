@@ -129,17 +129,17 @@ export type WireMessage =
       type: "dice_throw_request";
       requestId: string;
       forPlayerId: string;
-      sides: number;
-      count: number;
+      // Every pool the roll needs, thrown in one toss on the guest's device.
+      groups: { sides: number; count: number }[];
       formula: string;
       reason: string;
-      dc?: number;
     }
   | {
       type: "dice_throw_result";
       requestId: string;
+      // One face array per requested group, in the same order.
       // null = the targeted guest skipped/cancelled the throw.
-      faces: number[] | null;
+      faces: number[][] | null;
     }
   // Out-of-character chat between online players - the GM never sees this,
   // it's not part of StoryData and never enters the AI prompt context.

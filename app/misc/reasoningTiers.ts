@@ -316,7 +316,6 @@ export function computeSceneKey(state: StoryData): string {
 const ROLL_OR_ORACLE_TOOL_NAMES = new Set([
   "formula_roll",
   "opposed_formula",
-  "formula_challenge_check",
   "npc_roll",
   "fate_question",
 ]);

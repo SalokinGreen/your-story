@@ -427,20 +427,16 @@ describe("NetSession", () => {
     guest1.onDiceThrowRequest(guest1Heard);
 
     host.sendDiceThrowRequest("req-1", "guest-1", {
-      sides: 20,
-      count: 1,
+      groups: [{ sides: 20, count: 1 }],
       formula: "1d20+5",
       reason: "Climb the wall",
-      dc: 15,
     });
 
     expect(guest1Heard).toHaveBeenCalledWith({
       requestId: "req-1",
-      sides: 20,
-      count: 1,
+      groups: [{ sides: 20, count: 1 }],
       formula: "1d20+5",
       reason: "Climb the wall",
-      dc: 15,
     });
     expect(guest0Heard).not.toHaveBeenCalled();
   });
@@ -451,14 +447,48 @@ describe("NetSession", () => {
     host.onDiceThrowResult(result);
 
     host.sendDiceThrowRequest("req-1", "guest-1", {
-      sides: 6,
-      count: 2,
+      groups: [{ sides: 6, count: 2 }],
       formula: "2d6",
       reason: "Push the door",
     });
-    guest.sendDiceThrowResult("req-1", [4, 6]);
+    guest.sendDiceThrowResult("req-1", [[4, 6]]);
 
-    expect(result).toHaveBeenCalledWith({ requestId: "req-1", faces: [4, 6] });
+    expect(result).toHaveBeenCalledWith({ requestId: "req-1", faces: [[4, 6]] });
+  });
+
+  it("relays every pool of a multi-pool throw, and the per-pool faces back", async () => {
+    // A roll like Starforged's 1d6 action die + 2d10 challenge dice is one
+    // throw on the guest's device, and its result has to come home as
+    // separate pools - flattening them loses which die was which.
+    const { host, guest } = await createHostAndGuest("host-1", "guest-1");
+    const heard = vi.fn();
+    const result = vi.fn();
+    guest.onDiceThrowRequest(heard);
+    host.onDiceThrowResult(result);
+
+    host.sendDiceThrowRequest("req-1", "guest-1", {
+      groups: [
+        { sides: 6, count: 1 },
+        { sides: 10, count: 2 },
+      ],
+      formula: "1d6+2 and 2d10",
+      reason: "Face danger",
+    });
+
+    expect(heard).toHaveBeenCalledWith(
+      expect.objectContaining({
+        groups: [
+          { sides: 6, count: 1 },
+          { sides: 10, count: 2 },
+        ],
+      }),
+    );
+
+    guest.sendDiceThrowResult("req-1", [[4], [6, 8]]);
+    expect(result).toHaveBeenCalledWith({
+      requestId: "req-1",
+      faces: [[4], [6, 8]],
+    });
   });
 
   it("ignores a dice_throw_result from a guest the request wasn't sent to", async () => {
@@ -482,12 +512,11 @@ describe("NetSession", () => {
     // tries to answer it - the host must not accept a result from anyone
     // other than the guest it actually asked.
     host.sendDiceThrowRequest("req-1", "guest-1", {
-      sides: 6,
-      count: 1,
+      groups: [{ sides: 6, count: 1 }],
       formula: "1d6",
       reason: "Test",
     });
-    guest0.sendDiceThrowResult("req-1", [3]);
+    guest0.sendDiceThrowResult("req-1", [[3]]);
 
     expect(result).not.toHaveBeenCalled();
   });
@@ -497,7 +526,7 @@ describe("NetSession", () => {
     const result = vi.fn();
     host.onDiceThrowResult(result);
 
-    guest.sendDiceThrowResult("never-requested", [1]);
+    guest.sendDiceThrowResult("never-requested", [[1]]);
 
     expect(result).not.toHaveBeenCalled();
   });

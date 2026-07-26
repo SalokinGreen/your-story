@@ -3,7 +3,7 @@
  *
  * The GM stage runs before the story stage and determines:
  * - What dice rolls are needed (formula_roll, opposed_formula)
- * - Challenge management (start_challenge, formula_challenge_check)
+ * - Challenge management (start_challenge, record_challenge_result)
  * - Combat state management
  * - Oracle and utility tools
  *
@@ -45,14 +45,21 @@ export interface TakeRestParams {
 // The GM should look up character values and insert actual numbers
 
 /**
- * Roll a dice formula against an optional DC
- * The GM must calculate and insert actual numeric values
- * Example: "1d20+5+2" vs DC 15
+ * Roll one or more independent dice pools. The GM must calculate and insert
+ * actual numeric values.
+ *
+ * No DC and no verdict: the tool reports what the dice showed and nothing
+ * else. Whether that beats a target is arithmetic, so it goes through
+ * `calculate` (which evaluates comparisons) - see the tool description for
+ * why. Systems that roll dissimilar pools against each other (Starforged:
+ * 1d6+mods vs 2d10) pass them as separate `formulas` entries so nothing is
+ * summed across pools and every die is thrown in one handful.
  */
 export interface FormulaRollParams {
-  formula: string; // "1d20+5+2" (actual numbers, not variables)
-  dc?: number; // Optional target number
-  reverse_dc?: boolean; // If true, success = roll ≤ DC (Call of Cthulhu style)
+  formulas: string[]; // ["1d20+5+2"], or ["1d6+2", "2d10"] for separate pools
+  // Optional per-pool labels, parallel to `formulas` (e.g. ["action die",
+  // "challenge dice"]). Purely for how the result reads back.
+  labels?: string[];
   reason: string;
   display_name?: string;
   stakes?: "low" | "medium" | "high" | "deadly";
@@ -74,37 +81,27 @@ export interface FormulaRollParams {
 }
 
 /**
- * Manual dice mode: ask the player to roll physical dice and enter the
- * result. Only offered when storyData.diceMode === "manual". The frontend
- * pauses the GM loop, shows a roll prompt, and returns the number the
- * player typed in.
+ * Manual dice mode: ask the player to roll physical dice and report what
+ * they got. Only offered when storyData.diceMode === "manual". The frontend
+ * pauses the GM loop, shows a roll prompt, and returns the player's answer
+ * as verbatim text - "17", "4 and 6", "natural 20!" - with no number parsed
+ * out of it. The GM reads the text and does any arithmetic via `calculate`.
  */
 export interface AskForRollParams {
   title: string; // Short label, e.g. "Perception Check"
   description: string; // What's happening / why this roll matters
   player_name?: string; // Which player should roll (couch co-op)
   formula?: string; // What to roll, e.g. "1d20+3" (GM pre-computes modifiers)
-  dc?: number; // Optional target number to compare the entered total against
-  reverse_dc?: boolean; // If true, success = roll ≤ DC (roll-under systems)
 }
 
 /**
- * Pure numeric DC check: the player already reported a total (typed, said
- * out loud, or volunteered in freeform narration - "I rolled 17, plus 3 is
- * 20") and the GM needs a deterministic success/failure verdict instead of
- * judging the number itself. Does not roll any dice.
- */
-export interface CheckDCParams {
-  total: number; // The final number to check, already computed by the GM/player
-  dc: number; // Target number to compare against
-  reverse_dc?: boolean; // If true, success = total ≤ DC (roll-under systems)
-  reason: string; // What's being checked
-}
-
-/**
- * Opposed roll using formulas for both sides
- * GM should insert actual calculated values
- * Example: player "1d20+4" vs opponent "1d20+5"
+ * Opposed roll using formulas for both sides. GM should insert actual
+ * calculated values. Example: player "1d20+4" vs opponent "1d20+5".
+ *
+ * Rolls both sides and reports both totals; it does NOT declare a winner.
+ * "Higher total wins" is only true in some systems, and forcing it broke the
+ * ones where it isn't (a 1d6 action die "losing" to 2d10 challenge dice).
+ * Compare the reported totals with `calculate`.
  */
 export interface OpposedFormulaParams {
   player_formula: string; // "1d20+4" (actual value)
@@ -114,9 +111,12 @@ export interface OpposedFormulaParams {
   display_name?: string;
   stakes?: "low" | "medium" | "high" | "deadly";
   // See FormulaRollParams.target/forces_choice - same hardness dimensions,
-  // applied to the consequence if the player loses.
+  // attached to the "player loses" branch of the consequence guidance.
   target?: "self" | "someone_they_love" | "someone_present";
   forces_choice?: boolean;
+  // Planned consequences per outcome. Since the tool no longer picks a
+  // winner, all branches are echoed back as guidance and the GM narrates
+  // whichever one the comparison actually landed on.
   consequences?: {
     player_wins?: string;
     opponent_wins?: string;
@@ -128,28 +128,22 @@ export interface OpposedFormulaParams {
 }
 
 /**
- * Challenge check using a formula instead of stat lookup
- * GM should look up character values and insert actual numbers
+ * Record one resolved check against the active challenge, advancing its
+ * success/failure counts and closing it out when a threshold is reached.
  *
- * Same optional fields as FormulaRollParams (reverse_dc, stakes, the
- * target/forces_choice hardness dimensions, stat_name) - challenges are
- * reserved for the biggest scenes by this tool's own convention, so they
- * get the same rigor as an ordinary roll instead of a stripped-down subset.
+ * Deliberately does NOT roll: the GM rolls with `formula_roll`, compares with
+ * `calculate`, then reports the verdict here. Rolling and adjudicating used
+ * to be one `formula_challenge_check` call with its own `dc`, which meant
+ * challenges only worked for systems where "beat one target number" is the
+ * whole resolution.
  */
-export interface FormulaChallengeCheckParams {
-  formula: string; // "1d20+5" (actual value)
-  dc: number;
-  reverse_dc?: boolean; // If true, success = roll ≤ DC (Call of Cthulhu style)
-  description: string;
-  display_name?: string;
-  stakes?: "low" | "medium" | "high" | "deadly";
+export interface RecordChallengeResultParams {
+  outcome: "success" | "failure";
+  description: string; // What this check represented, e.g. "Vault over the gap"
+  // Hardness dimensions for a failure's narration - see
+  // FormulaRollParams.target/forces_choice. Ignored on a success.
   target?: "self" | "someone_they_love" | "someone_present";
   forces_choice?: boolean;
-  stat_name?: string;
-  consequences?: {
-    success?: string;
-    failure?: string;
-  };
 }
 
 /**
@@ -415,7 +409,6 @@ export interface ToggleCombatantConditionParams {
 export interface NPCRollParams {
   combatant: string; // Name or ID of the NPC making the roll
   formula: string; // Dice formula: "1d20+5", "2d6+3"
-  dc?: number; // Optional target number to check success
   reason: string; // What the roll is for
   target?: string; // Optional: who/what is being targeted
 }
@@ -630,9 +623,8 @@ export type GMToolParams =
   | { name: "formula_roll"; params: FormulaRollParams }
   | { name: "ask_for_roll"; params: AskForRollParams }
   | { name: "ask_question"; params: AskQuestionParams }
-  | { name: "check_dc"; params: CheckDCParams }
   | { name: "opposed_formula"; params: OpposedFormulaParams }
-  | { name: "formula_challenge_check"; params: FormulaChallengeCheckParams }
+  | { name: "record_challenge_result"; params: RecordChallengeResultParams }
   | { name: "fate_question"; params: FateQuestionParams }
   | { name: "roll_table"; params: RollTableParams }
   | { name: "generate_name"; params: GenerateNameParams }
@@ -758,20 +750,22 @@ const calculateTool: ToolSchema = {
   type: "function",
   function: {
     name: "calculate",
-    description: `Calculate a mathematical expression, optionally with dice.
+    description: `Evaluate a mathematical expression, optionally with dice. Also answers comparisons - this is how every "did it beat the target?" question gets settled.
 
 Use for:
-- Damage calculation after modifiers
-- Resource costs
-- Complex formulas
-- Any math with explanation`,
+- **Checking a roll against a target number.** Put a comparison in the expression and you get back TRUE or FALSE: '17+3 >= 15', '4+2 > 4', '38 <= 55' (roll-under systems). The dice tools report numbers only; this is what turns them into a verdict, so you never have to eyeball it yourself.
+- **Systems that compare against several numbers.** Call it once per comparison: with a 1d6+2 action score of 6 against challenge dice 4 and 6, '6 > 4' is TRUE and '6 > 6' is FALSE - beat one, not the other.
+- **A total the player reported themselves.** They typed or said "I rolled a 17, plus 3 that's 20"? Add it up in the expression and compare: '17+3 >= 15'.
+- Damage after modifiers, resource costs, any other arithmetic worth showing.
+
+Supported comparisons: >, >=, <, <=, ==, != (one per call). Without a comparison you get the number back as usual.`,
     parameters: {
       type: "object",
       properties: {
         expression: {
           type: "string",
           description:
-            "Math expression: '20 - 4', '50 + 2d6', '100 - 1d20 + 5'",
+            "Math expression ('20 - 4', '50 + 2d6', '100 - 1d20 + 5') or a comparison that resolves to TRUE/FALSE ('17+3 >= 15', '4+2 > 4', '38 <= 55')",
         },
         reason: {
           type: "string",
@@ -827,36 +821,38 @@ const formulaRollTool: ToolSchema = {
   type: "function",
   function: {
     name: "formula_roll",
-    description: `Roll a dice formula against an optional DC.
+    description: `Throw dice and report what they showed. This is the only dice tool for player-character rolls.
 
-Use when:
-- The adventure uses custom character sheets (characterData exists)
-- You need to roll a formula like "1d20+5+2"
-- The DC is known and you want to check success/failure
+**It does not judge the result.** There is no DC parameter: this tool rolls, and \`calculate\` answers "did that beat the target?" ('17+3 >= 15' → TRUE). Two steps, always - do not decide success or failure yourself in narration.
 
 YOU must look up character stats and insert the actual numeric values.
 For D&D-style modifiers, calculate floor((stat-10)/2) yourself.
 
-Example formulas:
-- "1d20+3+2" (attack with +3 STR mod and +2 proficiency)
-- "2d6+4" (damage with +4 bonus)
-- "1d100" (percentile check)`,
+**One pool (almost always):**
+- formulas: ["1d20+3+2"] (attack with +3 STR mod and +2 proficiency)
+- formulas: ["2d6+4"] (damage with +4 bonus)
+- formulas: ["1d100"] (percentile check)
+
+**Several pools** - only when the system rolls dissimilar dice that must NOT be added together, e.g. Starforged/Ironsworn's action die against its challenge dice:
+- formulas: ["1d6+2", "2d10"], labels: ["action score", "challenge dice"]
+Each pool is reported with its own separate total, and all the dice are thrown in one handful. Then compare with \`calculate\`, once per target ('6 > 4', '6 > 8').
+
+Never pack independent pools into one formula string ("1d6+2d10") - that adds them together into a meaningless number.`,
     parameters: {
       type: "object",
       properties: {
-        formula: {
-          type: "string",
+        formulas: {
+          type: "array",
+          minItems: 1,
+          items: { type: "string" },
           description:
-            "Dice formula with actual numbers: '1d20+5', '2d6+3', '1d100'",
+            "One entry per independent dice pool, with actual numbers. Almost always a single entry: ['1d20+5']. Use several ONLY for systems that roll separate pools which must not be summed: ['1d6+2', '2d10'].",
         },
-        dc: {
-          type: "number",
-          description: "Target number to beat for success (optional)",
-        },
-        reverse_dc: {
-          type: "boolean",
+        labels: {
+          type: "array",
+          items: { type: "string" },
           description:
-            "If true, success = roll ≤ DC (Call of Cthulhu/BRP style roll-under). Default: false (roll ≥ DC)",
+            "Optional label per pool, in the same order as formulas (e.g. ['action score', 'challenge dice']). Only worth setting when there are several pools.",
         },
         reason: {
           type: "string",
@@ -884,7 +880,8 @@ Example formulas:
         },
         consequences: {
           type: "object",
-          description: "What happens on each outcome",
+          description:
+            "What you intend to happen on each outcome, decided before the dice land. Both branches are echoed back to you with the roll - narrate whichever one your `calculate` comparison came out to.",
           properties: {
             success: { type: "string", description: "What happens on success" },
             failure: { type: "string", description: "What happens on failure" },
@@ -893,10 +890,10 @@ Example formulas:
         stat_name: {
           type: "string",
           description:
-            "Optional: name of the stat/resource this formula's flat modifier comes from (e.g. 'Strength'). If it matches a tracked stat/resource, the modifier is cross-checked against it as an integrity check. Omit for narrative-only or character_sheet-lore-based adventures with no tracked stats/resources.",
+            "Optional: name of the stat/resource the flat modifier comes from (e.g. 'Strength'). If it matches a tracked stat/resource, the modifier is cross-checked against it as an integrity check. Omit for narrative-only or character_sheet-lore-based adventures with no tracked stats/resources.",
         },
       },
-      required: ["formula", "reason"],
+      required: ["formulas", "reason"],
     },
   },
 };
@@ -905,12 +902,13 @@ const askForRollTool: ToolSchema = {
   type: "function",
   function: {
     name: "ask_for_roll",
-    description: `Ask the player to roll REAL dice at the table and enter their result. Only available in Manual Dice Mode.
+    description: `Ask the player to roll REAL dice at the table and tell you what came up. Only available in Manual Dice Mode.
 
 Use this INSTEAD of formula_roll whenever a player character makes a roll:
 - Tell them exactly what to roll in \`formula\` (look up their modifiers yourself, e.g. "1d20+3")
-- The game pauses until the player types in their total
-- The entered total is compared against \`dc\` if you provide one
+- The game pauses until they answer
+- **Their answer comes back as their own words, not a number** - "17", "4 and 6", "natural 20, so 23 total". Read it, work out what it means for the dice you asked for, and use \`calculate\` for any arithmetic or comparison ('17+3 >= 15'). Nothing is parsed or judged for you.
+- If their answer is genuinely unreadable or doesn't match what you asked for, ask them again in (round brackets) rather than guessing a number.
 
 Do NOT use this for NPC/enemy/secret rolls - roll those yourself with formula_roll or npc_roll instead.`,
     parameters: {
@@ -933,16 +931,7 @@ Do NOT use this for NPC/enemy/secret rolls - roll those yourself with formula_ro
         formula: {
           type: "string",
           description:
-            "What to roll, with modifiers pre-computed: '1d20+5', '2d6+3', '1d100'",
-        },
-        dc: {
-          type: "number",
-          description: "Target number to compare the entered total against (optional)",
-        },
-        reverse_dc: {
-          type: "boolean",
-          description:
-            "If true, success = total ≤ DC (Call of Cthulhu/BRP roll-under). Default: false (total ≥ DC)",
+            "What to roll, with modifiers pre-computed: '1d20+5', '2d6+3', '1d6 and 2d10'",
         },
       },
       required: ["title", "description"],
@@ -1012,51 +1001,20 @@ You can ask up to 3 questions in one call (e.g. two independent decisions at onc
   },
 };
 
-const checkDCTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "check_dc",
-    description: `Check a total the player already reported against a DC. Pure number comparison - does NOT roll any dice.
-
-Use this whenever a player tells you their roll result in freeform text or voice instead of you rolling for them, e.g. they say "I rolled a 17, plus my +3 that's 20." Do the addition yourself if they gave you the pieces, then call this tool with the final total - do NOT judge success/failure yourself in narration, let this tool resolve it deterministically.
-
-Do NOT use this to roll dice - use formula_roll or npc_roll for that. Only use this to check a number that's already been rolled.`,
-    parameters: {
-      type: "object",
-      properties: {
-        total: {
-          type: "number",
-          description:
-            "The final number to check, after any modifiers (compute the arithmetic yourself if the player only gave you the pieces)",
-        },
-        dc: {
-          type: "number",
-          description: "Target number to compare the total against",
-        },
-        reverse_dc: {
-          type: "boolean",
-          description:
-            "If true, success = total ≤ DC (Call of Cthulhu/BRP roll-under). Default: false (total ≥ DC)",
-        },
-        reason: {
-          type: "string",
-          description: "What's being checked",
-        },
-      },
-      required: ["total", "dc", "reason"],
-    },
-  },
-};
+// NOTE: there used to be a `check_dc` tool here for comparing a total the
+// player reported against a DC. `calculate` now evaluates comparisons
+// ('17+3 >= 15' → TRUE), so it was a second way to ask the same question.
 
 const opposedFormulaTool: ToolSchema = {
   type: "function",
   function: {
     name: "opposed_formula",
-    description: `Opposed roll using formulas. Both player and opponent roll, higher wins.
+    description: `Roll both sides of a direct contest at once - the player and the NPC they're up against. Reports both totals.
+
+**It does not declare a winner.** "Higher total wins" only holds in some systems, so the comparison is yours to make with \`calculate\` ('18 > 14' → TRUE) against whatever this adventure's mechanics note actually says.
 
 Use when:
-- Player contests an NPC directly
-- Both sides should roll (not just player vs static DC)
+- Player contests an NPC directly and both sides roll
 - The adventure uses custom character sheets
 
 YOU must look up character stats and insert actual numeric values.
@@ -1105,7 +1063,8 @@ Examples:
         },
         consequences: {
           type: "object",
-          description: "What happens on each outcome",
+          description:
+            "What you intend to happen on each outcome, decided before the dice land. All branches are echoed back with the totals - narrate the one your `calculate` comparison came out to.",
           properties: {
             player_wins: { type: "string" },
             opponent_wins: { type: "string" },
@@ -1128,77 +1087,45 @@ Examples:
   },
 };
 
-const formulaChallengeCheckTool: ToolSchema = {
+const recordChallengeResultTool: ToolSchema = {
   type: "function",
   function: {
-    name: "formula_challenge_check",
-    description: `Make a challenge check using a dice formula instead of stat lookup.
+    name: "record_challenge_result",
+    description: `Record one resolved check against the active challenge. Advances its success/failure count and closes the challenge out when a threshold is reached.
 
-Use when:
-- There's an active challenge in progress
-- The adventure uses custom character sheets (characterData)
-- You want to roll a formula like "1d20+5"
+This does NOT roll. One check inside a challenge is three steps:
+1. \`formula_roll\` - throw the dice for the check
+2. \`calculate\` - compare the result against the target ('14+3 >= 15' → TRUE)
+3. \`record_challenge_result\` - report which way it went
 
-YOU must look up character stats and insert actual numeric values.
-
-This tool updates challenge progress (successes/failures) based on the roll result.`,
+Report what the comparison actually said, not what you'd prefer. Requires an active challenge (\`start_challenge\`); use \`cancel_challenge\` if the challenge has stopped mattering instead of feeding it a made-up failure.`,
     parameters: {
       type: "object",
       properties: {
-        formula: {
+        outcome: {
           type: "string",
-          description: "Dice formula with actual numbers: '1d20+5'",
-        },
-        dc: {
-          type: "number",
-          description: "Target number to beat for success",
-        },
-        reverse_dc: {
-          type: "boolean",
+          enum: ["success", "failure"],
           description:
-            "If true, success = roll ≤ DC (Call of Cthulhu/BRP style roll-under). Default: false (roll ≥ DC)",
+            "Which way this check went, per your `calculate` comparison",
         },
         description: {
           type: "string",
           description:
-            "What this specific check represents (e.g., 'Vault over the gap')",
-        },
-        display_name: {
-          type: "string",
-          description: "Optional label for UI (e.g., 'Athletics Check')",
-        },
-        stakes: {
-          type: "string",
-          enum: ["low", "medium", "high", "deadly"],
-          description:
-            "Consequence tier on failure. Challenges are reserved for the biggest scenes - most challenge checks should be at least 'high'.",
+            "What this specific check represented (e.g., 'Vault over the gap')",
         },
         target: {
           type: "string",
           enum: ["self", "someone_they_love", "someone_present"],
           description:
-            "Who the failure consequence actually lands on. Independent of stakes. Omit for an ordinary consequence to the character themselves.",
+            "On a failure: who the consequence actually lands on. Omit for an ordinary consequence to the character themselves.",
         },
         forces_choice: {
           type: "boolean",
           description:
-            "If true, present the failure consequence as a dilemma between two costs the player must choose between, not a single flat cost.",
-        },
-        stat_name: {
-          type: "string",
-          description:
-            "Optional: name of the stat/resource this formula's flat modifier comes from. If it matches a tracked stat/resource, the modifier is cross-checked against it as an integrity check.",
-        },
-        consequences: {
-          type: "object",
-          description: "Specific consequences for this check",
-          properties: {
-            success: { type: "string" },
-            failure: { type: "string" },
-          },
+            "On a failure: if true, present the consequence as a dilemma between two costs the player must choose between, not a single flat cost.",
         },
       },
-      required: ["formula", "dc", "description"],
+      required: ["outcome", "description"],
     },
   },
 };
@@ -1973,10 +1900,13 @@ first if it's someone else's turn. (This doesn't restrict which combatant
 update_combatant_stat targets - damage/effects still apply to whichever
 combatant the action affects, e.g. the player being hit on the goblin's turn.)
 
+Reports the total only - it doesn't decide whether the roll hit. Use
+\`calculate\` for that ('18 >= 15' → TRUE), same as any other roll.
+
 Example flow:
-1. npc_roll: "1d20+5" for goblin attack vs player AC 15
-2. If hit: npc_roll: "1d6+2" for goblin damage
-3. update_combatant_stat: player HP -damage`,
+1. npc_roll: "1d20+5" for the goblin's attack
+2. calculate: "18 >= 15" (its total against the player's AC)
+3. If it hit: npc_roll "1d6+2" for damage, then update_combatant_stat: player HP -damage`,
     parameters: {
       type: "object",
       properties: {
@@ -1987,11 +1917,6 @@ Example flow:
         formula: {
           type: "string",
           description: "Dice formula (e.g., '1d20+5', '2d6+3')",
-        },
-        dc: {
-          type: "number",
-          description:
-            "Optional target number. If provided, determines success/failure.",
         },
         reason: {
           type: "string",
@@ -2581,9 +2506,8 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   formulaRollTool,
   askForRollTool,
   askQuestionTool,
-  checkDCTool,
   opposedFormulaTool,
-  formulaChallengeCheckTool,
+  recordChallengeResultTool,
   // Oracle & utility tools
   fateQuestionTool,
   rollTableTool,

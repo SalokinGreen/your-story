@@ -391,6 +391,74 @@ calls happen.
   never treated as proof of a fix: any flag the other judges *do* raise is
   still attached to the turn.
 
+## Phase 6 (later session): the dice tools stop judging
+
+Layer 2 (entropy/oracle) and layer 5 (adjudication) had been fused together
+inside the dice tools: `formula_roll`, `opposed_formula`,
+`formula_challenge_check`, `ask_for_roll` and `npc_roll` each rolled dice
+*and* compared the result against their own `dc` parameter, returning a
+SUCCESS/FAILURE verdict. That looked like good "engine disposes" design, and
+for D&D-shaped systems it was. It also quietly assumed that every system
+resolves a roll by beating one target number.
+
+Real play found the seam. Running Starforged - a 1d6 action die plus modifiers
+against two d10 challenge dice - the GM reached for `opposed_formula` and got
+back a "winner", because the tool's only vocabulary for two dice pools was
+"higher total wins". Roll-under systems needed a dedicated `reverse_dc` flag
+to say something plain arithmetic says on its own. Systems with degrees of
+success (beat both dice, beat one, beat neither) had no way to be expressed at
+all.
+
+**The split.** Rolling and adjudicating are now separate calls:
+
+- The dice tools report numbers and nothing else. No tool takes a `dc`; none
+  of them returns a verdict. `formula_roll`'s `success` means "the dice were
+  thrown".
+- `calculate` gained comparisons: `'17+3 >= 15'` returns TRUE/FALSE, and its
+  `success` carries that verdict (joining `DICE_TOOLS` in `generation.ts`, the
+  list of tools where `success: false` is a game outcome rather than an
+  error). Every check is now at least two calls.
+- `check_dc` was deleted - a second way to ask what `calculate` now answers.
+- `formula_challenge_check` became `record_challenge_result({ outcome })`,
+  which rolls nothing and banks a verdict the GM has already computed. A
+  challenge check is `formula_roll` → `calculate` → `record_challenge_result`.
+- Anything conditioned on pass/fail - per-outcome `consequences`, the
+  `target`/`forces_choice` hardness dimensions - is echoed back for *both*
+  branches, phrased conditionally ("[If this failed: ...]"), since the engine
+  genuinely no longer knows which one landed.
+
+This moves adjudication authority from the tool's hardcoded `>=` to the
+adventure's `mechanics` note, without moving it into the model's prose: the
+comparison is still deterministic code the model can't fudge, it just has to
+say out loud which comparison it wants. The M2 roll-invariant gate still keys
+on the *dice* tools (rolling, not bookkeeping), so a gated scene can't be
+resolved by adjudicating nothing.
+
+**One knock-on worth recording.** The observer's
+`outcome_narration_mismatch` judge compared narration against a roll's
+`success`. With the dice tools always reporting `success: true`, feeding them
+to that judge would have flagged every legitimately-failed roll as a
+contradiction. It now watches `calculate` and `record_challenge_result` - the
+two tools whose `success` is a real verdict.
+
+**Independent pools, and one handful of dice.** `formula_roll` takes
+`formulas: string[]`, one entry per independent pool, each with its own total
+and nothing summed across them - so `["1d6+2", "2d10"]` reports three dice
+and two totals, and the GM makes one `calculate` call per challenge die. The
+batched `DiceResolver` in `diceFormula.ts` collects every group across every
+formula before any dice are thrown, which also fixed a physical-dice bug that
+predated this work: `2d6+1d4` used to open the 3D tray twice, once per dice
+group, because the resolver was called per group. All of a roll's dice now
+leave the hand together, the way they do at a table.
+
+**Manual dice mode stopped parsing.** `ask_for_roll` used to run the player's
+typed or spoken answer through an `extractRollNumber()` helper that took the
+*first* number in the text. For a single d20 total that worked; for "4, 6" -
+two challenge dice - it silently reported 4. The answer now reaches the GM as
+verbatim text, and the GM reads it against what it asked for. The client no
+longer validates the answer at all, since it has no idea what shape a valid
+answer has.
+
 ## Deliberately not done
 
 - **H6 (content-safety layer):** explicitly skipped by product decision —

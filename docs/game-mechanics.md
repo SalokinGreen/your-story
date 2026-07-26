@@ -58,24 +58,52 @@ client-side "Roll + Stat ≥ DC" formula anymore. The GM looks up whatever
 values are relevant in the character sheet / mechanics notes, builds a
 formula, and calls one of:
 
-- **`formula_roll`**: roll a formula (e.g. `1d20+5`) against an optional
-  DC. Supports `reverse_dc` for roll-under systems (Call of Cthulhu/BRP
-  style), `stakes` (low/medium/high/deadly), and per-outcome
-  `consequences`.
+- **`formula_roll`**: throw dice and report what came up. Takes
+  `formulas: string[]` - one entry per *independent* pool, almost always
+  just `["1d20+5"]`. Supports `stakes` (low/medium/high/deadly), per-outcome
+  `consequences`, and the `target`/`forces_choice` hardness dimensions.
 - **`opposed_formula`**: both sides roll (e.g. player `1d20+4` vs. NPC
-  `1d20+3`), higher wins.
-- **`formula_challenge_check`**: a roll that contributes to an active
-  multi-roll challenge (see below).
+  `1d20+3`) and both totals are reported.
+- **`calculate`**: math expressions *and comparisons*. `'17+3 >= 15'` comes
+  back as TRUE or FALSE. Also handles damage after modifiers, resource
+  costs, and anything else worth showing the arithmetic for.
 - **`start_challenge`**: opens a "best of X successes" challenge for
   complex, high-stakes sequences (chases, boss fights, negotiations).
-  Only one challenge is active at a time; checks against it use
-  `formula_challenge_check` until it resolves or is cancelled.
-- **`calculate`**: general math/dice expressions (damage after modifiers,
-  resource costs) with an explanation.
+  Only one challenge is active at a time.
+- **`record_challenge_result`**: banks one resolved check against the active
+  challenge. Rolls nothing.
+
+### The dice tools don't judge
+
+**No dice tool takes a DC.** They roll; `calculate` decides. So a check is
+always at least two calls:
+
+1. `formula_roll` (or `opposed_formula`, `npc_roll`, `ask_for_roll`) - the
+   dice land and the numbers are reported, with no verdict attached
+2. `calculate` with a comparison - `'17+3 >= 15'` → **TRUE**
+
+Inside a challenge there's a third: `record_challenge_result` with the
+outcome the comparison gave.
+
+This split exists because "beat one target number" isn't how every system
+resolves a roll. Bundling the comparison into the dice tools forced
+everything through that one shape, and mangled the systems that don't fit -
+Starforged's 1d6 action die was being scored as "losing" to its own 2d10
+challenge dice, and a roll-under system needed a special `reverse_dc` flag
+to express something a plain `'38 <= 55'` says directly. Now the mechanics
+note describes the comparison in ordinary arithmetic and the GM performs it:
+beat-both-dice, roll-under, degrees of success, whatever the system does.
+
+Multiple pools follow from the same idea. `formulas: ["1d6+2", "2d10"]`
+rolls an action die and two challenge dice as one handful, reports three
+numbers and two separate totals, and adds nothing across them - then one
+`calculate` call per target ('6 > 4' → TRUE, '6 > 8' → FALSE) gives a weak
+hit. Packing those into a single `"1d6+2d10"` string would sum them into a
+meaningless number.
 
 The player never picks a "reroll" or "guarantee success" option anymore -
 momentum spending is gone. If a roll should be easier or harder, that's
-expressed through the formula or DC the GM chooses, informed by the
+expressed through the formula and the target the GM chooses, informed by the
 narrative and the adventure's `mechanics` note.
 
 ## Oracle & Random Tables
