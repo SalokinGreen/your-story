@@ -2,7 +2,7 @@
 
 ## Status
 
-**Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5a/5b implemented.** Phase 5
+**Phase 1 + Phase 2 + Phase 3 + Phase 4 + Phase 5a/5b + Phase 6 implemented.** Phase 5
 (the "situation, not plot" reframe) landed its prompt/convention core (5a) and
 its structured-reflection handoff (5b); **Phase 5c** (typed `steps?` on
 `StoryThread`, dedicated boundary digest) remains deferred until a demonstrated
@@ -26,8 +26,13 @@ grounding instruction was prompt-only and didn't reliably hold up in practice
 an actual gate - `create_note` refuses to create the "Campaign Plan" spine
 note until `read_notes`/`search_notes` has been called that turn, when there's
 something to read. Phase 4 also adds guidance to reach for `fate_question`/
-`roll_table` when the plan itself invents something uncertain. All four
-phases are covered by tests.
+`roll_table` when the plan itself invents something uncertain. **Phase 6 (the
+plan must exist at all)**: every earlier phase guards how the spine *evolves*
+and silently no-ops when there is no spine, so a GM that skipped it ran a whole
+campaign with the plan layer dark — `start_game` now refuses to end session
+zero until the "Campaign Plan" note exists, and the GM prompt carries an
+escalating setup reminder from 5 player turns on. All of these phases are
+covered by tests.
 
 ## The problem this solves
 
@@ -419,6 +424,52 @@ before you plan" above for the full rationale):
 - No change to the Phase 2 gate mechanics themselves — `isPlanAwaitingNextBeat`
   and `advance_plan` operate on `planState.beats` generically regardless of
   its length, so they needed no changes.
+
+### Phase 6 — the plan must exist at all (implemented)
+
+Phases 2–4 all assume a spine exists and guard how it *evolves*. Observed
+failure mode: a session where the GM called `start_game` and ran the whole
+adventure without ever creating the "Campaign Plan" note. Nothing downstream
+catches that — `isPlanAwaitingNextBeat` is permanently false with no
+`planState`, so the one-beat-ahead gate silently never fires, the pinned-plan
+injection is empty, and the entire plan layer stays dark for the rest of the
+campaign. Two additions close it, one hard and one soft:
+
+- **`start_game` precondition (hard).** `hasCampaignPlan` (`campaignPlan.ts`)
+  is true when `planState` exists **or** `findSpinePlanNote` finds a spine
+  note; `executeStartGame` (`gmExecutor.ts`) returns `success: false` with an
+  actionable `[ERROR: ...]` while it's false, mutating nothing (the story stays
+  named "New Story" and `sessionZeroActive` stays true). Writing the spine is
+  part of session zero's job, so session zero doesn't end without it. Same
+  posture as the Phase 4 grounding gate: it's a failed *tool response* the GM
+  sees and can act on in the next round (the round loop continues whenever a
+  round made any tool call), never a blocked turn — narration is unaffected
+  either way, so the turn still completes if the GM ignores it. The `planState`
+  half of the check is deliberate leniency for the mid-campaign case where a
+  player later renamed or deleted the note: that campaign *was* planned, and
+  shouldn't be shoved back into session zero.
+- **Escalating setup reminders (soft).** `freshStorySetupBlock` and the START OF
+  PLAY block are one-shot nudges aimed at turn one; a GM that talks past them
+  never sees the instruction again. `getSetupReminder` (`campaignPlan.ts`)
+  instead reports unfinished setup — missing plan, missing `start_game`, or
+  both — every turn from `SETUP_REMINDER_SOFT_TURNS` (5) player turns on,
+  escalating to `"urgent"` at `SETUP_REMINDER_URGENT_TURNS` (10).
+  `buildGMStagePrompt` renders it as a "⏳ SETUP UNFINISHED" / "🚨 SETUP
+  OVERDUE" block at the top of the system prompt, listing only the piece(s)
+  actually missing. Turn count comes from `countPlayerTurns` (user parts in
+  `scene.parts`, which compaction leaves in place), so no new counter field is
+  needed. Purely informational — it changes no control flow.
+- Prompt/schema wording: the `start_game` tool description, the START OF PLAY
+  block, the fresh-story-setup block, and the CAMPAIGN PLAN section all now
+  state the ordering (character(s) → Campaign Plan note → `start_game` →
+  opening scene) and that it's enforced, so the model learns the constraint
+  before it trips over the error.
+- Tests — `tests/gmTools.startGame.test.ts` (gate refusal with no plan, with
+  only a side-beat `gm_plan` note, and with a disabled note; allow with the
+  spine note and with `planState` alone; no mutation on refusal),
+  `tests/campaignPlan.setupReminder.test.ts` (`hasCampaignPlan`,
+  `countPlayerTurns`, every `getSetupReminder` branch, and the rendered prompt
+  block).
 
 ## Cost / budget
 
