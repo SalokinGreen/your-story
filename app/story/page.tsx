@@ -514,7 +514,7 @@ function StoryPageContent() {
   const [diceThrowRequest, setDiceThrowRequest] =
     useState<DiceThrowRequest | null>(null);
   const diceThrowResolveRef = useRef<
-    ((faces: number[] | null) => void) | null
+    ((faces: number[][] | null) => void) | null
   >(null);
   // Ask-question tool: the GM is asking one or more predefined-choice +
   // free-text questions. Same pause-and-resolve pattern as manual dice mode.
@@ -536,7 +536,10 @@ function StoryPageContent() {
   // throw relayed to a specific guest, so onDiceThrowResult/onPeerLeft can
   // complete or abandon it.
   const diceThrowRelayResolversRef = useRef<
-    Map<string, { forPlayerId: string; resolve: (faces: number[] | null) => void }>
+    Map<
+      string,
+      { forPlayerId: string; resolve: (faces: number[][] | null) => void }
+    >
   >(new Map());
   // Stack of full pre-turn StoryData snapshots, one pushed right before each
   // turn's GM tool calls can mutate state. Persisted to IndexedDB (see
@@ -769,11 +772,9 @@ function StoryPageContent() {
     // then report the settled faces back over the wire.
     onDiceThrowRequest: (request) => {
       requestDiceThrow({
-        sides: request.sides,
-        count: request.count,
+        groups: request.groups,
         formula: request.formula,
         reason: request.reason,
-        dc: request.dc,
       }).then((faces) => sendNetDiceThrowResult(request.requestId, faces));
     },
     // Host-only: a targeted guest's relayed throw resolved.
@@ -3295,7 +3296,7 @@ function StoryPageContent() {
   // guest's own netSession.role is never "host") shows the tray here and
   // resolves once the thrown dice settle or the player skips.
   function requestDiceThrow(request: DiceThrowRequest) {
-    return new Promise<number[] | null>((resolve) => {
+    return new Promise<number[][] | null>((resolve) => {
       const speakerIds = currentTurnSpeakerIdsRef.current;
       const remoteTargetId =
         netSession?.role === "host" &&
@@ -3311,11 +3312,9 @@ function StoryPageContent() {
           resolve,
         });
         sendNetDiceThrowRequest(requestId, remoteTargetId, {
-          sides: request.sides,
-          count: request.count,
+          groups: request.groups,
           formula: request.formula,
           reason: request.reason,
-          dc: request.dc,
         });
         return;
       }
@@ -3325,7 +3324,7 @@ function StoryPageContent() {
     });
   }
 
-  function resolveDiceThrow(faces: number[] | null) {
+  function resolveDiceThrow(faces: number[][] | null) {
     diceThrowResolveRef.current?.(faces);
     diceThrowResolveRef.current = null;
     setDiceThrowRequest(null);
@@ -5022,7 +5021,7 @@ function StoryPageContent() {
       <ManualRollModal
         request={manualRollRequest}
         couchPlayers={storyData?.multiplayer?.couchPlayers}
-        onSubmit={(value, rawText) => resolveManualRoll({ value, rawText })}
+        onSubmit={(rawText) => resolveManualRoll({ rawText })}
         onSkip={() => resolveManualRoll(null)}
       />
 

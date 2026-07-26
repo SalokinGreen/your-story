@@ -14,8 +14,9 @@ import {
   formatRollResult,
   getRollValues,
   getTotalExplosions,
-  extractRollNumber,
   DiceResolver,
+  DiceGroupRequest,
+  rollFormulasAsync,
 } from "../app/misc/diceFormula";
 
 describe("diceFormula", () => {
@@ -301,10 +302,9 @@ describe("diceFormula", () => {
     // rather than a coincidental Math.random() spy elsewhere still being
     // active.
     it("uses the resolver's face values instead of Math.random", async () => {
-      const resolver: DiceResolver = async (sides, count) => {
-        expect(sides).toBe(20);
-        expect(count).toBe(1);
-        return [17];
+      const resolver: DiceResolver = async (groups) => {
+        expect(groups).toEqual([{ sides: 20, count: 1 }]);
+        return [[17]];
       };
 
       const result = await rollFormulaAsync("1d20+5", undefined, resolver);
@@ -313,7 +313,7 @@ describe("diceFormula", () => {
     });
 
     it("resolves variables the same way as the sync path", async () => {
-      const resolver: DiceResolver = async () => [11];
+      const resolver: DiceResolver = async () => [[11]];
       const varResolver = (name: string) =>
         name === "STR_mod" ? 3 : undefined;
 
@@ -327,9 +327,9 @@ describe("diceFormula", () => {
     });
 
     it("applies keep-highest/lowest to resolver-supplied faces", async () => {
-      const resolver: DiceResolver = async (sides, count) => {
-        expect(count).toBe(4);
-        return [1, 2, 4, 6];
+      const resolver: DiceResolver = async (groups) => {
+        expect(groups).toEqual([{ sides: 6, count: 4 }]);
+        return [[1, 2, 4, 6]];
       };
 
       const result = await rollFormulaAsync("4d6kh3", undefined, resolver);
@@ -337,29 +337,101 @@ describe("diceFormula", () => {
       expect(result.rolls[0].droppedRolls).toEqual([1]);
     });
 
+    // The whole point of the batched resolver: at a real table you throw the
+    // handful once, so a formula with several dice groups must ask for all of
+    // them in a single call rather than one group at a time.
+    it("asks for every dice group in the formula in one call", async () => {
+      const calls: DiceGroupRequest[][] = [];
+      const resolver: DiceResolver = async (groups) => {
+        calls.push(groups);
+        return groups.map((g) => Array(g.count).fill(3));
+      };
+
+      const result = await rollFormulaAsync("2d6+1d4", undefined, resolver);
+      expect(calls).toEqual([
+        [
+          { sides: 6, count: 2 },
+          { sides: 4, count: 1 },
+        ],
+      ]);
+      expect(result.total).toBe(9); // 3 + 3 + 3
+    });
+
     it("requests one more die at a time to resolve explosions", async () => {
-      const calls: number[] = [];
+      const calls: DiceGroupRequest[][] = [];
       let call = 0;
-      const resolver: DiceResolver = async (sides, count) => {
-        calls.push(count);
+      const resolver: DiceResolver = async (groups) => {
+        calls.push(groups);
         call++;
         // First call: the initial die, rolls max (explodes). Second call:
         // the follow-up single die requested for the explosion, rolls 3.
-        if (call === 1) return [6];
-        return [3];
+        if (call === 1) return [[6]];
+        return [[3]];
       };
 
       const result = await rollFormulaAsync("1d6!", undefined, resolver);
-      expect(calls).toEqual([1, 1]); // initial die, then one explosion die
+      expect(calls).toEqual([
+        [{ sides: 6, count: 1 }], // initial die
+        [{ sides: 6, count: 1 }], // one explosion die
+      ]);
       expect(result.total).toBe(9); // 6 + 3
       expect(result.rolls[0].explosions).toBe(1);
     });
 
     it("falls back to the standard breakdown/total math", async () => {
-      const resolver: DiceResolver = async () => [11];
+      const resolver: DiceResolver = async () => [[11]];
       const result = await rollFormulaAsync("1d20+5", undefined, resolver);
       expect(result.breakdown).toContain("1d20");
       expect(result.breakdown).toContain("16");
+    });
+
+    it("fails the roll when the resolver returns too few faces for a group", async () => {
+      const resolver: DiceResolver = async () => [[4]]; // only one face for 2d6
+      await expect(
+        rollFormulaAsync("2d6", undefined, resolver)
+      ).rejects.toThrow(/face values/);
+    });
+  });
+
+  describe("rollFormulasAsync", () => {
+    // Independent pools - Starforged's 1d6 action die vs its 2d10 challenge
+    // dice - are one throw but separate totals. Adding them would be
+    // meaningless, so each formula keeps its own result.
+    it("throws every pool's dice in one call but totals them separately", async () => {
+      const calls: DiceGroupRequest[][] = [];
+      const resolver: DiceResolver = async (groups) => {
+        calls.push(groups);
+        return [[4], [6, 8]];
+      };
+
+      const results = await rollFormulasAsync(
+        ["1d6+2", "2d10"],
+        undefined,
+        resolver
+      );
+
+      expect(calls).toEqual([
+        [
+          { sides: 6, count: 1 },
+          { sides: 10, count: 2 },
+        ],
+      ]);
+      expect(results).toHaveLength(2);
+      expect(results[0].total).toBe(6); // 4 + 2, the action score
+      expect(results[1].total).toBe(14); // 6 + 8, the challenge dice
+    });
+
+    it("throws no dice at all when a later formula is invalid", async () => {
+      let called = false;
+      const resolver: DiceResolver = async (groups) => {
+        called = true;
+        return groups.map((g) => Array(g.count).fill(1));
+      };
+
+      await expect(
+        rollFormulasAsync(["1d20", "1d99999"], undefined, resolver)
+      ).rejects.toThrow();
+      expect(called).toBe(false);
     });
   });
 
@@ -561,32 +633,6 @@ describe("diceFormula", () => {
       expect(result.total).toBe(16);
 
       vi.restoreAllMocks();
-    });
-  });
-
-  describe("extractRollNumber", () => {
-    it("parses a bare number", () => {
-      expect(extractRollNumber("17")).toBe(17);
-    });
-
-    it("extracts a number from a sentence", () => {
-      expect(extractRollNumber("I rolled a 17")).toBe(17);
-      expect(extractRollNumber("natural 20!")).toBe(20);
-      expect(extractRollNumber("17 plus 3 is 20")).toBe(17);
-    });
-
-    it("handles negative numbers", () => {
-      expect(extractRollNumber("-3")).toBe(-3);
-    });
-
-    it("falls back to spelled-out numbers when no digits are present", () => {
-      expect(extractRollNumber("seventeen")).toBe(17);
-      expect(extractRollNumber("I got a natural twenty")).toBe(20);
-    });
-
-    it("returns null when no number can be found", () => {
-      expect(extractRollNumber("I rolled great")).toBeNull();
-      expect(extractRollNumber("")).toBeNull();
     });
   });
 });

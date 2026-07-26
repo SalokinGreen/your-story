@@ -5,6 +5,11 @@ declare module "@3d-dice/dice-box" {
   export interface DieResult {
     sides: number | string;
     value: number;
+    // Which notation entry this die came from when roll() was given an array
+    // (["2d6", "1d4"] → groupId 0 and 1). dice-box assigns these from an
+    // incrementing counter that keeps climbing across rolls, so treat them as
+    // grouping keys, not indices.
+    groupId?: number;
     [key: string]: unknown;
   }
 
@@ -46,7 +51,13 @@ declare module "@3d-dice/dice-box" {
   export default class DiceBox {
     constructor(options: DiceBoxOptions);
     init(): Promise<void>;
-    roll(notation: string, options?: RollOptions): Promise<DieResult[]>;
+    // An array of notations ("['2d6','1d4']") throws every pool in the same
+    // toss and comes back as one flat DieResult[], each die tagged with the
+    // groupId of the notation entry it came from.
+    roll(
+      notation: string | string[],
+      options?: RollOptions
+    ): Promise<DieResult[]>;
     // Re-throws an existing set of dice (the result objects from a prior
     // roll()/add()/reroll() call, which carry groupId/rollId) rather than
     // spawning a new set - used to re-toss the dice already sitting in the

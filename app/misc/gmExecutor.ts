@@ -35,9 +35,8 @@ import {
   AskForRollParams,
   AskQuestionParams,
   AskQuestionItem,
-  CheckDCParams,
   OpposedFormulaParams,
-  FormulaChallengeCheckParams,
+  RecordChallengeResultParams,
   FateQuestionParams,
   RollTableParams,
   GenerateNameParams,
@@ -124,9 +123,10 @@ import {
 import { getAbilityBonus } from "./abilitySystem";
 import {
   rollFormula,
-  rollFormulaAsync,
+  rollFormulasAsync,
   RollResult,
   DiceResolver,
+  DiceGroupRequest,
   MAX_DICE_COUNT,
   MAX_DICE_SIDES,
 } from "./diceFormula";
@@ -149,9 +149,8 @@ export interface GMToolResult {
     | GMFormulaRollResult
     | GMAskForRollResult
     | GMAskQuestionResult
-    | GMCheckDCResult
     | GMOpposedFormulaResult
-    | GMFormulaChallengeResult
+    | GMChallengeResultRecord
     | GMFateQuestionResult
     | GMRollTableResult
     | GMGenerateNameResult
@@ -216,7 +215,18 @@ export interface GMCancelChallengeResult {
 export interface GMCalculateResult {
   type: "calculate";
   expression: string;
+  // The arithmetic value. For a comparison ("17+3 >= 15") this is the left
+  // side's value and `isTrue` carries the verdict.
   result: number;
+  // Set only when the expression contained a comparison operator. This is how
+  // every roll-vs-target question is now answered (there is no dc parameter
+  // on any dice tool) - see the calculate tool description.
+  comparison?: {
+    operator: string;
+    left: number;
+    right: number;
+    isTrue: boolean;
+  };
   reason: string;
   displayName?: string;
 }
@@ -238,16 +248,20 @@ export interface GMRestResult {
 // FORMULA-BASED RESULT INTERFACES
 // ============================================
 
+/** One independent dice pool's outcome within a formula_roll. */
+export interface GMRolledPool {
+  formula: string;
+  resolvedFormula: string; // Breakdown with each group's faces shown
+  rolls: number[]; // Flattened list of all dice rolled in this pool
+  total: number;
+  label?: string; // Optional model-supplied name for the pool
+}
+
 export interface GMFormulaRollResult {
   type: "formula_roll";
-  formula: string;
-  resolvedFormula: string; // Formula with variables substituted
-  rolls: number[]; // Flattened list of all dice rolled
-  total: number;
-  dc?: number;
-  reverseDC?: boolean; // If true, success = roll ≤ DC
-  success?: boolean;
-  margin?: number;
+  // One entry per independent pool. Single-pool rolls (the overwhelming
+  // majority) have exactly one; nothing is ever summed across pools.
+  pools: GMRolledPool[];
   reason: string;
   displayName?: string;
   stakes?: string;
@@ -258,7 +272,6 @@ export interface GMFormulaRollResult {
     failure?: string;
   };
   unresolvedVariables?: string[]; // Variables that couldn't be resolved
-  breakdown?: string; // Human-readable breakdown
 }
 
 export interface GMAskForRollResult {
@@ -267,14 +280,11 @@ export interface GMAskForRollResult {
   description: string;
   playerName?: string;
   formula?: string;
-  dc?: number;
-  reverseDC?: boolean;
-  // The total extracted from the player's answer; null when they skipped/cancelled
-  rollValue: number | null;
-  // The player's raw answer text (may be free text/voice, e.g. "natural 20!")
-  rawText?: string;
-  success?: boolean; // vs dc, when both a value and a dc exist
-  margin?: number;
+  // Exactly what the player typed or said - "17", "4 and 6", "natural 20!".
+  // Deliberately not parsed into a number: pulling one total out of the text
+  // silently broke every system that rolls more than a single die pool.
+  // null when they skipped/cancelled.
+  answer: string | null;
   skipped?: boolean;
 }
 
@@ -288,16 +298,6 @@ export interface GMAskQuestionResult {
   }[];
 }
 
-export interface GMCheckDCResult {
-  type: "check_dc";
-  total: number;
-  dc: number;
-  reverseDC?: boolean;
-  success: boolean;
-  margin: number;
-  reason: string;
-}
-
 export interface GMOpposedFormulaResult {
   type: "opposed_formula";
   playerFormula: string;
@@ -309,8 +309,6 @@ export interface GMOpposedFormulaResult {
   opponentRolls: number[]; // Flattened list of all dice rolled
   opponentTotal: number;
   opponentName: string;
-  winner: "player" | "opponent" | "tie";
-  margin: number;
   reason: string;
   displayName?: string;
   stakes?: string;
@@ -323,25 +321,12 @@ export interface GMOpposedFormulaResult {
   };
 }
 
-export interface GMFormulaChallengeResult {
-  type: "formula_challenge_check";
-  formula: string;
-  resolvedFormula: string;
-  rolls: number[]; // Flattened list of all dice rolled
-  total: number;
-  dc: number;
-  reverseDC?: boolean; // If true, success = roll ≤ DC
-  success: boolean;
-  margin: number;
+export interface GMChallengeResultRecord {
+  type: "record_challenge_result";
+  outcome: "success" | "failure";
   description: string;
-  displayName?: string;
-  stakes?: string;
   target?: string; // Hardness dimension: who the failure consequence lands on
   forcesChoice?: boolean; // Hardness dimension: dilemma between two costs
-  consequences?: {
-    success?: string;
-    failure?: string;
-  };
   challengeProgress?: {
     name: string;
     successes: number;
@@ -499,8 +484,6 @@ export interface GMNPCRollResult {
   formula: string;
   rolls: number[];
   total: number;
-  dc?: number;
-  success?: boolean;
   reason: string;
   target?: string;
 }
@@ -687,22 +670,20 @@ function parseDifficulty(
 // ============================================
 
 // A pending "roll your real dice" request shown to the player (manual dice
-// mode). Produced by the ask_for_roll tool; the UI answers with the total
-// the player rolled, or null if they skipped.
+// mode). Produced by the ask_for_roll tool; the UI answers with whatever the
+// player reports, verbatim, or null if they skipped.
 export interface ManualRollRequest {
   title: string;
   description: string;
   playerName?: string;
   formula?: string;
-  dc?: number;
-  reverseDC?: boolean;
 }
 
-// What the player answered a manual roll prompt with: the number extracted
-// from their (possibly free-text/voice) answer, plus the raw text itself so
-// the GM can see phrasing like "natural 20" as flavor.
+// What the player answered a manual roll prompt with, verbatim: "17",
+// "4 and 6", "natural 20 so 23 total". No number is extracted from it - the
+// GM reads the text, since only it knows how many pools it asked for and what
+// this adventure's mechanics do with them.
 export interface ManualRollAnswer {
-  value: number;
   rawText: string;
 }
 
@@ -723,18 +704,17 @@ export interface AskQuestionAnswer {
   answers: AskQuestionAnswerItem[]; // Same length/order as request.questions
 }
 
-// A request to physically throw `count` dice of `sides` sides (e.g. via a
-// 3D physics dice UI) and report back the settled face values. Called once
-// per dice group in the formula for the initial throw, then again with
-// count=1 for each additional die needed to resolve an explosion, since the
-// explosion count isn't knowable up front. `formula`/`reason`/`dc` are
-// display-only context about the overall roll this die belongs to.
+// A request to physically throw dice (e.g. via a 3D physics dice UI) and
+// report back the settled face values. `groups` holds every pool the roll
+// needs - "2d6+1d4" is one request for two groups, thrown together as one
+// handful, not two sequential trays. Resolves with one face array per group,
+// in the same order. Called once per roll, then again with a single one-die
+// group for each explosion, since the explosion count isn't knowable up
+// front. `formula`/`reason` are display-only context.
 export interface DiceThrowRequest {
-  sides: number;
-  count: number;
+  groups: DiceGroupRequest[];
   formula: string;
   reason: string;
-  dc?: number;
 }
 
 // Handlers the frontend injects so interactive GM tools can pause the loop
@@ -743,10 +723,13 @@ export interface GMInteractionHandlers {
   requestManualRoll?: (
     request: ManualRollRequest
   ) => Promise<ManualRollAnswer | null>;
-  // Resolves with the thrown dice's face values, or null if the player
-  // skipped/cancelled - the caller then falls back to a fully digital
-  // (Math.random()) roll of the whole formula rather than mixing the two.
-  requestDiceThrow?: (request: DiceThrowRequest) => Promise<number[] | null>;
+  // Resolves with the thrown dice's face values, one array per requested
+  // group, or null if the player skipped/cancelled - the caller then falls
+  // back to a fully digital (Math.random()) roll of the whole formula rather
+  // than mixing the two.
+  requestDiceThrow?: (
+    request: DiceThrowRequest
+  ) => Promise<number[][] | null>;
   // Resolves with one answer per question (same order), or null if the
   // whole batch was skipped/cancelled (e.g. generation was stopped).
   requestPlayerAnswer?: (
@@ -775,6 +758,49 @@ export interface GMExecutionResult {
 // serve the same purpose of letting randomness rather than narrative
 // convenience settle an uncertain question.
 const ORACLE_TOOL_NAMES = new Set(["fate_question", "roll_table"]);
+
+/**
+ * Whether a `success: false` result means something actually went wrong, or
+ * just that the check didn't pass. The dice/check tools use `success` to
+ * carry a game outcome - a `calculate` comparison coming out FALSE, a
+ * challenge check recorded as a failure, a player skipping a manual roll -
+ * and none of those deserve a warning in the console or a place in the
+ * "tools failed" summary. Mirrors DICE_TOOLS in generation.ts, which draws
+ * the same line for the retry logic.
+ */
+const OUTCOME_BEARING_TOOL_NAMES = new Set([
+  "calculate",
+  "record_challenge_result",
+  "ask_for_roll",
+]);
+
+function isRealToolFailure(result: GMToolResult): boolean {
+  if (result.success) return false;
+  if (!OUTCOME_BEARING_TOOL_NAMES.has(result.toolName)) return true;
+  return result.contextForStory?.includes("ERROR") ?? false;
+}
+
+/**
+ * Rewrites tool arguments the model got *nearly* right into the shape the
+ * current schema declares, before validation runs - a near-miss shouldn't
+ * cost an error/retry round-trip.
+ *
+ * Only case today: formula_roll takes `formulas: string[]` (so systems that
+ * roll separate pools can pass several), but a single `formula: "1d20+5"` is
+ * such a strong habit - and was this tool's own shape until recently - that
+ * models keep reaching for it.
+ */
+function normalizeLegacyToolArgs(
+  toolName: string,
+  args: Record<string, unknown>
+): void {
+  if (toolName !== "formula_roll") return;
+  if (args.formulas === undefined && typeof args.formula === "string") {
+    args.formulas = [args.formula];
+  } else if (typeof args.formulas === "string") {
+    args.formulas = [args.formulas];
+  }
+}
 
 /**
  * Execute GM stage tool calls and return results for the story stage
@@ -896,6 +922,7 @@ export async function executeGMTools(
         typeof params === "object" && params !== null && !Array.isArray(params)
           ? (params as Record<string, unknown>)
           : {};
+      normalizeLegacyToolArgs(call.function.name, argsRecord);
       const validationErrors = validateToolArgs(gmToolSchema, argsRecord);
       if (validationErrors.length > 0) {
         const errorMsg = formatValidationErrors(
@@ -966,9 +993,6 @@ export async function executeGMTools(
             interaction
           );
           break;
-        case "check_dc":
-          result = executeCheckDC(call.id, params as CheckDCParams);
-          break;
         case "opposed_formula":
           result = await executeOpposedFormula(
             call.id,
@@ -977,12 +1001,11 @@ export async function executeGMTools(
             interaction
           );
           break;
-        case "formula_challenge_check":
-          result = await executeFormulaChallengeCheck(
+        case "record_challenge_result":
+          result = executeRecordChallengeResult(
             call.id,
-            params as FormulaChallengeCheckParams,
-            modified,
-            interaction
+            params as RecordChallengeResultParams,
+            modified
           );
           break;
         case "fate_question":
@@ -1293,8 +1316,9 @@ export async function executeGMTools(
       contextParts.push(result.contextForStory);
     }
 
-    // Log successful tool executions with failure status for debugging
-    if (!result.success) {
+    // Log genuine execution failures for debugging - not a check that simply
+    // didn't pass (see isRealToolFailure).
+    if (isRealToolFailure(result)) {
       console.warn(
         `[GM Tool Failed] Tool "${call.function.name}" returned failure`,
         {
@@ -1367,7 +1391,7 @@ export async function executeGMTools(
   }
 
   // Log execution summary for debugging
-  const failedResults = results.filter((r) => !r.success);
+  const failedResults = results.filter(isRealToolFailure);
   if (failedResults.length > 0) {
     console.warn(
       `[GM Execution Summary] ${failedResults.length}/${results.length} tools failed`,
@@ -1510,14 +1534,89 @@ function executeCancelChallenge(
 // CALCULATE EXECUTOR
 // ============================================
 
+// Comparison operators `calculate` understands. Longest-first so ">=" is
+// matched before ">". Exactly one comparison per expression: this tool
+// answers "did that number beat the target?", and chained comparisons
+// ("4 < x < 9") don't have one unambiguous answer worth guessing at.
+const COMPARISON_OPERATORS = [">=", "<=", "==", "!=", ">", "<"] as const;
+
+/**
+ * Splits an expression on its comparison operator, if it has one.
+ * "17+3 >= 15" -> { left: "17+3", operator: ">=", right: "15" }
+ */
+function splitComparison(
+  expression: string
+): { left: string; operator: string; right: string } | null {
+  for (const operator of COMPARISON_OPERATORS) {
+    const at = expression.indexOf(operator);
+    if (at === -1) continue;
+    return {
+      left: expression.slice(0, at),
+      operator,
+      right: expression.slice(at + operator.length),
+    };
+  }
+  return null;
+}
+
+function compare(operator: string, left: number, right: number): boolean {
+  switch (operator) {
+    case ">=":
+      return left >= right;
+    case "<=":
+      return left <= right;
+    case "==":
+      return left === right;
+    case "!=":
+      return left !== right;
+    case ">":
+      return left > right;
+    default:
+      return left < right;
+  }
+}
+
+/**
+ * Evaluates one arithmetic side of an expression, with dice already rolled
+ * out of it. Everything that isn't a number, operator, space or paren is
+ * stripped first, so a stray word or comparison operator can't reach the
+ * evaluator.
+ */
+function evaluateArithmetic(expression: string): number {
+  const safeExpression = expression.replace(/[^0-9+\-*/(). ]/g, "");
+  if (!safeExpression.trim()) {
+    throw new Error("empty expression");
+  }
+  // Function rather than eval - the input is already reduced to digits and
+  // arithmetic operators by the strip above.
+  const value = new Function(`return ${safeExpression}`)() as number;
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("not a finite number");
+  }
+  return value;
+}
+
 function executeCalculate(
   toolCallId: string,
   params: CalculateParams
 ): GMToolResult {
-  // Parse expression, handling dice and basic math
-  // Supports: "20 - 4", "50 + 2d6", "100 - 1d20 + 5"
+  // Parse expression, handling dice, basic math, and comparisons
+  // Supports: "20 - 4", "50 + 2d6", "100 - 1d20 + 5", "17+3 >= 15"
   let expression = params.expression;
-  let result = 0;
+
+  const failure = (detail: string): GMToolResult => ({
+    toolName: "calculate",
+    toolCallId,
+    success: false,
+    result: {
+      type: "calculate",
+      expression: params.expression,
+      result: 0,
+      reason: params.reason,
+      displayName: params.display_name,
+    } as GMCalculateResult,
+    contextForStory: `[ERROR: ${detail}]`,
+  });
 
   // Replace dice rolls with their results
   const diceRegex = /(\d+)d(\d+)/gi;
@@ -1534,19 +1633,9 @@ function executeCalculate(
       // this expression parser rolls dice itself instead of going through
       // diceFormula.ts, so it needs the same DoS guard applied explicitly.
       if (n < 1 || n > MAX_DICE_COUNT || d < 1 || d > MAX_DICE_SIDES) {
-        return {
-          toolName: "calculate",
-          toolCallId,
-          success: false,
-          result: {
-            type: "calculate",
-            expression: params.expression,
-            result: 0,
-            reason: params.reason,
-            displayName: params.display_name,
-          } as GMCalculateResult,
-          contextForStory: `[ERROR: Invalid dice "${diceMatch}" in "${params.expression}" - count must be 1-${MAX_DICE_COUNT}, sides must be 1-${MAX_DICE_SIDES}]`,
-        };
+        return failure(
+          `Invalid dice "${diceMatch}" in "${params.expression}" - count must be 1-${MAX_DICE_COUNT}, sides must be 1-${MAX_DICE_SIDES}`
+        );
       }
 
       const rolls: number[] = [];
@@ -1560,37 +1649,63 @@ function executeCalculate(
     }
   }
 
-  // Evaluate the expression safely (only allow numbers and basic operators)
-  try {
-    // Remove any characters that aren't numbers, operators, spaces, or parentheses
-    const safeExpression = expression.replace(/[^0-9+\-*/(). ]/g, "");
-    // Use Function to evaluate (safer than eval)
-    result = new Function(`return ${safeExpression}`)() as number;
-  } catch {
+  const displayName = params.display_name || "Calculation";
+  const diceDetail = diceRolls
+    .map((dr) => ` (${dr.notation}=[${dr.rolls.join(",")}])`)
+    .join("");
+
+  // A comparison ("17+3 >= 15") resolves to TRUE/FALSE - this is what
+  // settles every roll-against-a-target question, since the dice tools
+  // themselves report numbers and nothing else.
+  const split = splitComparison(expression);
+  if (split) {
+    let left: number;
+    let right: number;
+    try {
+      left = evaluateArithmetic(split.left);
+      right = evaluateArithmetic(split.right);
+    } catch {
+      return failure(
+        `Could not evaluate the comparison "${params.expression}" - both sides need to be plain arithmetic, e.g. "17+3 >= 15"`
+      );
+    }
+
+    const isTrue = compare(split.operator, left, right);
+    const contextForStory =
+      `[${displayName}: ${params.expression}${diceDetail} → ${left} ${split.operator} ${right} → **${isTrue ? "TRUE" : "FALSE"}**]` +
+      `\n[Reason: ${params.reason}]`;
+
     return {
       toolName: "calculate",
       toolCallId,
-      success: false,
+      // For a comparison, `success` carries the verdict itself - the same
+      // convention the dice tools used to follow with their DCs (see
+      // DICE_TOOLS in generation.ts: success=false here means the check
+      // didn't pass, not that the call errored). A real evaluation failure
+      // returns via failure() above with ERROR in its context instead.
+      success: isTrue,
       result: {
         type: "calculate",
         expression: params.expression,
-        result: 0,
+        result: left,
+        comparison: { operator: split.operator, left, right, isTrue },
         reason: params.reason,
         displayName: params.display_name,
       } as GMCalculateResult,
-      contextForStory: `[ERROR: Could not evaluate "${params.expression}"]`,
+      contextForStory,
     };
   }
 
-  const displayName = params.display_name || "Calculation";
-  let contextForStory = `[${displayName}: ${params.expression}`;
-  if (diceRolls.length > 0) {
-    for (const dr of diceRolls) {
-      contextForStory += ` (${dr.notation}=[${dr.rolls.join(",")}])`;
-    }
+  let result: number;
+  try {
+    result = evaluateArithmetic(expression);
+  } catch {
+    return failure(`Could not evaluate "${params.expression}"`);
   }
-  contextForStory += ` = ${result}]`;
-  contextForStory += `\n[Reason: ${params.reason}]`;
+
+  const contextForStory =
+    `[${displayName}: ${params.expression}${diceDetail} = ${result}]` +
+    `\n[Reason: ${params.reason}]`;
 
   return {
     toolName: "calculate",
@@ -1938,41 +2053,103 @@ function describeHardness(
 class PhysicalDiceSkipped extends Error {}
 
 /**
- * Rolls a formula physically (via interaction.requestDiceThrow) when that
- * handler is wired up, falling back to the standard Math.random() roll
- * otherwise - or if the player skips/cancels the physical throw partway
- * through a multi-group formula, in which case the whole formula is
- * rerolled digitally rather than left half-physical/half-digital.
+ * Rolls one or more independent formulas physically (via
+ * interaction.requestDiceThrow) when that handler is wired up, falling back
+ * to the standard Math.random() roll otherwise - or if the player
+ * skips/cancels the physical throw, in which case every formula is rerolled
+ * digitally rather than left half-physical/half-digital.
+ *
+ * Every dice group across every formula goes out in one request, so a roll
+ * like "2d6+1d4" (or Starforged's 1d6 + 2d10) is a single throw of the whole
+ * handful.
  */
-async function rollFormulaMaybePhysical(
-  formula: string,
-  context: { reason: string; dc?: number },
+async function rollFormulasMaybePhysical(
+  formulas: string[],
+  context: { reason: string },
   interaction: GMInteractionHandlers
-): Promise<RollResult> {
+): Promise<RollResult[]> {
   if (!interaction.requestDiceThrow) {
-    return rollFormula(formula);
+    return formulas.map((formula) => rollFormula(formula));
   }
 
-  const diceResolver: DiceResolver = async (sides, count) => {
+  // Independent pools are never summed, so they're joined for display with
+  // "and" rather than "+" - the tray header shouldn't read like one formula.
+  const displayFormula = formulas.join(" and ");
+  const diceResolver: DiceResolver = async (groups: DiceGroupRequest[]) => {
     const thrown = await interaction.requestDiceThrow!({
-      sides,
-      count,
-      formula,
+      groups,
+      formula: displayFormula,
       reason: context.reason,
-      dc: context.dc,
     });
     if (!thrown) throw new PhysicalDiceSkipped();
     return thrown;
   };
 
   try {
-    return await rollFormulaAsync(formula, undefined, diceResolver);
+    return await rollFormulasAsync(formulas, undefined, diceResolver);
   } catch (e) {
     if (e instanceof PhysicalDiceSkipped) {
-      return rollFormula(formula);
+      return formulas.map((formula) => rollFormula(formula));
     }
     throw e;
   }
+}
+
+/**
+ * Normalizes the formula list off a formula_roll call. The schema asks for
+ * `formulas: string[]`, but models drift toward the old singular
+ * `formula: "1d20+5"` shape, so both are accepted and empty entries dropped.
+ */
+function readRollFormulas(params: FormulaRollParams): string[] {
+  const legacy = (params as unknown as { formula?: unknown }).formula;
+  const raw = Array.isArray(params.formulas)
+    ? params.formulas
+    : typeof params.formulas === "string"
+      ? [params.formulas as string]
+      : typeof legacy === "string"
+        ? [legacy]
+        : [];
+  return raw
+    .filter((f): f is string => typeof f === "string")
+    .map((f) => f.trim())
+    .filter((f) => f.length > 0);
+}
+
+/**
+ * Renders one pool's dice and total, e.g. `2d6+3: [4, 5] +3 = **12**`.
+ */
+function describePool(pool: GMRolledPool): string {
+  const label = pool.label ? `${pool.label} ` : "";
+  const shown =
+    pool.resolvedFormula && pool.resolvedFormula !== pool.formula
+      ? `${pool.formula} → ${pool.resolvedFormula}`
+      : `${pool.formula}: [${pool.rolls.join(", ")}] = **${pool.total}**`;
+  return `${label}${shown}`;
+}
+
+/**
+ * Echoes the consequences the GM planned for each outcome. The engine no
+ * longer picks one - it doesn't know which way the check went, since
+ * comparing the total to a target is the GM's `calculate` call - so both
+ * branches go back with the failure branch carrying its hardness note.
+ */
+function describePlannedConsequences(
+  consequences: { success?: string; failure?: string } | undefined,
+  target: FormulaRollParams["target"],
+  forcesChoice: boolean | undefined
+): string {
+  let out = "";
+  if (consequences?.success) {
+    out += `\n[Planned consequence on success: ${consequences.success}]`;
+  }
+  if (consequences?.failure) {
+    out += `\n[Planned consequence on failure: ${consequences.failure}]`;
+  }
+  const hardness = describeHardness(target, forcesChoice);
+  if (hardness) {
+    out += `\n[If this failed:${hardness}]`;
+  }
+  return out;
 }
 
 async function executeFormulaRoll(
@@ -1982,13 +2159,30 @@ async function executeFormulaRoll(
   interaction: GMInteractionHandlers
 ): Promise<GMToolResult> {
   // No variable resolver - GM must provide actual numbers
+  const formulas = readRollFormulas(params);
+  const displayName = params.display_name || "Roll";
 
-  // Roll the formula
-  let rollResult: RollResult;
+  if (formulas.length === 0) {
+    return {
+      toolName: "formula_roll",
+      toolCallId,
+      success: false,
+      result: {
+        type: "formula_roll",
+        pools: [],
+        reason: params.reason,
+        unresolvedVariables: [],
+      } as GMFormulaRollResult,
+      contextForStory: `[ERROR: formula_roll needs at least one dice formula in \`formulas\`, e.g. formulas: ["1d20+5"]]`,
+    };
+  }
+
+  // Roll every pool - one physical throw for all of their dice together
+  let rollResults: RollResult[];
   try {
-    rollResult = await rollFormulaMaybePhysical(
-      params.formula,
-      { reason: params.reason, dc: params.dc },
+    rollResults = await rollFormulasMaybePhysical(
+      formulas,
+      { reason: params.reason },
       interaction
     );
   } catch (e) {
@@ -1998,109 +2192,74 @@ async function executeFormulaRoll(
       success: false,
       result: {
         type: "formula_roll",
-        formula: params.formula,
-        resolvedFormula: params.formula,
-        rolls: [],
-        total: 0,
+        pools: [],
         reason: params.reason,
         unresolvedVariables: [],
       } as GMFormulaRollResult,
-      contextForStory: `[ERROR: Invalid formula "${params.formula}" - ${
-        e instanceof Error ? e.message : "Unknown error"
-      }]`,
+      contextForStory: `[ERROR: Invalid formula in "${formulas.join(
+        ", "
+      )}" - ${e instanceof Error ? e.message : "Unknown error"}]`,
     };
   }
 
-  // Build resolved formula string for display
-  const resolvedFormula = rollResult.breakdown || params.formula;
+  const labels = Array.isArray(params.labels) ? params.labels : [];
+  const pools: GMRolledPool[] = rollResults.map((result, i) => ({
+    formula: formulas[i],
+    resolvedFormula: result.breakdown || formulas[i],
+    rolls: flattenRolls(result.rolls),
+    total: result.total,
+    label: typeof labels[i] === "string" && labels[i].trim() ? labels[i] : undefined,
+  }));
 
-  // Check success if DC provided
-  let success: boolean | undefined;
-  let margin: number | undefined;
-  const reverseDC = params.reverse_dc || false;
-  if (params.dc !== undefined) {
-    if (reverseDC) {
-      // Roll-under: success = roll ≤ DC (Call of Cthulhu/BRP style)
-      success = rollResult.total <= params.dc;
-      margin = params.dc - rollResult.total; // Positive margin = succeeded by this much
-    } else {
-      // Roll-over: success = roll ≥ DC (standard)
-      success = rollResult.total >= params.dc;
-      margin = rollResult.total - params.dc;
-    }
+  // Build context string. Multi-pool rolls list each pool on its own line so
+  // the totals stay visibly separate and never read as one sum.
+  let contextForStory: string;
+  if (pools.length === 1) {
+    contextForStory = `[${displayName}: ${describePool(pools[0])}]`;
+  } else {
+    contextForStory =
+      `[${displayName} - ${pools.length} separate pools, NOT added together:]` +
+      pools.map((pool) => `\n[  ${describePool(pool)}]`).join("");
   }
-
-  // Build context string
-  const displayName = params.display_name || "Formula Roll";
-  let contextForStory = `[${displayName}: ${params.formula}`;
-  if (resolvedFormula !== params.formula) {
-    contextForStory += ` → ${resolvedFormula}`;
-  }
-  contextForStory += `: [${flattenRolls(rollResult.rolls).join(", ")}] = **${
-    rollResult.total
-  }**`;
-  if (params.dc !== undefined) {
-    if (reverseDC) {
-      contextForStory += ` = ${rollResult.total} vs DC ${params.dc} → ${
-        success ? "SUCCESS" : "FAILURE"
-      }`;
-    } else {
-      contextForStory += ` vs DC ${params.dc} → ${
-        success ? "SUCCESS" : "FAILURE"
-      }`;
-    }
-    if (margin !== undefined) {
-      contextForStory += ` (margin: ${margin >= 0 ? "+" : ""}${margin})`;
-    }
-  }
-  contextForStory += `]`;
   contextForStory += `\n[Reason: ${params.reason}]`;
+  contextForStory += `\n[No verdict was computed. Compare against the target with \`calculate\` before narrating an outcome.]`;
 
   if (params.stakes) {
     contextForStory += `\n[Stakes: ${params.stakes}]`;
     contextForStory += applyStakesEscalation(storyData, params.stakes);
   }
 
-  contextForStory += checkStatIntegrity(
-    storyData,
-    params.stat_name,
-    rollResult.modifiers
+  // The stat-integrity check reads the flat modifier, which only makes sense
+  // for a single pool - with several, there's no one modifier to attribute.
+  if (pools.length === 1) {
+    contextForStory += checkStatIntegrity(
+      storyData,
+      params.stat_name,
+      rollResults[0].modifiers
+    );
+  }
+
+  contextForStory += describePlannedConsequences(
+    params.consequences,
+    params.target,
+    params.forces_choice
   );
-
-  if (params.consequences) {
-    const outcome = success
-      ? params.consequences.success
-      : params.consequences.failure;
-    if (outcome) {
-      contextForStory += `\n[Intended consequence: ${outcome}]`;
-    }
-  }
-
-  if (success === false) {
-    contextForStory += describeHardness(params.target, params.forces_choice);
-  }
 
   return {
     toolName: "formula_roll",
     toolCallId,
-    success: success ?? true,
+    // The dice were thrown, so the call succeeded. It says nothing about
+    // whether the character passed - that isn't this tool's business anymore.
+    success: true,
     result: {
       type: "formula_roll",
-      formula: params.formula,
-      resolvedFormula,
-      rolls: flattenRolls(rollResult.rolls),
-      total: rollResult.total,
-      dc: params.dc,
-      reverseDC,
-      success,
-      margin,
+      pools,
       reason: params.reason,
       displayName: params.display_name,
       stakes: params.stakes,
       target: params.target,
       forcesChoice: params.forces_choice,
       consequences: params.consequences,
-      breakdown: rollResult.breakdown,
     } as GMFormulaRollResult,
     contextForStory,
   };
@@ -2108,23 +2267,23 @@ async function executeFormulaRoll(
 
 /**
  * Execute ask_for_roll (manual dice mode): pause the GM loop and wait for
- * the player to roll physical dice and type in their total. The injected
- * `interaction.requestManualRoll` handler resolves with the entered number,
- * or null when the player skipped (then the GM should roll digitally).
+ * the player to roll physical dice and say what they got. The injected
+ * `interaction.requestManualRoll` handler resolves with their answer as
+ * verbatim text, or null when the player skipped (then the GM should roll
+ * digitally). Nothing is parsed out of the text and no verdict is computed -
+ * see ManualRollAnswer for why.
  */
 async function executeAskForRoll(
   toolCallId: string,
   params: AskForRollParams,
   interaction: GMInteractionHandlers
 ): Promise<GMToolResult> {
-  const baseResult: Omit<GMAskForRollResult, "rollValue"> = {
+  const baseResult: Omit<GMAskForRollResult, "answer"> = {
     type: "ask_for_roll",
     title: params.title,
     description: params.description,
     playerName: params.player_name,
     formula: params.formula,
-    dc: params.dc,
-    reverseDC: params.reverse_dc,
   };
 
   if (!interaction.requestManualRoll) {
@@ -2132,7 +2291,7 @@ async function executeAskForRoll(
       toolName: "ask_for_roll",
       toolCallId,
       success: false,
-      result: { ...baseResult, rollValue: null, skipped: true },
+      result: { ...baseResult, answer: null, skipped: true },
       contextForStory:
         "[ERROR: Manual dice input isn't available right now - roll digitally with formula_roll instead.]",
     };
@@ -2143,61 +2302,36 @@ async function executeAskForRoll(
     description: params.description,
     playerName: params.player_name,
     formula: params.formula,
-    dc: params.dc,
-    reverseDC: params.reverse_dc,
   });
 
-  if (answer === null || !Number.isFinite(answer.value)) {
+  const reported = answer?.rawText?.trim();
+  if (!reported) {
     return {
       toolName: "ask_for_roll",
       toolCallId,
       success: false,
-      result: { ...baseResult, rollValue: null, skipped: true },
-      contextForStory: `[Manual Roll Skipped: ${params.title} - the player didn't enter a roll. Roll it for them digitally with formula_roll${
-        params.formula ? ` ("${params.formula}"${params.dc !== undefined ? `, dc: ${params.dc}` : ""})` : ""
+      result: { ...baseResult, answer: null, skipped: true },
+      contextForStory: `[Manual Roll Skipped: ${params.title} - the player didn't report a roll. Roll it for them digitally with formula_roll${
+        params.formula ? ` (formulas: ["${params.formula}"])` : ""
       } and continue.]`,
     };
-  }
-
-  const rollValue = answer.value;
-
-  // Compare against DC if one was given
-  let success: boolean | undefined;
-  let margin: number | undefined;
-  const reverseDC = params.reverse_dc || false;
-  if (params.dc !== undefined) {
-    if (reverseDC) {
-      success = rollValue <= params.dc;
-      margin = params.dc - rollValue;
-    } else {
-      success = rollValue >= params.dc;
-      margin = rollValue - params.dc;
-    }
   }
 
   let contextForStory = `[Manual Roll: ${params.title}`;
   if (params.player_name) {
     contextForStory += ` - ${params.player_name}`;
   }
-  contextForStory += ` rolled${params.formula ? ` ${params.formula}` : ""} = **${rollValue}** (real dice, entered by the player`;
-  if (answer.rawText && answer.rawText !== String(rollValue)) {
-    contextForStory += `: "${answer.rawText}"`;
-  }
-  contextForStory += `)`;
-  if (params.dc !== undefined) {
-    contextForStory += ` vs DC ${params.dc} → ${success ? "SUCCESS" : "FAILURE"}`;
-    if (margin !== undefined) {
-      contextForStory += ` (margin: ${margin >= 0 ? "+" : ""}${margin})`;
-    }
-  }
-  contextForStory += `]`;
+  contextForStory += ` was asked to roll${
+    params.formula ? ` ${params.formula}` : ""
+  } with real dice and reported: "${reported}"]`;
   contextForStory += `\n[Reason: ${params.description}]`;
+  contextForStory += `\n[That is the player's own wording, exactly as given - no number was parsed out of it and no verdict was computed. Read it against what you asked for, use \`calculate\` for any arithmetic or comparison, and ask them again in (round brackets) if it genuinely doesn't answer the roll.]`;
 
   return {
     toolName: "ask_for_roll",
     toolCallId,
-    success: success ?? true,
-    result: { ...baseResult, rollValue, rawText: answer.rawText, success, margin },
+    success: true,
+    result: { ...baseResult, answer: reported },
     contextForStory,
   };
 }
@@ -2281,46 +2415,12 @@ async function executeAskQuestion(
 }
 
 /**
- * Execute check_dc: a pure numeric DC comparison for a total the player
- * already reported (typed, spoken, or volunteered in freeform narration),
- * so the GM doesn't have to judge success/failure itself. Rolls no dice -
- * same success/margin math as executeFormulaRoll, applied directly to
- * `params.total`.
- */
-function executeCheckDC(
-  toolCallId: string,
-  params: CheckDCParams
-): GMToolResult {
-  const reverseDC = params.reverse_dc || false;
-  const success = reverseDC
-    ? params.total <= params.dc
-    : params.total >= params.dc;
-  const margin = reverseDC
-    ? params.dc - params.total
-    : params.total - params.dc;
-
-  const contextForStory = `[DC Check: ${params.total} ${reverseDC ? "≤" : "vs"} DC ${params.dc} → ${success ? "SUCCESS" : "FAILURE"} (margin: ${margin >= 0 ? "+" : ""}${margin})]\n[Reason: ${params.reason}]`;
-
-  return {
-    toolName: "check_dc",
-    toolCallId,
-    success,
-    result: {
-      type: "check_dc",
-      total: params.total,
-      dc: params.dc,
-      reverseDC,
-      success,
-      margin,
-      reason: params.reason,
-    },
-    contextForStory,
-  };
-}
-
-/**
- * Execute an opposed formula roll
- * GM must provide formulas with actual numeric values (no variable substitution)
+ * Execute an opposed formula roll: both sides throw, both totals are
+ * reported, and that's it. Which total wins is a rules question the GM
+ * settles with `calculate` - see the tool description.
+ *
+ * GM must provide formulas with actual numeric values (no variable
+ * substitution).
  */
 async function executeOpposedFormula(
   toolCallId: string,
@@ -2330,13 +2430,27 @@ async function executeOpposedFormula(
 ): Promise<GMToolResult> {
   // No variable resolver - GM must provide actual numbers
 
+  const emptyResult = (): GMOpposedFormulaResult => ({
+    type: "opposed_formula",
+    playerFormula: params.player_formula,
+    playerResolvedFormula: params.player_formula,
+    playerRolls: [],
+    playerTotal: 0,
+    opponentFormula: params.opponent_formula,
+    opponentResolvedFormula: params.opponent_formula,
+    opponentRolls: [],
+    opponentTotal: 0,
+    opponentName: params.opponent_name,
+    reason: params.reason,
+  });
+
   // Roll player's formula (physical dice eligible - it's the human's roll).
   // The opponent's formula always stays digital.
   let playerResult: RollResult;
   try {
-    playerResult = await rollFormulaMaybePhysical(
-      params.player_formula,
-      { reason: params.reason, dc: undefined },
+    [playerResult] = await rollFormulasMaybePhysical(
+      [params.player_formula],
+      { reason: params.reason },
       interaction
     );
   } catch (e) {
@@ -2344,21 +2458,7 @@ async function executeOpposedFormula(
       toolName: "opposed_formula",
       toolCallId,
       success: false,
-      result: {
-        type: "opposed_formula",
-        playerFormula: params.player_formula,
-        playerResolvedFormula: params.player_formula,
-        playerRolls: [],
-        playerTotal: 0,
-        opponentFormula: params.opponent_formula,
-        opponentResolvedFormula: params.opponent_formula,
-        opponentRolls: [],
-        opponentTotal: 0,
-        opponentName: params.opponent_name,
-        winner: "opponent",
-        margin: 0,
-        reason: params.reason,
-      } as GMOpposedFormulaResult,
+      result: emptyResult(),
       contextForStory: `[ERROR: Invalid player formula "${
         params.player_formula
       }" - ${e instanceof Error ? e.message : "Unknown error"}]`,
@@ -2375,35 +2475,15 @@ async function executeOpposedFormula(
       toolCallId,
       success: false,
       result: {
-        type: "opposed_formula",
-        playerFormula: params.player_formula,
+        ...emptyResult(),
         playerResolvedFormula: playerResult.breakdown || params.player_formula,
         playerRolls: flattenRolls(playerResult.rolls),
         playerTotal: playerResult.total,
-        opponentFormula: params.opponent_formula,
-        opponentResolvedFormula: params.opponent_formula,
-        opponentRolls: [],
-        opponentTotal: 0,
-        opponentName: params.opponent_name,
-        winner: "player",
-        margin: 0,
-        reason: params.reason,
-      } as GMOpposedFormulaResult,
+      },
       contextForStory: `[ERROR: Invalid opponent formula "${
         params.opponent_formula
       }" - ${e instanceof Error ? e.message : "Unknown error"}]`,
     };
-  }
-
-  // Determine winner
-  let winner: "player" | "opponent" | "tie";
-  const margin = playerResult.total - opponentResult.total;
-  if (margin > 0) {
-    winner = "player";
-  } else if (margin < 0) {
-    winner = "opponent";
-  } else {
-    winner = "tie";
   }
 
   // Build context string
@@ -2419,13 +2499,7 @@ async function executeOpposedFormula(
     contextForStory += ` → ${opponentResult.breakdown}`;
   }
   contextForStory += ` = ${opponentResult.total}]`;
-  contextForStory += `\n[Winner: ${
-    winner === "player"
-      ? "PLAYER"
-      : winner === "opponent"
-      ? params.opponent_name.toUpperCase()
-      : "TIE"
-  } (margin: ${Math.abs(margin)})]`;
+  contextForStory += `\n[No winner was computed. Compare the two totals with \`calculate\` (e.g. "${playerResult.total} > ${opponentResult.total}") per this adventure's rules before narrating who came out ahead.]`;
 
   if (params.stakes) {
     contextForStory += `\n[Stakes: ${params.stakes}]`;
@@ -2438,26 +2512,27 @@ async function executeOpposedFormula(
     playerResult.modifiers
   );
 
-  if (params.consequences) {
-    const outcome =
-      winner === "player"
-        ? params.consequences.player_wins
-        : winner === "opponent"
-        ? params.consequences.opponent_wins
-        : params.consequences.tie;
-    if (outcome) {
-      contextForStory += `\n[Intended consequence: ${outcome}]`;
-    }
+  // All planned branches go back, since the engine doesn't know which one
+  // the comparison will land on.
+  if (params.consequences?.player_wins) {
+    contextForStory += `\n[Planned consequence if the player wins: ${params.consequences.player_wins}]`;
   }
-
-  if (winner === "opponent") {
-    contextForStory += describeHardness(params.target, params.forces_choice);
+  if (params.consequences?.opponent_wins) {
+    contextForStory += `\n[Planned consequence if ${params.opponent_name} wins: ${params.consequences.opponent_wins}]`;
+  }
+  if (params.consequences?.tie) {
+    contextForStory += `\n[Planned consequence on a tie: ${params.consequences.tie}]`;
+  }
+  const hardness = describeHardness(params.target, params.forces_choice);
+  if (hardness) {
+    contextForStory += `\n[If the player lost:${hardness}]`;
   }
 
   return {
     toolName: "opposed_formula",
     toolCallId,
-    success: winner === "player",
+    // Both sides rolled, so the call succeeded - it says nothing about who won.
+    success: true,
     result: {
       type: "opposed_formula",
       playerFormula: params.player_formula,
@@ -2470,8 +2545,6 @@ async function executeOpposedFormula(
       opponentRolls: flattenRolls(opponentResult.rolls),
       opponentTotal: opponentResult.total,
       opponentName: params.opponent_name,
-      winner,
-      margin: Math.abs(margin),
       reason: params.reason,
       displayName: params.display_name,
       stakes: params.stakes,
@@ -2484,82 +2557,37 @@ async function executeOpposedFormula(
 }
 
 /**
- * Execute a formula-based challenge check
+ * Record one resolved check against the active challenge. Rolls nothing: the
+ * GM rolls with formula_roll, compares with calculate, and reports the
+ * verdict here. (This replaced formula_challenge_check, which bundled roll +
+ * DC comparison + progress into one call and so only worked for systems
+ * where beating a single target number is the whole resolution.)
  */
-async function executeFormulaChallengeCheck(
+function executeRecordChallengeResult(
   toolCallId: string,
-  params: FormulaChallengeCheckParams,
-  storyData: StoryData,
-  interaction: GMInteractionHandlers
-): Promise<GMToolResult> {
+  params: RecordChallengeResultParams,
+  storyData: StoryData
+): GMToolResult {
   const challenge = storyData.activeChallenge;
   if (!challenge) {
     return {
-      toolName: "formula_challenge_check",
+      toolName: "record_challenge_result",
       toolCallId,
       success: false,
       result: {
-        type: "formula_challenge_check",
-        formula: params.formula,
-        resolvedFormula: params.formula,
-        rolls: [],
-        total: 0,
-        dc: params.dc,
-        success: false,
-        margin: 0,
+        type: "record_challenge_result",
+        outcome: params.outcome,
         description: params.description,
-      } as GMFormulaChallengeResult,
-      contextForStory: "[ERROR: No active challenge to make a check for]",
+      } as GMChallengeResultRecord,
+      contextForStory:
+        "[ERROR: No active challenge to record a result for. Use start_challenge first, or drop the challenge framing.]",
     };
   }
 
-  // No variable resolver - GM must provide actual numbers
-
-  // Roll the formula
-  let rollResult: RollResult;
-  try {
-    rollResult = await rollFormulaMaybePhysical(
-      params.formula,
-      { reason: params.description, dc: params.dc },
-      interaction
-    );
-  } catch (e) {
-    return {
-      toolName: "formula_challenge_check",
-      toolCallId,
-      success: false,
-      result: {
-        type: "formula_challenge_check",
-        formula: params.formula,
-        resolvedFormula: params.formula,
-        rolls: [],
-        total: 0,
-        dc: params.dc,
-        success: false,
-        margin: 0,
-        description: params.description,
-      } as GMFormulaChallengeResult,
-      contextForStory: `[ERROR: Invalid formula "${params.formula}" - ${
-        e instanceof Error ? e.message : "Unknown error"
-      }]`,
-    };
-  }
-
-  const resolvedFormula = rollResult.breakdown || params.formula;
-  const reverseDC = params.reverse_dc || false;
-  let success: boolean;
-  let margin: number;
-  if (reverseDC) {
-    // Roll-under: success = roll ≤ DC (Call of Cthulhu/BRP style)
-    success = rollResult.total <= params.dc;
-    margin = params.dc - rollResult.total;
-  } else {
-    success = rollResult.total >= params.dc;
-    margin = rollResult.total - params.dc;
-  }
+  const succeeded = params.outcome === "success";
 
   // Update challenge progress
-  if (success) {
+  if (succeeded) {
     challenge.currentSuccesses = (challenge.currentSuccesses || 0) + 1;
   } else {
     challenge.currentFailures = (challenge.currentFailures || 0) + 1;
@@ -2591,76 +2619,29 @@ async function executeFormulaChallengeCheck(
     challenge.resolvedAt = Date.now();
   }
 
-  // Build context string
-  const displayName = params.display_name || "Challenge Check";
-  let contextForStory = `[${displayName}: ${params.formula}`;
-  if (resolvedFormula !== params.formula) {
-    contextForStory += ` → ${resolvedFormula}`;
-  }
-  contextForStory += `: [${flattenRolls(rollResult.rolls).join(", ")}] = **${
-    rollResult.total
-  }**`;
-  if (reverseDC) {
-    contextForStory += ` = ${rollResult.total} vs DC ${params.dc} → ${
-      success ? "SUCCESS" : "FAILURE"
-    }`;
-  } else {
-    contextForStory += ` vs DC ${params.dc} → ${
-      success ? "SUCCESS" : "FAILURE"
-    }`;
-  }
-  contextForStory += ` (margin: ${margin >= 0 ? "+" : ""}${margin})]`;
-  contextForStory += `\n[${params.description}]`;
+  let contextForStory = `[Challenge Check ${
+    succeeded ? "SUCCESS" : "FAILURE"
+  }: ${params.description}]`;
   contextForStory += `\n[Challenge "${challenge.name}": ${challenge.currentSuccesses}/${requiredSuccessesToWin} successes, ${challenge.currentFailures}/${maxFailuresToLose} failures]`;
 
   if (completed) {
     contextForStory += `\n[Challenge ${won ? "WON" : "LOST"}!]`;
   }
 
-  if (params.stakes) {
-    contextForStory += `\n[Stakes: ${params.stakes}]`;
-    contextForStory += applyStakesEscalation(storyData, params.stakes);
-  }
-
-  contextForStory += checkStatIntegrity(
-    storyData,
-    params.stat_name,
-    rollResult.modifiers
-  );
-
-  if (params.consequences) {
-    const outcome = success
-      ? params.consequences.success
-      : params.consequences.failure;
-    if (outcome) {
-      contextForStory += `\n[Intended consequence: ${outcome}]`;
-    }
-  }
-
-  if (!success) {
+  if (!succeeded) {
     contextForStory += describeHardness(params.target, params.forces_choice);
   }
 
   return {
-    toolName: "formula_challenge_check",
+    toolName: "record_challenge_result",
     toolCallId,
-    success,
+    success: succeeded,
     result: {
-      type: "formula_challenge_check",
-      formula: params.formula,
-      resolvedFormula,
-      rolls: flattenRolls(rollResult.rolls),
-      total: rollResult.total,
-      dc: params.dc,
-      reverseDC,
-      success,
-      margin,
+      type: "record_challenge_result",
+      outcome: params.outcome,
       description: params.description,
-      displayName: params.display_name,
-      stakes: params.stakes,
       target: params.target,
       forcesChoice: params.forces_choice,
-      consequences: params.consequences,
       challengeProgress: {
         name: challenge.name,
         successes: challenge.currentSuccesses,
@@ -2670,7 +2651,7 @@ async function executeFormulaChallengeCheck(
         completed,
         won,
       },
-    } as GMFormulaChallengeResult,
+    } as GMChallengeResultRecord,
     contextForStory,
   };
 }
@@ -4392,20 +4373,12 @@ function executeNPCRoll(
     };
   }
 
-  // Check success if DC provided
-  let success: boolean | undefined;
-  if (params.dc !== undefined) {
-    success = rollResult.total >= params.dc;
-  }
-
-  // Log the roll
-  const dcText = params.dc !== undefined ? ` vs DC ${params.dc}` : "";
-  const successText =
-    success !== undefined ? (success ? " - SUCCESS" : " - FAIL") : "";
+  // Log the roll. No hit/miss verdict here - the GM compares the total
+  // against whatever it's up against with `calculate`, same as any roll.
   const targetText = params.target ? ` targeting ${params.target}` : "";
   logCombat(
     storyData.combatState,
-    `${combatant.name} rolled ${params.formula}${targetText}: ${rollResult.total}${dcText}${successText} - ${params.reason}`
+    `${combatant.name} rolled ${params.formula}${targetText}: ${rollResult.total} - ${params.reason}`
   );
 
   return {
@@ -4418,12 +4391,10 @@ function executeNPCRoll(
       formula: params.formula,
       rolls: flattenDiceRolls(rollResult),
       total: rollResult.total,
-      dc: params.dc,
-      success,
       reason: params.reason,
       target: params.target,
     } as GMNPCRollResult,
-    contextForStory: `[NPC Roll: ${combatant.name} rolled ${params.formula}${targetText} = ${rollResult.total}${dcText}${successText} - ${params.reason}]`,
+    contextForStory: `[NPC Roll: ${combatant.name} rolled ${params.formula}${targetText} = ${rollResult.total} - ${params.reason}]\n[No hit/miss verdict was computed. Compare it with \`calculate\` (e.g. "${rollResult.total} >= 15") before narrating the outcome.]`,
   };
 }
 

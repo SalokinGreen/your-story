@@ -987,15 +987,19 @@ export async function checkPlayerAgencyViolation(
   };
 }
 
-// Rolls whose outer `success` is a genuine pass/fail verdict worth checking
-// narration against. fate_question is deliberately excluded - its answer is
-// a four-way oracle response (Yes/No/Exceptional), not a SUCCESS/FAILURE
-// check, and doesn't map onto this same "did narration agree" question.
+// Tool calls whose outer `success` is a genuine pass/fail verdict worth
+// checking narration against.
+//
+// Deliberately NOT the dice tools: formula_roll/opposed_formula/npc_roll
+// report what the dice showed and never judge it, so their `success` is just
+// "the dice were thrown" and comparing narration to it would flag every
+// legitimately-failed roll. The verdict is `calculate`'s comparison
+// (TRUE/FALSE) and record_challenge_result's outcome. fate_question stays
+// excluded too - its answer is a four-way oracle response (Yes/No/
+// Exceptional), not a SUCCESS/FAILURE check.
 const OUTCOME_CHECK_TOOL_NAMES = new Set([
-  "formula_roll",
-  "opposed_formula",
-  "formula_challenge_check",
-  "npc_roll",
+  "calculate",
+  "record_challenge_result",
 ]);
 
 export interface RollOutcomeForCheck {

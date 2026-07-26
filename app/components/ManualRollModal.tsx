@@ -3,7 +3,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import type { ManualRollRequest } from "../misc/gmExecutor";
 import type { CouchPlayer } from "../misc/structs";
-import { extractRollNumber } from "../misc/diceFormula";
 import { DynamicIcon } from "./DynamicIcon";
 import STTButton from "./STTButton";
 
@@ -12,13 +11,20 @@ interface ManualRollModalProps {
   request: ManualRollRequest | null;
   // Couch players, used to color the "who rolls" chip when names match
   couchPlayers?: CouchPlayer[];
-  onSubmit: (value: number, rawText: string) => void;
+  // The player's answer, exactly as typed or spoken. Nothing is parsed out
+  // of it - see ManualRollAnswer in gmExecutor.ts.
+  onSubmit: (rawText: string) => void;
   onSkip: () => void;
 }
 
 /**
  * Manual dice mode prompt: the GM called ask_for_roll, generation is paused,
- * and whoever is named rolls their physical dice and types in the total.
+ * and whoever is named rolls their physical dice and reports what came up.
+ *
+ * Whatever they write goes to the GM verbatim. This used to pull a single
+ * number out of the text before sending it, which quietly mangled every
+ * system that rolls more than one pool - "4, 6" for two challenge dice
+ * arrived as 4 - so the GM now reads the answer itself.
  */
 export default function ManualRollModal({
   request,
@@ -48,8 +54,8 @@ export default function ManualRollModal({
 
   if (!request) return null;
 
-  const parsed = extractRollNumber(value);
-  const isValid = parsed !== null;
+  const answer = value.trim();
+  const canSubmit = answer.length > 0;
 
   const matchedPlayer = request.playerName
     ? couchPlayers.find(
@@ -60,20 +66,16 @@ export default function ManualRollModal({
     : undefined;
 
   const submit = () => {
-    if (parsed === null) return;
-    onSubmit(parsed, value.trim());
+    if (!canSubmit) return;
+    onSubmit(answer);
   };
 
-  // Voice input should feel hands-free: once the player stops talking and a
-  // number comes back, submit immediately instead of making them also tap
-  // Confirm. If nothing parseable was said, just fill the box so they can
-  // fix it up and confirm manually.
+  // Voice input should feel hands-free: once the player stops talking, send
+  // what they said straight through instead of making them also tap Confirm.
   const handleVoiceTranscript = (text: string) => {
     setValue(text);
-    const parsedNumber = extractRollNumber(text);
-    if (parsedNumber !== null) {
-      onSubmit(parsedNumber, text.trim());
-    }
+    const spoken = text.trim();
+    if (spoken) onSubmit(spoken);
   };
 
   return (
@@ -104,25 +106,18 @@ export default function ManualRollModal({
           </p>
 
           {/* What to roll */}
-          {(request.formula || request.dc !== undefined) && (
+          {request.formula && (
             <div className="flex items-center justify-center gap-2 text-sm">
-              {request.formula && (
-                <span className="px-3 py-1.5 rounded-lg bg-purple-900/40 border border-purple-600/40 text-purple-100 font-mono font-semibold">
-                  🎲 {request.formula}
-                </span>
-              )}
-              {request.dc !== undefined && (
-                <span className="px-3 py-1.5 rounded-lg bg-blue-900/40 border border-blue-600/40 text-blue-100 font-semibold">
-                  {request.reverseDC ? "≤" : "vs"} DC {request.dc}
-                </span>
-              )}
+              <span className="px-3 py-1.5 rounded-lg bg-purple-900/40 border border-purple-600/40 text-purple-100 font-mono font-semibold">
+                🎲 {request.formula}
+              </span>
             </div>
           )}
 
           {/* Result input */}
           <div>
             <label className="block text-xs font-semibold text-blue-200/70 uppercase tracking-wider mb-2 text-center">
-              Your total (with modifiers)
+              What did you roll?
             </label>
             <div className="flex items-stretch gap-2">
               <input
@@ -136,22 +131,19 @@ export default function ManualRollModal({
                     submit();
                   }
                 }}
-                placeholder='17, or "I rolled a natural 20"'
+                placeholder='17, or "4 and 6", or "natural 20!"'
                 className="w-full px-4 py-3 bg-blue-900/30 border border-blue-700/40 rounded-xl text-white text-center text-xl font-bold focus:outline-none focus:ring-2 focus:ring-purple-500"
               />
               <STTButton onTranscript={handleVoiceTranscript} className="shrink-0" />
             </div>
             <p className="mt-2 text-center text-xs text-blue-300/60 h-4">
-              {value.trim() &&
-                (isValid
-                  ? `Detected: ${parsed}`
-                  : "Couldn't find a number in that - try again")}
+              Every die, in your own words - the GM reads it as you write it
             </p>
           </div>
 
           <button
             onClick={submit}
-            disabled={!isValid}
+            disabled={!canSubmit}
             className="w-full py-3 rounded-xl bg-linear-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-[0.99] disabled:opacity-40 text-white font-semibold transition-all flex items-center justify-center gap-2"
           >
             <DynamicIcon name="Check" className="w-4 h-4" />

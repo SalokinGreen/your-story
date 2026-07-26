@@ -333,29 +333,91 @@ function rollDiceGroup(dice: DiceRoll): DiceGroupResult {
   return buildDiceGroupResult(dice, allRolls, explosions);
 }
 
-/**
- * Resolves real face values for `count` dice of the given `sides` - e.g. a
- * physical 3D dice throw settling, rather than Math.random(). Called once
- * per dice group for the initial throw, then again with count=1 for each
- * additional die needed to resolve an explosion (the explosion count isn't
- * knowable up front).
- */
-export type DiceResolver = (
-  sides: number,
-  count: number
-) => Promise<number[]>;
+/** One pool of identical dice that needs face values. */
+export interface DiceGroupRequest {
+  sides: number;
+  count: number;
+}
 
 /**
- * Async counterpart to rollDiceGroup, sourcing face values from an
- * injected resolver (e.g. a physical dice throw) instead of Math.random().
+ * Resolves real face values for a whole batch of dice groups at once - e.g. a
+ * physical 3D dice throw settling, rather than Math.random(). Returns one
+ * face array per requested group, in the same order.
+ *
+ * The batch matters: a roll like "2d6+1d4" (or two independent pools such as
+ * Starforged's 1d6 action die and 2d10 challenge dice) is *one* handful of
+ * dice at a real table, so every group is handed over in a single call and
+ * thrown together. Explosions are the one exception - how many extra dice a
+ * group needs isn't knowable up front, so each is requested as its own
+ * follow-up batch of a single one-die group.
+ */
+export type DiceResolver = (
+  groups: DiceGroupRequest[]
+) => Promise<number[][]>;
+
+/**
+ * Every dice group a parsed formula will roll, in token order - so a caller
+ * can hand a DiceResolver the whole handful at once (see DiceResolver).
+ */
+export function collectDiceGroups(parsed: ParsedFormula): DiceGroupRequest[] {
+  const groups: DiceGroupRequest[] = [];
+  for (const token of parsed.tokens) {
+    if (token.type !== "dice") continue;
+    const dice = token.value as DiceRoll;
+    groups.push({ sides: dice.sides, count: dice.count });
+  }
+  return groups;
+}
+
+/**
+ * Hands out the pre-thrown faces for each dice group in token order, and
+ * requests extra single dice on demand for explosions. One instance is
+ * shared across every formula in a multi-formula roll so all their dice come
+ * from the same initial throw.
+ */
+class BatchedDiceFaces {
+  private nextGroup = 0;
+
+  constructor(
+    private readonly prethrown: number[][],
+    private readonly resolver: DiceResolver
+  ) {}
+
+  take(dice: DiceRoll): number[] {
+    const faces = this.prethrown[this.nextGroup++];
+    if (!faces || faces.length < dice.count) {
+      throw new Error(
+        `Dice resolver returned ${faces?.length ?? 0} face values for ${
+          dice.count
+        }d${dice.sides}`
+      );
+    }
+    return faces;
+  }
+
+  async explode(sides: number): Promise<number> {
+    const [faces] = await this.resolver([{ sides, count: 1 }]);
+    const face = faces?.[0];
+    if (typeof face !== "number") {
+      throw new Error(
+        `Dice resolver returned no face value for an exploding d${sides}`
+      );
+    }
+    return face;
+  }
+}
+
+/**
+ * Async counterpart to rollDiceGroup, taking face values from an already-
+ * thrown batch (e.g. a physical dice throw) instead of Math.random().
  * Keep-highest/lowest/notation math is shared with rollDiceGroup via
  * buildDiceGroupResult so the two can't diverge.
  */
 async function rollDiceGroupAsync(
   dice: DiceRoll,
-  diceResolver: DiceResolver
+  faces: BatchedDiceFaces
 ): Promise<DiceGroupResult> {
-  const initialRolls = await diceResolver(dice.sides, dice.count);
+  const initialRolls = faces.take(dice);
   const allRolls: number[] = [];
   let explosions = 0;
 
@@ -365,8 +427,7 @@ async function rollDiceGroupAsync(
 
     if (dice.exploding) {
       while (roll === dice.sides && explosions < MAX_EXPLOSIONS_PER_DIE) {
-        const [nextRoll] = await diceResolver(dice.sides, 1);
-        roll = nextRoll;
+        roll = await faces.explode(dice.sides);
         allRolls.push(roll);
         explosions++;
       }
@@ -486,14 +547,40 @@ export function rollFormula(
 /**
  * Async counterpart to rollParsedFormula, sourcing dice faces from an
  * injected DiceResolver (e.g. a physical dice throw) instead of
- * Math.random(). Mirrors rollParsedFormula's token walk exactly except for
- * the dice case - variable/operator/modifier handling never needs to be
- * async, so keep both in sync if formula semantics change.
+ * Math.random(). Every dice group in the formula is thrown in one batch
+ * before the token walk starts, so "2d6+1d4" leaves the hand together.
  */
 export async function rollParsedFormulaAsync(
   parsed: ParsedFormula,
   resolver: VariableResolver,
   diceResolver: DiceResolver
+): Promise<RollResult> {
+  const faces = await throwGroupsFor([parsed], diceResolver);
+  return rollParsedFormulaWithFaces(parsed, resolver, faces);
+}
+
+/**
+ * Throws every dice group across a set of parsed formulas in a single
+ * DiceResolver batch and wraps the results for the token walks to consume.
+ */
+async function throwGroupsFor(
+  parsedFormulas: ParsedFormula[],
+  diceResolver: DiceResolver
+): Promise<BatchedDiceFaces> {
+  const groups = parsedFormulas.flatMap(collectDiceGroups);
+  const prethrown = groups.length > 0 ? await diceResolver(groups) : [];
+  return new BatchedDiceFaces(prethrown, diceResolver);
+}
+
+/**
+ * The token walk itself. Mirrors rollParsedFormula exactly except for the
+ * dice case - variable/operator/modifier handling never needs to be async,
+ * so keep both in sync if formula semantics change.
+ */
+async function rollParsedFormulaWithFaces(
+  parsed: ParsedFormula,
+  resolver: VariableResolver,
+  faces: BatchedDiceFaces
 ): Promise<RollResult> {
   const rolls: DiceGroupResult[] = [];
   const substitutedVariables: Record<string, number> = {};
@@ -510,7 +597,7 @@ export async function rollParsedFormulaAsync(
 
       case "dice": {
         const diceRoll = token.value as DiceRoll;
-        const result = await rollDiceGroupAsync(diceRoll, diceResolver);
+        const result = await rollDiceGroupAsync(diceRoll, faces);
         rolls.push(result);
 
         const value =
@@ -590,6 +677,35 @@ export async function rollFormulaAsync(
 ): Promise<RollResult> {
   const parsed = parseFormula(formula);
   return rollParsedFormulaAsync(parsed, resolver, diceResolver);
+}
+
+/**
+ * Roll several *independent* formulas as one handful of dice: every group
+ * across every formula is thrown in a single DiceResolver batch, but each
+ * formula keeps its own separate total (nothing is summed across them).
+ *
+ * This is what systems that roll dissimilar pools against each other need -
+ * Starforged's 1d6 action die and 2d10 challenge dice are one throw but
+ * three numbers, and adding them together would be meaningless. Comparing
+ * the totals is deliberately left to the caller.
+ *
+ * All formulas are parsed before any dice are thrown, so an invalid formula
+ * later in the list fails the whole roll rather than leaving dice on the
+ * table.
+ */
+export async function rollFormulasAsync(
+  formulas: string[],
+  resolver: VariableResolver = () => undefined,
+  diceResolver: DiceResolver
+): Promise<RollResult[]> {
+  const parsedFormulas = formulas.map(parseFormula);
+  const faces = await throwGroupsFor(parsedFormulas, diceResolver);
+
+  const results: RollResult[] = [];
+  for (const parsed of parsedFormulas) {
+    results.push(await rollParsedFormulaWithFaces(parsed, resolver, faces));
+  }
+  return results;
 }
 
 // ============================================
@@ -772,36 +888,8 @@ export function createSchemaBasedResolver(
   };
 }
 
-// ============================================
-// FREE-TEXT ROLL INPUT
-// ============================================
-
-const WORD_NUMBERS: Record<string, number> = {
-  zero: 0, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
-  eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12, thirteen: 13,
-  fourteen: 14, fifteen: 15, sixteen: 16, seventeen: 17, eighteen: 18,
-  nineteen: 19, twenty: 20, thirty: 30, forty: 40, fifty: 50,
-};
-
-/**
- * Extract the roll total a player typed or spoke, e.g. "17", "I rolled a 17",
- * "natural 20!", or (as an STT fallback) "seventeen". Returns null if no
- * number can be found. Used by manual dice mode, where players answer in
- * free text/voice instead of a bare numeric field.
- */
-export function extractRollNumber(text: string): number | null {
-  const digitMatch = text.match(/-?\d+/);
-  if (digitMatch) {
-    const value = parseInt(digitMatch[0], 10);
-    return Number.isFinite(value) ? value : null;
-  }
-
-  const words = text.toLowerCase().match(/[a-z]+/g) || [];
-  for (const word of words) {
-    if (word in WORD_NUMBERS) {
-      return WORD_NUMBERS[word];
-    }
-  }
-
-  return null;
-}
+// NOTE: manual dice mode used to run the player's typed/spoken answer
+// through an extractRollNumber() helper that pulled the *first* number out
+// of it. That silently mangled every system whose roll isn't a single total -
+// "4, 6" for two challenge dice became 4 - so the answer now reaches the GM
+// as verbatim text and the GM reads it (see ask_for_roll in gmTools.ts).

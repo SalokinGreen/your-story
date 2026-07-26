@@ -93,12 +93,25 @@ The GM improvises dice mechanics per-adventure by reading a `mechanics`-type
 lore note and a `character_sheet`-type lore note (freeform text — "notes, not
 stat blocks"), then calls tools such as:
 
-- `formula_roll` / `opposed_formula` / `formula_challenge_check` — all dice
-  resolution goes through these; supports `reverse_dc` (roll-under systems),
-  `stakes` (low/medium/high/deadly), per-outcome `consequences`.
-- `start_challenge` / `formula_challenge_check` / `resolve_challenge` /
+- `formula_roll` / `opposed_formula` — all dice resolution goes through
+  these. **They report what the dice showed and never judge it**: no tool
+  takes a `dc`, and `calculate` is what turns a roll into a verdict (see
+  below). `formula_roll` takes `formulas: string[]`, one entry per
+  *independent* pool, so a system that rolls dissimilar dice against each
+  other (Starforged: `["1d6+2", "2d10"]`) gets separate totals with nothing
+  summed across them — and every die in the call is thrown in one physical
+  toss. Supports `stakes` (low/medium/high/deadly), per-outcome
+  `consequences` (both branches echoed back, since the engine doesn't know
+  which one landed), and the `target`/`forces_choice` hardness dimensions.
+- `calculate` — math *and comparisons*: `'17+3 >= 15'` comes back TRUE/FALSE.
+  This is the only place a pass/fail verdict is decided, so every check is
+  two steps (roll, then compare). Its `success` carries the verdict, the way
+  the dice tools' DCs used to.
+- `start_challenge` / `record_challenge_result` / `resolve_challenge` /
   `cancel_challenge` — multi-roll "best of X successes" challenges
-  (`StoryData.activeChallenge`, only one active at a time).
+  (`StoryData.activeChallenge`, only one active at a time). A check inside
+  one is three calls: `formula_roll` → `calculate` → `record_challenge_result`
+  (which rolls nothing and just banks the outcome).
 - `fate_question` / `roll_table` — Mythic-style oracle (weighted by a 1-9
   chaos factor) and random tables.
 - `start_combat` / `add_combatant` / `update_combatant_stat` /

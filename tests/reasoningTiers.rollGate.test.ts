@@ -103,8 +103,14 @@ describe("hasSatisfiedRollGate", () => {
   it("is satisfied by a roll tool", () => {
     expect(hasSatisfiedRollGate(["formula_roll"])).toBe(true);
     expect(hasSatisfiedRollGate(["opposed_formula"])).toBe(true);
-    expect(hasSatisfiedRollGate(["formula_challenge_check"])).toBe(true);
     expect(hasSatisfiedRollGate(["npc_roll"])).toBe(true);
+  });
+
+  it("is not satisfied by merely adjudicating - dice have to be thrown", () => {
+    // calculate settles a check and record_challenge_result banks it, but the
+    // gate exists to force the *roll*, not the bookkeeping around it.
+    expect(hasSatisfiedRollGate(["calculate"])).toBe(false);
+    expect(hasSatisfiedRollGate(["record_challenge_result"])).toBe(false);
   });
 
   it("is satisfied by the fate oracle", () => {
@@ -123,8 +129,7 @@ describe("applyStakesEscalation writes highStakesSceneKey", () => {
     const result = await executeGMTools(
       [
         createToolCall("formula_roll", {
-          formula: "1d20+5",
-          dc: 15,
+          formulas: ["1d20+5"],
           stakes: "high",
           reason: "Leap across the chasm",
         }),
@@ -141,8 +146,8 @@ describe("applyStakesEscalation writes highStakesSceneKey", () => {
     const result = await executeGMTools(
       [
         createToolCall("formula_roll", {
-          formula: "1d20+5",
-          dc: 15,
+          formulas: ["1d20+5"],
+          reason: "A routine shove",
           stakes: "low",
         }),
       ],

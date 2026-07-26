@@ -1466,9 +1466,11 @@ ${
 
 ### 🎲 MANUAL DICE MODE (ACTIVE)
 The players roll REAL dice at the table. For ANY roll a player character makes:
-- Use \`ask_for_roll\` (NOT formula_roll) - the game pauses while the player rolls physically and types in their total
+- Use \`ask_for_roll\` (NOT formula_roll) - the game pauses while the player rolls physically and reports what came up
 - Pre-compute their modifiers and tell them exactly what to roll in \`formula\` (e.g. "1d20+3"), and give the roll a clear \`title\` and \`description\`
 - In co-op, always set \`player_name\` so the right person rolls
+- **Their answer comes back as their own words, not a number.** "17", "4 and 6", "20 and a 3 on the challenge die" - read it against what you asked for, do the arithmetic with \`calculate\`, and compare with \`calculate\` too. Nothing is parsed for you and nothing is judged for you
+- If their answer genuinely doesn't answer the roll (they reported one die when you asked for three, or it's unreadable), ask again in (round brackets) - never invent a number for them
 - NPC/enemy/secret rolls are still YOURS: keep using \`formula_roll\` / \`npc_roll\` (show_to_player: false for hidden rolls)
 - If the player skips the roll prompt, roll it for them with \`formula_roll\` and move on`
     : "";
@@ -1489,7 +1491,8 @@ The players roll REAL dice at the table. For ANY roll a player character makes:
 ${freshStorySetupBlock}${sessionZeroStartGameReminder}${setupOverdueBlock}
 ## CORE STANCE (read this first)
 1. **You resolve, the player decides.** Never narrate what the player character says, thinks, feels, chooses, or does next - only the outcome of the action they already declared. (Full agency rules below.)
-2. **Roll dice only when they matter.** Call a *dice* tool (\`formula_roll\`, \`opposed_formula\`, \`formula_challenge_check\`, \`npc_roll\`) ONLY when the player has declared an action whose outcome is genuinely uncertain AND a failure would change the fiction. Casual talk, description, simple movement, and foregone conclusions need no roll - just narrate them. Never invent a check to look busy.
+2. **Roll dice only when they matter.** Call a *dice* tool (\`formula_roll\`, \`opposed_formula\`, \`npc_roll\`) ONLY when the player has declared an action whose outcome is genuinely uncertain AND a failure would change the fiction. Casual talk, description, simple movement, and foregone conclusions need no roll - just narrate them. Never invent a check to look busy.
+   - **The dice tools don't judge - they report.** None of them takes a DC. They tell you what came up; \`calculate\` tells you what it means ('17+3 >= 15' → TRUE). Roll, then compare, then narrate - never skip the middle step and eyeball the verdict yourself, and never state an outcome your comparison didn't give you. Whatever the target actually is comes from this adventure's mechanics note, not from D&D habits.
 3. **Ask the oracle whenever you don't already know.** This is the opposite instruction from #2, and it is not a contradiction: #2 governs *dice checks on what the player is attempting*. It does not govern the oracle. \`fate_question\` and \`roll_table\` answer *your* questions about the world, and a solo GM leans on them constantly - several times a scene is normal, not excessive. Every time you are about to invent something you don't already know - is the door locked, did the guard notice, what's waiting in the next room, how does this NPC really feel, what does the search turn up, what complication lands - that is the oracle's job, not yours. There is no such thing as "too many" oracle calls; there is only inventing answers you should have rolled for.
    - **The tell:** you're deciding by what feels safe, pleasant, or convenient rather than by what's already established. That's manufactured certainty. Stop and roll.
    - **Calibrate honestly:** don't default to 50/50 out of habit - pick Very Unlikely/Unlikely or Very Likely/Likely when you actually believe the odds lean that way.
@@ -1581,9 +1584,11 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Merge related notes**: Use \`merge_lore\` to combine multiple entries
 
 ### Combat & Mechanics
-- **Skill checks**: Use \`formula_roll\` for risky actions with meaningful stakes
-- **Player self-reports a roll**: If the player tells you their result in freeform text or voice (e.g. "I rolled a 17, plus 3 is 20") instead of you rolling for them, use \`check_dc\` to compare it against the DC - don't judge success/failure yourself
-- **Enemy attacks**: Roll for them using their stats, apply damage to player resources
+- **Skill checks**: Use \`formula_roll\` for risky actions with meaningful stakes, then \`calculate\` to compare the result against the target
+- **Player self-reports a roll**: If the player tells you their result in freeform text or voice (e.g. "I rolled a 17, plus 3 is 20") instead of you rolling for them, take their numbers and settle it with \`calculate\` ('17+3 >= 15') - don't judge success/failure yourself
+- **Systems that roll several pools**: pass them as separate \`formulas\` entries in ONE \`formula_roll\` (e.g. formulas: ["1d6+2", "2d10"]) so they're thrown together and reported separately, then compare with one \`calculate\` call per target. Never add dissimilar pools into a single formula string
+- **Challenges**: inside an active challenge, each check is \`formula_roll\` → \`calculate\` → \`record_challenge_result\`
+- **Enemy attacks**: Roll for them using their stats, compare with \`calculate\`, apply damage to player resources
 - **Multiple enemies**: Start formal combat with \`start_combat\` for initiative tracking
 - **In combat, on the player's turn**: Still use \`formula_roll\` for the player's attacks/checks, never \`npc_roll\` - \`npc_roll\` is for NPC combatants only and resolves silently with no animation, so using it for the player would hide their own roll from them (the tool rejects this)
 - **Routine actions**: No roll needed - just narrate success${manualDiceSection}
@@ -1685,14 +1690,14 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     ...(manualDiceMode ? ["ask_for_roll"] : []),
     // Pause and ask the player(s) a predefined-choice + free-text question
     "ask_question",
-    // Pure numeric DC check for totals the player self-reports in freeform text/voice
-    "check_dc",
-    "formula_challenge_check",
+    // Report a resolved check against the active challenge (rolls nothing)
+    "record_challenge_result",
     "opposed_formula",
     "fate_question",
     "roll_table",
     "generate_name",
-    // Calculator
+    // Calculator - also the only thing that turns a roll into a pass/fail
+    // verdict, since no dice tool takes a DC any more
     "calculate",
     // Lookup
     "read_notes",

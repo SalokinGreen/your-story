@@ -550,6 +550,31 @@ describe("checkOutcomeMismatch", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("ignores the dice tools - they report numbers, they don't judge", async () => {
+    // formula_roll/opposed_formula/npc_roll always come back success=true now
+    // (the dice were thrown), so checking narration against that would flag
+    // every legitimately-failed roll. The verdict lives on calculate.
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkOutcomeMismatch(
+      "You leap the gap easily.",
+      [
+        { toolName: "formula_roll", success: true, contextForStory: "[Roll: 8]" },
+        { toolName: "npc_roll", success: true, contextForStory: "[NPC Roll: 4]" },
+        {
+          toolName: "opposed_formula",
+          success: true,
+          contextForStory: "[Player: 8] [Guard: 19]",
+        },
+      ],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("ignores fate_question results (not a SUCCESS/FAILURE check)", async () => {
     const fetchMock = vi.fn();
     global.fetch = fetchMock as unknown as typeof fetch;
@@ -580,9 +605,9 @@ describe("checkOutcomeMismatch", () => {
       "You leap the gap easily and land without a scratch.",
       [
         {
-          toolName: "formula_roll",
+          toolName: "calculate",
           success: false,
-          contextForStory: "[Athletics: 8 vs DC 15 -> FAILURE]",
+          contextForStory: "[Athletics check: 8 >= 15 -> **FALSE**]",
         },
       ],
       { model: "test-model", token: "tok" },
@@ -605,11 +630,35 @@ describe("checkOutcomeMismatch", () => {
 
     const flag = await checkOutcomeMismatch(
       "You stumble and fall short of the ledge.",
-      [{ toolName: "formula_roll", success: false, contextForStory: "FAILURE" }],
+      [{ toolName: "calculate", success: false, contextForStory: "**FALSE**" }],
       { model: "test-model", token: "tok" },
     );
 
     expect(flag).toBeNull();
+  });
+
+  it("checks a recorded challenge outcome too", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ mismatch: false, reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await checkOutcomeMismatch(
+      "You slip, and the ledge crumbles under your boot.",
+      [
+        {
+          toolName: "record_challenge_result",
+          success: false,
+          contextForStory: "[Challenge Check FAILURE: Vault over the gap]",
+        },
+      ],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(fetchMock).toHaveBeenCalled();
   });
 
   it("only checks the last relevant roll when multiple rolls happened this turn", async () => {
@@ -624,8 +673,8 @@ describe("checkOutcomeMismatch", () => {
     await checkOutcomeMismatch(
       "You succeed on the second attempt.",
       [
-        { toolName: "formula_roll", success: false, contextForStory: "first: FAILURE" },
-        { toolName: "formula_roll", success: true, contextForStory: "second: SUCCESS" },
+        { toolName: "calculate", success: false, contextForStory: "first: FALSE" },
+        { toolName: "calculate", success: true, contextForStory: "second: TRUE" },
       ],
       { model: "test-model", token: "tok" },
     );
@@ -633,7 +682,7 @@ describe("checkOutcomeMismatch", () => {
     const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
     const userMessage = sentBody.messages[1].content;
     expect(userMessage).toContain("SUCCESS");
-    expect(userMessage).toContain("second: SUCCESS");
+    expect(userMessage).toContain("second: TRUE");
   });
 
   it("fails open (returns null) when the API call errors", async () => {
@@ -642,7 +691,7 @@ describe("checkOutcomeMismatch", () => {
 
     const flag = await checkOutcomeMismatch(
       "Something happens.",
-      [{ toolName: "npc_roll", success: true, contextForStory: "SUCCESS" }],
+      [{ toolName: "calculate", success: true, contextForStory: "TRUE" }],
       { model: "test-model", token: "tok" },
     );
 
@@ -1270,12 +1319,12 @@ describe("runObserver", () => {
       narration: Array(400).fill("word").join(" "),
       playerChoice: "I draw my sword",
       replyLength: "medium",
-      toolNames: ["formula_roll"],
+      toolNames: ["formula_roll", "calculate"],
       rollResults: [
         {
-          toolName: "formula_roll",
+          toolName: "calculate",
           success: true,
-          contextForStory: "Roll: 14 vs DC 12 - SUCCESS",
+          contextForStory: "Climb check: 14 >= 12 -> **TRUE**",
         },
       ],
       tierUsed: 1,
