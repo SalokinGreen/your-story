@@ -554,6 +554,83 @@ describe("syncManager", () => {
     });
   });
 
+  // Regression: bucket manifest tokens are client-minted, millisecond-
+  // resolution ISO strings, and the noop fast-path used to *order* the remote
+  // token against our own last-synced one. Two pushes in the same millisecond
+  // mint the same token, so a real remote change read as "nothing changed" and
+  // the merge was skipped - which made the settings test above flake under
+  // load, and in production stranded changes from any device whose clock ran
+  // behind. The fix is nextPushToken (unique + monotonic per bucket, always
+  // ahead of the newest item) plus an inequality check instead of an ordering
+  // one. Freezing the clock makes every timestamp in the run collide, so this
+  // is the worst case rather than a rare one: it fails deterministically
+  // against the old comparison and passes deterministically against the fix.
+  it("detects remote changes even when every push lands on the same clock tick", async () => {
+    installFakeServer();
+    vi.useFakeTimers({
+      now: new Date("2026-07-26T12:00:00.000Z"),
+      // Date only - faking setTimeout/microtasks would stall fake-indexeddb.
+      toFake: ["Date"],
+    });
+    try {
+      const key = "test-key-same-millisecond";
+
+      const a = new Device(key);
+      a.setSetting("storyFontSize", "18");
+      await a.sync();
+
+      const b = new Device(key);
+      await b.sync();
+      b.setSetting("storyTheme", "forest");
+      await b.sync();
+
+      // Same tick as every push so far - A must still see the bucket moved.
+      const resultsA = await a.sync();
+      expect(resultsA.find((r) => r.bucket === "settings")?.action).toBe(
+        "merged",
+      );
+      expect(a.getSetting("storyTheme")).toBe("forest");
+
+      // And a deletion, whose whole signal is an id disappearing from a
+      // bucket whose token would otherwise look unchanged.
+      b.activate();
+      localStorage.removeItem("storyTheme");
+      await b.sync();
+
+      const resultsA2 = await a.sync();
+      expect(resultsA2.find((r) => r.bucket === "settings")).toMatchObject({
+        action: "merged",
+        removed: 1,
+      });
+      expect(a.getSetting("storyTheme")).toBeNull();
+      expect(a.getSetting("storyFontSize")).toBe("18");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("still reports noop on a bucket nobody touched, with the clock frozen", async () => {
+    // The other half of the same fix: an inequality check must not turn every
+    // sync into a merge, and the push token staying ahead of the newest item
+    // is what keeps the local-change check quiet too - even when the item and
+    // the push it went out in share a millisecond.
+    installFakeServer();
+    vi.useFakeTimers({
+      now: new Date("2026-07-26T12:00:00.000Z"),
+      // Date only - faking setTimeout/microtasks would stall fake-indexeddb.
+      toFake: ["Date"],
+    });
+    try {
+      const a = new Device("test-key-noop-frozen");
+      a.createFolder("Solo Adventures");
+      await a.sync();
+      const second = await a.sync();
+      expect(second.find((r) => r.bucket === "folders")?.action).toBe("noop");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("never syncs excluded keys like API keys, even though other settings do", async () => {
     installFakeServer();
     const key = "test-key-excluded-settings";

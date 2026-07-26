@@ -282,14 +282,49 @@ async function fetchManifest(
   return res.json();
 }
 
+// A bucket's manifest timestamp is minted here, client-side, and is the only
+// thing distinguishing one version of a bucket from the next - so it has to be
+// unique per push, at millisecond resolution. Two pushes sharing a millisecond
+// mint the same token, and an identical token reads as "nothing changed" to
+// every other device, silently stranding whatever the second push contained.
+// Two floors keep that from happening:
+//
+// - The last token this client minted for the bucket, so back-to-back pushes
+//   (two syncs racing, or a sync loop tight enough to fit in one tick) can't
+//   collide with each other.
+// - The newest *item* timestamp in what's being pushed, because
+//   syncBucketMerge's local-change check compares those two
+//   (`localMax > lastSyncedAt`): an item written in the same millisecond as the
+//   push carrying it would otherwise look unpushed forever, costing a redundant
+//   merge on every later sync.
+//
+// What this does NOT cover: two *different* devices minting the same token in
+// the same millisecond. Nothing client-side can, since neither knows the
+// other's clock - it needs a version the server assigns on write, which is a
+// sync-worker change. The window is one millisecond wide and self-heals on the
+// next change to the bucket, so it's left as a known gap.
+const lastPushTokenMs: Partial<Record<SyncBucket, number>> = {};
+
+function nextPushToken(bucket: SyncBucket, newestItemAt: string | null): string {
+  const floor = Math.max(
+    lastPushTokenMs[bucket] ?? 0,
+    newestItemAt === null ? 0 : new Date(newestItemAt).getTime(),
+  );
+  const now = Date.now();
+  const ms = now > floor ? now : floor + 1;
+  lastPushTokenMs[bucket] = ms;
+  return new Date(ms).toISOString();
+}
+
 async function pushBucketRaw(
   bucket: SyncBucket,
   syncKey: string,
   data: unknown,
+  newestItemAt: string | null,
 ): Promise<string> {
   const cryptoKey = await getOrDeriveKey(syncKey);
   const { ciphertext, iv } = await encryptJSON(cryptoKey, data);
-  const updatedAt = new Date().toISOString();
+  const updatedAt = nextPushToken(bucket, newestItemAt);
   const res = await apiFetch(`/sync/${bucket}`, syncKey, {
     method: "PUT",
     body: JSON.stringify({ ciphertext, iv, updatedAt }),
@@ -602,9 +637,18 @@ async function syncBucketMerge(
   const mightHaveLocalChanges =
     localIdsChanged ||
     (localMax !== null && (!lastSyncedAt || localMax > lastSyncedAt));
+  // The manifest value is an opaque per-bucket version token, not a clock to
+  // order ourselves against: it was minted by whichever device pushed last
+  // (nextPushToken), so ">" quietly assumes every device's clock agrees. It
+  // doesn't - a device running even slightly behind mints a token that looks
+  // *older* than our last sync, and its changes then never get pulled (the
+  // same "I don't get anything from the other device" symptom resetSyncState()
+  // above exists for, arrived at by a different route). Any token that isn't
+  // the one we last wrote means the bucket moved; that's all we need to know,
+  // and it holds regardless of whose clock minted it.
   const mightHaveRemoteChanges =
     remoteManifestUpdatedAt !== null &&
-    (!lastSyncedAt || remoteManifestUpdatedAt > lastSyncedAt);
+    (!lastSyncedAt || remoteManifestUpdatedAt !== lastSyncedAt);
 
   if (!mightHaveLocalChanges && !mightHaveRemoteChanges) {
     return { bucket, action: "noop" };
@@ -616,7 +660,15 @@ async function syncBucketMerge(
   const merged = mergeItems(localItems, remoteItems, lastSyncedIds);
   await adapter.applyMerged(merged, localItems);
 
-  const updatedAt = await pushBucketRaw(bucket, syncKey, merged);
+  // Token floor is the merged set's newest item, not localMax: applyMerged
+  // just wrote those timestamps into local bookkeeping, so the merged set is
+  // what the *next* sync will compute its localMax from.
+  const updatedAt = await pushBucketRaw(
+    bucket,
+    syncKey,
+    merged,
+    latestTimestamp(merged.map((i) => i.updatedAt)),
+  );
   localStorage.setItem(`${LAST_SYNCED_PREFIX}${bucket}`, updatedAt);
   localStorage.setItem(
     syncedIdsKey(bucket),
