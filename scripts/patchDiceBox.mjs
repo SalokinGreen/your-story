@@ -27,6 +27,9 @@ const targetPath = path.join(
 );
 
 const MARKER = "applyImpulse";
+// Bumped whenever NEW_ROLL_DIE below changes, so an already-patched (but
+// stale) copy in node_modules is reported instead of silently kept.
+const PATCH_MARKER = "ysThrowPatch2";
 
 // The exact minified rollDie() body from @3d-dice/dice-box@1.1.4's
 // embedded physics worker. Variable names (p=config, d=Ammo, P=setVector3,
@@ -34,21 +37,37 @@ const MARKER = "applyImpulse";
 const OLD_ROLL_DIE =
   'ge=_=>{_.setLinearVelocity(P(dt(-p.startPosition[0]*.5,-p.startPosition[0]*p.throwForce,Math.random()),dt(-p.startPosition[1],-p.startPosition[1]*2,Math.random()),dt(-p.startPosition[2]*.5,-p.startPosition[2]*p.throwForce,Math.random())));const t=Math.random()>.5?1:-1,f=dt(p.spinForce*.5,p.spinForce,Math.random()),g=new d.btVector3(f*t,f*-t,f*t),j=Math.abs(p.scale-1)+p.scale*p.scale*(_.mass/p.mass)*.75;_.applyImpulse(g,P(j,j,j))}';
 
+// Replacement rollDie(). When the app supplies customThrowVelocity /
+// customThrowSpin (a drag-driven throw), they are applied as the die's initial
+// linear / angular velocity; otherwise dice-box's own randomized throw runs
+// exactly as before.
+//
+// Each die gets its own small spread (`Zs` power scale, `Za` heading rotation)
+// around the supplied aim. Every die in a group spawns at the same
+// startPosition, so without that they would fly in lockstep and grind into
+// each other - dice-box's built-in throw randomizes per die for the same
+// reason.
+//
+// Note customThrowSpin is an angular *velocity*, not the off-center impulse
+// the unpatched code uses for spin: that impulse's torque depends on the die's
+// mass/scale-derived offset (and leaks into linear velocity), which makes a
+// gesture-aimed tumble impossible to express. The unpatched branch below keeps
+// using the impulse so default rolls are unchanged.
 const NEW_ROLL_DIE =
-  "ge=_=>{" +
+  "ge=_=>{/*ysThrowPatch2*/" +
+  "const Zs=.85+Math.random()*.3,Za=(Math.random()-.5)*.35,Zc=Math.cos(Za),Zn=Math.sin(Za);" +
   "if(p.customThrowVelocity){" +
-  "_.setLinearVelocity(P(p.customThrowVelocity[0],p.customThrowVelocity[1],p.customThrowVelocity[2]))" +
+  "const c=p.customThrowVelocity;" +
+  "_.setLinearVelocity(P((c[0]*Zc-c[2]*Zn)*Zs,c[1]*Zs,(c[0]*Zn+c[2]*Zc)*Zs))" +
   "}else{" +
   "_.setLinearVelocity(P(dt(-p.startPosition[0]*.5,-p.startPosition[0]*p.throwForce,Math.random()),dt(-p.startPosition[1],-p.startPosition[1]*2,Math.random()),dt(-p.startPosition[2]*.5,-p.startPosition[2]*p.throwForce,Math.random())))" +
   "}" +
-  "let g;" +
   "if(p.customThrowSpin){" +
-  "g=new d.btVector3(p.customThrowSpin[0],p.customThrowSpin[1],p.customThrowSpin[2])" +
-  "}else{" +
-  "const t=Math.random()>.5?1:-1,f=dt(p.spinForce*.5,p.spinForce,Math.random());" +
-  "g=new d.btVector3(f*t,f*-t,f*t)" +
+  "const s=p.customThrowSpin;" +
+  "_.setAngularVelocity(P((s[0]*Zc-s[2]*Zn)*Zs,s[1]*Zs,(s[0]*Zn+s[2]*Zc)*Zs));" +
+  "return" +
   "}" +
-  "const j=Math.abs(p.scale-1)+p.scale*p.scale*(_.mass/p.mass)*.75;" +
+  "const t=Math.random()>.5?1:-1,f=dt(p.spinForce*.5,p.spinForce,Math.random()),g=new d.btVector3(f*t,f*-t,f*t),j=Math.abs(p.scale-1)+p.scale*p.scale*(_.mass/p.mass)*.75;" +
   "_.applyImpulse(g,P(j,j,j))}";
 
 function findWorkerBlobLiteral(source) {
@@ -89,9 +108,21 @@ function main() {
     );
   }
 
-  if (blob.decoded.includes("customThrowVelocity")) {
+  if (blob.decoded.includes(PATCH_MARKER)) {
     console.log("patchDiceBox: already patched, skipping.");
     return;
+  }
+
+  if (blob.decoded.includes("customThrowVelocity")) {
+    // An older revision of this script already rewrote rollDie(), so the
+    // pristine source it matches on is gone. npm re-extracts the package on
+    // install, so this only happens when the script is re-run against a
+    // previously patched tree.
+    throw new Error(
+      "patchDiceBox: found an older version of this patch already applied. " +
+        "Reinstall the dependency to restore the pristine source first: " +
+        "rm -rf node_modules/@3d-dice/dice-box && npm install"
+    );
   }
 
   if (!blob.decoded.includes(OLD_ROLL_DIE)) {

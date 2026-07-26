@@ -18,22 +18,35 @@ declare module "@3d-dice/dice-box" {
   export interface DiceBoxConfigUpdate {
     // Upstream dice-box physics knobs (read by its rollDie()): how hard the
     // die is launched inward from its spawn edge, and how much angular spin
-    // it gets. Scaling these by the drag distance is how the throw gesture
-    // controls power while keeping dice-box's own (in-bounds, downward,
-    // inward) throw direction.
+    // it gets. Only used for the tray's automatic spawn-in toss now - a
+    // player's throw is fully described by the custom* fields below.
     throwForce?: number;
     spinForce?: number;
+    // Where dice are launched from, in world space. Upstream dice-box
+    // recomputes this to a random point on the tray rim before every roll, so
+    // it is only honoured when the roll is issued with
+    // `newStartPoint: false`.
+    startPosition?: [number, number, number] | null;
     // Patched in via scripts/patchDiceBox.mjs - not part of upstream dice-box.
-    // No longer used to drive the throw (the natural throwForce/spinForce
-    // path above does), but kept so a leftover value can be cleared to null.
+    // The initial linear and angular velocity of every die in the throw, which
+    // is how a drag gesture aims the roll. Set both to null to fall back to
+    // dice-box's own randomized throw (used for the spawn-in toss).
     customThrowVelocity?: [number, number, number] | null;
     customThrowSpin?: [number, number, number] | null;
+  }
+
+  export interface RollOptions {
+    // false keeps the configured `startPosition` instead of letting dice-box
+    // pick a fresh random point on the tray rim.
+    newStartPoint?: boolean;
+    theme?: string;
+    themeColor?: string;
   }
 
   export default class DiceBox {
     constructor(options: DiceBoxOptions);
     init(): Promise<void>;
-    roll(notation: string): Promise<DieResult[]>;
+    roll(notation: string, options?: RollOptions): Promise<DieResult[]>;
     // Re-throws an existing set of dice (the result objects from a prior
     // roll()/add()/reroll() call, which carry groupId/rollId) rather than
     // spawning a new set - used to re-toss the dice already sitting in the
