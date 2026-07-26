@@ -948,9 +948,10 @@ export async function generateStoryTurn(
     // most setup-heavy turn of the campaign - as the only part of session
     // zero that still got judged. The tool-name check covers the same turn
     // when no snapshot could be taken.
-    // Who the player character is, what their sheet says, and which names
-    // are NPCs - built once and shared by every judge and by the rewrite
-    // call (see observer.ts's formatCharacterContextBlock).
+    // Who the player character is, what their sheet says, which names are
+    // NPCs, and what dice system this adventure actually runs on - built once
+    // and shared by every judge and by the rewrite call (see observer.ts's
+    // formatCharacterContextBlock and formatMechanicsBlock).
     const observerCharacterContext = buildObserverCharacterContext(storyData);
 
     const suspensionReason = observerSuspensionReason({
@@ -1107,6 +1108,11 @@ export async function generateStoryTurn(
           tierUsed: tierUsedThisTurn,
           gmStoryContext: result.gmStoryContext,
           characterContext: observerCharacterContext,
+          // Lets the outcome-mismatch judge see the rules ruling behind the
+          // prose (see ObserverParams.narrationThoughts) - a correctly-called
+          // partial success is usually explained in the reasoning, not the
+          // narration.
+          narrationThoughts: result.narrationThoughts,
           settings: observerSettings,
           apiOptions: observerApiOptions,
         });
@@ -1436,6 +1442,7 @@ export async function generateStoryTurn(
             tierUsed: tierUsedThisTurn,
             gmStoryContext: result.gmStoryContext,
             characterContext: observerCharacterContext,
+            narrationThoughts: result.narrationThoughts,
             settings: observerSettings,
             apiOptions: observerApiOptions,
           });

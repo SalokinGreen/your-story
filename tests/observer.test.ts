@@ -21,6 +21,7 @@ import {
   hasCharacterSheetNote,
   buildObserverCharacterContext,
   formatCharacterContextBlock,
+  formatMechanicsBlock,
   buildObserverWarningNote,
   buildObserverCorrectionNote,
   reconcileGmConversationAfterRewrite,
@@ -661,7 +662,10 @@ describe("checkOutcomeMismatch", () => {
     expect(fetchMock).toHaveBeenCalled();
   });
 
-  it("only checks the last relevant roll when multiple rolls happened this turn", async () => {
+  it("shows the judge every relevant comparison, not just the last one", async () => {
+    // The whole verdict, not one slice of it: a system that composes an
+    // outcome from several comparisons (Starforged's action score vs. two
+    // challenge dice) has no single comparison that IS the result.
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -681,8 +685,130 @@ describe("checkOutcomeMismatch", () => {
 
     const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
     const userMessage = sentBody.messages[1].content;
-    expect(userMessage).toContain("SUCCESS");
+    expect(userMessage).toContain("first: FALSE");
     expect(userMessage).toContain("second: TRUE");
+    expect(userMessage).toContain("FAILURE");
+    expect(userMessage).toContain("SUCCESS");
+  });
+
+  it("caps a mixed-verdict mismatch at minor so a weak hit can never trigger a reset", async () => {
+    // The Starforged weak hit that started this: action score beats one
+    // challenge die but not the other. Even if the judge still calls it a
+    // mismatch, a mixed set of comparisons is the shape of a legitimate
+    // partial success, so it stays advisory and keeps the turn's one rewrite.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          mismatch: true,
+          reason: "The second comparison failed but the narration reads as a success.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkOutcomeMismatch(
+      "You clear the gap, but your pack tears open and the rations scatter below.",
+      [
+        {
+          toolName: "calculate",
+          success: true,
+          contextForStory: "[Action vs Challenge Die 1: 7 >= 5 -> **TRUE**]",
+        },
+        {
+          toolName: "calculate",
+          success: false,
+          contextForStory: "[Action vs Challenge Die 2: 7 >= 9 -> **FALSE**]",
+        },
+      ],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag).not.toBeNull();
+    expect(flag?.severity).toBe("minor");
+    expect(flag?.detail).toContain("narration reads as a success");
+    // Advisory wording - it must not claim the turn was reset.
+    expect(flag?.correctivePrompt).not.toContain("was reset");
+    expect(flag?.correctivePrompt).toContain("partial success");
+  });
+
+  it("tells the judge outright when the comparisons came out mixed", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ mismatch: false, reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await checkOutcomeMismatch(
+      "You get through, but the alarm trips.",
+      [
+        { toolName: "calculate", success: true, contextForStory: "die 1: TRUE" },
+        { toolName: "calculate", success: false, contextForStory: "die 2: FALSE" },
+      ],
+      { model: "test-model", token: "tok" },
+    );
+
+    const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sentBody.messages[1].content).toContain("did NOT all come out the same way");
+    expect(sentBody.messages[0].content).toContain("weak hit");
+  });
+
+  it("keeps a unanimous multi-comparison mismatch at major severity", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({
+          mismatch: true,
+          reason: "Both comparisons failed but the narration describes a clean win.",
+        }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const flag = await checkOutcomeMismatch(
+      "You vault the gap without breaking stride.",
+      [
+        { toolName: "calculate", success: false, contextForStory: "die 1: FALSE" },
+        { toolName: "calculate", success: false, contextForStory: "die 2: FALSE" },
+      ],
+      { model: "test-model", token: "tok" },
+    );
+
+    expect(flag?.severity).toBe("major");
+    expect(flag?.correctivePrompt).toContain("was reset");
+  });
+
+  it("gives the judge the adventure's own rules and the GM's reasoning", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ mismatch: false, reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await checkOutcomeMismatch(
+      "You get through, but the alarm trips.",
+      [{ toolName: "calculate", success: false, contextForStory: "die 2: FALSE" }],
+      { model: "test-model", token: "tok" },
+      checkSettings(),
+      "Sneak past the sentry",
+      {
+        mechanicsNote:
+          "Beat both challenge dice for a strong hit, one for a weak hit, neither for a miss.",
+      },
+      "Action score 7 beat the first die but not the second - that's a weak hit.",
+    );
+
+    const sentBody = JSON.parse(fetchMock.mock.calls[0][1].body);
+    const userMessage = sentBody.messages[1].content;
+    expect(userMessage).toContain("Sneak past the sentry");
+    expect(userMessage).toContain("one for a weak hit");
+    expect(userMessage).toContain("that's a weak hit");
+    // The reasoning is testimony, not evidence - the numbers still outrank it.
+    expect(userMessage).toContain("numbers outrank the explanation");
   });
 
   it("fails open (returns null) when the API call errors", async () => {
@@ -1159,6 +1285,62 @@ describe("buildObserverCharacterContext", () => {
     expect(context.characterSheet!.endsWith("...")).toBe(true);
   });
 
+  it("pulls the mechanics note out too, so the judges know the dice system in play", () => {
+    const context = buildObserverCharacterContext(
+      storyWith({
+        lore: [
+          {
+            title: "Starforged Rolls",
+            content:
+              "Roll 1d6+stat against 2d10. Beat both = strong hit, one = weak hit, neither = miss.",
+            type: "mechanics",
+          },
+          { title: "Kira", content: "Traits: reckless", type: "character_sheet" },
+        ] as unknown as StoryData["lore"],
+      }),
+    );
+    expect(context.mechanicsNote).toContain("weak hit");
+    // The two notes stay in their own fields - the sheet is a casting
+    // question, the mechanics note a rules question.
+    expect(context.mechanicsNote).not.toContain("Traits: reckless");
+    expect(context.characterSheet).not.toContain("weak hit");
+  });
+
+  it("skips disabled mechanics notes and leaves the field unset when there are none", () => {
+    expect(
+      buildObserverCharacterContext(
+        storyWith({
+          lore: [
+            {
+              title: "Old Rules",
+              content: "Stale d20 system",
+              type: "mechanics",
+              enabled: false,
+            },
+          ] as unknown as StoryData["lore"],
+        }),
+      ).mechanicsNote,
+    ).toBeUndefined();
+
+    expect(buildObserverCharacterContext(storyWith()).mechanicsNote).toBeUndefined();
+  });
+
+  it("truncates a very long mechanics note rather than blowing up the judge prompt", () => {
+    const context = buildObserverCharacterContext(
+      storyWith({
+        lore: [
+          {
+            title: "Rules",
+            content: Array(3000).fill("rule").join(" "),
+            type: "mechanics",
+          },
+        ] as unknown as StoryData["lore"],
+      }),
+    );
+    expect(context.mechanicsNote!.length).toBeLessThan(2600);
+    expect(context.mechanicsNote!.endsWith("...")).toBe(true);
+  });
+
   it("treats couch co-op players as additional player characters", () => {
     const context = buildObserverCharacterContext(
       storyWith({
@@ -1195,6 +1377,32 @@ describe("formatCharacterContextBlock", () => {
       playerAliases: ["Kira", "Ren"],
     });
     expect(block).toContain("PLAYER CHARACTERS are **Kira**, **Ren**");
+  });
+
+  it("leaves the mechanics note out - WHO IS WHO answers a casting question, not a rules one", () => {
+    const block = formatCharacterContextBlock({
+      playerName: "Kira",
+      mechanicsNote: "Beat both dice for a strong hit.",
+    });
+    expect(block).not.toContain("strong hit");
+  });
+});
+
+describe("formatMechanicsBlock", () => {
+  it("returns nothing when the adventure has no mechanics note", () => {
+    expect(formatMechanicsBlock(undefined)).toBe("");
+    expect(formatMechanicsBlock({})).toBe("");
+    expect(formatMechanicsBlock({ mechanicsNote: "   " })).toBe("");
+  });
+
+  it("hands over the rules and tells the judge to prefer them over generic assumptions", () => {
+    const block = formatMechanicsBlock({
+      mechanicsNote: "Beat both challenge dice for a strong hit, one for a weak hit.",
+    });
+    expect(block).toContain("one for a weak hit");
+    expect(block).toContain("not against generic pass/fail");
+    // The outcome tiers between success and failure are the point.
+    expect(block).toContain("outcome tiers");
   });
 });
 
@@ -1267,6 +1475,49 @@ describe("character context reaches the judges", () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.messages[1].content).not.toContain("WHO IS WHO");
+  });
+
+  it("gives the tool-usage judge the adventure's rules, so a built-in oracle isn't mistaken for a gap", async () => {
+    const fetchMock = mockJudge({
+      missed_oracle_or_table: false,
+      oracle_reason: "",
+      missed_scene_increment: false,
+      scene_reason: "",
+    });
+
+    await checkToolUsageGaps(
+      "You ask the ship's oracle and it answers in static.",
+      [],
+      { model: "test-model", token: "tok" },
+      checkSettings(),
+      checkSettings(),
+      { mechanicsNote: "Ask the Oracle: roll 2d10 on the Starforged oracle tables." },
+    );
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(body.messages[1].content).toContain("Starforged oracle tables");
+  });
+
+  it("does not leak the GM's reasoning into the agency judge", async () => {
+    // The reasoning there is as likely to hold the violation ("I'll have her
+    // decide to run") as an exoneration, so only the outcome judge gets it.
+    const fetchMock = mockJudge({ violation: false, severity: "minor", reason: "" });
+
+    await runObserver({
+      narration: "The rain keeps falling.",
+      playerChoice: "I wait",
+      narrationThoughts: "I'll have her decide to run for the treeline.",
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const agencyCalls = fetchMock.mock.calls.filter((call) =>
+      JSON.parse(call[1].body).messages[0].content.includes("PLAYER AGENCY") ||
+      JSON.parse(call[1].body).messages[0].content.includes("player character says, thinks"),
+    );
+    expect(agencyCalls.length).toBeGreaterThan(0);
+    for (const call of agencyCalls) {
+      expect(call[1].body).not.toContain("run for the treeline");
+    }
   });
 });
 
@@ -1578,6 +1829,40 @@ describe("runObserver", () => {
     });
 
     expect(flags.some((f) => f.type === "tier_escalation_missed")).toBe(true);
+  });
+
+  it("threads the rules note and the GM's reasoning through to the outcome judge", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        content: JSON.stringify({ mismatch: false, reason: "" }),
+      }),
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await runObserver({
+      narration: "You slip aboard, but the hatch seals behind you.",
+      playerChoice: "Board the derelict",
+      rollResults: [
+        { toolName: "calculate", success: true, contextForStory: "die 1: TRUE" },
+        { toolName: "calculate", success: false, contextForStory: "die 2: FALSE" },
+      ],
+      characterContext: {
+        playerName: "Kira Vance",
+        mechanicsNote: "Beat one challenge die for a weak hit.",
+      },
+      narrationThoughts: "One die beaten, one not - weak hit, so she's in but trapped.",
+      apiOptions: { model: "test-model", token: "tok" },
+    });
+
+    const outcomeCall = fetchMock.mock.calls.find((call) =>
+      JSON.parse(call[1].body).messages[1].content.includes("die 2: FALSE"),
+    );
+    expect(outcomeCall).toBeDefined();
+    const userMessage = JSON.parse(outcomeCall![1].body).messages[1].content;
+    expect(userMessage).toContain("Beat one challenge die for a weak hit.");
+    expect(userMessage).toContain("weak hit, so she's in but trapped");
+    expect(userMessage).toContain("Board the derelict");
   });
 });
 

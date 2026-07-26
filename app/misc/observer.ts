@@ -45,10 +45,19 @@
  *   what the player declared - the "PLAYER AGENCY (NON-NEGOTIABLE)" rule
  *   already in ai_staged.ts's GM system prompt.
  * - checkOutcomeMismatch: an LLM call that judges whether the finished
- *   narration contradicts the mechanical result (SUCCESS/FAILURE) of the
- *   last roll/check made this turn. The roll result is ground truth - this
+ *   narration contradicts the mechanical results (SUCCESS/FAILURE) of the
+ *   rolls/checks made this turn. The roll results are ground truth - this
  *   is the same "LLM proposes, deterministic engine disposes" thesis the
- *   whole app is built on, just checked directly for the first time.
+ *   whole app is built on, just checked directly for the first time. It
+ *   judges EVERY comparison the turn resolved, together, because a single
+ *   comparison is not the verdict in a system that builds one outcome out
+ *   of several (Starforged's action score vs. two challenge dice: beat
+ *   both = strong hit, beat one = weak hit, beat neither = miss). Judging
+ *   only the last one made a weak hit indistinguishable from a narration
+ *   that reversed a failed roll. A turn whose comparisons came out MIXED
+ *   is also capped at "minor" severity, so a partial-success outcome can
+ *   never burn the turn's one rewrite on a false positive (see
+ *   checkOutcomeMismatch).
  *
  * Minor by default (log-only, surfaced as a warning - see below on how that
  * default can be changed):
@@ -249,9 +258,31 @@ export interface ObserverCharacterContext {
   playerAliases?: string[];
   /** Names the GM legitimately speaks and acts for - everyone who is NOT the player character. */
   npcNames?: string[];
+  /**
+   * The mechanics-type lore note(s), truncated - this adventure's own dice
+   * system, as improvised by the GM (see the "GM is tool-calling, not a fixed
+   * dice system" design). Without it the judges fall back on generic
+   * pass/fail d20 intuition, which is what made checkOutcomeMismatch flag a
+   * correctly-narrated Starforged weak hit: nothing in its prompt defined a
+   * weak hit, so "beat one challenge die but not the other" could only read
+   * as a failed roll narrated as a success. Handed to the judges that rule on
+   * rules - the outcome-mismatch check and the tool-usage-gap check (a system
+   * with its own built-in oracle shouldn't be scolded for not calling
+   * fate_question).
+   */
+  mechanicsNote?: string;
 }
 
 const CHARACTER_SHEET_CONTEXT_LIMIT = 1500;
+
+/**
+ * Cap on the mechanics note handed to the judges. Larger than the character
+ * sheet's: a mechanics note carries the resolution rules, outcome tiers, and
+ * roll formulas, and a system whose weak-hit definition got truncated away is
+ * exactly the failure this context was added to fix. Kept from the START,
+ * since these notes lead with the core resolution rules.
+ */
+const MECHANICS_CONTEXT_LIMIT = 2500;
 
 /**
  * Cap on the original narration's reasoning when it's pasted into the rewrite
@@ -318,6 +349,13 @@ export function buildObserverCharacterContext(
     .join("\n\n")
     .trim();
 
+  const mechanics = (storyData.lore || [])
+    .filter((l) => l.enabled !== false && l.type === "mechanics")
+    .map((l) => `${l.title}\n${l.content}`.trim())
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+
   const couchNames = (storyData.multiplayer?.couchPlayers || [])
     .map((p) => p.name?.trim())
     .filter((name): name is string => Boolean(name));
@@ -334,6 +372,11 @@ export function buildObserverCharacterContext(
     npcNames: (storyData.npcs || [])
       .map((npc) => npc.name?.trim())
       .filter((name): name is string => Boolean(name)),
+    mechanicsNote: mechanics
+      ? mechanics.length > MECHANICS_CONTEXT_LIMIT
+        ? `${mechanics.slice(0, MECHANICS_CONTEXT_LIMIT).trim()}...`
+        : mechanics
+      : undefined,
   };
 }
 
@@ -388,6 +431,62 @@ export function formatCharacterContextBlock(
   return `\n\nWHO IS WHO (use this to tell the player character apart from NPCs):\n${lines.join(
     "\n",
   )}${sheetBlock}`;
+}
+
+/**
+ * Renders the adventure's own mechanics note for a judge that has to rule on
+ * whether the GM applied the rules correctly.
+ *
+ * Deliberately separate from formatCharacterContextBlock rather than folded
+ * into it: that block is "WHO IS WHO", it answers a casting question, and it
+ * goes to the agency judge and the rewrite, neither of which has any business
+ * reasoning about dice. This block answers a rules question and goes only to
+ * the judges that ask one.
+ *
+ * The "these rules, not generic pass/fail" framing is the load-bearing part.
+ * There is no fixed dice system in this app - every adventure improvises one
+ * in this note - so a judge given the narration and a bare TRUE/FALSE has no
+ * choice but to substitute its own d20 assumptions, and will call any outcome
+ * tier those assumptions don't have (a weak hit, a partial, a success-at-a-
+ * cost) a contradiction.
+ */
+export function formatMechanicsBlock(
+  context: ObserverCharacterContext | undefined,
+): string {
+  const mechanics = context?.mechanicsNote?.trim();
+  if (!mechanics) return "";
+
+  return `\n\nTHIS ADVENTURE'S RULES (the dice system actually in play - judge against THESE, not against generic pass/fail assumptions from other games). Note especially any outcome tiers it defines between total success and total failure - partial successes, mixed results, successes at a cost - and treat narration matching one of those tiers as correct:\n"""\n${mechanics}\n"""`;
+}
+
+/**
+ * Renders the GM's own reasoning for a JUDGE, as opposed to
+ * formatNarrationThoughtsBlock which renders it for the REWRITE. The two want
+ * opposite things from the same text and so cannot share a formatter: the
+ * rewrite is told "this is what you were going for, preserve it", while a
+ * judge must be told the reasoning is testimony, not evidence.
+ *
+ * The reason this is worth handing over at all: when a GM correctly resolves a
+ * multi-comparison outcome, the reasoning is usually where the rules
+ * interpretation lives ("beat one die, not both - that's a weak hit, so she
+ * gets through but the alarm trips"), and a judge that can read it stops
+ * mistaking a correct partial for a reversal.
+ *
+ * The risk it cuts against - a judge that reads a rationalization and nods
+ * along - is why the framing here is explicitly subordinate to the numbers.
+ * A GM that talks itself into an outcome the comparisons don't support is
+ * still a mismatch, and the prompt says so.
+ */
+function formatJudgeReasoningBlock(thoughts?: string): string {
+  const trimmed = thoughts?.trim();
+  if (!trimmed) return "";
+
+  const clipped =
+    trimmed.length > NARRATION_THOUGHTS_LIMIT
+      ? `...${trimmed.slice(-NARRATION_THOUGHTS_LIMIT).trimStart()}`
+      : trimmed;
+
+  return `\n\nThe GM's own reasoning while writing that narration, for context on how it read the rules:\n"""\n${clipped}\n"""\nWeigh this as the GM's ACCOUNT of its ruling, not as proof the ruling was right. If it explains the outcome correctly under this adventure's rules, that counts against a mismatch. If it rationalizes an outcome the mechanical results above do not support, that is still a mismatch - the numbers outrank the explanation.`;
 }
 
 // ============================================================
@@ -1024,20 +1123,45 @@ function extractOutcomeMismatchJson(content: string): OutcomeMismatchResult | nu
 
 async function callOutcomeMismatchApi(
   narration: string,
-  roll: RollOutcomeForCheck,
+  rolls: RollOutcomeForCheck[],
+  mixedVerdict: boolean,
   apiOptions: ObserverApiOptions,
   sensitivity: number,
+  playerChoice: string,
+  characterContext?: ObserverCharacterContext,
+  narrationThoughts?: string,
 ): Promise<OutcomeMismatchResult | null> {
-  const system = `You are a strict reviewer for a tabletop-style interactive fiction game. A dice roll or check was just mechanically resolved with a specific result, shown below - that result is ground truth and cannot be overridden by narration. Your only job is to check whether the GM's narration agrees with it.
+  const system = `You are a strict reviewer for a tabletop-style interactive fiction game. One or more dice rolls/checks were just mechanically resolved this turn, with the specific results shown below - those results are ground truth and cannot be overridden by narration. Your only job is to check whether the GM's narration agrees with them.
 
-Given the mechanical result and the GM's narration that followed it, judge: does the narration directly contradict the mechanical result (e.g. the roll was a FAILURE but the narration describes clear, unqualified success, or vice versa)? A narration that adds partial success, complications, or a costly/Pyrrhic outcome on top of the correct pass/fail result is NOT a contradiction - only flag a direct reversal of the result itself.
+JUDGE ALL THE RESULTS TOGETHER, NEVER ONE IN ISOLATION, AND EXPECT MIXED ONES. Many systems build a single outcome out of more than one comparison. For example, a roll may be checked against two separate challenge dice, where beating both is a full success, beating only one is a PARTIAL SUCCESS (a "weak hit" - the character gets what they wanted, but at a cost, with a complication, or only partway) and beating neither is a failure. A turn like that legitimately shows one TRUE and one FALSE. That is not the GM contradicting itself and it is not a failed roll - it is a partial success, and narration describing one is CORRECT.
+
+So: work out what the results TAKEN TOGETHER support under this adventure's rules, then compare the narration to that. Only flag a DIRECT REVERSAL - the results collectively support failure but the narration describes clear, unqualified success, or they collectively support success but the narration describes clear failure. A narration that adds partial success, complications, or a costly/Pyrrhic outcome on top of what the results support is NOT a contradiction. Neither is narration that lands on an intermediate outcome tier this adventure's rules actually define.
 
 ${sensitivityInstruction(sensitivity)}
 
 Respond with ONLY a JSON object, no other text:
 {"mismatch": true|false, "reason": "<one sentence, empty string if no mismatch>"}`;
 
-  const user = `Mechanical result: ${roll.success ? "SUCCESS" : "FAILURE"}\n${roll.contextForStory}\n\nGM's narration:\n"""\n${narration.trim()}\n"""`;
+  const resultLines = rolls
+    .map(
+      (roll, i) =>
+        `${rolls.length > 1 ? `${i + 1}. ` : ""}${
+          roll.success ? "SUCCESS" : "FAILURE"
+        } (${roll.toolName})\n${roll.contextForStory}`,
+    )
+    .join("\n\n");
+
+  const mixedNote = mixedVerdict
+    ? `\n\nNOTE: these comparisons did NOT all come out the same way - some passed and some failed. Under many systems that combination is a partial success/weak hit rather than a failure. Establish what this adventure's rules make of a mixed result before judging the narration against it.`
+    : "";
+
+  const user = `Player's declared action:\n"""\n${
+    playerChoice.trim() || "(none - opening scene)"
+  }\n"""${formatMechanicsBlock(characterContext)}\n\nMechanical result${
+    rolls.length > 1 ? "s" : ""
+  } this turn, in the order they were resolved (ground truth):\n${resultLines}${mixedNote}\n\nGM's narration:\n"""\n${narration.trim()}\n"""${formatJudgeReasoningBlock(
+    narrationThoughts,
+  )}`;
 
   try {
     const response = await fetch("/api/generate", {
@@ -1085,20 +1209,44 @@ Respond with ONLY a JSON object, no other text:
 }
 
 /**
- * Checks whether the finished narration contradicts the mechanical result of
- * the last roll/check made this turn. Only the LAST relevant roll is
- * checked - it's the one this turn's final narration is actually resolving;
- * earlier rolls in a multi-round turn were already resolved by intermediate
- * context the model saw before writing this narration. "major" severity:
- * unlike the tool-usage gaps below, a roll's result being ground truth the
- * model can't override is the core "LLM proposes, deterministic engine
- * disposes" thesis this whole app is built on, not a soft best-practice.
+ * Checks whether the finished narration contradicts the mechanical results of
+ * the rolls/checks made this turn.
+ *
+ * EVERY relevant comparison this turn is judged, together. It used to be only
+ * the last one, on the reasoning that earlier rolls in a multi-round turn were
+ * already resolved by intermediate context - but that assumes one comparison
+ * IS the verdict, which is false for any system that composes an outcome from
+ * several. Starforged is the case that broke it: an action score is checked
+ * against two challenge dice, and beating exactly one is a "weak hit" - a
+ * partial success. Handing the judge only the second comparison ("7 >= 9 →
+ * FALSE") described a plain failed roll, so a correctly-narrated weak hit was
+ * indistinguishable from narration reversing a failure, and got flagged every
+ * time the losing comparison happened to go last.
+ *
+ * "major" severity: unlike the tool-usage gaps below, a roll's result being
+ * ground truth the model can't override is the core "LLM proposes,
+ * deterministic engine disposes" thesis this whole app is built on, not a soft
+ * best-practice.
+ *
+ * ...with one floor. When the turn's comparisons came out MIXED (at least one
+ * pass and at least one fail), the flag is capped at "minor" - still logged,
+ * still surfaced to the player, still fed back to the GM by
+ * buildObserverWarningNote next turn, but never able to trigger a reset. A
+ * mixed set of comparisons is the exact shape of a legitimate partial success,
+ * so it's where this check is likeliest to be wrong, and being wrong here is
+ * expensive: it spends the turn's one rewrite (MAX_OBSERVER_RESETS) pushing
+ * correct prose into agreement with a verdict the GM never actually reached.
+ * Deterministic and free - it reads the booleans, not the narration - so it
+ * holds even if the judge above is talked out of the rules.
  */
 export async function checkOutcomeMismatch(
   narration: string,
   rollResults: RollOutcomeForCheck[],
   apiOptions: ObserverApiOptions,
   settings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.outcome_narration_mismatch,
+  playerChoice: string = "",
+  characterContext?: ObserverCharacterContext,
+  narrationThoughts?: string,
 ): Promise<ObserverFlag | null> {
   if (!settings.enabled || !narration.trim()) return null;
 
@@ -1106,26 +1254,43 @@ export async function checkOutcomeMismatch(
     OUTCOME_CHECK_TOOL_NAMES.has(r.toolName),
   );
   if (relevantRolls.length === 0) return null;
-  const lastRoll = relevantRolls[relevantRolls.length - 1];
+
+  const mixedVerdict =
+    relevantRolls.length > 1 &&
+    relevantRolls.some((r) => r.success) &&
+    relevantRolls.some((r) => !r.success);
 
   const result = await callOutcomeMismatchApi(
     narration,
-    lastRoll,
+    relevantRolls,
+    mixedVerdict,
     apiOptions,
     settings.sensitivity,
+    playerChoice,
+    characterContext,
+    narrationThoughts,
   );
   if (!result || !result.mismatch) return null;
 
-  const outcomeLabel = lastRoll.success ? "SUCCESS" : "FAILURE";
+  const outcomeLabel = mixedVerdict
+    ? "MIXED - some comparisons passed, some failed"
+    : relevantRolls[relevantRolls.length - 1].success
+      ? "SUCCESS"
+      : "FAILURE";
   const reason =
     result.reason ||
     `The mechanical result was ${outcomeLabel}, but the narration says otherwise.`;
 
   return {
     type: "outcome_narration_mismatch",
-    severity: "major",
+    // See the mixed-verdict floor above: advisory-only when the comparisons
+    // themselves were mixed, since that's the shape of a legitimate partial
+    // success and a false positive there costs the turn its only rewrite.
+    severity: mixedVerdict ? "minor" : "major",
     detail: reason,
-    correctivePrompt: `Your previous attempt at this turn was reset because the narration didn't match the roll's mechanical result (${outcomeLabel}): ${reason} Rewrite the narration so it agrees with what the roll actually determined - the roll result is ground truth and narration cannot override it.`,
+    correctivePrompt: mixedVerdict
+      ? `The observer thought this turn's narration didn't line up with what its checks resolved to (${outcomeLabel}): ${reason} Note the checks came out mixed, which under many systems is a partial success rather than a failure - if that's what this adventure's rules say, your narration may well have been right. Keep the roll results as ground truth either way.`
+      : `Your previous attempt at this turn was reset because the narration didn't match the mechanical result of this turn's checks (${outcomeLabel}): ${reason} Rewrite the narration so it agrees with what the rolls actually determined - the roll results are ground truth and narration cannot override them.`,
   };
 }
 
@@ -1161,6 +1326,7 @@ async function callToolUsageApi(
   askAboutScene: boolean,
   sceneSensitivity: number,
   apiOptions: ObserverApiOptions,
+  characterContext?: ObserverCharacterContext,
 ): Promise<ToolUsageJudgment | null> {
   const system = `You are a strict but fair reviewer for a tabletop-style interactive fiction game. Two of the Game Master AI's mechanics are relevant here:
 ${
@@ -1175,7 +1341,12 @@ ${
 Given the GM's narration below, judge only the question(s) above. Respond with ONLY a JSON object, no other text:
 {${askAboutOracle ? `"missed_oracle_or_table": true|false, "oracle_reason": "<one sentence, empty string if not applicable>", ` : ""}${askAboutScene ? `"missed_scene_increment": true|false, "scene_reason": "<one sentence, empty string if not applicable>"` : ""}}`;
 
-  const user = `GM's narration:\n"""\n${narration.trim()}\n"""`;
+  // The rules note matters most to the oracle half: this adventure may define
+  // its own oracle/table procedure, and a GM following it to the letter was
+  // getting flagged for not calling the generic fate_question tool.
+  const user = `GM's narration:\n"""\n${narration.trim()}\n"""${formatMechanicsBlock(
+    characterContext,
+  )}`;
 
   try {
     const response = await fetch("/api/generate", {
@@ -1242,6 +1413,7 @@ export async function checkToolUsageGaps(
   apiOptions: ObserverApiOptions,
   oracleSettings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.missing_oracle_or_table,
   sceneSettings: ObserverCheckSettings = DEFAULT_OBSERVER_SETTINGS.missing_scene_increment,
+  characterContext?: ObserverCharacterContext,
 ): Promise<ObserverFlag[]> {
   if (!narration.trim()) return [];
 
@@ -1261,6 +1433,7 @@ export async function checkToolUsageGaps(
     askAboutScene,
     sceneSettings.sensitivity,
     apiOptions,
+    characterContext,
   );
   if (!judgment) return [];
 
@@ -1441,8 +1614,18 @@ export interface ObserverParams {
   tierUsed?: number;
   /** The turn's executed tool/roll results, joined - context for the length judge (several results legitimately take more words to narrate). */
   gmStoryContext?: string;
-  /** Who the player character is vs. who the NPCs are (see buildObserverCharacterContext) - handed to every judge that has to tell them apart. */
+  /** Who the player character is vs. who the NPCs are, plus this adventure's mechanics note (see buildObserverCharacterContext) - handed to every judge that has to tell the cast, or the rules, apart. */
   characterContext?: ObserverCharacterContext;
+  /**
+   * The reasoning the model produced while writing this narration
+   * (GenerationResult.narrationThoughts). Handed to checkOutcomeMismatch only:
+   * that's the check whose whole question is "did the GM apply the rules
+   * correctly", and the ruling usually lives in the reasoning rather than the
+   * prose. Deliberately NOT given to checkPlayerAgencyViolation, where the
+   * reasoning is as likely to contain the violation itself ("I'll have her
+   * decide to run") as an exoneration - see formatJudgeReasoningBlock.
+   */
+  narrationThoughts?: string;
   /** StoryData.sessionZeroActive as of the START of this turn - suspends every check (see observerSuspensionReason). */
   sessionZeroActive?: boolean;
   /** Whether the story has a character_sheet note yet - false means it's still in setup, which also suspends every check. */
@@ -1503,6 +1686,9 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
         params.rollResults || [],
         params.apiOptions,
         settingsFor(params.settings, "outcome_narration_mismatch"),
+        params.playerChoice,
+        params.characterContext,
+        params.narrationThoughts,
       ),
       checkToolUsageGaps(
         params.narration,
@@ -1510,6 +1696,7 @@ export async function runObserver(params: ObserverParams): Promise<ObserverFlag[
         params.apiOptions,
         settingsFor(params.settings, "missing_oracle_or_table"),
         settingsFor(params.settings, "missing_scene_increment"),
+        params.characterContext,
       ),
       // Skipped entirely when the caller didn't say which tier the turn ran
       // at - there's nothing to judge the escalation against.

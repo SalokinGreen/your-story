@@ -174,11 +174,12 @@ phase made that call. Five checks, two severities:
   player character says/thinks/does, an LLM-judged check against the
   existing "PLAYER AGENCY (NON-NEGOTIABLE)" prompt rule); and an
   **outcome/narration mismatch** — an LLM-judged check for whether the
-  finished narration contradicts the mechanical `SUCCESS`/`FAILURE` result
-  of the last roll made that turn. The roll result being ground truth
-  narration can't override is the core "LLM proposes, deterministic engine
-  disposes" thesis this whole app is built on — this is the first place
-  that's checked directly rather than just hoped for.
+  finished narration contradicts the mechanical `SUCCESS`/`FAILURE` results
+  of the rolls made that turn. (Originally only the *last* roll; see Phase 7
+  for why that was wrong and what replaced it.) The roll result being ground
+  truth narration can't override is the core "LLM proposes, deterministic
+  engine disposes" thesis this whole app is built on — this is the first
+  place that's checked directly rather than just hoped for.
 - **Minor (log-only, surfaced as a warning, never triggers a reset — neither
   rule was ever stated to the GM as a hard requirement the way PLAYER
   AGENCY was):** two tool-usage-gap checks — narration that invented an
@@ -458,6 +459,74 @@ two challenge dice - it silently reported 4. The answer now reaches the GM as
 verbatim text, and the GM reads it against what it asked for. The client no
 longer validates the answer at all, since it has no idea what shape a valid
 answer has.
+
+## Phase 7 (later session): the observer learns the rules it's judging
+
+Found in play, on Starforged: the GM resolved a **weak hit** correctly — the
+action score beat one challenge die but not the other, so the character got
+what they wanted at a cost — and the observer flagged it as an
+outcome/narration mismatch and spent the turn's rewrite "fixing" prose that
+was right. The GM's own reasoning had explained the ruling clearly. Nothing
+was wrong with the GM; the observer was structurally unable to agree with it.
+
+Three separate causes, all fixed here.
+
+**A single comparison was being mistaken for the verdict.**
+`checkOutcomeMismatch` judged only the LAST `calculate`/`record_challenge_result`
+of the turn, on the Phase 3 reasoning that earlier rolls in a multi-round turn
+were already resolved by intermediate context. That silently assumes one
+comparison *is* the outcome — false for any system that composes an outcome
+from several, which is exactly what Phase 6 above encouraged ("the GM makes one
+`calculate` call per challenge die"). A weak hit is one `TRUE` and one `FALSE`;
+handing the judge only `7 >= 9 → FALSE` describes a plain failed roll, so
+correct weak-hit narration was indistinguishable from narration reversing a
+failure — and got flagged whenever the losing comparison happened to go last.
+The judge now sees **every** relevant comparison, in resolution order, and is
+asked what they support *taken together*.
+
+**The judges didn't know the rules of the game they were judging.** There is no
+fixed dice system in this app — every adventure improvises one in a `mechanics`
+note — but `buildObserverCharacterContext` only ever pulled `character_sheet`
+lore. So a judge given narration and a bare `TRUE`/`FALSE` had no choice but to
+substitute generic d20 pass/fail assumptions, and would call any outcome tier
+those assumptions lack (a weak hit, a partial, a success at a cost) a
+contradiction. `ObserverCharacterContext` now carries a truncated
+`mechanicsNote`, rendered by a new `formatMechanicsBlock` and handed to the two
+judges that rule on rules: the outcome-mismatch judge and the tool-usage-gap
+judge (a system with its own oracle procedure shouldn't be scolded for not
+calling `fate_question`). Deliberately *not* folded into
+`formatCharacterContextBlock` — "WHO IS WHO" answers a casting question and
+goes to the agency judge and the rewrite, neither of which should be reasoning
+about dice.
+
+**A deterministic floor under the whole check.** When a turn's comparisons come
+out **mixed** (at least one pass, at least one fail), the flag is now capped at
+`minor`: still logged, still surfaced to the player, still fed back to the GM
+by `buildObserverWarningNote` next turn, but never able to trigger a reset. A
+mixed set of comparisons is the exact shape of a legitimate partial success, so
+it's where this check is likeliest to be wrong, and being wrong there is
+expensive — it spends the turn's one rewrite (`MAX_OBSERVER_RESETS`) forcing
+correct prose into agreement with a verdict the GM never reached. This reads
+the booleans, not the narration, so it holds even if the judge is talked out of
+the rules.
+
+**And the reasoning behind the narration now reaches one judge.**
+`GenerationResult.narrationThoughts` already existed and was already threaded
+to `rewriteFlaggedNarration` (Phase 5) — but never to any judge, so the
+explanation that would have settled this case was sitting unused in the same
+turn's result. It now reaches `checkOutcomeMismatch` only, via a separate
+`formatJudgeReasoningBlock` rather than `formatNarrationThoughtsBlock`: the two
+callers want opposite things from the same text. The rewrite is told "this is
+what you were going for, preserve it"; a judge must be told the reasoning is
+*testimony, not evidence* — if it explains the outcome correctly under the
+adventure's rules that counts against a mismatch, but if it rationalizes an
+outcome the numbers don't support, the numbers still win.
+
+Held to the outcome judge on purpose. `checkPlayerAgencyViolation` does not get
+it: there, the reasoning is as likely to contain the violation itself ("I'll
+have her decide to run") as an exoneration, and a judge that reads the
+defendant's account before ruling is a weaker check, not a better-informed one.
+There's a test asserting the reasoning never reaches that prompt.
 
 ## Deliberately not done
 
