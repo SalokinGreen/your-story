@@ -17,6 +17,7 @@ import { OCRSummarizeRequestBody } from "@/app/misc/ocrSummarizeCall";
 import { StoryLore, CustomTable } from "@/app/misc/structs";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 import { mergeExtractedContent } from "@/app/misc/ocrMerge";
+import { stripImagesFromPDF } from "@/app/misc/pdfImageStrip";
 import { PDFDocument } from "pdf-lib";
 import {
   LocalPDFImport,
@@ -513,15 +514,12 @@ async function planPDFChunks(
 }
 
 /**
- * Build the base64-encoded PDF bytes for a single chunk. Intended to be
- * called lazily, immediately before uploading that chunk, so at most a
- * handful of chunk payloads exist in memory simultaneously rather than
- * every chunk in the document at once.
+ * Extract a single chunk's page range into its own PDF document's bytes.
  */
-async function buildPDFChunkBase64(
+async function buildPDFChunkBytes(
   pdfDoc: PDFDocument,
   range: PDFChunkRange,
-): Promise<string> {
+): Promise<Uint8Array> {
   const chunkDoc = await PDFDocument.create();
   const pageIndicesToCopy = Array.from(
     { length: range.endIndex - range.startIndex + 1 },
@@ -531,8 +529,123 @@ async function buildPDFChunkBase64(
   const copiedPages = await chunkDoc.copyPages(pdfDoc, pageIndicesToCopy);
   copiedPages.forEach((page) => chunkDoc.addPage(page));
 
-  const chunkBytes = await chunkDoc.save();
-  return bytesToBase64(chunkBytes);
+  return chunkDoc.save();
+}
+
+/**
+ * Build the base64-encoded PDF bytes for a single chunk. Intended to be
+ * called lazily, immediately before uploading that chunk, so at most a
+ * handful of chunk payloads exist in memory simultaneously rather than
+ * every chunk in the document at once.
+ */
+async function buildPDFChunkBase64(
+  pdfDoc: PDFDocument,
+  range: PDFChunkRange,
+): Promise<string> {
+  return bytesToBase64(await buildPDFChunkBytes(pdfDoc, range));
+}
+
+/**
+ * Whether an OCR result is effectively blank - no text at all once the
+ * `<!-- Page N -->` markers the OCR route interleaves between pages are
+ * discarded. Used to tell "we recovered this page's text" apart from "this
+ * page was pure image and there was never any text to recover".
+ */
+function isBlankOCRMarkdown(markdown: string): boolean {
+  return markdown.replace(/<!--[\s\S]*?-->/g, "").trim().length === 0;
+}
+
+/**
+ * Last-resort OCR for a single page whose PDF payload is over the upload
+ * size limit: strip the page's embedded images and send just what's left.
+ *
+ * A single page can't be split any further, so without this the page is
+ * simply lost from the import. Since OCR only reads text, a page that
+ * carries a real text layer under full-bleed artwork loses nothing that
+ * mattered by having the artwork removed - and the payload typically drops
+ * by orders of magnitude.
+ *
+ * The one case this can't rescue is a pure scan, where the text *is* the
+ * image: stripping leaves a blank page, so blank output is treated as a
+ * failure (with the original "try a lower-resolution scan" advice) rather
+ * than being imported as an empty page.
+ */
+async function ocrPageWithoutImages(
+  pdfDoc: PDFDocument,
+  range: PDFChunkRange,
+  fileNameBase: string,
+  mistralKey: string,
+): Promise<{ markdown: string; totalPages: number }> {
+  const tooLarge = `page ${range.pageStart} is too image-heavy to upload directly (exceeds the server's request size limit)`;
+
+  let base64: string;
+  let imagesRemoved: number;
+  try {
+    // Scoped so the source bytes and the stripped copy are both eligible
+    // for collection before the (still multi-MB) base64 string is built.
+    const stripped = await stripImagesFromPDF(
+      await buildPDFChunkBytes(pdfDoc, range),
+    );
+    imagesRemoved = stripped.imagesRemoved;
+    base64 = imagesRemoved > 0 ? bytesToBase64(stripped.bytes) : "";
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "unknown error";
+    throw new Error(
+      `${tooLarge}, and removing its images failed too - ${message}. Try a lower-resolution scan of this page.`,
+    );
+  }
+
+  if (imagesRemoved === 0) {
+    throw new Error(
+      `${tooLarge}, and it has no embedded images to remove - its size comes from vector art or fonts. Try a flattened, lower-resolution version of this page.`,
+    );
+  }
+
+  if (base64.length > SAFE_BASE64_PAYLOAD_BYTES) {
+    base64 = "";
+    throw new Error(
+      `${tooLarge} even after removing its ${imagesRemoved} image(s). Try a lower-resolution scan of this page.`,
+    );
+  }
+
+  let response: Response;
+  try {
+    response = await fetchWithRetry(
+      "/api/ocr/process",
+      {
+        base64Data: base64,
+        fileName: `${fileNameBase}_page_${range.pageStart}_no_images.pdf`,
+        mimeType: "application/pdf",
+        includeImages: false,
+        mistralKey,
+      },
+      OCR_TIMEOUT_MS,
+    );
+  } finally {
+    base64 = "";
+  }
+
+  if (!response.ok) {
+    const errorMsg = await extractErrorMessage(
+      response,
+      "OCR processing failed",
+    );
+    throw new Error(
+      `page ${range.pageStart} (retried without images): ${errorMsg}`,
+    );
+  }
+
+  const result: OCRProcessResult = await response.json();
+  if (isBlankOCRMarkdown(result.markdown || "")) {
+    throw new Error(
+      `${tooLarge}. Removing its images left no text behind, so the page is a pure scan. Try a lower-resolution scan of this page.`,
+    );
+  }
+
+  return {
+    markdown: `<!-- page ${range.pageStart}: too large to upload, so its ${imagesRemoved} image(s) were removed and only its text layer was read -->\n${result.markdown}`,
+    totalPages: result.totalPages,
+  };
 }
 
 /**
@@ -564,12 +677,11 @@ async function ocrPDFRange(
   if (base64.length > SAFE_BASE64_PAYLOAD_BYTES && pageCount === 1) {
     // Can't split a single page any further - sending it anyway would just
     // hit the platform's hard body-size limit and come back as a raw 413
-    // ("Entity Too Large"). Fail this page with a clear, actionable
-    // message instead so the rest of the document can still complete.
+    // ("Entity Too Large"). Strip the page's images and send what's left
+    // instead; that recovers the text layer of an illustrated page, and
+    // throws with actionable advice when there's no text to recover.
     base64 = "";
-    throw new Error(
-      `page ${range.pageStart} is too image-heavy to upload directly (exceeds the server's request size limit). Try a lower-resolution scan of this page.`,
-    );
+    return ocrPageWithoutImages(pdfDoc, range, fileNameBase, mistralKey);
   }
   if (base64.length > SAFE_BASE64_PAYLOAD_BYTES && pageCount > 1) {
     base64 = "";
@@ -645,6 +757,14 @@ async function ocrPDFRange(
   }
 
   if (!response.ok) {
+    // A single page rejected as too large (413) is the same problem the
+    // local size check above catches, just measured by the platform rather
+    // than by us - JSON field overhead and a lower-than-expected platform
+    // limit can both push a page over after it passed our own budget. Give
+    // it the same image-stripping retry rather than losing the page.
+    if (response.status === 413 && pageCount === 1) {
+      return ocrPageWithoutImages(pdfDoc, range, fileNameBase, mistralKey);
+    }
     const errorMsg = await extractErrorMessage(
       response,
       "OCR processing failed",
