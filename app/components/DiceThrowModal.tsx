@@ -4,6 +4,11 @@ import React, { useEffect, useRef, useState } from "react";
 import type DiceBox from "@3d-dice/dice-box";
 import type { DieResult } from "@3d-dice/dice-box";
 import type { DiceThrowRequest } from "../misc/gmExecutor";
+import {
+  powerFromDragDistance,
+  throwFromDrag,
+  type TraySize,
+} from "../misc/diceThrow";
 import { DynamicIcon } from "./DynamicIcon";
 
 interface DiceThrowModalProps {
@@ -72,12 +77,17 @@ function splitFacesByGroup(
 }
 
 interface DragState {
+  // Which pointer owns the drag, so a second finger landing on the tray
+  // mid-gesture can't hijack or cancel it.
+  pointerId: number;
+  // Drag start and the tray's size, both in tray-local CSS px, captured at
+  // drag-start so the throw-vector line and the throw itself can be computed
+  // without re-measuring on every move.
   startX: number;
   startY: number;
-  // Tray's bounding rect at drag-start, so the visual throw-vector line can
-  // be drawn in tray-local coordinates without re-measuring on every move.
   rectLeft: number;
   rectTop: number;
+  tray: TraySize;
 }
 
 interface DragVisual {
@@ -85,54 +95,42 @@ interface DragVisual {
   y1: number;
   x2: number;
   y2: number;
+  // 0..1 gesture strength, so the aiming line can show how hard this throw
+  // will land before the player commits to it.
+  power: number;
 }
 
-// dice-box's own rollDie() already produces a good throw: it launches the
-// die *inward* from its spawn edge (velocity proportional to -startPosition)
-// and *downward* from the starting height, so it always lands in-bounds and
-// tumbles to a stop. All the gesture needs to control is how *hard* that
-// throw is, via dice-box's throwForce/spinForce config knobs (defaults 5/6).
+// The gesture drives the throw completely: the dice spawn where the player
+// pressed, fly along the drag, and fly harder the further it went. See
+// app/misc/diceThrow.ts for the screen -> tray-world geometry, and
+// scripts/patchDiceBox.mjs for the dice-box physics-worker patch that lets a
+// caller set a die's initial velocity/spin at all.
 //
-// An earlier version instead fed a fully custom velocity vector (patched in
-// via scripts/patchDiceBox.mjs) built straight from the drag direction with
-// an upward Y. Because the die respawns at a random edge at height 8, a
-// drag pointing toward that same edge launched it up and over the wall -
-// the "teleports to a corner and flies off a random way" bug. Driving only
-// the force magnitude and letting dice-box aim the throw fixes that.
+// An earlier version only scaled dice-box's own throwForce/spinForce and let
+// the library aim the throw. That could not work: dice-box respawns the dice
+// at a *random* point on the tray rim before every roll and aims them inward
+// from there, so the drag direction was ignored outright, and its throw
+// velocity is lerp(halfForce, fullForce, Math.random()) from a spawn point
+// whose distance from the middle also varies - which buried the drag's
+// contribution to power under two layers of randomness. Pinning startPosition
+// (with `newStartPoint: false`) and setting the velocity outright fixes both.
 //
 // Power comes from how FAR the player dragged, not how fast: a slow,
 // deliberate drag should throw as hard as a quick flick across the same
 // distance (a speed-based version scored near-zero force on a real ~1s
-// human drag). Distances are in CSS px; the constants below are tuned by
-// eye against the tray - see app/dev/dice-spike.
-const MIN_DRAG_PX = 20; // below this it's a tap, not a throw
-const FULL_POWER_PX = 220; // drag length that maps to a full-strength throw
-
-function throwForceFromDrag(dx: number, dy: number) {
-  const dist = Math.hypot(dx, dy);
-  const power = Math.min(
-    Math.max((dist - MIN_DRAG_PX) / (FULL_POWER_PX - MIN_DRAG_PX), 0),
-    1
-  );
-  // Gentle floor so even a short flick still visibly tumbles, up to roughly
-  // dice-box's own defaults at full power.
-  return {
-    throwForce: 2 + power * 3.5, // ~2 (soft) .. ~5.5 (firm)
-    spinForce: 3 + power * 4, // ~3 .. ~7
-  };
-}
+// human drag).
 
 type Phase = "loading" | "aiming" | "rolling" | "settled";
 
 /**
  * Physical dice mode: the GM's formula_roll/opposed_formula rolls can be
  * thrown on a 3D dice tray instead of resolved silently. The dice spawn in
- * and settle as soon as the tray opens, sitting visible at rest; drag
- * anywhere on the tray (a line shows the throw vector) and release to
- * re-throw them for the actual result - the result comes from
- * @3d-dice/dice-box's real physics (see scripts/patchDiceBox.mjs for how the
- * throw itself is gesture-driven rather than the library's own randomized
- * toss).
+ * and settle as soon as the tray opens, sitting visible at rest; press
+ * anywhere on the tray and drag (a line shows the throw vector), and on
+ * release the dice are thrown from the point you pressed, along the drag, as
+ * hard as the drag was long - the result comes from @3d-dice/dice-box's real
+ * physics (see scripts/patchDiceBox.mjs for how the throw itself is
+ * gesture-driven rather than the library's own randomized toss).
  *
  * Every pool in the roll is thrown in the same toss: "2d6+1d4" puts three
  * dice in the tray at once, and Starforged's 1d6 action die lands alongside
@@ -249,48 +247,68 @@ export default function DiceThrowModal({
   }, [request]);
 
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (phase !== "aiming") return;
+    if (phase !== "aiming" || dragRef.current) return;
+    // Capture so the gesture keeps reporting once the finger/cursor leaves the
+    // tray - a throw aimed at an edge naturally overshoots past it, and
+    // without capture the drag would silently die at the boundary.
     e.currentTarget.setPointerCapture(e.pointerId);
     const rect = e.currentTarget.getBoundingClientRect();
     dragRef.current = {
+      pointerId: e.pointerId,
       startX: e.clientX,
       startY: e.clientY,
       rectLeft: rect.left,
       rectTop: rect.top,
+      tray: { width: rect.width, height: rect.height },
     };
     setDragVisual({
       x1: e.clientX - rect.left,
       y1: e.clientY - rect.top,
       x2: e.clientX - rect.left,
       y2: e.clientY - rect.top,
+      power: 0,
     });
   };
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
-    if (!drag || phase !== "aiming") return;
+    if (!drag || drag.pointerId !== e.pointerId || phase !== "aiming") return;
     setDragVisual({
       x1: drag.startX - drag.rectLeft,
       y1: drag.startY - drag.rectTop,
       x2: e.clientX - drag.rectLeft,
       y2: e.clientY - drag.rectTop,
+      power: powerFromDragDistance(
+        Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY),
+        drag.tray
+      ),
     });
   };
 
-  const cancelDrag = () => {
+  const onPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (dragRef.current?.pointerId !== e.pointerId) return;
     dragRef.current = null;
     setDragVisual(null);
   };
 
   const onPointerUp = async (e: React.PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current;
+    if (!drag || drag.pointerId !== e.pointerId) return;
     dragRef.current = null;
     setDragVisual(null);
-    if (!drag || phase !== "aiming" || !request) return;
+    if (phase !== "aiming" || !request) return;
 
-    const dx = e.clientX - drag.startX;
-    const dy = e.clientY - drag.startY;
-    if (Math.hypot(dx, dy) < MIN_DRAG_PX) return; // require a drag, not a tap
+    // Everything the throw needs, in tray-local px: dice spawn at the press
+    // point, fly along the drag, and fly harder the longer it was. Returns
+    // null for a tap.
+    const gesture = throwFromDrag(
+      drag.startX - drag.rectLeft,
+      drag.startY - drag.rectTop,
+      e.clientX - drag.rectLeft,
+      e.clientY - drag.rectTop,
+      drag.tray
+    );
+    if (!gesture) return;
 
     const token = requestTokenRef.current;
     try {
@@ -298,23 +316,20 @@ export default function DiceThrowModal({
       if (requestTokenRef.current !== token) return;
 
       setPhase("rolling");
-      // Drive dice-box's own throw with a drag-scaled force, and make sure
-      // any leftover custom-velocity override from an older code path is
-      // cleared so the natural (in-bounds, downward, inward) throw runs.
-      const { throwForce, spinForce } = throwForceFromDrag(dx, dy);
       await diceBox.updateConfig({
-        throwForce,
-        spinForce,
-        customThrowVelocity: null,
-        customThrowSpin: null,
+        startPosition: gesture.startPosition,
+        customThrowVelocity: gesture.velocity,
+        customThrowSpin: gesture.spin,
       });
       const group = diceGroupRef.current;
-      // Let dice-box pick a fresh random spawn edge (newStartPoint default)
-      // so each throw tumbles in from the rim like a real toss; its velocity
-      // is aimed inward from that edge, so the die always stays in the tray.
+      // newStartPoint: false is what makes the startPosition above stick -
+      // dice-box otherwise overwrites it with a random point on the tray rim
+      // just before spawning the dice.
       const results = group
-        ? await diceBox.reroll(group, { remove: true })
-        : await diceBox.roll(notationFor(request.groups));
+        ? await diceBox.reroll(group, { remove: true, newStartPoint: false })
+        : await diceBox.roll(notationFor(request.groups), {
+            newStartPoint: false,
+          });
       if (requestTokenRef.current !== token) return;
 
       diceGroupRef.current = results;
@@ -379,7 +394,7 @@ export default function DiceThrowModal({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
-        onPointerCancel={cancelDrag}
+        onPointerCancel={onPointerCancel}
         // min-h-0 overrides the flex default of min-height:auto - without it,
         // a <canvas> child's intrinsic size (its width/height attributes,
         // which dice-box sets to match this container's last measured size)
@@ -404,10 +419,14 @@ export default function DiceThrowModal({
         )}
         {request && phase === "aiming" && !dragVisual && (
           <div className="absolute inset-x-0 bottom-6 text-center text-blue-200/60 text-sm pointer-events-none">
-            Drag and release to throw
+            Drag from where you want to throw - the further, the harder
           </div>
         )}
         {dragVisual && (
+          // The line runs from the spawn point (where the player pressed) along
+          // the throw; it thickens and brightens with the power the release
+          // will actually use, so the drag-distance-is-power rule is visible
+          // before committing to the throw.
           <svg className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true">
             <line
               x1={dragVisual.x1}
@@ -415,11 +434,18 @@ export default function DiceThrowModal({
               x2={dragVisual.x2}
               y2={dragVisual.y2}
               stroke="rgb(196 181 253)"
-              strokeWidth={4}
+              strokeOpacity={0.45 + dragVisual.power * 0.55}
+              strokeWidth={3 + dragVisual.power * 6}
               strokeLinecap="round"
             />
             <circle cx={dragVisual.x1} cy={dragVisual.y1} r={7} fill="rgb(196 181 253)" fillOpacity={0.6} />
-            <circle cx={dragVisual.x2} cy={dragVisual.y2} r={11} fill="rgb(196 181 253)" fillOpacity={0.35} />
+            <circle
+              cx={dragVisual.x2}
+              cy={dragVisual.y2}
+              r={9 + dragVisual.power * 9}
+              fill="rgb(196 181 253)"
+              fillOpacity={0.25 + dragVisual.power * 0.35}
+            />
           </svg>
         )}
       </div>
