@@ -248,6 +248,20 @@ function applyReasoningEffort(
     return;
   }
 
+  // OpenRouter's reasoning.effort enum accepts an explicit "none" value that
+  // actually disables reasoning - unlike simply omitting the field, which
+  // falls back to whatever the model itself defaults to. Some models default
+  // to reasoning ON (e.g. Grok 4.5 defaults to "high" effort even with no
+  // reasoning param sent at all), so a tier assigned effort "none" has to
+  // send this explicitly or it silently keeps paying for reasoning tokens
+  // the tier system believes it turned off - see turnCost.ts's
+  // REASONING_OUTPUT_MULTIPLIER, which assumes "none" means no reasoning
+  // overhead at all.
+  if (provider === "openrouter" && reasoningEffort === "none") {
+    requestBody.reasoning = { effort: "none" };
+    return;
+  }
+
   if (!reasoningEffort || reasoningEffort === "none") return;
 
   if (provider === "mistral") {

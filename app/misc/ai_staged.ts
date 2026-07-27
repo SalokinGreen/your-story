@@ -1904,10 +1904,30 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     }
   }
 
+  // Reasoning/thought-signature replay (Gemini's `reasoning.encrypted` in
+  // particular) is only meaningful for the round immediately being
+  // continued - not for every past round concatenated into history.
+  // Re-sending an old encrypted reasoning blob from an already-completed
+  // round is exactly the failure mode reported against OpenRouter's own
+  // Gemini integration: stale `reasoning.encrypted` replayed from history
+  // causes a 400 on a later, unrelated request (OpenRouterTeam/ai-sdk-
+  // provider#491). So only the LAST assistant part in history keeps its
+  // reasoning/reasoning_details; everything older keeps its content and
+  // tool_calls (needed for narrative/tool-call continuity) but drops the
+  // reasoning metadata.
+  let lastAssistantPartIndex = -1;
+  for (let j = partsToInclude.length - 1; j >= 0; j--) {
+    if (!partsToInclude[j].user) {
+      lastAssistantPartIndex = j;
+      break;
+    }
+  }
+
   // Process parts in pairs: user choice followed by assistant story
   // We need to reconstruct the full GM conversation flow
   for (let i = 0; i < partsToInclude.length; i++) {
     const part = partsToInclude[i];
+    const isMostRecentRound = i === lastAssistantPartIndex;
 
     if (part.user) {
       // User action - simple format, story context comes after GM response
@@ -1925,8 +1945,12 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
             const assistantMsg: ChatMessage = {
               role: "assistant",
               content: cleanString(msg.content),
-              reasoning: msg.reasoning,
-              reasoning_details: msg.reasoning_details,
+              ...(isMostRecentRound
+                ? {
+                    reasoning: msg.reasoning,
+                    reasoning_details: msg.reasoning_details,
+                  }
+                : {}),
             };
             if (msg.tool_calls && msg.tool_calls.length > 0) {
               assistantMsg.tool_calls = msg.tool_calls;
