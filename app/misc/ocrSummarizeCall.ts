@@ -61,6 +61,16 @@ export interface OCRSummarizeSuccess {
    * allowed.
    */
   incomplete: boolean;
+  /** How many parts the document was split into (1 = it fit in one prompt). */
+  totalParts: number;
+  /**
+   * 1-based numbers of the parts that never got a single extraction round
+   * before the budget ran out. Nothing from these parts of the source is in
+   * the result at all, which is a categorically worse outcome than a part
+   * that was merely covered shallowly - so it's reported separately from
+   * `incomplete` and named in the importer's warning.
+   */
+  unreachedParts: number[];
 }
 
 /**
@@ -480,17 +490,33 @@ export async function summarizeOCR(
       customTables: collected.customTables.length,
     });
   emitRoundEnd(1);
-  let windowIndex = 0;
-  // Whether the current part of the document still has more to give: the
-  // model was cut off by the output limit before it finished with it.
-  let moreInThisWindow = first.truncated;
-  let rounds = 1;
 
-  // What the running totals looked like when the current part started, so a
-  // part that produced tables but no notes can be spotted and redone.
-  let notesAtWindowStart = 0;
-  let tablesAtWindowStart = 0;
-  let notesRecoveryTried = false;
+  /** Per-part bookkeeping, so follow-up rounds can be scheduled across parts. */
+  interface PartState {
+    /** This part has had at least one extraction round. */
+    visited: boolean;
+    /**
+     * The model was cut off by the output limit on this part's last round
+     * and still had something new to say - i.e. the part has more to give.
+     */
+    truncated: boolean;
+    /** This part's last round filled in tables and wrote no notes at all. */
+    producedOnlyTables: boolean;
+    /** Notes recovery has already been spent on this part. */
+    recoveryTried: boolean;
+  }
+  const parts: PartState[] = windows.map(() => ({
+    visited: false,
+    truncated: false,
+    producedOnlyTables: false,
+    recoveryTried: false,
+  }));
+  parts[0].visited = true;
+  parts[0].truncated = first.truncated;
+  parts[0].producedOnlyTables =
+    notesCount(collected) === 0 && collected.customTables.length > 0;
+
+  let rounds = 1;
   // Truncation continuations are the only rounds the user's setting caps;
   // spending its budget on anything else would make "0" mean something
   // different than "don't continue past the output limit".
@@ -499,79 +525,54 @@ export async function summarizeOCR(
   // inside the budget. Rounds are the same shape of work every time, so the
   // slowest one to date is a fair worst case for the next.
   let slowestRoundMs = Date.now() - firstRoundStartedAt;
+  // Set when a round errors out. A failed round is never fatal - we keep
+  // whatever earlier rounds extracted - but there's no point scheduling more.
+  let roundFailed = false;
 
-  // Truncation rounds, document parts and notes recovery get separate
-  // allowances, so a long document doesn't spend its whole budget re-trying
-  // part one. Recovery gets one round per part regardless of the
+  // Allowance of *follow-up* rounds, on top of the first round that has
+  // already run. Truncation rounds, document parts and notes recovery get
+  // separate allowances, so a long document doesn't spend its whole budget
+  // re-trying part one. Recovery gets one round per part regardless of the
   // continuation-round setting: a part that came back as tables and nothing
   // else is a broken extraction, not a thoroughness preference.
-  const maxRounds =
+  const maxFollowUpRounds =
     maxContinuationRounds + (windows.length - 1) + windows.length;
 
-  // A single big document (a whole .md file is imported as one chunk) usually
-  // has far more notes in it than fit in one response's output budget.
-  // Closing the JSON only salvages what was already written - everything the
-  // model hadn't got to yet is simply missing. So keep going while there's
-  // stuff left, either because the model ran out of room on this part or
-  // because there are more parts of the document to work through.
-  while (rounds <= maxRounds) {
-    // Judged against where the next round would *end*, not where it starts:
-    // a round begun just inside the budget still runs for minutes, and
-    // overrunning the request timeout loses the whole response - every note
-    // already written included - instead of returning it as incomplete.
-    if (Date.now() - startedAt + slowestRoundMs >= continuationBudgetMs) {
-      console.warn(
-        "OCR summarize has no room left for another round - returning partial notes",
-      );
-      break;
-    }
+  /**
+   * Whether another round fits in the budget. Judged against where that
+   * round would *end*, not where it starts: a round begun just inside the
+   * budget still runs for minutes, and overrunning the request timeout loses
+   * the whole response - every note already written included - instead of
+   * returning it as incomplete.
+   */
+  const roomForAnotherRound = () =>
+    rounds - 1 < maxFollowUpRounds &&
+    !roundFailed &&
+    Date.now() - startedAt + slowestRoundMs < continuationBudgetMs;
 
-    // This part produced tables and no notes at all - the model filled in
-    // customTables and stopped, which is a failed extraction however
-    // table-heavy the source is.
-    const onlyTablesFromThisWindow =
-      !notesRecoveryTried &&
-      notesCount(collected) === notesAtWindowStart &&
-      collected.customTables.length > tablesAtWindowStart;
-
-    let prompt: string;
-    let reason: "continuation" | "notes_recovery" | "next_part";
-    if (moreInThisWindow && continuationsUsed < maxContinuationRounds) {
-      console.log(
-        `OCR summarize hit the output limit, continuing part ${windowIndex + 1}/${windows.length} (round ${rounds}/${maxRounds})...`,
-      );
-      continuationsUsed++;
-      reason = "continuation";
-      prompt = buildContinuationUserPrompt(promptForWindow(windowIndex), collected);
-    } else if (onlyTablesFromThisWindow) {
-      console.log(
-        `OCR summarize got tables but no notes from part ${windowIndex + 1}/${windows.length} - asking for the notes...`,
-      );
-      notesRecoveryTried = true;
-      reason = "notes_recovery";
-      prompt = buildNotesRecoveryPrompt(promptForWindow(windowIndex), collected);
-    } else if (windowIndex + 1 < windows.length) {
-      windowIndex++;
-      console.log(
-        `OCR summarize moving on to part ${windowIndex + 1}/${windows.length}...`,
-      );
-      notesAtWindowStart = notesCount(collected);
-      tablesAtWindowStart = collected.customTables.length;
-      notesRecoveryTried = false;
-      reason = "next_part";
-      prompt = buildNextPartUserPrompt(promptForWindow(windowIndex), collected);
-    } else {
-      // Nothing left: the model finished, on the last part of the document.
-      break;
-    }
+  /** Run one follow-up round against `partIndex` and fold it into `collected`. */
+  const runRound = async (
+    partIndex: number,
+    reason: "continuation" | "notes_recovery" | "next_part",
+  ): Promise<void> => {
+    const base = promptForWindow(partIndex);
+    const prompt =
+      reason === "continuation"
+        ? buildContinuationUserPrompt(base, collected)
+        : reason === "notes_recovery"
+          ? buildNotesRecoveryPrompt(base, collected)
+          : buildNextPartUserPrompt(base, collected);
 
     onEvent?.({
       type: "round_start",
       round: rounds + 1,
-      part: windowIndex,
+      part: partIndex,
       totalParts: windows.length,
       reason,
     });
+
+    const notesBefore = notesCount(collected);
+    const tablesBefore = collected.customTables.length;
 
     const roundStartedAt = Date.now();
     const round = await runExtractionRound(
@@ -585,20 +586,78 @@ export async function summarizeOCR(
     );
     slowestRoundMs = Math.max(slowestRoundMs, Date.now() - roundStartedAt);
 
-    // A failed round is never fatal: keep whatever earlier rounds already
-    // extracted rather than losing the whole import.
     if (round.error) {
-      console.error("Continuation round failed:", round.error);
-      break;
+      console.error(`OCR summarize ${reason} round failed:`, round.error);
+      roundFailed = true;
+      return;
     }
 
     rounds++;
     const added = mergeRound(collected, round.parsed);
     emitRoundEnd(rounds);
+
+    const state = parts[partIndex];
+    state.visited = true;
     // Re-asking only pays off while the model still has something new to
-    // say; if it's just repeating entries we already have, move on to the
-    // next part of the document instead.
-    moreInThisWindow = round.truncated && added > 0;
+    // say; if it's just repeating entries we already have, stop asking.
+    state.truncated = round.truncated && added > 0;
+    state.producedOnlyTables =
+      notesCount(collected) === notesBefore &&
+      collected.customTables.length > tablesBefore;
+  };
+
+  // ---- Phase 1: sweep ----
+  //
+  // Every part of the document gets one round before any part gets a second.
+  // A part that's never looked at contributes *nothing* to the import, which
+  // is far worse than a part covered shallowly - and that's exactly what the
+  // old depth-first order produced on a long rulebook: continuation and
+  // recovery rounds drained the whole wall-clock budget on part one, so the
+  // back half of the book was never sent to the model at all.
+  for (let i = 1; i < windows.length && roomForAnotherRound(); i++) {
+    console.log(`OCR summarize reading part ${i + 1}/${windows.length}...`);
+    await runRound(i, "next_part");
+  }
+
+  // ---- Phase 2: deepen ----
+  //
+  // Whatever budget survived the sweep goes on parts that asked for more,
+  // round-robin so one greedy part can't starve the rest. Notes recovery
+  // outranks continuation for a part needing both: a part with no notes at
+  // all is a broken extraction, while a truncated one at least produced
+  // something.
+  for (let progressed = true; progressed && roomForAnotherRound(); ) {
+    progressed = false;
+    for (let i = 0; i < windows.length && roomForAnotherRound(); i++) {
+      const state = parts[i];
+      if (!state.visited) continue;
+
+      if (state.producedOnlyTables && !state.recoveryTried) {
+        console.log(
+          `OCR summarize got tables but no notes from part ${i + 1}/${windows.length} - asking for the notes...`,
+        );
+        state.recoveryTried = true;
+        await runRound(i, "notes_recovery");
+        progressed = true;
+      } else if (state.truncated && continuationsUsed < maxContinuationRounds) {
+        console.log(
+          `OCR summarize hit the output limit on part ${i + 1}/${windows.length}, continuing (round ${rounds}/${maxFollowUpRounds + 1})...`,
+        );
+        continuationsUsed++;
+        await runRound(i, "continuation");
+        progressed = true;
+      }
+    }
+  }
+
+  const unreachedParts = parts
+    .map((state, i) => (state.visited ? 0 : i + 1))
+    .filter((partNumber) => partNumber > 0);
+
+  if (unreachedParts.length > 0) {
+    console.warn(
+      `OCR summarize ran out of budget - parts ${unreachedParts.join(", ")} of ${windows.length} were never read`,
+    );
   }
 
   return {
@@ -607,7 +666,9 @@ export async function summarizeOCR(
     detectedContentType: contentType,
     rawExtractedTables: extractedTables.length,
     extractionRounds: rounds,
-    incomplete: moreInThisWindow || windowIndex < windows.length - 1,
+    incomplete: unreachedParts.length > 0 || parts.some((s) => s.truncated),
+    totalParts: windows.length,
+    unreachedParts,
   };
 }
 
@@ -630,7 +691,7 @@ OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields
   "lore": [
     {
       "title": "Entry title",
-      "content": "Detailed content (2-4 paragraphs)",
+      "content": "Detailed markdown content - see CONTENT RULES below",
       "type": null,  // "lore" (default) = world-building, "mechanics" = rules/systems, "character_sheet" = player character info
       "folder": "Category folder (Characters, Locations, Items, Factions, History, etc.)",
       "tags": ["tag1", "tag2"],
@@ -644,7 +705,7 @@ OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields
   "mechanicNotes": [
     {
       "title": "Rule/Mechanic name",
-      "content": "Detailed explanation of the rule or mechanic",
+      "content": "The rule itself, in full, as markdown - every number, branch and option. See CONTENT RULES below",
       "type": "mechanics",
       "folder": "Rules"
     }
@@ -683,7 +744,15 @@ ${
 }
 ${
   focusAll || focus.includes("tables")
-    ? "- Extract ALL TABLES **in addition to** the notes: Random tables, encounter tables, loot tables. For each entry use 'text' for the result and 'weight' for the probability (use the range size as weight, e.g. 1-10 = weight 10). A table never replaces the note that explains it - whatever a table is about (a region's encounters, a faction's rumours, a dungeon's rooms) also gets a lore or mechanic note describing it in prose."
+    ? `- Extract ALL TABLES **in addition to** the notes: Random tables, encounter tables, loot tables, oracles, miss/consequence tables. A table never replaces the note that explains it - whatever a table is about (a region's encounters, a faction's rumours, a dungeon's rooms) also gets a lore or mechanic note describing it in prose.
+
+TABLE SHAPE - these tables get rolled on by a dice engine that picks exactly ONE entry at random, so shape them accordingly:
+  - ONE TABLE PER ROLL. If the source has several separate d6 lists under one heading (e.g. six different background questions, each with its own 1-6 answers), that is SIX tables, not one. Merging them produces a table that answers a random question, which is useless. Split them.
+  - The table's identity goes in "name" and "description" - the question, the heading, what you roll it for and when. Never in the entries.
+  - "text" is the RESULT ALONE, exactly as written in the source. Do NOT prefix it with the roll number ("3: ..."), the question, or an abbreviation of the question. "Nothing." is correct; "Miss least? 2: Nothing." is wrong twice over.
+  - Quote results verbatim. Do not paraphrase, shorten, or re-word them - these are the words the game shows the player.
+  - "weight" is the probability weight: use the size of the entry's die range (1-10 on a d100 table = weight 10), or 1 when every result is equally likely.
+  - Never emit a table with an empty "entries" array. If you don't have room to write its results, leave the table out entirely and write it on a later round instead.`
     : ""
 }
 ${
@@ -693,6 +762,20 @@ ${
 }
 
 CONTENT RULES:
+
+WRITE THE RULES DOWN, DON'T SUMMARIZE THEM. These notes are handed to a Game Master who has never seen the source document and cannot look anything up - the note IS the rule now. A note that names a rule without stating it ("Success at a Cost: choose from Feed the Beast, Collateral Damage, Mask Slips, Flesh and Bone") is a failed extraction, because nobody can run the game from it. That same rule written properly lists each option AND what each one does to the character.
+- Reproduce every number, threshold, die size, cost, modifier, cap and range exactly as the source states it.
+- Reproduce every branch in full. If a move has strong hit / weak hit / miss outcomes, all three get written out. If an outcome offers a choice of four consequences, all four get written out with their individual effects.
+- When a rule names another rule, meter, chapter or move, keep that cross-reference in the text.
+- Preserve distinctive rules language and terms of art verbatim - the source's own names for things are what the GM and player will say at the table.
+- Length follows the source. A dense two-page subsystem becomes a long note; a one-line clarification stays short. Never compress a rule to fit an imagined length limit.
+
+FORMAT NOTES AS MARKDOWN. Plain run-on paragraphs are unreadable at the table and bury the rule the GM is looking for.
+- Use "## " sub-headings to separate the parts of a longer note.
+- Use bullet lists for outcome branches, options, costs, steps and tables of effects.
+- Use **bold** for the terms being defined - move names, outcome tiers, meter names, keywords.
+- Use short paragraphs for prose and flavour. Keep the source's own paragraph breaks.
+
 - Each lore entry should be 2-4 paragraphs of rich detail
 - Use descriptive folder names for organization (Characters, Locations, Items, Factions, History, Bestiary, etc.)
 - If a character, place, or thing is referred to by more than one name in the text (a nickname, title, alias, alternate spelling, or shortened form - e.g. "Bob" for "Robert the Blacksmith", or "the Sunken Temple" for "Vashti's Sanctum"), list those other names in "aliases" so mentions of them can also be recognized. Leave "aliases" as [] when there's only the one name.
@@ -701,7 +784,8 @@ CONTENT RULES:
 - Mark secret/hidden information with "secrtet": true
 - For tables, estimate reasonable min/max ranges if not explicitly stated
 - NEVER return "customTables" alongside an empty "lore" and "mechanicNotes". If the source is nothing but tables, the notes are still required: write them from what the tables tell you - what each table is for and when it's rolled, the place/faction/creatures its entries describe, and the setting details buried in its headers, intro text and results.
-- Be thorough but concise - prioritize quality over quantity
+- One note per topic. Prefer several focused notes over one note covering a whole chapter - a note is retrieved and shown on its own, so it has to stand alone.
+- If you are running out of output room, write FEWER notes at full fidelity rather than more notes as one-line summaries. Whatever you leave out, a later round will pick up; what you compress is lost for good.
 
 ${customInstructions ? `ADDITIONAL INSTRUCTIONS:\n${customInstructions}` : ""}`;
 }
@@ -1087,28 +1171,36 @@ export function processParserResult(parsed: any): {
     }),
   );
 
-  const customTables: CustomTable[] = (parsed.customTables || []).map(
-    (table: any, index: number) => ({
+  const customTables: CustomTable[] = (parsed.customTables || [])
+    .map((table: any, index: number) => ({
       id: `table-ocr-${Date.now()}-${index}`,
-      name: table.name || `Table ${index + 1}`,
+      name: typeof table.name === "string" ? table.name.trim() : `Table ${index + 1}`,
       description: table.description || "",
-      entries: (table.entries || []).map((entry: any) => {
-        const text = entry.text || entry.result || "";
-        let weight = entry.weight;
-        if (weight === undefined || weight === null || isNaN(Number(weight))) {
-          if (entry.min !== undefined && entry.max !== undefined) {
-            weight = Math.max(1, Number(entry.max) - Number(entry.min) + 1);
-          } else {
-            weight = 1;
+      entries: (table.entries || [])
+        .map((entry: any) => {
+          const raw = entry.text || entry.result || "";
+          const text = typeof raw === "string" ? raw.trim() : "";
+          let weight = entry.weight;
+          if (weight === undefined || weight === null || isNaN(Number(weight))) {
+            if (entry.min !== undefined && entry.max !== undefined) {
+              weight = Math.max(1, Number(entry.max) - Number(entry.min) + 1);
+            } else {
+              weight = 1;
+            }
           }
-        }
-        return {
-          text,
-          weight: Math.max(1, Number(weight) || 1),
-        };
-      }),
-    }),
-  );
+          return {
+            text,
+            weight: Math.max(1, Number(weight) || 1),
+          };
+        })
+        .filter((entry: { text: string }) => entry.text.length > 0),
+    }))
+    // Drop table shells. Models routinely emit a named table and then run out
+    // of room (or just never fill it) before writing any results, and an
+    // empty table is unrollable - it can only ever be dead weight in the
+    // user's library. The streaming preview already filtered these; the
+    // committed result did not, so the shells were what actually got saved.
+    .filter((table: CustomTable) => table.name.length > 0 && table.entries.length > 0);
 
   return {
     summary: parsed.summary || "",

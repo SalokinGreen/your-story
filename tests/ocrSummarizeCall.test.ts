@@ -603,11 +603,11 @@ describe("summarizeOCR notes recovery", () => {
     expect(parts).toBe(2);
 
     queueResponses([
-      // Part 1: tables only -> recovery -> notes.
+      // Sweep: every part is read once before either is revisited.
       aiResponse({ customTables: [tableResult("Table A", ["a"])] }, "stop"),
-      aiResponse({ lore: [loreEntry("Notes for A")] }, "stop"),
-      // Part 2: tables only again -> its own recovery -> notes.
       aiResponse({ customTables: [tableResult("Table B", ["b"])] }, "stop"),
+      // Then each part's notes are recovered, in order.
+      aiResponse({ lore: [loreEntry("Notes for A")] }, "stop"),
       aiResponse({ lore: [loreEntry("Notes for B")] }, "stop"),
     ]);
 
@@ -617,5 +617,187 @@ describe("summarizeOCR notes recovery", () => {
     expect(mockProviderFetch).toHaveBeenCalledTimes(4);
     expect(result.lore.map((e) => e.title)).toEqual(["Notes for A", "Notes for B"]);
     expect(result.customTables.map((t) => t.name)).toEqual(["Table A", "Table B"]);
+  });
+});
+
+/**
+ * Breadth-first coverage tests.
+ *
+ * A part of the document that is never sent to the model contributes nothing
+ * at all to the import, which is far worse than a part covered shallowly.
+ * The extraction used to work depth-first - exhausting continuation and
+ * notes-recovery rounds on part one before looking at part two - so on a
+ * book-length document the wall-clock budget was spent on the opening
+ * chapters and the back half was never read. Every part now gets one round
+ * before any part gets a second.
+ */
+describe("summarizeOCR part coverage", () => {
+  beforeEach(() => {
+    mockProviderFetch.mockReset();
+  });
+
+  /** A document long enough to be split into several parts. */
+  function multiPartMarkdown() {
+    return [
+      "# One",
+      "filler line\n".repeat(6000),
+      "# Two",
+      "filler line\n".repeat(6000),
+      "# Three",
+      "filler line\n".repeat(600),
+    ].join("\n");
+  }
+
+  it("reads every part before spending a second round on any of them", async () => {
+    const markdown = multiPartMarkdown();
+    const parts = splitIntoWindows(markdown).length;
+    expect(parts).toBeGreaterThan(2);
+
+    // Every round claims it ran out of room, which under the old
+    // depth-first order meant part one absorbed the entire budget.
+    let call = 0;
+    mockProviderFetch.mockImplementation(async () => {
+      call++;
+      return aiResponse({ lore: [loreEntry(`Entry ${call}`)] }, "length");
+    });
+
+    await summarizeOCR({ ...baseBody, markdown });
+
+    const promptFor = (n: number) =>
+      JSON.parse(mockProviderFetch.mock.calls[n][1].body as string).messages[1]
+        .content as string;
+
+    // The first `parts` calls are the sweep: one per part, in order.
+    for (let i = 0; i < parts; i++) {
+      expect(promptFor(i)).toContain(`PART ${i + 1} OF ${parts}`);
+    }
+    // Only after the sweep does anything get a continuation round.
+    expect(promptFor(parts)).toContain("CONTINUATION ROUND");
+  });
+
+  it("reports the parts it never reached", async () => {
+    const markdown = multiPartMarkdown();
+    const parts = splitIntoWindows(markdown).length;
+
+    // Each round eats about the whole budget, leaving room for one only.
+    const ROUND_MS = 60;
+    mockProviderFetch.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, ROUND_MS));
+      return aiResponse({ lore: [loreEntry("Only entry")] }, "stop");
+    });
+
+    const result = await summarizeOCR({
+      ...baseBody,
+      markdown,
+      continuationBudgetMs: ROUND_MS * 1.5,
+    });
+    if ("error" in result) throw new Error(result.error);
+
+    expect(mockProviderFetch).toHaveBeenCalledTimes(1);
+    expect(result.totalParts).toBe(parts);
+    // Part 1 was read; everything after it never was, and is named so the
+    // importer can say which content is missing entirely.
+    expect(result.unreachedParts).toEqual(
+      Array.from({ length: parts - 1 }, (_, i) => i + 2),
+    );
+    expect(result.incomplete).toBe(true);
+  });
+
+  it("reports no unreached parts when the whole document was read", async () => {
+    const markdown = multiPartMarkdown();
+    mockProviderFetch.mockImplementation(async () =>
+      aiResponse({ lore: [loreEntry("Entry")] }, "stop"),
+    );
+
+    const result = await summarizeOCR({ ...baseBody, markdown });
+    if ("error" in result) throw new Error(result.error);
+
+    expect(result.unreachedParts).toEqual([]);
+    expect(result.incomplete).toBe(false);
+  });
+
+  it("spreads continuation rounds across parts instead of draining them on one", async () => {
+    const markdown = multiPartMarkdown();
+    const parts = splitIntoWindows(markdown).length;
+
+    mockProviderFetch.mockImplementation(async () =>
+      aiResponse({ lore: [loreEntry(`Entry ${mockProviderFetch.mock.calls.length}`)] }, "length"),
+    );
+
+    await summarizeOCR({ ...baseBody, markdown, maxContinuationRounds: 2 });
+
+    const continuationParts = mockProviderFetch.mock.calls
+      .map(
+        (call) =>
+          JSON.parse(call[1].body as string).messages[1].content as string,
+      )
+      .filter((prompt) => prompt.includes("CONTINUATION ROUND"))
+      .map((prompt) => /PART (\d+) OF/.exec(prompt)?.[1]);
+
+    // Two continuation rounds, and they went to two *different* parts.
+    expect(continuationParts).toHaveLength(2);
+    expect(new Set(continuationParts).size).toBe(2);
+    expect(parts).toBeGreaterThan(2);
+  });
+});
+
+/**
+ * Empty-table tests.
+ *
+ * Models routinely name a table and then never fill it - they run out of
+ * output room, or just move on. An entry-less table is unrollable, so it can
+ * only ever be dead weight in the user's library. The streaming preview
+ * filtered these out, but the committed result did not, so the shells were
+ * what actually got saved.
+ */
+describe("processParserResult table handling", () => {
+  it("drops tables that have no entries", () => {
+    const result = processParserResult({
+      customTables: [
+        { name: "Wandering Horrors", entries: [{ text: "Brine wraith", weight: 1 }] },
+        { name: "Never Filled In", entries: [] },
+        { name: "Also Empty" },
+      ],
+    });
+
+    expect(result.customTables.map((t) => t.name)).toEqual(["Wandering Horrors"]);
+  });
+
+  it("drops tables left with no entries after blank results are stripped", () => {
+    const result = processParserResult({
+      customTables: [{ name: "Blank Rows", entries: [{ text: "   " }, { text: "" }] }],
+    });
+
+    expect(result.customTables).toEqual([]);
+  });
+
+  it("drops tables with no name", () => {
+    const result = processParserResult({
+      customTables: [{ name: "   ", entries: [{ text: "Something", weight: 1 }] }],
+    });
+
+    expect(result.customTables).toEqual([]);
+  });
+
+  it("keeps a well-formed table intact, trimming its result text", () => {
+    const result = processParserResult({
+      customTables: [
+        {
+          name: "Wandering Horrors",
+          description: "Roll 1d6 when the tide turns.",
+          entries: [
+            { text: "  Brine wraith  ", weight: 1 },
+            { text: "Coral golem", min: 2, max: 4 },
+          ],
+        },
+      ],
+    });
+
+    expect(result.customTables).toHaveLength(1);
+    expect(result.customTables[0].description).toBe("Roll 1d6 when the tide turns.");
+    expect(result.customTables[0].entries).toEqual([
+      { text: "Brine wraith", weight: 1 },
+      { text: "Coral golem", weight: 3 },
+    ]);
   });
 });
