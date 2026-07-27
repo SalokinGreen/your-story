@@ -31,7 +31,6 @@ function CreatorPage() {
   const { addNotification } = useNotification();
 
   const editId = searchParams.get("edit") || undefined;
-  const startText = searchParams.get("start") || undefined;
 
   const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
   const [showSettings, setShowSettings] = useState(false);
@@ -291,7 +290,6 @@ function CreatorPage() {
             onSend={session.send}
             onStop={session.stop}
             showSuggestions={isBlank}
-            initialInput={startText}
           />
         </div>
 

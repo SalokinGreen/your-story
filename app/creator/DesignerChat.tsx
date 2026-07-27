@@ -18,8 +18,6 @@ interface DesignerChatProps {
   onStop: () => void;
   /** Show starter prompts only while the adventure is still blank. */
   showSuggestions: boolean;
-  /** Pre-fills the composer (e.g. from a landing-page genre shortcut). */
-  initialInput?: string;
 }
 
 export default function DesignerChat({
@@ -28,9 +26,8 @@ export default function DesignerChat({
   onSend,
   onStop,
   showSuggestions,
-  initialInput,
 }: DesignerChatProps) {
-  const [input, setInput] = useState(initialInput ?? "");
+  const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 

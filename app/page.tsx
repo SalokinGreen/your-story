@@ -15,11 +15,11 @@ import {
   Palette,
   HardDrive,
   Zap,
+  ChevronRight,
 } from "lucide-react";
 
 // Import client components
 import LandingAuthSection from "./components/LandingAuthSection";
-import QuickStartGenres from "./components/QuickStartGenres";
 import GuidedStoryStart from "./components/GuidedStoryStart";
 import LastPlayedStories from "./components/LastPlayedStories";
 import InfoTabs from "./components/InfoTabs";
@@ -140,8 +140,29 @@ export default async function Home() {
         {/* Last played stories - Client component */}
         <LastPlayedStories />
 
-        {/* Quick Start Genres (pre-generated adventures) - Client component */}
-        <QuickStartGenres />
+        {/* Entry point into the conversational creator - Static */}
+        <div className="mb-8">
+          <Link
+            href="/creator"
+            className="group block max-w-2xl mx-auto rounded-2xl border border-white/10 bg-white/[0.03] hover:border-purple-400/40 hover:bg-white/[0.05] transition-all p-5"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-linear-to-br from-purple-500 to-pink-600 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <MessageSquare className="w-6 h-6 text-white" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h2 className="font-medium text-white mb-0.5">
+                  Design your own adventure
+                </h2>
+                <p className="text-sm text-blue-200/50">
+                  Talk it through with a game designer — premise, rules, world
+                  and cast, one piece at a time.
+                </p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-blue-300/40 group-hover:text-purple-300 group-hover:translate-x-0.5 transition-all shrink-0" />
+            </div>
+          </Link>
+        </div>
 
         {/* How It Works - Static server-rendered */}
         <div className="mb-8">
