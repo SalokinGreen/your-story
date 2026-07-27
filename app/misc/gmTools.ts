@@ -1164,8 +1164,13 @@ LIKELIHOODS (from least to most likely) - pick the one you honestly believe, don
 - A Sure Thing: Almost certainly yes
 - Has To Be: Definitely yes
 
-Results can be: Exceptional No, No, Yes, or Exceptional Yes.
-Exceptional results are extreme versions - treat them dramatically.
+Results are one of four, and the difference between the plain and the exceptional ones matters:
+- Normal Yes: yes, plainly. The thing is true / it happens, at ordinary scale. NOT a triumph.
+- Normal No: no, plainly. The thing is false / it doesn't happen, at ordinary scale. NOT a disaster.
+- Exceptional Yes: yes, and more than asked for - swing the fiction hard in that direction.
+- Exceptional No: no, and worse than asked for - swing the fiction hard the other way.
+
+Read the result literally. "Normal Yes" is not a quiet Exceptional Yes; narrate it as the ordinary answer it is and save the big swings for the exceptional results.
 
 May also trigger a Random Event (check the result).`,
     parameters: {

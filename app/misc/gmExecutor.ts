@@ -88,6 +88,7 @@ import {
 } from "./semanticSearchFallback";
 import {
   askFate,
+  FateAnswer,
   generateElement,
   generateEventFocus,
   generateEventMeaning,
@@ -348,7 +349,7 @@ export interface GMFateQuestionResult {
   likelihood: string;
   chaosFactor: number;
   roll: number;
-  answer: "Exceptional Yes" | "Yes" | "No" | "Exceptional No";
+  answer: FateAnswer;
   randomEvent: boolean;
   reason?: string;
 }
@@ -2739,11 +2740,7 @@ function executeFateQuestion(
       likelihood,
       chaosFactor,
       roll: fateResult.roll,
-      answer: fateResult.answer as
-        | "Exceptional Yes"
-        | "Yes"
-        | "No"
-        | "Exceptional No",
+      answer: fateResult.answer,
       randomEvent: fateResult.randomEvent,
       reason: params.reason,
     } as GMFateQuestionResult,
