@@ -335,7 +335,6 @@ function resolveModelConfig(
       maxOutputTokens: customModel.maxOutputTokens,
       provider: "openrouter",
       supportsToolCalling: true,
-      cost: 0,
       inputPrice: customModel.inputPrice || 0,
       outputPrice: customModel.outputPrice || 0,
       finetunes: [],

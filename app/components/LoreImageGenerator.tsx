@@ -44,47 +44,28 @@ export function saveImageGenSettings(
   localStorage.setItem(STORAGE_KEY_MODEL, model);
 }
 
-// Helper to get model cost for display
+/**
+ * Per-image price for display. Both providers are BYOK, so this is what the
+ * user's own key gets billed - free models show as FREE.
+ */
 export function getImageModelCost(
   provider: "deepinfra" | "openrouter",
   model: string,
-): { cost: number; isByok: boolean; display: string; dollarCost: number } {
-  if (provider === "deepinfra") {
-    const config =
-      DEEPINFRA_IMAGE_MODELS[model as keyof typeof DEEPINFRA_IMAGE_MODELS];
-    if (config) {
-      return {
-        cost: config.cost,
-        isByok: false,
-        display: config.cost === 0 ? "FREE" : `${config.cost} coins`,
-        dollarCost: 0,
-      };
-    }
-  } else {
-    const config =
-      OPENROUTER_IMAGE_MODELS[model as keyof typeof OPENROUTER_IMAGE_MODELS];
-    if (config) {
-      const isFlat = config.inputPrice === 0 && config.outputPrice === 0;
-      // Get actual dollar cost per image for flat-rate models
-      let dollarCost = 0;
-      let displayCost = "varies";
-      if (isFlat) {
-        if (model.includes("Flux 2 Pro")) {
-          dollarCost = 0.03;
-          displayCost = "~$0.030";
-        } else if (model.includes("Flux 2 Flex")) {
-          dollarCost = 0.015;
-          displayCost = "~$0.015";
-        }
-      } else {
-        // Token-based models - estimate ~$0.01-0.30 per image depending on model
-        dollarCost = (config.inputPrice / 1000) * 500; // Rough estimate: 500 input tokens
-        displayCost = `~$${(config.inputPrice || 0).toFixed(3)}`;
-      }
-      return { cost: 0, isByok: true, display: displayCost, dollarCost };
-    }
-  }
-  return { cost: 0, isByok: false, display: "unknown", dollarCost: 0 };
+): { display: string; dollarCost: number } {
+  const config =
+    provider === "deepinfra"
+      ? DEEPINFRA_IMAGE_MODELS[model as keyof typeof DEEPINFRA_IMAGE_MODELS]
+      : OPENROUTER_IMAGE_MODELS[model as keyof typeof OPENROUTER_IMAGE_MODELS];
+  if (!config) return { display: "unknown", dollarCost: 0 };
+  return {
+    display: formatImagePrice(config.pricePerImage),
+    dollarCost: config.pricePerImage,
+  };
+}
+
+/** "FREE" or a per-image dollar estimate. */
+export function formatImagePrice(pricePerImage: number): string {
+  return pricePerImage === 0 ? "FREE" : `~$${pricePerImage.toFixed(3)}`;
 }
 
 interface LoreImageGeneratorProps {
@@ -293,8 +274,8 @@ export default function LoreImageGenerator({
               }
               className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white"
             >
-              <option value="deepinfra">DeepInfra (Coins)</option>
-              <option value="openrouter">OpenRouter (BYOK)</option>
+              <option value="deepinfra">DeepInfra</option>
+              <option value="openrouter">OpenRouter</option>
             </select>
 
             <select
@@ -302,35 +283,15 @@ export default function LoreImageGenerator({
               onChange={(e) => handleModelChange(e.target.value)}
               className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white"
             >
-              {imageProvider === "deepinfra"
-                ? Object.entries(DEEPINFRA_IMAGE_MODELS).map(
-                    ([key, config]) => (
-                      <option key={key} value={key}>
-                        {key} (
-                        {config.cost === 0 ? "FREE" : `${config.cost} coins`})
-                      </option>
-                    ),
-                  )
-                : Object.entries(OPENROUTER_IMAGE_MODELS).map(
-                    ([key, config]) => {
-                      // For flat-rate models (Flux), show per-image cost
-                      // For token-based models, show approximate cost
-                      const isFlat =
-                        config.inputPrice === 0 && config.outputPrice === 0;
-                      const displayCost = isFlat
-                        ? key.includes("Flux 2 Pro")
-                          ? "~$0.030"
-                          : key.includes("Flux 2 Flex")
-                            ? "~$0.015"
-                            : "varies"
-                        : `~$${(config.inputPrice || 0).toFixed(3)}`;
-                      return (
-                        <option key={key} value={key}>
-                          {key} ({displayCost})
-                        </option>
-                      );
-                    },
-                  )}
+              {Object.entries(
+                imageProvider === "deepinfra"
+                  ? DEEPINFRA_IMAGE_MODELS
+                  : OPENROUTER_IMAGE_MODELS,
+              ).map(([key, config]) => (
+                <option key={key} value={key}>
+                  {key} ({formatImagePrice(config.pricePerImage)})
+                </option>
+              ))}
             </select>
           </div>
         </div>

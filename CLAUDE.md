@@ -43,10 +43,10 @@ separate typecheck script; use `npx tsc --noEmit` if you need one. Node LTS >=
 18.
 
 Required env vars for a working `.env.local` are listed in
-`docs/getting-started.md`; the important ones: `DEEPSEEK_API_KEY` or
-`OPENROUTER_API_KEY` (BYOK story generation), `MISTRAL_API_KEY` /
-`DEEPINFRA_API_KEY` (server-side "Coins" mode + TTS/STT), and the Supabase
-quartet (`NEXT_PUBLIC_SUPABASE_URL`/`KEY`, `SUPABASE_URL`/`KEY`,
+`docs/getting-started.md`, but AI generation itself needs none of them —
+provider keys are BYOK and live in the browser (Settings → API keys). The
+server-side vars that still matter are the Supabase quartet
+(`NEXT_PUBLIC_SUPABASE_URL`/`KEY`, `SUPABASE_URL`/`KEY`,
 `SUPABASE_SERVICE_ROLE_KEY`).
 
 ## Architecture
@@ -184,7 +184,13 @@ The pieces:
   forced `alwaysOn`, because the GM can't run the game if the rules are only
   keyword-triggered.
 - `useDesignerSession.ts` — the bounded tool loop (max 5 rounds/turn), the
-  chat transcript, and IndexedDB save.
+  chat transcript, IndexedDB save, and `importFromLibrary()`, which merges
+  notes/tables picked from the global notes library (`LibraryPickerModal`,
+  shared with story start and the in-game lore editor) into the draft. Imports
+  dedupe on `libraryNoteId`/`libraryTableId` so re-importing updates in place;
+  the Designer learns about imported material through `summarizeDraft()`, not
+  through the transcript. The creator offers this on opening a blank adventure
+  and from the header's Import button at any time.
 - `AdventureInspector.tsx` — hand editing. The AI's tools and the inspector
   write to the same draft, and `summarizeDraft()` re-injects live state into
   the system prompt each turn, so the Designer sees the author's manual edits
@@ -233,18 +239,26 @@ work in any of these layers — it tracks what's already been tried/reverted and
 why (e.g. `activate_downside` was reverted for depending on soft-deprecated
 `Ability` data).
 
-### Auth, tokens ("Coins"), and BYOK
+### Auth and BYOK (Coins are gone)
 
 - Supabase Auth; `app/misc/AuthContext.tsx` (`useAuth()`), `app/misc/auth.ts`.
-- Two ways to pay for AI generation: **BYOK** (user supplies their own
-  OpenRouter/DeepSeek key, no coin cost, gated to paid subscribers via
-  `hasByokAccess` — currently force-`true` for everyone since Stripe purchase
-  flows were removed) and **Coins** (server-side key for Mistral/DeepInfra
-  models, deducted via `app/misc/tokens.ts`, 2.5x markup via
-  `MARKUP_MULTIPLIER`).
+- **AI generation is BYOK, always.** The user supplies their own key for every
+  provider (OpenRouter, DeepSeek, Google, Mistral, DeepInfra, plus the TTS/STT
+  providers), stored in localStorage and read via `useAPIKeys()`
+  (`APIKeysContext.tsx`). Clients forward all five provider keys on every
+  `/api/generate`(`-stream`) call and the proxy picks the one the model's
+  provider needs. `getAvailableModels()` in `ai_prices.ts` is the shared
+  "which models can this user actually call" helper — a model is offered when
+  its provider's key is saved, optionally filtered to tool-calling models.
+- **Coins are fully removed.** There is no coin ledger, no server-side
+  provider key, no markup: `app/misc/tokens.ts`, `/api/tokens`,
+  `/api/subscriptions`, `MARKUP_MULTIPLIER`/`COINS_PER_DOLLAR`, the coin cost
+  helpers and `MODEL_PRESETS` are all gone, and Mistral/DeepInfra are ordinary
+  BYOK providers like the rest. Cost figures shown in the UI (`turnCost.ts`,
+  `TurnCostPanel.tsx`, the image-model pickers) are real dollar estimates
+  against the user's own key. Don't reintroduce a coin/credit concept.
 - **Stripe purchasing is removed** (checkout/webhook/portal routes and their
-  UI are gone) — only the free tier is reachable in practice; the coin ledger
-  itself is still live and still deducts per generation call.
+  UI are gone) — there is nothing to buy.
 - Two DB-level auth patterns: user-context calls use
   `NEXT_PUBLIC_SUPABASE_URL/KEY` + RLS + a validated `Authorization: Bearer
   <token>` header (`authenticatedFetch()` in `app/misc/getAuthToken.ts`);

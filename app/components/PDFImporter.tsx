@@ -3623,7 +3623,7 @@ export default function PDFImporter({
                         </div>
                         <div className="flex items-center gap-2 px-1 pt-1 text-xs text-amber-200/70 border-t border-white/5">
                           <span className="shrink-0 text-amber-300/80">
-                            <DynamicIcon name="Coins" className="w-3.5 h-3.5" />
+                            <DynamicIcon name="Receipt" className="w-3.5 h-3.5" />
                           </span>
                           <span>
                             ~{pageCount} pages · about $

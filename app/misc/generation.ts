@@ -231,7 +231,7 @@ export interface GenerationOptions {
   // the Director Assistant's increment_scene gate to a roll/tool call that
   // genuinely happened - they'd just never have anything to look at.
   precomputedGMResults?: GMToolResult[];
-  // Sampling settings (for story stage only, Coins mode)
+  // Sampling settings (story stage only; Mistral/DeepInfra/OpenRouter)
   samplingSettings?: SamplingSettings;
   // Role Affirmation (prefill) - primes model to follow output constraints
   usePrefill?: boolean; // Default: true
@@ -2924,7 +2924,7 @@ async function generateStoryTurnOnce(
         stop: ["[GAME MASTER State Update]", "[GAME MASTER State", "[STOP]"],
       };
 
-      // Add sampling settings for Coins mode (Mistral/DeepInfra)
+      // Add sampling settings (Mistral/DeepInfra/OpenRouter accept them)
       if (options.samplingSettings) {
         storyRequestBody.samplingSettings = options.samplingSettings;
       }

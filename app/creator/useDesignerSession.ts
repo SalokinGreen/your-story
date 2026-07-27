@@ -25,9 +25,28 @@ import {
   getLocalAdventure,
   saveLocalAdventure,
 } from "@/app/misc/localAdventureManager";
+import {
+  LibraryNote,
+  libraryNoteToStoryLore,
+} from "@/app/misc/localNotesLibraryManager";
+import {
+  LibraryTable,
+  libraryTableToCustomTable,
+} from "@/app/misc/localTablesLibraryManager";
+import { APIKeys } from "@/app/misc/APIKeysContext";
+import { getCustomModelIfUUID } from "@/app/misc/user_settings";
+import { getRequiredKeyForModel } from "@/app/misc/ai_prices";
 
 /** A turn can trigger several rounds of tool calls before the model settles. */
 const MAX_TOOL_ROUNDS = 5;
+/** Provider names for the "you need a key" message. */
+const PROVIDER_LABELS: Record<string, string> = {
+  openRouterKey: "OpenRouter",
+  deepseekKey: "DeepSeek",
+  googleKey: "Google",
+  mistralKey: "Mistral",
+  deepinfraKey: "DeepInfra",
+};
 /** How much conversation to replay. Draft state is injected separately. */
 const HISTORY_LIMIT = 24;
 
@@ -80,8 +99,7 @@ export interface UseDesignerSessionOptions {
   adventureId?: string;
   model: string;
   maxOutputTokens: number;
-  byokMode: boolean;
-  apiKeys: { openRouterKey: string; deepseekKey: string; googleKey: string };
+  apiKeys: APIKeys;
   onError?: (message: string) => void;
 }
 
@@ -89,7 +107,6 @@ export function useDesignerSession({
   adventureId,
   model,
   maxOutputTokens,
-  byokMode,
   apiKeys,
   onError,
 }: UseDesignerSessionOptions) {
@@ -161,6 +178,85 @@ export function useDesignerSession({
     [],
   );
 
+  /**
+   * Pull saved notes and tables out of the global library into the draft.
+   *
+   * Notes keep their `libraryNoteId`, which is also what dedupes them: bringing
+   * the same note in twice updates the copy that's already here instead of
+   * stacking duplicates the Designer would then see as two conflicting notes.
+   * Mechanics and character-sheet notes arrive pinned on (libraryNoteToStoryLore
+   * handles that), matching what the Designer's own tools do.
+   */
+  const importFromLibrary = useCallback(
+    (notes: LibraryNote[], tables: LibraryTable[]) => {
+      if (notes.length === 0 && tables.length === 0) return;
+
+      const incomingLore = notes.map(libraryNoteToStoryLore);
+      const incomingTables = tables.map(libraryTableToCustomTable);
+
+      const current = draftRef.current;
+      const lore = [...current.lore];
+      for (const note of incomingLore) {
+        const index = lore.findIndex(
+          (l) =>
+            (note.libraryNoteId && l.libraryNoteId === note.libraryNoteId) ||
+            l.title.trim().toLowerCase() === note.title.trim().toLowerCase(),
+        );
+        if (index >= 0) lore[index] = { ...lore[index], ...note };
+        else lore.push(note);
+      }
+
+      const customTables = [...current.customTables];
+      for (const table of incomingTables) {
+        const index = customTables.findIndex(
+          (t) =>
+            (table.libraryTableId &&
+              t.libraryTableId === table.libraryTableId) ||
+            t.name.trim().toLowerCase() === table.name.trim().toLowerCase(),
+        );
+        if (index >= 0)
+          customTables[index] = { ...customTables[index], ...table };
+        else customTables.push(table);
+      }
+
+      // The tool loop reads draftRef synchronously, so keep it in step with
+      // the state update rather than waiting for the mirroring effect.
+      const next = { ...current, lore, customTables };
+      draftRef.current = next;
+      setDraft(next);
+      setDirty(true);
+
+      // Record the import in the transcript. The Designer reads the draft
+      // summary rather than this message, but the author should see what
+      // landed and what it means for the adventure.
+      const parts: string[] = [];
+      if (incomingLore.length > 0) {
+        parts.push(
+          `${incomingLore.length} note${incomingLore.length === 1 ? "" : "s"}`,
+        );
+      }
+      if (incomingTables.length > 0) {
+        parts.push(
+          `${incomingTables.length} table${incomingTables.length === 1 ? "" : "s"}`,
+        );
+      }
+      const titles = [
+        ...incomingLore.map((l) => l.title),
+        ...incomingTables.map((t) => t.name),
+      ];
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: newMessageId(),
+          role: "assistant",
+          content: `Brought in ${parts.join(" and ")} from your library. Tell me what you want built around this material — or ask me what it still needs.`,
+          changes: titles,
+        },
+      ]);
+    },
+    [],
+  );
+
   const stop = useCallback(() => {
     abortRef.current?.abort();
     abortRef.current = null;
@@ -172,8 +268,23 @@ export function useDesignerSession({
       const trimmed = text.trim();
       if (!trimmed || loading) return;
 
-      if (byokMode && !apiKeys.openRouterKey && !apiKeys.deepseekKey && !apiKeys.googleKey) {
-        onError?.("Add an API key in Settings to use your own key.");
+      // Every provider is BYOK, so a turn is only possible with the key for
+      // the selected model's provider. Custom models are always OpenRouter.
+      // No model at all means no provider key is saved yet.
+      if (!model) {
+        onError?.(
+          "The Designer runs on your own API key — add one in Settings to start.",
+        );
+        return;
+      }
+      const customModel = getCustomModelIfUUID(model);
+      const requiredKey = customModel
+        ? ("openRouterKey" as const)
+        : getRequiredKeyForModel(model);
+      if (requiredKey && !apiKeys[requiredKey]) {
+        onError?.(
+          `That model needs your ${PROVIDER_LABELS[requiredKey]} API key — add one in Settings.`,
+        );
         return;
       }
 
@@ -218,9 +329,12 @@ export function useDesignerSession({
               model,
               maxTokens: maxOutputTokens,
               temperature: 0.8,
-              openRouterKey: byokMode ? apiKeys.openRouterKey : undefined,
-              deepseekKey: byokMode ? apiKeys.deepseekKey : undefined,
-              googleKey: byokMode ? apiKeys.googleKey : undefined,
+              openRouterKey: apiKeys.openRouterKey,
+              deepseekKey: apiKeys.deepseekKey,
+              googleKey: apiKeys.googleKey,
+              mistralKey: apiKeys.mistralKey,
+              deepinfraKey: apiKeys.deepinfraKey,
+              customModel,
             }),
             signal: controller.signal,
           });
@@ -308,16 +422,7 @@ export function useDesignerSession({
         ),
       );
     },
-    [
-      loading,
-      model,
-      maxOutputTokens,
-      byokMode,
-      apiKeys.openRouterKey,
-      apiKeys.deepseekKey,
-      apiKeys.googleKey,
-      onError,
-    ],
+    [loading, model, maxOutputTokens, apiKeys, onError],
   );
 
   const save = useCallback(async (): Promise<string | undefined> => {
@@ -343,6 +448,7 @@ export function useDesignerSession({
   return {
     draft,
     updateDraft,
+    importFromLibrary,
     messages,
     loading,
     loadingAdventure,

@@ -815,10 +815,13 @@ export default function AIConfigTab() {
         </p>
       </div>
 
-      {/* Sampling Settings - all reasoning tiers are Mistral/DeepInfra (Coins mode) */}
+      {/* Sampling Settings - only some providers accept these parameters */}
       <SamplingSettingsTab
-        byokMode={false}
-        hasOpenRouterKey={hasKey("openRouterKey")}
+        hasSamplingCapableKey={
+          hasKey("openRouterKey") ||
+          hasKey("mistralKey") ||
+          hasKey("deepinfraKey")
+        }
       />
 
       {/* Tool Calling Settings */}
@@ -963,8 +966,8 @@ export default function AIConfigTab() {
             <DynamicIcon name="Info" className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span>
               When enabled, uses Mistral embeddings to semantically search lore
-              and memories for more relevant context. Cost: ~0.5 coins per 100
-              turns.
+              and memories for more relevant context. Billed to your own
+              Mistral key - a fraction of a cent per hundred turns.
             </span>
           </p>
         </div>

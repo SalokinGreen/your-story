@@ -42,7 +42,7 @@
  * Prices come from AI_MODELS (ai_prices.ts) and are raw provider dollars -
  * NOT coins. Every provider is BYOK now (see reasoningTiers.ts), so what the
  * player wants to know is what their own OpenRouter/DeepSeek/Mistral bill
- * goes up by, with no MARKUP_MULTIPLIER in the way.
+ * goes up by, with no markup in the way.
  */
 
 import { AI_MODELS, AIModelKey } from "@/app/misc/ai_prices";

@@ -814,7 +814,7 @@ export default function APIKeysModal({ isOpen, onClose }: APIKeysModalProps) {
                       Enable Speech Input
                     </p>
                     <p className="text-xs text-blue-300/60">
-                      Show microphone button for voice input (2 coins per use)
+                      Show microphone button for voice input (billed to your Mistral key)
                     </p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
