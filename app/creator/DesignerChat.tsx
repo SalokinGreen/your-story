@@ -18,6 +18,8 @@ interface DesignerChatProps {
   onStop: () => void;
   /** Show starter prompts only while the adventure is still blank. */
   showSuggestions: boolean;
+  /** Opens the notes-library picker. */
+  onImport: () => void;
 }
 
 export default function DesignerChat({
@@ -26,6 +28,7 @@ export default function DesignerChat({
   onSend,
   onStop,
   showSuggestions,
+  onImport,
 }: DesignerChatProps) {
   const [input, setInput] = useState("");
   const endRef = useRef<HTMLDivElement>(null);
@@ -112,16 +115,39 @@ export default function DesignerChat({
         )}
 
         {showSuggestions && messages.length <= 1 && !loading && (
-          <div className="flex flex-wrap gap-2 pt-2 pl-10">
-            {DESIGNER_SUGGESTIONS.map((suggestion) => (
-              <button
-                key={suggestion}
-                onClick={() => submit(suggestion)}
-                className="px-3 py-1.5 rounded-full border border-white/12 text-xs text-white/60 hover:text-white hover:border-purple-400/50 hover:bg-purple-500/10 transition-colors"
-              >
-                {suggestion}
-              </button>
-            ))}
+          <div className="pt-2 pl-10 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {DESIGNER_SUGGESTIONS.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  onClick={() => submit(suggestion)}
+                  className="px-3 py-1.5 rounded-full border border-white/12 text-xs text-white/60 hover:text-white hover:border-purple-400/50 hover:bg-purple-500/10 transition-colors"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+
+            {/* Authors who imported a rulebook or wrote notes elsewhere start
+                from that material rather than from a blank premise. */}
+            <button
+              onClick={onImport}
+              className="w-full text-left px-3 py-2.5 rounded-xl border border-white/12 hover:border-purple-400/50 hover:bg-purple-500/10 transition-colors flex items-center gap-2.5"
+            >
+              <DynamicIcon
+                name="Library"
+                className="w-4 h-4 text-purple-300 shrink-0"
+              />
+              <span className="min-w-0">
+                <span className="block text-xs text-white/75">
+                  Already have notes? Import them
+                </span>
+                <span className="block text-[11px] text-white/40">
+                  Pull rules, lore, character sheets or tables out of your notes
+                  library and build from those.
+                </span>
+              </span>
+            </button>
           </div>
         )}
 

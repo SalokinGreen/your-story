@@ -386,38 +386,46 @@ export default function TermsOfService() {
             </div>
           </section>
 
-          {/* Tokens & Purchases */}
+          {/* AI Provider Keys */}
           <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
             <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Coins" className="w-5 h-5 text-yellow-400" />
-              Tokens & Purchases
+              <DynamicIcon name="KeyRound" className="w-5 h-5 text-yellow-400" />
+              AI Provider Keys
             </h2>
             <div className="space-y-3 text-sm">
-              <p>Regarding in-app purchases and tokens:</p>
+              <p>
+                Your Story has no in-app purchases and no credit balance. All AI
+                generation runs on API keys you supply yourself:
+              </p>
               <ul className="space-y-2">
                 <li className="flex items-start gap-2">
                   <span className="text-blue-400 shrink-0">•</span>
                   <span className="flex-1 min-w-0">
-                    Token purchases are final and non-refundable
+                    You bring your own keys (OpenRouter, DeepSeek, Google,
+                    Mistral, DeepInfra, and the TTS/STT providers) and are
+                    billed directly by those providers
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-blue-400 shrink-0">•</span>
                   <span className="flex-1 min-w-0">
-                    Tokens have no real-world cash value and cannot be exchanged
-                    for money
+                    Your keys are stored in your browser and are sent only to
+                    the provider the request is going to
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-blue-400 shrink-0">•</span>
                   <span className="flex-1 min-w-0">
-                    We reserve the right to modify token pricing and packages
+                    We don&apos;t control provider pricing, rate limits, or
+                    availability, and can&apos;t refund what a provider charges
+                    you
                   </span>
                 </li>
                 <li className="flex items-start gap-2">
                   <span className="text-blue-400 shrink-0">•</span>
                   <span className="flex-1 min-w-0">
-                    Banned accounts forfeit any remaining tokens
+                    Cost figures shown in the app are estimates from published
+                    provider prices, not a bill
                   </span>
                 </li>
               </ul>

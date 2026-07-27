@@ -89,13 +89,16 @@ function SliderControl({
 }
 
 interface SamplingSettingsTabProps {
-  byokMode: boolean;
-  hasOpenRouterKey?: boolean;
+  /**
+   * Whether the user has a key for a provider that accepts sampling
+   * parameters (Mistral, DeepInfra, OpenRouter). DeepSeek and Google ignore
+   * them, so with only those keys there's nothing to tune.
+   */
+  hasSamplingCapableKey?: boolean;
 }
 
 export default function SamplingSettingsTab({
-  byokMode,
-  hasOpenRouterKey = false,
+  hasSamplingCapableKey = false,
 }: SamplingSettingsTabProps) {
   const { addNotification } = useNotification();
 
@@ -228,17 +231,17 @@ export default function SamplingSettingsTab({
     allPresets.find((p) => p.id === currentPresetId) ||
     BUILT_IN_SAMPLING_PRESETS[0];
 
-  // Only show for Coins mode (DeepInfra/Mistral) or OpenRouter BYOK
-  // Hide only for DeepSeek-only BYOK mode
-  if (byokMode && !hasOpenRouterKey) {
+  // Only Mistral, DeepInfra and OpenRouter accept these parameters - DeepSeek
+  // and Google use their own defaults regardless of what's set here.
+  if (!hasSamplingCapableKey) {
     return (
       <div className="p-4 bg-white/[0.03] backdrop-blur-md border border-white/10 rounded-lg">
         <div className="flex items-center gap-2 text-blue-300/60">
           <DynamicIcon name="Info" className="w-4 h-4" />
           <p className="text-sm">
-            Sampling settings are available for Coins mode models
-            (DeepInfra/Mistral) or when using OpenRouter. DeepSeek uses default
-            sampling.
+            Sampling settings apply to Mistral, DeepInfra and OpenRouter models.
+            Add one of those API keys in Settings to tune them - DeepSeek and
+            Google use their own default sampling.
           </p>
         </div>
       </div>

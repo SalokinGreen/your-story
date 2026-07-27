@@ -8,14 +8,18 @@
  * game designer, with a live inspector beside it for hand edits.
  */
 
-import { Suspense, useCallback, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
+import APIKeysModal from "@/app/components/APIKeysModal";
+import LibraryPickerModal from "@/app/components/LibraryPickerModal";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
 import { useNotification } from "@/app/misc/NotificationContext";
-import { AI_MODELS } from "@/app/misc/ai_prices";
-import { CustomModel } from "@/app/misc/user_settings";
+import { getAvailableModels } from "@/app/misc/ai_prices";
+import { CustomModel, getCustomModels } from "@/app/misc/user_settings";
+import { LibraryNote } from "@/app/misc/localNotesLibraryManager";
+import { LibraryTable } from "@/app/misc/localTablesLibraryManager";
 import { startAdventureLocally } from "@/app/misc/localStoryManager";
 import { draftToAdventure } from "@/app/misc/designer_executor";
 import AdventureInspector from "./AdventureInspector";
@@ -24,60 +28,71 @@ import { useDesignerSession } from "./useDesignerSession";
 
 type MobilePane = "chat" | "adventure";
 
+const DEFAULT_MAX_OUTPUT = 8000;
+
 function CreatorPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { keys: apiKeys, hasKey } = useAPIKeys();
+  const { keys: apiKeys } = useAPIKeys();
   const { addNotification } = useNotification();
 
   const editId = searchParams.get("edit") || undefined;
 
   const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
   const [showSettings, setShowSettings] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const [showAPIKeys, setShowAPIKeys] = useState(false);
 
-  const [byokMode, setByokMode] = useState(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("designerByokMode") === "true";
-  });
-  const [model, setModel] = useState(() => {
-    if (typeof window === "undefined") return "DeepInfra DeepSeek V3.2";
-    return localStorage.getItem("designerModel") || "DeepInfra DeepSeek V3.2";
-  });
-  const [maxOutputTokens, setMaxOutputTokens] = useState(() => {
-    if (typeof window === "undefined") return 8000;
-    const stored = localStorage.getItem("designerMaxOutput");
-    return stored ? parseInt(stored, 10) : 8000;
-  });
+  // Persisted settings are read after mount - reading localStorage while
+  // rendering would make the server and client markup disagree.
+  const [model, setModel] = useState("");
+  const [maxOutputTokens, setMaxOutputTokens] = useState(DEFAULT_MAX_OUTPUT);
+  const [customModels, setCustomModels] = useState<CustomModel[]>([]);
 
-  const customModels: CustomModel[] = useMemo(() => {
-    if (typeof window === "undefined") return [];
-    try {
-      const stored = localStorage.getItem("customModels");
-      return stored ? JSON.parse(stored) : [];
-    } catch {
-      return [];
+  useEffect(() => {
+    const stored = {
+      customModels: getCustomModels(),
+      model: localStorage.getItem("designerModel") || "",
+      maxOutput: parseInt(
+        localStorage.getItem("designerMaxOutput") || "",
+        10,
+      ),
+    };
+    setCustomModels(stored.customModels);
+    setModel(stored.model);
+    if (Number.isFinite(stored.maxOutput)) {
+      setMaxOutputTokens(stored.maxOutput);
     }
   }, []);
 
-  // BYOK reaches OpenRouter/DeepSeek/Google; Coins covers the server-side keys.
+  // Everything is BYOK: a model is offered when its provider's key is saved.
+  // The Designer works entirely through tool calls, so models that can't call
+  // tools would produce a chat that never writes into the adventure.
   const availableModels = useMemo(() => {
-    const builtIn = Object.entries(AI_MODELS).filter(([, m]) => {
-      const provider = (m as { provider?: string }).provider;
-      return byokMode
-        ? provider === "openrouter" ||
-            provider === "deepseek" ||
-            provider === "google"
-        : provider === "mistral" || provider === "deepinfra";
-    });
-    const entries: [string, { name: string }][] = builtIn.map(([key, m]) => [
-      key,
-      { name: (m as { name: string }).name },
-    ]);
-    if (byokMode) {
-      customModels.forEach((m) => entries.push([m.id, { name: `⭐ ${m.name}` }]));
+    const entries: [string, string][] = getAvailableModels(
+      {
+        openRouterKey: !!apiKeys.openRouterKey,
+        deepseekKey: !!apiKeys.deepseekKey,
+        googleKey: !!apiKeys.googleKey,
+        mistralKey: !!apiKeys.mistralKey,
+        deepinfraKey: !!apiKeys.deepinfraKey,
+      },
+      { requireToolCalling: true },
+    ).map(([key, config]) => [key, config.name]);
+    // Custom models are OpenRouter-only.
+    if (apiKeys.openRouterKey) {
+      customModels.forEach((m) => entries.push([m.id, `⭐ ${m.name}`]));
     }
     return entries;
-  }, [byokMode, customModels]);
+  }, [apiKeys, customModels]);
+
+  const hasAnyKey = availableModels.length > 0;
+  // Fall back to the first usable model when nothing is stored, or when the
+  // stored one belongs to a provider whose key has since been removed.
+  const activeModel =
+    model && availableModels.some(([key]) => key === model)
+      ? model
+      : (availableModels[0]?.[0] ?? "");
 
   const persistSetting = (key: string, value: string) => {
     if (typeof window !== "undefined") localStorage.setItem(key, value);
@@ -90,14 +105,21 @@ function CreatorPage() {
 
   const session = useDesignerSession({
     adventureId: editId,
-    model,
+    model: activeModel,
     maxOutputTokens,
-    byokMode,
     apiKeys,
     onError: handleError,
   });
 
-  const { draft, updateDraft, messages, loading, save, dirty } = session;
+  const {
+    draft,
+    updateDraft,
+    importFromLibrary,
+    messages,
+    loading,
+    save,
+    dirty,
+  } = session;
 
   const handleSave = async () => {
     const id = await save();
@@ -123,8 +145,19 @@ function CreatorPage() {
   };
 
   const isBlank = !draft.title && !draft.premise && draft.lore.length === 0;
-  const hasBYOKKey =
-    hasKey("openRouterKey") || hasKey("deepseekKey") || hasKey("googleKey");
+
+  const handleImport = useCallback(
+    (notes: LibraryNote[], tables: LibraryTable[]) => {
+      importFromLibrary(notes, tables);
+      setShowImport(false);
+      const count = notes.length + tables.length;
+      addNotification(
+        `Imported ${count} item${count === 1 ? "" : "s"} from your library`,
+        "success",
+      );
+    },
+    [importFromLibrary, addNotification],
+  );
 
   if (session.loadingAdventure) {
     return (
@@ -166,6 +199,13 @@ function CreatorPage() {
           </div>
 
           <button
+            onClick={() => setShowImport(true)}
+            className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors shrink-0"
+            title="Import notes and tables from your library"
+          >
+            <DynamicIcon name="Import" className="w-4 h-4" />
+          </button>
+          <button
             onClick={() => setShowSettings((v) => !v)}
             className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors shrink-0"
             title="Model settings"
@@ -191,44 +231,24 @@ function CreatorPage() {
         {showSettings && (
           <div className="px-4 py-3 border-t border-white/10 bg-black/30 space-y-3">
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex rounded-lg overflow-hidden border border-white/10">
-                <button
-                  onClick={() => {
-                    setByokMode(false);
-                    persistSetting("designerByokMode", "false");
-                  }}
-                  className={`px-3 py-1.5 text-xs transition-colors ${
-                    !byokMode ? "bg-purple-600 text-white" : "text-white/50"
-                  }`}
-                >
-                  Coins
-                </button>
-                <button
-                  onClick={() => {
-                    setByokMode(true);
-                    persistSetting("designerByokMode", "true");
-                  }}
-                  className={`px-3 py-1.5 text-xs transition-colors ${
-                    byokMode ? "bg-purple-600 text-white" : "text-white/50"
-                  }`}
-                >
-                  My API key
-                </button>
-              </div>
-
               <select
-                value={model}
+                value={activeModel}
                 onChange={(e) => {
                   setModel(e.target.value);
                   persistSetting("designerModel", e.target.value);
                 }}
-                className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-400/50"
+                disabled={!hasAnyKey}
+                className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-400/50 disabled:opacity-50"
               >
-                {availableModels.map(([key, m]) => (
-                  <option key={key} value={key}>
-                    {m.name}
-                  </option>
-                ))}
+                {hasAnyKey ? (
+                  availableModels.map(([key, name]) => (
+                    <option key={key} value={key}>
+                      {name}
+                    </option>
+                  ))
+                ) : (
+                  <option value="">No models available</option>
+                )}
               </select>
 
               <label className="flex items-center gap-2 text-xs text-white/50">
@@ -251,9 +271,17 @@ function CreatorPage() {
                 </span>
               </label>
             </div>
-            {byokMode && !hasBYOKKey && (
+            {!hasAnyKey && (
               <p className="text-xs text-amber-300/80">
-                No API key saved yet — add one in Settings to use your own key.
+                No API key saved yet — the Designer runs on your own provider
+                key.{" "}
+                <button
+                  onClick={() => setShowAPIKeys(true)}
+                  className="underline hover:text-amber-200"
+                >
+                  Add one now
+                </button>
+                .
               </p>
             )}
           </div>
@@ -290,6 +318,7 @@ function CreatorPage() {
             onSend={session.send}
             onStop={session.stop}
             showSuggestions={isBlank}
+            onImport={() => setShowImport(true)}
           />
         </div>
 
@@ -301,6 +330,21 @@ function CreatorPage() {
           <AdventureInspector draft={draft} onChange={updateDraft} />
         </div>
       </div>
+
+      <LibraryPickerModal
+        isOpen={showImport}
+        onClose={() => setShowImport(false)}
+        onImport={handleImport}
+        title="Import into this adventure"
+        description="Bring saved notes, rules, character sheets and random tables into the draft. The Designer builds on top of whatever you import."
+        confirmLabel="Import"
+        includeTables
+      />
+
+      <APIKeysModal
+        isOpen={showAPIKeys}
+        onClose={() => setShowAPIKeys(false)}
+      />
     </div>
   );
 }

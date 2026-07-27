@@ -12,7 +12,6 @@ export const AI_MODELS = {
     description:
       "xAI's frontier model for coding, knowledge work, and STEM. Strong at rules adjudication and tool-heavy turns. Defaults to high reasoning effort; billing doubles above 200k-token prompts.",
     bannerUrl: undefined,
-    cost: 20,
     inputPrice: 2,
     outputPrice: 6,
     finetunes: [],
@@ -26,7 +25,6 @@ export const AI_MODELS = {
     maxOutputTokens: 65000,
     provider: "deepseek",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.14,
     outputPrice: 0.28,
     finetunes: [],
@@ -44,7 +42,6 @@ export const AI_MODELS = {
     maxOutputTokens: 65000,
     provider: "deepseek",
     supportsToolCalling: true,
-    cost: 2,
     inputPrice: 0.435,
     outputPrice: 0.87,
     finetunes: [],
@@ -62,7 +59,6 @@ export const AI_MODELS = {
     maxOutputTokens: 65000,
     provider: "openrouter",
     supportsToolCalling: true,
-    cost: 2,
     inputPrice: 0.25,
     outputPrice: 1.5,
     finetunes: [],
@@ -82,7 +78,6 @@ export const AI_MODELS = {
     maxOutputTokens: 65000,
     provider: "google",
     supportsToolCalling: true,
-    cost: 0,
     inputPrice: 0.15,
     outputPrice: 0.6,
     finetunes: [],
@@ -101,7 +96,6 @@ export const AI_MODELS = {
     maxOutputTokens: 65000,
     provider: "google",
     supportsToolCalling: true,
-    cost: 0,
     inputPrice: 0.075,
     outputPrice: 0.3,
     finetunes: [],
@@ -120,7 +114,6 @@ export const AI_MODELS = {
     maxOutputTokens: 65000,
     provider: "google",
     supportsToolCalling: true,
-    cost: 0,
     inputPrice: 1.25,
     outputPrice: 10.0,
     finetunes: [],
@@ -139,7 +132,6 @@ export const AI_MODELS = {
     maxOutputTokens: 65000,
     provider: "google",
     supportsToolCalling: true,
-    cost: 0,
     inputPrice: 1.25,
     outputPrice: 10.0,
     finetunes: [],
@@ -157,7 +149,6 @@ export const AI_MODELS = {
     maxOutputTokens: 65000,
     provider: "google",
     supportsToolCalling: true,
-    cost: 0,
     inputPrice: 0.5,
     outputPrice: 3,
     finetunes: [],
@@ -173,7 +164,6 @@ export const AI_MODELS = {
     model: "z-ai/glm-5.2",
     maxTokens: 1048576,
     maxOutputTokens: 128000,
-    cost: 10,
     inputPrice: 0.65,
     outputPrice: 2.1,
     provider: "openrouter",
@@ -192,7 +182,6 @@ export const AI_MODELS = {
     model: "moonshotai/kimi-k3",
     maxTokens: 1048576,
     maxOutputTokens: 128000,
-    cost: 40,
     inputPrice: 3,
     outputPrice: 15,
     provider: "openrouter",
@@ -211,7 +200,6 @@ export const AI_MODELS = {
     model: "moonshotai/kimi-k2.6",
     maxTokens: 262144,
     maxOutputTokens: 262144,
-    cost: 15,
     inputPrice: 0.6,
     outputPrice: 3.41,
     provider: "openrouter",
@@ -232,7 +220,6 @@ export const AI_MODELS = {
     maxOutputTokens: 10000,
     provider: "openrouter",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.2,
     outputPrice: 1.5,
     finetunes: [],
@@ -250,7 +237,6 @@ export const AI_MODELS = {
     maxOutputTokens: 131072,
     provider: "openrouter",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.255,
     outputPrice: 1.02,
     finetunes: [],
@@ -268,7 +254,6 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "openrouter",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.06,
     outputPrice: 0.14,
     finetunes: [],
@@ -279,7 +264,7 @@ export const AI_MODELS = {
     bannerUrl: undefined,
   },
   // ============================================
-  // MISTRAL MODELS (Server-side API - Coins)
+  // MISTRAL MODELS (BYOK - user's own Mistral key)
   // ============================================
 
   "Mistral Small 3.2": {
@@ -290,14 +275,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.1,
     outputPrice: 0.3,
     finetunes: [],
     strengths: ["fast", "cost-effective", "tool calling"],
     weaknesses: ["creativity"],
     description:
-      "Mistral's efficient small model. Great for fast responses and tool calling. Uses Coins.",
+      "Mistral's efficient small model. Great for fast responses and tool calling.",
     bannerUrl: undefined,
   },
 
@@ -309,14 +293,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 2,
     inputPrice: 0.4,
     outputPrice: 2.0,
     finetunes: [],
     strengths: ["creativity", "storytelling", "multimodal"],
     weaknesses: ["price"],
     description:
-      "Mistral's frontier-class model with excellent creative writing capabilities. Uses Coins.",
+      "Mistral's frontier-class model with excellent creative writing capabilities.",
     bannerUrl: undefined,
   },
 
@@ -328,14 +311,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.15,
     outputPrice: 0.15,
     finetunes: [],
     strengths: ["extremely cost-effective", "multilingual"],
     weaknesses: ["creativity", "complex reasoning"],
     description:
-      "Mistral's budget-friendly open source model. Great for basic tasks at minimal cost. Uses Coins.",
+      "Mistral's budget-friendly open source model. Great for basic tasks at minimal cost.",
     bannerUrl: undefined,
   },
 
@@ -347,14 +329,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.04,
     outputPrice: 0.04,
     finetunes: [],
     strengths: ["ultra cost-effective", "fast", "edge model"],
     weaknesses: ["creativity", "complex reasoning"],
     description:
-      "Mistral's tiny edge model. Ultra-cheap for simple tasks like choices generation. Uses Coins.",
+      "Mistral's tiny edge model. Ultra-cheap for simple tasks like choices generation.",
     bannerUrl: undefined,
   },
   "Ministral 8B": {
@@ -365,14 +346,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.15,
     outputPrice: 0.15,
     finetunes: [],
     strengths: ["ultra cost-effective", "fast", "edge model"],
     weaknesses: ["creativity", "complex reasoning"],
     description:
-      "Mistral's tiny edge model. Ultra-cheap for simple tasks like choices generation. Uses Coins.",
+      "Mistral's tiny edge model. Ultra-cheap for simple tasks like choices generation.",
     bannerUrl: undefined,
   },
   "Magistral Medium 1.2": {
@@ -383,14 +363,13 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 3,
     inputPrice: 2,
     outputPrice: 5,
     finetunes: [],
     strengths: ["creative", "powerful", "tool calling"],
     weaknesses: ["price"],
     description:
-      "Mistral's powerful medium model with enhanced creativity and tool calling. Uses Coins.",
+      "Mistral's powerful medium model with enhanced creativity and tool calling.",
     bannerUrl: undefined,
   },
   "Magistral Small 1.2": {
@@ -401,14 +380,13 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 3,
     inputPrice: 0.5,
     outputPrice: 1.5,
     finetunes: [],
     strengths: ["creative", "powerful", "tool calling"],
     weaknesses: ["price"],
     description:
-      "Mistral's powerful medium model with enhanced creativity and tool calling. Uses Coins.",
+      "Mistral's powerful medium model with enhanced creativity and tool calling.",
     bannerUrl: undefined,
   },
   Codestral: {
@@ -419,14 +397,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.3,
     outputPrice: 0.9,
     finetunes: [],
     strengths: ["tool calling", "structured output", "logic"],
     weaknesses: ["creativity"],
     description:
-      "Mistral's code-optimized model, excellent for tool calling and structured tasks. Uses Coins.",
+      "Mistral's code-optimized model, excellent for tool calling and structured tasks.",
     bannerUrl: undefined,
   },
   "Devstral Small 2": {
@@ -437,14 +414,13 @@ export const AI_MODELS = {
     maxOutputTokens: 100000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.1,
     outputPrice: 0.3,
     finetunes: [],
     strengths: ["tool calling", "code", "agents", "fast"],
     weaknesses: ["creativity"],
     description:
-      "Mistral's open source model excelling at tool use and agent tasks. Great for structured operations. Uses Coins.",
+      "Mistral's open source model excelling at tool use and agent tasks. Great for structured operations.",
     bannerUrl: undefined,
   },
   "Devstral 2": {
@@ -455,14 +431,13 @@ export const AI_MODELS = {
     maxOutputTokens: 100000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 2,
     inputPrice: 0.4,
     outputPrice: 2.0,
     finetunes: [],
     strengths: ["tool calling", "code", "agents", "performance"],
     weaknesses: ["price"],
     description:
-      "Mistral's enterprise-grade agent model. Excellent tool use and code capabilities. Uses Coins.",
+      "Mistral's enterprise-grade agent model. Excellent tool use and code capabilities.",
     bannerUrl: undefined,
   },
   "Mistral Large 3.0": {
@@ -473,14 +448,13 @@ export const AI_MODELS = {
     maxOutputTokens: 100000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 3,
     inputPrice: 0.5,
     outputPrice: 1.5,
     finetunes: [],
     strengths: ["creativity", "storytelling", "reasoning", "large context"],
     weaknesses: ["price"],
     description:
-      "Mistral's flagship large model with 256k context. Excellent for creative writing and complex narratives. Uses Coins.",
+      "Mistral's flagship large model with 256k context. Excellent for creative writing and complex narratives.",
     bannerUrl: undefined,
   },
   "Ministral 14B": {
@@ -491,19 +465,18 @@ export const AI_MODELS = {
     maxOutputTokens: 100000,
     provider: "mistral",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.2,
     outputPrice: 0.2,
     finetunes: [],
     strengths: ["cost-effective", "fast", "large context"],
     weaknesses: ["complex reasoning"],
     description:
-      "Mistral's budget-friendly 14B model with 256k context. Great value for story generation. Uses Coins.",
+      "Mistral's budget-friendly 14B model with 256k context. Great value for story generation.",
     bannerUrl: undefined,
   },
 
   // ============================================
-  // DEEPINFRA MODELS (Coins - Server-side API key)
+  // DEEPINFRA MODELS (BYOK - user's own DeepInfra key)
   // ============================================
 
   "DeepInfra DeepSeek V3.2": {
@@ -514,14 +487,13 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.27,
     outputPrice: 0.41,
     finetunes: [],
     strengths: ["cost-effective", "creative", "long context"],
     weaknesses: [],
     description:
-      "DeepSeek V3.2 via DeepInfra. Very cost-effective with excellent performance. Uses Coins.",
+      "DeepSeek V3.2 via DeepInfra. Very cost-effective with excellent performance.",
     bannerUrl: undefined,
   },
 
@@ -533,14 +505,13 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.21,
     outputPrice: 0.79,
     finetunes: [],
     strengths: ["cost-effective", "creative", "long context"],
     weaknesses: [],
     description:
-      "DeepSeek V3.1 via DeepInfra. Solid performance at low cost. Uses Coins.",
+      "DeepSeek V3.1 via DeepInfra. Solid performance at low cost.",
     bannerUrl: undefined,
   },
 
@@ -552,14 +523,13 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.09,
     outputPrice: 0.57,
     finetunes: [],
     strengths: ["powerful", "cost-effective", "long context"],
     weaknesses: [],
     description:
-      "Qwen3 235B via DeepInfra. Powerful model at excellent price. Uses Coins.",
+      "Qwen3 235B via DeepInfra. Powerful model at excellent price.",
     bannerUrl: undefined,
   },
 
@@ -571,13 +541,12 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.1,
     outputPrice: 0.28,
     finetunes: [],
     strengths: ["fast", "cost-effective"],
     weaknesses: ["context size"],
-    description: "Qwen3 32B via DeepInfra. Fast and affordable. Uses Coins.",
+    description: "Qwen3 32B via DeepInfra. Fast and affordable.",
     bannerUrl: undefined,
   },
 
@@ -589,14 +558,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.13,
     outputPrice: 0.38,
     finetunes: [],
     strengths: ["fast", "reliable", "cost-effective"],
     weaknesses: [],
     description:
-      "Meta's Llama 3.3 70B Turbo via DeepInfra. Fast and reliable. Uses Coins.",
+      "Meta's Llama 3.3 70B Turbo via DeepInfra. Fast and reliable.",
     bannerUrl: undefined,
   },
 
@@ -608,14 +576,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.02,
     outputPrice: 0.03,
     finetunes: [],
     strengths: ["ultra fast", "extremely cost-effective"],
     weaknesses: ["smaller model"],
     description:
-      "Llama 3.1 8B Turbo via DeepInfra. Ultra-cheap for simple tasks. Uses Coins.",
+      "Llama 3.1 8B Turbo via DeepInfra. Ultra-cheap for simple tasks.",
     bannerUrl: undefined,
   },
 
@@ -627,14 +594,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.09,
     outputPrice: 0.16,
     finetunes: [],
     strengths: ["balanced", "cost-effective"],
     weaknesses: [],
     description:
-      "Google's Gemma 3 27B via DeepInfra. Good balance of quality and cost. Uses Coins.",
+      "Google's Gemma 3 27B via DeepInfra. Good balance of quality and cost.",
     bannerUrl: undefined,
   },
 
@@ -646,14 +612,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.075,
     outputPrice: 0.2,
     finetunes: [],
     strengths: ["fast", "cost-effective", "tool calling"],
     weaknesses: [],
     description:
-      "Mistral Small 3.2 via DeepInfra. Great for tool calling at low cost. Uses Coins.",
+      "Mistral Small 3.2 via DeepInfra. Great for tool calling at low cost.",
     bannerUrl: undefined,
   },
 
@@ -665,14 +630,13 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.43,
     outputPrice: 1.75,
     finetunes: [],
     strengths: ["creative", "long context", "nsfw"],
     weaknesses: [],
     description:
-      "GLM 4.6 via DeepInfra. Excellent for creative writing. Uses Coins.",
+      "GLM 4.6 via DeepInfra. Excellent for creative writing.",
     bannerUrl: undefined,
   },
   "DeepInfra Kimi-K2-Thinking": {
@@ -683,14 +647,13 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.47,
     outputPrice: 2,
     finetunes: [],
     strengths: ["powerful", "long context", "creative"],
     weaknesses: [],
     description:
-      "Kimi-K2-Thinking via DeepInfra. Powerful model with 262k context. Uses Coins.",
+      "Kimi-K2-Thinking via DeepInfra. Powerful model with 262k context.",
     bannerUrl: undefined,
   },
 
@@ -702,14 +665,13 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.14,
     outputPrice: 1.1,
     finetunes: [],
     strengths: ["powerful", "long context", "MoE", "256k context"],
     weaknesses: [],
     description:
-      "Qwen3 Next 80B A3B MoE model via DeepInfra. Powerful with 256k context. Uses Coins.",
+      "Qwen3 Next 80B A3B MoE model via DeepInfra. Powerful with 256k context.",
     bannerUrl: undefined,
   },
 
@@ -721,14 +683,13 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.07,
     outputPrice: 0.14,
     finetunes: [],
     strengths: ["fast", "cost-effective", "small"],
     weaknesses: ["context size"],
     description:
-      "Microsoft Phi 4 via DeepInfra. Very cheap for simple tasks like choice generation. Uses Coins.",
+      "Microsoft Phi 4 via DeepInfra. Very cheap for simple tasks like choice generation.",
     bannerUrl: undefined,
   },
 
@@ -740,7 +701,6 @@ export const AI_MODELS = {
     maxOutputTokens: 131072,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.255,
     outputPrice: 1.02,
     finetunes: [],
@@ -752,7 +712,7 @@ export const AI_MODELS = {
     ],
     weaknesses: [],
     description:
-      "MiniMax M2 via DeepInfra. Mini model built for coding & agentic workflows with 262k context. Uses Coins.",
+      "MiniMax M2 via DeepInfra. Mini model built for coding & agentic workflows with 262k context.",
     bannerUrl: undefined,
   },
 
@@ -764,14 +724,13 @@ export const AI_MODELS = {
     maxOutputTokens: 16000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.039,
     outputPrice: 0.19,
     finetunes: [],
     strengths: ["ultra cheap", "fast", "long context", "tool calling"],
     weaknesses: [],
     description:
-      "GPT-OSS 120B via DeepInfra. Extremely cost-effective with great capabilities. Uses Coins.",
+      "GPT-OSS 120B via DeepInfra. Extremely cost-effective with great capabilities.",
     bannerUrl: undefined,
   },
 
@@ -783,17 +742,19 @@ export const AI_MODELS = {
     maxOutputTokens: 8000,
     provider: "deepinfra",
     supportsToolCalling: true,
-    cost: 1,
     inputPrice: 0.08,
     outputPrice: 0.29,
     finetunes: [],
     strengths: ["fast", "cost-effective", "MoE"],
     weaknesses: ["context size"],
     description:
-      "Qwen3 30B A3B MoE model via DeepInfra. Fast and very affordable. Uses Coins.",
+      "Qwen3 30B A3B MoE model via DeepInfra. Fast and very affordable.",
     bannerUrl: undefined,
   },
 } as const;
+// OpenRouter image models (BYOK - user's own OpenRouter key). pricePerImage is
+// a per-image dollar estimate for the model pickers: exact for the flat-rate
+// Flux models, derived from typical output-token usage for the rest.
 export const OPENROUTER_IMAGE_MODELS = {
   "Nano Banana Pro": {
     name: "Nano Banana Pro",
@@ -806,7 +767,7 @@ export const OPENROUTER_IMAGE_MODELS = {
     // Based on real usage: ~$0.14 for ~1600 output tokens
     inputPrice: 2, // $/1M tokens (official)
     outputPrice: 90, // $/1M tokens (effective for image gen)
-    cost: 300, // Fallback flat cost
+    pricePerImage: 0.144, // ~1600 output tokens at the effective rate
   },
   "Nano Banana": {
     name: "Nano Banana",
@@ -819,7 +780,7 @@ export const OPENROUTER_IMAGE_MODELS = {
     // Based on real usage: ~$0.038 for ~1300 output tokens
     inputPrice: 0.3, // $/1M tokens (official)
     outputPrice: 30, // $/1M tokens (effective for image gen)
-    cost: 80, // Fallback flat cost
+    pricePerImage: 0.039, // ~1300 output tokens at the effective rate
   },
   "Flux 2 Pro": {
     name: "Flux 2 Pro",
@@ -831,7 +792,7 @@ export const OPENROUTER_IMAGE_MODELS = {
     // Flux charges per-image flat rate, not per-token
     inputPrice: 0,
     outputPrice: 0,
-    cost: 60, // ~$0.03 per image × 2 markup × 1000 coins/$
+    pricePerImage: 0.03,
   },
   "Flux 2 Flex": {
     name: "Flux 2 Flex",
@@ -843,7 +804,7 @@ export const OPENROUTER_IMAGE_MODELS = {
     // Flux charges per-image flat rate, not per-token
     inputPrice: 0,
     outputPrice: 0,
-    cost: 30, // ~$0.015 per image × 2 markup × 1000 coins/$
+    pricePerImage: 0.015,
   },
   "GPT-5 Image": {
     name: "GPT-5 Image",
@@ -855,7 +816,7 @@ export const OPENROUTER_IMAGE_MODELS = {
     // GPT image models charge based on output tokens
     inputPrice: 10,
     outputPrice: 40, // Higher effective rate for image gen
-    cost: 200, // Fallback flat cost
+    pricePerImage: 0.06, // ~1500 output tokens at the effective rate
   },
   "GPT-5 Image Mini": {
     name: "GPT-5 Image Mini",
@@ -866,14 +827,14 @@ export const OPENROUTER_IMAGE_MODELS = {
     provider: "openrouter",
     inputPrice: 2.5,
     outputPrice: 10, // Higher effective rate for image gen
-    cost: 50, // Fallback flat cost
+    pricePerImage: 0.015, // ~1500 output tokens at the effective rate
   },
 };
 
 // Helper type for image models
 export type ImageModelKey = keyof typeof OPENROUTER_IMAGE_MODELS;
 
-// DeepInfra Image Models (server-side key - users pay with coins, or BYOK)
+// DeepInfra Image Models (BYOK - user's own DeepInfra key)
 export const DEEPINFRA_IMAGE_MODELS = {
   "Bria 3.2": {
     name: "Bria 3.2",
@@ -881,7 +842,6 @@ export const DEEPINFRA_IMAGE_MODELS = {
     description: "Fast, commercial-ready with great text rendering. FREE!",
     provider: "deepinfra",
     pricePerImage: 0.0, // FREE
-    cost: 0, // No coins needed
   },
   "P-Image": {
     name: "P-Image",
@@ -889,7 +849,6 @@ export const DEEPINFRA_IMAGE_MODELS = {
     description: "State-of-the-art, <1 second, exceptional text rendering.",
     provider: "deepinfra",
     pricePerImage: 0.005,
-    cost: 13, // $0.005 × 2.5 markup × 1000 coins/$
   },
   "FLUX 2 Pro": {
     name: "FLUX 2 Pro",
@@ -897,7 +856,6 @@ export const DEEPINFRA_IMAGE_MODELS = {
     description: "Premium photorealistic with precise control.",
     provider: "deepinfra",
     pricePerImage: 0.015,
-    cost: 38, // $0.015 × 2.5 markup × 1000 coins/$
   },
 } as const;
 
@@ -911,380 +869,82 @@ export function isPureImageModel(modelId: string): boolean {
   return modelId.includes("flux") || modelId.includes("black-forest-labs");
 }
 
-/**
- * Calculate the cost in coins for DeepInfra image generation
- * @param modelKey - Key from DEEPINFRA_IMAGE_MODELS
- * @returns Cost in coins (can be 0 for free models like Bria)
- */
-export function calculateDeepInfraImageCost(modelKey: string): number {
-  const model = DEEPINFRA_IMAGE_MODELS[modelKey as DeepInfraImageModelKey];
-  if (!model) {
-    return MINIMUM_COST;
-  }
-  return model.cost;
-}
-
-/**
- * Calculate actual cost for image generation based on token usage
- * @param modelKey - Key from OPENROUTER_IMAGE_MODELS
- * @param inputTokens - Actual input tokens from API response
- * @param outputTokens - Actual output tokens from API response
- * @returns Cost in coins
- */
-export function calculateImageTokenCost(
-  modelKey: string,
-  inputTokens: number,
-  outputTokens: number,
-): number {
-  const model = OPENROUTER_IMAGE_MODELS[modelKey as ImageModelKey];
-  if (!model) {
-    return MINIMUM_COST;
-  }
-
-  // For pure image models (Flux), use flat cost since they charge per-image
-  if (isPureImageModel(model.model)) {
-    return model.cost;
-  }
-
-  // Calculate raw cost in dollars (prices are per 1M tokens)
-  const inputCost = (inputTokens / 1_000_000) * model.inputPrice;
-  const outputCost = (outputTokens / 1_000_000) * model.outputPrice;
-  const rawCost = inputCost + outputCost;
-
-  // Apply markup and convert to coins
-  const costWithMarkup = rawCost * MARKUP_MULTIPLIER;
-  const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
-
-  // Ensure minimum cost
-  return Math.max(costInCoins, MINIMUM_COST);
-}
-
-/**
- * Estimate cost for image generation (for display purposes before generation)
- * @param modelKey - Key from OPENROUTER_IMAGE_MODELS
- * @returns Estimated cost in coins
- */
-export function estimateImageCost(modelKey: string): number {
-  const model = OPENROUTER_IMAGE_MODELS[modelKey as ImageModelKey];
-  if (!model) {
-    return MINIMUM_COST;
-  }
-
-  // For pure image models (Flux), use flat cost since no token usage
-  if (isPureImageModel(model.model)) {
-    return model.cost;
-  }
-
-  // For chat-based models, estimate based on typical token usage
-  // Input: ~400 tokens for prompt, Output: ~1500 tokens for image
-  const estimatedInputTokens = 400;
-  const estimatedOutputTokens = 1500;
-  return calculateImageTokenCost(
-    modelKey,
-    estimatedInputTokens,
-    estimatedOutputTokens,
-  );
-}
-
-export interface ModelPreset {
-  id: string;
-  name: string;
-  description: string;
-  storyModel: string; // Key from AI_MODELS
-  toolsModel: string; // Key from AI_MODELS
-  choicesModel: string; // Key from AI_MODELS
-  estimatedCost: number; // Sum of the three model costs
-  // Advanced toggle options
-  advancedToolsModel?: string; // Upgraded tools model (e.g., Devstral Medium)
-  advancedChoicesModel?: string; // Upgraded choices model (e.g., MiniMax M2)
-  // Category for organizing in dropdown
-  category?: "recommended" | "premium" | "budget" | "byok";
-}
-
-export const MODEL_PRESETS: Record<string, ModelPreset> = {
-  // ============================================
-  // CUSTOM
-  // ============================================
-  custom: {
-    id: "custom",
-    name: "Custom",
-    description: "Choose your own models for each stage",
-    storyModel: "DeepSeek V4 Flash", // Defaults
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 12,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-  },
-
-  // ============================================
-  // RECOMMENDED - Mid-cost balanced options
-  // ============================================
-  ministral14b: {
-    id: "ministral14b",
-    name: "Ministral 14B",
-    description: "Ministral 14B story with 256k context - uses Coins",
-    storyModel: "Ministral 14B",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 2,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "recommended",
-  },
-  deepseek: {
-    id: "deepseek",
-    name: "DeepSeek V3.2",
-    description: "DeepSeek V3.2 story - uses Coins",
-    storyModel: "DeepInfra DeepSeek V3.2",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 2,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "recommended",
-  },
-  mistralMedium: {
-    id: "mistralMedium",
-    name: "Mistral Medium 3.1",
-    description: "Balanced Mistral models - uses Coins for payment",
-    storyModel: "Mistral Medium 3.1",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 4,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "recommended",
-  },
-  qwenPremium: {
-    id: "qwenPremium",
-    name: "Qwen3 Next 80B",
-    description: "Qwen3 Next 80B for story with 256k context - uses Coins",
-    storyModel: "DeepInfra Qwen3 Next 80B",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 2,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "recommended",
-  },
-
-  // ============================================
-  // PREMIUM - Higher cost, best quality
-  // ============================================
-
-  glmCreative: {
-    id: "glmCreative",
-    name: "GLM 4.6",
-    description: "GLM 4.6 for creative/NSFW writing - uses Coins",
-    storyModel: "DeepInfra GLM 4.6",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 2,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "premium",
-  },
-  mistralLarge: {
-    id: "mistralLarge",
-    name: "Mistral Large 3.0",
-    description: "Mistral Large 3.0 for story with 256k context - uses Coins",
-    storyModel: "Mistral Large 3.0",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 5,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "premium",
-  },
-  deepseekBrain: {
-    id: "deepseekBrain",
-    name: "DeepSeek R1-0528",
-    description: "DeepSeek R1-0528 reasoning for story - uses Coins",
-    storyModel: "DeepInfra DeepSeek R1-0528",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 3,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "premium",
-  },
-  kimiK2: {
-    id: "kimiK2",
-    name: "Kimi-K2-Thinking",
-    description: "Kimi-K2-Thinking powerful model for story - uses Coins",
-    storyModel: "DeepInfra Kimi-K2-Thinking",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 4,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "premium",
-  },
-
-  // ============================================
-  // BUDGET - Lower cost options
-  // ============================================
-  ministral8b: {
-    id: "ministral8b",
-    name: "Ministral 8B",
-    description: "Ministral 8B story - ultra budget option - uses Coins",
-    storyModel: "Ministral 8B",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 1,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "budget",
-  },
-  ministral3b: {
-    id: "ministral3b",
-    name: "Ministral 3B",
-    description: "Ministral 3B story - cheapest option - uses Coins",
-    storyModel: "Ministral 3B",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 1,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "budget",
-  },
-  ultraBudget: {
-    id: "ultraBudget",
-    name: "GPT-OSS 120B",
-    description: "Maximum savings with GPT-OSS 120B - uses Coins",
-    storyModel: "DeepInfra GPT-OSS 120B",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 1,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "budget",
-  },
-  qwenBudget: {
-    id: "qwenBudget",
-    name: "Qwen3 30B A3B",
-    description: "Qwen3 30B MoE for story - uses Coins",
-    storyModel: "DeepInfra Qwen3 30B A3B",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 1,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "budget",
-  },
-  gemmaBalanced: {
-    id: "gemmaBalanced",
-    name: "Gemma 3 27B",
-    description: "Google Gemma 3 27B for story - uses Coins",
-    storyModel: "DeepInfra Gemma 3 27B",
-    toolsModel: "Devstral Small 2",
-    choicesModel: "DeepInfra Phi 4",
-    estimatedCost: 1,
-    advancedToolsModel: "Devstral 2",
-    advancedChoicesModel: "DeepInfra MiniMax M2",
-    category: "budget",
-  },
-
-  // ============================================
-  // BYOK - Bring Your Own Key
-  // ============================================
-  byokDeepseek: {
-    id: "byokDeepseek",
-    name: "BYOK DeepSeek",
-    description:
-      "DeepSeek V4 Flash for all stages - uses your DeepSeek API key",
-    storyModel: "DeepSeek V4 Flash",
-    toolsModel: "DeepSeek V4 Flash",
-    choicesModel: "DeepSeek V4 Flash",
-    estimatedCost: 0,
-    category: "byok",
-  },
-  byokOpenRouter: {
-    id: "byokOpenRouter",
-    name: "BYOK OpenRouter",
-    description: "The best openrouter models - uses your OpenRouter API key",
-    storyModel: "GLM 5.2",
-    toolsModel: "Gemini 3.1 Flash Lite",
-    choicesModel: "Gemini 3.1 Flash Lite",
-    estimatedCost: 0,
-    category: "byok",
-  },
-  byokOpenRouterPremium: {
-    id: "byokOpenRouterPremium",
-    name: "BYOK OpenRouter Premium",
-    description:
-      "Kimi K2.6 for story with strong tool calling - uses your OpenRouter API key",
-    storyModel: "Kimi K2.6",
-    toolsModel: "Grok 4.5",
-    choicesModel: "Gemini 3.1 Flash Lite",
-    estimatedCost: 0,
-    category: "byok",
-  },
-  byokGoogle: {
-    id: "byokGoogle",
-    name: "BYOK Google AI",
-    description: "Google Gemini models direct - uses your Google AI Studio key",
-    storyModel: "Google Gemini 2.5 Flash",
-    toolsModel: "Google Gemini 2.5 Flash",
-    choicesModel: "Google Gemini 2.5 Flash Lite",
-    estimatedCost: 0,
-    category: "byok",
-  },
-};
 
 // ============================================
 // MODEL FILTERING HELPERS
 // ============================================
 
+/**
+ * Which provider keys the user has saved. Every provider is BYOK - there is no
+ * server-side key and no coin balance behind any of them, so a model is
+ * available exactly when its provider's key is present.
+ */
 export interface APIKeysAvailable {
   openRouterKey?: boolean;
   deepseekKey?: boolean;
-  coinsEnabled?: boolean; // For Mistral and DeepInfra models that use server-side API
+  googleKey?: boolean;
+  mistralKey?: boolean;
+  deepinfraKey?: boolean;
+}
+
+/** Maps a model's provider onto the key field that unlocks it. */
+const PROVIDER_KEY_FIELD: Record<
+  AIModelConfig["provider"],
+  keyof APIKeysAvailable
+> = {
+  openrouter: "openRouterKey",
+  deepseek: "deepseekKey",
+  google: "googleKey",
+  mistral: "mistralKey",
+  deepinfra: "deepinfraKey",
+};
+
+export interface AvailableModelOptions {
+  /** Drop models that can't call tools - GM and Designer turns need them. */
+  requireToolCalling?: boolean;
 }
 
 /**
- * Filter AI models based on which API keys the user has configured
- * - OpenRouter models: Shown when user has OpenRouter key
- * - DeepSeek models: Shown only when user has DeepSeek API key
- * - DeepInfra models: Shown when coins are enabled (server-side API)
+ * Filter AI models down to the ones the user can actually call: their
+ * provider's key is saved, and (optionally) they support tool calling.
  *
  * @param keys - Object indicating which keys the user has
  * @returns Array of [modelKey, config] entries for available models
  */
 export function getAvailableModels(
   keys: APIKeysAvailable,
+  options: AvailableModelOptions = {},
 ): [string, AIModelConfig][] {
   const entries = Object.entries(AI_MODELS) as [string, AIModelConfig][];
 
   return entries.filter(([, config]) => {
-    switch (config.provider) {
-      case "openrouter":
-        return !!keys.openRouterKey;
-      case "deepseek":
-        return !!keys.deepseekKey;
-      case "deepinfra":
-        return !!keys.coinsEnabled;
-      case "mistral":
-        return !!keys.coinsEnabled;
-      default:
-        return false;
-    }
+    if (options.requireToolCalling && !config.supportsToolCalling) return false;
+    const field = PROVIDER_KEY_FIELD[config.provider];
+    return field ? !!keys[field] : false;
   });
 }
 
 /**
  * Get available model keys as an array
  */
-export function getAvailableModelKeys(keys: APIKeysAvailable): string[] {
-  return getAvailableModels(keys).map(([key]) => key);
+export function getAvailableModelKeys(
+  keys: APIKeysAvailable,
+  options: AvailableModelOptions = {},
+): string[] {
+  return getAvailableModels(keys, options).map(([key]) => key);
 }
 
 /**
  * Check if user has any API key configured for AI generation
  */
 export function hasAnyAIKey(keys: APIKeysAvailable): boolean {
-  return !!(keys.openRouterKey || keys.deepseekKey || keys.coinsEnabled);
+  return !!(
+    keys.openRouterKey ||
+    keys.deepseekKey ||
+    keys.googleKey ||
+    keys.mistralKey ||
+    keys.deepinfraKey
+  );
 }
 
 /**
@@ -1293,21 +953,9 @@ export function hasAnyAIKey(keys: APIKeysAvailable): boolean {
 export function getRequiredKeyForModel(
   modelKey: string,
 ): keyof APIKeysAvailable | null {
-  const config = AI_MODELS[modelKey as AIModelKey];
+  const config = AI_MODELS[modelKey as AIModelKey] as AIModelConfig | undefined;
   if (!config) return null;
-
-  switch (config.provider) {
-    case "openrouter":
-      return "openRouterKey";
-    case "deepseek":
-      return "deepseekKey";
-    case "deepinfra":
-      return "coinsEnabled";
-    case "mistral":
-      return "coinsEnabled";
-    default:
-      return null;
-  }
+  return PROVIDER_KEY_FIELD[config.provider] ?? null;
 }
 
 /**
@@ -1335,7 +983,6 @@ export interface AIModelConfig {
     | "deepinfra"
     | "google";
   supportsToolCalling?: boolean; // Whether this model supports function calling
-  cost: number;
   inputPrice: number;
   outputPrice: number;
   finetunes: readonly string[];
@@ -1347,15 +994,6 @@ export interface AIModelConfig {
 }
 
 export type AIModelKey = keyof typeof AI_MODELS;
-
-// ============================================
-// DYNAMIC COST CALCULATION
-// ============================================
-
-// Constants for cost calculation
-export const MARKUP_MULTIPLIER = 2.5; // 150% markup for service
-export const COINS_PER_DOLLAR = 1000; // 1 coin = $0.001
-export const MINIMUM_COST = 1; // Minimum 1 coin per API call
 
 // TTS pricing - all BYOK (user supplies their own provider key in Settings)
 export const TTS_MODELS = {
@@ -1375,200 +1013,7 @@ export const TTS_MODELS = {
 
 export type TTSModelKey = keyof typeof TTS_MODELS;
 
-/**
- * Calculate the cost in coins for TTS generation
- * @param characterCount - Number of characters to convert to speech
- * @param model - TTS model to use (cartesia or elevenlabs)
- * @returns Cost in coins (minimum 1)
- */
-export function calculateTTSCost(
-  characterCount: number,
-  model: TTSModelKey = "elevenlabs",
-): number {
-  const ttsModel = TTS_MODELS[model] || TTS_MODELS.elevenlabs;
 
-  // Calculate raw cost in dollars
-  const rawCost = (characterCount / 1_000_000) * ttsModel.pricePerMillionChars;
-
-  // Apply markup and convert to coins
-  const costWithMarkup = rawCost * MARKUP_MULTIPLIER;
-  const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
-
-  // Ensure minimum cost
-  return Math.max(costInCoins, MINIMUM_COST);
-}
-
-/**
- * Calculate the cost in coins for a given model and token usage
- * @param modelKey - The key of the model in AI_MODELS (or model identifier string)
- * @param inputTokens - Number of input tokens used
- * @param outputTokens - Number of output tokens generated
- * @returns Cost in coins (minimum 1)
- */
-export function calculateTokenCost(
-  modelKey: string,
-  inputTokens: number,
-  outputTokens: number,
-): number {
-  const model = getModelConfig(modelKey);
-
-  // Calculate raw cost in dollars (prices are per 1M tokens)
-  const inputCost = (inputTokens / 1_000_000) * model.inputPrice;
-  const outputCost = (outputTokens / 1_000_000) * model.outputPrice;
-  const rawCost = inputCost + outputCost;
-
-  // Apply markup and convert to coins
-  const costWithMarkup = rawCost * MARKUP_MULTIPLIER;
-  const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
-
-  // Ensure minimum cost
-  return Math.max(costInCoins, MINIMUM_COST);
-}
-
-/**
- * Calculate cost in coins from provider's estimated_cost (in dollars)
- * Used for DeepInfra which provides estimated_cost in the response
- * @param estimatedCost - The estimated cost in dollars from the provider
- * @returns Cost in coins (minimum 1)
- */
-export function calculateCostFromEstimatedCost(estimatedCost: number): number {
-  // Apply markup and convert to coins
-  const costWithMarkup = estimatedCost * MARKUP_MULTIPLIER;
-  const costInCoins = Math.ceil(costWithMarkup * COINS_PER_DOLLAR);
-
-  // Ensure minimum cost
-  return Math.max(costInCoins, MINIMUM_COST);
-}
-
-/**
- * Estimate cost for a typical generation (for display purposes)
- * @param modelKey - The key of the model in AI_MODELS
- * @param estimatedInputTokens - Expected input tokens (default 3000)
- * @param estimatedOutputTokens - Expected output tokens (default 1500)
- * @returns Estimated cost in coins
- */
-export function estimateGenerationCost(
-  modelKey: string,
-  estimatedInputTokens: number = 3000,
-  estimatedOutputTokens: number = 1500,
-): number {
-  return calculateTokenCost(
-    modelKey,
-    estimatedInputTokens,
-    estimatedOutputTokens,
-  );
-}
-
-/**
- * Estimate total cost for a full 3-stage generation turn
- * Based on typical 100k context gameplay
- * @param storyModel - Model key for story generation
- * @param toolsModel - Model key for tools stage
- * @param choicesModel - Model key for choices stage
- * @param contextSize - Optional custom context size in tokens (default 120000)
- * @returns Estimated total cost in coins
- */
-export function estimateFullTurnCost(
-  storyModel: string,
-  toolsModel: string,
-  choicesModel: string,
-  contextSize: number = 120000,
-): number {
-  // Scale context usage based on provided size
-  // Story: full context + system prompt, ~1.5k output
-  // Tools: ~25% of story context, ~500 output
-  // Choices: ~17% of story context, ~300 output
-  const storyInputTokens = contextSize;
-  const toolsInputTokens = Math.floor(contextSize * 0.25);
-  const choicesInputTokens = Math.floor(contextSize * 0.17);
-
-  const storyCost = calculateTokenCost(storyModel, storyInputTokens, 1500);
-  const toolsCost = calculateTokenCost(toolsModel, toolsInputTokens, 500);
-  const choicesCost = calculateTokenCost(choicesModel, choicesInputTokens, 300);
-
-  return storyCost + toolsCost + choicesCost;
-}
-
-// Average TTS character count per generation (typical story narration)
-export const AVERAGE_TTS_CHARACTERS = 1500;
-
-/**
- * Estimate cost for a full turn including TTS narration
- * @param storyModel - Model key for story generation
- * @param toolsModel - Model key for tools stage
- * @param choicesModel - Model key for choices stage
- * @param includeTTS - Whether to include TTS cost (default true)
- * @returns Estimated total cost in coins
- */
-export function estimateFullTurnWithTTS(
-  storyModel: string,
-  toolsModel: string,
-  choicesModel: string,
-  includeTTS: boolean = true,
-): number {
-  const generationCost = estimateFullTurnCost(
-    storyModel,
-    toolsModel,
-    choicesModel,
-  );
-  const ttsCost = includeTTS ? calculateTTSCost(AVERAGE_TTS_CHARACTERS) : 0;
-  return generationCost + ttsCost;
-}
-
-/**
- * Get estimated costs for display purposes
- * @param presetId - The preset ID from MODEL_PRESETS
- * @returns Object with generation and TTS costs
- */
-export function getPresetCostBreakdown(presetId: string): {
-  generationCost: number;
-  ttsCost: number;
-  totalWithTTS: number;
-} {
-  const preset = MODEL_PRESETS[presetId];
-  if (!preset) {
-    return {
-      generationCost: MINIMUM_COST,
-      ttsCost: MINIMUM_COST,
-      totalWithTTS: MINIMUM_COST * 2,
-    };
-  }
-
-  const generationCost = estimateFullTurnCost(
-    preset.storyModel,
-    preset.toolsModel,
-    preset.choicesModel,
-  );
-  const ttsCost = calculateTTSCost(AVERAGE_TTS_CHARACTERS);
-
-  return {
-    generationCost,
-    ttsCost,
-    totalWithTTS: generationCost + ttsCost,
-  };
-}
-
-/**
- * Get a human-readable cost breakdown for a model
- * @param modelKey - The key of the model
- * @returns Object with pricing info
- */
-export function getModelPricing(modelKey: string): {
-  inputPricePerMillion: number;
-  outputPricePerMillion: number;
-  inputPriceWithMarkup: number;
-  outputPriceWithMarkup: number;
-  estimatedCostPerTurn: number;
-} {
-  const model = getModelConfig(modelKey);
-  return {
-    inputPricePerMillion: model.inputPrice,
-    outputPricePerMillion: model.outputPrice,
-    inputPriceWithMarkup: model.inputPrice * MARKUP_MULTIPLIER,
-    outputPriceWithMarkup: model.outputPrice * MARKUP_MULTIPLIER,
-    estimatedCostPerTurn: estimateGenerationCost(modelKey),
-  };
-}
 
 export function getModelConfig(modelKey: string): AIModelConfig {
   // Check if the key exists in AI_MODELS
@@ -1595,7 +1040,6 @@ export function getModelConfig(modelKey: string): AIModelConfig {
       maxOutputTokens: 8000,
       provider: "openrouter", // Custom models are always OpenRouter
       supportsToolCalling: true,
-      cost: 0,
       inputPrice: 0,
       outputPrice: 0,
       finetunes: [],
@@ -1613,60 +1057,3 @@ export function getModelConfig(modelKey: string): AIModelConfig {
   return AI_MODELS["DeepSeek V4 Flash"] as unknown as AIModelConfig;
 }
 
-/**
- * Get the dynamic estimated cost for a preset
- * @param presetId - The preset ID from MODEL_PRESETS
- * @param contextSize - Optional custom context size in tokens
- * @returns Estimated cost in coins for a full turn
- */
-export function getPresetEstimatedCost(
-  presetId: string,
-  contextSize?: number,
-): number {
-  const preset = MODEL_PRESETS[presetId];
-  if (!preset) {
-    return MINIMUM_COST;
-  }
-  return estimateFullTurnCost(
-    preset.storyModel,
-    preset.toolsModel,
-    preset.choicesModel,
-    contextSize,
-  );
-}
-
-/**
- * Get the estimated cost for just the story stage
- * Useful for calculating BYOK savings when using an external provider
- * @param storyModel - Model key for story stage
- * @param contextSize - Optional custom context size in tokens
- * @returns Estimated cost in coins for story stage only
- */
-export function getStoryStageCost(
-  storyModel: string,
-  contextSize: number = 120000,
-): number {
-  return calculateTokenCost(storyModel, contextSize, 1500);
-}
-
-/**
- * Get the dynamic estimated cost for custom model selection
- * @param storyModel - Model key for story stage
- * @param toolsModel - Model key for tools stage
- * @param choicesModel - Model key for choices stage
- * @param contextSize - Optional custom context size in tokens
- * @returns Estimated cost in coins for a full turn
- */
-export function getCustomEstimatedCost(
-  storyModel: string,
-  toolsModel: string,
-  choicesModel: string,
-  contextSize?: number,
-): number {
-  return estimateFullTurnCost(
-    storyModel,
-    toolsModel,
-    choicesModel,
-    contextSize,
-  );
-}

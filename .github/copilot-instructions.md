@@ -83,10 +83,9 @@ The GM stage reads mechanics from lore entries and uses formula_roll with custom
   - **DEPRECATED fields**: stats, resources, abilities, rpgSystem are no longer sent to AI. Character data is in character_sheet lore, mechanics in mechanics lore.
 - app/misc/toolExecutor.ts: Executes tool calls from AI responses locally on the frontend, mapping AI tool names to XML command format. Modifies storyData directly and returns `{ responses: CommandResponse[], stateChanges: string[] }`. The `stateChanges` array contains human-readable descriptions of game state modifications for tools like stat/resource changes, item updates, conditions, etc.
 - app/misc/ai_prices.ts: AI model configuration with provider routing (DeepSeek, OpenRouter, Mistral). Includes getModelConfig() helper for dynamic model selection. Exports AI_MODELS constant with models from multiple providers:
-  - **BYOK providers** (user provides API key): OpenRouter, DeepSeek, NovelAI
-  - **Coins provider** (server-side key, user pays with coins): Mistral (mistral-small-2506, mistral-medium-2508, codestral-2508, devstral-small-2507, devstral-medium-2507)
-  - **APIKeysAvailable**: Interface with `coinsEnabled` flag for Mistral models
-  - **Image models**: `OPENROUTER_IMAGE_MODELS` (BYOK via OpenRouter), `DEEPINFRA_IMAGE_MODELS` (Coins: Bria 3.2 FREE, P-Image $0.005, FLUX 2 Pro $0.015)
+  - **Providers** (all BYOK, user supplies the key): OpenRouter, DeepSeek, Google, Mistral, DeepInfra
+  - **APIKeysAvailable**: per-provider boolean flags; `getAvailableModels()` filters AI_MODELS by saved key (and optionally to tool-calling models)
+  - **Image models**: `OPENROUTER_IMAGE_MODELS` and `DEEPINFRA_IMAGE_MODELS`, both BYOK; each entry carries `pricePerImage` for the pickers (Bria 3.2 FREE, P-Image $0.005, FLUX 2 Pro $0.015)
 - app/misc/story_creator_ai.ts: **Story Creative Assistant utilities**. Exports buildStoryCreatorMessages() and applyCreatorChangesToStoryData(). Converts between Adventure-style AI outputs and StoryData structures.
   - **buildStoryCreatorMessages**: Builds prompts with story history (last 15 scene parts), recent memory context, and current game state. Returns messages array with Adventure-style output format.
   - **applyCreatorChangesToStoryData**: Applies AI-suggested changes (stats, resources, inventory, abilities, achievements, lore) to StoryData. Uses mergeArrayWithCommands() for array modifications.
@@ -111,12 +110,12 @@ The GM stage reads mechanics from lore entries and uses formula_roll with custom
   - Stage 3: Calls buildChoicesPrompt(), parses choice syntax from AI response
   - All context building, prompt construction, and tool execution happens on the frontend
   - Backend is just a thin AI proxy (no storyData parsing or tool execution)
-- app/api/generate/route.ts: **Thin AI proxy** (non-streaming). Supports BYOK (OpenRouter/DeepSeek) and Coins (Mistral). Accepts { messages, tools?, model, maxTokens, temperature, openRouterKey?, deepseekKey? }. Validates auth, forwards to AI provider, returns { content, toolCalls?, meta }. Mistral models deduct coins after successful generation.
-- app/api/generate-stream/route.ts: **Thin AI proxy** (SSE streaming). Supports BYOK and Coins modes. Streams events: { type: "content", content }, { type: "tool_calls", toolCalls }, { type: "done", meta }. Mistral models check balance before generation and deduct coins after.
+- app/api/generate/route.ts: **Thin AI proxy** (non-streaming), BYOK only. Accepts { messages, tools?, model, maxTokens, temperature, openRouterKey?, deepseekKey?, googleKey?, mistralKey?, deepinfraKey?, customModel? }, forwards to the provider the model implies, returns { content, toolCalls?, meta }. No auth check, no deduction.
+- app/api/generate-stream/route.ts: **Thin AI proxy** (SSE streaming), BYOK only. Streams events: { type: "content", content }, { type: "tool_calls", toolCalls }, { type: "done", meta }.
 - app/api/novelai/generate-stream/route.ts: **NovelAI BYOK proxy** (SSE streaming). Accepts { messages, novelaiKey, maxTokens, temperature }. Converts chat messages to completion prompt, forwards to NovelAI GLM-4-6, streams back. No token deduction (BYOK). Story stage only.
 - app/misc/novelai.ts: NovelAI types and utilities. Exports NOVELAI_MODEL ("glm-4-6"), NOVELAI_DEFAULT_PARAMS, convertMessagesToPrompt(), buildNovelAIRequest(), NOVELAI_CONTEXT_SIZE (8192).
 - app/api/tts/generate/route.ts: POST endpoint for text-to-speech generation via Cartesia Sonic-3 or ElevenLabs Flash v2.5; fully BYOK (user-supplied provider key), no coin deduction.
-- app/api/stt/transcribe/route.ts: POST endpoint for Voxtral speech-to-text transcription (Mistral API); accepts FormData with audio file; uses server MISTRAL_API_KEY; deducts 2 coins per transcription.
+- app/api/stt/transcribe/route.ts: POST endpoint for Voxtral speech-to-text transcription (Mistral API); accepts FormData with audio file plus the user's own mistralKey. BYOK, no deduction.
 - app/api/settings/api-keys/route.ts: GET/POST/DELETE encrypted API key storage. Uses AES-256-GCM encryption with API_KEY_ENCRYPTION_SECRET env var.
 - app/misc/APIKeysContext.tsx: React context for managing API keys. Supports localStorage (default) and optional encrypted server storage. Includes OpenRouter OAuth PKCE flow.
 - app/components/APIKeysModal.tsx: Settings modal for API key management with tabs for OpenRouter (OAuth + manual), DeepSeek, NovelAI. Includes TTS model/voice selection (Cartesia/ElevenLabs).
@@ -139,7 +138,6 @@ The GM stage reads mechanics from lore entries and uses formula_roll with custom
 
 #### Subscriptions
 
-- app/api/subscriptions/route.ts: GET current user's subscription status, tier, coins remaining, period dates.
 - app/api/subscriptions/checkout/route.ts: POST to create Stripe checkout session for subscription purchase.
 - app/api/subscriptions/portal/route.ts: POST to create Stripe customer portal session for subscription management.
 - app/api/subscriptions/webhook/route.ts: POST Stripe webhook handler for subscription lifecycle events.
@@ -165,7 +163,7 @@ The GM stage reads mechanics from lore entries and uses formula_roll with custom
 - app/api/creator/regenerate-section/route.ts: Regenerate a specific section of an existing adventure.
 - app/api/creator/extend-section/route.ts: Add more content to an existing section (lore, achievements, etc.).
 - app/api/creator/generate-stage/route.ts: Single-stage generation. Uses same repair strategy: local repair first, then prefill AI continuation if needed.
-- app/api/creator/generate-image/route.ts: AI image generation for adventure covers. Supports two providers: DeepInfra (Coins mode with Bria 3.2 FREE, P-Image $0.005/img, FLUX 2 Pro $0.015/img) and OpenRouter (BYOK with Gemini/GPT image models). Returns base64 or URL, uploads to Supabase storage.
+- app/api/creator/generate-image/route.ts: AI image generation for adventure covers. Two providers, both BYOK: DeepInfra (Bria 3.2 FREE, P-Image $0.005/img, FLUX 2 Pro $0.015/img) and OpenRouter (Gemini/GPT image models). Returns base64 or URL, uploads to Supabase storage.
 - app/misc/big_adventure_ai.ts: Big Adventure AI configuration and prompt builders. Key exports:
   - `GenerationStage`: "core" | "mechanics" | "content" | "advanced"
   - `BigAdventureConfig`: Full configuration with complexity, duration, RPG system, feature toggles
@@ -193,7 +191,6 @@ The GM stage reads mechanics from lore entries and uses formula_roll with custom
 - app/components/NotificationContainer.tsx: Toast notifications display.
 - app/components/TTSControls.tsx: Text-to-speech controls with voice selection, volume, play/pause/stop, and auto-generation support.
 - app/components/CustomVoiceManager.tsx: Manage custom voice IDs for TTS (Cartesia UUIDs or ElevenLabs ~20-char IDs).
-- app/components/StoryCreativeAssistant.tsx: AI-powered story editing modal for in-game modifications. Features BYOK/Coins toggle, model selection, output size slider, cost estimation, chat history persistence. Uses story_creator_ai.ts to build prompts with recent story history (last 15 scene parts) and memory context, then applies AI-suggested changes to StoryData.
 - app/components/CharacterSheet.tsx: Renders character sheet from CharacterSchema + CharacterData. Supports both default field-based rendering and custom HTML/CSS/JS templates via sandboxed iframe.
 - app/components/CharacterSchemaEditor.tsx: UI for creating/editing character schemas. Three tabs: Fields (add/edit schema fields), Custom Template (HTML/CSS/JS editor with syntax help), Resources (upload images/fonts for templates).
 
@@ -245,34 +242,17 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 ### Authentication Patterns
 
 - **User-context API calls**: Use NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_KEY with RLS policies. Pass Authorization: Bearer ${token} header.
-- **Admin/service operations**: Use SUPABASE_SERVICE_ROLE_KEY to bypass RLS for admin operations (mint/remove tokens, user management).
+- **Admin/service operations**: Use SUPABASE_SERVICE_ROLE_KEY to bypass RLS for admin operations (user management).
 - **Client-side auth**: Use useAuth() hook from AuthContext.tsx; supabase client configured with persistSession, autoRefreshToken.
 - **API authentication**: Validate Bearer token with supabase.auth.getUser(token); reject 401 if invalid.
 - **Helper functions**: Use authenticatedFetch from getAuthToken.ts for client-side API calls.
 
-### Token System
+### Payment model: BYOK only (Coins removed)
 
-- **Database**: tokens table (id, creator_id, minted_at, metadata_url); token_ownerships table (token_id, owner_id, acquired_at).
-- **Tradability**: Tokens are tradable if minted_at >= 1 month ago; locked otherwise.
-- **Balance counting**: Use aggregate counts (via head count) to bypass Supabase 1000-row limit; getUserTokenBalance in tokens.ts returns { total, tradable, locked }.
-- **Operations**: deductTokens (burn newest first), giftTokens (transfer tradable only), mintTokens (admin only).
-- **API balance**: Always use /api/tokens/balance with service role for accurate counts.
-- **Token costs**: AI generation via Coins mode uses tokens (2.5x markup). TTS/STT cost tokens only when using server keys (not BYOK).
-- **BYOK (Bring Your Own Key)**: Available to paid subscribers only. Users provide their own API keys and pay providers directly (no coin cost).
-
-### Subscription System
-
-- **Stripe purchasing removed**: checkout/webhook/portal/coins routes, BuyCoinsModal, PricingTable, SubscriptionCard, SubscriptionBadge, UpgradePrompt are all gone. Paid tiers are currently unreachable - only the free tier exists in practice.
-- **Coin ledger still live**: app/misc/tokens.ts still deducts coins per generation call (generate/generate-stream/tts/stt/ocr/creator routes) - this was intentionally kept, only the purchase/billing UI was removed.
-- **Database**: user_subscriptions table with subscription_tier enum, Stripe ID columns (now always null), period tracking, weekly coin refills. See docs/subscription-migration.sql.
-- **Weekly Coins**: Refilled automatically on first request after 7 days since last refill (free tier only reachable, via /api/subscriptions GET). Coins don't roll over - reset to tier amount.
-- **API Routes**:
-  - /api/subscriptions - GET current subscription status, auto-creates free tier, handles weekly refill
-  - /api/subscriptions/admin - POST, admin-only grant/revoke/set_coins/add_coins (support tooling, no Stripe dependency)
-- **Client Context**: SubscriptionContext provides tier, hasByokAccess (force-enabled `true` for everyone since there's no purchase flow to reach a paid tier), weeklyCoins, daysUntilRefill, refreshSubscription().
-- **BYOK Gating**: APIKeysContext checks hasByokAccess from SubscriptionContext before allowing key usage - always true now.
-- **Reasoning-tier router**: app/misc/reasoningTiers.ts picks (model, reasoning_effort) automatically per GM turn - see REASONING_TIERS, NARRATION_MODEL_KEY. Replaces the old manual per-stage model picker in AIConfigTab.tsx.
-- **Markup**: MARKUP_MULTIPLIER in ai_prices.ts is 2.5x (platform takes 60% margin on Coins usage).
+- **Every provider is BYOK.** Users supply their own key for OpenRouter, DeepSeek, Google, Mistral, DeepInfra and the TTS/STT providers. Keys live in localStorage, read through `useAPIKeys()` (APIKeysContext.tsx), and clients forward all five provider keys on each `/api/generate`(`-stream`) call - the proxy picks the one the model's provider needs.
+- **Coins/tokens/subscriptions are gone.** No coin ledger (`app/misc/tokens.ts`), no `/api/tokens`, no `/api/subscriptions`, no `SubscriptionContext`, no Stripe, no server-side provider keys, no markup. `MARKUP_MULTIPLIER`, `COINS_PER_DOLLAR`, `MINIMUM_COST`, the coin cost helpers and `MODEL_PRESETS` were deleted from ai_prices.ts. Do not reintroduce a coin/credit concept.
+- **Model availability**: `getAvailableModels(keys, { requireToolCalling })` in ai_prices.ts is the shared helper - a model is offered when its provider's key is saved. `getRequiredKeyForModel()` maps a model onto the key field it needs.
+- **Cost display**: figures in the UI (`turnCost.ts`, `TurnCostPanel.tsx`, image-model pickers) are real dollar estimates from published provider prices, billed to the user's own key.
 
 ### Adventure Visibility System
 
@@ -291,8 +271,8 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - **API Keys Settings**: Users must provide their own API keys via Settings modal (gear icon in header). Supports OpenRouter (OAuth + manual), DeepSeek, NovelAI. TTS is fully BYOK (Cartesia/ElevenLabs keys). Keys stored in localStorage (default) or encrypted on server (optional).
 - **NovelAI Settings**: BYOK integration for story generation only. Settings saved to localStorage (novelaiEnabled, novelaiKey, novelaiTemperature). When enabled, story stage uses NovelAI GLM-4-6 while tools/choices stages use OpenRouter/DeepSeek.
 - **TTS Settings**: All TTS preferences saved to localStorage (ttsEnabled, ttsLastVoice, ttsAutoGenerate, ttsVolume, ttsCustomVoices, ttsModel). Two models: Cartesia Sonic-3 (low-latency) and ElevenLabs Flash v2.5 (premium, expressive - default).
-- **STT Settings**: Speech-to-text uses Voxtral (Mistral API) and costs 2 coins per transcription. Settings saved to localStorage (sttEnabled). STTButton in ChoicesModal sends audio to /api/stt/transcribe with auto-stop after 3s silence.
-- **Embeddings Settings**: Semantic search settings saved to localStorage (embeddingsEnabled, embeddingThreshold). When enabled, uses Mistral embeddings to find relevant lore/memories. embeddingThreshold (0.1-0.5, default 0.25) controls strictness: lower = more results (relaxed), higher = fewer results (strict). Auto-activates for stories with 30+ lore or 50+ memories. Cost: ~0.5 coins per 100 turns.
+- **STT Settings**: Speech-to-text uses Voxtral, billed to the user's own Mistral key. Settings saved to localStorage (sttEnabled). STTButton in ChoicesModal sends audio to /api/stt/transcribe with auto-stop after 3s silence.
+- **Embeddings Settings**: Semantic search settings saved to localStorage (embeddingsEnabled, embeddingThreshold). When enabled, uses Mistral embeddings to find relevant lore/memories. embeddingThreshold (0.1-0.5, default 0.25) controls strictness: lower = more results (relaxed), higher = fewer results (strict). Auto-activates for stories with 30+ lore or 50+ memories. Billed to the user's own Mistral key - a fraction of a cent per hundred turns.
 - **Hidden Messages**: AI can use ||double pipes|| syntax for hidden text (DM notes). Players can't see hidden text unless "showHiddenMessages" is enabled in localStorage. When revealed, hidden text appears with purple highlighting.
 - **Storyteller Mode**: Two narrative styles controlled via localStorage "storytellerMode" key. "narrator" (default): Literary prose with no mechanical echoes, showing outcomes through vivid description. "dm": Dungeon Master style that weaves mechanics inline, announcing dice results, damage numbers, and skill checks like a tabletop GM. Toggle in Settings > AI Config. Uses different system prompts (`getNarratorSystemPrompt()` vs `getDMSystemPrompt()`) and few-shot examples in ai_staged.ts.
 - **Font Settings**: Story text font customization via Settings > Display tab. Settings saved to localStorage (storyFontSize, storyFontFamily, storyLineHeight, storyParagraphSpacing, storyTheme). Custom fonts stored in IndexedDB ("your-story-fonts" database) and injected via @font-face. Theme presets: Ocean Blue (default), Sepia, Pure Dark, Paper White, Forest, Sunset, Nord, Solarized Dark. Components: FontSettingsTab.tsx (UI), FontInitializer.tsx (app load), useFontSettings hook. story.tsx receives font settings and applies via inline styles on the prose container.
@@ -309,9 +289,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Executes tools locally on storyData via toolExecutor.ts
   - Parses choices from AI response
 - **Multi-provider support**: Automatically routes to DeepSeek, OpenRouter, Mistral, or DeepInfra based on model parameter.
-- Requires DEEPSEEK_API_KEY for DeepSeek models, OPENROUTER_API_KEY for OpenRouter models, MISTRAL_API_KEY for Mistral (Coins mode), DEEPINFRA_API_KEY for DeepInfra (Coins mode).
-- Mistral models (mistral-small-2506, mistral-medium-2508, codestral-2508, devstral-small-2507, devstral-medium-2507) use server-side key - users pay with coins.
-- DeepInfra models (DeepSeek V3.2/V3.1/R1, Qwen3, Llama 3, Gemma 3, etc.) use server-side key - users pay with coins.
+- No server-side provider keys: every model runs on a key the user saved in Settings (OpenRouter, DeepSeek, Google, Mistral, DeepInfra).
 - Optional: DEFAULT_AI_MODEL, DEEPSEEK_MODEL, NEXT_PUBLIC_SITE_URL environment variables.
 - Deducts tokens based on actual usage; returns updated balance in response meta.
 - **Context allocation**: Uses (maxTokens - maxOutputTokens) then allocates 75% to history, 25% to memory.
@@ -349,7 +327,7 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
   - Set by: `updateStoryData({ lore })`, AI lore commands (create_lore, lore_update, lore_add_content, lore_replace_content, lore_delete_content)
   - Checked by: useEffect in page.tsx that triggers sync only when dirty
   - Cleared after: Successful embedding sync
-- **Cost**: ~$0.00005 per turn (~0.5 coins per 100-turn playthrough). Negligible.
+- **Cost**: ~$0.00005 per turn on the user's own key. Negligible.
 - **Fallback**: If embedding search fails, falls back to trigger-based lore and full memory list.
 
 ## Developer workflows
@@ -362,8 +340,6 @@ Key pattern: StoryData is spread into the Story component (e.g., <Story {...stor
 - Environment: Create .env.local with:
   - DEEPSEEK_API_KEY=<your_key>
   - OPENROUTER_API_KEY=<your_key>
-  - MISTRAL_API_KEY=<your_key> (server-side for Coins mode and STT)
-  - DEEPINFRA_API_KEY=<your_key> (server-side for Coins mode and TTS)
   - NEXT_PUBLIC_SUPABASE_URL=<your_url>
   - NEXT_PUBLIC_SUPABASE_KEY=<your_anon_key>
   - SUPABASE_URL=<your_url> (same as NEXT_PUBLIC)

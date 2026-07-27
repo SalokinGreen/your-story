@@ -9,6 +9,7 @@ import {
   getSavedImageGenSettings,
   saveImageGenSettings,
   getImageModelCost,
+  formatImagePrice,
 } from "./LoreImageGenerator";
 import {
   DEEPINFRA_IMAGE_MODELS,
@@ -48,9 +49,10 @@ export default function MassLoreImageGenerator({
   const loreWithoutImages = lore.filter((l) => !l.thumbnailUrl);
   const count = loreWithoutImages.length;
 
-  // Calculate cost estimate
+  // Cost estimate - every image provider is BYOK, so this is what the user's
+  // own key gets billed.
   const costInfo = getImageModelCost(imageProvider, imageModel);
-  const totalCost = costInfo.isByok ? 0 : costInfo.cost * count;
+  const totalCost = costInfo.dollarCost * count;
 
   // Handle provider change
   const handleProviderChange = (newProvider: "deepinfra" | "openrouter") => {
@@ -265,8 +267,8 @@ export default function MassLoreImageGenerator({
                 disabled={isGenerating}
                 className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
               >
-                <option value="deepinfra">DeepInfra (Coins)</option>
-                <option value="openrouter">OpenRouter (BYOK)</option>
+                <option value="deepinfra">DeepInfra</option>
+                <option value="openrouter">OpenRouter</option>
               </select>
             </div>
 
@@ -278,33 +280,15 @@ export default function MassLoreImageGenerator({
                 disabled={isGenerating}
                 className="px-2 py-1 bg-white/5 border border-white/10 rounded-lg text-white text-sm"
               >
-                {imageProvider === "deepinfra"
-                  ? Object.entries(DEEPINFRA_IMAGE_MODELS).map(
-                      ([key, config]) => (
-                        <option key={key} value={key}>
-                          {key} (
-                          {config.cost === 0 ? "FREE" : `${config.cost} coins`})
-                        </option>
-                      ),
-                    )
-                  : Object.entries(OPENROUTER_IMAGE_MODELS).map(
-                      ([key, config]) => {
-                        const isFlat =
-                          config.inputPrice === 0 && config.outputPrice === 0;
-                        const displayCost = isFlat
-                          ? key.includes("Flux 2 Pro")
-                            ? "~$0.030"
-                            : key.includes("Flux 2 Flex")
-                              ? "~$0.015"
-                              : "varies"
-                          : `~$${(config.inputPrice || 0).toFixed(3)}`;
-                        return (
-                          <option key={key} value={key}>
-                            {key} ({displayCost})
-                          </option>
-                        );
-                      },
-                    )}
+                {Object.entries(
+                  imageProvider === "deepinfra"
+                    ? DEEPINFRA_IMAGE_MODELS
+                    : OPENROUTER_IMAGE_MODELS,
+                ).map(([key, config]) => (
+                  <option key={key} value={key}>
+                    {key} ({formatImagePrice(config.pricePerImage)})
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -314,16 +298,11 @@ export default function MassLoreImageGenerator({
             <div className="flex items-center justify-between text-sm">
               <span className="text-blue-200">Estimated Cost:</span>
               <span className="font-medium text-white">
-                {costInfo.isByok ? (
-                  <span className="text-green-400">
-                    ~${(costInfo.dollarCost * count).toFixed(2)} via your API
-                    key
-                  </span>
-                ) : totalCost === 0 ? (
+                {totalCost === 0 ? (
                   <span className="text-green-400">FREE</span>
                 ) : (
-                  <span>
-                    <span className="text-yellow-400">{totalCost} coins</span>
+                  <span className="text-green-400">
+                    ~${totalCost.toFixed(2)} via your API key
                   </span>
                 )}
               </span>

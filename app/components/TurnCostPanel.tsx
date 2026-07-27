@@ -15,7 +15,7 @@
  * Director) land their calls.
  *
  * Dollar figures are raw provider list prices against the player's own BYOK
- * key - no markup, no coins.
+ * key - no markup.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -122,7 +122,7 @@ export default function TurnCostPanel({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <h4 className="text-sm font-medium text-white flex items-center gap-2">
-            <DynamicIcon name="Coins" className="w-4 h-4" />
+            <DynamicIcon name="Receipt" className="w-4 h-4" />
             Cost per turn
           </h4>
           <p className="text-xs text-blue-300/60 mt-1">
