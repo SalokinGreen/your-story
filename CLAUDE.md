@@ -161,6 +161,44 @@ rationale):
 Old saves keep these fields for backward compatibility; the GM doesn't read
 them and the UI doesn't expose them.
 
+### The creator is conversational — a Game Designer, not a Game Master
+
+Authoring an adventure means talking to a **Game Designer** AI, a deliberately
+different character from the play-time GM. The GM runs a story for a player and
+never breaks fiction; the Designer talks to the *author* about the adventure as
+a designed object and writes the material the GM later improvises from. Prompt
+lives in `app/misc/designer_ai.ts`.
+
+The pieces:
+
+- `designer_tools.ts` — 14 tools, all targeting things the GM actually reads:
+  `set_adventure_info`, `set_premise`, `write_note`/`delete_note` (one tool for
+  every `LoreType`, including the mechanics note and character sheet),
+  `write_npcs`, `write_goals`, `set_starting_choices`, `write_presets`,
+  `set_character_sheet_template`, `write_tables`, plus deletes.
+- `designer_executor.ts` — the deterministic half. Owns `AdventureDraft` (a
+  flat working shape), applies tool calls to a *copy* so a malformed call can't
+  corrupt the draft, and converts to/from `Adventure` via
+  `draftToAdventure`/`adventureToDraft`. It also overrides the model where
+  correctness demands it: `mechanics` and `character_sheet` notes are always
+  forced `alwaysOn`, because the GM can't run the game if the rules are only
+  keyword-triggered.
+- `useDesignerSession.ts` — the bounded tool loop (max 5 rounds/turn), the
+  chat transcript, and IndexedDB save.
+- `AdventureInspector.tsx` — hand editing. The AI's tools and the inspector
+  write to the same draft, and `summarizeDraft()` re-injects live state into
+  the system prompt each turn, so the Designer sees the author's manual edits
+  and is told to treat them as authoritative.
+
+The old creator — a 12-step manual wizard, a staged batch generator
+(`big_adventure_ai.ts`, `generation_orchestrator.ts`), `creator_tools.ts`,
+`creator_ai.ts`, `story_creator_ai.ts`, and the `CreatorAIChat` sidebar — is
+**deleted**. Don't restore it or write new code against those modules. It had
+drifted badly: it still authored `abilities`, `skillTrees`, `variables`,
+`relationships`, and `upgradeSettings`, none of which the GM reads. Generic
+JSON-repair helpers from the batch generator survive in `jsonRepair.ts`
+because the OCR pipeline uses them.
+
 ### Data model
 
 `app/misc/structs.ts` is the single source of truth for all shapes —
@@ -219,8 +257,8 @@ exhaustive per-file breakdown, keeping in mind some of its mechanics claims
 are stale per the "Removed/deprecated systems" list above)
 
 - `app/misc/` — nearly all core logic: prompt builders (`ai_staged.ts`,
-  `ai.ts` legacy/non-staged path, `creator_ai.ts`, `story_creator_ai.ts`,
-  `big_adventure_ai.ts`), tool schemas/execution (`toolSchemas.ts`,
+  `ai.ts` legacy/non-staged path, `designer_ai.ts` for the authoring-side
+  Game Designer), tool schemas/execution (`toolSchemas.ts`,
   `toolExecutor.ts`, `gmTools.ts`, `gmExecutor.ts`), game logic
   (`diceFormula.ts`, `mythic.ts`, `mythicChaos.ts`, `compaction.ts`,
   `reflection.ts`, `consistencyCheck.ts`, `embeddings.ts`), auth/tokens
@@ -229,14 +267,15 @@ are stale per the "Removed/deprecated systems" list above)
   `localPDFImportManager.ts`) for offline/optimistic story storage.
 - `app/api/` — thin route handlers: AI proxies (`generate`,
   `generate-stream`), content CRUD (`stories`,
-  `adventures`, `folders`, `comments`), tokens/subscriptions, `creator/*`
-  (multi-stage full-adventure generation with JSON-repair fallback), `tts`,
-  `stt`, `ocr`, `embeddings/*`.
+  `adventures`, `folders`, `comments`), tokens/subscriptions,
+  `creator/generate-image`, `tts`, `stt`, `ocr`, `embeddings/*`.
 - `app/story/` — gameplay UI: `page.tsx` (state/orchestration shell),
   `story.tsx` (presentational), `menu.tsx` (in-story editor), `stats.tsx`,
   `lore.tsx`, `npcs.tsx`, `upgrades.tsx`.
-- `app/creator/` — adventure authoring UI (`page.tsx`, `manual/` step wizard,
-  `generate/`).
+- `app/creator/` — adventure authoring UI. A conversation with a **Game
+  Designer** AI (`page.tsx` shell, `DesignerChat.tsx`,
+  `AdventureInspector.tsx` for hand edits, `useDesignerSession.ts` for the
+  draft + tool loop). See "The creator is conversational" below.
 - `app/library/` — story/adventure browsing, search/filter/sort, folders.
 - `app/components/` — shared UI components (dice visualizer, character sheet
   renderer/editor, TTS/STT controls, API key modal, etc.)

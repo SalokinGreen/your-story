@@ -13,7 +13,7 @@
  * same key/provider handling as ocrSummarizeCall.ts.
  */
 
-import { attemptJSONRepair } from "@/app/misc/big_adventure_ai";
+import { attemptJSONRepair } from "@/app/misc/jsonRepair";
 import {
   AIProvider,
   callProviderAI,

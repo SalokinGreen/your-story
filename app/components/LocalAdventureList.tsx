@@ -53,7 +53,7 @@ export default function LocalAdventureList() {
 
   const handleEdit = (e: React.MouseEvent, adventureId: string) => {
     e.stopPropagation();
-    router.push(`/creator/manual?edit=${adventureId}`);
+    router.push(`/creator?edit=${adventureId}`);
   };
 
   if (loading) {

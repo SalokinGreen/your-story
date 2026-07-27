@@ -14,7 +14,7 @@ import {
   attemptJSONRepair,
   cleanContinuationContent,
   buildContinuationPrompt,
-} from "@/app/misc/big_adventure_ai";
+} from "@/app/misc/jsonRepair";
 import { getProviderFetch } from "@/app/misc/platformFetch";
 
 export type AIProvider = "openrouter" | "deepseek" | "mistral" | "google" | "deepinfra";

@@ -124,7 +124,7 @@ export async function deleteSavedPlayerProfile(
 // CUSTOM MODELS (user-added OpenRouter models, BYOK only)
 // ============================================================
 // Stored under their own localStorage key (not nested in STORAGE_KEY above)
-// since CreatorAIChat already reads/writes "customModels" directly - these
+// since the creator already reads/writes "customModels" directly - these
 // helpers are additive, reading
 // and writing the exact same key/shape so all call sites stay in sync.
 
