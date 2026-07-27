@@ -337,9 +337,23 @@ export async function summarizeOCR(
   let moreInThisWindow = first.truncated;
   let rounds = 1;
 
-  // Truncation rounds and document parts get separate allowances, so a long
-  // document doesn't spend its whole budget re-trying part one.
-  const maxRounds = maxContinuationRounds + (windows.length - 1);
+  // What the running totals looked like when the current part started, so a
+  // part that produced tables but no notes can be spotted and redone.
+  let notesAtWindowStart = 0;
+  let tablesAtWindowStart = 0;
+  let notesRecoveryTried = false;
+  // Truncation continuations are the only rounds the user's setting caps;
+  // spending its budget on anything else would make "0" mean something
+  // different than "don't continue past the output limit".
+  let continuationsUsed = 0;
+
+  // Truncation rounds, document parts and notes recovery get separate
+  // allowances, so a long document doesn't spend its whole budget re-trying
+  // part one. Recovery gets one round per part regardless of the
+  // continuation-round setting: a part that came back as tables and nothing
+  // else is a broken extraction, not a thoroughness preference.
+  const maxRounds =
+    maxContinuationRounds + (windows.length - 1) + windows.length;
 
   // A single big document (a whole .md file is imported as one chunk) usually
   // has far more notes in it than fit in one response's output budget.
@@ -355,17 +369,35 @@ export async function summarizeOCR(
       break;
     }
 
+    // This part produced tables and no notes at all - the model filled in
+    // customTables and stopped, which is a failed extraction however
+    // table-heavy the source is.
+    const onlyTablesFromThisWindow =
+      !notesRecoveryTried &&
+      notesCount(collected) === notesAtWindowStart &&
+      collected.customTables.length > tablesAtWindowStart;
+
     let prompt: string;
-    if (moreInThisWindow) {
+    if (moreInThisWindow && continuationsUsed < maxContinuationRounds) {
       console.log(
         `OCR summarize hit the output limit, continuing part ${windowIndex + 1}/${windows.length} (round ${rounds}/${maxRounds})...`,
       );
+      continuationsUsed++;
       prompt = buildContinuationUserPrompt(promptForWindow(windowIndex), collected);
+    } else if (onlyTablesFromThisWindow) {
+      console.log(
+        `OCR summarize got tables but no notes from part ${windowIndex + 1}/${windows.length} - asking for the notes...`,
+      );
+      notesRecoveryTried = true;
+      prompt = buildNotesRecoveryPrompt(promptForWindow(windowIndex), collected);
     } else if (windowIndex + 1 < windows.length) {
       windowIndex++;
       console.log(
         `OCR summarize moving on to part ${windowIndex + 1}/${windows.length}...`,
       );
+      notesAtWindowStart = notesCount(collected);
+      tablesAtWindowStart = collected.customTables.length;
+      notesRecoveryTried = false;
       prompt = buildNextPartUserPrompt(promptForWindow(windowIndex), collected);
     } else {
       // Nothing left: the model finished, on the last part of the document.
@@ -416,6 +448,8 @@ function buildSystemPrompt(focus: string[], customInstructions: string): string 
   return `You are an expert RPG content analyzer. Your task is to convert OCR-extracted text from RPG rulebooks, adventures, and supplements into structured data for a text adventure game engine.
 
 IMPORTANT: Extract ALL relevant content from the document. Do not limit yourself - capture everything useful.
+
+NOTES ARE THE PRIMARY OUTPUT. "lore" and "mechanicNotes" are what the game engine reads during play and what the player actually sees - they are the point of this extraction. "customTables" are an ADDITION on top of the notes, never a substitute for them. A response full of tables with few or no notes is a failed extraction, no matter how table-heavy the source material is. Write the notes first, then add the tables.
 
 OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields:
 {
@@ -476,7 +510,7 @@ ${
 }
 ${
   focusAll || focus.includes("tables")
-    ? "- Extract ALL TABLES: Random tables, encounter tables, loot tables. For each entry use 'text' for the result and 'weight' for the probability (use the range size as weight, e.g. 1-10 = weight 10)."
+    ? "- Extract ALL TABLES **in addition to** the notes: Random tables, encounter tables, loot tables. For each entry use 'text' for the result and 'weight' for the probability (use the range size as weight, e.g. 1-10 = weight 10). A table never replaces the note that explains it - whatever a table is about (a region's encounters, a faction's rumours, a dungeon's rooms) also gets a lore or mechanic note describing it in prose."
     : ""
 }
 ${
@@ -493,6 +527,7 @@ CONTENT RULES:
 - Give each lore entry a few short "keys" - single words or short phrases (not sentences) a player or GM would plausibly say that should bring this note to mind later (a name, a place, a distinctive item or event). Leave as [] if nothing stands out.
 - Mark secret/hidden information with "secrtet": true
 - For tables, estimate reasonable min/max ranges if not explicitly stated
+- NEVER return "customTables" alongside an empty "lore" and "mechanicNotes". If the source is nothing but tables, the notes are still required: write them from what the tables tell you - what each table is for and when it's rolled, the place/faction/creatures its entries describe, and the setting details buried in its headers, intro text and results.
 - Be thorough but concise - prioritize quality over quantity
 
 ${customInstructions ? `ADDITIONAL INSTRUCTIONS:\n${customInstructions}` : ""}`;
@@ -551,11 +586,11 @@ function buildUserPrompt(
 
   return `${partHeader}Analyze this OCR-extracted RPG content and convert it to structured data.
 
-DETECTED CONTENT TYPE: ${contentType}
+DETECTED CONTENT TYPE: ${contentType} (a hint about the source material, not a restriction on what to extract - notes are required whatever this says)
 
 ${
   extractedTables.length > 0
-    ? `PRE-EXTRACTED TABLES (${extractedTables.length} found):\n${JSON.stringify(extractedTables.slice(0, 5), null, 2)}\n\n`
+    ? `PRE-EXTRACTED TABLES (${extractedTables.length} found) - these are given so you don't have to retype them, NOT a sign that tables are the main output. The notes are still the primary deliverable:\n${JSON.stringify(extractedTables.slice(0, 5), null, 2)}\n\n`
     : ""
 }
 
@@ -614,6 +649,35 @@ CONTINUE THE EXTRACTION:
 5. If the document is fully covered and there is genuinely nothing left, output {"summary": "", "lore": [], "mechanicNotes": [], "customTables": []}.`;
 }
 
+/**
+ * Prompt for the round that recovers the notes from a part that came back as
+ * tables and nothing else.
+ *
+ * Table-heavy source material (a rulebook appendix, a page of random tables)
+ * reliably pulls models into filling `customTables` and calling it done, even
+ * though the notes are what the game engine actually reads during play. When
+ * that happens the tables are kept and this asks for the notes alone.
+ */
+function buildNotesRecoveryPrompt(
+  basePrompt: string,
+  collected: ExtractedContent,
+): string {
+  return `${basePrompt}
+
+=== NOTES STILL MISSING ===
+
+Your previous response for this part extracted tables but no notes. The tables below are already saved - do NOT output them again.
+
+ALREADY EXTRACTED TABLES:
+${titleList(collected.customTables.map((table) => table.name))}
+
+Tables are a supplement; the notes are the primary output and this part has none yet. Output the SAME JSON format with "customTables": [] and fill in "lore" and "mechanicNotes" for this part of the document:
+1. What each table above is for, when it gets rolled, and how to read its results - these belong in "mechanicNotes".
+2. The world content the tables and the surrounding text describe - the places, factions, creatures, items and events named in the table titles, intro text and individual entries - as "lore" entries.
+3. Anything in this part that isn't a table at all: prose, headers, sidebars, captions.
+Write real notes with substance, not one-line restatements of the table names.`;
+}
+
 /** Prompt for the round that moves on to the next part of the document. */
 function buildNextPartUserPrompt(
   basePrompt: string,
@@ -636,6 +700,11 @@ Extract the notes, mechanics and tables from THIS part of the document, in the s
 
 export function emptyExtraction(): ExtractedContent {
   return { summary: "", lore: [], mechanicNotes: [], customTables: [] };
+}
+
+/** Notes (lore + mechanics) collected so far - the primary output. */
+function notesCount(collected: ExtractedContent): number {
+  return collected.lore.length + collected.mechanicNotes.length;
 }
 
 /**
