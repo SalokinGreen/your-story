@@ -1299,7 +1299,7 @@ export default function LibraryPage() {
                         </button>
                         <button
                           onClick={() =>
-                            router.push(`/creator/manual?edit=${adventure.id}`)
+                            router.push(`/creator?edit=${adventure.id}`)
                           }
                           className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
                         >

@@ -1,6 +1,6 @@
 /**
  * Small, dependency-free text utilities shared across prompt-building modules
- * (ai.ts, ai_staged.ts, big_adventure_ai.ts, ...). Kept dependency-free to
+ * (ai.ts, ai_staged.ts, designer_ai.ts, ...). Kept dependency-free to
  * avoid circular imports between those modules.
  */
 

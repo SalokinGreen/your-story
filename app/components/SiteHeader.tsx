@@ -12,9 +12,10 @@ export default function SiteHeader() {
 
   const isActive = (path: string) => pathname === path;
 
-  // Hidden while actively playing a story — the story page has its own
-  // compact controls and doesn't need the persistent site chrome.
-  if (pathname?.startsWith("/story")) {
+  // Hidden on the full-viewport workspaces. Both the story player and the
+  // creator carry their own compact header and lay themselves out against the
+  // full viewport height, so the sticky site chrome would overlap them.
+  if (pathname?.startsWith("/story") || pathname?.startsWith("/creator")) {
     return null;
   }
 

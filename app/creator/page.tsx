@@ -1,656 +1,325 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+/**
+ * Adventure creator.
+ *
+ * The old creator was two wizards: a 12-step manual form and a staged batch
+ * generator. Both are gone. Building an adventure is now a conversation with a
+ * game designer, with a live inspector beside it for hand edits.
+ */
+
+import { Suspense, useCallback, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { StaticIcon } from "@/app/components/StaticIcon";
-import FullScreenView from "@/app/components/FullScreenView";
-import { AI_MODELS } from "@/app/misc/ai_prices";
+import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { useAPIKeys } from "@/app/misc/APIKeysContext";
+import { useNotification } from "@/app/misc/NotificationContext";
+import { AI_MODELS } from "@/app/misc/ai_prices";
+import { CustomModel } from "@/app/misc/user_settings";
+import { startAdventureLocally } from "@/app/misc/localStoryManager";
+import { draftToAdventure } from "@/app/misc/designer_executor";
+import AdventureInspector from "./AdventureInspector";
+import DesignerChat from "./DesignerChat";
+import { useDesignerSession } from "./useDesignerSession";
 
-// Genre options for quick generation
-const genres = [
-  {
-    name: "Fantasy",
-    icon: "Sword",
-    color: "from-purple-500 to-indigo-600",
-    description: "Epic quests, magic, mythical creatures, and heroic journeys",
-  },
-  {
-    name: "Sci-Fi",
-    icon: "Rocket",
-    color: "from-cyan-500 to-blue-600",
-    description:
-      "Space exploration, advanced technology, alien encounters, and futuristic societies",
-  },
-  {
-    name: "Horror",
-    icon: "Ghost",
-    color: "from-red-500 to-rose-700",
-    description:
-      "Survival horror, psychological terror, supernatural threats, and dark mysteries",
-  },
-  {
-    name: "Mystery",
-    icon: "Search",
-    color: "from-amber-500 to-orange-600",
-    description:
-      "Crime solving, detective work, puzzles, intrigue, and uncovering secrets",
-  },
-  {
-    name: "Romance",
-    icon: "Heart",
-    color: "from-pink-500 to-rose-500",
-    description:
-      "Love stories, relationship drama, emotional connections, and heartfelt moments",
-  },
-  {
-    name: "Western",
-    icon: "Sun",
-    color: "from-yellow-500 to-amber-600",
-    description:
-      "Frontier life, outlaws and lawmen, dusty towns, and rugged adventures",
-  },
-  {
-    name: "Comedy",
-    icon: "Laugh",
-    color: "from-green-400 to-emerald-500",
-    description:
-      "Hilarious situations, witty dialogue, absurd scenarios, and laugh-out-loud moments",
-  },
-  {
-    name: "Superheroes",
-    icon: "Zap",
-    color: "from-red-500 to-yellow-500",
-    description:
-      "Superpowers, epic battles, secret identities, and saving the world from villains",
-  },
-  {
-    name: "Dark Fantasy",
-    icon: "Skull",
-    color: "from-gray-600 to-purple-900",
-    description:
-      "Grim worlds, morally gray choices, dark magic, and survival against overwhelming odds",
-  },
-  {
-    name: "Historical",
-    icon: "Crown",
-    color: "from-amber-600 to-yellow-700",
-    description:
-      "Real historical periods, political intrigue, wars, and pivotal moments in history",
-  },
-  {
-    name: "Pirates",
-    icon: "Anchor",
-    color: "from-blue-600 to-teal-600",
-    description:
-      "High seas adventure, treasure hunts, naval battles, and swashbuckling action",
-  },
-  {
-    name: "Survival",
-    icon: "TreePine",
-    color: "from-green-600 to-emerald-700",
-    description:
-      "Wilderness challenges, resource management, harsh environments, and staying alive",
-  },
-  {
-    name: "Urban Fantasy",
-    icon: "Building2",
-    color: "from-violet-500 to-fuchsia-600",
-    description:
-      "Magic in modern cities, hidden supernatural worlds, and contemporary adventures",
-  },
-  {
-    name: "Steampunk",
-    icon: "Cog",
-    color: "from-amber-500 to-stone-600",
-    description:
-      "Victorian aesthetics, steam-powered technology, airships, and clockwork inventions",
-  },
-  {
-    name: "Drama",
-    icon: "Drama",
-    color: "from-rose-500 to-purple-600",
-    description:
-      "Character-driven stories, emotional conflicts, personal growth, and meaningful choices",
-  },
-  {
-    name: "Thriller",
-    icon: "Crosshair",
-    color: "from-slate-500 to-zinc-700",
-    description:
-      "High-stakes tension, dangerous pursuits, conspiracies, and edge-of-your-seat action",
-  },
-  {
-    name: "Post-Apocalyptic",
-    icon: "Flame",
-    color: "from-orange-600 to-red-800",
-    description:
-      "Ruined civilizations, scavenging for resources, factions, and rebuilding society",
-  },
-  {
-    name: "Noir",
-    icon: "Moon",
-    color: "from-gray-700 to-slate-900",
-    description:
-      "Cynical detectives, femme fatales, shadowy conspiracies, and morally ambiguous tales",
-  },
-];
+type MobilePane = "chat" | "adventure";
 
-// Size presets for quick generation
-const sizePresets = [
-  {
-    name: "Quick",
-    value: "quick",
-    tokens: 20000,
-    timeMin: 6,
-    timeMax: 10,
-    description: "Basic adventure, fewer details",
-  },
-  {
-    name: "Standard",
-    value: "standard",
-    tokens: 50000,
-    timeMin: 12,
-    timeMax: 20,
-    description: "Well-rounded adventure",
-  },
-  {
-    name: "Detailed",
-    value: "detailed",
-    tokens: 100000,
-    timeMin: 25,
-    timeMax: 40,
-    description: "Rich lore and content",
-  },
-  {
-    name: "Epic",
-    value: "epic",
-    tokens: 200000,
-    timeMin: 45,
-    timeMax: 70,
-    description: "Maximum depth and detail",
-  },
-];
-
-// BYOK-only models available for Quick Generation
-const quickGenModels = Object.entries(AI_MODELS).filter(([, model]) => {
-  const provider = (model as { provider?: string }).provider;
-  return (
-    provider === "openrouter" ||
-    provider === "deepseek" ||
-    provider === "google"
-  );
-});
-
-export default function CreatorLandingPage() {
+function CreatorPage() {
   const router = useRouter();
-  const { hasKey } = useAPIKeys();
+  const searchParams = useSearchParams();
+  const { keys: apiKeys, hasKey } = useAPIKeys();
+  const { addNotification } = useNotification();
 
-  // Quick generation state
-  const [showQuickModal, setShowQuickModal] = useState(false);
-  const [selectedGenre, setSelectedGenre] = useState<(typeof genres)[0] | null>(
-    null,
+  const editId = searchParams.get("edit") || undefined;
+  const startText = searchParams.get("start") || undefined;
+
+  const [mobilePane, setMobilePane] = useState<MobilePane>("chat");
+  const [showSettings, setShowSettings] = useState(false);
+
+  const [byokMode, setByokMode] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem("designerByokMode") === "true";
+  });
+  const [model, setModel] = useState(() => {
+    if (typeof window === "undefined") return "DeepInfra DeepSeek V3.2";
+    return localStorage.getItem("designerModel") || "DeepInfra DeepSeek V3.2";
+  });
+  const [maxOutputTokens, setMaxOutputTokens] = useState(() => {
+    if (typeof window === "undefined") return 8000;
+    const stored = localStorage.getItem("designerMaxOutput");
+    return stored ? parseInt(stored, 10) : 8000;
+  });
+
+  const customModels: CustomModel[] = useMemo(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const stored = localStorage.getItem("customModels");
+      return stored ? JSON.parse(stored) : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  // BYOK reaches OpenRouter/DeepSeek/Google; Coins covers the server-side keys.
+  const availableModels = useMemo(() => {
+    const builtIn = Object.entries(AI_MODELS).filter(([, m]) => {
+      const provider = (m as { provider?: string }).provider;
+      return byokMode
+        ? provider === "openrouter" ||
+            provider === "deepseek" ||
+            provider === "google"
+        : provider === "mistral" || provider === "deepinfra";
+    });
+    const entries: [string, { name: string }][] = builtIn.map(([key, m]) => [
+      key,
+      { name: (m as { name: string }).name },
+    ]);
+    if (byokMode) {
+      customModels.forEach((m) => entries.push([m.id, { name: `⭐ ${m.name}` }]));
+    }
+    return entries;
+  }, [byokMode, customModels]);
+
+  const persistSetting = (key: string, value: string) => {
+    if (typeof window !== "undefined") localStorage.setItem(key, value);
+  };
+
+  const handleError = useCallback(
+    (message: string) => addNotification(message, "failure"),
+    [addNotification],
   );
-  const [customPrompt, setCustomPrompt] = useState("");
-  const [sizeIndex, setSizeIndex] = useState(1); // Default to "Standard"
-  const [showCustomGenreInput, setShowCustomGenreInput] = useState(false);
-  const [customGenreName, setCustomGenreName] = useState("");
-  const [quickModel, setQuickModel] = useState("DeepSeek V4 Flash");
 
-  const selectedSize = sizePresets[sizeIndex];
+  const session = useDesignerSession({
+    adventureId: editId,
+    model,
+    maxOutputTokens,
+    byokMode,
+    apiKeys,
+    onError: handleError,
+  });
 
-  const hasAnyBYOKKey =
+  const { draft, updateDraft, messages, loading, save, dirty } = session;
+
+  const handleSave = async () => {
+    const id = await save();
+    if (id) {
+      addNotification("Adventure saved", "success");
+      if (!editId) {
+        window.history.replaceState(null, "", `/creator?edit=${id}`);
+      }
+    }
+  };
+
+  const handleSaveAndPlay = async () => {
+    const id = await save();
+    if (!id) return;
+    // Playing an adventure means spinning up a fresh local story from it —
+    // the story player takes a storyId, not an adventure id.
+    try {
+      const storyId = await startAdventureLocally(draftToAdventure(draft));
+      router.push(`/story?storyId=${storyId}`);
+    } catch {
+      addNotification("Couldn't start a story from this adventure.", "failure");
+    }
+  };
+
+  const isBlank = !draft.title && !draft.premise && draft.lore.length === 0;
+  const hasBYOKKey =
     hasKey("openRouterKey") || hasKey("deepseekKey") || hasKey("googleKey");
 
-  const handleQuickGenerate = () => {
-    if (!selectedGenre) return;
-
-    // Build the quick start params
-    const params = new URLSearchParams({
-      quickStart: "true",
-      genre: selectedGenre.name.toLowerCase(),
-      size: selectedSize.value,
-      model: quickModel,
-    });
-
-    if (customPrompt.trim()) {
-      params.set("prompt", customPrompt.trim());
-    }
-
-    // Navigate to the big adventure creator with quick start params
-    router.push(`/creator/generate?${params.toString()}`);
-  };
-
-  const openQuickModal = (genre: (typeof genres)[0]) => {
-    setSelectedGenre(genre);
-    setCustomPrompt("");
-    setShowQuickModal(true);
-    setShowCustomGenreInput(false);
-  };
-
-  const selectCustomGenre = () => {
-    if (!customGenreName.trim()) return;
-    const customGenre = {
-      name: customGenreName.trim(),
-      icon: "Sparkles" as const,
-      color: "from-violet-500 to-fuchsia-500",
-      description: "Your custom adventure genre",
-    };
-    setSelectedGenre(customGenre);
-    setShowCustomGenreInput(false);
-  };
+  if (session.loadingAdventure) {
+    return (
+      <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-white/50">
+          <DynamicIcon name="Loader2" className="w-5 h-5 animate-spin" />
+          Loading adventure…
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950">
-      <main className="max-w-5xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-10">
-          <Link
-            href="/"
-            className="inline-flex items-center gap-2 text-blue-400 hover:text-blue-300 mb-4 transition-colors"
-          >
-            <StaticIcon name="ArrowLeft" className="w-4 h-4" />
-            Back to Home
-          </Link>
-          <h1 className="text-3xl sm:text-4xl font-bold mb-3 bg-linear-to-r from-purple-400 via-pink-400 to-amber-400 bg-clip-text text-transparent">
-            Adventure Creator
-          </h1>
-          <p className="text-blue-200/60 text-lg max-w-xl mx-auto">
-            Choose how you want to create your adventure
-          </p>
-        </div>
-
-        {/* Three Options Grid */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          {/* Quick Generation */}
-          <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/10 p-6 hover:border-purple-400/40 transition-all group">
-            <div className="w-14 h-14 rounded-full bg-linear-to-br from-green-500 to-emerald-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <StaticIcon name="Zap" className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="text-xl font-bold text-white mb-2">
-              Quick Generation
-            </h2>
-            <p className="text-blue-300/60 text-sm mb-4">
-              Pick a genre and let AI create a complete adventure in minutes.
-              Perfect for jumping straight into play.
-            </p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              <span className="px-2 py-1 bg-green-500/20 text-green-300 text-xs rounded-full">
-                ~6-20 min
-              </span>
-              <span className="px-2 py-1 bg-amber-500/20 text-amber-300 text-xs rounded-full">
-                AI-powered
-              </span>
-            </div>
-            <button
-              onClick={() => setShowQuickModal(true)}
-              className="w-full px-4 py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-all font-medium flex items-center justify-center gap-2"
-            >
-              <StaticIcon name="Sparkles" className="w-4 h-4" />
-              Quick Start
-            </button>
-          </div>
-
-          {/* Advanced Generation */}
-          <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/10 p-6 hover:border-purple-400/40 transition-all group">
-            <div className="w-14 h-14 rounded-full bg-linear-to-br from-purple-500 to-blue-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <StaticIcon name="Wand2" className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="text-xl font-bold text-white mb-2">
-              Advanced Generation
-            </h2>
-            <p className="text-blue-300/60 text-sm mb-4">
-              Full control over AI generation with custom settings, RPG systems,
-              complexity levels, and style presets.
-            </p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              <span className="px-2 py-1 bg-purple-500/20 text-purple-300 text-xs rounded-full">
-                Full control
-              </span>
-              <span className="px-2 py-1 bg-blue-500/20 text-blue-300 text-xs rounded-full">
-                Custom prompts
-              </span>
-            </div>
-            <Link
-              href="/creator/generate"
-              className="w-full px-4 py-2.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-all font-medium flex items-center justify-center gap-2"
-            >
-              <StaticIcon name="Settings" className="w-4 h-4" />
-              Advanced Creator
-            </Link>
-          </div>
-
-          {/* Manual Creator */}
-          <div className="bg-white/[0.03] backdrop-blur-md rounded-2xl border border-white/10 p-6 hover:border-purple-400/40 transition-all group">
-            <div className="w-14 h-14 rounded-full bg-linear-to-br from-amber-500 to-orange-600 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-              <StaticIcon name="Palette" className="w-7 h-7 text-white" />
-            </div>
-            <h2 className="text-xl font-bold text-white mb-2">
-              Manual Creator
-            </h2>
-            <p className="text-blue-300/60 text-sm mb-4">
-              Build your adventure from scratch with complete creative freedom.
-              Define every stat, item, lore entry, and more.
-            </p>
-            <div className="flex flex-wrap gap-2 mb-4">
-              <span className="px-2 py-1 bg-amber-500/20 text-amber-300 text-xs rounded-full">
-                Full freedom
-              </span>
-              <span className="px-2 py-1 bg-orange-500/20 text-orange-300 text-xs rounded-full">
-                No AI needed
-              </span>
-            </div>
-            <Link
-              href="/creator/manual"
-              className="w-full px-4 py-2.5 bg-linear-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white rounded-lg transition-all font-medium flex items-center justify-center gap-2"
-            >
-              <StaticIcon name="Edit" className="w-4 h-4" />
-              Manual Editor
-            </Link>
-          </div>
-        </div>
-
-        {/* Quick comparison */}
-        <div className="bg-white/[0.03] backdrop-blur-md rounded-xl border border-white/10 p-6 mb-8">
-          <h3 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-            <StaticIcon name="HelpCircle" className="w-5 h-5 text-blue-400" />
-            Which should I choose?
-          </h3>
-          <div className="grid md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <h4 className="font-medium text-green-400 mb-2">
-                Quick Generation
-              </h4>
-              <ul className="space-y-1 text-blue-300/70">
-                <li>• You want to play now</li>
-                <li>• Genre-based inspiration</li>
-                <li>• Minimal setup required</li>
-                <li>• Good for first-timers</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium text-purple-400 mb-2">
-                Advanced Generation
-              </h4>
-              <ul className="space-y-1 text-blue-300/70">
-                <li>• Custom story concepts</li>
-                <li>• Specific RPG systems</li>
-                <li>• Control over complexity</li>
-                <li>• Style and tone presets</li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-medium text-amber-400 mb-2">
-                Manual Creator
-              </h4>
-              <ul className="space-y-1 text-blue-300/70">
-                <li>• Complete control</li>
-                <li>• No coin cost</li>
-                <li>• Import/adapt existing</li>
-                <li>• Learning the system</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick links */}
-        <div className="flex justify-center gap-4 text-sm">
+    <div className="h-dvh flex flex-col bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 text-white overflow-hidden">
+      {/* Header */}
+      <header className="shrink-0 border-b border-white/10 bg-black/20 backdrop-blur-md">
+        <div className="flex items-center gap-3 px-3 sm:px-4 h-14">
           <Link
             href="/library"
-            className="text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+            className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors shrink-0"
+            title="Back to library"
           >
-            <StaticIcon name="Library" className="w-4 h-4" />
-            My Library
+            <DynamicIcon name="ArrowLeft" className="w-4 h-4" />
           </Link>
-          <span className="text-blue-800">•</span>
-          <Link
-            href="/creator/manual"
-            className="text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
-          >
-            <StaticIcon name="Compass" className="w-4 h-4" />
-            Build Manually
-          </Link>
-        </div>
-      </main>
 
-      {/* Quick Generation Modal */}
-      {showQuickModal && (
-        <FullScreenView
-          title={
-            selectedGenre ? `${selectedGenre.name} Adventure` : "Quick Adventure Generation"
-          }
-          subtitle={selectedGenre ? selectedGenre.description : undefined}
-          icon={selectedGenre ? selectedGenre.icon : "Zap"}
-          onClose={() => {
-            setShowQuickModal(false);
-            setSelectedGenre(null);
-            setShowCustomGenreInput(false);
-            setCustomGenreName("");
-          }}
-          onBack={
-            selectedGenre
-              ? () => {
-                  setSelectedGenre(null);
-                  setCustomGenreName("");
-                }
-              : undefined
-          }
-          footer={
-            selectedGenre ? (
-              <div className="max-w-2xl mx-auto flex gap-3 p-4">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-sm font-semibold truncate">
+                {draft.title || "New adventure"}
+              </h1>
+              {dirty && (
+                <span
+                  className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0"
+                  title="Unsaved changes"
+                />
+              )}
+            </div>
+            <p className="text-[11px] text-white/35">Game designer</p>
+          </div>
+
+          <button
+            onClick={() => setShowSettings((v) => !v)}
+            className="p-2 rounded-lg hover:bg-white/10 text-white/50 hover:text-white transition-colors shrink-0"
+            title="Model settings"
+          >
+            <DynamicIcon name="Settings2" className="w-4 h-4" />
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-sm transition-colors shrink-0"
+          >
+            Save
+          </button>
+          <button
+            onClick={handleSaveAndPlay}
+            className="flex px-3 py-1.5 rounded-lg bg-linear-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-sm font-medium transition-all items-center gap-1.5 shrink-0"
+            title="Save and play"
+          >
+            <DynamicIcon name="Play" className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Play</span>
+          </button>
+        </div>
+
+        {showSettings && (
+          <div className="px-4 py-3 border-t border-white/10 bg-black/30 space-y-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex rounded-lg overflow-hidden border border-white/10">
                 <button
                   onClick={() => {
-                    setShowQuickModal(false);
-                    setSelectedGenre(null);
+                    setByokMode(false);
+                    persistSetting("designerByokMode", "false");
                   }}
-                  className="flex-1 px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-lg transition-colors"
+                  className={`px-3 py-1.5 text-xs transition-colors ${
+                    !byokMode ? "bg-purple-600 text-white" : "text-white/50"
+                  }`}
                 >
-                  Cancel
+                  Coins
                 </button>
                 <button
-                  onClick={handleQuickGenerate}
-                  className="flex-1 px-4 py-2.5 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-colors font-medium flex items-center justify-center gap-2"
+                  onClick={() => {
+                    setByokMode(true);
+                    persistSetting("designerByokMode", "true");
+                  }}
+                  className={`px-3 py-1.5 text-xs transition-colors ${
+                    byokMode ? "bg-purple-600 text-white" : "text-white/50"
+                  }`}
                 >
-                  <StaticIcon name="Wand2" className="w-4 h-4" />
-                  Generate Adventure
+                  My API key
                 </button>
               </div>
-            ) : undefined
-          }
-        >
-          <div className="max-w-2xl mx-auto">
-            {/* Genre Selection */}
-            {!selectedGenre ? (
-              <>
-                <p className="text-blue-300/70 mb-4">
-                  Choose a genre to start:
-                </p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {genres.map((genre) => (
-                    <button
-                      key={genre.name}
-                      onClick={() => openQuickModal(genre)}
-                      className="p-4 bg-white/5 hover:bg-white/10 rounded-xl border border-white/10 hover:border-purple-400/40 transition-all group text-center"
-                    >
-                      <div
-                        className={`w-10 h-10 rounded-full bg-linear-to-br ${genre.color} flex items-center justify-center mx-auto mb-2 group-hover:scale-110 transition-transform`}
-                      >
-                        <StaticIcon
-                          name={genre.icon}
-                          className="w-5 h-5 text-white"
-                        />
-                      </div>
-                      <span className="text-white font-medium text-sm">
-                        {genre.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
 
-                {/* Custom Genre Input */}
-                <div className="mt-4 pt-4 border-t border-white/10">
-                  {!showCustomGenreInput ? (
-                    <button
-                      onClick={() => setShowCustomGenreInput(true)}
-                      className="w-full p-3 bg-violet-500/10 hover:bg-violet-500/20 rounded-lg border border-violet-400/20 hover:border-violet-400/40 transition-all flex items-center justify-center gap-2 text-violet-300 hover:text-white"
-                    >
-                      <StaticIcon name="Edit3" className="w-4 h-4" />
-                      <span className="font-medium text-sm">Custom Genre</span>
-                    </button>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={customGenreName}
-                        onChange={(e) => setCustomGenreName(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && customGenreName.trim()) {
-                            selectCustomGenre();
-                          } else if (e.key === "Escape") {
-                            setShowCustomGenreInput(false);
-                            setCustomGenreName("");
-                          }
-                        }}
-                        placeholder="Enter your genre name..."
-                        className="flex-1 px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-violet-500"
-                        autoFocus
-                      />
-                      <button
-                        onClick={selectCustomGenre}
-                        disabled={!customGenreName.trim()}
-                        className="px-4 py-2 bg-linear-to-r from-violet-600 to-fuchsia-600 hover:from-violet-500 hover:to-fuchsia-500 disabled:opacity-40 disabled:from-white/10 disabled:to-white/10 text-white rounded-lg shadow-md shadow-violet-950/40 transition-all"
-                      >
-                        <StaticIcon name="Check" className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => {
-                          setShowCustomGenreInput(false);
-                          setCustomGenreName("");
-                        }}
-                        className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 text-blue-300 hover:text-white rounded-lg transition-colors"
-                      >
-                        <StaticIcon name="X" className="w-4 h-4" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                {/* Prompt Input */}
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-blue-200 mb-2">
-                    Adventure Concept{" "}
-                    <span className="text-blue-400/60">(optional)</span>
-                  </label>
-                  <textarea
-                    value={customPrompt}
-                    onChange={(e) => setCustomPrompt(e.target.value)}
-                    placeholder={`Describe your ${selectedGenre.name.toLowerCase()} adventure idea, or leave blank for AI to decide...`}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-400/40 focus:outline-none focus:ring-2 focus:ring-purple-500 resize-y min-h-20"
-                    rows={3}
-                  />
-                </div>
+              <select
+                value={model}
+                onChange={(e) => {
+                  setModel(e.target.value);
+                  persistSetting("designerModel", e.target.value);
+                }}
+                className="bg-black/40 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-purple-400/50"
+              >
+                {availableModels.map(([key, m]) => (
+                  <option key={key} value={key}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
 
-                {/* Size Slider */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-blue-200 mb-2">
-                    Adventure Size
-                  </label>
-                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                    <input
-                      type="range"
-                      min={0}
-                      max={sizePresets.length - 1}
-                      value={sizeIndex}
-                      onChange={(e) => setSizeIndex(parseInt(e.target.value))}
-                      className="w-full h-2 bg-white/10 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                    />
-                    <div className="flex justify-between text-xs text-blue-400/60 mt-1 px-1">
-                      {sizePresets.map((preset) => (
-                        <span key={preset.value}>{preset.name}</span>
-                      ))}
-                    </div>
-                    <div className="mt-3 flex items-center justify-between">
-                      <div>
-                        <span className="text-lg font-bold text-white">
-                          {selectedSize.name}
-                        </span>
-                        <span className="text-sm text-blue-300/60 ml-2">
-                          {selectedSize.description}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-medium text-purple-300">
-                          ~{selectedSize.timeMin}-{selectedSize.timeMax} min
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Model Selection */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-blue-200 mb-2">
-                    AI Model (BYOK - Bring Your Own Key)
-                  </label>
-                  <select
-                    value={quickModel}
-                    onChange={(e) => setQuickModel(e.target.value)}
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500"
-                  >
-                    {quickGenModels.map(([key, model]) => (
-                      <option key={key} value={key}>
-                        {model.name}
-                      </option>
-                    ))}
-                  </select>
-                  {!hasAnyBYOKKey && (
-                    <p className="mt-2 text-xs text-red-300">
-                      ⚠️ No API keys configured. Add keys in Settings (gear icon
-                      in header).
-                    </p>
-                  )}
-                </div>
-
-                {/* Info Box */}
-                <div className="bg-purple-500/[0.06] border border-purple-400/20 rounded-lg p-3 mb-4">
-                  <div className="flex items-start gap-2">
-                    <StaticIcon
-                      name="Sparkles"
-                      className="w-4 h-4 text-purple-400 mt-0.5 shrink-0"
-                    />
-                    <div className="text-sm text-purple-200/80">
-                      <p className="font-medium mb-1">
-                        Powered by Your Own API Key!
-                      </p>
-                      <p className="text-purple-300/60 text-xs">
-                        AI will choose the best RPG system, complexity, and
-                        settings for your genre.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Warning Box */}
-                <div className="bg-amber-500/[0.06] border border-amber-400/20 rounded-lg p-3 mb-6">
-                  <div className="flex items-start gap-2">
-                    <StaticIcon
-                      name="AlertTriangle"
-                      className="w-4 h-4 text-amber-400 mt-0.5 shrink-0"
-                    />
-                    <p className="text-xs text-amber-200/80">
-                      Keep the tab open during generation. Switching tabs or
-                      minimizing may interrupt the connection.
-                    </p>
-                  </div>
-                </div>
-              </>
+              <label className="flex items-center gap-2 text-xs text-white/50">
+                Response length
+                <input
+                  type="range"
+                  min={2000}
+                  max={16000}
+                  step={1000}
+                  value={maxOutputTokens}
+                  onChange={(e) => {
+                    const value = parseInt(e.target.value, 10);
+                    setMaxOutputTokens(value);
+                    persistSetting("designerMaxOutput", String(value));
+                  }}
+                  className="accent-purple-500"
+                />
+                <span className="tabular-nums text-white/40">
+                  {(maxOutputTokens / 1000).toFixed(0)}k
+                </span>
+              </label>
+            </div>
+            {byokMode && !hasBYOKKey && (
+              <p className="text-xs text-amber-300/80">
+                No API key saved yet — add one in Settings to use your own key.
+              </p>
             )}
           </div>
-        </FullScreenView>
-      )}
+        )}
+      </header>
+
+      {/* Mobile pane switcher */}
+      <div className="md:hidden shrink-0 flex border-b border-white/10 bg-black/20">
+        {(["chat", "adventure"] as MobilePane[]).map((pane) => (
+          <button
+            key={pane}
+            onClick={() => setMobilePane(pane)}
+            className={`flex-1 py-2.5 text-xs font-medium transition-colors ${
+              mobilePane === pane
+                ? "text-purple-300 border-b-2 border-purple-400"
+                : "text-white/40"
+            }`}
+          >
+            {pane === "chat" ? "Conversation" : "Adventure"}
+          </button>
+        ))}
+      </div>
+
+      {/* Body */}
+      <div className="flex-1 min-h-0 flex">
+        <div
+          className={`flex-1 min-w-0 ${
+            mobilePane === "chat" ? "flex" : "hidden"
+          } md:flex flex-col`}
+        >
+          <DesignerChat
+            messages={messages}
+            loading={loading}
+            onSend={session.send}
+            onStop={session.stop}
+            showSuggestions={isBlank}
+            initialInput={startText}
+          />
+        </div>
+
+        <div
+          className={`w-full md:w-[380px] lg:w-[440px] shrink-0 md:border-l border-white/10 ${
+            mobilePane === "adventure" ? "block" : "hidden"
+          } md:block`}
+        >
+          <AdventureInspector draft={draft} onChange={updateDraft} />
+        </div>
+      </div>
     </div>
+  );
+}
+
+export default function CreatorPageWrapper() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-linear-to-br from-gray-900 via-blue-950 to-purple-950 flex items-center justify-center">
+          <DynamicIcon
+            name="Loader2"
+            className="w-5 h-5 animate-spin text-white/50"
+          />
+        </div>
+      }
+    >
+      <CreatorPage />
+    </Suspense>
   );
 }
