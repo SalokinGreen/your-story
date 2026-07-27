@@ -13,7 +13,10 @@ import {
 } from "@/app/misc/ocr";
 import { ocrFetch } from "@/app/misc/ocrFetch";
 import { OCRProcessRequestBody } from "@/app/misc/ocrCall";
-import { OCRSummarizeRequestBody } from "@/app/misc/ocrSummarizeCall";
+import {
+  OCRSummarizeRequestBody,
+  DEFAULT_MAX_CONTINUATION_ROUNDS,
+} from "@/app/misc/ocrSummarizeCall";
 import { StoryLore, CustomTable } from "@/app/misc/structs";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 import { mergeExtractedContent } from "@/app/misc/ocrMerge";
@@ -137,6 +140,7 @@ interface PDFImporterSettings {
   customModelId: string;
   customInstructions: string;
   maxOutputTokens: number;
+  maxContinuationRounds: number;
   mergeDuplicates: boolean;
 }
 
@@ -146,8 +150,13 @@ const DEFAULT_PDF_IMPORTER_SETTINGS: PDFImporterSettings = {
   customModelId: "",
   customInstructions: "",
   maxOutputTokens: 16000,
+  maxContinuationRounds: DEFAULT_MAX_CONTINUATION_ROUNDS,
   mergeDuplicates: true,
 };
+
+// Ceiling for the continuation-rounds slider. Each round re-sends the source
+// document, so this caps API spend as much as it caps thoroughness.
+const MAX_CONTINUATION_ROUNDS_LIMIT = 15;
 
 const PDF_IMPORTER_SETTINGS_KEY = "pdfImporterSettings";
 
@@ -882,6 +891,13 @@ export default function PDFImporter({
   const [maxOutputTokens, setMaxOutputTokens] = useState(
     () => loadPDFImporterSettings().maxOutputTokens,
   );
+  // How many extra rounds the model gets to keep writing notes after a
+  // response runs out of output length (see ocrSummarizeCall.ts). Each round
+  // re-sends the source document, so more rounds means a more complete
+  // import at a higher API cost; 0 keeps only what fits in one response.
+  const [maxContinuationRounds, setMaxContinuationRounds] = useState(
+    () => loadPDFImporterSettings().maxContinuationRounds,
+  );
   // Post-import cleanup pass (see ocrMerge.ts) that merges lore/mechanic
   // entries fragmented or duplicated across chunk boundaries. On by default;
   // exposed as a toggle for users who want the raw per-chunk output
@@ -899,6 +915,7 @@ export default function PDFImporter({
       customModelId,
       customInstructions,
       maxOutputTokens,
+      maxContinuationRounds,
       mergeDuplicates,
     };
     try {
@@ -915,6 +932,7 @@ export default function PDFImporter({
     customModelId,
     customInstructions,
     maxOutputTokens,
+    maxContinuationRounds,
     mergeDuplicates,
   ]);
 
@@ -924,6 +942,9 @@ export default function PDFImporter({
     setCustomModelId(DEFAULT_PDF_IMPORTER_SETTINGS.customModelId);
     setCustomInstructions(DEFAULT_PDF_IMPORTER_SETTINGS.customInstructions);
     setMaxOutputTokens(DEFAULT_PDF_IMPORTER_SETTINGS.maxOutputTokens);
+    setMaxContinuationRounds(
+      DEFAULT_PDF_IMPORTER_SETTINGS.maxContinuationRounds,
+    );
     setMergeDuplicates(DEFAULT_PDF_IMPORTER_SETTINGS.mergeDuplicates);
     addNotification("Reset to default AI model and settings", "success");
   }, [addNotification]);
@@ -970,6 +991,13 @@ export default function PDFImporter({
     pdfDoc: PDFDocument;
     fileName: string;
   } | null>(null);
+
+  // How many summarize responses were still cut off by the model's output
+  // limit after every continuation round the server allows (see
+  // `incomplete` in ocrSummarizeCall.ts). Those notes are probably missing
+  // content from the tail of that chunk, so the user is told rather than
+  // quietly getting a partial import.
+  const incompleteExtractionsRef = useRef(0);
 
   // JSON Repair Modal state - for manual fixing of broken chunk output
   const [repairModalOpen, setRepairModalOpen] = useState(false);
@@ -1184,6 +1212,7 @@ export default function PDFImporter({
             model: getSelectedModel().model,
             provider: getSelectedModel().provider,
             maxTokens: maxOutputTokens,
+            maxContinuationRounds,
             openRouterKey: keys.openRouterKey,
             deepseekKey: keys.deepseekKey,
             mistralKey: keys.mistralKey,
@@ -1275,6 +1304,7 @@ export default function PDFImporter({
       customInstructions,
       getSelectedModel,
       maxOutputTokens,
+      maxContinuationRounds,
       keys,
       addNotification,
     ],
@@ -1554,7 +1584,8 @@ export default function PDFImporter({
       const totalChunks = ranges.length;
       const progressEnd = progressStart + progressRange;
       const { model, provider } = resolveModelSelection(settings);
-      const { customInstructions, maxOutputTokens } = settings;
+      const { customInstructions, maxOutputTokens, maxContinuationRounds } =
+        settings;
 
       // Retain the parsed document so failed chunks can re-run OCR from
       // the chunk panel after the import finishes.
@@ -1770,6 +1801,7 @@ export default function PDFImporter({
                   model,
                   provider,
                   maxTokens: maxOutputTokens,
+                  maxContinuationRounds,
                   openRouterKey: keys.openRouterKey,
                   deepseekKey: keys.deepseekKey,
                   mistralKey: keys.mistralKey,
@@ -1852,6 +1884,8 @@ export default function PDFImporter({
                 pageEnd: range.pageEnd,
               };
             }
+
+            if (result.incomplete) incompleteExtractionsRef.current++;
 
             setChunkStatuses((prev) =>
               prev.map((cs) =>
@@ -2040,6 +2074,7 @@ export default function PDFImporter({
     // rework rather than silently ending up with missing content.
     const allFailedPages: FailedPageRange[] = [];
     let totalPagesProcessed = 0;
+    incompleteExtractionsRef.current = 0;
 
     try {
       const totalFiles = selectedFiles.length;
@@ -2117,6 +2152,7 @@ export default function PDFImporter({
               customModelId,
               customInstructions,
               maxOutputTokens,
+              maxContinuationRounds,
             },
           );
 
@@ -2178,6 +2214,7 @@ export default function PDFImporter({
                   model: getSelectedModel().model,
                   provider: getSelectedModel().provider,
                   maxTokens: maxOutputTokens,
+                  maxContinuationRounds,
                   openRouterKey: keys.openRouterKey,
                   deepseekKey: keys.deepseekKey,
                   mistralKey: keys.mistralKey,
@@ -2197,6 +2234,7 @@ export default function PDFImporter({
               }
 
               const summarizeResult = await summarizeResponse.json();
+              if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
               const fileResult = {
                 lore: summarizeResult.lore || [],
                 mechanicNotes: summarizeResult.mechanicNotes || [],
@@ -2276,6 +2314,7 @@ export default function PDFImporter({
                 model: getSelectedModel().model,
                 provider: getSelectedModel().provider,
                 maxTokens: maxOutputTokens,
+                maxContinuationRounds,
                 openRouterKey: keys.openRouterKey,
                 deepseekKey: keys.deepseekKey,
                 mistralKey: keys.mistralKey,
@@ -2292,6 +2331,7 @@ export default function PDFImporter({
             }
 
             const summarizeResult = await summarizeResponse.json();
+            if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
             const fileResult = {
               lore: summarizeResult.lore || [],
               mechanicNotes: summarizeResult.mechanicNotes || [],
@@ -2367,6 +2407,14 @@ export default function PDFImporter({
           `${allFailedPages.length} page range${
             allFailedPages.length > 1 ? "s" : ""
           } failed to import and were skipped - see Saved Imports for details on which pages to rework`,
+          "warning",
+        );
+      }
+      if (incompleteExtractionsRef.current > 0) {
+        addNotification(
+          `${incompleteExtractionsRef.current} section${
+            incompleteExtractionsRef.current > 1 ? "s" : ""
+          } still had more to extract when the import stopped - some notes near the end may be missing. Raise "Continuation Rounds" or "Max Output Size" in Advanced Options and re-import to capture the rest.`,
           "warning",
         );
       }
@@ -2472,6 +2520,7 @@ export default function PDFImporter({
           model: selectedModel.model,
           provider: selectedModel.provider,
           maxTokens: maxOutputTokens,
+          maxContinuationRounds,
           openRouterKey: keys.openRouterKey,
           deepseekKey: keys.deepseekKey,
           mistralKey: keys.mistralKey,
@@ -2564,6 +2613,9 @@ export default function PDFImporter({
     setCustomModelId(settings.customModelId);
     setCustomInstructions(settings.customInstructions);
     setMaxOutputTokens(settings.maxOutputTokens);
+    if (settings.maxContinuationRounds !== undefined) {
+      setMaxContinuationRounds(settings.maxContinuationRounds);
+    }
 
     try {
       const pdfDoc = await PDFDocument.load(interruptedImport.fileBytes, {
@@ -3627,6 +3679,37 @@ export default function PDFImporter({
                           <p className="text-xs text-blue-300/60 mt-1">
                             Higher values extract more content but take longer.
                             Increase if content is being cut off.
+                          </p>
+                        </div>
+
+                        {/* Continuation Rounds Slider */}
+                        <div>
+                          <label className="block text-sm font-semibold text-blue-200 mb-1">
+                            Continuation Rounds: {maxContinuationRounds}
+                          </label>
+                          <input
+                            type="range"
+                            min={0}
+                            max={MAX_CONTINUATION_ROUNDS_LIMIT}
+                            step={1}
+                            value={maxContinuationRounds}
+                            onChange={(e) =>
+                              setMaxContinuationRounds(Number(e.target.value))
+                            }
+                            className="w-full h-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                          />
+                          <div className="flex justify-between text-xs text-blue-300/60 mt-1">
+                            <span>0 (Off)</span>
+                            <span>
+                              {MAX_CONTINUATION_ROUNDS_LIMIT} (Thorough)
+                            </span>
+                          </div>
+                          <p className="text-xs text-blue-300/60 mt-1">
+                            When a response runs out of output length, ask the
+                            model to carry on with the notes it hasn&apos;t
+                            written yet, up to this many extra rounds. Each
+                            round re-sends the document, so higher values cost
+                            more. 0 keeps only what fits in one response.
                           </p>
                         </div>
 

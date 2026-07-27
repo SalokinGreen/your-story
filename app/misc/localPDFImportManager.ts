@@ -71,6 +71,11 @@ export interface InProgressPDFImportSettings {
   customModelId: string;
   customInstructions: string;
   maxOutputTokens: number;
+  /**
+   * Optional: records written before this setting existed don't carry it,
+   * and resuming one of those just falls back to the default.
+   */
+  maxContinuationRounds?: number;
 }
 
 export interface InProgressPDFImport {
