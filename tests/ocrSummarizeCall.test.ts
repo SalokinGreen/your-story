@@ -426,3 +426,174 @@ describe("summarizeOCR document parts", () => {
     expect(result.incomplete).toBe(true);
   });
 });
+
+/**
+ * Notes-recovery tests.
+ *
+ * Table-heavy source material (a rulebook appendix, a page of random tables)
+ * reliably pulls models into filling customTables and calling the job done,
+ * leaving the import with no lore or mechanic notes at all - but the notes
+ * are what the game engine reads during play, and the tables are meant to be
+ * an addition on top of them. summarizeOCR now spots a part that came back
+ * as tables and nothing else and asks again for the notes.
+ */
+function tableResult(name: string, rows: string[]) {
+  return {
+    name,
+    entries: rows.map((text) => ({ text, weight: 1 })),
+  };
+}
+
+describe("summarizeOCR notes recovery", () => {
+  beforeEach(() => {
+    mockProviderFetch.mockReset();
+  });
+
+  it("asks again for the notes when a response is all tables and no notes", async () => {
+    queueResponses([
+      aiResponse(
+        {
+          summary: "A book of random tables.",
+          lore: [],
+          mechanicNotes: [],
+          customTables: [tableResult("Wandering Horrors", ["Brine wraith"])],
+        },
+        "stop",
+      ),
+      aiResponse(
+        {
+          lore: [loreEntry("The Brine Wraiths")],
+          mechanicNotes: [loreEntry("Rolling for Wandering Horrors")],
+          customTables: [],
+        },
+        "stop",
+      ),
+    ]);
+
+    const result = await summarizeOCR(baseBody);
+    if ("error" in result) throw new Error(result.error);
+
+    expect(mockProviderFetch).toHaveBeenCalledTimes(2);
+    expect(result.lore.map((e) => e.title)).toEqual(["The Brine Wraiths"]);
+    expect(result.mechanicNotes.map((e) => e.title)).toEqual([
+      "Rolling for Wandering Horrors",
+    ]);
+    // The tables it did extract are kept, not re-requested or lost.
+    expect(result.customTables.map((t) => t.name)).toEqual(["Wandering Horrors"]);
+  });
+
+  it("tells the recovery round which tables are already saved and to skip them", async () => {
+    queueResponses([
+      aiResponse(
+        { customTables: [tableResult("Wandering Horrors", ["Brine wraith"])] },
+        "stop",
+      ),
+      aiResponse({ lore: [loreEntry("The Brine Wraiths")] }, "stop"),
+    ]);
+
+    await summarizeOCR(baseBody);
+
+    const recoveryPrompt = JSON.parse(
+      mockProviderFetch.mock.calls[1][1].body as string,
+    ).messages[1].content as string;
+    expect(recoveryPrompt).toContain("NOTES STILL MISSING");
+    expect(recoveryPrompt).toContain("- Wandering Horrors");
+    expect(recoveryPrompt).toContain('"customTables": []');
+  });
+
+  it("does not fire when the response already has notes alongside its tables", async () => {
+    queueResponses([
+      aiResponse(
+        {
+          lore: [loreEntry("The Brine Wraiths")],
+          customTables: [tableResult("Wandering Horrors", ["Brine wraith"])],
+        },
+        "stop",
+      ),
+    ]);
+
+    const result = await summarizeOCR(baseBody);
+    if ("error" in result) throw new Error(result.error);
+
+    expect(mockProviderFetch).toHaveBeenCalledTimes(1);
+    expect(result.extractionRounds).toBe(1);
+  });
+
+  it("does not fire when the response has neither notes nor tables", async () => {
+    queueResponses([aiResponse({ lore: [], mechanicNotes: [] }, "stop")]);
+
+    await summarizeOCR(baseBody);
+
+    expect(mockProviderFetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("only retries once per part, even if the retry brings back no notes", async () => {
+    mockProviderFetch.mockImplementation(async () =>
+      aiResponse(
+        { customTables: [tableResult("Wandering Horrors", ["Brine wraith"])] },
+        "stop",
+      ),
+    );
+
+    const result = await summarizeOCR(baseBody);
+    if ("error" in result) throw new Error(result.error);
+
+    expect(mockProviderFetch).toHaveBeenCalledTimes(2);
+    expect(result.lore).toEqual([]);
+  });
+
+  it("still recovers notes when continuation rounds are turned off", async () => {
+    queueResponses([
+      aiResponse(
+        { customTables: [tableResult("Wandering Horrors", ["Brine wraith"])] },
+        "stop",
+      ),
+      aiResponse({ lore: [loreEntry("The Brine Wraiths")] }, "stop"),
+    ]);
+
+    const result = await summarizeOCR({ ...baseBody, maxContinuationRounds: 0 });
+    if ("error" in result) throw new Error(result.error);
+
+    expect(mockProviderFetch).toHaveBeenCalledTimes(2);
+    expect(result.lore.map((e) => e.title)).toEqual(["The Brine Wraiths"]);
+  });
+
+  it("does not spend the disabled continuation budget on a truncated response", async () => {
+    // maxContinuationRounds: 0 means "don't continue past the output limit" -
+    // the recovery allowance must not be repurposed into one.
+    queueResponses([
+      aiResponse({ lore: [loreEntry("Vashti")] }, "length"),
+      aiResponse({ lore: [loreEntry("Should not be requested")] }, "stop"),
+    ]);
+
+    const result = await summarizeOCR({ ...baseBody, maxContinuationRounds: 0 });
+    if ("error" in result) throw new Error(result.error);
+
+    expect(mockProviderFetch).toHaveBeenCalledTimes(1);
+    expect(result.incomplete).toBe(true);
+  });
+
+  it("recovers notes per part of a multi-part document", async () => {
+    const longMarkdown = `# Tables one\n${"filler line\n".repeat(6000)}\n# Tables two\n${"more filler\n".repeat(
+      100,
+    )}`;
+    const parts = splitIntoWindows(longMarkdown).length;
+    expect(parts).toBe(2);
+
+    queueResponses([
+      // Part 1: tables only -> recovery -> notes.
+      aiResponse({ customTables: [tableResult("Table A", ["a"])] }, "stop"),
+      aiResponse({ lore: [loreEntry("Notes for A")] }, "stop"),
+      // Part 2: tables only again -> its own recovery -> notes.
+      aiResponse({ customTables: [tableResult("Table B", ["b"])] }, "stop"),
+      aiResponse({ lore: [loreEntry("Notes for B")] }, "stop"),
+    ]);
+
+    const result = await summarizeOCR({ ...baseBody, markdown: longMarkdown });
+    if ("error" in result) throw new Error(result.error);
+
+    expect(mockProviderFetch).toHaveBeenCalledTimes(4);
+    expect(result.lore.map((e) => e.title)).toEqual(["Notes for A", "Notes for B"]);
+    expect(result.customTables.map((t) => t.name)).toEqual(["Table A", "Table B"]);
+  });
+});
