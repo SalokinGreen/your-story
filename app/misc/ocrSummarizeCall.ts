@@ -83,12 +83,17 @@ export interface ExtractedContent {
 export const DEFAULT_MAX_CONTINUATION_ROUNDS = 5;
 
 /**
- * Default wall-clock budget for continuation rounds. Must stay under the
- * caller's request timeout (PDFImporter allows 4 minutes, the route's
- * `maxDuration` is 5) so a long extraction returns the notes it has rather
- * than being killed mid-flight with nothing to show.
+ * Default wall-clock budget for the whole call, continuation rounds
+ * included. Must stay under the route's `maxDuration` (5 minutes) with room
+ * to spare: a call killed by the platform takes the whole SSE stream down
+ * with it, which costs the client every note written so far, whereas
+ * stopping ourselves returns them with `incomplete: true`.
+ *
+ * The budget covers the round about to start, not just the moment it starts
+ * (see `summarizeOCR`), so overrunning it takes a round far slower than
+ * every round before it.
  */
-export const DEFAULT_CONTINUATION_BUDGET_MS = 180_000;
+export const DEFAULT_CONTINUATION_BUDGET_MS = 240_000;
 
 export interface OCRSummarizeError {
   error: string;
@@ -450,6 +455,7 @@ export async function summarizeOCR(
     reason: "initial",
   });
 
+  const firstRoundStartedAt = Date.now();
   const first = await runExtractionRound(
     effectiveProvider,
     systemPrompt,
@@ -489,6 +495,10 @@ export async function summarizeOCR(
   // spending its budget on anything else would make "0" mean something
   // different than "don't continue past the output limit".
   let continuationsUsed = 0;
+  // The slowest round so far, used to judge whether the next one can finish
+  // inside the budget. Rounds are the same shape of work every time, so the
+  // slowest one to date is a fair worst case for the next.
+  let slowestRoundMs = Date.now() - firstRoundStartedAt;
 
   // Truncation rounds, document parts and notes recovery get separate
   // allowances, so a long document doesn't spend its whole budget re-trying
@@ -505,9 +515,13 @@ export async function summarizeOCR(
   // stuff left, either because the model ran out of room on this part or
   // because there are more parts of the document to work through.
   while (rounds <= maxRounds) {
-    if (Date.now() - startedAt >= continuationBudgetMs) {
+    // Judged against where the next round would *end*, not where it starts:
+    // a round begun just inside the budget still runs for minutes, and
+    // overrunning the request timeout loses the whole response - every note
+    // already written included - instead of returning it as incomplete.
+    if (Date.now() - startedAt + slowestRoundMs >= continuationBudgetMs) {
       console.warn(
-        "OCR summarize continuation budget spent - returning partial notes",
+        "OCR summarize has no room left for another round - returning partial notes",
       );
       break;
     }
@@ -559,6 +573,7 @@ export async function summarizeOCR(
       reason,
     });
 
+    const roundStartedAt = Date.now();
     const round = await runExtractionRound(
       effectiveProvider,
       systemPrompt,
@@ -568,6 +583,7 @@ export async function summarizeOCR(
       apiKey,
       onDelta,
     );
+    slowestRoundMs = Math.max(slowestRoundMs, Date.now() - roundStartedAt);
 
     // A failed round is never fatal: keep whatever earlier rounds already
     // extracted rather than losing the whole import.

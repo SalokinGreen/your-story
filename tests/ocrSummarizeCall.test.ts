@@ -425,6 +425,28 @@ describe("summarizeOCR document parts", () => {
     expect(mockProviderFetch).toHaveBeenCalledTimes(1);
     expect(result.incomplete).toBe(true);
   });
+
+  it("does not start a round the budget cannot cover", async () => {
+    // A round takes about as long as the whole remaining budget, so
+    // starting another one would run past the request timeout and take the
+    // entire response - every note already written included - down with it.
+    const ROUND_MS = 60;
+    mockProviderFetch.mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, ROUND_MS));
+      return aiResponse({ lore: [loreEntry("Only entry")] }, "length");
+    });
+
+    const result = await summarizeOCR({
+      ...baseBody,
+      // Room for the first round and then some, but nowhere near enough for
+      // a second one.
+      continuationBudgetMs: ROUND_MS * 1.5,
+    });
+    if ("error" in result) throw new Error(result.error);
+
+    expect(mockProviderFetch).toHaveBeenCalledTimes(1);
+    expect(result.incomplete).toBe(true);
+  });
 });
 
 /**

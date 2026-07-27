@@ -145,7 +145,7 @@ export default function NotePreviewCard({
 
         <span className="flex-1 min-w-0">
           <span className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-white text-sm break-words">
+            <span className="font-semibold text-white text-sm [overflow-wrap:anywhere]">
               {note.title || (
                 <span className="text-blue-300/50 italic">Writing…</span>
               )}
@@ -191,7 +191,11 @@ export default function NotePreviewCard({
 
       {expanded && (
         <div className="px-3 pb-3 -mt-1 space-y-2">
-          <div className="rounded-lg bg-black/20 p-3 prose prose-sm prose-invert max-w-none text-blue-50/85 prose-headings:text-white prose-strong:text-white prose-a:text-purple-300 prose-table:text-xs">
+          {/* An extracted note can hold a markdown table or a long unbroken
+              string, either of which is wider than a phone screen. Wrap what
+              can be wrapped and scroll the rest inside the card, so the card
+              never widens the page around it. */}
+          <div className="rounded-lg bg-black/20 p-3 overflow-x-auto [overflow-wrap:anywhere] prose prose-sm prose-invert max-w-none text-blue-50/85 prose-headings:text-white prose-strong:text-white prose-a:text-purple-300 prose-table:text-xs">
             {note.content ? (
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {note.content}

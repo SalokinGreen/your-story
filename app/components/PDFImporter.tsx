@@ -19,6 +19,7 @@ import {
   OCRSummarizeSuccess,
   OCRSummarizeError,
   DEFAULT_MAX_CONTINUATION_ROUNDS,
+  processParserResult,
 } from "@/app/misc/ocrSummarizeCall";
 import { streamSummarizeOCR } from "@/app/misc/ocrSummarizeStream";
 import {
@@ -76,8 +77,11 @@ const LOW_MEMORY_DEVICE_THRESHOLD_GB = 4;
 // small each individual chunk ends up being. Treat large source files as
 // memory-constrained on their own, independent of device detection.
 const VERY_LARGE_FILE_SIZE_MB = 25;
-// Timeout for summarize requests (4 minutes - server allows 5)
-const SUMMARIZE_TIMEOUT_MS = 240000;
+// How long a summarize stream may go silent before it counts as dead. This
+// is an *idle* timeout, not a cap on the whole extraction: a whole rulebook
+// takes several minutes of continuous streaming, and a wall-clock cap kills
+// a perfectly healthy extraction and restarts it from nothing.
+const SUMMARIZE_IDLE_TIMEOUT_MS = 90000;
 // Timeout per OCR upload attempt (4 minutes - server allows 5). Large,
 // image-heavy chunks can legitimately take Mistral several minutes.
 const OCR_TIMEOUT_MS = 240000;
@@ -258,7 +262,7 @@ function createLimiter(concurrency: number) {
 async function fetchWithRetry(
   path: "/api/ocr/process",
   body: OCRProcessRequestBody,
-  timeoutMs: number = SUMMARIZE_TIMEOUT_MS,
+  timeoutMs: number = OCR_TIMEOUT_MS,
   maxRetries: number = MAX_RETRIES,
 ): Promise<Response> {
   let lastError: Error = new Error("Request failed after retries");
@@ -367,6 +371,13 @@ function createLiveTracker(onUpdate: (live: PartialExtraction) => void) {
     },
     /** The model's raw output, for the manual JSON-repair flow. */
     getRaw: () => raw,
+    /**
+     * Everything parsed out of the stream so far. Normally just a preview,
+     * but it is also what survives a connection that drops mid-extraction -
+     * see `summarizeWithLive`.
+     */
+    getPartial: () =>
+      mergePartialExtraction(committed, parsePartialExtraction(buffer)),
     stop() {
       stopped = true;
       if (timer !== null) {
@@ -374,6 +385,49 @@ function createLiveTracker(onUpdate: (live: PartialExtraction) => void) {
         timer = null;
       }
     },
+  };
+}
+
+/**
+ * Turn what a dropped stream managed to write into a usable (incomplete)
+ * extraction, or null when nothing finished.
+ *
+ * Only entries the model actually finished count: a title with no content
+ * (or the entry it was midway through when the connection died) would import
+ * as an empty note. Everything that survives goes through the same
+ * normaliser the server uses, so a salvaged note is shaped exactly like one
+ * that came back over a healthy connection.
+ */
+function salvagePartialExtraction(
+  partial: PartialExtraction,
+): OCRSummarizeSuccess | null {
+  const usableNotes = (notes: PartialExtraction["lore"]) =>
+    notes.filter((note) => note.title.trim() && note.content.trim());
+  const lore = usableNotes(partial.lore);
+  const mechanicNotes = usableNotes(partial.mechanicNotes);
+  const customTables = partial.customTables.filter(
+    (table) => table.name.trim() && table.entries.length > 0,
+  );
+
+  if (lore.length + mechanicNotes.length + customTables.length === 0) {
+    return null;
+  }
+
+  const processed = processParserResult({
+    summary: partial.summary,
+    lore,
+    mechanicNotes,
+    customTables,
+  });
+  return {
+    success: true,
+    ...processed,
+    detectedContentType: "unknown",
+    rawExtractedTables: 0,
+    extractionRounds: 0,
+    // The rest of the document never arrived, which is exactly what this
+    // flag is for - the importer warns about it at the end.
+    incomplete: true,
   };
 }
 
@@ -1187,6 +1241,11 @@ export default function PDFImporter({
    * Returns the same success/error result the non-streaming call did, plus
    * the raw model output - which is what the manual JSON-repair flow needs
    * when a response comes back unparseable.
+   *
+   * A stream that dies after the model has already written notes keeps those
+   * notes: they are parsed out of what was streamed and returned as an
+   * incomplete extraction. Throwing them away would mean re-running the whole
+   * document from the first note for the sake of the ones that never arrived.
    */
   const summarizeWithLive = useCallback(
     async (
@@ -1201,10 +1260,18 @@ export default function PDFImporter({
         const result = await streamSummarizeOCR(body, {
           onEvent: tracker.onEvent,
           onRetry: tracker.reset,
-          timeoutMs: SUMMARIZE_TIMEOUT_MS,
+          idleTimeoutMs: SUMMARIZE_IDLE_TIMEOUT_MS,
           maxRetries: MAX_RETRIES,
         });
         return { result, raw: tracker.getRaw() };
+      } catch (err) {
+        const salvaged = salvagePartialExtraction(tracker.getPartial());
+        if (!salvaged) throw err;
+        console.warn(
+          "Summarize stream failed after notes were written - keeping the partial extraction:",
+          err,
+        );
+        return { result: salvaged, raw: tracker.getRaw() };
       } finally {
         tracker.stop();
       }
@@ -3188,8 +3255,13 @@ export default function PDFImporter({
               )}
             </div>
 
+            {/* overflow-wrap:anywhere rather than break-words: only
+                `anywhere` also shrinks the block's min-content width, and a
+                single long token in the source (a rule of dashes, a table
+                row, a URL) is otherwise wide enough to push the whole
+                importer past the width of a phone. */}
             {chunkPreviewTab === "text" && canPreviewText && (
-              <pre className="text-xs text-blue-200/70 whitespace-pre-wrap break-words max-h-64 overflow-y-auto bg-black/25 rounded-lg p-2.5">
+              <pre className="text-xs text-blue-200/70 whitespace-pre-wrap [overflow-wrap:anywhere] max-h-64 overflow-y-auto bg-black/25 rounded-lg p-2.5">
                 {chunk.ocrMarkdown}
               </pre>
             )}
@@ -3201,7 +3273,7 @@ export default function PDFImporter({
                 customTables={preview.customTables}
                 streaming={chunk.status === "summarizing"}
                 emptyMessage="No notes came out of this chunk."
-                maxHeightClass="max-h-72"
+                scrollClass="max-h-72 overflow-y-auto pr-1"
               />
             )}
           </div>
@@ -3299,6 +3371,11 @@ export default function PDFImporter({
           }
         >
           <div className={`mx-auto ${hasWorkspace ? "max-w-6xl" : "max-w-2xl"}`}>
+            {/* min-w-0 on the columns: a grid item refuses to shrink below
+                its content's min-content width by default, so one wide note
+                (a markdown table, a long unbroken string) would otherwise
+                stretch the whole workspace past the edge of a phone screen
+                instead of scrolling inside its own card. */}
             <div
               className={
                 hasWorkspace
@@ -3308,7 +3385,7 @@ export default function PDFImporter({
             >
               {/* Left: what to import, and how far along it is */}
               <div
-                className={`space-y-4 ${hasWorkspace ? "lg:col-span-5" : ""}`}
+                className={`space-y-4 min-w-0 ${hasWorkspace ? "lg:col-span-5" : ""}`}
               >
                 {/* Interrupted Import Recovery Banner */}
                 {interruptedImport && step === "idle" && (
@@ -3935,7 +4012,7 @@ export default function PDFImporter({
                                         mechanicNotes={imp.mechanicNotes}
                                         customTables={imp.customTables}
                                         emptyMessage="This import came back empty."
-                                        maxHeightClass="max-h-80"
+                                        scrollClass="max-h-80 overflow-y-auto pr-1"
                                       />
 
                                       {imp.failedPages &&
@@ -4011,7 +4088,7 @@ export default function PDFImporter({
 
               {/* Right: the notes, as they're written */}
               {hasWorkspace && (
-                <div className="lg:col-span-7 mt-4 lg:mt-0">
+                <div className="lg:col-span-7 min-w-0 mt-4 lg:mt-0">
                   <div className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
                     <div className="px-3 sm:px-4 py-3 border-b border-white/10 flex items-center gap-2 flex-wrap">
                       <span className="text-purple-300 shrink-0">
@@ -4054,6 +4131,12 @@ export default function PDFImporter({
                       </div>
                     </div>
 
+                    {/* The inner scroll boxes are a desktop affordance: the
+                        two columns sit side by side and each keeps its own
+                        height. Stacked on mobile there is only one column,
+                        so a second scroller inside the page's own scroll
+                        just fights the finger that's trying to scroll the
+                        page - the panel grows and the body scrolls instead. */}
                     <div className="p-3">
                       {workspaceTab === "notes" ? (
                         <ExtractionPreview
@@ -4062,10 +4145,10 @@ export default function PDFImporter({
                           customTables={extracted.customTables}
                           streaming={isBusy && step !== "complete"}
                           emptyMessage="Notes will show up here as they're written."
-                          maxHeightClass="max-h-[calc(100dvh-20rem)]"
+                          scrollClass="lg:max-h-[calc(100dvh-20rem)] lg:overflow-y-auto lg:pr-1"
                         />
                       ) : (
-                        <div className="space-y-2 max-h-[calc(100dvh-20rem)] overflow-y-auto pr-1">
+                        <div className="space-y-2 lg:max-h-[calc(100dvh-20rem)] lg:overflow-y-auto lg:pr-1">
                           {chunkStatuses.length === 0 && (
                             <p className="text-xs text-blue-300/50 italic py-2">
                               Nothing being processed yet.
