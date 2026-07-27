@@ -26,6 +26,17 @@ export interface OCRSummarizeRequestBody {
   model?: string;
   provider?: AIProvider;
   maxTokens?: number;
+  /**
+   * How many extra generation rounds are allowed after a response that ran
+   * out of output tokens (see `summarizeOCR`). 0 disables continuation.
+   */
+  maxContinuationRounds?: number;
+  /**
+   * Wall-clock budget for the whole call. No continuation round is started
+   * once it's spent, so a document with more content than the budget allows
+   * returns partial notes instead of overrunning the request timeout.
+   */
+  continuationBudgetMs?: number;
   openRouterKey?: string;
   deepseekKey?: string;
   mistralKey?: string;
@@ -41,7 +52,43 @@ export interface OCRSummarizeSuccess {
   customTables: CustomTable[];
   detectedContentType: string;
   rawExtractedTables: number;
+  /** Total generation rounds used (1 = the model finished in one response). */
+  extractionRounds: number;
+  /**
+   * True when there was still more to extract when we stopped - the last
+   * round hit the output limit again, or parts of the document were never
+   * reached - i.e. the document has more in it than the round/time budget
+   * allowed.
+   */
+  incomplete: boolean;
 }
+
+/**
+ * A single round's worth of extracted content, and the shape the rounds are
+ * folded into (see `mergeRound`).
+ */
+export interface ExtractedContent {
+  summary: string;
+  lore: StoryLore[];
+  mechanicNotes: StoryLore[];
+  customTables: CustomTable[];
+}
+
+/**
+ * Default cap on continuation rounds. A big single-chunk document (a whole
+ * .md file imported in one go) routinely needs more notes than fit in one
+ * response's output budget, so the model gets several rounds to keep going -
+ * but not unboundedly, since each round re-sends the source document.
+ */
+export const DEFAULT_MAX_CONTINUATION_ROUNDS = 5;
+
+/**
+ * Default wall-clock budget for continuation rounds. Must stay under the
+ * caller's request timeout (PDFImporter allows 4 minutes, the route's
+ * `maxDuration` is 5) so a long extraction returns the notes it has rather
+ * than being killed mid-flight with nothing to show.
+ */
+export const DEFAULT_CONTINUATION_BUDGET_MS = 180_000;
 
 export interface OCRSummarizeError {
   error: string;
@@ -76,7 +123,14 @@ export async function callProviderAI(
   model: string,
   maxTokens: number,
   apiKey: string,
-): Promise<{ success: boolean; content?: string; error?: string }> {
+  options: { jsonMode?: boolean } = {},
+): Promise<{
+  success: boolean;
+  content?: string;
+  error?: string;
+  /** Raw provider finish reason ("stop" / "length" / ...) when reported. */
+  finishReason?: string;
+}> {
   try {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -97,7 +151,10 @@ export async function callProviderAI(
     };
     // Only Mistral/DeepSeek were asked for strict JSON mode in the original
     // per-provider implementations - OpenRouter/Google/DeepInfra weren't.
-    if (provider === "mistral" || provider === "deepseek") {
+    // `jsonMode: false` opts out for calls whose expected output isn't a
+    // whole JSON object (the bracket-closing salvage call below).
+    const jsonMode = options.jsonMode ?? true;
+    if (jsonMode && (provider === "mistral" || provider === "deepseek")) {
       requestBody.response_format = { type: "json_object" };
     }
 
@@ -115,10 +172,93 @@ export async function callProviderAI(
     }
 
     const data = await response.json();
-    return { success: true, content: data.choices[0]?.message?.content || "" };
+    return {
+      success: true,
+      content: data.choices[0]?.message?.content || "",
+      finishReason: data.choices[0]?.finish_reason,
+    };
   } catch (error: any) {
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * One generation round: call the model, then get a parsed result out of
+ * whatever came back. A response cut off by the output limit is first given
+ * two cheap "close the JSON" attempts (so the entries it *did* write survive
+ * intact), then falls back to bracket repair, which drops at most the final
+ * half-written entry. Callers use `truncated` to decide whether to ask for
+ * another round of *new* content.
+ */
+async function runExtractionRound(
+  provider: AIProvider,
+  systemPrompt: string,
+  userPrompt: string,
+  model: string,
+  maxTokens: number,
+  apiKey: string,
+): Promise<{ parsed: ExtractedContent; truncated: boolean; error?: string }> {
+  const aiResponse = await callProviderAI(
+    provider,
+    systemPrompt,
+    userPrompt,
+    model,
+    maxTokens,
+    apiKey,
+  );
+
+  if (!aiResponse.success) {
+    return {
+      parsed: emptyExtraction(),
+      truncated: false,
+      error: aiResponse.error || "AI processing failed",
+    };
+  }
+
+  let content = aiResponse.content || "";
+  // Judge truncation from the raw response, before any repair below makes
+  // the JSON look complete again.
+  const truncated = wasTruncated(content, aiResponse.finishReason);
+  let parsed = tryParseAIResponse(content);
+
+  if (!parsed && isContentTruncated(content)) {
+    console.log("Content appears truncated, attempting continuation...");
+
+    for (let attempt = 0; attempt < 2; attempt++) {
+      console.log(`Continuation attempt ${attempt + 1}/2`);
+      const continuationPrompt = buildContinuationPrompt(content, "core");
+
+      const continuationResponse = await callProviderAI(
+        provider,
+        "You are a JSON completion assistant. Output ONLY the minimal characters needed to close the JSON.",
+        continuationPrompt,
+        model,
+        2000,
+        apiKey,
+        // Not a whole JSON object - strict JSON mode would fight the prompt.
+        { jsonMode: false },
+      );
+
+      if (continuationResponse?.success && continuationResponse.content) {
+        const cleanedContinuation = cleanContinuationContent(content, continuationResponse.content);
+        if (cleanedContinuation) {
+          content = content + cleanedContinuation;
+          parsed = tryParseAIResponse(content);
+          if (parsed) {
+            console.log(`Continuation successful on attempt ${attempt + 1}`);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  if (!parsed) {
+    console.log("Using JSON repair as final fallback");
+    parsed = parseAIResponse(content);
+  }
+
+  return { parsed, truncated };
 }
 
 export async function summarizeOCR(
@@ -131,6 +271,8 @@ export async function summarizeOCR(
     model = "ministral-14b-2512",
     provider,
     maxTokens = 16000,
+    maxContinuationRounds = DEFAULT_MAX_CONTINUATION_ROUNDS,
+    continuationBudgetMs = DEFAULT_CONTINUATION_BUDGET_MS,
     openRouterKey,
     deepseekKey,
     mistralKey,
@@ -159,68 +301,108 @@ export async function summarizeOCR(
     };
   }
 
+  const startedAt = Date.now();
   const contentType = detectContentType(markdown);
   const extractedTables = extractTables(markdown);
 
   const systemPrompt = buildSystemPrompt(focus, customInstructions);
-  const userPrompt = buildUserPrompt(markdown, contentType, extractedTables);
+  const windows = splitIntoWindows(markdown);
+  // The pre-extracted tables come from the whole document, so they're only
+  // worth attaching to the first part's prompt.
+  const promptForWindow = (index: number) =>
+    buildUserPrompt(
+      windows[index],
+      contentType,
+      index === 0 ? extractedTables : [],
+      { index, total: windows.length },
+    );
 
-  const aiResponse = await callProviderAI(
+  const first = await runExtractionRound(
     effectiveProvider,
     systemPrompt,
-    userPrompt,
+    promptForWindow(0),
     model,
     maxTokens,
     apiKey,
   );
 
-  if (!aiResponse.success) {
-    return { error: aiResponse.error || "AI processing failed", status: 500 };
+  if (first.error) {
+    return { error: first.error, status: 500 };
   }
 
-  let content = aiResponse.content || "";
-  let parsed = tryParseAIResponse(content);
+  const collected = first.parsed;
+  let windowIndex = 0;
+  // Whether the current part of the document still has more to give: the
+  // model was cut off by the output limit before it finished with it.
+  let moreInThisWindow = first.truncated;
+  let rounds = 1;
 
-  if (!parsed && isContentTruncated(content)) {
-    console.log("Content appears truncated, attempting continuation...");
+  // Truncation rounds and document parts get separate allowances, so a long
+  // document doesn't spend its whole budget re-trying part one.
+  const maxRounds = maxContinuationRounds + (windows.length - 1);
 
-    for (let attempt = 0; attempt < 2; attempt++) {
-      console.log(`Continuation attempt ${attempt + 1}/2`);
-      const continuationPrompt = buildContinuationPrompt(content, "core");
-
-      const continuationResponse = await callProviderAI(
-        effectiveProvider,
-        "You are a JSON completion assistant. Output ONLY the minimal characters needed to close the JSON.",
-        continuationPrompt,
-        model,
-        2000,
-        apiKey,
+  // A single big document (a whole .md file is imported as one chunk) usually
+  // has far more notes in it than fit in one response's output budget.
+  // Closing the JSON only salvages what was already written - everything the
+  // model hadn't got to yet is simply missing. So keep going while there's
+  // stuff left, either because the model ran out of room on this part or
+  // because there are more parts of the document to work through.
+  while (rounds <= maxRounds) {
+    if (Date.now() - startedAt >= continuationBudgetMs) {
+      console.warn(
+        "OCR summarize continuation budget spent - returning partial notes",
       );
-
-      if (continuationResponse?.success && continuationResponse.content) {
-        const cleanedContinuation = cleanContinuationContent(content, continuationResponse.content);
-        if (cleanedContinuation) {
-          content = content + cleanedContinuation;
-          parsed = tryParseAIResponse(content);
-          if (parsed) {
-            console.log(`Continuation successful on attempt ${attempt + 1}`);
-            break;
-          }
-        }
-      }
+      break;
     }
-  }
 
-  if (!parsed) {
-    console.log("Using JSON repair as final fallback");
-    parsed = parseAIResponse(content);
+    let prompt: string;
+    if (moreInThisWindow) {
+      console.log(
+        `OCR summarize hit the output limit, continuing part ${windowIndex + 1}/${windows.length} (round ${rounds}/${maxRounds})...`,
+      );
+      prompt = buildContinuationUserPrompt(promptForWindow(windowIndex), collected);
+    } else if (windowIndex + 1 < windows.length) {
+      windowIndex++;
+      console.log(
+        `OCR summarize moving on to part ${windowIndex + 1}/${windows.length}...`,
+      );
+      prompt = buildNextPartUserPrompt(promptForWindow(windowIndex), collected);
+    } else {
+      // Nothing left: the model finished, on the last part of the document.
+      break;
+    }
+
+    const round = await runExtractionRound(
+      effectiveProvider,
+      systemPrompt,
+      prompt,
+      model,
+      maxTokens,
+      apiKey,
+    );
+
+    // A failed round is never fatal: keep whatever earlier rounds already
+    // extracted rather than losing the whole import.
+    if (round.error) {
+      console.error("Continuation round failed:", round.error);
+      break;
+    }
+
+    rounds++;
+    const added = mergeRound(collected, round.parsed);
+    // Re-asking only pays off while the model still has something new to
+    // say; if it's just repeating entries we already have, move on to the
+    // next part of the document instead.
+    moreInThisWindow = round.truncated && added > 0;
   }
 
   return {
     success: true,
-    ...parsed,
+    ...collected,
     detectedContentType: contentType,
     rawExtractedTables: extractedTables.length,
+    extractionRounds: rounds,
+    incomplete: moreInThisWindow || windowIndex < windows.length - 1,
   };
 }
 
@@ -316,18 +498,58 @@ CONTENT RULES:
 ${customInstructions ? `ADDITIONAL INSTRUCTIONS:\n${customInstructions}` : ""}`;
 }
 
-function buildUserPrompt(
+/**
+ * How much of the document goes into one prompt. Anything longer is walked
+ * part by part across rounds (see `splitIntoWindows`) rather than cut off -
+ * a text/markdown file is imported as a single chunk, with no page-range
+ * splitting to fall back on, so a hard truncation here used to mean the tail
+ * of the file was never seen by the model at all.
+ */
+export const MAX_PROMPT_CHARS = 50000;
+
+/** Overlap between consecutive parts, so a section on the seam isn't lost. */
+export const WINDOW_OVERLAP_CHARS = 1500;
+
+export function splitIntoWindows(
   markdown: string,
+  maxChars: number = MAX_PROMPT_CHARS,
+  overlap: number = WINDOW_OVERLAP_CHARS,
+): string[] {
+  if (markdown.length <= maxChars) return [markdown];
+
+  const windows: string[] = [];
+  let start = 0;
+
+  while (start < markdown.length) {
+    let end = Math.min(start + maxChars, markdown.length);
+    if (end < markdown.length) {
+      // Prefer a line break in the last tenth of the window so parts tend to
+      // split between sections rather than mid-sentence.
+      const earliestBreak = start + Math.floor(maxChars * 0.9);
+      const lineBreak = markdown.lastIndexOf("\n", end);
+      if (lineBreak > earliestBreak) end = lineBreak;
+    }
+
+    windows.push(markdown.slice(start, end));
+    if (end >= markdown.length) break;
+    start = Math.max(end - overlap, start + 1);
+  }
+
+  return windows;
+}
+
+function buildUserPrompt(
+  documentPart: string,
   contentType: string,
   extractedTables: { headers: string[]; rows: string[][] }[],
+  part: { index: number; total: number } = { index: 0, total: 1 },
 ): string {
-  const maxChars = 50000;
-  const truncatedMarkdown =
-    markdown.length > maxChars
-      ? markdown.substring(0, maxChars) + "\n\n[... content truncated ...]"
-      : markdown;
+  const partHeader =
+    part.total > 1
+      ? `THIS IS PART ${part.index + 1} OF ${part.total} OF THE DOCUMENT. Extract everything covered by this part; the other parts are handled by their own passes.\n\n`
+      : "";
 
-  return `Analyze this OCR-extracted RPG content and convert it to structured data.
+  return `${partHeader}Analyze this OCR-extracted RPG content and convert it to structured data.
 
 DETECTED CONTENT TYPE: ${contentType}
 
@@ -338,14 +560,171 @@ ${
 }
 
 DOCUMENT CONTENT:
-${truncatedMarkdown}
+${documentPart}
 
 Please analyze this content and output a JSON object with lore entries, mechanic notes, custom tables, and variables as specified.`;
+}
+
+function titleList(titles: string[]): string {
+  return titles.length > 0 ? titles.map((t) => `- ${t}`).join("\n") : "(none yet)";
+}
+
+/**
+ * The "you've already done these" block shared by both follow-up prompts.
+ * Each round is a fresh call with no memory of the last one, so the titles
+ * collected so far are what keeps it from re-writing the same notes.
+ */
+function alreadyExtractedBlock(collected: ExtractedContent): string {
+  return `ALREADY EXTRACTED LORE ENTRIES:
+${titleList(collected.lore.map((entry) => entry.title))}
+
+ALREADY EXTRACTED MECHANIC NOTES:
+${titleList(collected.mechanicNotes.map((entry) => entry.title))}
+
+ALREADY EXTRACTED TABLES:
+${titleList(collected.customTables.map((table) => table.name))}`;
+}
+
+/**
+ * Prompt for a follow-up round after the model ran out of output tokens on
+ * this same part of the document.
+ *
+ * Asking for a fresh, self-contained JSON object of *new* entries - rather
+ * than a raw continuation of the cut-off string - keeps every round
+ * independently parseable and works with providers pinned to strict JSON
+ * mode.
+ */
+function buildContinuationUserPrompt(
+  basePrompt: string,
+  collected: ExtractedContent,
+): string {
+  return `${basePrompt}
+
+=== CONTINUATION ROUND ===
+
+Your previous response ran out of output length before you finished. Everything you had written by then has already been saved, listed below.
+
+${alreadyExtractedBlock(collected)}
+
+CONTINUE THE EXTRACTION:
+1. Work through the parts of the document that the entries above do NOT cover yet.
+2. Output the SAME JSON format, containing ONLY the new entries. Do not repeat or rewrite anything already listed above.
+3. The one exception: if an entry above was cut off mid-way, you may output that single entry again in full - reuse its exact title so it replaces the incomplete version.
+4. "summary" may be left as an empty string; the first round's summary is kept.
+5. If the document is fully covered and there is genuinely nothing left, output {"summary": "", "lore": [], "mechanicNotes": [], "customTables": []}.`;
+}
+
+/** Prompt for the round that moves on to the next part of the document. */
+function buildNextPartUserPrompt(
+  basePrompt: string,
+  collected: ExtractedContent,
+): string {
+  return `${basePrompt}
+
+=== EARLIER PARTS ALREADY COVERED ===
+
+Earlier parts of this document have already been extracted, producing the entries below. They are saved - do not repeat them.
+
+${alreadyExtractedBlock(collected)}
+
+Extract the notes, mechanics and tables from THIS part of the document, in the same JSON format, containing only entries not already listed above. If this part continues a topic listed above, output that entry again under its exact existing title with the fuller combined text.`;
 }
 
 // ============================================================================
 // Response Parsing
 // ============================================================================
+
+export function emptyExtraction(): ExtractedContent {
+  return { summary: "", lore: [], mechanicNotes: [], customTables: [] };
+}
+
+/**
+ * Whether a response was cut short by the output-token limit. The provider's
+ * `finish_reason` is authoritative when we get one ("length" = cut off,
+ * anything else = the model chose to stop); the bracket-balance heuristic is
+ * only the fallback for providers that don't report it.
+ */
+export function wasTruncated(content: string, finishReason?: string): boolean {
+  if (finishReason === "length") return true;
+  if (finishReason) return false;
+  return isContentTruncated(content);
+}
+
+function titleKey(title: string): string {
+  return title
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\s]/g, "")
+    .replace(/\s+/g, " ");
+}
+
+function mergeEntryList(base: StoryLore[], next: StoryLore[]): number {
+  const index = new Map<string, number>();
+  base.forEach((entry, i) => index.set(titleKey(entry.title), i));
+
+  let changed = 0;
+  for (const entry of next) {
+    const key = titleKey(entry.title);
+    if (!key) continue;
+    const existing = index.get(key);
+    if (existing === undefined) {
+      index.set(key, base.length);
+      base.push(entry);
+      changed++;
+    } else if (entry.content.length > base[existing].content.length) {
+      // Same title, more text: this is the previous round's final entry,
+      // re-sent in full after the output limit chopped it off mid-sentence.
+      base[existing] = entry;
+      changed++;
+    }
+  }
+  return changed;
+}
+
+function mergeTableList(base: CustomTable[], next: CustomTable[]): number {
+  const index = new Map<string, CustomTable>();
+  base.forEach((table) => index.set(titleKey(table.name), table));
+
+  let changed = 0;
+  for (const table of next) {
+    const key = titleKey(table.name);
+    if (!key) continue;
+    const existing = index.get(key);
+    if (!existing) {
+      index.set(key, table);
+      base.push(table);
+      changed++;
+      continue;
+    }
+    // Same table continued across rounds - append the rows it didn't have
+    // room for, skipping any it repeated.
+    const seen = new Set(existing.entries.map((row) => titleKey(row.text)));
+    for (const row of table.entries) {
+      const rowKey = titleKey(row.text);
+      if (!rowKey || seen.has(rowKey)) continue;
+      seen.add(rowKey);
+      existing.entries.push(row);
+      changed++;
+    }
+  }
+  return changed;
+}
+
+/**
+ * Fold a continuation round's output into the running result, in place.
+ * Returns the number of entries added or replaced - 0 means the round
+ * produced nothing new, which is the signal to stop asking for more.
+ */
+export function mergeRound(base: ExtractedContent, next: ExtractedContent): number {
+  if (!base.summary && next.summary) {
+    base.summary = next.summary;
+  }
+  return (
+    mergeEntryList(base.lore, next.lore) +
+    mergeEntryList(base.mechanicNotes, next.mechanicNotes) +
+    mergeTableList(base.customTables, next.customTables)
+  );
+}
 
 function isContentTruncated(content: string): boolean {
   const trimmed = content.trim();

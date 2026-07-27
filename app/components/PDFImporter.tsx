@@ -971,6 +971,13 @@ export default function PDFImporter({
     fileName: string;
   } | null>(null);
 
+  // How many summarize responses were still cut off by the model's output
+  // limit after every continuation round the server allows (see
+  // `incomplete` in ocrSummarizeCall.ts). Those notes are probably missing
+  // content from the tail of that chunk, so the user is told rather than
+  // quietly getting a partial import.
+  const incompleteExtractionsRef = useRef(0);
+
   // JSON Repair Modal state - for manual fixing of broken chunk output
   const [repairModalOpen, setRepairModalOpen] = useState(false);
   const [repairChunkIndex, setRepairChunkIndex] = useState<number | null>(null);
@@ -1853,6 +1860,8 @@ export default function PDFImporter({
               };
             }
 
+            if (result.incomplete) incompleteExtractionsRef.current++;
+
             setChunkStatuses((prev) =>
               prev.map((cs) =>
                 cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx
@@ -2040,6 +2049,7 @@ export default function PDFImporter({
     // rework rather than silently ending up with missing content.
     const allFailedPages: FailedPageRange[] = [];
     let totalPagesProcessed = 0;
+    incompleteExtractionsRef.current = 0;
 
     try {
       const totalFiles = selectedFiles.length;
@@ -2197,6 +2207,7 @@ export default function PDFImporter({
               }
 
               const summarizeResult = await summarizeResponse.json();
+              if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
               const fileResult = {
                 lore: summarizeResult.lore || [],
                 mechanicNotes: summarizeResult.mechanicNotes || [],
@@ -2292,6 +2303,7 @@ export default function PDFImporter({
             }
 
             const summarizeResult = await summarizeResponse.json();
+            if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
             const fileResult = {
               lore: summarizeResult.lore || [],
               mechanicNotes: summarizeResult.mechanicNotes || [],
@@ -2367,6 +2379,14 @@ export default function PDFImporter({
           `${allFailedPages.length} page range${
             allFailedPages.length > 1 ? "s" : ""
           } failed to import and were skipped - see Saved Imports for details on which pages to rework`,
+          "warning",
+        );
+      }
+      if (incompleteExtractionsRef.current > 0) {
+        addNotification(
+          `${incompleteExtractionsRef.current} section${
+            incompleteExtractionsRef.current > 1 ? "s" : ""
+          } still ran out of output length after several continuation rounds - some notes near the end may be missing. Raise "Max output tokens" in the importer settings and re-import to capture the rest.`,
           "warning",
         );
       }
