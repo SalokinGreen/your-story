@@ -27,7 +27,7 @@ export default function ExtractionPreview({
   customTables,
   streaming = false,
   emptyMessage = "Nothing extracted yet.",
-  maxHeightClass,
+  scrollClass,
 }: {
   lore: PreviewNote[];
   mechanicNotes: PreviewNote[];
@@ -35,8 +35,13 @@ export default function ExtractionPreview({
   /** True while entries are still arriving, for the live indicator. */
   streaming?: boolean;
   emptyMessage?: string;
-  /** e.g. "max-h-72" to scroll inside a fixed height. */
-  maxHeightClass?: string;
+  /**
+   * Classes that make the list scroll inside a fixed height, e.g.
+   * "max-h-72 overflow-y-auto pr-1". Left to the caller (rather than a bare
+   * height) so a layout can keep the list scrolling on desktop and let it
+   * grow into the page scroll on mobile.
+   */
+  scrollClass?: string;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
@@ -147,7 +152,7 @@ export default function ExtractionPreview({
       )}
 
       <div
-        className={`space-y-2 ${maxHeightClass ? `${maxHeightClass} overflow-y-auto pr-1` : ""}`}
+        className={`space-y-2 ${scrollClass ?? ""}`}
       >
         {visibleCount === 0 && (
           <p className="text-xs text-blue-300/50 italic py-2">

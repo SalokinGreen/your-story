@@ -29,16 +29,36 @@ export interface StreamSummarizeOptions {
    * just before the retry starts.
    */
   onRetry?: (attempt: number, error: string) => void;
-  /** Wall-clock cap per attempt (web build only). */
-  timeoutMs?: number;
+  /**
+   * How long the stream may go *silent* before it counts as dead (web build
+   * only). Deliberately an idle timeout rather than a wall-clock cap on the
+   * whole attempt: a big document legitimately takes several minutes of
+   * continuous streaming, and cutting a healthy extraction off mid-flight
+   * just restarts it from nothing (see `streamSummarizeOCR`).
+   */
+  idleTimeoutMs?: number;
   maxRetries?: number;
   /** Caller-owned cancellation - aborts immediately, no retry. */
   signal?: AbortSignal;
 }
 
-/** Matches the PDF importer's own summarize timeout (server allows 5 min). */
-export const DEFAULT_STREAM_TIMEOUT_MS = 240000;
+/**
+ * A stream that has gone quiet this long has stopped, not slowed down: the
+ * gap between deltas is milliseconds while the model writes, and the longest
+ * legitimate silence is the pause between two rounds (one provider request's
+ * time-to-first-token).
+ */
+export const DEFAULT_STREAM_IDLE_TIMEOUT_MS = 90000;
 export const DEFAULT_STREAM_MAX_RETRIES = 2;
+
+/**
+ * How much the model has to have written before a failed attempt is worth
+ * more than a retry (see `streamSummarizeOCR`). A stream that died in its
+ * first couple of notes has produced nothing a fresh attempt won't produce
+ * again in seconds; one that died several notes in has minutes of work in it
+ * that restarting would throw away.
+ */
+const SALVAGE_OVER_RETRY_CHARS = 2000;
 
 type StreamEnvelope =
   | OCRSummarizeEvent
@@ -52,6 +72,13 @@ type StreamEnvelope =
  * equivalent of a non-OK response) and throws only for network-level
  * failures that survived every retry, so callers can keep the same
  * error handling they had around the non-streaming call.
+ *
+ * A retry starts the whole extraction over, so it is deliberately limited to
+ * attempts that produced *nothing*: a connection that drops after the model
+ * has already written notes gets reported to the caller (which can keep the
+ * partial) rather than silently restarting from zero. Restarting a long
+ * extraction that ran out of time only walks into the same wall again - from
+ * the outside that looks like the importer looping forever.
  */
 export async function streamSummarizeOCR(
   body: OCRSummarizeRequestBody,
@@ -60,7 +87,7 @@ export async function streamSummarizeOCR(
   const {
     onEvent,
     onRetry,
-    timeoutMs = DEFAULT_STREAM_TIMEOUT_MS,
+    idleTimeoutMs = DEFAULT_STREAM_IDLE_TIMEOUT_MS,
     maxRetries = DEFAULT_STREAM_MAX_RETRIES,
     signal,
   } = options;
@@ -78,15 +105,28 @@ export async function streamSummarizeOCR(
 
     const controller = new AbortController();
     let timedOut = false;
-    const timeoutId = setTimeout(() => {
-      timedOut = true;
-      controller.abort();
-    }, timeoutMs);
+    let idleTimer: ReturnType<typeof setTimeout> | null = null;
+    // Every byte that arrives is proof the stream is alive, so the clock
+    // starts again from there.
+    const armIdleTimer = () => {
+      if (idleTimer !== null) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        timedOut = true;
+        controller.abort();
+      }, idleTimeoutMs);
+    };
+    armIdleTimer();
     const abortOuter = () => controller.abort();
     signal?.addEventListener("abort", abortOuter);
+    let charsWritten = 0;
 
     try {
-      return await runStreamRequest(body, onEvent, controller.signal);
+      return await runStreamRequest(body, onEvent, controller.signal, {
+        onActivity: armIdleTimer,
+        onModelOutput: (chars) => {
+          charsWritten += chars;
+        },
+      });
     } catch (error) {
       const failure =
         error instanceof Error ? error : new Error(String(error));
@@ -94,10 +134,15 @@ export async function streamSummarizeOCR(
         // Only our own timeout is retryable; a caller-driven abort has to
         // propagate straight away.
         if (!timedOut) throw error;
-        lastError = new Error(`Request timed out after ${timeoutMs / 1000}s`);
+        lastError = new Error(
+          `Note extraction stalled - nothing received for ${idleTimeoutMs / 1000}s`,
+        );
       } else {
         lastError = failure;
       }
+
+      // Work already streamed is worth more than another full attempt.
+      if (charsWritten >= SALVAGE_OVER_RETRY_CHARS) throw lastError;
 
       if (attempt < maxRetries) {
         const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
@@ -107,7 +152,7 @@ export async function streamSummarizeOCR(
         await new Promise((resolve) => setTimeout(resolve, delay));
       }
     } finally {
-      clearTimeout(timeoutId);
+      if (idleTimer !== null) clearTimeout(idleTimer);
       signal?.removeEventListener("abort", abortOuter);
     }
   }
@@ -115,10 +160,18 @@ export async function streamSummarizeOCR(
   throw lastError;
 }
 
+interface StreamHooks {
+  /** Called for every piece of data read off the wire. */
+  onActivity: () => void;
+  /** Called with the size of each piece of content the model wrote. */
+  onModelOutput: (chars: number) => void;
+}
+
 async function runStreamRequest(
   body: OCRSummarizeRequestBody,
   onEvent: OCRSummarizeEventHandler | undefined,
   signal: AbortSignal,
+  hooks: StreamHooks,
 ): Promise<OCRSummarizeSuccess | OCRSummarizeError> {
   const response = await fetch("/api/ocr/summarize-stream", {
     method: "POST",
@@ -152,6 +205,7 @@ async function runStreamRequest(
     } else if (event.type === "error") {
       result = { error: event.error, status: event.status };
     } else {
+      if (event.type === "delta") hooks.onModelOutput(event.text.length);
       onEvent?.(event);
     }
   };
@@ -170,11 +224,34 @@ async function runStreamRequest(
     }
   };
 
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
-    drainLines(false);
+  // A silent stream is the case the idle timeout exists for, and a pending
+  // `read()` on one resolves only when the body is torn down - which an
+  // abort is not guaranteed to do promptly. Racing the signal makes the
+  // abort take effect there and then.
+  let abortPending: (reason: Error) => void = () => {};
+  const aborted = new Promise<never>((_, reject) => {
+    abortPending = reject;
+  });
+  aborted.catch(() => {});
+  const onAbort = () => {
+    const error = new Error("The note extraction stream was aborted");
+    error.name = "AbortError";
+    abortPending(error);
+  };
+  if (signal.aborted) onAbort();
+  signal.addEventListener("abort", onAbort, { once: true });
+
+  try {
+    for (;;) {
+      const { done, value } = await Promise.race([reader.read(), aborted]);
+      if (done) break;
+      hooks.onActivity();
+      buffer += decoder.decode(value, { stream: true });
+      drainLines(false);
+    }
+  } finally {
+    signal.removeEventListener("abort", onAbort);
+    reader.cancel().catch(() => {});
   }
   drainLines(true);
 

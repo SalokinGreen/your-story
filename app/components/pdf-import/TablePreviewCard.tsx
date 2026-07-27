@@ -56,7 +56,7 @@ export default function TablePreviewCard({
 
         <span className="flex-1 min-w-0">
           <span className="flex items-center gap-2 flex-wrap">
-            <span className="font-semibold text-white text-sm break-words">
+            <span className="font-semibold text-white text-sm [overflow-wrap:anywhere]">
               {table.name || (
                 <span className="text-blue-300/50 italic">Writing…</span>
               )}
@@ -102,7 +102,7 @@ export default function TablePreviewCard({
                     style={{ width: `${share}%` }}
                     aria-hidden
                   />
-                  <span className="relative flex-1 min-w-0 text-xs text-blue-100/85 break-words">
+                  <span className="relative flex-1 min-w-0 text-xs text-blue-100/85 [overflow-wrap:anywhere]">
                     {entry.text}
                   </span>
                   <span className="relative shrink-0 text-[10px] tabular-nums text-purple-200/70">

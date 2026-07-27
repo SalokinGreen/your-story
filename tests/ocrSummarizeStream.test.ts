@@ -124,10 +124,13 @@ describe("streamSummarizeOCR", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
-  it("retries a stream that ends without a result, and resets the listener", async () => {
+  it("retries a stream that dies before the model wrote anything worth keeping", async () => {
     fetchMock
       .mockResolvedValueOnce(
-        sseResponse([{ type: "delta", text: '{"lore":[{"title":"Half' }]),
+        sseResponse([
+          { type: "round_start", round: 1, part: 0, totalParts: 1, reason: "initial" },
+          { type: "delta", text: '{"lore":[{"title":"Ha' },
+        ]),
       )
       .mockResolvedValueOnce(sseResponse([{ type: "done", result: DONE_RESULT }]));
 
@@ -142,16 +145,88 @@ describe("streamSummarizeOCR", () => {
     expect(result).toEqual(DONE_RESULT);
   });
 
+  it("does not restart an extraction that had already written notes", async () => {
+    // Retrying here would throw away everything streamed so far and start
+    // the document again from the first note - the restart loop the caller
+    // salvages the partial to avoid.
+    fetchMock.mockImplementation(async () =>
+      sseResponse([
+        {
+          type: "delta",
+          text: `{"lore":[${'{"title":"A note","content":"Some prose."},'.repeat(60)}{"title":"Half`,
+        },
+      ]),
+    );
+
+    const retries: number[] = [];
+    await expect(
+      streamSummarizeOCR(BODY, {
+        onRetry: (attempt) => retries.push(attempt),
+        maxRetries: 2,
+      }),
+    ).rejects.toThrow(/ended unexpectedly/);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(retries).toEqual([]);
+  });
+
   it("gives up after the retry budget is spent", async () => {
     // A fresh Response per attempt - a body stream can only be read once.
-    fetchMock.mockImplementation(async () =>
-      sseResponse([{ type: "delta", text: "…" }]),
-    );
+    fetchMock.mockImplementation(async () => sseResponse([]));
 
     await expect(
       streamSummarizeOCR(BODY, { maxRetries: 1 }),
     ).rejects.toThrow(/ended unexpectedly/);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a slow but steadily streaming extraction alive", async () => {
+    // The bug this guards: a wall-clock cap on the whole attempt aborted
+    // healthy long extractions and restarted them from zero notes.
+    const encoder = new TextEncoder();
+    const line = (event: unknown) =>
+      encoder.encode(`data: ${JSON.stringify(event)}\n\n`);
+
+    fetchMock.mockResolvedValueOnce(
+      new Response(
+        new ReadableStream<Uint8Array>({
+          async start(controller) {
+            for (let i = 0; i < 8; i++) {
+              await new Promise((resolve) => setTimeout(resolve, 20));
+              controller.enqueue(line({ type: "delta", text: `note ${i}` }));
+            }
+            controller.enqueue(line({ type: "done", result: DONE_RESULT }));
+            controller.close();
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+
+    // Well under the total time the stream takes, but never exceeded
+    // between two deltas.
+    const result = await streamSummarizeOCR(BODY, { idleTimeoutMs: 60 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(DONE_RESULT);
+  });
+
+  it("aborts a stream that goes silent", async () => {
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(
+          new ReadableStream<Uint8Array>({
+            start() {
+              // Opened, then nothing - a connection that died without
+              // closing.
+            },
+          }),
+          { status: 200 },
+        ),
+    );
+
+    await expect(
+      streamSummarizeOCR(BODY, { idleTimeoutMs: 30, maxRetries: 0 }),
+    ).rejects.toThrow(/stalled/);
   });
 
   it("reports a platform-level rejection as an error result", async () => {

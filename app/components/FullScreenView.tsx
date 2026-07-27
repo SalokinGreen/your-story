@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { DynamicIcon } from "./DynamicIcon";
 import { useViewportHeight } from "../misc/useViewportHeight";
 
@@ -42,6 +42,31 @@ export default function FullScreenView({
   children,
 }: FullScreenViewProps) {
   const viewportHeight = useViewportHeight();
+
+  // This view covers the viewport, but the page underneath is still
+  // scrollable: on mobile that shows up as the whole screen sliding around
+  // (and the address bar collapsing and expanding) whenever a drag lands
+  // anywhere that isn't the body's own scroll area. Lock the document while
+  // the takeover is mounted, restoring whatever was set before so a nested
+  // FullScreenView - or the story page, which locks scrolling itself -
+  // doesn't get unlocked when the inner one closes.
+  useEffect(() => {
+    const html = document.documentElement.style;
+    const body = document.body.style;
+    const previous = {
+      htmlOverflow: html.overflow,
+      bodyOverflow: body.overflow,
+      bodyOverscroll: body.overscrollBehavior,
+    };
+    html.overflow = "hidden";
+    body.overflow = "hidden";
+    body.overscrollBehavior = "none";
+    return () => {
+      html.overflow = previous.htmlOverflow;
+      body.overflow = previous.bodyOverflow;
+      body.overscrollBehavior = previous.bodyOverscroll;
+    };
+  }, []);
 
   return (
     <div
