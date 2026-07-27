@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect } from "react";
 import { useNotification } from "@/app/misc/NotificationContext";
 import { useAPIKeys, APIKeys } from "@/app/misc/APIKeysContext";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
@@ -15,8 +15,20 @@ import { ocrFetch } from "@/app/misc/ocrFetch";
 import { OCRProcessRequestBody } from "@/app/misc/ocrCall";
 import {
   OCRSummarizeRequestBody,
+  OCRSummarizeEvent,
+  OCRSummarizeSuccess,
+  OCRSummarizeError,
   DEFAULT_MAX_CONTINUATION_ROUNDS,
 } from "@/app/misc/ocrSummarizeCall";
+import { streamSummarizeOCR } from "@/app/misc/ocrSummarizeStream";
+import {
+  PartialExtraction,
+  emptyPartialExtraction,
+  mergePartialExtraction,
+  parsePartialExtraction,
+  countPartialExtraction,
+} from "@/app/misc/partialNotes";
+import ExtractionPreview from "@/app/components/pdf-import/ExtractionPreview";
 import { StoryLore, CustomTable } from "@/app/misc/structs";
 import { AI_MODELS } from "@/app/misc/ai_prices";
 import { mergeExtractedContent } from "@/app/misc/ocrMerge";
@@ -240,11 +252,12 @@ function createLimiter(concurrency: number) {
 /**
  * OCR fetch (via ocrFetch - web build proxies through our API routes,
  * standalone build calls the provider directly) with timeout and retry
- * support.
+ * support. Note extraction doesn't come through here: it streams, and
+ * carries its own timeout/retry (see ocrSummarizeStream.ts).
  */
 async function fetchWithRetry(
-  path: "/api/ocr/process" | "/api/ocr/summarize",
-  body: OCRProcessRequestBody | OCRSummarizeRequestBody,
+  path: "/api/ocr/process",
+  body: OCRProcessRequestBody,
   timeoutMs: number = SUMMARIZE_TIMEOUT_MS,
   maxRetries: number = MAX_RETRIES,
 ): Promise<Response> {
@@ -289,6 +302,93 @@ async function fetchWithRetry(
   }
 
   throw lastError;
+}
+
+// How often the live note preview is refreshed while the model writes.
+// Deltas arrive far faster than anyone can read, and a dozen chunks stream
+// at once, so re-parsing and re-rendering on every token would burn the
+// frame budget for no visible gain.
+const LIVE_UPDATE_INTERVAL_MS = 120;
+
+/**
+ * Turns a summarize stream into a live view of the notes as they're
+ * written.
+ *
+ * Each round of an extraction is its own self-contained JSON object (see
+ * ocrSummarizeCall.ts), so the buffer is parsed leniently while a round is
+ * in flight and folded into the committed result the moment the next round
+ * starts - the same title-keyed merge the server does, so an entry re-sent
+ * in full after being cut off replaces the short version rather than
+ * appearing twice.
+ */
+function createLiveTracker(onUpdate: (live: PartialExtraction) => void) {
+  let committed = emptyPartialExtraction();
+  let buffer = "";
+  let raw = "";
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let stopped = false;
+
+  const flush = () => {
+    timer = null;
+    if (stopped) return;
+    onUpdate(mergePartialExtraction(committed, parsePartialExtraction(buffer)));
+  };
+
+  const schedule = () => {
+    if (timer !== null || stopped) return;
+    timer = setTimeout(flush, LIVE_UPDATE_INTERVAL_MS);
+  };
+
+  const commitRound = () => {
+    if (!buffer) return;
+    committed = mergePartialExtraction(
+      committed,
+      parsePartialExtraction(buffer),
+    );
+    buffer = "";
+  };
+
+  return {
+    onEvent(event: OCRSummarizeEvent) {
+      if (event.type === "delta") {
+        buffer += event.text;
+        raw += event.text;
+      } else {
+        commitRound();
+      }
+      schedule();
+    },
+    /** A retry restarts the extraction from scratch - drop what we had. */
+    reset() {
+      committed = emptyPartialExtraction();
+      buffer = "";
+      raw = "";
+      schedule();
+    },
+    /** The model's raw output, for the manual JSON-repair flow. */
+    getRaw: () => raw,
+    stop() {
+      stopped = true;
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    },
+  };
+}
+
+/**
+ * A response the model clearly wrote content into, that still yielded no
+ * notes, is a parsing failure rather than an empty page range - and the one
+ * case where offering the manual JSON-repair flow pays off. A genuinely
+ * blank chunk writes almost nothing, so it stays a (empty) success.
+ */
+const UNPARSEABLE_OUTPUT_MIN_CHARS = 200;
+
+function looksUnparseable(result: OCRSummarizeSuccess, raw: string): boolean {
+  const extracted =
+    result.lore.length + result.mechanicNotes.length + result.customTables.length;
+  return extracted === 0 && raw.trim().length >= UNPARSEABLE_OUTPUT_MIN_CHARS;
 }
 
 // Maximum length of any error message we surface to the UI. Raw error
@@ -809,6 +909,37 @@ interface PDFImporterProps {
   onClose?: () => void;
 }
 
+/**
+ * The pipeline as the user sees it, for the progress rail. The internal
+ * step names are pipeline stages; these are what each one means for the
+ * document in front of them.
+ */
+const PIPELINE_STAGES: {
+  id: "uploading" | "ocr" | "summarizing";
+  label: string;
+  icon: string;
+  hint: string;
+}[] = [
+  {
+    id: "uploading",
+    label: "Prepare",
+    icon: "Upload",
+    hint: "Reading the document and splitting it into chunks…",
+  },
+  {
+    id: "ocr",
+    label: "Read pages",
+    icon: "ScanText",
+    hint: "Running OCR over the pages…",
+  },
+  {
+    id: "summarizing",
+    label: "Write notes",
+    icon: "BookOpen",
+    hint: "Turning the text into lore, mechanics and tables…",
+  },
+];
+
 type ProcessingStep =
   | "idle"
   | "uploading"
@@ -832,6 +963,12 @@ interface ChunkStatus {
   ocrMarkdown?: string;
   rawSummarizeOutput?: string;
   error?: string;
+  /**
+   * Notes parsed out of the model's output while it is still being written
+   * (see createLiveTracker). Replaced by `result` once the chunk finishes -
+   * this is a preview, not what gets imported.
+   */
+  live?: PartialExtraction;
   result?: {
     lore: StoryLore[];
     mechanicNotes: StoryLore[];
@@ -966,7 +1103,12 @@ export default function PDFImporter({
   // small enough to skip chunking, so every file in a multi-file import
   // gets a row in the preview panel below.
   const [chunkStatuses, setChunkStatuses] = useState<ChunkStatus[]>([]);
-  const [showChunkDetails, setShowChunkDetails] = useState(false);
+  // Which half of the workspace panel is showing: the notes themselves
+  // (default - it's what the import is for) or the per-chunk source list
+  // with its retry/repair controls.
+  const [workspaceTab, setWorkspaceTab] = useState<"notes" | "sources">(
+    "notes",
+  );
   // Which chunk currently has its live preview (raw OCR text and/or
   // extracted notes) expanded in the chunk status panel. `chunkIndex` alone
   // isn't unique across files (each file's chunks start at 0), so the
@@ -1036,6 +1178,38 @@ export default function PDFImporter({
       });
     },
     [mergeDuplicates, getSelectedModel, keys],
+  );
+
+  /**
+   * Run one note extraction, streaming the notes into the chunk's live
+   * preview as the model writes them.
+   *
+   * Returns the same success/error result the non-streaming call did, plus
+   * the raw model output - which is what the manual JSON-repair flow needs
+   * when a response comes back unparseable.
+   */
+  const summarizeWithLive = useCallback(
+    async (
+      body: OCRSummarizeRequestBody,
+      onLive: (live: PartialExtraction) => void,
+    ): Promise<{
+      result: OCRSummarizeSuccess | OCRSummarizeError;
+      raw: string;
+    }> => {
+      const tracker = createLiveTracker(onLive);
+      try {
+        const result = await streamSummarizeOCR(body, {
+          onEvent: tracker.onEvent,
+          onRetry: tracker.reset,
+          timeoutMs: SUMMARIZE_TIMEOUT_MS,
+          maxRetries: MAX_RETRIES,
+        });
+        return { result, raw: tracker.getRaw() };
+      } finally {
+        tracker.stop();
+      }
+    },
+    [],
   );
 
   // Load saved imports from IndexedDB on mount
@@ -1195,14 +1369,13 @@ export default function PDFImporter({
       setChunkStatuses((prev) =>
         prev.map((cs) =>
           matches(cs)
-            ? { ...cs, status: "summarizing", error: undefined }
+            ? { ...cs, status: "summarizing", error: undefined, live: undefined }
             : cs,
         ),
       );
 
       try {
-        const summarizeResponse = await fetchWithRetry(
-          "/api/ocr/summarize",
+        const { result, raw } = await summarizeWithLive(
           {
             markdown: ocrMarkdown,
             focus: ["all"],
@@ -1219,13 +1392,15 @@ export default function PDFImporter({
             googleKey: keys.googleKey,
             deepinfraKey: keys.deepinfraKey,
           },
-          SUMMARIZE_TIMEOUT_MS,
-          MAX_RETRIES,
+          (live) =>
+            setChunkStatuses((prev) =>
+              prev.map((cs) => (matches(cs) ? { ...cs, live } : cs)),
+            ),
         );
 
-        if (!summarizeResponse.ok) {
-          const errorMsg = await extractErrorMessage(
-            summarizeResponse,
+        if ("error" in result) {
+          const errorMsg = sanitizeErrorMessage(
+            result.error,
             "Note extraction failed",
           );
           setChunkStatuses((prev) =>
@@ -1237,25 +1412,21 @@ export default function PDFImporter({
           return;
         }
 
-        const resultText = await summarizeResponse.text();
-        let result;
-        try {
-          result = JSON.parse(resultText);
-        } catch {
+        if (looksUnparseable(result, raw)) {
           setChunkStatuses((prev) =>
             prev.map((cs) =>
               matches(cs)
                 ? {
                     ...cs,
                     status: "failed",
-                    error: "JSON parse error",
-                    rawSummarizeOutput: resultText,
+                    error: "No notes could be read from the model's output",
+                    rawSummarizeOutput: raw,
                   }
                 : cs,
             ),
           );
           addNotification(
-            "Retry failed: JSON parse error. You can try manual fix.",
+            "Retry failed: the output couldn't be read. You can try the manual fix.",
             "warning",
           );
           return;
@@ -1270,6 +1441,7 @@ export default function PDFImporter({
                   status: "complete",
                   error: undefined,
                   rawSummarizeOutput: undefined,
+                  live: undefined,
                   result: {
                     lore: result.lore || [],
                     mechanicNotes: result.mechanicNotes || [],
@@ -1307,6 +1479,7 @@ export default function PDFImporter({
       maxContinuationRounds,
       keys,
       addNotification,
+      summarizeWithLive,
     ],
   );
 
@@ -1789,9 +1962,8 @@ export default function PDFImporter({
           reportProgress();
 
           try {
-            const summarizeResponse = await summarizeLimiter(() =>
-              fetchWithRetry(
-                "/api/ocr/summarize",
+            const { result: summarizeResult, raw } = await summarizeLimiter(() =>
+              summarizeWithLive(
                 {
                   markdown: ocrMarkdown,
                   focus: ["all"],
@@ -1808,14 +1980,20 @@ export default function PDFImporter({
                   googleKey: keys.googleKey,
                   deepinfraKey: keys.deepinfraKey,
                 },
-                SUMMARIZE_TIMEOUT_MS,
-                MAX_RETRIES,
+                (live) =>
+                  setChunkStatuses((prev) =>
+                    prev.map((cs) =>
+                      cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx
+                        ? { ...cs, live }
+                        : cs,
+                    ),
+                  ),
               ),
             );
 
-            if (!summarizeResponse.ok) {
-              const errorMsg = await extractErrorMessage(
-                summarizeResponse,
+            if ("error" in summarizeResult) {
+              const errorMsg = sanitizeErrorMessage(
+                summarizeResult.error,
                 "Note extraction failed",
               );
               console.error(
@@ -1848,20 +2026,18 @@ export default function PDFImporter({
               };
             }
 
-            const resultText = await summarizeResponse.text();
-            let result;
-            try {
-              result = JSON.parse(resultText);
-            } catch {
-              // Store raw output for manual repair
+            // The model wrote plenty but none of it survived parsing -
+            // keep the raw output so it can be repaired by hand.
+            if (looksUnparseable(summarizeResult, raw)) {
+              const parseError = "No notes could be read from the model's output";
               setChunkStatuses((prev) =>
                 prev.map((cs) =>
                   cs.fileIndex === fileIndex && cs.chunkIndex === chunkIdx
                     ? {
                         ...cs,
                         status: "failed",
-                        error: "JSON parse error",
-                        rawSummarizeOutput: resultText,
+                        error: parseError,
+                        rawSummarizeOutput: raw,
                       }
                     : cs,
                 ),
@@ -1869,7 +2045,7 @@ export default function PDFImporter({
               persistedStatuses[chunkIdx] = {
                 ...persistedStatuses[chunkIdx],
                 status: "failed",
-                error: "JSON parse error",
+                error: parseError,
                 ocrMarkdown,
               };
               persistProgress();
@@ -1879,13 +2055,19 @@ export default function PDFImporter({
                 chunkIndex: chunkIdx,
                 stage: "summarize",
                 success: false,
-                error: "JSON parse error",
+                error: parseError,
                 pageStart: range.pageStart,
                 pageEnd: range.pageEnd,
               };
             }
 
-            if (result.incomplete) incompleteExtractionsRef.current++;
+            if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
+
+            const chunkOutput = {
+              lore: summarizeResult.lore || [],
+              mechanicNotes: summarizeResult.mechanicNotes || [],
+              customTables: summarizeResult.customTables || [],
+            };
 
             setChunkStatuses((prev) =>
               prev.map((cs) =>
@@ -1893,11 +2075,8 @@ export default function PDFImporter({
                   ? {
                       ...cs,
                       status: "complete",
-                      result: {
-                        lore: result.lore || [],
-                        mechanicNotes: result.mechanicNotes || [],
-                        customTables: result.customTables || [],
-                      },
+                      live: undefined,
+                      result: chunkOutput,
                     }
                   : cs,
               ),
@@ -1907,11 +2086,7 @@ export default function PDFImporter({
               status: "complete",
               error: undefined,
               ocrMarkdown: undefined,
-              result: {
-                lore: result.lore || [],
-                mechanicNotes: result.mechanicNotes || [],
-                customTables: result.customTables || [],
-              },
+              result: chunkOutput,
             };
             persistProgress();
             summarizeDone++;
@@ -1920,9 +2095,7 @@ export default function PDFImporter({
               chunkIndex: chunkIdx,
               stage: "summarize",
               success: true,
-              lore: result.lore || [],
-              mechanicNotes: result.mechanicNotes || [],
-              customTables: result.customTables || [],
+              ...chunkOutput,
               pageStart: range.pageStart,
               pageEnd: range.pageEnd,
             };
@@ -1973,7 +2146,7 @@ export default function PDFImporter({
       );
       const succeededOcrCount = pendingChunkIndices.length - failedOcr.length;
       if (failedOcr.length > 0) {
-        setShowChunkDetails(true);
+        setWorkspaceTab("sources");
         // Only abort the whole thing if this was a completely fresh run
         // (no chunks already done from a resume) and every single chunk
         // failed OCR - that's almost certainly a systemic problem (bad
@@ -2005,7 +2178,7 @@ export default function PDFImporter({
         console.warn(
           `${failedSummarize.length}/${succeededOcrCount} chunks failed to summarize`,
         );
-        setShowChunkDetails(true);
+        setWorkspaceTab("sources");
       }
       for (const failed of failedSummarize) {
         failedPages.push({
@@ -2043,7 +2216,7 @@ export default function PDFImporter({
         totalPagesProcessed,
       };
     },
-    [keys, addNotification],
+    [keys, addNotification, summarizeWithLive],
   );
 
   const processFiles = async () => {
@@ -2203,8 +2376,7 @@ export default function PDFImporter({
               combinedTotalPages = 0;
               updateFileChunk({ ocrMarkdown: textContent });
 
-              const summarizeResponse = await fetchWithRetry(
-                "/api/ocr/summarize",
+              const { result: summarizeResult } = await summarizeWithLive(
                 {
                   markdown: combinedMarkdown,
                   focus: ["all"],
@@ -2221,19 +2393,18 @@ export default function PDFImporter({
                   googleKey: keys.googleKey,
                   deepinfraKey: keys.deepinfraKey,
                 },
-                SUMMARIZE_TIMEOUT_MS,
-                MAX_RETRIES,
+                (live) => updateFileChunk({ live }),
               );
 
-              if (!summarizeResponse.ok) {
-                const errorMsg = await extractErrorMessage(
-                  summarizeResponse,
-                  "Note extraction failed",
+              if ("error" in summarizeResult) {
+                throw new Error(
+                  `${file.name}: ${sanitizeErrorMessage(
+                    summarizeResult.error,
+                    "Note extraction failed",
+                  )}`,
                 );
-                throw new Error(`${file.name}: ${errorMsg}`);
               }
 
-              const summarizeResult = await summarizeResponse.json();
               if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
               const fileResult = {
                 lore: summarizeResult.lore || [],
@@ -2243,7 +2414,11 @@ export default function PDFImporter({
               allLore.push(...fileResult.lore);
               allMechanicNotes.push(...fileResult.mechanicNotes);
               allCustomTables.push(...fileResult.customTables);
-              updateFileChunk({ status: "complete", result: fileResult });
+              updateFileChunk({
+                status: "complete",
+                live: undefined,
+                result: fileResult,
+              });
               setProgress(fileProgressEnd);
               continue;
             }
@@ -2307,7 +2482,8 @@ export default function PDFImporter({
               `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`,
             );
 
-            const summarizeResponse = await ocrFetch("/api/ocr/summarize", {
+            const { result: summarizeResult } = await summarizeWithLive(
+              {
                 markdown: combinedMarkdown,
                 focus: ["all"],
                 customInstructions,
@@ -2320,17 +2496,19 @@ export default function PDFImporter({
                 mistralKey: keys.mistralKey,
                 googleKey: keys.googleKey,
                 deepinfraKey: keys.deepinfraKey,
-            });
+              },
+              (live) => updateFileChunk({ live }),
+            );
 
-            if (!summarizeResponse.ok) {
-              const errorMsg = await extractErrorMessage(
-                summarizeResponse,
-                "Note extraction failed",
+            if ("error" in summarizeResult) {
+              throw new Error(
+                `${file.name}: ${sanitizeErrorMessage(
+                  summarizeResult.error,
+                  "Note extraction failed",
+                )}`,
               );
-              throw new Error(`${file.name}: ${errorMsg}`);
             }
 
-            const summarizeResult = await summarizeResponse.json();
             if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
             const fileResult = {
               lore: summarizeResult.lore || [],
@@ -2340,7 +2518,11 @@ export default function PDFImporter({
             allLore.push(...fileResult.lore);
             allMechanicNotes.push(...fileResult.mechanicNotes);
             allCustomTables.push(...fileResult.customTables);
-            updateFileChunk({ status: "complete", result: fileResult });
+            updateFileChunk({
+              status: "complete",
+              live: undefined,
+              result: fileResult,
+            });
             setProgress(fileProgressEnd);
           } catch (err) {
             // Any failure above (including ones not yet reflected in the
@@ -2511,8 +2693,25 @@ export default function PDFImporter({
       setStep("summarizing");
       setStatusMessage("Extracting notes from the document...");
 
-      const summarizeResponse = await fetchWithRetry(
-        "/api/ocr/summarize",
+      // A link import is one whole-document pass, but it still gets an
+      // entry in the live panel so its notes show up as they're written,
+      // the same as an uploaded file's.
+      const linkLabel = documentUrl.split("/").pop() || "Linked document";
+      setChunkStatuses([
+        {
+          chunkIndex: 0,
+          fileIndex: 0,
+          fileName: linkLabel,
+          pageStart: 1,
+          pageEnd: Math.max(1, ocrResult.totalPages),
+          status: "summarizing",
+          ocrMarkdown: ocrResult.markdown,
+        },
+      ]);
+      const updateLinkChunk = (patch: Partial<ChunkStatus>) =>
+        setChunkStatuses((prev) => prev.map((cs) => ({ ...cs, ...patch })));
+
+      const { result: summarizeResult } = await summarizeWithLive(
         {
           markdown: ocrResult.markdown,
           focus: ["all"],
@@ -2527,19 +2726,27 @@ export default function PDFImporter({
           googleKey: keys.googleKey,
           deepinfraKey: keys.deepinfraKey,
         },
-        SUMMARIZE_TIMEOUT_MS,
-        MAX_RETRIES,
+        (live) => updateLinkChunk({ live }),
       );
 
-      if (!summarizeResponse.ok) {
-        const errorMsg = await extractErrorMessage(
-          summarizeResponse,
+      if ("error" in summarizeResult) {
+        const errorMsg = sanitizeErrorMessage(
+          summarizeResult.error,
           "Note extraction failed",
         );
+        updateLinkChunk({ status: "failed", error: errorMsg });
         throw new Error(errorMsg);
       }
 
-      const summarizeResult = await summarizeResponse.json();
+      updateLinkChunk({
+        status: "complete",
+        live: undefined,
+        result: {
+          lore: summarizeResult.lore || [],
+          mechanicNotes: summarizeResult.mechanicNotes || [],
+          customTables: summarizeResult.customTables || [],
+        },
+      });
 
       setStep("complete");
       setStatusMessage("Import complete!");
@@ -2742,7 +2949,7 @@ export default function PDFImporter({
     setPageCount(0);
     setCurrentFileIndex(0);
     setChunkStatuses([]);
-    setShowChunkDetails(false);
+    setWorkspaceTab("notes");
     setExpandedChunkIndex(null);
     setExpandedChunkFileIndex(null);
     chunkedPdfSourceRef.current = null;
@@ -2773,16 +2980,36 @@ export default function PDFImporter({
     }
   };
 
-  const getStepColor = () => {
-    switch (step) {
-      case "complete":
-        return "text-green-400";
-      case "error":
-        return "text-red-400";
-      default:
-        return "text-blue-400";
+  // Everything extracted so far across every file/chunk of this import -
+  // finished chunks contribute their real results, in-flight ones whatever
+  // the model has written by now, folded together the same way the server
+  // folds its own rounds.
+  const extracted = useMemo(() => {
+    let combined = emptyPartialExtraction();
+    for (const chunk of chunkStatuses) {
+      const part: PartialExtraction | undefined = chunk.result
+        ? {
+            summary: "",
+            lore: chunk.result.lore,
+            mechanicNotes: chunk.result.mechanicNotes,
+            customTables: chunk.result.customTables,
+          }
+        : chunk.live;
+      if (part) combined = mergePartialExtraction(combined, part);
     }
-  };
+    return combined;
+  }, [chunkStatuses]);
+
+  const extractedCount = countPartialExtraction(extracted);
+  const failedChunks = chunkStatuses.filter((cs) => cs.status === "failed");
+  const completeChunks = chunkStatuses.filter((cs) => cs.status === "complete");
+  const isBusy = step !== "idle" && step !== "error";
+  // The workspace column earns its place once there's something to watch.
+  const hasWorkspace = isBusy || chunkStatuses.length > 0;
+  const stageIndex =
+    step === "complete"
+      ? PIPELINE_STAGES.length
+      : PIPELINE_STAGES.findIndex((stage) => stage.id === step);
 
   // Compact button mode
   if (compact && !isOpen) {
@@ -2796,6 +3023,192 @@ export default function PDFImporter({
       </button>
     );
   }
+
+  const renderChunkRow = (chunk: ChunkStatus) => {
+    const isExpanded =
+      expandedChunkIndex === chunk.chunkIndex &&
+      expandedChunkFileIndex === chunk.fileIndex;
+    // A file small enough to skip chunking has a single entry - just its
+    // name. A split file gets the page range too, since every file's chunks
+    // restart numbering at 1.
+    const isMultiChunkFile =
+      chunkStatuses.filter((cs) => cs.fileIndex === chunk.fileIndex).length > 1;
+    const preview: PartialExtraction | undefined = chunk.result
+      ? {
+          summary: "",
+          lore: chunk.result.lore,
+          mechanicNotes: chunk.result.mechanicNotes,
+          customTables: chunk.result.customTables,
+        }
+      : chunk.live;
+    const previewCount = preview ? countPartialExtraction(preview) : 0;
+    const canPreviewText = !!chunk.ocrMarkdown;
+    const canPreview = previewCount > 0 || canPreviewText;
+
+    const tone =
+      chunk.status === "complete"
+        ? "border-green-500/25 bg-green-500/[0.06]"
+        : chunk.status === "failed"
+          ? "border-red-500/30 bg-red-500/[0.06]"
+          : chunk.status === "pending"
+            ? "border-white/10 bg-white/[0.02]"
+            : "border-purple-400/25 bg-purple-500/[0.06]";
+
+    return (
+      <div
+        key={`${chunk.fileIndex}-${chunk.chunkIndex}`}
+        className={`rounded-xl border transition-colors ${tone}`}
+      >
+        <div className="flex items-center gap-2.5 p-2.5">
+          <span
+            className={`shrink-0 ${
+              chunk.status === "complete"
+                ? "text-green-400"
+                : chunk.status === "failed"
+                  ? "text-red-400"
+                  : chunk.status === "pending"
+                    ? "text-blue-300/40"
+                    : "text-purple-300"
+            }`}
+          >
+            {chunk.status === "complete" && (
+              <DynamicIcon name="CircleCheck" className="w-5 h-5" />
+            )}
+            {chunk.status === "failed" && (
+              <DynamicIcon name="CircleX" className="w-5 h-5" />
+            )}
+            {(chunk.status === "ocr" || chunk.status === "summarizing") && (
+              <DynamicIcon
+                name="LoaderCircle"
+                className="w-5 h-5 animate-spin"
+              />
+            )}
+            {chunk.status === "pending" && (
+              <DynamicIcon name="Clock" className="w-5 h-5" />
+            )}
+          </span>
+
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-white truncate">
+              {chunk.fileName}
+            </p>
+            <p className="text-xs text-blue-300/60 truncate">
+              {isMultiChunkFile && (
+                <span className="text-blue-300/40">
+                  Pages {chunk.pageStart}–{chunk.pageEnd} ·{" "}
+                </span>
+              )}
+              {chunk.status === "pending" && "Queued"}
+              {chunk.status === "ocr" && "Reading the pages…"}
+              {chunk.status === "summarizing" &&
+                (previewCount > 0
+                  ? `Writing notes · ${previewCount} so far`
+                  : "Writing notes…")}
+              {chunk.status === "complete" &&
+                `${chunk.result?.lore.length ?? 0} lore · ${
+                  chunk.result?.mechanicNotes.length ?? 0
+                } mechanics · ${chunk.result?.customTables.length ?? 0} tables`}
+              {chunk.status === "failed" && (
+                <span className="text-red-300/80" title={chunk.error}>
+                  {chunk.error}
+                </span>
+              )}
+            </p>
+          </div>
+
+          {canPreview && (
+            <button
+              onClick={() => {
+                setExpandedChunkIndex(isExpanded ? null : chunk.chunkIndex);
+                setExpandedChunkFileIndex(isExpanded ? null : chunk.fileIndex);
+                setChunkPreviewTab(previewCount > 0 ? "notes" : "text");
+              }}
+              className="shrink-0 p-1.5 rounded-lg text-blue-200/70 hover:text-white hover:bg-white/10 transition-colors"
+              title={isExpanded ? "Hide preview" : "Preview extracted content"}
+            >
+              <DynamicIcon
+                name={isExpanded ? "EyeOff" : "Eye"}
+                className="w-4 h-4"
+              />
+            </button>
+          )}
+
+          {chunk.status === "failed" && (
+            <div className="flex gap-1 shrink-0">
+              <button
+                onClick={() => retryChunk(chunk.fileIndex, chunk.chunkIndex)}
+                className="px-2 py-1 text-xs bg-blue-600/80 hover:bg-blue-600 text-white rounded-lg transition-colors flex items-center gap-1"
+                title="Retry this chunk"
+              >
+                <DynamicIcon name="RefreshCw" className="w-3 h-3" />
+                Retry
+              </button>
+              {chunk.rawSummarizeOutput && (
+                <button
+                  onClick={() =>
+                    openRepairModal(chunk.fileIndex, chunk.chunkIndex)
+                  }
+                  className="px-2 py-1 text-xs bg-amber-600/80 hover:bg-amber-600 text-white rounded-lg transition-colors flex items-center gap-1"
+                  title="Manually fix the model's output"
+                >
+                  <DynamicIcon name="Wrench" className="w-3 h-3" />
+                  Fix
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {isExpanded && canPreview && (
+          <div className="px-2.5 pb-2.5 space-y-2">
+            <div className="flex gap-1">
+              {previewCount > 0 && (
+                <button
+                  onClick={() => setChunkPreviewTab("notes")}
+                  className={`px-2 py-1 text-xs rounded-lg transition-colors ${
+                    chunkPreviewTab === "notes"
+                      ? "bg-purple-500/25 text-purple-100"
+                      : "bg-white/5 text-blue-300/60 hover:bg-white/10"
+                  }`}
+                >
+                  Notes
+                </button>
+              )}
+              {canPreviewText && (
+                <button
+                  onClick={() => setChunkPreviewTab("text")}
+                  className={`px-2 py-1 text-xs rounded-lg transition-colors ${
+                    chunkPreviewTab === "text"
+                      ? "bg-purple-500/25 text-purple-100"
+                      : "bg-white/5 text-blue-300/60 hover:bg-white/10"
+                  }`}
+                >
+                  Raw text
+                </button>
+              )}
+            </div>
+
+            {chunkPreviewTab === "text" && canPreviewText && (
+              <pre className="text-xs text-blue-200/70 whitespace-pre-wrap break-words max-h-64 overflow-y-auto bg-black/25 rounded-lg p-2.5">
+                {chunk.ocrMarkdown}
+              </pre>
+            )}
+
+            {chunkPreviewTab === "notes" && preview && (
+              <ExtractionPreview
+                lore={preview.lore}
+                mechanicNotes={preview.mechanicNotes}
+                customTables={preview.customTables}
+                streaming={chunk.status === "summarizing"}
+                emptyMessage="No notes came out of this chunk."
+                maxHeightClass="max-h-72"
+              />
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <>
@@ -2832,9 +3245,28 @@ export default function PDFImporter({
             closeModal();
             resetState();
           }}
-          bodyClassName="p-4"
+          bodyClassName="p-3 sm:p-5"
+          headerActions={
+            isBusy ? (
+              <span className="hidden sm:flex items-center gap-2 px-2.5 py-1 rounded-lg bg-purple-500/10 ring-1 ring-purple-400/20 text-xs text-purple-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                {extractedCount} extracted
+              </span>
+            ) : undefined
+          }
           footer={
-            <div className="max-w-2xl mx-auto flex justify-end gap-3 p-4">
+            <div
+              className={`mx-auto flex items-center justify-end gap-3 p-4 ${
+                hasWorkspace ? "max-w-6xl" : "max-w-2xl"
+              }`}
+            >
+              {step === "idle" && selectedFiles.length > 0 && (
+                <p className="mr-auto text-xs text-blue-300/50 hidden sm:block">
+                  {selectedFiles.length} file
+                  {selectedFiles.length === 1 ? "" : "s"} · ~{pageCount} pages ·
+                  ~${estimatedCost.toFixed(3)} OCR
+                </p>
+              )}
               <button
                 onClick={() => {
                   closeModal();
@@ -2842,7 +3274,7 @@ export default function PDFImporter({
                 }}
                 className="px-4 py-2 bg-white/5 hover:bg-white/10 text-white rounded-lg transition-colors"
               >
-                Cancel
+                {step === "complete" ? "Close" : "Cancel"}
               </button>
               <button
                 onClick={
@@ -2857,575 +3289,243 @@ export default function PDFImporter({
                 }
                 className="px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors flex items-center gap-2"
               >
-                <DynamicIcon name="Sparkles" className="w-4 h-4" />
-                Start Import
+                <DynamicIcon
+                  name={isBusy ? "LoaderCircle" : "Sparkles"}
+                  className={`w-4 h-4 ${isBusy ? "animate-spin" : ""}`}
+                />
+                {isBusy ? "Importing…" : "Start Import"}
               </button>
             </div>
           }
         >
-            <div className="max-w-2xl mx-auto space-y-4">
-              {/* Interrupted Import Recovery Banner */}
-              {interruptedImport && step === "idle" && (
-                <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg p-4">
-                  <div className="flex items-start gap-3">
-                    <DynamicIcon
-                      name="History"
-                      className="w-6 h-6 text-amber-400 shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-amber-200">
-                        Interrupted import found
-                      </p>
-                      <p className="text-sm text-amber-300/70 mt-0.5 break-words">
-                        {interruptedImport.fileName} -{" "}
-                        {
-                          interruptedImport.chunkStatuses.filter(
-                            (cs) => cs.status === "complete",
-                          ).length
-                        }
-                        /{interruptedImport.chunkStatuses.length} chunks
-                        already done. Resume to pick up where it left off
-                        without redoing finished pages.
-                      </p>
-                      <div className="flex gap-2 mt-3">
-                        <button
-                          onClick={resumeInterruptedImport}
-                          disabled={isResuming}
-                          className="px-3 py-1.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
-                        >
-                          <DynamicIcon
-                            name={isResuming ? "Loader2" : "RefreshCw"}
-                            className={`w-4 h-4 ${isResuming ? "animate-spin" : ""}`}
-                          />
-                          {isResuming ? "Resuming..." : "Resume"}
-                        </button>
-                        <button
-                          onClick={discardInterruptedImport}
-                          disabled={isResuming}
-                          className="px-3 py-1.5 bg-amber-900/40 hover:bg-amber-800/50 disabled:opacity-50 disabled:cursor-not-allowed text-amber-200 text-sm rounded-lg transition-colors"
-                        >
-                          Discard
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Processing State */}
-              {step !== "idle" && step !== "error" && (
-                <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className={`animate-pulse ${getStepColor()}`}>
-                      <DynamicIcon name={getStepIcon()} className="w-6 h-6" />
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-white">
-                        {step === "uploading" && "Step 1/3: Uploading"}
-                        {step === "ocr" && "Step 2/3: Text Extraction"}
-                        {step === "summarizing" && "Step 3/3: Creating Notes"}
-                        {step === "complete" && "✓ Import Complete"}
-                      </p>
-                      <p className="text-sm text-blue-300/70 mt-0.5">
-                        {statusMessage}
-                      </p>
-                      <p className="text-xs text-blue-300/50 mt-1">
-                        {step === "uploading" &&
-                          "Uploading your PDF to secure storage..."}
-                        {step === "ocr" &&
-                          `Running OCR on ${pageCount} page${
-                            pageCount !== 1 ? "s" : ""
-                          }...`}
-                        {step === "summarizing" &&
-                          "AI is creating lore, mechanics, and character sheet notes..."}
-                        {step === "complete" &&
-                          "Ready to use your imported content!"}
-                      </p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-purple-300">
-                        {Math.round(progress)}%
-                      </p>
-                    </div>
-                  </div>
-                  <div className="w-full bg-white/5 rounded-full h-2.5">
-                    <div
-                      className="bg-linear-to-r from-purple-500 to-blue-500 h-2.5 rounded-full transition-all duration-300"
-                      style={{ width: `${progress}%` }}
-                    />
-                  </div>
-                  <div className="flex justify-between text-xs text-blue-300/40 mt-1">
-                    <span>Upload</span>
-                    <span>OCR</span>
-                    <span>Notes</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Chunk Details Panel - Shows status of individual chunks */}
-              {chunkStatuses.length > 0 && (
-                <div className="bg-white/[0.03] rounded-lg border border-white/10 overflow-hidden">
-                  <button
-                    onClick={() => setShowChunkDetails(!showChunkDetails)}
-                    className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/5 transition-colors"
-                  >
-                      <div className="flex items-center gap-2">
-                        <DynamicIcon
-                          name="Layers"
-                          className="w-4 h-4 text-blue-400"
-                        />
-                        <span className="text-sm font-medium text-blue-200">
-                          Chunk Status (
+          <div className={`mx-auto ${hasWorkspace ? "max-w-6xl" : "max-w-2xl"}`}>
+            <div
+              className={
+                hasWorkspace
+                  ? "grid lg:grid-cols-12 gap-4 items-start"
+                  : undefined
+              }
+            >
+              {/* Left: what to import, and how far along it is */}
+              <div
+                className={`space-y-4 ${hasWorkspace ? "lg:col-span-5" : ""}`}
+              >
+                {/* Interrupted Import Recovery Banner */}
+                {interruptedImport && step === "idle" && (
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/[0.07] p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="shrink-0 w-9 h-9 rounded-xl bg-amber-500/15 ring-1 ring-amber-400/25 text-amber-300 flex items-center justify-center">
+                        <DynamicIcon name="History" className="w-4 h-4" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-amber-100">
+                          Unfinished import found
+                        </p>
+                        <p className="text-sm text-amber-200/70 mt-0.5 break-words">
+                          {interruptedImport.fileName} —{" "}
                           {
-                            chunkStatuses.filter(
+                            interruptedImport.chunkStatuses.filter(
                               (cs) => cs.status === "complete",
                             ).length
                           }
-                          /{chunkStatuses.length} complete)
+                          /{interruptedImport.chunkStatuses.length} chunks
+                          already done. Resume to pick up where it left off
+                          without redoing finished pages.
+                        </p>
+                        <div className="flex gap-2 mt-3">
+                          <button
+                            onClick={resumeInterruptedImport}
+                            disabled={isResuming}
+                            className="px-3 py-1.5 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm rounded-lg transition-colors flex items-center gap-1.5"
+                          >
+                            <DynamicIcon
+                              name={isResuming ? "LoaderCircle" : "RefreshCw"}
+                              className={`w-4 h-4 ${isResuming ? "animate-spin" : ""}`}
+                            />
+                            {isResuming ? "Resuming…" : "Resume"}
+                          </button>
+                          <button
+                            onClick={discardInterruptedImport}
+                            disabled={isResuming}
+                            className="px-3 py-1.5 bg-white/5 hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed text-amber-100 text-sm rounded-lg transition-colors"
+                          >
+                            Discard
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Progress */}
+                {isBusy && (
+                  <div className="rounded-2xl border border-white/10 bg-linear-to-br from-purple-900/25 to-blue-900/10 p-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <span
+                        className={`shrink-0 w-10 h-10 rounded-xl flex items-center justify-center ${
+                          step === "complete"
+                            ? "bg-green-500/15 ring-1 ring-green-400/25 text-green-300"
+                            : "bg-purple-500/15 ring-1 ring-purple-400/25 text-purple-200"
+                        }`}
+                      >
+                        <DynamicIcon
+                          name={getStepIcon()}
+                          className={`w-5 h-5 ${
+                            step === "complete" ? "" : "animate-pulse"
+                          }`}
+                        />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-white">
+                          {step === "complete"
+                            ? "Import complete"
+                            : (PIPELINE_STAGES[stageIndex]?.label ??
+                              "Working…")}
+                        </p>
+                        <p className="text-xs text-blue-200/70 mt-0.5 break-words">
+                          {statusMessage ||
+                            PIPELINE_STAGES[stageIndex]?.hint ||
+                            "Ready to use your imported content."}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-2xl font-bold tabular-nums text-purple-200">
+                        {Math.round(progress)}
+                        <span className="text-sm font-semibold text-purple-300/60">
+                          %
                         </span>
-                        {chunkStatuses.some((cs) => cs.status === "failed") && (
-                          <span className="px-2 py-0.5 bg-red-900/50 text-red-300 text-xs rounded-full">
-                            {
-                              chunkStatuses.filter(
-                                (cs) => cs.status === "failed",
-                              ).length
-                            }{" "}
-                            failed
-                          </span>
-                        )}
-                      </div>
-                      <DynamicIcon
-                        name={showChunkDetails ? "ChevronUp" : "ChevronDown"}
-                        className="w-4 h-4 text-blue-400"
+                      </span>
+                    </div>
+
+                    <div className="h-1.5 rounded-full bg-white/5 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-linear-to-r from-purple-500 to-blue-400 transition-all duration-300"
+                        style={{ width: `${progress}%` }}
                       />
-                    </button>
+                    </div>
 
-                    {showChunkDetails && (
-                      <div className="p-3 pt-0 space-y-2 max-h-96 overflow-y-auto">
-                        {chunkStatuses.map((chunk) => {
-                          const isExpanded =
-                            expandedChunkIndex === chunk.chunkIndex &&
-                            expandedChunkFileIndex === chunk.fileIndex;
-                          const canPreviewText = !!chunk.ocrMarkdown;
-                          const canPreviewNotes = !!chunk.result;
-                          const canPreview =
-                            canPreviewText || canPreviewNotes;
-                          // A file that was small enough to skip chunking
-                          // only ever has one entry here - show just its
-                          // name. A file split into page-range chunks gets
-                          // the chunk number/page range alongside its name
-                          // so entries from different files (which each
-                          // restart numbering at "Chunk 1") aren't confused
-                          // for one another.
-                          const isMultiChunkFile =
-                            chunkStatuses.filter(
-                              (cs) => cs.fileIndex === chunk.fileIndex,
-                            ).length > 1;
-                          return (
-                            <div
-                              key={`${chunk.fileIndex}-${chunk.chunkIndex}`}
-                              className={`rounded-lg ${
-                                chunk.status === "complete"
-                                  ? "bg-green-900/20 border border-green-700/30"
-                                  : chunk.status === "failed"
-                                    ? "bg-red-900/20 border border-red-700/30"
-                                    : chunk.status === "summarizing" ||
-                                        chunk.status === "ocr"
-                                      ? "bg-white/5 border border-white/10"
-                                      : "bg-white/[0.03] border border-white/10"
+                    <div className="grid grid-cols-3 gap-1.5">
+                      {PIPELINE_STAGES.map((stage, i) => {
+                        const state =
+                          i < stageIndex
+                            ? "done"
+                            : i === stageIndex
+                              ? "active"
+                              : "todo";
+                        return (
+                          <div
+                            key={stage.id}
+                            className={`rounded-lg px-2 py-1.5 flex items-center gap-1.5 text-[11px] font-medium ${
+                              state === "done"
+                                ? "bg-green-500/10 text-green-200 ring-1 ring-green-400/20"
+                                : state === "active"
+                                  ? "bg-purple-500/15 text-purple-100 ring-1 ring-purple-400/25"
+                                  : "bg-white/[0.03] text-blue-300/40"
+                            }`}
+                          >
+                            <DynamicIcon
+                              name={state === "done" ? "Check" : stage.icon}
+                              className={`w-3.5 h-3.5 shrink-0 ${
+                                state === "active" ? "animate-pulse" : ""
                               }`}
-                            >
-                              <div className="flex items-center gap-3 p-2">
-                                <div className="shrink-0">
-                                  {chunk.status === "complete" && (
-                                    <DynamicIcon
-                                      name="CheckCircle"
-                                      className="w-5 h-5 text-green-400"
-                                    />
-                                  )}
-                                  {chunk.status === "failed" && (
-                                    <DynamicIcon
-                                      name="XCircle"
-                                      className="w-5 h-5 text-red-400"
-                                    />
-                                  )}
-                                  {(chunk.status === "summarizing" ||
-                                    chunk.status === "ocr") && (
-                                    <DynamicIcon
-                                      name="Loader2"
-                                      className="w-5 h-5 text-blue-400 animate-spin"
-                                    />
-                                  )}
-                                  {chunk.status === "pending" && (
-                                    <DynamicIcon
-                                      name="Clock"
-                                      className="w-5 h-5 text-blue-300/60"
-                                    />
-                                  )}
-                                </div>
+                            />
+                            <span className="truncate">{stage.label}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
 
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-sm font-medium text-white truncate">
-                                    {chunk.fileName}
-                                    {isMultiChunkFile &&
-                                      ` — Chunk ${chunk.chunkIndex + 1}: Pages ${chunk.pageStart}-${chunk.pageEnd}`}
-                                  </p>
-                                  {chunk.status === "complete" &&
-                                    chunk.result && (
-                                      <p className="text-xs text-green-300/70">
-                                        {chunk.result.lore.length} lore,{" "}
-                                        {chunk.result.mechanicNotes.length}{" "}
-                                        mechanics,{" "}
-                                        {chunk.result.customTables.length}{" "}
-                                        tables
-                                      </p>
-                                    )}
-                                  {chunk.status === "failed" &&
-                                    chunk.error && (
-                                      <p
-                                        className="text-xs text-red-300/70 break-words max-h-16 overflow-y-auto"
-                                        title={chunk.error}
-                                      >
-                                        {chunk.error}
-                                      </p>
-                                    )}
-                                  {chunk.status === "summarizing" && (
-                                    <p className="text-xs text-blue-300/70">
-                                      Creating notes...
-                                    </p>
-                                  )}
-                                  {chunk.status === "ocr" && (
-                                    <p className="text-xs text-blue-300/70">
-                                      Extracting text...
-                                    </p>
-                                  )}
-                                  {chunk.status === "pending" && (
-                                    <p className="text-xs text-blue-300/50">
-                                      Waiting...
-                                    </p>
-                                  )}
-                                </div>
-
-                                {/* Preview toggle - read the extracted
-                                    text/notes for this chunk while (or
-                                    after) it's processed */}
-                                {canPreview && (
-                                  <button
-                                    onClick={() => {
-                                      setExpandedChunkIndex(
-                                        isExpanded ? null : chunk.chunkIndex,
-                                      );
-                                      setExpandedChunkFileIndex(
-                                        isExpanded ? null : chunk.fileIndex,
-                                      );
-                                      setChunkPreviewTab(
-                                        canPreviewNotes ? "notes" : "text",
-                                      );
-                                    }}
-                                    className="px-2 py-1 text-xs bg-white/5 hover:bg-white/10 text-blue-200 rounded transition-colors flex items-center gap-1 shrink-0"
-                                    title="Preview extracted content"
-                                  >
-                                    <DynamicIcon
-                                      name={isExpanded ? "EyeOff" : "Eye"}
-                                      className="w-3 h-3"
-                                    />
-                                    {isExpanded ? "Hide" : "Preview"}
-                                  </button>
-                                )}
-
-                                {/* Actions for failed chunks */}
-                                {chunk.status === "failed" && (
-                                  <div className="flex gap-1 shrink-0">
-                                    <button
-                                      onClick={() =>
-                                        retryChunk(
-                                          chunk.fileIndex,
-                                          chunk.chunkIndex,
-                                        )
-                                      }
-                                      className="px-2 py-1 text-xs bg-blue-600/80 hover:bg-blue-600 text-white rounded transition-colors flex items-center gap-1"
-                                      title="Retry this chunk"
-                                    >
-                                      <DynamicIcon
-                                        name="RefreshCw"
-                                        className="w-3 h-3"
-                                      />
-                                      Retry
-                                    </button>
-                                    {chunk.rawSummarizeOutput && (
-                                      <button
-                                        onClick={() =>
-                                          openRepairModal(
-                                            chunk.fileIndex,
-                                            chunk.chunkIndex,
-                                          )
-                                        }
-                                        className="px-2 py-1 text-xs bg-amber-600/80 hover:bg-amber-600 text-white rounded transition-colors flex items-center gap-1"
-                                        title="Manually fix JSON"
-                                      >
-                                        <DynamicIcon
-                                          name="Wrench"
-                                          className="w-3 h-3"
-                                        />
-                                        Fix
-                                      </button>
-                                    )}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Expanded live preview: raw OCR text
-                                  and/or extracted notes for this chunk */}
-                              {isExpanded && canPreview && (
-                                <div className="px-2 pb-2">
-                                  <div className="flex gap-1 mb-2">
-                                    {canPreviewNotes && (
-                                      <button
-                                        onClick={() =>
-                                          setChunkPreviewTab("notes")
-                                        }
-                                        className={`px-2 py-1 text-xs rounded transition-colors ${
-                                          chunkPreviewTab === "notes"
-                                            ? "bg-purple-600/80 text-white"
-                                            : "bg-white/5 text-blue-300/70 hover:bg-white/10"
-                                        }`}
-                                      >
-                                        Notes
-                                      </button>
-                                    )}
-                                    {canPreviewText && (
-                                      <button
-                                        onClick={() =>
-                                          setChunkPreviewTab("text")
-                                        }
-                                        className={`px-2 py-1 text-xs rounded transition-colors ${
-                                          chunkPreviewTab === "text"
-                                            ? "bg-purple-600/80 text-white"
-                                            : "bg-white/5 text-blue-300/70 hover:bg-white/10"
-                                        }`}
-                                      >
-                                        Raw Text
-                                      </button>
-                                    )}
-                                  </div>
-
-                                  {chunkPreviewTab === "text" &&
-                                    canPreviewText && (
-                                      <pre className="text-xs text-blue-200/80 whitespace-pre-wrap break-words max-h-48 overflow-y-auto bg-black/20 rounded p-2">
-                                        {chunk.ocrMarkdown}
-                                      </pre>
-                                    )}
-
-                                  {chunkPreviewTab === "notes" &&
-                                    canPreviewNotes &&
-                                    chunk.result && (
-                                      <div className="space-y-2 max-h-48 overflow-y-auto bg-black/20 rounded p-2">
-                                        {chunk.result.lore.length > 0 && (
-                                          <div>
-                                            <p className="text-xs font-semibold text-blue-300 mb-1">
-                                              📚 Lore (
-                                              {chunk.result.lore.length})
-                                            </p>
-                                            {chunk.result.lore.map((l, i) => (
-                                              <p
-                                                key={i}
-                                                className="text-xs text-blue-200/80 break-words"
-                                              >
-                                                <span className="font-medium">
-                                                  {l.title}:
-                                                </span>{" "}
-                                                {l.content}
-                                              </p>
-                                            ))}
-                                          </div>
-                                        )}
-                                        {chunk.result.mechanicNotes.length >
-                                          0 && (
-                                          <div>
-                                            <p className="text-xs font-semibold text-amber-300 mb-1">
-                                              ⚙️ Mechanics (
-                                              {chunk.result.mechanicNotes.length}
-                                              )
-                                            </p>
-                                            {chunk.result.mechanicNotes.map(
-                                              (m, i) => (
-                                                <p
-                                                  key={i}
-                                                  className="text-xs text-amber-200/80 break-words"
-                                                >
-                                                  <span className="font-medium">
-                                                    {m.title}:
-                                                  </span>{" "}
-                                                  {m.content}
-                                                </p>
-                                              ),
-                                            )}
-                                          </div>
-                                        )}
-                                        {chunk.result.customTables.length >
-                                          0 && (
-                                          <div>
-                                            <p className="text-xs font-semibold text-purple-300 mb-1">
-                                              🎲 Tables (
-                                              {chunk.result.customTables.length}
-                                              )
-                                            </p>
-                                            {chunk.result.customTables.map(
-                                              (t, i) => (
-                                                <p
-                                                  key={i}
-                                                  className="text-xs text-purple-200/80 break-words"
-                                                >
-                                                  {t.name} ({t.entries.length}{" "}
-                                                  entries)
-                                                </p>
-                                              ),
-                                            )}
-                                          </div>
-                                        )}
-                                        {chunk.result.lore.length === 0 &&
-                                          chunk.result.mechanicNotes.length ===
-                                            0 &&
-                                          chunk.result.customTables.length ===
-                                            0 && (
-                                            <p className="text-xs text-blue-300/50 italic">
-                                              No notes extracted from this
-                                              chunk.
-                                            </p>
-                                          )}
-                                      </div>
-                                    )}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-
-                        {/* Complete with current results button */}
-                        {chunkStatuses.some((cs) => cs.status === "failed") &&
-                          chunkStatuses.some(
-                            (cs) => cs.status === "complete",
-                          ) && (
-                            <div className="pt-2 border-t border-white/10">
-                              <button
-                                onClick={completeWithCurrentResults}
-                                className="w-full px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
-                              >
-                                <DynamicIcon
-                                  name="Download"
-                                  className="w-4 h-4"
-                                />
-                                Complete Import with{" "}
-                                {
-                                  chunkStatuses.filter(
-                                    (cs) => cs.status === "complete",
-                                  ).length
-                                }{" "}
-                                Chunks
-                              </button>
-                              <p className="text-xs text-blue-300/50 text-center mt-1">
-                                Skip{" "}
-                                {
-                                  chunkStatuses.filter(
-                                    (cs) => cs.status === "failed",
-                                  ).length
-                                }{" "}
-                                failed chunk
-                                {chunkStatuses.filter(
-                                  (cs) => cs.status === "failed",
-                                ).length !== 1
-                                  ? "s"
-                                  : ""}
-                              </p>
-                            </div>
-                          )}
-                      </div>
+                    {chunkStatuses.length > 1 && (
+                      <p className="text-[11px] text-blue-300/50">
+                        {completeChunks.length}/{chunkStatuses.length} chunks
+                        done
+                        {failedChunks.length > 0 &&
+                          ` · ${failedChunks.length} failed`}
+                      </p>
                     )}
                   </div>
                 )}
 
-              {/* Error State */}
-              {step === "error" && (
-                <div className="bg-red-900/30 rounded-lg p-4 border border-red-700/40">
-                  <div className="flex items-start gap-3">
-                    <DynamicIcon
-                      name="XCircle"
-                      className="w-6 h-6 text-red-400 shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-red-300 break-words max-h-32 overflow-y-auto">
-                        {statusMessage}
-                      </p>
-                      <button
-                        onClick={resetState}
-                        className="text-sm text-red-400 hover:text-red-300 underline mt-1"
-                      >
-                        Try again
-                      </button>
+                {/* Error State */}
+                {step === "error" && (
+                  <div className="rounded-2xl border border-red-500/30 bg-red-500/[0.07] p-4">
+                    <div className="flex items-start gap-3">
+                      <span className="shrink-0 w-9 h-9 rounded-xl bg-red-500/15 ring-1 ring-red-400/25 text-red-300 flex items-center justify-center">
+                        <DynamicIcon name="TriangleAlert" className="w-4 h-4" />
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-red-100">
+                          Import failed
+                        </p>
+                        <p className="text-sm text-red-200/80 mt-0.5 break-words max-h-32 overflow-y-auto">
+                          {statusMessage}
+                        </p>
+                        <button
+                          onClick={resetState}
+                          className="mt-2 px-3 py-1.5 bg-white/5 hover:bg-white/10 text-red-100 text-sm rounded-lg transition-colors"
+                        >
+                          Try again
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* File Selection */}
-              {step === "idle" && (
-                <>
-                  {/* Import Mode Toggle */}
-                  <div className="flex gap-2 p-1 bg-white/5 rounded-lg">
-                    <button
-                      onClick={() => setImportMode("file")}
-                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        importMode === "file"
-                          ? "bg-purple-600 text-white"
-                          : "text-blue-300 hover:text-white"
-                      }`}
-                    >
-                      Upload file
-                    </button>
-                    <button
-                      onClick={() => setImportMode("link")}
-                      className={`flex-1 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                        importMode === "link"
-                          ? "bg-purple-600 text-white"
-                          : "text-blue-300 hover:text-white"
-                      }`}
-                    >
-                      Import from link
-                    </button>
-                  </div>
-
-                  {importMode === "link" ? (
-                    <div className="space-y-2">
-                      <label className="block text-sm font-semibold text-blue-200">
-                        Document link (e.g. Google Drive)
-                      </label>
-                      <input
-                        type="url"
-                        value={linkUrl}
-                        onChange={(e) => setLinkUrl(e.target.value)}
-                        placeholder="https://drive.google.com/file/d/.../view"
-                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/50"
-                      />
-                      <p className="text-xs text-blue-300/60">
-                        The file must be shared as &quot;Anyone with the
-                        link&quot;. Mistral fetches it directly, so there
-                        isn&apos;t an upload size limit here - but very
-                        large files can trigger Drive&apos;s virus-scan
-                        warning page instead of serving the file directly;
-                        use the file upload tab if that happens.
-                      </p>
+                {/* Setup */}
+                {step === "idle" && (
+                  <>
+                    {/* Import Mode Toggle */}
+                    <div className="flex gap-1 p-1 bg-white/5 rounded-xl">
+                      {(
+                        [
+                          { id: "file" as const, label: "Upload files", icon: "Upload" },
+                          { id: "link" as const, label: "From a link", icon: "Link" },
+                        ]
+                      ).map((mode) => (
+                        <button
+                          key={mode.id}
+                          onClick={() => setImportMode(mode.id)}
+                          className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                            importMode === mode.id
+                              ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+                              : "text-blue-300/70 hover:text-white hover:bg-white/5"
+                          }`}
+                        >
+                          <DynamicIcon name={mode.icon} className="w-4 h-4" />
+                          {mode.label}
+                        </button>
+                      ))}
                     </div>
-                  ) : (
-                    <>
-                      {/* Drop Zone */}
+
+                    {importMode === "link" ? (
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-2">
+                        <label className="block text-sm font-semibold text-white">
+                          Document link
+                        </label>
+                        <input
+                          type="url"
+                          value={linkUrl}
+                          onChange={(e) => setLinkUrl(e.target.value)}
+                          placeholder="https://drive.google.com/file/d/.../view"
+                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/40 focus:outline-none focus:border-purple-400/40"
+                        />
+                        <p className="text-xs text-blue-300/50">
+                          The file must be shared as “Anyone with the link”.
+                          Mistral fetches it directly, so there isn&apos;t an
+                          upload size limit here — but very large files can
+                          trigger Drive&apos;s virus-scan warning page instead
+                          of the file itself; use the upload tab if that
+                          happens.
+                        </p>
+                      </div>
+                    ) : (
                       <div
                         onDrop={handleDrop}
                         onDragOver={handleDragOver}
                         onClick={() => fileInputRef.current?.click()}
-                        className={`border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all ${
+                        className={`rounded-2xl border-2 border-dashed p-8 text-center cursor-pointer transition-all ${
                           selectedFiles.length > 0
-                            ? "border-green-500/50 bg-green-900/20"
-                            : "border-white/10 hover:border-purple-500/50 hover:bg-purple-900/20"
+                            ? "border-green-500/40 bg-green-500/[0.06]"
+                            : "border-white/15 hover:border-purple-400/50 hover:bg-purple-500/[0.06]"
                         }`}
                       >
                         <input
@@ -3436,578 +3536,587 @@ export default function PDFImporter({
                           multiple
                           className="hidden"
                         />
-                        <div className="space-y-2">
+                        <span
+                          className={`mx-auto mb-3 w-14 h-14 rounded-2xl flex items-center justify-center ${
+                            selectedFiles.length > 0
+                              ? "bg-green-500/15 ring-1 ring-green-400/25 text-green-300"
+                              : "bg-purple-500/15 ring-1 ring-purple-400/25 text-purple-200"
+                          }`}
+                        >
                           <DynamicIcon
                             name={
                               selectedFiles.length > 0 ? "FilePlus" : "Upload"
                             }
-                            className={`w-10 h-10 mx-auto ${
-                              selectedFiles.length > 0
-                                ? "text-green-400"
-                                : "text-blue-400"
-                            }`}
+                            className="w-6 h-6"
                           />
-                          <p className="font-medium text-white">
-                            {selectedFiles.length > 0
-                              ? "Drop more files or click to add"
-                              : "Drop your PDFs here or click to browse"}
-                          </p>
-                          <p className="text-sm text-blue-300/60">
-                            Supports multiple files • PDF, PNG, JPEG, WebP •
-                            Max {MAX_PDF_SIZE_MB}MB each
-                          </p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Selected Files List */}
-                  {importMode === "file" && selectedFiles.length > 0 && (
-                    <div className="space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-semibold text-blue-200">
-                          Selected Files ({selectedFiles.length})
+                        </span>
+                        <p className="font-semibold text-white">
+                          {selectedFiles.length > 0
+                            ? "Drop more files, or click to add"
+                            : "Drop your rulebooks here"}
                         </p>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedFiles([]);
-                            setEstimatedCost(0);
-                            setPageCount(0);
-                            if (fileInputRef.current)
-                              fileInputRef.current.value = "";
-                          }}
-                          className="text-xs text-red-400 hover:text-red-300"
-                        >
-                          Clear all
-                        </button>
-                      </div>
-                      <div className="max-h-40 overflow-y-auto space-y-1">
-                        {selectedFiles.map((file, index) => {
-                          const filePages = Math.max(
-                            1,
-                            Math.ceil(file.size / (100 * 1024)),
-                          );
-                          return (
-                            <div
-                              key={`${file.name}-${index}`}
-                              className="flex items-center gap-2 p-2 bg-white/5 rounded-lg group"
-                            >
-                              <DynamicIcon
-                                name="FileText"
-                                className="w-4 h-4 text-blue-400 shrink-0"
-                              />
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm text-white truncate">
-                                  {file.name}
-                                </p>
-                                <p className="text-xs text-blue-300/60">
-                                  {(file.size / 1024 / 1024).toFixed(2)} MB • ~
-                                  {filePages} pages
-                                </p>
-                              </div>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  removeFile(index);
-                                }}
-                                className="p-1 hover:bg-red-900/30 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                              >
-                                <DynamicIcon
-                                  name="X"
-                                  className="w-4 h-4 text-red-400"
-                                />
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <p className="text-xs text-blue-300/60 text-right">
-                        Total: ~{pageCount} pages
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Cost Estimate */}
-                  {selectedFiles.length > 0 && (
-                    <div className="bg-amber-900/20 border border-amber-700/40 rounded-lg p-3 flex items-center gap-3">
-                      <DynamicIcon
-                        name="DollarSign"
-                        className="w-5 h-5 text-amber-400"
-                      />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-amber-200">
-                          Estimated OCR cost: ~${estimatedCost.toFixed(3)}
-                        </p>
-                        <p className="text-xs text-amber-300/60">
-                          BYOK: paid directly to your Mistral API key. AI
-                          summarization costs extra via your selected model.
+                        <p className="text-sm text-blue-300/50 mt-1">
+                          PDF, PNG, JPEG, WebP, TXT, MD · up to{" "}
+                          {MAX_PDF_SIZE_MB}MB each
                         </p>
                       </div>
-                    </div>
-                  )}
-
-                  {/* AI Model Selection */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-sm font-semibold text-blue-200">
-                        AI Model for Summarization
-                      </label>
-                      <button
-                        type="button"
-                        onClick={resetPDFImporterSettings}
-                        className="text-xs text-blue-300/50 hover:text-blue-200 underline"
-                        title="Reset the model and advanced options below back to their defaults"
-                      >
-                        Reset to defaults
-                      </button>
-                    </div>
-                    <p className="text-xs text-blue-300/50 mb-1.5">
-                      BYOK only - add a provider key in Settings to unlock its
-                      models. Your choice is remembered for next time.
-                    </p>
-                    <select
-                      value={aiModel}
-                      onChange={(e) => setAIModel(e.target.value)}
-                      className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
-                    >
-                      {(Object.keys(PROVIDER_LABELS) as BYOKProvider[]).map(
-                        (provider) => {
-                          if (!keys[PROVIDER_KEY_FIELD[provider]]) return null;
-                          const models = MODELS_BY_PROVIDER[provider];
-                          if (models.length === 0) return null;
-                          return (
-                            <optgroup
-                              key={provider}
-                              label={PROVIDER_LABELS[provider]}
-                            >
-                              {models.map((m) => (
-                                <option key={m.model} value={m.model}>
-                                  {m.name}
-                                </option>
-                              ))}
-                            </optgroup>
-                          );
-                        },
-                      )}
-                      <optgroup label="Custom">
-                        <option value="custom-model">
-                          Custom Model (any provider)
-                        </option>
-                      </optgroup>
-                    </select>
-                    {!Object.values(PROVIDER_KEY_FIELD).some(
-                      (field) => keys[field],
-                    ) && (
-                      <p className="text-xs text-amber-400/80 mt-1">
-                        No API keys configured yet - add one in Settings to
-                        pick a model.
-                      </p>
                     )}
-                    {aiModel === "custom-model" && (
-                      <div className="mt-2 space-y-2">
-                        <select
-                          value={customModelProvider}
-                          onChange={(e) =>
-                            setCustomModelProvider(
-                              e.target.value as BYOKProvider,
-                            )
-                          }
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
-                        >
-                          {(
-                            Object.keys(PROVIDER_LABELS) as BYOKProvider[]
-                          ).map((provider) => (
-                            <option key={provider} value={provider}>
-                              {PROVIDER_LABELS[provider]}
-                              {!keys[PROVIDER_KEY_FIELD[provider]]
-                                ? " (no key set)"
-                                : ""}
-                            </option>
-                          ))}
-                        </select>
-                        <input
-                          type="text"
-                          value={customModelId}
-                          onChange={(e) => setCustomModelId(e.target.value)}
-                          placeholder="Model ID, e.g. anthropic/claude-opus-4.1"
-                          className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/50"
-                        />
-                      </div>
-                    )}
-                  </div>
 
-                  {/* Advanced Options */}
-                  <div className="border border-white/10 rounded-lg">
-                    <button
-                      onClick={() => setShowAdvanced(!showAdvanced)}
-                      className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/[0.03] rounded-lg transition-colors"
-                    >
-                      <span className="text-sm font-medium text-blue-200">
-                        Advanced Options
-                      </span>
-                      <DynamicIcon
-                        name={showAdvanced ? "ChevronUp" : "ChevronDown"}
-                        className="w-4 h-4 text-blue-400"
-                      />
-                    </button>
-                    {showAdvanced && (
-                      <div className="p-4 pt-0 space-y-4">
-                        {/* Max Output Tokens Slider */}
-                        <div>
-                          <label className="block text-sm font-semibold text-blue-200 mb-1">
-                            Max Output Size: {maxOutputTokens.toLocaleString()}{" "}
-                            tokens
-                          </label>
-                          <input
-                            type="range"
-                            min={4000}
-                            max={getModelMaxOutput()}
-                            step={1000}
-                            value={maxOutputTokens}
-                            onChange={(e) =>
-                              setMaxOutputTokens(Number(e.target.value))
-                            }
-                            className="w-full h-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                          />
-                          <div className="flex justify-between text-xs text-blue-300/60 mt-1">
-                            <span>4K (Fast)</span>
-                            <span>
-                              {(getModelMaxOutput() / 1000).toFixed(0)}K (Max)
-                            </span>
-                          </div>
-                          <p className="text-xs text-blue-300/60 mt-1">
-                            Higher values extract more content but take longer.
-                            Increase if content is being cut off.
+                    {/* Selected Files */}
+                    {importMode === "file" && selectedFiles.length > 0 && (
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 space-y-2">
+                        <div className="flex items-center justify-between px-1">
+                          <p className="text-sm font-semibold text-white">
+                            {selectedFiles.length} file
+                            {selectedFiles.length === 1 ? "" : "s"} ready
                           </p>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedFiles([]);
+                              setEstimatedCost(0);
+                              setPageCount(0);
+                              if (fileInputRef.current)
+                                fileInputRef.current.value = "";
+                            }}
+                            className="text-xs text-blue-300/50 hover:text-red-300 transition-colors"
+                          >
+                            Clear all
+                          </button>
                         </div>
-
-                        {/* Continuation Rounds Slider */}
-                        <div>
-                          <label className="block text-sm font-semibold text-blue-200 mb-1">
-                            Continuation Rounds: {maxContinuationRounds}
-                          </label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={MAX_CONTINUATION_ROUNDS_LIMIT}
-                            step={1}
-                            value={maxContinuationRounds}
-                            onChange={(e) =>
-                              setMaxContinuationRounds(Number(e.target.value))
-                            }
-                            className="w-full h-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
-                          />
-                          <div className="flex justify-between text-xs text-blue-300/60 mt-1">
-                            <span>0 (Off)</span>
-                            <span>
-                              {MAX_CONTINUATION_ROUNDS_LIMIT} (Thorough)
-                            </span>
-                          </div>
-                          <p className="text-xs text-blue-300/60 mt-1">
-                            When a response runs out of output length, ask the
-                            model to carry on with the notes it hasn&apos;t
-                            written yet, up to this many extra rounds. Each
-                            round re-sends the document, so higher values cost
-                            more. 0 keeps only what fits in one response.
-                          </p>
-                        </div>
-
-                        {/* Custom Instructions */}
-                        <div>
-                          <label className="block text-sm font-semibold text-blue-200 mb-1">
-                            Custom Instructions (optional)
-                          </label>
-                          <textarea
-                            value={customInstructions}
-                            onChange={(e) =>
-                              setCustomInstructions(e.target.value)
-                            }
-                            placeholder="e.g., Focus on monster stat blocks, ignore fluff text..."
-                            rows={3}
-                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white resize-none"
-                          />
-                        </div>
-
-                        {/* Merge Duplicates Toggle */}
-                        <label className="flex items-start gap-2 cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={mergeDuplicates}
-                            onChange={(e) =>
-                              setMergeDuplicates(e.target.checked)
-                            }
-                            className="mt-1 accent-purple-500"
-                          />
-                          <span className="text-sm">
-                            <span className="block font-semibold text-blue-200">
-                              Merge duplicate entries
-                            </span>
-                            <span className="block text-xs text-blue-300/60">
-                              After import, combine notes/tables that were
-                              split across chunk boundaries or extracted
-                              twice under different names. Disable to keep
-                              each chunk&apos;s raw output untouched.
-                            </span>
-                          </span>
-                        </label>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Saved Imports Section */}
-                  {savedImports.length > 0 && (
-                    <div className="border border-green-700/40 rounded-lg overflow-hidden">
-                      <button
-                        onClick={() => setShowSavedImports(!showSavedImports)}
-                        className="w-full px-4 py-3 flex items-center justify-between bg-green-900/20 hover:bg-green-900/30 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <DynamicIcon
-                            name="History"
-                            className="w-4 h-4 text-green-400"
-                          />
-                          <span className="text-sm font-medium text-green-200">
-                            Saved Imports ({savedImports.length})
-                          </span>
-                        </div>
-                        <DynamicIcon
-                          name={showSavedImports ? "ChevronUp" : "ChevronDown"}
-                          className="w-4 h-4 text-green-400"
-                        />
-                      </button>
-                      {showSavedImports && (
-                        <div className="p-3 space-y-2 max-h-80 overflow-y-auto bg-green-900/10">
-                          {savedImports.map((imp) => {
-                            const totalNotes =
-                              imp.lore.length + imp.mechanicNotes.length;
-                            const isExpanded = expandedImport === imp.id;
+                        <div className="max-h-52 overflow-y-auto space-y-1.5 pr-1">
+                          {selectedFiles.map((file, index) => {
+                            const filePages = Math.max(
+                              1,
+                              Math.ceil(file.size / (100 * 1024)),
+                            );
                             return (
                               <div
-                                key={imp.id}
-                                className="bg-white/5 rounded-lg border border-white/10 overflow-hidden"
+                                key={`${file.name}-${index}`}
+                                className="flex items-center gap-2.5 p-2 bg-white/[0.04] rounded-xl"
                               >
-                                {/* Import Header */}
-                                <div
-                                  onClick={() =>
-                                    setExpandedImport(
-                                      isExpanded ? null : imp.id,
-                                    )
-                                  }
-                                  className="flex items-center gap-3 p-3 cursor-pointer hover:bg-white/10 transition-colors"
-                                >
-                                  <DynamicIcon
-                                    name="FileText"
-                                    className="w-5 h-5 text-green-400 shrink-0"
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-white truncate">
-                                      {imp.fileName}
-                                    </p>
-                                    <p className="text-xs text-blue-300/60">
-                                      {new Date(
-                                        imp.timestamp,
-                                      ).toLocaleDateString()}{" "}
-                                      • {totalNotes} notes •{" "}
-                                      {imp.customTables.length} tables
-                                    </p>
-                                  </div>
-                                  {imp.failedPages &&
-                                    imp.failedPages.length > 0 && (
-                                      <span className="px-2 py-0.5 bg-red-900/50 text-red-300 text-xs rounded-full shrink-0">
-                                        {imp.failedPages.length} page
-                                        {imp.failedPages.length > 1
-                                          ? "s"
-                                          : ""}{" "}
-                                        failed
-                                      </span>
-                                    )}
-                                  <DynamicIcon
-                                    name={
-                                      isExpanded ? "ChevronUp" : "ChevronDown"
-                                    }
-                                    className="w-4 h-4 text-blue-400 shrink-0"
-                                  />
+                                <span className="shrink-0 w-8 h-8 rounded-lg bg-blue-500/15 ring-1 ring-blue-400/20 text-blue-300 flex items-center justify-center">
+                                  <DynamicIcon name="FileText" className="w-4 h-4" />
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm text-white truncate">
+                                    {file.name}
+                                  </p>
+                                  <p className="text-xs text-blue-300/50">
+                                    {(file.size / 1024 / 1024).toFixed(2)} MB ·
+                                    ~{filePages} pages
+                                  </p>
                                 </div>
-
-                                {/* Expanded Content */}
-                                {isExpanded && (
-                                  <div className="px-3 pb-3 space-y-3 border-t border-white/10">
-                                    {/* Lore Preview */}
-                                    {imp.lore.length > 0 && (
-                                      <div className="mt-3">
-                                        <p className="text-xs font-semibold text-blue-300 mb-1">
-                                          📚 Lore ({imp.lore.length})
-                                        </p>
-                                        <div className="space-y-1 max-h-24 overflow-y-auto">
-                                          {imp.lore.slice(0, 5).map((l, i) => (
-                                            <p
-                                              key={i}
-                                              className="text-xs text-blue-200/80 truncate"
-                                            >
-                                              • {l.title}
-                                            </p>
-                                          ))}
-                                          {imp.lore.length > 5 && (
-                                            <p className="text-xs text-blue-300/50 italic">
-                                              +{imp.lore.length - 5} more...
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Mechanics Preview */}
-                                    {imp.mechanicNotes.length > 0 && (
-                                      <div>
-                                        <p className="text-xs font-semibold text-amber-300 mb-1">
-                                          ⚙️ Mechanics (
-                                          {imp.mechanicNotes.length})
-                                        </p>
-                                        <div className="space-y-1 max-h-24 overflow-y-auto">
-                                          {imp.mechanicNotes
-                                            .slice(0, 5)
-                                            .map((m, i) => (
-                                              <p
-                                                key={i}
-                                                className="text-xs text-amber-200/80 truncate"
-                                              >
-                                                • {m.title}
-                                              </p>
-                                            ))}
-                                          {imp.mechanicNotes.length > 5 && (
-                                            <p className="text-xs text-amber-300/50 italic">
-                                              +{imp.mechanicNotes.length - 5}{" "}
-                                              more...
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Tables Preview */}
-                                    {imp.customTables.length > 0 && (
-                                      <div>
-                                        <p className="text-xs font-semibold text-purple-300 mb-1">
-                                          🎲 Tables ({imp.customTables.length})
-                                        </p>
-                                        <div className="space-y-1">
-                                          {imp.customTables
-                                            .slice(0, 3)
-                                            .map((t, i) => (
-                                              <p
-                                                key={i}
-                                                className="text-xs text-purple-200/80 truncate"
-                                              >
-                                                • {t.name} ({t.entries.length}{" "}
-                                                entries)
-                                              </p>
-                                            ))}
-                                          {imp.customTables.length > 3 && (
-                                            <p className="text-xs text-purple-300/50 italic">
-                                              +{imp.customTables.length - 3}{" "}
-                                              more...
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    )}
-
-                                    {/* Failed Pages - pages that didn't get
-                                        processed, and why, so the player
-                                        knows what to rework/retry */}
-                                    {imp.failedPages &&
-                                      imp.failedPages.length > 0 && (
-                                        <div>
-                                          <p className="text-xs font-semibold text-red-300 mb-1">
-                                            ⚠️ Failed Pages (
-                                            {imp.failedPages.length})
-                                          </p>
-                                          <div className="space-y-1 max-h-32 overflow-y-auto">
-                                            {imp.failedPages.map((fp, i) => (
-                                              <p
-                                                key={i}
-                                                className="text-xs text-red-200/80 break-words"
-                                                title={fp.reason}
-                                              >
-                                                • {fp.fileName} p.
-                                                {fp.pageStart}
-                                                {fp.pageEnd !== fp.pageStart
-                                                  ? `-${fp.pageEnd}`
-                                                  : ""}
-                                                : {fp.reason}
-                                              </p>
-                                            ))}
-                                          </div>
-                                        </div>
-                                      )}
-
-                                    {/* Action Buttons */}
-                                    <div className="flex gap-2 pt-2 border-t border-white/10">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          useSavedImport(imp);
-                                        }}
-                                        className="flex-1 px-3 py-1.5 bg-green-600/80 hover:bg-green-600 text-white text-xs rounded-lg transition-colors flex items-center justify-center gap-1"
-                                      >
-                                        <DynamicIcon
-                                          name="Download"
-                                          className="w-3 h-3"
-                                        />
-                                        Use
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          deleteSavedImport(imp.id);
-                                        }}
-                                        className="px-3 py-1.5 bg-red-900/50 hover:bg-red-800/50 text-red-300 text-xs rounded-lg transition-colors"
-                                      >
-                                        <DynamicIcon
-                                          name="Trash2"
-                                          className="w-3 h-3"
-                                        />
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    removeFile(index);
+                                  }}
+                                  className="shrink-0 p-1.5 rounded-lg text-blue-300/40 hover:text-red-300 hover:bg-red-500/10 transition-colors"
+                                  title="Remove"
+                                >
+                                  <DynamicIcon name="X" className="w-4 h-4" />
+                                </button>
                               </div>
                             );
                           })}
                         </div>
+                        <div className="flex items-center gap-2 px-1 pt-1 text-xs text-amber-200/70 border-t border-white/5">
+                          <span className="shrink-0 text-amber-300/80">
+                            <DynamicIcon name="Coins" className="w-3.5 h-3.5" />
+                          </span>
+                          <span>
+                            ~{pageCount} pages · about $
+                            {estimatedCost.toFixed(3)} of OCR, billed to your
+                            own Mistral key (the notes model costs extra).
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Model */}
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-sm font-semibold text-white">
+                          Model that writes the notes
+                        </label>
+                        <button
+                          type="button"
+                          onClick={resetPDFImporterSettings}
+                          className="text-xs text-blue-300/40 hover:text-blue-200 transition-colors"
+                          title="Reset the model and advanced options below back to their defaults"
+                        >
+                          Reset
+                        </button>
+                      </div>
+                      <select
+                        value={aiModel}
+                        onChange={(e) => setAIModel(e.target.value)}
+                        className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-purple-400/40"
+                      >
+                        {(Object.keys(PROVIDER_LABELS) as BYOKProvider[]).map(
+                          (provider) => {
+                            if (!keys[PROVIDER_KEY_FIELD[provider]]) return null;
+                            const models = MODELS_BY_PROVIDER[provider];
+                            if (models.length === 0) return null;
+                            return (
+                              <optgroup
+                                key={provider}
+                                label={PROVIDER_LABELS[provider]}
+                              >
+                                {models.map((m) => (
+                                  <option key={m.model} value={m.model}>
+                                    {m.name}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            );
+                          },
+                        )}
+                        <optgroup label="Custom">
+                          <option value="custom-model">
+                            Custom Model (any provider)
+                          </option>
+                        </optgroup>
+                      </select>
+                      <p className="text-xs text-blue-300/40">
+                        BYOK only — add a provider key in Settings to unlock its
+                        models. Your choice is remembered.
+                      </p>
+                      {!Object.values(PROVIDER_KEY_FIELD).some(
+                        (field) => keys[field],
+                      ) && (
+                        <p className="text-xs text-amber-300/80 flex items-center gap-1.5">
+                          <DynamicIcon
+                            name="TriangleAlert"
+                            className="w-3.5 h-3.5"
+                          />
+                          No API keys configured yet — add one in Settings to
+                          pick a model.
+                        </p>
+                      )}
+                      {aiModel === "custom-model" && (
+                        <div className="space-y-2 pt-1">
+                          <select
+                            value={customModelProvider}
+                            onChange={(e) =>
+                              setCustomModelProvider(
+                                e.target.value as BYOKProvider,
+                              )
+                            }
+                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:border-purple-400/40"
+                          >
+                            {(
+                              Object.keys(PROVIDER_LABELS) as BYOKProvider[]
+                            ).map((provider) => (
+                              <option key={provider} value={provider}>
+                                {PROVIDER_LABELS[provider]}
+                                {!keys[PROVIDER_KEY_FIELD[provider]]
+                                  ? " (no key set)"
+                                  : ""}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            value={customModelId}
+                            onChange={(e) => setCustomModelId(e.target.value)}
+                            placeholder="Model ID, e.g. anthropic/claude-opus-4.1"
+                            className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/40 focus:outline-none focus:border-purple-400/40"
+                          />
+                        </div>
                       )}
                     </div>
-                  )}
-                </>
+
+                    {/* Advanced Options */}
+                    <div className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
+                      <button
+                        onClick={() => setShowAdvanced(!showAdvanced)}
+                        className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/[0.03] transition-colors"
+                      >
+                        <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                          <span className="text-blue-300/60">
+                            <DynamicIcon
+                              name="SlidersHorizontal"
+                              className="w-4 h-4"
+                            />
+                          </span>
+                          Advanced options
+                        </span>
+                        <DynamicIcon
+                          name={showAdvanced ? "ChevronUp" : "ChevronDown"}
+                          className="w-4 h-4 text-blue-300/40"
+                        />
+                      </button>
+                      {showAdvanced && (
+                        <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4">
+                          {/* Max Output Tokens */}
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <label className="text-sm font-medium text-blue-100">
+                                Max output size
+                              </label>
+                              <span className="text-xs tabular-nums text-purple-200">
+                                {maxOutputTokens.toLocaleString()} tokens
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={4000}
+                              max={getModelMaxOutput()}
+                              step={1000}
+                              value={maxOutputTokens}
+                              onChange={(e) =>
+                                setMaxOutputTokens(Number(e.target.value))
+                              }
+                              className="w-full h-2 mt-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                            />
+                            <div className="flex justify-between text-[11px] text-blue-300/40 mt-1">
+                              <span>4K (fast)</span>
+                              <span>
+                                {(getModelMaxOutput() / 1000).toFixed(0)}K (max)
+                              </span>
+                            </div>
+                            <p className="text-xs text-blue-300/50 mt-1">
+                              Higher values extract more per response. Raise it
+                              if content is being cut off.
+                            </p>
+                          </div>
+
+                          {/* Continuation Rounds */}
+                          <div>
+                            <div className="flex items-center justify-between">
+                              <label className="text-sm font-medium text-blue-100">
+                                Continuation rounds
+                              </label>
+                              <span className="text-xs tabular-nums text-purple-200">
+                                {maxContinuationRounds}
+                              </span>
+                            </div>
+                            <input
+                              type="range"
+                              min={0}
+                              max={MAX_CONTINUATION_ROUNDS_LIMIT}
+                              step={1}
+                              value={maxContinuationRounds}
+                              onChange={(e) =>
+                                setMaxContinuationRounds(Number(e.target.value))
+                              }
+                              className="w-full h-2 mt-2 bg-white/5 rounded-lg appearance-none cursor-pointer accent-purple-500"
+                            />
+                            <div className="flex justify-between text-[11px] text-blue-300/40 mt-1">
+                              <span>0 (off)</span>
+                              <span>
+                                {MAX_CONTINUATION_ROUNDS_LIMIT} (thorough)
+                              </span>
+                            </div>
+                            <p className="text-xs text-blue-300/50 mt-1">
+                              When a response runs out of length, ask the model
+                              to carry on with the notes it hasn&apos;t written
+                              yet. Each round re-sends the document, so higher
+                              values cost more.
+                            </p>
+                          </div>
+
+                          {/* Custom Instructions */}
+                          <div>
+                            <label className="block text-sm font-medium text-blue-100 mb-1.5">
+                              Custom instructions
+                            </label>
+                            <textarea
+                              value={customInstructions}
+                              onChange={(e) =>
+                                setCustomInstructions(e.target.value)
+                              }
+                              placeholder="e.g. Focus on monster stat blocks, ignore fluff text…"
+                              rows={3}
+                              className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white placeholder-blue-300/40 resize-none focus:outline-none focus:border-purple-400/40"
+                            />
+                          </div>
+
+                          {/* Merge Duplicates */}
+                          <label className="flex items-start gap-2.5 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={mergeDuplicates}
+                              onChange={(e) =>
+                                setMergeDuplicates(e.target.checked)
+                              }
+                              className="mt-0.5 accent-purple-500"
+                            />
+                            <span>
+                              <span className="block text-sm font-medium text-blue-100">
+                                Merge duplicate entries
+                              </span>
+                              <span className="block text-xs text-blue-300/50">
+                                After import, combine notes and tables that were
+                                split across chunk boundaries or extracted twice
+                                under different names.
+                              </span>
+                            </span>
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Saved Imports */}
+                    {savedImports.length > 0 && (
+                      <div className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
+                        <button
+                          onClick={() => setShowSavedImports(!showSavedImports)}
+                          className="w-full px-4 py-3 flex items-center justify-between hover:bg-white/[0.03] transition-colors"
+                        >
+                          <span className="flex items-center gap-2 text-sm font-semibold text-white">
+                            <span className="text-green-300/70">
+                              <DynamicIcon name="History" className="w-4 h-4" />
+                            </span>
+                            Saved imports
+                            <span className="px-1.5 py-0.5 rounded bg-white/5 text-[11px] text-blue-200/60 tabular-nums">
+                              {savedImports.length}
+                            </span>
+                          </span>
+                          <DynamicIcon
+                            name={showSavedImports ? "ChevronUp" : "ChevronDown"}
+                            className="w-4 h-4 text-blue-300/40"
+                          />
+                        </button>
+                        {showSavedImports && (
+                          <div className="p-3 space-y-2 max-h-[28rem] overflow-y-auto border-t border-white/5">
+                            {savedImports.map((imp) => {
+                              const totalNotes =
+                                imp.lore.length + imp.mechanicNotes.length;
+                              const isExpanded = expandedImport === imp.id;
+                              return (
+                                <div
+                                  key={imp.id}
+                                  className="rounded-xl border border-white/10 bg-white/[0.02] overflow-hidden"
+                                >
+                                  <div
+                                    onClick={() =>
+                                      setExpandedImport(
+                                        isExpanded ? null : imp.id,
+                                      )
+                                    }
+                                    className="flex items-center gap-2.5 p-2.5 cursor-pointer hover:bg-white/[0.04] transition-colors"
+                                  >
+                                    <span className="shrink-0 w-8 h-8 rounded-lg bg-green-500/15 ring-1 ring-green-400/20 text-green-300 flex items-center justify-center">
+                                      <DynamicIcon name="FileCheck" className="w-4 h-4" />
+                                    </span>
+                                    <div className="flex-1 min-w-0">
+                                      <p className="text-sm font-medium text-white truncate">
+                                        {imp.fileName}
+                                      </p>
+                                      <p className="text-xs text-blue-300/50">
+                                        {new Date(
+                                          imp.timestamp,
+                                        ).toLocaleDateString()}{" "}
+                                        · {totalNotes} notes ·{" "}
+                                        {imp.customTables.length} tables
+                                      </p>
+                                    </div>
+                                    {imp.failedPages &&
+                                      imp.failedPages.length > 0 && (
+                                        <span className="shrink-0 px-2 py-0.5 rounded-full bg-red-500/15 text-red-200 text-[10px] ring-1 ring-red-400/20">
+                                          {imp.failedPages.length} failed
+                                        </span>
+                                      )}
+                                    <DynamicIcon
+                                      name={
+                                        isExpanded ? "ChevronUp" : "ChevronDown"
+                                      }
+                                      className="w-4 h-4 text-blue-300/40 shrink-0"
+                                    />
+                                  </div>
+
+                                  {isExpanded && (
+                                    <div className="px-2.5 pb-2.5 space-y-3 border-t border-white/5 pt-3">
+                                      <ExtractionPreview
+                                        lore={imp.lore}
+                                        mechanicNotes={imp.mechanicNotes}
+                                        customTables={imp.customTables}
+                                        emptyMessage="This import came back empty."
+                                        maxHeightClass="max-h-80"
+                                      />
+
+                                      {imp.failedPages &&
+                                        imp.failedPages.length > 0 && (
+                                          <div className="rounded-xl border border-red-500/20 bg-red-500/[0.05] p-2.5">
+                                            <p className="text-xs font-semibold text-red-200 mb-1 flex items-center gap-1.5">
+                                              <DynamicIcon
+                                                name="TriangleAlert"
+                                                className="w-3.5 h-3.5"
+                                              />
+                                              Pages that failed (
+                                              {imp.failedPages.length})
+                                            </p>
+                                            <div className="space-y-1 max-h-28 overflow-y-auto">
+                                              {imp.failedPages.map((fp, i) => (
+                                                <p
+                                                  key={i}
+                                                  className="text-xs text-red-200/70 break-words"
+                                                  title={fp.reason}
+                                                >
+                                                  • {fp.fileName} p.
+                                                  {fp.pageStart}
+                                                  {fp.pageEnd !== fp.pageStart
+                                                    ? `–${fp.pageEnd}`
+                                                    : ""}
+                                                  : {fp.reason}
+                                                </p>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        )}
+
+                                      <div className="flex gap-2">
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            useSavedImport(imp);
+                                          }}
+                                          className="flex-1 px-3 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white text-sm rounded-lg transition-colors flex items-center justify-center gap-1.5"
+                                        >
+                                          <DynamicIcon
+                                            name="Download"
+                                            className="w-4 h-4"
+                                          />
+                                          Use this import
+                                        </button>
+                                        <button
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            deleteSavedImport(imp.id);
+                                          }}
+                                          className="px-3 py-2 bg-white/5 hover:bg-red-500/15 text-red-300 rounded-lg transition-colors"
+                                          title="Delete this saved import"
+                                        >
+                                          <DynamicIcon
+                                            name="Trash2"
+                                            className="w-4 h-4"
+                                          />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* Right: the notes, as they're written */}
+              {hasWorkspace && (
+                <div className="lg:col-span-7 mt-4 lg:mt-0">
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.03] overflow-hidden">
+                    <div className="px-3 sm:px-4 py-3 border-b border-white/10 flex items-center gap-2 flex-wrap">
+                      <span className="text-purple-300 shrink-0">
+                        <DynamicIcon name="Sparkles" className="w-4 h-4" />
+                      </span>
+                      <h3 className="text-sm font-semibold text-white">
+                        {isBusy && step !== "complete"
+                          ? "Notes being written"
+                          : "Extracted notes"}
+                      </h3>
+                      <span className="px-1.5 py-0.5 rounded bg-white/5 text-[11px] text-blue-200/60 tabular-nums">
+                        {extractedCount}
+                      </span>
+
+                      <div className="ml-auto flex items-center gap-1 p-0.5 bg-white/5 rounded-lg">
+                        {(
+                          [
+                            { id: "notes" as const, label: "Notes" },
+                            { id: "sources" as const, label: "Sources" },
+                          ]
+                        ).map((tab) => (
+                          <button
+                            key={tab.id}
+                            onClick={() => setWorkspaceTab(tab.id)}
+                            className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 ${
+                              workspaceTab === tab.id
+                                ? "bg-white/10 text-white"
+                                : "text-blue-300/60 hover:text-white"
+                            }`}
+                          >
+                            {tab.label}
+                            {tab.id === "sources" &&
+                              failedChunks.length > 0 && (
+                                <span className="px-1 rounded bg-red-500/20 text-red-200 text-[10px]">
+                                  {failedChunks.length}
+                                </span>
+                              )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="p-3">
+                      {workspaceTab === "notes" ? (
+                        <ExtractionPreview
+                          lore={extracted.lore}
+                          mechanicNotes={extracted.mechanicNotes}
+                          customTables={extracted.customTables}
+                          streaming={isBusy && step !== "complete"}
+                          emptyMessage="Notes will show up here as they're written."
+                          maxHeightClass="max-h-[calc(100dvh-20rem)]"
+                        />
+                      ) : (
+                        <div className="space-y-2 max-h-[calc(100dvh-20rem)] overflow-y-auto pr-1">
+                          {chunkStatuses.length === 0 && (
+                            <p className="text-xs text-blue-300/50 italic py-2">
+                              Nothing being processed yet.
+                            </p>
+                          )}
+                          {chunkStatuses.map(renderChunkRow)}
+
+                          {failedChunks.length > 0 &&
+                            completeChunks.length > 0 && (
+                              <div className="pt-2 border-t border-white/10">
+                                <button
+                                  onClick={completeWithCurrentResults}
+                                  className="w-full px-4 py-2 bg-linear-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white rounded-lg transition-colors flex items-center justify-center gap-2"
+                                >
+                                  <DynamicIcon
+                                    name="Download"
+                                    className="w-4 h-4"
+                                  />
+                                  Finish with {completeChunks.length} chunk
+                                  {completeChunks.length === 1 ? "" : "s"}
+                                </button>
+                                <p className="text-xs text-blue-300/40 text-center mt-1">
+                                  Skips {failedChunks.length} failed chunk
+                                  {failedChunks.length === 1 ? "" : "s"}
+                                </p>
+                              </div>
+                            )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
+          </div>
         </FullScreenView>
       )}
 
       {/* JSON Repair Modal - for manually fixing broken chunk output */}
       {repairModalOpen && repairChunkIndex !== null && repairFileIndex !== null && (
         <FullScreenView
-          title="Fix JSON Output"
-          subtitle={`${
-            chunkStatuses.find(
+          title="Fix the model's output"
+          subtitle={(() => {
+            const chunk = chunkStatuses.find(
               (cs) =>
                 cs.fileIndex === repairFileIndex &&
                 cs.chunkIndex === repairChunkIndex,
-            )?.fileName
-          } — Chunk ${repairChunkIndex + 1}: Pages ${
-            chunkStatuses.find(
-              (cs) =>
-                cs.fileIndex === repairFileIndex &&
-                cs.chunkIndex === repairChunkIndex,
-            )?.pageStart
-          }-${
-            chunkStatuses.find(
-              (cs) =>
-                cs.fileIndex === repairFileIndex &&
-                cs.chunkIndex === repairChunkIndex,
-            )?.pageEnd
-          }`}
+            );
+            if (!chunk) return undefined;
+            return `${chunk.fileName} — pages ${chunk.pageStart}–${chunk.pageEnd}`;
+          })()}
           icon="Wrench"
           className="z-70"
           onClose={() => {
@@ -4019,12 +4128,11 @@ export default function PDFImporter({
           }}
           bodyClassName="p-0"
           footer={
-            <div className="flex items-center justify-between p-4 bg-white/[0.03]">
-              <div className="text-xs text-blue-300/50">
-                Tip: Look for missing commas, unclosed brackets, or truncated
-                strings
+            <div className="flex items-center justify-between gap-3 p-4">
+              <div className="text-xs text-blue-300/40 hidden sm:block">
+                Look for missing commas, unclosed brackets, or truncated strings
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-2 ml-auto">
                 <button
                   onClick={() => {
                     try {
@@ -4039,7 +4147,7 @@ export default function PDFImporter({
                       );
                     }
                   }}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/10 text-blue-200 rounded-lg transition-colors"
+                  className="px-4 py-2 bg-white/5 hover:bg-white/10 text-blue-100 rounded-lg transition-colors"
                 >
                   Validate
                 </button>
@@ -4059,28 +4167,26 @@ export default function PDFImporter({
                   onClick={() => handleRepairSave(repairContent)}
                   className="px-4 py-2 bg-linear-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white rounded-lg transition-colors"
                 >
-                  Save & Apply
+                  Save &amp; apply
                 </button>
               </div>
             </div>
           }
         >
           <div className="h-full flex flex-col">
-            {/* Error message */}
-            <div className="px-4 py-2 bg-red-900/20 border-b border-red-700/30 shrink-0">
-              <p className="text-sm text-red-300">
+            <div className="px-4 py-2.5 bg-red-500/[0.07] border-b border-red-500/20 shrink-0">
+              <p className="text-sm text-red-200">
                 <span className="font-semibold">Error:</span> {repairError}
               </p>
-              <p className="text-xs text-red-300/70 mt-1">
-                The AI output couldn&apos;t be parsed. You can try to fix the
-                JSON manually below.
+              <p className="text-xs text-red-200/60 mt-0.5">
+                The AI output couldn&apos;t be parsed. Fix the JSON below and
+                apply it to recover this chunk.
               </p>
             </div>
 
-            {/* Editor area */}
             <div className="flex-1 p-4 overflow-hidden flex flex-col min-h-0">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-blue-300/60">
+                <span className="text-xs text-blue-300/50">
                   Raw output ({repairContent.length.toLocaleString()} chars)
                 </span>
                 <button
@@ -4116,7 +4222,7 @@ export default function PDFImporter({
                       );
                     }
                   }}
-                  className="px-3 py-1 text-xs bg-white/10 hover:bg-white/10 text-blue-300 rounded transition-colors"
+                  className="px-3 py-1 text-xs bg-white/5 hover:bg-white/10 text-blue-200 rounded-lg transition-colors"
                 >
                   Format JSON
                 </button>
@@ -4124,7 +4230,7 @@ export default function PDFImporter({
               <textarea
                 value={repairContent}
                 onChange={(e) => setRepairContent(e.target.value)}
-                className="flex-1 w-full min-h-[400px] bg-white/5 border border-white/10 rounded-lg p-3 font-mono text-sm text-blue-100 resize-y focus:outline-none focus:border-blue-500"
+                className="flex-1 w-full min-h-[400px] bg-white/5 border border-white/10 rounded-lg p-3 font-mono text-sm text-blue-100 resize-y focus:outline-none focus:border-purple-400/40"
                 placeholder="Paste or edit JSON content here..."
                 spellCheck={false}
               />
