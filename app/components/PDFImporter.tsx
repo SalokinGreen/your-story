@@ -22,6 +22,7 @@ import {
   processParserResult,
 } from "@/app/misc/ocrSummarizeCall";
 import { streamSummarizeOCR } from "@/app/misc/ocrSummarizeStream";
+import { splitMarkdownIntoImportChunks } from "@/app/misc/textImportChunks";
 import {
   PartialExtraction,
   emptyPartialExtraction,
@@ -428,6 +429,11 @@ function salvagePartialExtraction(
     // The rest of the document never arrived, which is exactly what this
     // flag is for - the importer warns about it at the end.
     incomplete: true,
+    // The stream died mid-round, so how the document was split is unknown -
+    // report no *specific* unreached parts and let `incomplete` carry the
+    // warning, rather than inventing a count.
+    totalParts: 1,
+    unreachedParts: [],
   };
 }
 
@@ -1013,6 +1019,12 @@ interface ChunkStatus {
   fileName: string;
   pageStart: number;
   pageEnd: number;
+  /**
+   * What this chunk covers, for display. Page-range chunks of a PDF leave it
+   * unset and are labelled from `pageStart`/`pageEnd`; text imports, which
+   * are split on headings rather than pages, set it to "Section N of M".
+   */
+  label?: string;
   status: "pending" | "ocr" | "summarizing" | "complete" | "failed";
   ocrMarkdown?: string;
   rawSummarizeOutput?: string;
@@ -1194,6 +1206,13 @@ export default function PDFImporter({
   // content from the tail of that chunk, so the user is told rather than
   // quietly getting a partial import.
   const incompleteExtractionsRef = useRef(0);
+
+  // How many document parts were never sent to the model at all before their
+  // extraction ran out of budget (see `unreachedParts` in
+  // ocrSummarizeCall.ts). Distinct from the count above: an incomplete
+  // extraction is thin near the end, an unreached part contributed nothing
+  // whatsoever, so it's worth telling the user about separately.
+  const unreachedPartsRef = useRef(0);
 
   // JSON Repair Modal state - for manual fixing of broken chunk output
   const [repairModalOpen, setRepairModalOpen] = useState(false);
@@ -1448,7 +1467,9 @@ export default function PDFImporter({
             focus: ["all"],
             customInstructions:
               customInstructions +
-              `\n\nNote: This is pages ${chunk.pageStart}-${chunk.pageEnd} of a larger document.`,
+              (chunk.label
+                ? `\n\nNote: This is ${chunk.label.toLowerCase()} of a larger document.`
+                : `\n\nNote: This is pages ${chunk.pageStart}-${chunk.pageEnd} of a larger document.`),
             model: getSelectedModel().model,
             provider: getSelectedModel().provider,
             maxTokens: maxOutputTokens,
@@ -2129,6 +2150,7 @@ export default function PDFImporter({
             }
 
             if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
+            unreachedPartsRef.current += summarizeResult.unreachedParts.length;
 
             const chunkOutput = {
               lore: summarizeResult.lore || [],
@@ -2315,6 +2337,7 @@ export default function PDFImporter({
     const allFailedPages: FailedPageRange[] = [];
     let totalPagesProcessed = 0;
     incompleteExtractionsRef.current = 0;
+    unreachedPartsRef.current = 0;
 
     try {
       const totalFiles = selectedFiles.length;
@@ -2343,6 +2366,136 @@ export default function PDFImporter({
 
         let combinedMarkdown = "";
         let combinedTotalPages = 0;
+
+        if (isTextImportFile(file)) {
+          // Text/markdown import. Split on headings and give every section
+          // its own summarize call, the same way a large PDF's page ranges
+          // each get one. Sending the whole file as a single call meant all
+          // of its sections had to share one wall-clock budget, and on a
+          // book-length document the later ones simply never ran.
+          setStep("summarizing");
+          setProgress(fileProgressStart + fileProgressRange * 0.1);
+
+          const textContent = await file.text();
+          const textChunks = splitMarkdownIntoImportChunks(textContent);
+
+          setChunkStatuses((prev) => [
+            ...prev,
+            ...textChunks.map((section, idx) => ({
+              chunkIndex: idx,
+              fileIndex: i,
+              fileName: file.name,
+              pageStart: 1,
+              pageEnd: 1,
+              label:
+                textChunks.length > 1
+                  ? `Section ${idx + 1} of ${textChunks.length}`
+                  : undefined,
+              status: "pending" as const,
+              ocrMarkdown: section,
+            })),
+          ]);
+
+          const updateTextChunk = (idx: number, patch: Partial<ChunkStatus>) =>
+            setChunkStatuses((prev) =>
+              prev.map((cs) =>
+                cs.fileIndex === i && cs.chunkIndex === idx
+                  ? { ...cs, ...patch }
+                  : cs,
+              ),
+            );
+
+          let failedSections = 0;
+          let lastSectionError = "";
+
+          for (let c = 0; c < textChunks.length; c++) {
+            updateTextChunk(c, { status: "summarizing" });
+            setStatusMessage(
+              textChunks.length > 1
+                ? `Extracting notes from ${file.name}, section ${c + 1}/${textChunks.length}...`
+                : `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`,
+            );
+            setProgress(
+              fileProgressStart +
+                fileProgressRange * (0.1 + 0.85 * (c / textChunks.length)),
+            );
+
+            const sectionNote =
+              textChunks.length > 1
+                ? `\n\nNote: This content was imported from a text file (${file.name}). This is section ${c + 1} of ${textChunks.length}; the other sections are extracted by their own passes.`
+                : `\n\nNote: This content was imported from a text file (${file.name}).`;
+
+            const { result: summarizeResult } = await summarizeWithLive(
+              {
+                markdown: textChunks[c],
+                focus: ["all"],
+                customInstructions: (customInstructions || "") + sectionNote,
+                model: getSelectedModel().model,
+                provider: getSelectedModel().provider,
+                maxTokens: maxOutputTokens,
+                maxContinuationRounds,
+                openRouterKey: keys.openRouterKey,
+                deepseekKey: keys.deepseekKey,
+                mistralKey: keys.mistralKey,
+                googleKey: keys.googleKey,
+                deepinfraKey: keys.deepinfraKey,
+              },
+              (live) => updateTextChunk(c, { live }),
+            );
+
+            // One failed section doesn't sink the file - the rest still have
+            // their own calls to make, exactly like a PDF's page ranges.
+            if ("error" in summarizeResult) {
+              const message = sanitizeErrorMessage(
+                summarizeResult.error,
+                "Note extraction failed",
+              );
+              console.error(`${file.name} section ${c + 1} failed:`, message);
+              failedSections++;
+              lastSectionError = message;
+              updateTextChunk(c, {
+                status: "failed",
+                live: undefined,
+                error: message,
+              });
+              continue;
+            }
+
+            if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
+            unreachedPartsRef.current += summarizeResult.unreachedParts.length;
+
+            const sectionResult = {
+              lore: summarizeResult.lore || [],
+              mechanicNotes: summarizeResult.mechanicNotes || [],
+              customTables: summarizeResult.customTables || [],
+            };
+            allLore.push(...sectionResult.lore);
+            allMechanicNotes.push(...sectionResult.mechanicNotes);
+            allCustomTables.push(...sectionResult.customTables);
+            updateTextChunk(c, {
+              status: "complete",
+              live: undefined,
+              result: sectionResult,
+            });
+          }
+
+          // Every section failing is a systemic problem (bad key, no credit,
+          // an unreachable provider), not bad luck on one section - surface
+          // it the way a whole-file failure always was, rather than finishing
+          // "successfully" with nothing to show.
+          if (failedSections === textChunks.length) {
+            throw new Error(`${file.name}: ${lastSectionError}`);
+          }
+          if (failedSections > 0) {
+            addNotification(
+              `${failedSections} of ${textChunks.length} sections of ${file.name} failed - retry them from the section list`,
+              "warning",
+            );
+          }
+
+          setProgress(fileProgressEnd);
+          continue;
+        }
 
         if (needsChunking) {
           // Large PDF: read the bytes once (needed both to plan chunks and
@@ -2430,66 +2583,6 @@ export default function PDFImporter({
           };
 
           try {
-            if (isTextImportFile(file)) {
-              setStep("summarizing");
-              updateFileChunk({ status: "summarizing" });
-              setProgress(fileProgressStart + fileProgressRange * 0.4);
-              setStatusMessage(
-                `Extracting notes from ${file.name} (${i + 1}/${totalFiles})...`,
-              );
-
-              const textContent = await file.text();
-              combinedMarkdown = textContent;
-              combinedTotalPages = 0;
-              updateFileChunk({ ocrMarkdown: textContent });
-
-              const { result: summarizeResult } = await summarizeWithLive(
-                {
-                  markdown: combinedMarkdown,
-                  focus: ["all"],
-                  customInstructions:
-                    (customInstructions || "") +
-                    `\n\nNote: This content was imported from a text file (${file.name}).`,
-                  model: getSelectedModel().model,
-                  provider: getSelectedModel().provider,
-                  maxTokens: maxOutputTokens,
-                  maxContinuationRounds,
-                  openRouterKey: keys.openRouterKey,
-                  deepseekKey: keys.deepseekKey,
-                  mistralKey: keys.mistralKey,
-                  googleKey: keys.googleKey,
-                  deepinfraKey: keys.deepinfraKey,
-                },
-                (live) => updateFileChunk({ live }),
-              );
-
-              if ("error" in summarizeResult) {
-                throw new Error(
-                  `${file.name}: ${sanitizeErrorMessage(
-                    summarizeResult.error,
-                    "Note extraction failed",
-                  )}`,
-                );
-              }
-
-              if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
-              const fileResult = {
-                lore: summarizeResult.lore || [],
-                mechanicNotes: summarizeResult.mechanicNotes || [],
-                customTables: summarizeResult.customTables || [],
-              };
-              allLore.push(...fileResult.lore);
-              allMechanicNotes.push(...fileResult.mechanicNotes);
-              allCustomTables.push(...fileResult.customTables);
-              updateFileChunk({
-                status: "complete",
-                live: undefined,
-                result: fileResult,
-              });
-              setProgress(fileProgressEnd);
-              continue;
-            }
-
             setStep("uploading");
             setProgress(fileProgressStart + fileProgressRange * 0.1);
             setStatusMessage(
@@ -2577,6 +2670,7 @@ export default function PDFImporter({
             }
 
             if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
+            unreachedPartsRef.current += summarizeResult.unreachedParts.length;
             const fileResult = {
               lore: summarizeResult.lore || [],
               mechanicNotes: summarizeResult.mechanicNotes || [],
@@ -2659,7 +2753,18 @@ export default function PDFImporter({
           "warning",
         );
       }
-      if (incompleteExtractionsRef.current > 0) {
+      if (unreachedPartsRef.current > 0) {
+        // Worse than "thin near the end": this content was never sent to the
+        // model, so none of it is in the import at any quality.
+        addNotification(
+          `${unreachedPartsRef.current} part${
+            unreachedPartsRef.current > 1 ? "s" : ""
+          } of the source ran out of time before being read at all - nothing from ${
+            unreachedPartsRef.current > 1 ? "them" : "it"
+          } was imported. Re-import with a faster model, or split the file, to capture the rest.`,
+          "warning",
+        );
+      } else if (incompleteExtractionsRef.current > 0) {
         addNotification(
           `${incompleteExtractionsRef.current} section${
             incompleteExtractionsRef.current > 1 ? "s" : ""
@@ -3160,10 +3265,14 @@ export default function PDFImporter({
               {chunk.fileName}
             </p>
             <p className="text-xs text-blue-300/60 truncate">
-              {isMultiChunkFile && (
-                <span className="text-blue-300/40">
-                  Pages {chunk.pageStart}–{chunk.pageEnd} ·{" "}
-                </span>
+              {chunk.label ? (
+                <span className="text-blue-300/40">{chunk.label} · </span>
+              ) : (
+                isMultiChunkFile && (
+                  <span className="text-blue-300/40">
+                    Pages {chunk.pageStart}–{chunk.pageEnd} ·{" "}
+                  </span>
+                )
               )}
               {chunk.status === "pending" && "Queued"}
               {chunk.status === "ocr" && "Reading the pages…"}
@@ -4198,7 +4307,9 @@ export default function PDFImporter({
                 cs.chunkIndex === repairChunkIndex,
             );
             if (!chunk) return undefined;
-            return `${chunk.fileName} — pages ${chunk.pageStart}–${chunk.pageEnd}`;
+            return chunk.label
+              ? `${chunk.fileName} — ${chunk.label.toLowerCase()}`
+              : `${chunk.fileName} — pages ${chunk.pageStart}–${chunk.pageEnd}`;
           })()}
           icon="Wrench"
           className="z-70"
