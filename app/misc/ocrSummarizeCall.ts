@@ -95,6 +95,40 @@ export interface OCRSummarizeError {
   status: number;
 }
 
+/**
+ * Progress events emitted while an extraction runs, so a caller can show the
+ * notes appearing as the model writes them instead of a spinner until the
+ * whole call resolves.
+ *
+ * Every round is its own self-contained JSON object (see the follow-up
+ * prompts below), so `delta` text belongs to the round most recently
+ * announced by `round_start` - a listener accumulating deltas resets its
+ * buffer on each `round_start` and folds what it parsed so far into its
+ * running result.
+ */
+export type OCRSummarizeEvent =
+  | {
+      type: "round_start";
+      /** 1-based round number across the whole call. */
+      round: number;
+      /** 0-based index of the document part this round works on. */
+      part: number;
+      totalParts: number;
+      /** Why this round is running - see the prompt builders below. */
+      reason: "initial" | "continuation" | "notes_recovery" | "next_part";
+    }
+  | { type: "delta"; text: string }
+  | {
+      type: "round_end";
+      round: number;
+      /** Running totals after this round was folded in. */
+      lore: number;
+      mechanicNotes: number;
+      customTables: number;
+    };
+
+export type OCRSummarizeEventHandler = (event: OCRSummarizeEvent) => void;
+
 export function inferProvider(model: string): AIProvider {
   if (
     model.startsWith("mistral-") ||
@@ -116,6 +150,55 @@ const PROVIDER_ENDPOINTS: Record<AIProvider, string> = {
   deepinfra: "https://api.deepinfra.com/v1/openai/chat/completions",
 };
 
+/**
+ * Reader for an OpenAI-style SSE completion stream. Fed raw response text in
+ * whatever sized pieces arrive, it reassembles `data:` lines across chunk
+ * boundaries and hands each content delta to `onDelta` as it lands.
+ */
+function createSSEConsumer(onDelta?: (text: string) => void) {
+  let buffer = "";
+  let content = "";
+  let finishReason: string | undefined;
+
+  const handleData = (data: string) => {
+    if (!data || data === "[DONE]") return;
+    try {
+      const parsed = JSON.parse(data);
+      const choice = parsed.choices?.[0];
+      // `delta` while streaming; `message` covers providers that answer a
+      // stream request with a single non-streamed chunk.
+      const piece = choice?.delta?.content ?? choice?.message?.content;
+      if (typeof piece === "string" && piece) {
+        content += piece;
+        onDelta?.(piece);
+      }
+      if (choice?.finish_reason) finishReason = choice.finish_reason;
+    } catch {
+      // Skip malformed JSON - a partial line is picked up by the next push.
+    }
+  };
+
+  return {
+    push(chunk: string) {
+      buffer += chunk;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith("data:")) continue;
+        handleData(trimmed.slice(5).trim());
+      }
+    },
+    /** Flush whatever is left in the line buffer and return the result. */
+    finish(): { content: string; finishReason?: string } {
+      const trimmed = buffer.trim();
+      buffer = "";
+      if (trimmed.startsWith("data:")) handleData(trimmed.slice(5).trim());
+      return { content, finishReason };
+    },
+  };
+}
+
 export async function callProviderAI(
   provider: AIProvider,
   systemPrompt: string,
@@ -123,7 +206,15 @@ export async function callProviderAI(
   model: string,
   maxTokens: number,
   apiKey: string,
-  options: { jsonMode?: boolean } = {},
+  options: {
+    jsonMode?: boolean;
+    /**
+     * When set, the response is requested as a token stream and each content
+     * delta is handed over as it arrives. The return value is the same
+     * either way - the whole content, once the stream is done.
+     */
+    onDelta?: (text: string) => void;
+  } = {},
 ): Promise<{
   success: boolean;
   content?: string;
@@ -157,6 +248,9 @@ export async function callProviderAI(
     if (jsonMode && (provider === "mistral" || provider === "deepseek")) {
       requestBody.response_format = { type: "json_object" };
     }
+    if (options.onDelta) {
+      requestBody.stream = true;
+    }
 
     const providerFetch = getProviderFetch();
     const response = await providerFetch(PROVIDER_ENDPOINTS[provider], {
@@ -169,6 +263,26 @@ export async function callProviderAI(
       const error = await response.text();
       console.error(`${provider} AI error:`, error);
       return { success: false, error: `${provider} API error: ${response.statusText}` };
+    }
+
+    if (options.onDelta) {
+      const consumer = createSSEConsumer(options.onDelta);
+      const reader = response.body?.getReader();
+      if (reader) {
+        const decoder = new TextDecoder();
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          consumer.push(decoder.decode(value, { stream: true }));
+        }
+      } else {
+        // No readable body (some native HTTP clients buffer the whole
+        // response) - the SSE payload is still parseable in one go, the
+        // deltas just all arrive at once.
+        consumer.push(await response.text());
+      }
+      const { content, finishReason } = consumer.finish();
+      return { success: true, content, finishReason };
     }
 
     const data = await response.json();
@@ -197,6 +311,9 @@ async function runExtractionRound(
   model: string,
   maxTokens: number,
   apiKey: string,
+  // Only the round's own generation streams; the bracket-closing salvage
+  // calls below emit closing punctuation, not notes, so they stay silent.
+  onDelta?: (text: string) => void,
 ): Promise<{ parsed: ExtractedContent; truncated: boolean; error?: string }> {
   const aiResponse = await callProviderAI(
     provider,
@@ -205,6 +322,7 @@ async function runExtractionRound(
     model,
     maxTokens,
     apiKey,
+    { onDelta },
   );
 
   if (!aiResponse.success) {
@@ -263,6 +381,7 @@ async function runExtractionRound(
 
 export async function summarizeOCR(
   body: OCRSummarizeRequestBody,
+  onEvent?: OCRSummarizeEventHandler,
 ): Promise<OCRSummarizeSuccess | OCRSummarizeError> {
   const {
     markdown,
@@ -317,6 +436,20 @@ export async function summarizeOCR(
       { index, total: windows.length },
     );
 
+  // Streaming is opt-in per call: without a listener nothing changes about
+  // how the provider is called.
+  const onDelta = onEvent
+    ? (text: string) => onEvent({ type: "delta", text })
+    : undefined;
+
+  onEvent?.({
+    type: "round_start",
+    round: 1,
+    part: 0,
+    totalParts: windows.length,
+    reason: "initial",
+  });
+
   const first = await runExtractionRound(
     effectiveProvider,
     systemPrompt,
@@ -324,6 +457,7 @@ export async function summarizeOCR(
     model,
     maxTokens,
     apiKey,
+    onDelta,
   );
 
   if (first.error) {
@@ -331,6 +465,15 @@ export async function summarizeOCR(
   }
 
   const collected = first.parsed;
+  const emitRoundEnd = (round: number) =>
+    onEvent?.({
+      type: "round_end",
+      round,
+      lore: collected.lore.length,
+      mechanicNotes: collected.mechanicNotes.length,
+      customTables: collected.customTables.length,
+    });
+  emitRoundEnd(1);
   let windowIndex = 0;
   // Whether the current part of the document still has more to give: the
   // model was cut off by the output limit before it finished with it.
@@ -378,17 +521,20 @@ export async function summarizeOCR(
       collected.customTables.length > tablesAtWindowStart;
 
     let prompt: string;
+    let reason: "continuation" | "notes_recovery" | "next_part";
     if (moreInThisWindow && continuationsUsed < maxContinuationRounds) {
       console.log(
         `OCR summarize hit the output limit, continuing part ${windowIndex + 1}/${windows.length} (round ${rounds}/${maxRounds})...`,
       );
       continuationsUsed++;
+      reason = "continuation";
       prompt = buildContinuationUserPrompt(promptForWindow(windowIndex), collected);
     } else if (onlyTablesFromThisWindow) {
       console.log(
         `OCR summarize got tables but no notes from part ${windowIndex + 1}/${windows.length} - asking for the notes...`,
       );
       notesRecoveryTried = true;
+      reason = "notes_recovery";
       prompt = buildNotesRecoveryPrompt(promptForWindow(windowIndex), collected);
     } else if (windowIndex + 1 < windows.length) {
       windowIndex++;
@@ -398,11 +544,20 @@ export async function summarizeOCR(
       notesAtWindowStart = notesCount(collected);
       tablesAtWindowStart = collected.customTables.length;
       notesRecoveryTried = false;
+      reason = "next_part";
       prompt = buildNextPartUserPrompt(promptForWindow(windowIndex), collected);
     } else {
       // Nothing left: the model finished, on the last part of the document.
       break;
     }
+
+    onEvent?.({
+      type: "round_start",
+      round: rounds + 1,
+      part: windowIndex,
+      totalParts: windows.length,
+      reason,
+    });
 
     const round = await runExtractionRound(
       effectiveProvider,
@@ -411,6 +566,7 @@ export async function summarizeOCR(
       model,
       maxTokens,
       apiKey,
+      onDelta,
     );
 
     // A failed round is never fatal: keep whatever earlier rounds already
@@ -422,6 +578,7 @@ export async function summarizeOCR(
 
     rounds++;
     const added = mergeRound(collected, round.parsed);
+    emitRoundEnd(rounds);
     // Re-asking only pays off while the model still has something new to
     // say; if it's just repeating entries we already have, move on to the
     // next part of the document instead.
