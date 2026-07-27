@@ -10,6 +10,7 @@ import {
   GRAB_MAX_SPEED,
   GRAB_SPREAD,
   GRAB_STIFFNESS,
+  TRAY_PHYSICS,
   gentleThrowSpeed,
   holdPointFromPointer,
   throwFromRelease,
@@ -204,6 +205,10 @@ export default function DiceThrowModal({
           assetPath: "/assets/",
           theme: "default",
           scale: 6,
+          // Has to go in here rather than updateConfig: the physics worker
+          // builds the floor and wall bodies from this during init(), and
+          // those are half of what a throw's momentum survives.
+          ...TRAY_PHYSICS,
         });
         await box.init();
         diceBoxRef.current = box;

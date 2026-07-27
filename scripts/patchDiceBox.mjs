@@ -19,7 +19,13 @@
 //   2. stepSim()  - each physics step, a held die is servo-driven toward the
 //                   hand and is exempt from the settle check, so a drag that
 //                   pauses can't be mistaken for dice coming to rest and
-//                   resolve the roll early.
+//                   resolve the roll early. The settle check itself is also
+//                   replaced: dice-box asks for an instantaneous |v| < 0.01,
+//                   which is below the solver's own resting jitter, so it
+//                   never fired and every roll ran out the 5s settleTimeout
+//                   instead. Ours waits for a *run* of near-still steps, which
+//                   both fires on dice that have actually stopped and refuses
+//                   to freeze one that is still slowly toppling.
 //   3. a control channel - a BroadcastChannel the app posts grab/move/release
 //                   messages on. dice-box exposes no way to reach the physics
 //                   worker per frame (its own updateConfig path rebuilds the
@@ -130,8 +136,12 @@ const PATCHED_ROLL_DIE =
 
 // Replacement per-step body update.
 const PATCHED_STEP =
-  "/*ysStepPatch1*/" +
+  "/*ysStepPatch2*/" +
   "const t=_/1e3;Z.stepSimulation(t,2,1/90),k[0]=wt.length;" +
+  // Settle thresholds, overridable from the app's dice-box config (see
+  // TRAY_PHYSICS in app/misc/diceThrow.ts). The fallbacks keep a bare dice-box
+  // usable if the config never sets them.
+  "const Zs=p.settleSpeed??.2,Zn=p.settleSpin??.35,Zq=p.settleSteps??20;" +
   "for(let f=wt.length-1;f>=0;f--){" +
   "const g=wt[f];" +
   "let Zh=!1;" +
@@ -157,10 +167,15 @@ const PATCHED_STEP =
   "g.timeout=p.settleTimeout" +
   "}else g.ysGrab=null;" +
   "const j=g.getLinearVelocity().length(),V=g.getAngularVelocity().length();" +
-  // The settle check, skipped while held - a hand holding still is not a die
-  // that has come to rest, and letting it sleep here would resolve the roll
-  // mid-drag.
-  "if(!Zh&&(j<.01&&V<.005||g.timeout<0)){" +
+  // A die counts as settled once it has been near-still for a *run* of steps
+  // rather than for one. Reading a single step is what forces the thresholds
+  // to be tighter than the solver's resting jitter (and so never fire); over
+  // ~0.2s the jitter averages out, while a die still creeping toward its final
+  // face keeps resetting the count instead of being frozen mid-topple.
+  "g.ysQuiet=!Zh&&j<Zs&&V<Zn?(g.ysQuiet||0)+1:0;" +
+  // Skipped entirely while held - a hand holding still is not a die that has
+  // come to rest, and letting it sleep here would resolve the roll mid-drag.
+  "if(!Zh&&(g.ysQuiet>=Zq||g.timeout<0)){" +
   "k[f*8+1]=g.id,k[f*8+2]=-1,g.asleep=!0,g.setMassProps(0),g.forceActivationState(3)," +
   "g.setLinearVelocity(he),g.setAngularVelocity(he),zt.push(wt.splice(f,1)[0]);" +
   "continue" +
