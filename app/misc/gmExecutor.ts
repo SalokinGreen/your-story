@@ -38,8 +38,6 @@ import {
   ReadNotesParams,
   SearchMemoryParams,
   RequestContinuationParams,
-  AskPlayerParams,
-  RespondToPlayerParams,
   // Timer tools
   CreateTimerParams,
   AdvanceTimerParams,
@@ -135,7 +133,6 @@ export interface GMToolResult {
     | GMReadNotesResult
     | GMSearchMemoryResult
     | GMRequestContinuationResult
-    | GMEndGmThinkingResult
     | GMSetReasoningTierResult
     | GMStateChangeResult
     // Timer results
@@ -337,14 +334,6 @@ export interface GMRequestContinuationResult {
   reason: string;
   context: string;
   nextAction?: string;
-}
-
-export interface GMEndGmThinkingResult {
-  type: "end_gm_thinking";
-  summary: string;
-  outcome: "success" | "failure" | "mixed" | "neutral";
-  narrativeHints?: string;
-  dramaticMoment?: boolean;
 }
 
 export interface GMSetReasoningTierResult {
@@ -663,12 +652,6 @@ export interface GMExecutionResult {
   // Special flow control flags
   requestsContinuation?: boolean; // AI wants another GM round (legacy)
   continuationContext?: string; // Context for next round (legacy)
-  // Terminal condition (new loop-based GM)
-  isComplete?: boolean; // end_gm_thinking was called - GM stage is done
-  finalSummary?: string; // Summary from end_gm_thinking
-  finalOutcome?: "success" | "failure" | "mixed" | "neutral";
-  narrativeHints?: string;
-  dramaticMoment?: boolean;
 }
 
 /**
@@ -681,16 +664,6 @@ export async function executeGMTools(
   interaction: GMInteractionHandlers = {},
   subagentContext: SubagentContext = {}
 ): Promise<GMExecutionResult> {
-  // Check for premature end_gm_thinking calls when there are other tools
-  // The AI sometimes calls end_gm_thinking before processing roll results
-  const endGmThinkingCall = toolCalls.find(
-    (c) => c.function.name === "end_gm_thinking"
-  );
-  const otherToolCalls = toolCalls.filter(
-    (c) => c.function.name !== "end_gm_thinking"
-  );
-  const hasOtherTools = otherToolCalls.length > 0;
-
   // Clone storyData to avoid mutations. structuredClone (vs. the previous
   // JSON.parse(JSON.stringify(...)) round-trip) is both faster and doesn't
   // silently drop values JSON can't represent (undefined, Map/Set, etc.).
@@ -698,35 +671,7 @@ export async function executeGMTools(
   const results: GMToolResult[] = [];
   const contextParts: string[] = [];
 
-  // If end_gm_thinking was called with other tools, add an error result for it
-  if (endGmThinkingCall && hasOtherTools) {
-    console.log(
-      `[GM Tools] Rejecting premature end_gm_thinking (${toolCalls.length} total calls)`
-    );
-    const errorResult: GMToolResult = {
-      toolName: "end_gm_thinking",
-      toolCallId: endGmThinkingCall.id,
-      success: false,
-      result: {
-        type: "end_gm_thinking",
-        summary:
-          "ERROR: end_gm_thinking must be called ALONE, not with other tools.",
-        outcome: "failure",
-        narrativeHints:
-          "Process the other tools first, see their results, THEN call end_gm_thinking in a separate response.",
-      } as GMEndGmThinkingResult,
-      contextForStory:
-        "⚠️ ERROR: end_gm_thinking rejected - you called it with other tools. Review your other tool results below, then call end_gm_thinking ALONE in your next response.",
-    };
-    results.push(errorResult);
-    contextParts.push(errorResult.contextForStory);
-  }
-
-  // Process either filtered tools (if end_gm_thinking was premature) or all tools
-  const toolsToProcess =
-    hasOtherTools && endGmThinkingCall ? otherToolCalls : toolCalls;
-
-  for (const call of toolsToProcess) {
+  for (const call of toolCalls) {
     // route.ts marks a tool call this way when the response hit the token
     // limit before this call's arguments finished streaming - the raw
     // arguments string was unterminated JSON and got replaced with `{}`.
@@ -896,12 +841,6 @@ export async function executeGMTools(
           result = executeRequestContinuation(
             call.id,
             params as RequestContinuationParams
-          );
-          break;
-        case "end_gm_thinking":
-          result = executeEndGmThinking(
-            call.id,
-            params as RespondToPlayerParams
           );
           break;
         // Combat tools
@@ -1155,12 +1094,6 @@ export async function executeGMTools(
   // Check for special flow control results
   let requestsContinuation = false;
   let continuationContext: string | undefined;
-  // Terminal condition
-  let isComplete = false;
-  let finalSummary: string | undefined;
-  let finalOutcome: "success" | "failure" | "mixed" | "neutral" | undefined;
-  let narrativeHints: string | undefined;
-  let dramaticMoment: boolean | undefined;
 
   for (const res of results) {
     if (res.toolName === "request_continuation") {
@@ -1169,45 +1102,6 @@ export async function executeGMTools(
       continuationContext = `Previous round: ${
         contResult.context
       }\nNext planned: ${contResult.nextAction || "See results"}`;
-    }
-    if (res.toolName === "end_gm_thinking") {
-      isComplete = true;
-      const respResult = res.result as GMEndGmThinkingResult;
-      finalSummary = respResult.summary;
-      finalOutcome = respResult.outcome;
-      narrativeHints = respResult.narrativeHints;
-      dramaticMoment = respResult.dramaticMoment;
-    }
-  }
-
-  // Auto-advance timers when GM turn completes
-  if (isComplete && modified.timers && modified.timers.length > 0) {
-    const timerUpdates: string[] = [];
-    for (const timer of modified.timers) {
-      if (timer.status === "active" && timer.autoAdvance) {
-        const prevTicks = timer.currentTicks;
-        timer.currentTicks = Math.max(0, timer.currentTicks - 1);
-
-        if (timer.currentTicks === 0 && timer.status === "active") {
-          // Timer triggered!
-          timer.status = "triggered";
-          timer.triggeredAt = Date.now();
-          timerUpdates.push(
-            `[⏰ TIMER TRIGGERED: "${timer.name}" has reached 0!${
-              timer.description ? ` - ${timer.description}` : ""
-            }]`
-          );
-        } else if (timer.currentTicks !== prevTicks) {
-          // Just ticked down
-          timerUpdates.push(
-            `[Timer: "${timer.name}" ${prevTicks} → ${timer.currentTicks} ticks]`
-          );
-        }
-      }
-    }
-    // Add timer updates to context
-    if (timerUpdates.length > 0) {
-      contextParts.push(...timerUpdates);
     }
   }
 
@@ -1234,11 +1128,6 @@ export async function executeGMTools(
     storyContext: contextParts.join("\n"),
     requestsContinuation,
     continuationContext,
-    isComplete,
-    finalSummary,
-    finalOutcome,
-    narrativeHints,
-    dramaticMoment,
   };
 }
 
@@ -2612,52 +2501,6 @@ function executeRequestContinuation(
       context: params.context,
       nextAction: params.next_action,
     } as GMRequestContinuationResult,
-    contextForStory,
-  };
-}
-
-/**
- * Execute end_gm_thinking - terminal tool that ends the GM stage
- */
-function executeEndGmThinking(
-  toolCallId: string,
-  params: RespondToPlayerParams
-): GMToolResult {
-  // Defensive: Handle missing params (can happen if streaming truncates tool call arguments)
-  const summary = params?.summary || "(No summary provided)";
-  const outcome = params?.outcome || "neutral";
-  const narrativeHints = params?.narrative_hints;
-  const dramaticMoment = params?.dramatic_moment;
-
-  // Log warning if params are missing (helps debug streaming issues)
-  if (!params?.summary || !params?.outcome) {
-    console.warn(
-      `[GM Tools] end_gm_thinking called with missing params:`,
-      JSON.stringify(params)
-    );
-  }
-
-  // Build the final context for story stage
-  let contextForStory = `[GAME MASTER Summary: ${summary}]`;
-  contextForStory += `\n[Outcome: ${outcome}]`;
-  if (narrativeHints) {
-    contextForStory += `\n[Narrative Hints: ${narrativeHints}]`;
-  }
-  if (dramaticMoment) {
-    contextForStory += `\n[DRAMATIC MOMENT - Emphasize this beat]`;
-  }
-
-  return {
-    toolName: "end_gm_thinking",
-    toolCallId,
-    success: true,
-    result: {
-      type: "end_gm_thinking",
-      summary,
-      outcome,
-      narrativeHints,
-      dramaticMoment,
-    } as GMEndGmThinkingResult,
     contextForStory,
   };
 }

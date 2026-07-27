@@ -183,17 +183,6 @@ export interface RequestContinuationParams {
 }
 
 /**
- * Ask Player - Pause and ask the player a question
- * The player's answer will be included in the next GM round
- */
-export interface AskPlayerParams {
-  question: string; // Question to ask the player
-  context: string; // Why you need this information
-  options?: string[]; // Optional: suggested answers
-  allow_custom?: boolean; // Whether player can give custom answer (default true)
-}
-
-/**
  * Read Notes - Fetch note content by exact titles
  * Used by GM to read notes from World Lore and Secrets folders
  */
@@ -208,17 +197,6 @@ export interface ReadNotesParams {
 export interface SearchMemoryParams {
   patterns: string[]; // Array of search patterns (case-insensitive substring match)
   max_results?: number; // Limit number of results (default: 10)
-}
-
-/**
- * Respond to Player - TERMINAL TOOL that ends the GM stage loop
- * Called when all mechanics are resolved and ready to narrate
- */
-export interface RespondToPlayerParams {
-  summary: string; // Summary of all mechanical results for the story stage
-  outcome: "success" | "failure" | "mixed" | "neutral"; // Overall outcome
-  narrative_hints?: string; // Optional guidance for the story stage
-  dramatic_moment?: boolean; // Mark as particularly dramatic (affects narration style)
 }
 
 /**
@@ -551,7 +529,6 @@ export type GMToolParams =
   | { name: "read_notes"; params: ReadNotesParams }
   | { name: "search_memory"; params: SearchMemoryParams }
   | { name: "request_continuation"; params: RequestContinuationParams }
-  | { name: "end_gm_thinking"; params: RespondToPlayerParams }
   // Timer tool (unified create/advance/toggle_pause/cancel/trigger)
   | { name: "manage_timer"; params: ManageTimerParams }
   // Combat tools
@@ -1128,58 +1105,6 @@ Example flow:
         },
       },
       required: ["reason", "context"],
-    },
-  },
-};
-
-const endGmThinkingTool: ToolSchema = {
-  type: "function",
-  function: {
-    name: "end_gm_thinking",
-    description: `**TERMINAL TOOL** - Ends the GM thinking stage and hands off to the Story stage.
-
-Call this when ALL mechanical resolution is complete and you're ready for narration.
-
-This tool MUST be called to end the GM stage loop. Without it, the GM stage will continue.
-
-The summary you provide becomes context for the Story stage to write the narrative.
-
-WHEN TO CALL:
-- All necessary rolls have been made
-- All state changes (items, stats, conditions) have been applied
-- You have a clear picture of what happened mechanically
-- You're ready for the story to be narrated
-
-DO NOT call if:
-- You still need to make rolls
-- You need to see results before deciding next action
-- You want to ask the player something (use OOC brackets instead, then continue)`,
-    parameters: {
-      type: "object",
-      properties: {
-        summary: {
-          type: "string",
-          description:
-            "Comprehensive summary of all mechanical results. Include: roll outcomes, damage dealt/taken, items used/gained, conditions applied, challenge progress, etc. This is what the Story stage uses to write the narrative.",
-        },
-        outcome: {
-          type: "string",
-          enum: ["success", "failure", "mixed", "neutral"],
-          description:
-            "Overall outcome: success (player achieved goal), failure (player failed), mixed (partial success or success with cost), neutral (no clear win/loss, e.g., roleplay or information gathering)",
-        },
-        narrative_hints: {
-          type: "string",
-          description:
-            "Optional guidance for the Story stage: tone, specific details to emphasize, dramatic beats to hit, etc.",
-        },
-        dramatic_moment: {
-          type: "boolean",
-          description:
-            "Mark as a particularly dramatic moment (critical hit, near-death, major revelation). Story stage will write with more gravitas.",
-        },
-      },
-      required: ["summary", "outcome"],
     },
   },
 };
@@ -2233,8 +2158,6 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   negotiatePriceTool,
   // Sub-agent delegation
   delegateTaskTool,
-  // Terminal tool - ends GM loop
-  endGmThinkingTool,
   // Reasoning-tier self-escalation
   setReasoningTierTool,
 ];

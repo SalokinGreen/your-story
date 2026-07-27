@@ -6,7 +6,7 @@ describe("getToolProgressLabel", () => {
     expect(getToolProgressLabel("formula_roll")).toBe("Rolling dice");
     expect(getToolProgressLabel("manage_timer")).toBe("Managing timer");
     expect(getToolProgressLabel("add_combatant")).toBe("Adding combatant");
-    expect(getToolProgressLabel("end_gm_thinking")).toBe("Wrapping up");
+    expect(getToolProgressLabel("request_continuation")).toBe("Continuing");
   });
 
   it("prettifies unknown tool names as a fallback", () => {
