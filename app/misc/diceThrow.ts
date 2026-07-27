@@ -34,6 +34,58 @@ const WALL_INSET = 0.5;
 // that is born intersecting it, which Bullet resolves by flinging it back out.
 const DIE_HALF_WIDTH = 0.7;
 
+/**
+ * The tray's physics material, passed to the DiceBox constructor (so it
+ * reaches the physics worker's `init`, which is what builds the floor and wall
+ * bodies with it).
+ *
+ * dice-box's own defaults are tuned for dice that drop in and stop, and they
+ * are what made a thrown die shed its momentum the instant it left the hand:
+ * `linearDamping: 0.5` bleeds half a die's speed every second *in mid-air*
+ * (Bullet applies `v *= (1 - damping)^dt`), `angularDamping: 0.4` does the
+ * same to its tumble, and `friction: 0.8` on both the die and the floor is
+ * grabbier than rubber. Worst of all is `restitution: 0.1`: Bullet takes the
+ * *product* of the two bodies' restitution, so die-on-floor came out at 0.01
+ * and dice landed like wet clay.
+ *
+ * Measured on a phone-sized tray (8.5 world units deep), the same flick used
+ * to carry the dice ~1.9 units and now carries them ~5.7 - about a third of
+ * that gain is the release keeping the hand's speed, the rest is this.
+ *
+ * The values below are a felt-lined tray: near-zero air drag, enough friction
+ * that a die tumbles rather than skates (0.65 * 0.65 ≈ 0.42 combined), and
+ * enough bounce to carry a throw across the tray (0.5 * 0.5 = 0.25 combined).
+ *
+ * `settleTimeout` is the backstop for a die that never quiets down; it is not
+ * how long a roll takes. `settleSpeed`/`settleSpin`/`settleSteps` are read by
+ * the patched physics worker (scripts/patchDiceBox.mjs) and are what normally
+ * ends a roll: a die is done once it has stayed under those speeds for that
+ * many physics steps (~0.2s at 90Hz). dice-box's own check - an instantaneous
+ * |v| < 0.01 - is tighter than the solver's resting jitter, so it essentially
+ * never fired and every roll ran out the full timeout instead, which is why
+ * the tray used to sit on motionless dice for five seconds before showing a
+ * result.
+ *
+ * Deliberately no `gravity` or `mass` here, however tempting: dice-box derives
+ * both from the raw config on *every* `updateConfig` call, and its worker
+ * derives gravity from the already-derived value (`gravity + mass/3`), so
+ * setting either one makes gravity creep upward on every config update - and
+ * the tray updates its config on every grab.
+ */
+export const TRAY_PHYSICS = {
+  friction: 0.65,
+  restitution: 0.5,
+  linearDamping: 0.05,
+  angularDamping: 0.1,
+  settleTimeout: 8000,
+  // A fifth of a second under these speeds moves a die by 4% of its own width
+  // and turns it by ~4 degrees, so nothing that passes this check can still be
+  // on its way to a different face.
+  settleSpeed: 0.2,
+  settleSpin: 0.35,
+  settleSteps: 20,
+} as const;
+
 // How high above the floor the dice ride while the player is dragging them.
 // High enough that they read as held rather than shoved along the felt, low
 // enough that letting go is a short drop rather than a long fall.
@@ -66,27 +118,33 @@ const FULL_RELEASE_TRAY_HEIGHTS_PER_SEC = 2;
 // rather than remembering the motion.
 export const VELOCITY_WINDOW_MS = 90;
 
-// Power is spent on *travel distance*, not on raw launch speed. The tray is
-// only ~8.5 world units deep and, in portrait, under 4 wide - a launch speed
-// picked to feel strong just slams the dice into a wall, and once they start
-// ricocheting neither the throw's direction nor its strength is readable in
-// where they end up. Budgeting the throw against the room actually available
-// in the direction thrown keeps both legible whatever shape the tray is.
+// A throw leaves the hand at the speed the hand was moving, converted into
+// world units through the same tray geometry the hold point uses. Continuity
+// is the whole point: while the dice are held, the physics worker's servo is
+// already carrying them at roughly the hand's speed, so *any* other release
+// speed shows up as the dice abruptly changing pace at the exact moment the
+// player lets go - which is what "the dice don't take on any momentum" looks
+// like.
 //
-// The travel -> speed conversion is empirical, measured by launching dice at
-// known speeds down the tray and finding where they settled (~0.68 units of
-// travel per unit/sec, offset by the ~1.6 units/sec that dies to friction
-// before the die goes anywhere).
-const SPEED_PER_TRAVEL = 1.5;
-const SPEED_BASE = 1.4;
-// Travel for the weakest throw that still counts, in world units - enough that
-// dice visibly leave the hand.
-const MIN_TRAVEL = 1;
-// Safety clamps, in units/sec: the floor keeps a throw into a nearby wall from
-// being a dead drop, the ceiling keeps a pathological tray aspect from
-// launching dice hard enough to ricochet.
-const MIN_SPEED = 3;
-const MAX_SPEED = 16;
+// An earlier version spent the throw's power on travel *distance* instead,
+// budgeted against the room left in the tray so that even a full-strength
+// flick stopped short of the far wall. That made throws legible and dead: on a
+// phone tray it capped every throw at ~6.7 units/sec against a hand carrying
+// the dice at ~7.7, so letting go was always a deceleration. Dice are supposed
+// to reach the walls of a tray; TRAY_PHYSICS above is what makes arriving
+// there read as dice bouncing rather than as a glitch.
+
+// Pointer samples are averaged over VELOCITY_WINDOW_MS, which clips the peak
+// of a flick - a hand is fastest in the last few ms before it opens. This gain
+// puts back roughly what that averaging takes off.
+const THROW_GAIN = 1.2;
+// Safety clamps, in units/sec. The floor only bites on a degenerate tray -
+// powerFromReleaseSpeed's drop threshold already lands near it - and the
+// ceiling keeps a wild flick from crossing the tray faster than the physics
+// step can resolve it. The ceiling stays below GRAB_MAX_SPEED so that letting
+// go can never be *faster* than the hand was able to carry the dice.
+const MIN_SPEED = 2.5;
+const MAX_SPEED = 24;
 // Constant downward bias on a thrown (not dropped) release, so a hard throw
 // drives the dice down onto the felt instead of skimming at hand height across
 // the whole tray.
@@ -165,6 +223,17 @@ export function trayPointToWorld(
 }
 
 /**
+ * Converts a hand speed in CSS px/sec into world units/sec at hold height -
+ * how fast the dice themselves were actually moving while the hand carried
+ * them. This is what a release has to preserve for the throw to look like
+ * letting go rather than like the dice hitting an invisible brake.
+ */
+export function trayPxPerSecToWorld(pxPerSec: number, tray: TraySize): number {
+  const unitsPerPx = (2 * WORLD_HALF_DEPTH) / Math.max(tray.height, 1);
+  return pxPerSec * unitsPerPx * ((CAMERA_HEIGHT - HOLD_HEIGHT) / CAMERA_HEIGHT);
+}
+
+/**
  * Half-extents of the region a die's centre can occupy: dice-box's physics box
  * (`size` deep by `size * aspect` wide), less its wall inset and the die's own
  * half-width.
@@ -190,29 +259,6 @@ export function clampToTrayFloor(
     x: Math.min(Math.max(x, -limit.x), limit.x),
     z: Math.min(Math.max(z, -limit.z), limit.z),
   };
-}
-
-/**
- * How far a die let go at `(x, z)` can travel along the unit direction
- * `(dirX, dirZ)` before it reaches a wall. This is the throw's budget:
- * spending full power on exactly this distance lands a full-strength throw
- * against the far wall instead of ricocheting off it.
- */
-export function roomInDirection(
-  x: number,
-  z: number,
-  dirX: number,
-  dirZ: number,
-  tray: TraySize
-): number {
-  const limit = trayFloorLimits(tray);
-  // Standard ray/box exit distance, per axis, ignoring axes the throw doesn't
-  // move along.
-  const along = (pos: number, dir: number, max: number) => {
-    if (Math.abs(dir) < 1e-6) return Infinity;
-    return Math.max((dir > 0 ? max - pos : -max - pos) / dir, 0);
-  };
-  return Math.min(along(x, dirX, limit.x), along(z, dirZ, limit.z));
 }
 
 /**
@@ -291,9 +337,8 @@ export function velocityFromSamples(
  * hand was moving at `(vxPxPerSec, vyPxPerSec)`.
  *
  * Slow release: the dice simply fall out of the hand where it left them. Fast
- * release: they are thrown the way the hand was moving, as hard as it was
- * moving - budgeted so that even a full-strength flick spends itself on the
- * room available rather than rebounding off the far wall.
+ * release: they leave the hand along the drag, carrying the speed the hand was
+ * carrying them at, so the moment of letting go is invisible in their motion.
  */
 export function throwFromRelease(
   px: number,
@@ -317,17 +362,9 @@ export function throwFromRelease(
   const dirX = -vxPxPerSec / speedPx;
   const dirZ = vyPxPerSec / speedPx;
 
-  // Spend the release's power on distance: a nudge at the low end, right up
-  // against the far wall at full strength. `reach` guards the case where the
-  // player let go next to a wall while moving at it, leaving no room - the
-  // throw is then a short bump rather than nothing at all.
-  const reach = Math.max(
-    roomInDirection(startPosition[0], startPosition[2], dirX, dirZ, tray),
-    MIN_TRAVEL
-  );
-  const travel = MIN_TRAVEL + power * (reach - MIN_TRAVEL);
+  // The dice keep going at the speed the hand was already moving them.
   const speed = Math.min(
-    Math.max(SPEED_BASE + travel * SPEED_PER_TRAVEL, MIN_SPEED),
+    Math.max(trayPxPerSecToWorld(speedPx, tray) * THROW_GAIN, MIN_SPEED),
     MAX_SPEED
   );
 

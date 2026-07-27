@@ -34,6 +34,23 @@ declare module "@3d-dice/dice-box" {
     assetPath: string;
     theme?: string;
     scale?: number;
+    // The physics material, forwarded verbatim to the physics worker's init.
+    // See TRAY_PHYSICS in app/misc/diceThrow.ts for the values and why the
+    // defaults had to go - and for why `gravity`/`mass`, which dice-box
+    // re-derives on every updateConfig, are deliberately absent here.
+    friction?: number;
+    restitution?: number;
+    linearDamping?: number;
+    angularDamping?: number;
+    // How long a die may go without settling before it is frozen where it is
+    // and its face read anyway.
+    settleTimeout?: number;
+    // Patched in via scripts/patchDiceBox.mjs - not part of upstream dice-box.
+    // A die is settled once its linear/angular speed has stayed under
+    // settleSpeed/settleSpin for settleSteps consecutive physics steps.
+    settleSpeed?: number;
+    settleSpin?: number;
+    settleSteps?: number;
   }
 
   export interface DiceBoxConfigUpdate {

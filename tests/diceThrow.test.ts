@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
   HOLD_HEIGHT,
+  GRAB_MAX_SPEED,
+  TRAY_PHYSICS,
   clampToTrayFloor,
   gentleThrowSpeed,
   holdPointFromPointer,
   powerFromReleaseSpeed,
-  roomInDirection,
   throwFromRelease,
   trayFloorLimits,
   trayPointToWorld,
+  trayPxPerSecToWorld,
   velocityFromSamples,
   type TraySize,
 } from "@/app/misc/diceThrow";
@@ -83,28 +85,58 @@ describe("trayPointToWorld", () => {
   });
 });
 
-describe("roomInDirection", () => {
-  it("measures the distance to the wall the throw is aimed at", () => {
-    const limits = trayFloorLimits(PHONE);
-    expect(roomInDirection(0, 0, 0, 1, PHONE)).toBeCloseTo(limits.z);
-    expect(roomInDirection(0, 0, 0, -1, PHONE)).toBeCloseTo(limits.z);
-    expect(roomInDirection(0, 0, 1, 0, PHONE)).toBeCloseTo(limits.x);
+describe("trayPxPerSecToWorld", () => {
+  // The conversion a release depends on: a hand crossing the tray in a second
+  // is moving the dice across the tray's world depth in a second.
+  it("converts a hand speed into the world speed the dice were carried at", () => {
+    for (const tray of [PHONE, DESKTOP]) {
+      const trayHeightPerSec = trayPxPerSecToWorld(tray.height, tray);
+      // The visible floor spans ~9.17 world units top to bottom, less a little
+      // for the dice being held nearer the lens than the floor is.
+      expect(trayHeightPerSec).toBeGreaterThan(8);
+      expect(trayHeightPerSec).toBeLessThan(9.2);
+    }
   });
 
-  it("gives a point near a wall little room toward it and lots away from it", () => {
-    const limits = trayFloorLimits(PHONE);
-    const nearFar = limits.z - 0.2;
-    expect(roomInDirection(0, nearFar, 0, 1, PHONE)).toBeCloseTo(0.2);
-    expect(roomInDirection(0, nearFar, 0, -1, PHONE)).toBeCloseTo(2 * limits.z - 0.2);
+  it("scales linearly and reports a still hand as still", () => {
+    expect(trayPxPerSecToWorld(0, PHONE)).toBe(0);
+    expect(trayPxPerSecToWorld(600, PHONE)).toBeCloseTo(
+      2 * trayPxPerSecToWorld(300, PHONE),
+      6
+    );
   });
 
-  it("never returns a negative distance for a point already outside the walls", () => {
-    expect(roomInDirection(99, 99, 0, 1, PHONE)).toBeGreaterThanOrEqual(0);
+  it("survives a degenerate tray without dividing by zero", () => {
+    expect(Number.isFinite(trayPxPerSecToWorld(500, { width: 0, height: 0 }))).toBe(true);
+  });
+});
+
+// The tray's physics material. The numbers themselves are a feel judgement,
+// but two properties are load-bearing and easy to regress by "just tuning".
+describe("TRAY_PHYSICS", () => {
+  it("keeps damping low enough that a throw doesn't die in flight", () => {
+    // Bullet applies v *= (1 - damping)^dt, so damping is the fraction of
+    // speed lost per second. dice-box's 0.5 default halved a throw every
+    // second in mid-air, which is most of what "the dice carry no momentum"
+    // was.
+    expect(TRAY_PHYSICS.linearDamping).toBeLessThan(0.15);
+    expect(TRAY_PHYSICS.angularDamping).toBeLessThan(0.2);
   });
 
-  it("is limited by whichever wall a diagonal throw reaches first", () => {
-    const diagonal = roomInDirection(0, 0, Math.SQRT1_2, Math.SQRT1_2, PHONE);
-    expect(diagonal).toBeLessThan(roomInDirection(0, 0, 0, 1, PHONE));
+  it("leaves the dice enough bounce to reach a wall", () => {
+    // Bullet multiplies the two bodies' restitution, so this is what a die
+    // actually gets off the floor and walls - dice-box's 0.1 default came out
+    // at 0.01.
+    expect(TRAY_PHYSICS.restitution ** 2).toBeGreaterThan(0.15);
+  });
+
+  // dice-box re-derives gravity from its own already-derived value on every
+  // updateConfig call, and the tray updates its config on every grab - so
+  // setting either of these would make the tray's gravity climb as the player
+  // rolls.
+  it("sets neither gravity nor mass", () => {
+    expect(TRAY_PHYSICS).not.toHaveProperty("gravity");
+    expect(TRAY_PHYSICS).not.toHaveProperty("mass");
   });
 });
 
@@ -334,45 +366,42 @@ describe("throwFromRelease", () => {
     expect(mag(hard.spin!)).toBeGreaterThan(mag(soft.spin!));
   });
 
-  // The reason a "full power" throw used to be unreadable: it outran the tray,
-  // hit a wall and rebounded, so where the dice ended up said nothing about
-  // either the direction or the strength of the throw.
-  it("budgets even a full-power throw to the room available, so dice don't rebound", () => {
-    const limits = trayFloorLimits(PHONE);
-    for (const [vx, vy] of [
-      [0, FLICK_SPEED],
-      [0, -FLICK_SPEED],
-      [FLICK_SPEED, 0],
-      [-FLICK_SPEED, 0],
-      [FLICK_SPEED, FLICK_SPEED],
-    ]) {
-      const thrown = throwFromRelease(mid.x, mid.y, vx, vy, PHONE);
-      expect(thrown.power).toBe(1);
-      const [tx, , tz] = thrown.velocity;
-      const speed = Math.hypot(tx, tz);
-      const room = roomInDirection(
-        thrown.startPosition[0],
-        thrown.startPosition[2],
-        tx / speed,
-        tz / speed,
-        PHONE
-      );
-      // Travel is the speed budget run backwards through the empirical
-      // travel -> speed fit; it should land inside the tray, not past a wall.
-      const travel = (speed - 1.4) / 1.5;
-      expect(travel).toBeLessThanOrEqual(room + 0.5);
-      expect(travel).toBeGreaterThan(0);
-      // Sanity: the tray really is much tighter across than along in portrait,
-      // which is why a single speed range cannot serve both.
-      expect(limits.x).toBeLessThan(limits.z);
+  // The headline fix: the dice leave the hand at the speed the hand was
+  // carrying them, so nothing about their motion changes at the moment of
+  // release. Anything slower reads as the dice hitting an invisible brake -
+  // which is exactly what the old travel-distance budget did, capping a phone
+  // throw at ~6.7 units/sec against a hand moving at ~7.7.
+  it("throws at the speed the hand was already moving the dice", () => {
+    for (const perTrayHeight of [0.5, 0.9, 1.4]) {
+      const handPx = perTrayHeight * PHONE.height;
+      const thrown = throwFromRelease(mid.x, mid.y, 0, handPx, PHONE);
+      const speed = Math.hypot(thrown.velocity[0], thrown.velocity[2]);
+      const hand = trayPxPerSecToWorld(handPx, PHONE);
+      expect(speed).toBeGreaterThanOrEqual(hand);
+      // ...and not so much more that the release is a catapult.
+      expect(speed).toBeLessThan(hand * 1.5);
     }
   });
 
-  it("throws a cross-tray flick more gently than a lengthwise one, since there is less room", () => {
+  it("never throws faster than the hand could have carried the dice", () => {
+    // GRAB_MAX_SPEED is the servo's ceiling while the dice are held, so a
+    // release above it would speed them up as they left the hand.
+    const wild = throwFromRelease(mid.x, mid.y, 40 * PHONE.height, 0, PHONE);
+    expect(Math.hypot(...wild.velocity)).toBeLessThan(GRAB_MAX_SPEED);
+  });
+
+  // The tray is much tighter across than along in portrait, and a throw is
+  // no longer budgeted against that - the dice reach the wall and bounce off
+  // it like dice in a real tray, rather than being launched more softly
+  // sideways than forwards for the same flick.
+  it("throws a cross-tray flick as hard as a lengthwise one", () => {
     const across = throwFromRelease(mid.x, mid.y, FLICK_SPEED, 0, PHONE);
     const along = throwFromRelease(mid.x, mid.y, 0, FLICK_SPEED, PHONE);
-    expect(across.power).toBe(along.power);
-    expect(Math.abs(across.velocity[0])).toBeLessThan(Math.abs(along.velocity[2]));
+    expect(trayFloorLimits(PHONE).x).toBeLessThan(trayFloorLimits(PHONE).z);
+    expect(Math.abs(across.velocity[0])).toBeCloseTo(
+      Math.abs(along.velocity[2]),
+      5
+    );
   });
 
   it("still throws when the hand lets go against a wall while moving into it", () => {

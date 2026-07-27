@@ -21,6 +21,7 @@ import {
   GRAB_MAX_SPEED,
   GRAB_SPREAD,
   GRAB_STIFFNESS,
+  TRAY_PHYSICS,
   holdPointFromPointer,
   throwFromRelease,
   velocityFromSamples,
@@ -75,6 +76,9 @@ export default function DiceSpikePage() {
         assetPath: "/assets/",
         theme: "default",
         scale: 6,
+        // Same tray material the real modal uses, or this harness would be
+        // retuning the gesture against physics the game doesn't have.
+        ...TRAY_PHYSICS,
       });
       diceBoxRef.current = diceBox;
 
