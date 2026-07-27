@@ -1,12 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
-  MIN_DRAG_PX,
+  HOLD_HEIGHT,
   clampToTrayFloor,
-  powerFromDragDistance,
+  gentleThrowSpeed,
+  holdPointFromPointer,
+  powerFromReleaseSpeed,
   roomInDirection,
-  throwFromDrag,
+  throwFromRelease,
   trayFloorLimits,
   trayPointToWorld,
+  velocityFromSamples,
   type TraySize,
 } from "@/app/misc/diceThrow";
 
@@ -14,6 +17,11 @@ import {
 // shapes the modal actually renders at.
 const PHONE: TraySize = { width: 390, height: 520 };
 const DESKTOP: TraySize = { width: 900, height: 500 };
+
+// Speeds in px/sec that land either side of the drop/throw threshold on the
+// phone tray - a slow carry and a real flick.
+const CARRY_SPEED = 0.1 * PHONE.height;
+const FLICK_SPEED = 4 * PHONE.height;
 
 describe("trayPointToWorld", () => {
   it("maps the middle of the tray to the middle of the physics world", () => {
@@ -52,6 +60,26 @@ describe("trayPointToWorld", () => {
       expect(Math.abs(clamped.x - corner.x)).toBeLessThan(1.5);
       expect(Math.abs(clamped.z - corner.z)).toBeLessThan(1.5);
     }
+  });
+
+  // The camera is a perspective one looking straight down, so dice held up off
+  // the floor are nearer the lens - they have to sit closer to the middle of
+  // the tray to stay under the same screen point. Without this the handful
+  // visibly drifts away from the pointer toward the tray edges.
+  it("pulls a raised point toward the middle, in proportion to its height", () => {
+    const px = PHONE.width / 2 + 120;
+    const onFloor = trayPointToWorld(px, PHONE.height / 2 + 90, PHONE);
+    const raised = trayPointToWorld(px, PHONE.height / 2 + 90, PHONE, HOLD_HEIGHT);
+    expect(Math.abs(raised.x)).toBeLessThan(Math.abs(onFloor.x));
+    expect(Math.abs(raised.z)).toBeLessThan(Math.abs(onFloor.z));
+    // Same proportion on both axes, so a raised point doesn't shear.
+    expect(raised.x / onFloor.x).toBeCloseTo(raised.z / onFloor.z, 5);
+  });
+
+  it("leaves the middle of the tray put however high the dice are held", () => {
+    const raised = trayPointToWorld(PHONE.width / 2, PHONE.height / 2, PHONE, HOLD_HEIGHT);
+    expect(raised.x).toBeCloseTo(0);
+    expect(raised.z).toBeCloseTo(0);
   });
 });
 
@@ -106,92 +134,175 @@ describe("clampToTrayFloor", () => {
   });
 });
 
-describe("powerFromDragDistance", () => {
-  it("scores a tap-length drag at zero", () => {
-    expect(powerFromDragDistance(MIN_DRAG_PX, PHONE)).toBe(0);
-    expect(powerFromDragDistance(0, PHONE)).toBe(0);
+describe("holdPointFromPointer", () => {
+  it("holds the dice above the floor but below the tray walls", () => {
+    const hold = holdPointFromPointer(100, 100, PHONE);
+    expect(hold[1]).toBe(HOLD_HEIGHT);
+    expect(hold[1]).toBeGreaterThan(0);
+    expect(hold[1]).toBeLessThan(8);
   });
 
-  it("ramps up with distance and saturates at 1", () => {
-    const short = powerFromDragDistance(40, PHONE);
-    const medium = powerFromDragDistance(100, PHONE);
-    expect(short).toBeGreaterThan(0);
-    expect(medium).toBeGreaterThan(short);
-    expect(powerFromDragDistance(10000, PHONE)).toBe(1);
+  it("never holds the dice outside the walls, however far off-tray the pointer is", () => {
+    for (const [px, py] of [
+      [-500, -500],
+      [PHONE.width + 500, PHONE.height + 500],
+      [0, PHONE.height],
+    ]) {
+      const hold = holdPointFromPointer(px, py, PHONE);
+      expect(Math.abs(hold[0])).toBeLessThan(4.75);
+      expect(Math.abs(hold[2])).toBeLessThan(4.75);
+    }
   });
 
-  // The whole reason power felt broken on mobile: dice spawn where you press,
-  // so the longest drag available is roughly the tray's own shorter side. A
-  // desktop-tuned fixed threshold puts full power out of reach on a phone.
-  it("makes full power reachable within the tray on a phone-sized tray", () => {
-    const reachable = Math.min(PHONE.width, PHONE.height) * 0.5;
-    expect(powerFromDragDistance(reachable, PHONE)).toBe(1);
-  });
-
-  it("scales the ramp to the tray, so the same fraction of each tray throws about as hard", () => {
-    const quarterOfTray = (tray: TraySize) =>
-      powerFromDragDistance(Math.min(tray.width, tray.height) * 0.25, tray);
-    // Not exactly equal - the tap deadzone is a fixed number of px, so it eats
-    // a slightly larger share of a small tray - but close enough that the same
-    // gesture feels the same on a phone and a desktop.
-    expect(quarterOfTray(PHONE)).toBeCloseTo(quarterOfTray(DESKTOP), 1);
+  it("follows the pointer across the tray", () => {
+    const left = holdPointFromPointer(60, 260, PHONE);
+    const right = holdPointFromPointer(330, 260, PHONE);
+    // Screen right is world -X.
+    expect(right[0]).toBeLessThan(left[0]);
   });
 });
 
-describe("throwFromDrag", () => {
+describe("velocityFromSamples", () => {
+  it("reports no motion for a hand that never moved", () => {
+    expect(velocityFromSamples([{ x: 10, y: 10, t: 0 }])).toEqual({ vx: 0, vy: 0 });
+    expect(
+      velocityFromSamples([
+        { x: 10, y: 10, t: 0 },
+        { x: 10, y: 10, t: 50 },
+      ])
+    ).toEqual({ vx: 0, vy: 0 });
+  });
+
+  it("measures px/sec over the sampled motion", () => {
+    const { vx, vy } = velocityFromSamples([
+      { x: 0, y: 0, t: 0 },
+      { x: 30, y: -60, t: 50 },
+    ]);
+    expect(vx).toBeCloseTo(600);
+    expect(vy).toBeCloseTo(-1200);
+  });
+
+  // The whole reason power is measured this way: a player who carries the dice
+  // deliberately across the tray and then lets go is dropping them, not
+  // throwing them, however far the hand travelled getting there.
+  it("ignores everything before the window, so a long carry doesn't count as a throw", () => {
+    const carry: { x: number; y: number; t: number }[] = [];
+    for (let t = 0; t <= 800; t += 16) carry.push({ x: t / 2, y: 0, t });
+    const flicked = velocityFromSamples([
+      ...carry,
+      { x: 400, y: -300, t: 830 },
+      { x: 500, y: -400, t: 846 },
+    ]);
+    // The tail is what's left: ~100px in 16ms, not the carry's ~500px/sec.
+    expect(Math.hypot(flicked.vx, flicked.vy)).toBeGreaterThan(4000);
+
+    const stopped = velocityFromSamples([...carry, { x: 400, y: 0, t: 1400 }]);
+    expect(Math.hypot(stopped.vx, stopped.vy)).toBeLessThan(200);
+  });
+
+  it("still measures something when the only samples straddle the window", () => {
+    const { vx } = velocityFromSamples([
+      { x: 0, y: 0, t: 0 },
+      { x: 100, y: 0, t: 500 },
+    ]);
+    expect(vx).toBeCloseTo(200);
+  });
+});
+
+describe("powerFromReleaseSpeed", () => {
+  it("scores a slow release at zero, so letting go gently is a drop", () => {
+    expect(powerFromReleaseSpeed(0, PHONE)).toBe(0);
+    expect(powerFromReleaseSpeed(CARRY_SPEED, PHONE)).toBe(0);
+  });
+
+  it("ramps up with speed and saturates at 1", () => {
+    const slow = powerFromReleaseSpeed(0.6 * PHONE.height, PHONE);
+    const brisk = powerFromReleaseSpeed(1.2 * PHONE.height, PHONE);
+    expect(slow).toBeGreaterThan(0);
+    expect(brisk).toBeGreaterThan(slow);
+    expect(powerFromReleaseSpeed(FLICK_SPEED, PHONE)).toBe(1);
+  });
+
+  // A flick is a gesture at screen scale, so the same fraction of a tray per
+  // second has to mean the same thing on a phone and on a desktop.
+  it("scales the ramp to the tray, so the same flick throws about as hard on either", () => {
+    const sameFlick = (tray: TraySize) =>
+      powerFromReleaseSpeed(tray.height, tray);
+    expect(sameFlick(PHONE)).toBeCloseTo(sameFlick(DESKTOP), 5);
+  });
+
+  it("puts the fallback's gentle toss inside the throwing range", () => {
+    for (const tray of [PHONE, DESKTOP]) {
+      const power = powerFromReleaseSpeed(gentleThrowSpeed(tray), tray);
+      expect(power).toBeGreaterThan(0);
+      expect(power).toBeLessThan(1);
+    }
+  });
+});
+
+describe("throwFromRelease", () => {
   const mid = { x: PHONE.width / 2, y: PHONE.height / 2 };
 
-  it("rejects a tap", () => {
-    expect(throwFromDrag(mid.x, mid.y, mid.x + 4, mid.y + 4, PHONE)).toBeNull();
+  it("drops the dice where the hand left them when it was barely moving", () => {
+    const dropped = throwFromRelease(mid.x, mid.y, 0, CARRY_SPEED, PHONE);
+    expect(dropped.power).toBe(0);
+    expect(dropped.velocity).toEqual([0, 0, 0]);
+    // No imposed spin either - a dropped die keeps whatever tumble the hand
+    // gave it, which is what letting go actually looks like.
+    expect(dropped.spin).toBeNull();
   });
 
-  it("spawns the dice where the player pressed, not at a random rim point", () => {
-    const nearTopLeft = throwFromDrag(30, 40, 200, 300, PHONE);
-    const nearBottomRight = throwFromDrag(
+  it("lets go of the dice where the hand is, not at a random rim point", () => {
+    const nearTopLeft = throwFromRelease(30, 40, 0, FLICK_SPEED, PHONE);
+    const nearBottomRight = throwFromRelease(
       PHONE.width - 30,
       PHONE.height - 40,
-      200,
-      200,
+      0,
+      -FLICK_SPEED,
       PHONE
     );
-    expect(nearTopLeft).not.toBeNull();
-    expect(nearBottomRight).not.toBeNull();
     // Top-left of the screen is +X / -Z; bottom-right is -X / +Z.
-    expect(nearTopLeft!.startPosition[0]).toBeGreaterThan(0);
-    expect(nearTopLeft!.startPosition[2]).toBeLessThan(0);
-    expect(nearBottomRight!.startPosition[0]).toBeLessThan(0);
-    expect(nearBottomRight!.startPosition[2]).toBeGreaterThan(0);
+    expect(nearTopLeft.startPosition[0]).toBeGreaterThan(0);
+    expect(nearTopLeft.startPosition[2]).toBeLessThan(0);
+    expect(nearBottomRight.startPosition[0]).toBeLessThan(0);
+    expect(nearBottomRight.startPosition[2]).toBeGreaterThan(0);
   });
 
-  it("spawns above the floor but below the tray walls", () => {
-    const thrown = throwFromDrag(mid.x, mid.y, mid.x, mid.y + 150, PHONE)!;
+  it("lets go above the floor but below the tray walls", () => {
+    const thrown = throwFromRelease(mid.x, mid.y, 0, FLICK_SPEED, PHONE);
     expect(thrown.startPosition[1]).toBeGreaterThan(0);
     expect(thrown.startPosition[1]).toBeLessThan(8);
   });
 
-  it("throws along the drag direction", () => {
-    const cases: Array<[string, number, number, (v: number[]) => void]> = [
-      ["down the screen", 0, 150, (v) => expect(v[2]).toBeGreaterThan(0)],
-      ["up the screen", 0, -150, (v) => expect(v[2]).toBeLessThan(0)],
-      ["right", 150, 0, (v) => expect(v[0]).toBeLessThan(0)],
-      ["left", -150, 0, (v) => expect(v[0]).toBeGreaterThan(0)],
+  it("throws the way the hand was moving", () => {
+    const cases: Array<[number, number, (v: number[]) => void]> = [
+      [0, FLICK_SPEED, (v) => expect(v[2]).toBeGreaterThan(0)], // down the screen
+      [0, -FLICK_SPEED, (v) => expect(v[2]).toBeLessThan(0)], // up the screen
+      [FLICK_SPEED, 0, (v) => expect(v[0]).toBeLessThan(0)], // right
+      [-FLICK_SPEED, 0, (v) => expect(v[0]).toBeGreaterThan(0)], // left
     ];
-    for (const [, dx, dy, assert] of cases) {
-      const thrown = throwFromDrag(mid.x, mid.y, mid.x + dx, mid.y + dy, PHONE)!;
-      assert(thrown.velocity);
+    for (const [vx, vy, assert] of cases) {
+      assert(throwFromRelease(mid.x, mid.y, vx, vy, PHONE).velocity);
     }
   });
 
-  it("keeps the throw heading proportional to the drag, independent of length", () => {
-    const shortDrag = throwFromDrag(mid.x, mid.y, mid.x + 30, mid.y + 30, PHONE)!;
-    const longDrag = throwFromDrag(mid.x, mid.y, mid.x + 150, mid.y + 150, PHONE)!;
+  it("keeps the throw heading proportional to the hand's, independent of speed", () => {
+    const gentle = throwFromRelease(mid.x, mid.y, 400, 400, PHONE);
+    const hard = throwFromRelease(mid.x, mid.y, 3000, 3000, PHONE);
     const heading = (v: number[]) => Math.atan2(v[2], v[0]);
-    expect(heading(shortDrag.velocity)).toBeCloseTo(heading(longDrag.velocity), 5);
+    expect(heading(gentle.velocity)).toBeCloseTo(heading(hard.velocity), 5);
   });
 
-  it("throws harder the further the drag went", () => {
-    const speeds = [30, 60, 120, 240].map((d) => {
-      const thrown = throwFromDrag(mid.x, mid.y, mid.x, mid.y + d, PHONE)!;
+  // The headline behaviour: power comes from the hand's speed, nothing else.
+  it("throws harder the faster the hand was moving", () => {
+    const speeds = [0.4, 0.8, 1.2, 1.8].map((perTrayHeight) => {
+      const thrown = throwFromRelease(
+        mid.x,
+        mid.y,
+        0,
+        perTrayHeight * PHONE.height,
+        PHONE
+      );
       return Math.hypot(thrown.velocity[0], thrown.velocity[2]);
     });
     for (let i = 1; i < speeds.length; i++) {
@@ -200,17 +311,16 @@ describe("throwFromDrag", () => {
     expect(speeds.at(-1)!).toBeGreaterThan(speeds[0] * 1.5);
   });
 
-  it("always throws with some downward bias so a throw can't skim the tray", () => {
-    for (const d of [30, 100, 400]) {
-      const thrown = throwFromDrag(mid.x, mid.y, mid.x + d, mid.y, PHONE)!;
-      expect(thrown.velocity[1]).toBeLessThan(0);
+  it("throws with a downward bias so a throw can't skim the tray", () => {
+    for (const speed of [0.6, 1.2, 4].map((s) => s * PHONE.height)) {
+      expect(throwFromRelease(mid.x, mid.y, speed, 0, PHONE).velocity[1]).toBeLessThan(0);
     }
   });
 
   it("tumbles about an axis perpendicular to the throw, in the direction of travel", () => {
-    const thrown = throwFromDrag(mid.x, mid.y, mid.x, mid.y + 150, PHONE)!;
+    const thrown = throwFromRelease(mid.x, mid.y, 0, FLICK_SPEED, PHONE);
     const [vx, , vz] = thrown.velocity;
-    const [sx, , sz] = thrown.spin;
+    const [sx, , sz] = thrown.spin!;
     // For rolling without slipping, spin ∝ (vz, 0, -vx): perpendicular to the
     // velocity in the XZ plane (zero dot product), not anti-parallel to it.
     expect(vx * sx + vz * sz).toBeCloseTo(0, 5);
@@ -218,33 +328,33 @@ describe("throwFromDrag", () => {
   });
 
   it("spins faster on a harder throw", () => {
-    const soft = throwFromDrag(mid.x, mid.y, mid.x + 30, mid.y, PHONE)!;
-    const hard = throwFromDrag(mid.x, mid.y, mid.x + 240, mid.y, PHONE)!;
+    const soft = throwFromRelease(mid.x, mid.y, 0.5 * PHONE.height, 0, PHONE);
+    const hard = throwFromRelease(mid.x, mid.y, 4 * PHONE.height, 0, PHONE);
     const mag = (v: number[]) => Math.hypot(...v);
-    expect(mag(hard.spin)).toBeGreaterThan(mag(soft.spin));
+    expect(mag(hard.spin!)).toBeGreaterThan(mag(soft.spin!));
   });
 
   // The reason a "full power" throw used to be unreadable: it outran the tray,
   // hit a wall and rebounded, so where the dice ended up said nothing about
-  // either the direction or the length of the drag.
+  // either the direction or the strength of the throw.
   it("budgets even a full-power throw to the room available, so dice don't rebound", () => {
     const limits = trayFloorLimits(PHONE);
-    for (const [dx, dy] of [
-      [0, 400],
-      [0, -400],
-      [400, 0],
-      [-400, 0],
-      [300, 300],
+    for (const [vx, vy] of [
+      [0, FLICK_SPEED],
+      [0, -FLICK_SPEED],
+      [FLICK_SPEED, 0],
+      [-FLICK_SPEED, 0],
+      [FLICK_SPEED, FLICK_SPEED],
     ]) {
-      const thrown = throwFromDrag(mid.x, mid.y, mid.x + dx, mid.y + dy, PHONE)!;
+      const thrown = throwFromRelease(mid.x, mid.y, vx, vy, PHONE);
       expect(thrown.power).toBe(1);
-      const [vx, , vz] = thrown.velocity;
-      const speed = Math.hypot(vx, vz);
+      const [tx, , tz] = thrown.velocity;
+      const speed = Math.hypot(tx, tz);
       const room = roomInDirection(
         thrown.startPosition[0],
         thrown.startPosition[2],
-        vx / speed,
-        vz / speed,
+        tx / speed,
+        tz / speed,
         PHONE
       );
       // Travel is the speed budget run backwards through the empirical
@@ -258,31 +368,31 @@ describe("throwFromDrag", () => {
     }
   });
 
-  it("throws a cross-tray drag more gently than a lengthwise one, since there is less room", () => {
-    const across = throwFromDrag(mid.x, mid.y, mid.x + 400, mid.y, PHONE)!;
-    const along = throwFromDrag(mid.x, mid.y, mid.x, mid.y + 400, PHONE)!;
+  it("throws a cross-tray flick more gently than a lengthwise one, since there is less room", () => {
+    const across = throwFromRelease(mid.x, mid.y, FLICK_SPEED, 0, PHONE);
+    const along = throwFromRelease(mid.x, mid.y, 0, FLICK_SPEED, PHONE);
     expect(across.power).toBe(along.power);
     expect(Math.abs(across.velocity[0])).toBeLessThan(Math.abs(along.velocity[2]));
   });
 
-  it("still throws when the player presses against a wall and drags into it", () => {
-    const thrown = throwFromDrag(4, mid.y, 4 - 200, mid.y, PHONE);
-    expect(thrown).not.toBeNull();
-    expect(Math.hypot(thrown!.velocity[0], thrown!.velocity[2])).toBeGreaterThan(0);
+  it("still throws when the hand lets go against a wall while moving into it", () => {
+    const thrown = throwFromRelease(4, mid.y, -FLICK_SPEED, 0, PHONE);
+    expect(Math.hypot(thrown.velocity[0], thrown.velocity[2])).toBeGreaterThan(0);
   });
 
-  it("reports the same power the aiming UI shows for that drag", () => {
-    const thrown = throwFromDrag(mid.x, mid.y, mid.x, mid.y + 90, PHONE)!;
-    expect(thrown.power).toBeCloseTo(powerFromDragDistance(90, PHONE), 5);
+  it("reports the same power powerFromReleaseSpeed does for that hand speed", () => {
+    const speed = 1.1 * PHONE.height;
+    const thrown = throwFromRelease(mid.x, mid.y, 0, speed, PHONE);
+    expect(thrown.power).toBeCloseTo(powerFromReleaseSpeed(speed, PHONE), 5);
   });
 
-  it("never spawns dice outside the walls, however far off-tray the press was", () => {
+  it("never lets go of dice outside the walls, however far off-tray the hand is", () => {
     for (const [px, py] of [
       [-500, -500],
       [PHONE.width + 500, PHONE.height + 500],
       [0, PHONE.height],
     ]) {
-      const thrown = throwFromDrag(px, py, px + 120, py + 120, PHONE)!;
+      const thrown = throwFromRelease(px, py, FLICK_SPEED, FLICK_SPEED, PHONE);
       expect(Math.abs(thrown.startPosition[0])).toBeLessThan(4.75);
       expect(Math.abs(thrown.startPosition[2])).toBeLessThan(4.75);
     }

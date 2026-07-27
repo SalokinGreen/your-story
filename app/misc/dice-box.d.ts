@@ -13,6 +13,22 @@ declare module "@3d-dice/dice-box" {
     [key: string]: unknown;
   }
 
+  /**
+   * One pool of dice. The object form is what carries `themeColor`, which is
+   * how the app gives each pool of a mixed roll its own colour - dice-box only
+   * honours it on a theme whose material is `"type": "color"` (the bundled
+   * `default` theme is one).
+   *
+   * Note dice-box writes its own bookkeeping onto whatever object it is given,
+   * so these should be built fresh per roll.
+   */
+  export interface RollNotation {
+    sides: number;
+    qty?: number;
+    themeColor?: string;
+    theme?: string;
+  }
+
   export interface DiceBoxOptions {
     container?: string;
     assetPath: string;
@@ -33,9 +49,11 @@ declare module "@3d-dice/dice-box" {
     // `newStartPoint: false`.
     startPosition?: [number, number, number] | null;
     // Patched in via scripts/patchDiceBox.mjs - not part of upstream dice-box.
-    // The initial linear and angular velocity of every die in the throw, which
-    // is how a drag gesture aims the roll. Set both to null to fall back to
-    // dice-box's own randomized throw (used for the spawn-in toss).
+    // The initial linear and angular velocity of every die in the throw. Set
+    // both to null to fall back to dice-box's own randomized throw (used for
+    // the spawn-in toss). A player's throw normally travels over the control
+    // channel instead (app/misc/diceControlChannel.ts); these are what the
+    // no-held-phase fallback path uses.
     customThrowVelocity?: [number, number, number] | null;
     customThrowSpin?: [number, number, number] | null;
   }
@@ -51,24 +69,24 @@ declare module "@3d-dice/dice-box" {
   export default class DiceBox {
     constructor(options: DiceBoxOptions);
     init(): Promise<void>;
-    // An array of notations ("['2d6','1d4']") throws every pool in the same
-    // toss and comes back as one flat DieResult[], each die tagged with the
-    // groupId of the notation entry it came from.
+    // An array of notations throws every pool in the same toss and comes back
+    // as one flat DieResult[], each die tagged with the groupId of the
+    // notation entry it came from.
     roll(
-      notation: string | string[],
+      notation: string | string[] | RollNotation[],
       options?: RollOptions
     ): Promise<DieResult[]>;
     // Re-throws an existing set of dice (the result objects from a prior
     // roll()/add()/reroll() call, which carry groupId/rollId) rather than
-    // spawning a new set - used to re-toss the dice already sitting in the
-    // tray once the player performs the throw gesture. `remove: false`
-    // (dice-box's default) leaves the pre-reroll dice sitting in the scene
-    // alongside the new ones instead of replacing them - always pass
-    // `remove: true` here unless dice are meant to visibly accumulate.
+    // spawning a new set. `remove: false` (dice-box's default) leaves the
+    // pre-reroll dice sitting in the scene alongside the new ones instead of
+    // replacing them - always pass `remove: true` here unless dice are meant
+    // to visibly accumulate.
     reroll(
       notation: DieResult[] | DieResult,
       options?: { remove?: boolean; newStartPoint?: boolean }
     ): Promise<DieResult[]>;
     updateConfig(options: DiceBoxConfigUpdate): Promise<this>;
+    clear(): this;
   }
 }
