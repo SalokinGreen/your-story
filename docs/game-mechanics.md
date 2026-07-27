@@ -111,8 +111,15 @@ narrative and the adventure's `mechanics` note.
 - **`fate_question`**: a Mythic-style yes/no oracle for resolving unknown
   facts about the world ("Is the door locked?"), weighted by likelihood
   (Impossible → Has To Be) and the story's **chaos factor** (1-9, editable
-  in the Chaos/Oracle tab). Higher chaos means more unexpected answers and
-  a higher chance of a triggered Random Event.
+  in the Chaos/Oracle tab). Higher chaos bends the odds toward yes and
+  raises the chance of a triggered Random Event. Answers are **Normal
+  Yes**, **Normal No**, **Exceptional Yes**, **Exceptional No** — the
+  ordinary results are named explicitly because a bare "Yes" next to
+  "Exceptional Yes" reads to the model as a truncation of it, and plain
+  successes were getting narrated as if the oracle had swung hard. The
+  chart itself is derived from Mythic's probability ladder in
+  `mythic.ts` (`fateTargetNumber`), not a hand-typed table: a 50/50
+  question at chaos 5 is a literal coin flip.
 - **`roll_table`**: rolls on a custom table (defined in the story's Tables
   tab) or a built-in element table (character traits, locations, plot
   twists, atmosphere, and more) for on-the-fly inspiration.

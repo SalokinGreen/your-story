@@ -19,7 +19,16 @@ import type {
 } from "./structs";
 import { pickTagFocusExamples } from "./tagFocusExamples";
 
-export type FateAnswer = "Exceptional Yes" | "Yes" | "No" | "Exceptional No";
+// "Normal Yes"/"Normal No" rather than a bare "Yes"/"No": the answer string
+// is handed straight to the model, and a bare "Yes" next to "Exceptional Yes"
+// reads as a truncation of it - the GM was routinely narrating an ordinary
+// success as if the oracle had swung hard. Naming the ordinary result
+// explicitly removes the ambiguity without changing what the dice mean.
+export type FateAnswer =
+  | "Exceptional Yes"
+  | "Normal Yes"
+  | "Normal No"
+  | "Exceptional No";
 export type SceneType = "Normal" | "Altered" | "Interrupted";
 export type Likelihood =
   | "Impossible"
@@ -34,130 +43,82 @@ export type Likelihood =
   | "A Sure Thing"
   | "Has To Be";
 
-// AGMT Fate Chart (Chaos Factor rows, Likelihood columns)
-// Returns: [Exceptional No, No, Yes, Exceptional Yes] thresholds
-const FATE_CHART: Record<
-  number,
-  Record<Likelihood, [number, number, number, number]>
-> = {
-  9: {
-    Impossible: [10, 50, 91, 96],
-    "No Way": [5, 25, 86, 96],
-    "Very Unlikely": [3, 15, 81, 96],
-    Unlikely: [2, 10, 77, 95],
-    "50/50": [1, 5, 75, 95],
-    "Somewhat Likely": [1, 3, 70, 94],
-    Likely: [0, 2, 65, 93],
-    "Very Likely": [0, 1, 60, 92],
-    "Near Sure Thing": [0, 1, 55, 91],
-    "A Sure Thing": [0, 0, 50, 90],
-    "Has To Be": [0, 0, 45, 88],
-  },
-  8: {
-    Impossible: [10, 50, 91, 97],
-    "No Way": [5, 25, 86, 97],
-    "Very Unlikely": [3, 15, 81, 97],
-    Unlikely: [2, 10, 77, 96],
-    "50/50": [1, 5, 75, 96],
-    "Somewhat Likely": [1, 3, 70, 95],
-    Likely: [0, 2, 65, 94],
-    "Very Likely": [0, 1, 60, 93],
-    "Near Sure Thing": [0, 1, 55, 92],
-    "A Sure Thing": [0, 0, 50, 91],
-    "Has To Be": [0, 0, 45, 89],
-  },
-  7: {
-    Impossible: [10, 50, 91, 98],
-    "No Way": [5, 25, 86, 98],
-    "Very Unlikely": [3, 15, 81, 98],
-    Unlikely: [2, 10, 77, 97],
-    "50/50": [1, 5, 75, 97],
-    "Somewhat Likely": [1, 3, 70, 96],
-    Likely: [0, 2, 65, 95],
-    "Very Likely": [0, 1, 60, 94],
-    "Near Sure Thing": [0, 1, 55, 93],
-    "A Sure Thing": [0, 0, 50, 92],
-    "Has To Be": [0, 0, 45, 90],
-  },
-  6: {
-    Impossible: [10, 50, 91, 99],
-    "No Way": [5, 25, 86, 99],
-    "Very Unlikely": [3, 15, 81, 99],
-    Unlikely: [2, 10, 77, 98],
-    "50/50": [1, 5, 75, 98],
-    "Somewhat Likely": [1, 3, 70, 97],
-    Likely: [0, 2, 65, 96],
-    "Very Likely": [0, 1, 60, 95],
-    "Near Sure Thing": [0, 1, 55, 94],
-    "A Sure Thing": [0, 0, 50, 93],
-    "Has To Be": [0, 0, 45, 91],
-  },
-  5: {
-    Impossible: [10, 50, 91, 100],
-    "No Way": [5, 25, 86, 100],
-    "Very Unlikely": [3, 15, 81, 100],
-    Unlikely: [2, 10, 77, 99],
-    "50/50": [1, 5, 75, 99],
-    "Somewhat Likely": [1, 3, 70, 98],
-    Likely: [0, 2, 65, 97],
-    "Very Likely": [0, 1, 60, 96],
-    "Near Sure Thing": [0, 1, 55, 95],
-    "A Sure Thing": [0, 0, 50, 94],
-    "Has To Be": [0, 0, 45, 92],
-  },
-  4: {
-    Impossible: [13, 65, 94, 100],
-    "No Way": [10, 50, 91, 100],
-    "Very Unlikely": [7, 35, 88, 100],
-    Unlikely: [5, 25, 86, 99],
-    "50/50": [3, 15, 81, 99],
-    "Somewhat Likely": [2, 10, 77, 98],
-    Likely: [1, 5, 75, 97],
-    "Very Likely": [1, 3, 70, 96],
-    "Near Sure Thing": [0, 2, 65, 95],
-    "A Sure Thing": [0, 1, 60, 94],
-    "Has To Be": [0, 1, 55, 93],
-  },
-  3: {
-    Impossible: [16, 85, 97, 100],
-    "No Way": [13, 65, 94, 100],
-    "Very Unlikely": [10, 50, 91, 100],
-    Unlikely: [7, 35, 88, 99],
-    "50/50": [5, 25, 86, 99],
-    "Somewhat Likely": [3, 15, 81, 98],
-    Likely: [2, 10, 77, 97],
-    "Very Likely": [1, 5, 75, 96],
-    "Near Sure Thing": [1, 3, 70, 95],
-    "A Sure Thing": [0, 2, 65, 94],
-    "Has To Be": [0, 1, 60, 93],
-  },
-  2: {
-    Impossible: [18, 100, 99, 100],
-    "No Way": [16, 85, 97, 100],
-    "Very Unlikely": [13, 65, 94, 100],
-    Unlikely: [10, 50, 91, 99],
-    "50/50": [7, 35, 88, 99],
-    "Somewhat Likely": [5, 25, 86, 98],
-    Likely: [3, 15, 81, 97],
-    "Very Likely": [2, 10, 77, 96],
-    "Near Sure Thing": [1, 5, 75, 95],
-    "A Sure Thing": [1, 3, 70, 94],
-    "Has To Be": [0, 2, 65, 93],
-  },
-  1: {
-    Impossible: [19, 100, 100, 100],
-    "No Way": [18, 100, 99, 100],
-    "Very Unlikely": [16, 85, 97, 100],
-    Unlikely: [13, 65, 94, 99],
-    "50/50": [10, 50, 91, 99],
-    "Somewhat Likely": [7, 35, 88, 98],
-    Likely: [5, 25, 86, 97],
-    "Very Likely": [3, 15, 81, 96],
-    "Near Sure Thing": [2, 10, 77, 95],
-    "A Sure Thing": [1, 5, 75, 94],
-    "Has To Be": [1, 3, 70, 93],
-  },
+// The Fate Chart, rebuilt from Mythic's own probability ladder rather than
+// stored as 99 hand-typed cells.
+//
+// It used to be a literal table whose cells were authored in Mythic's
+// published `[Exceptional Yes, Yes, Exceptional No]` order but read back as
+// `[Exceptional No, No, Yes, Exceptional Yes]`, with the likelihood columns
+// reversed on top of that. The result was an oracle that answered yes 95% of
+// the time to a 50/50 question at the default Chaos Factor (and 50% of the
+// time to an "Impossible" one), which is what "the oracle always says yes"
+// looked like from the table. Deriving the numbers makes the orientation
+// impossible to get wrong again, and `tests/mythicFateChart.test.ts` pins it.
+//
+// Every target number in Mythic sits on one shared ladder of percentages.
+const ODDS_LADDER = [
+  1, 3, 5, 10, 15, 25, 35, 50, 65, 75, 85, 90, 95, 97, 99,
+];
+
+// Where each likelihood sits on that ladder at Chaos Factor 5 - the neutral
+// row, where a 50/50 question is a literal coin flip. The yes half of the
+// ladder is finer-grained than the no half because the likelihood labels are
+// too (six shades of yes, four of no); the pairs that matter still mirror -
+// Impossible/Has To Be at 1%/99%, No Way/A Sure Thing at 5%/95%, Very
+// Unlikely/Very Likely at 15%/85%, Unlikely/Somewhat Likely at 35%/65%.
+const BASE_LADDER_INDEX: Record<Likelihood, number> = {
+  Impossible: 0, // 1%
+  "No Way": 2, // 5%
+  "Very Unlikely": 4, // 15%
+  Unlikely: 6, // 35%
+  "50/50": 7, // 50%
+  "Somewhat Likely": 8, // 65%
+  Likely: 9, // 75%
+  "Very Likely": 10, // 85%
+  "Near Sure Thing": 11, // 90%
+  "A Sure Thing": 12, // 95%
+  "Has To Be": 14, // 99%
 };
+
+/**
+ * The d100 target number a fate question has to roll at or under for a yes.
+ *
+ * Chaos moves the question one rung along the ladder per point away from 5:
+ * a chaotic world bends toward yes, a stable one toward no. That reproduces
+ * Mythic's own 50/50 column exactly (10/15/25/35/50/65/75/85/90 for Chaos
+ * Factor 1 through 9). Exported for the tests that pin the chart's shape.
+ */
+export function fateTargetNumber(
+  likelihood: Likelihood,
+  chaosFactor: number
+): number {
+  const clampedChaos = Math.max(1, Math.min(9, chaosFactor));
+  const index = BASE_LADDER_INDEX[likelihood] + (clampedChaos - 5);
+  return ODDS_LADDER[Math.max(0, Math.min(ODDS_LADDER.length - 1, index))];
+}
+
+/**
+ * Mythic's exceptional-result rule: the bottom fifth of the yes range is an
+ * Exceptional Yes, the top fifth of the no range an Exceptional No. Returns
+ * the two roll boundaries around the target - a roll at or under
+ * `exceptionalYesMax` is an Exceptional Yes, one at or over
+ * `exceptionalNoMin` an Exceptional No, and anything in between is an
+ * ordinary result on whichever side of `target` it fell.
+ *
+ * At extreme targets a fifth of the losing range rounds away to nothing
+ * (there is no Exceptional Yes at a 1% target, no Exceptional No at 99%),
+ * which is the intended behaviour: a near-certain question has no room left
+ * to swing.
+ */
+export function fateThresholds(target: number): {
+  exceptionalYesMax: number;
+  exceptionalNoMin: number;
+} {
+  return {
+    exceptionalYesMax: Math.floor(target / 5),
+    exceptionalNoMin: 100 - Math.floor((100 - target) / 5) + 1,
+  };
+}
 
 /**
  * Roll a d100 (1-100)
@@ -195,8 +156,8 @@ export function askFate(
   // Clamp chaos factor to valid range
   chaosFactor = Math.max(1, Math.min(9, chaosFactor));
 
-  // Validate likelihood exists in chart
-  if (!FATE_CHART[chaosFactor] || !FATE_CHART[chaosFactor][likelihood]) {
+  // Validate the likelihood is one the ladder knows
+  if (BASE_LADDER_INDEX[likelihood] === undefined) {
     console.error(
       `Invalid AGMT parameters: chaosFactor=${chaosFactor}, likelihood="${likelihood}"`
     );
@@ -205,21 +166,22 @@ export function askFate(
   }
 
   const roll = rollD100();
-  const thresholds = FATE_CHART[chaosFactor][likelihood];
-  const [exceptionalNo, no, yes, exceptionalYes] = thresholds;
+  const target = fateTargetNumber(likelihood, chaosFactor);
+  const { exceptionalYesMax, exceptionalNoMin } = fateThresholds(target);
 
+  // Ordered so every roll from 1 to 100 lands in exactly one branch - the
+  // old chain's final `else` swallowed every roll above its top threshold
+  // into an Exceptional Yes, so the highest rolls on the die could never
+  // come back as a no.
   let answer: FateAnswer;
-  if (roll <= exceptionalNo) {
+  if (roll <= exceptionalYesMax) {
+    answer = "Exceptional Yes";
+  } else if (roll <= target) {
+    answer = "Normal Yes";
+  } else if (roll >= exceptionalNoMin) {
     answer = "Exceptional No";
-  } else if (roll <= no) {
-    answer = "No";
-  } else if (roll <= yes) {
-    answer = "Yes";
-  } else if (roll <= exceptionalYes) {
-    answer = "Exceptional Yes";
   } else {
-    // Above exceptional yes threshold
-    answer = "Exceptional Yes";
+    answer = "Normal No";
   }
 
   const randomEvent = isRandomEvent(roll);
