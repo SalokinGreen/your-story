@@ -33,9 +33,9 @@ import { AI_MODELS } from "@/app/misc/ai_prices";
 // "Mistral Nemo" is $0.15/$0.15 per 1M tokens - a model with equal input and
 // output prices keeps the hand-computed expectations below readable.
 const CHEAP_MODEL = "Mistral Nemo";
-// "GLM 4.6" is $0.40 in / $1.75 out - asymmetric, so it catches an
+// "GLM 5.2" is $0.65 in / $2.10 out - asymmetric, so it catches an
 // input/output price mix-up that a symmetric model would hide.
-const PRICEY_MODEL = "GLM 4.6";
+const PRICEY_MODEL = "GLM 5.2";
 
 // The suite runs in vitest's node environment, but everything under test
 // reads config through `typeof window === "undefined"` guards plus
@@ -87,8 +87,8 @@ afterEach(() => {
 describe("getModelPrice", () => {
   it("reads prices straight off the AI_MODELS entry", () => {
     const price = getModelPrice(PRICEY_MODEL);
-    expect(price.inputPrice).toBe(AI_MODELS["GLM 4.6"].inputPrice);
-    expect(price.outputPrice).toBe(AI_MODELS["GLM 4.6"].outputPrice);
+    expect(price.inputPrice).toBe(AI_MODELS["GLM 5.2"].inputPrice);
+    expect(price.outputPrice).toBe(AI_MODELS["GLM 5.2"].outputPrice);
     expect(price.provider).toBe("openrouter");
     expect(price.unpriced).toBe(false);
   });
@@ -145,8 +145,8 @@ describe("getModelPrice", () => {
 
 describe("priceCall", () => {
   it("bills input and output at their separate per-million rates", () => {
-    // 1M in at $0.40 + 1M out at $1.75
-    expect(priceCall(PRICEY_MODEL, 1_000_000, 1_000_000)).toBeCloseTo(2.15, 6);
+    // 1M in at $0.65 + 1M out at $2.10
+    expect(priceCall(PRICEY_MODEL, 1_000_000, 1_000_000)).toBeCloseTo(2.75, 6);
   });
 
   it("scales linearly below a million tokens", () => {
@@ -565,7 +565,7 @@ describe("estimateTurnCost", () => {
     const line = estimateTurnCost().lines.find(
       (l) => l.stage === "memory_keeper",
     )!;
-    expect(line.modelName).toBe(AI_MODELS["GLM 4.6"].name);
+    expect(line.modelName).toBe(AI_MODELS["GLM 5.2"].name);
   });
 
   it("drops observer lines when every check is disabled", () => {

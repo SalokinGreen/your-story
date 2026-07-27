@@ -59,12 +59,12 @@ export const REASONING_TIERS: ReasoningTier[] = [
     note: "default GM narration / skill checks",
   },
   {
-    modelKey: "GLM 4.6",
+    modelKey: "Grok 4.5",
     reasoningEffort: "high",
     note: "rules adjudication, combat",
   },
   {
-    modelKey: "Open Router Gemini 3 Flash",
+    modelKey: "Kimi K3",
     reasoningEffort: "xhigh",
     note: "boss fights, campaign-shaping calls",
   },
