@@ -157,11 +157,20 @@ export interface CommandResponse {
 // FOLDER types show only titles (use read_notes tool to view content):
 //   - lore: General world-building (default)
 //   - secret: Hidden from player (GM-only notes)
+//   - table: A random table written as prose + a rollable listing. This
+//     replaced the old structured CustomTable[] engine (see the DEPRECATED
+//     note on CustomTable below): the GM reads the note like any other,
+//     rolls the die the note names with `formula_roll`, and reads the
+//     matching entry off it. Nothing about the table is engine-parsed, so a
+//     table can carry as much surrounding context as the author wants -
+//     when to roll it, what the results mean, which entries chain into
+//     others - instead of being flattened into {text, weight} pairs.
 // LEGACY types (treated as "lore" for folder display):
 //   - gm_notes, npc, item, location, faction, event
 export type LoreType =
   | "lore" // 📁 World Lore - titles only, default type
   | "secret" // 🔒 Secrets - titles only, hidden from player view
+  | "table" // 🎲 Random tables - titles only, rolled by the GM with formula_roll
   | "dm_instructions" // 📌 GM Stage only - guidance for running the adventure
   | "story_instructions" // 📌 Story Stage only - narrator guidance for prose style
   | "mechanics" // 📌 GM Stage only - Game rules for dice/checks
@@ -765,11 +774,19 @@ export const REST_CONFIG: Record<AdventureDifficulty, RestConfig> = {
 };
 
 // Custom random tables
+//
+// DEPRECATED - backward compat only. Random tables are now `StoryLore`
+// entries with `type: "table"`: freeform notes the GM reads and rolls on
+// itself with `formula_roll`, rather than a structured shape the engine
+// picks from. Existing `customTables` are converted to notes once, on load,
+// by migrateCustomTablesToNotes() in tableNotes.ts; nothing writes to these
+// fields any more. Don't build new features against them.
 export interface CustomTableEntry {
   text: string; // The result text
   weight: number; // Probability weight (higher = more likely)
 }
 
+/** @deprecated Use a `StoryLore` note with `type: "table"`. */
 export interface CustomTable {
   id: string; // Unique identifier
   name: string; // Display name (e.g., "Weather Conditions")
@@ -1026,7 +1043,9 @@ export interface StoryData {
   // the prior scene are simply stale and get overwritten on next roll -
   // this is a read-time check, not something that needs active pruning.
   incidentalReactions?: Record<string, IncidentalReaction>;
-  customTables?: CustomTable[]; // Creator-defined random tables
+  // DEPRECATED - migrated to `type: "table"` lore notes on load, see
+  // tableNotes.ts. Kept so old saves can still be read and converted.
+  customTables?: CustomTable[];
   variables?: Variable[]; // Dynamic tracked variables (numbers, booleans, lists)
   starting_choices?: StartingChoice[]; // Optional custom starting choices from adventure
   loreEmbeddingsDirty?: boolean; // Flag indicating lore has changed and needs re-embedding

@@ -19,28 +19,19 @@ import {
   bulkMoveLibraryNotes,
   LibraryNote,
 } from "@/app/misc/localNotesLibraryManager";
-import {
-  listLibraryTables,
-  createLibraryTable,
-  updateLibraryTable,
-  deleteLibraryTable,
-  bulkDeleteLibraryTables,
-  bulkMoveLibraryTables,
-  LibraryTable,
-} from "@/app/misc/localTablesLibraryManager";
+import { migrateTablesLibraryToNotes } from "@/app/misc/tablesLibraryMigration";
+import { customTableToNote } from "@/app/misc/tableNotes";
 import { createLocalFolder, LocalFolder } from "@/app/misc/localFolderManager";
 import {
   downloadLibraryNotes,
   readLibraryNotesFile,
 } from "@/app/misc/notesLibraryExport";
-import {
-  downloadLibraryTables,
-  readLibraryTablesFile,
-} from "@/app/misc/tablesLibraryExport";
+import { readLibraryTablesFile } from "@/app/misc/tablesLibraryExport";
 
 const NOTE_TYPE_OPTIONS: { value: LoreType; label: string }[] = [
   { value: "lore", label: "📜 Lore" },
   { value: "secret", label: "🔒 Secret" },
+  { value: "table", label: "🎲 Table" },
   { value: "mechanics", label: "⚙️ Mechanics" },
   { value: "character_sheet", label: "🧙 Character Sheet" },
   { value: "dm_instructions", label: "📌 GM Instructions" },
@@ -88,8 +79,6 @@ export default function NotesLibraryTab({
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [notes, setNotes] = useState<LibraryNote[]>([]);
-  const [tables, setTables] = useState<LibraryTable[]>([]);
-  const [subView, setSubView] = useState<"notes" | "tables">("notes");
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -98,12 +87,10 @@ export default function NotesLibraryTab({
 
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedNotes, setSelectedNotes] = useState<Set<string>>(new Set());
-  const [selectedTables, setSelectedTables] = useState<Set<string>>(new Set());
   const [showMassMoveDropdown, setShowMassMoveDropdown] = useState(false);
 
   const [showNewFolderDialog, setShowNewFolderDialog] = useState(false);
   const [movingNote, setMovingNote] = useState<string | null>(null);
-  const [movingTable, setMovingTable] = useState<string | null>(null);
 
   // OCR/PDF import: ask which folder to save results into before the
   // PDFImporter modal (and its OCR pipeline) opens.
@@ -158,12 +145,19 @@ export default function NotesLibraryTab({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [notesList, tablesList] = await Promise.all([
-        listLibraryNotes(),
-        listLibraryTables(),
-      ]);
+      // Random tables live in the notes library now, as `type: "table"`
+      // notes. Anything still sitting in the old tables store is moved over
+      // before the list is read, so the migration is invisible to the user -
+      // they just find their tables among their notes.
+      const migrated = await migrateTablesLibraryToNotes();
+      const notesList = await listLibraryNotes();
       setNotes(notesList);
-      setTables(tablesList);
+      if (migrated > 0) {
+        addNotification(
+          `Moved ${migrated} table${migrated === 1 ? "" : "s"} into your notes`,
+          "success",
+        );
+      }
     } catch (error: any) {
       console.error("Error loading notes library:", error);
       addNotification(`Failed to load notes library: ${error.message}`, "failure");
@@ -301,21 +295,6 @@ export default function NotesLibraryTab({
     }
   };
 
-  const handleMoveTable = async (tableId: string, folderId: string | null) => {
-    try {
-      const updated = await updateLibraryTable(tableId, {
-        folderId: folderId || undefined,
-      });
-      if (updated) {
-        setTables((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
-      }
-      setMovingTable(null);
-      addNotification("Table moved", "success");
-    } catch (error: any) {
-      addNotification(`Failed to move table: ${error.message}`, "failure");
-    }
-  };
-
   // ============================================
   // Selection / bulk actions
   // ============================================
@@ -323,7 +302,6 @@ export default function NotesLibraryTab({
   const toggleSelectionMode = () => {
     setSelectionMode(!selectionMode);
     setSelectedNotes(new Set());
-    setSelectedTables(new Set());
   };
 
   const toggleNoteSelection = (noteId: string) => {
@@ -418,6 +396,13 @@ export default function NotesLibraryTab({
     if (!file) return;
     e.target.value = "";
 
+    // A previously exported .tables file still imports - its tables just
+    // become table notes on the way in, the same as everywhere else.
+    if (file.name.toLowerCase().endsWith(".tables")) {
+      await importLegacyTablesFile(file);
+      return;
+    }
+
     const result = await readLibraryNotesFile(file);
     if (!result.success || !result.notes) {
       addNotification(result.error || "Failed to import notes", "failure");
@@ -483,45 +468,47 @@ export default function NotesLibraryTab({
     if (allNotes.length === 0 && data.customTables.length === 0) return;
 
     try {
-      const [createdNotes, createdTables] = await Promise.all([
-        Promise.all(
-          allNotes.map((note) =>
-            createLibraryNote({
-              title: note.title,
-              content: note.content,
-              type: note.type || "lore",
-              tags: note.tags || [],
-              folderId: targetFolder,
-              pinned: false,
-              source: "ocr",
-              relatedCharacters: note.relatedCharacters || [],
-              relatedLocations: note.relatedLocations || [],
-              keys: note.keys || [],
-            }),
-          ),
+      // The extractor still reports tables in the structured shape it pulls
+      // out of the PDF; they're rendered into table notes here so everything
+      // an import produces lands in one library, as one kind of thing.
+      const createdNotes = await Promise.all([
+        ...allNotes.map((note) =>
+          createLibraryNote({
+            title: note.title,
+            content: note.content,
+            type: note.type || "lore",
+            tags: note.tags || [],
+            folderId: targetFolder,
+            pinned: false,
+            source: "ocr",
+            relatedCharacters: note.relatedCharacters || [],
+            relatedLocations: note.relatedLocations || [],
+            keys: note.keys || [],
+          }),
         ),
-        Promise.all(
-          data.customTables.map((table) =>
-            createLibraryTable({
-              name: table.name,
-              description: table.description,
-              entries: table.entries,
-              tags: [],
-              folderId: targetFolder,
-              pinned: false,
-              source: "ocr",
-            }),
-          ),
-        ),
+        ...data.customTables.map((table) => {
+          const note = customTableToNote(table);
+          return createLibraryNote({
+            title: note.title,
+            content: note.content,
+            type: "table",
+            tags: [],
+            folderId: targetFolder,
+            pinned: false,
+            source: "ocr",
+            relatedCharacters: [],
+            relatedLocations: [],
+            keys: note.keys || [],
+          });
+        }),
       ]);
       setNotes((prev) => [...createdNotes, ...prev]);
-      setTables((prev) => [...createdTables, ...prev]);
       const parts = [
-        createdNotes.length > 0
-          ? `${createdNotes.length} note${createdNotes.length === 1 ? "" : "s"}`
+        allNotes.length > 0
+          ? `${allNotes.length} note${allNotes.length === 1 ? "" : "s"}`
           : null,
-        createdTables.length > 0
-          ? `${createdTables.length} table${createdTables.length === 1 ? "" : "s"}`
+        data.customTables.length > 0
+          ? `${data.customTables.length} table${data.customTables.length === 1 ? "" : "s"}`
           : null,
       ].filter(Boolean);
       addNotification(
@@ -560,139 +547,10 @@ export default function NotesLibraryTab({
       return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
     });
 
-  const filteredTables = tables
-    .filter((table) => {
-      if (selectedFolder !== null) {
-        if (selectedFolder === "uncategorized") {
-          if (table.folderId) return false;
-        } else if (table.folderId !== selectedFolder) {
-          return false;
-        }
-      }
-      if (
-        search &&
-        !table.name.toLowerCase().includes(search.toLowerCase()) &&
-        !table.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
-      ) {
-        return false;
-      }
-      return true;
-    })
-    .sort((a, b) => {
-      if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-    });
-
-  const toggleTableSelection = (tableId: string) => {
-    const next = new Set(selectedTables);
-    if (next.has(tableId)) next.delete(tableId);
-    else next.add(tableId);
-    setSelectedTables(next);
-  };
-
-  const selectAllTables = () => {
-    if (!selectionMode) setSelectionMode(true);
-    setSelectedTables(new Set(filteredTables.map((t) => t.id)));
-  };
-
-  const deselectAllTables = () => setSelectedTables(new Set());
-
-  const handleDeleteTable = (tableId: string) => {
-    setConfirmDialog({
-      isOpen: true,
-      title: "Delete Table?",
-      message: "Are you sure you want to delete this table? This action cannot be undone.",
-      icon: "Trash2",
-      confirmText: "Delete Table",
-      confirmButtonClass: "bg-red-600 hover:bg-red-700",
-      onConfirm: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        try {
-          setDeleting(tableId);
-          await deleteLibraryTable(tableId);
-          setTables((prev) => prev.filter((t) => t.id !== tableId));
-          addNotification("Table deleted", "success");
-        } catch (error: any) {
-          addNotification(`Failed to delete: ${error.message}`, "failure");
-        } finally {
-          setDeleting(null);
-        }
-      },
-    });
-  };
-
-  const handleMassDeleteTables = () => {
-    if (selectedTables.size === 0) return;
-    const ids = Array.from(selectedTables);
-
-    setConfirmDialog({
-      isOpen: true,
-      title: "Delete Multiple Tables?",
-      message: `Are you sure you want to delete ${ids.length} table${ids.length === 1 ? "" : "s"}? This action cannot be undone.`,
-      icon: "Trash2",
-      confirmText: `Delete ${ids.length} Table${ids.length === 1 ? "" : "s"}`,
-      confirmButtonClass: "bg-red-600 hover:bg-red-700",
-      onConfirm: async () => {
-        setConfirmDialog((prev) => ({ ...prev, isOpen: false }));
-        try {
-          await bulkDeleteLibraryTables(ids);
-          const idSet = new Set(ids);
-          setTables((prev) => prev.filter((t) => !idSet.has(t.id)));
-          setSelectedTables(new Set());
-          setSelectionMode(false);
-          addNotification(`${ids.length} table${ids.length === 1 ? "" : "s"} deleted`, "success");
-        } catch (error: any) {
-          addNotification(`Failed to delete tables: ${error.message}`, "failure");
-        }
-      },
-    });
-  };
-
-  const handleMassMoveTables = async (folderId: string | null) => {
-    if (selectedTables.size === 0) return;
-    const ids = Array.from(selectedTables);
-    try {
-      await bulkMoveLibraryTables(ids, folderId || undefined);
-      const idSet = new Set(ids);
-      setTables((prev) =>
-        prev.map((t) =>
-          idSet.has(t.id) ? { ...t, folderId: folderId || undefined } : t,
-        ),
-      );
-      setSelectedTables(new Set());
-      setSelectionMode(false);
-      const folderName = folderId
-        ? folders.find((f) => f.id === folderId)?.name || "folder"
-        : "Uncategorized";
-      addNotification(`${ids.length} table${ids.length === 1 ? "" : "s"} moved to ${folderName}`, "success");
-    } catch (error: any) {
-      addNotification(`Failed to move tables: ${error.message}`, "failure");
-    }
-  };
-
-  const handleExportTables = () => {
-    const toExport =
-      selectedTables.size > 0
-        ? tables.filter((t) => selectedTables.has(t.id))
-        : filteredTables;
-    if (toExport.length === 0) {
-      addNotification("No tables to export", "warning");
-      return;
-    }
-    downloadLibraryTables(toExport);
-    addNotification(
-      `Exported ${toExport.length} table${toExport.length === 1 ? "" : "s"}`,
-      "success",
-    );
-  };
-
-  const handleImportTablesFileChange = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = "";
-
+  /**
+   * Reads a legacy .tables export and stores its tables as table notes.
+   */
+  const importLegacyTablesFile = async (file: File) => {
     const result = await readLibraryTablesFile(file);
     if (!result.success || !result.tables) {
       addNotification(result.error || "Failed to import tables", "failure");
@@ -701,24 +559,31 @@ export default function NotesLibraryTab({
 
     try {
       const created = await Promise.all(
-        result.tables.map((t) =>
-          createLibraryTable({
+        result.tables.map((t) => {
+          const note = customTableToNote({
+            id: t.name,
             name: t.name,
             description: t.description,
             entries: t.entries,
+          });
+          return createLibraryNote({
+            title: note.title,
+            content: note.content,
+            type: "table",
             tags: t.tags,
             folderId: undefined,
             pinned: t.pinned,
             source: t.source,
             sourceFile: t.sourceFile,
-          }),
-        ),
+            relatedCharacters: [],
+            relatedLocations: [],
+            keys: note.keys || [],
+          });
+        }),
       );
-      setTables((prev) => [...created, ...prev]);
+      setNotes((prev) => [...created, ...prev]);
       addNotification(
-        `Imported ${created.length} table${created.length === 1 ? "" : "s"}${
-          result.warnings.length > 0 ? ` (${result.warnings.length} warning${result.warnings.length === 1 ? "" : "s"})` : ""
-        }`,
+        `Imported ${created.length} table${created.length === 1 ? "" : "s"} as notes`,
         "success",
       );
     } catch (error: any) {
@@ -783,61 +648,19 @@ export default function NotesLibraryTab({
           <input
             ref={fileInputRef}
             type="file"
-            accept={subView === "notes" ? ".notes,.json" : ".tables,.json"}
-            onChange={
-              subView === "notes"
-                ? handleImportFileChange
-                : handleImportTablesFileChange
-            }
+            accept=".notes,.json"
+            onChange={handleImportFileChange}
             className="hidden"
           />
           <button
-            onClick={subView === "notes" ? handleExport : handleExportTables}
+            onClick={handleExport}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-900/50 hover:bg-blue-800/60 border border-blue-700/50 rounded-xl transition-colors text-sm font-medium"
           >
             <DynamicIcon name="Download" className="w-4 h-4" />
             Export
-            {subView === "notes"
-              ? selectedNotes.size > 0
-                ? ` (${selectedNotes.size})`
-                : ""
-              : selectedTables.size > 0
-                ? ` (${selectedTables.size})`
-                : ""}
+            {selectedNotes.size > 0 ? ` (${selectedNotes.size})` : ""}
           </button>
         </div>
-      </div>
-
-      {/* Notes / Tables sub-view toggle */}
-      <div className="flex border border-blue-800/40 rounded-xl overflow-hidden w-fit">
-        <button
-          onClick={() => {
-            setSubView("notes");
-            setSelectionMode(false);
-          }}
-          className={`px-4 py-2 text-sm font-medium transition-colors flex items-center gap-1.5 ${
-            subView === "notes"
-              ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-              : "bg-blue-950/50 text-blue-200/60 hover:bg-blue-900/50"
-          }`}
-        >
-          <DynamicIcon name="NotebookText" className="w-3.5 h-3.5" />
-          Notes ({notes.length})
-        </button>
-        <button
-          onClick={() => {
-            setSubView("tables");
-            setSelectionMode(false);
-          }}
-          className={`px-4 py-2 text-sm font-medium transition-colors flex items-center gap-1.5 ${
-            subView === "tables"
-              ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-              : "bg-blue-950/50 text-blue-200/60 hover:bg-blue-900/50"
-          }`}
-        >
-          <DynamicIcon name="Dices" className="w-3.5 h-3.5" />
-          Tables ({tables.length})
-        </button>
       </div>
 
       {/* Folder Chips */}
@@ -851,7 +674,7 @@ export default function NotesLibraryTab({
           }`}
         >
           <DynamicIcon name="NotebookText" className="w-3.5 h-3.5" />
-          All ({subView === "notes" ? notes.length : tables.length})
+          All ({notes.length})
         </button>
         <button
           onClick={() => setSelectedFolder("uncategorized")}
@@ -863,10 +686,7 @@ export default function NotesLibraryTab({
         >
           <DynamicIcon name="FileText" className="w-3.5 h-3.5" />
           Uncategorized (
-          {subView === "notes"
-            ? notes.filter((n) => !n.folderId).length
-            : tables.filter((t) => !t.folderId).length}
-          )
+          {notes.filter((n) => !n.folderId).length})
         </button>
         {folders.map((folder) => (
           <div key={folder.id} className="relative group shrink-0">
@@ -881,10 +701,7 @@ export default function NotesLibraryTab({
             >
               <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
               {folder.name} (
-              {subView === "notes"
-                ? notes.filter((n) => n.folderId === folder.id).length
-                : tables.filter((t) => t.folderId === folder.id).length}
-              )
+              {notes.filter((n) => n.folderId === folder.id).length})
             </button>
             <button
               onClick={(e) => {
@@ -910,7 +727,7 @@ export default function NotesLibraryTab({
       {/* Select mode + selection bar */}
       <div className="flex items-center gap-2">
         <div className="flex-1" />
-        {(subView === "notes" ? filteredNotes.length : filteredTables.length) > 0 && (
+        {filteredNotes.length > 0 && (
           <>
             <button
               onClick={toggleSelectionMode}
@@ -927,7 +744,7 @@ export default function NotesLibraryTab({
               {selectionMode ? "Done" : "Select"}
             </button>
             <button
-              onClick={subView === "notes" ? selectAllNotes : selectAllTables}
+              onClick={selectAllNotes}
               className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all bg-blue-900/30 text-blue-200/60 hover:bg-blue-800/40"
             >
               Select All
@@ -936,7 +753,7 @@ export default function NotesLibraryTab({
         )}
       </div>
 
-      {subView === "notes" && selectionMode && selectedNotes.size > 0 && (
+      {selectionMode && selectedNotes.size > 0 && (
         <div className="flex items-center gap-3 p-3 bg-purple-900/30 border border-purple-700/30 rounded-xl flex-wrap">
           <span className="text-sm font-medium">{selectedNotes.size} selected</span>
           <div className="flex-1" />
@@ -998,70 +815,8 @@ export default function NotesLibraryTab({
         </div>
       )}
 
-      {subView === "tables" && selectionMode && selectedTables.size > 0 && (
-        <div className="flex items-center gap-3 p-3 bg-purple-900/30 border border-purple-700/30 rounded-xl flex-wrap">
-          <span className="text-sm font-medium">{selectedTables.size} selected</span>
-          <div className="flex-1" />
-          <div className="relative">
-            <button
-              onClick={() => setShowMassMoveDropdown(!showMassMoveDropdown)}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-sm rounded-lg transition-colors flex items-center gap-2"
-            >
-              <DynamicIcon name="FolderOpen" className="w-4 h-4" />
-              Move
-            </button>
-            {showMassMoveDropdown && (
-              <div className="absolute top-full right-0 mt-1 bg-blue-950 border border-blue-800/50 rounded-lg shadow-xl p-2 min-w-[180px] z-50">
-                <button
-                  onClick={() => {
-                    handleMassMoveTables(null);
-                    setShowMassMoveDropdown(false);
-                  }}
-                  className="w-full text-left px-3 py-2 hover:bg-blue-900/50 rounded-lg text-sm"
-                >
-                  Uncategorized
-                </button>
-                {folders.map((folder) => (
-                  <button
-                    key={folder.id}
-                    onClick={() => {
-                      handleMassMoveTables(folder.id);
-                      setShowMassMoveDropdown(false);
-                    }}
-                    className="w-full text-left px-3 py-2 hover:bg-blue-900/50 rounded-lg text-sm"
-                    style={{ borderLeft: `3px solid ${folder.color}` }}
-                  >
-                    {folder.name}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <button
-            onClick={handleExportTables}
-            className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors flex items-center gap-2"
-          >
-            <DynamicIcon name="Download" className="w-4 h-4" />
-            Export
-          </button>
-          <button
-            onClick={handleMassDeleteTables}
-            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-sm rounded-lg transition-colors flex items-center gap-2"
-          >
-            <DynamicIcon name="Trash2" className="w-4 h-4" />
-            Delete
-          </button>
-          <button
-            onClick={deselectAllTables}
-            className="px-3 py-1.5 bg-blue-900/50 hover:bg-blue-800/50 text-sm rounded-lg transition-colors"
-          >
-            Clear
-          </button>
-        </div>
-      )}
-
       {/* Notes Grid */}
-      {subView === "notes" && (filteredNotes.length === 0 ? (
+      {filteredNotes.length === 0 ? (
         <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
           <DynamicIcon
             name="NotebookText"
@@ -1186,109 +941,7 @@ export default function NotesLibraryTab({
             </div>
           ))}
         </div>
-      ))}
-
-      {/* Tables Grid */}
-      {subView === "tables" &&
-        (filteredTables.length === 0 ? (
-          <div className="bg-blue-950/50 rounded-2xl p-12 text-center border border-blue-800/30">
-            <DynamicIcon
-              name="Dices"
-              className="w-16 h-16 text-blue-400/30 mx-auto mb-4"
-            />
-            <h3 className="text-xl font-bold mb-2">
-              {tables.length === 0 ? "No Tables Yet" : "No Tables Match Filters"}
-            </h3>
-            <p className="text-blue-200/60 mb-6">
-              {tables.length === 0
-                ? "Import a PDF with tables to build your library - detected tables are saved here automatically."
-                : "Try adjusting your search or folder filter."}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {filteredTables.map((table) => (
-              <div
-                key={table.id}
-                onClick={() =>
-                  selectionMode && toggleTableSelection(table.id)
-                }
-                className={`group relative p-4 rounded-xl border transition-all ${
-                  selectionMode ? "cursor-pointer" : ""
-                } ${
-                  selectionMode && selectedTables.has(table.id)
-                    ? "bg-purple-900/30 border-purple-500"
-                    : "bg-blue-950/50 border-blue-800/30 hover:bg-blue-900/50 hover:border-blue-700/50"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  {selectionMode && (
-                    <div
-                      className={`mt-1 w-5 h-5 rounded border-2 flex items-center justify-center transition-colors shrink-0 ${
-                        selectedTables.has(table.id)
-                          ? "bg-purple-600 border-purple-600"
-                          : "border-blue-600"
-                      }`}
-                    >
-                      {selectedTables.has(table.id) && (
-                        <DynamicIcon name="Check" className="w-3 h-3" />
-                      )}
-                    </div>
-                  )}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <h3 className="font-semibold truncate">{table.name}</h3>
-                      <span className="px-1.5 py-0.5 bg-gray-500/20 text-gray-400 text-xs rounded shrink-0">
-                        {table.entries.length} entries
-                      </span>
-                      {table.source === "ocr" && (
-                        <span
-                          className="px-1.5 py-0.5 bg-blue-500/20 text-blue-300 text-xs rounded flex items-center gap-1 shrink-0"
-                          title="Extracted via OCR"
-                        >
-                          <DynamicIcon name="ScanText" className="w-3 h-3" />
-                          OCR
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-blue-200/50 line-clamp-2 mb-2">
-                      {table.description || "No description"}
-                    </p>
-                    <div className="flex items-center gap-3 text-xs text-blue-200/40">
-                      <span>{getRelativeTime(table.updatedAt)}</span>
-                    </div>
-                  </div>
-                  {!selectionMode && (
-                    <div
-                      className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <button
-                        onClick={() => setMovingTable(table.id)}
-                        className="p-1.5 hover:bg-blue-800/50 rounded-lg transition-colors"
-                        title="Move"
-                      >
-                        <DynamicIcon name="Folder" className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteTable(table.id)}
-                        disabled={deleting === table.id}
-                        className="p-1.5 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors"
-                        title="Delete"
-                      >
-                        {deleting === table.id ? (
-                          <DynamicIcon name="Loader2" className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <DynamicIcon name="Trash2" className="w-4 h-4" />
-                        )}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        ))}
+      )}
 
       {/* New/Edit Note Modal */}
       {editingNoteId && (
@@ -1446,44 +1099,6 @@ export default function NotesLibraryTab({
             </div>
             <button
               onClick={() => setMovingNote(null)}
-              className="w-full mt-4 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 font-semibold rounded-lg transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
-
-      {movingTable && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-blue-950 border border-blue-800/50 rounded-xl p-6 max-w-md w-full">
-            <h2 className="text-xl font-bold mb-4">Move to Folder</h2>
-            <div className="space-y-2 max-h-96 overflow-y-auto">
-              <button
-                onClick={() => movingTable && handleMoveTable(movingTable, null)}
-                className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
-              >
-                <span className="flex items-center gap-2">
-                  <DynamicIcon name="FolderOpen" className="w-5 h-5" />
-                  Uncategorized
-                </span>
-              </button>
-              {folders.map((folder) => (
-                <button
-                  key={folder.id}
-                  onClick={() => movingTable && handleMoveTable(movingTable, folder.id)}
-                  className="w-full p-3 text-left rounded-lg border-2 border-blue-800/50 hover:border-purple-500 transition-colors"
-                  style={{ borderLeftColor: folder.color, borderLeftWidth: "4px" }}
-                >
-                  <span className="flex items-center gap-2">
-                    <DynamicIcon name={folder.icon} className="w-5 h-5" />
-                    {folder.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => setMovingTable(null)}
               className="w-full mt-4 px-4 py-2 bg-blue-900/50 hover:bg-blue-800/50 font-semibold rounded-lg transition-colors"
             >
               Cancel

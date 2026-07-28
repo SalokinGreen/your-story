@@ -36,6 +36,13 @@ export interface TimelineBlock {
   toolCallId?: string;
   success?: boolean;
   contextForStory?: string;
+  // Never rendered to the player (a `gm_roll` made behind the GM's screen).
+  // The block is still produced and kept in the list rather than omitted,
+  // because updateLiveRoundBlocks uses "tool" blocks as the boundary between
+  // completed and still-streaming rounds - dropping one would let the next
+  // round's text merge into the previous round's blocks. It's filtered at
+  // render time instead; see TimelineEntryPill in story.tsx.
+  hidden?: boolean;
 }
 
 let blockIdCounter = 0;
@@ -160,14 +167,20 @@ export function toolResultBlock(result: {
   toolCallId: string;
   success: boolean;
   contextForStory: string;
+  hiddenFromPlayer?: boolean;
 }): TimelineBlock {
+  const hidden = isHiddenFromPlayer(result.toolName, result);
   return {
     id: nextId(),
     kind: "tool",
     toolName: result.toolName,
     toolCallId: result.toolCallId,
     success: result.success,
-    contextForStory: result.contextForStory,
+    // A hidden roll carries no detail either - the pill is skipped at render
+    // time, but nothing about the dice should sit in client state waiting to
+    // be surfaced by some future view that forgets to check `hidden`.
+    contextForStory: hidden ? undefined : result.contextForStory,
+    hidden: hidden || undefined,
   };
 }
 
@@ -283,6 +296,26 @@ interface SavedToolResult {
   success: boolean;
   contextForStory: string;
   toolName: string;
+  hiddenFromPlayer?: boolean;
+}
+
+/**
+ * Tool calls the player must never see rendered in the turn timeline, even
+ * as a bare name with no result attached - a "gm_roll" row would announce
+ * that the GM rolled for something, which is the one thing that tool exists
+ * to avoid. Matched by name as well as by the result's `hiddenFromPlayer`
+ * flag, because the timeline falls back to the raw tool-call name whenever
+ * the result is missing (an aborted round, a save from a partial turn).
+ */
+const HIDDEN_FROM_PLAYER_TOOLS = new Set(["gm_roll"]);
+
+function isHiddenFromPlayer(
+  toolName: string,
+  result: { hiddenFromPlayer?: boolean } | undefined,
+): boolean {
+  return (
+    result?.hiddenFromPlayer === true || HIDDEN_FROM_PLAYER_TOOLS.has(toolName)
+  );
 }
 
 function normalizeForCompare(text: string): string {
@@ -365,13 +398,16 @@ export function buildSavedTimeline(
     if (msg.tool_calls) {
       for (const tc of msg.tool_calls) {
         const result = toolResults?.get(tc.id);
+        const toolName = result?.toolName || tc.function.name;
+        const hidden = isHiddenFromPlayer(toolName, result);
         blocks.push({
           id: nextId(),
           kind: "tool",
-          toolName: result?.toolName || tc.function.name,
+          toolName,
           toolCallId: tc.id,
           success: result?.success,
-          contextForStory: result?.contextForStory,
+          contextForStory: hidden ? undefined : result?.contextForStory,
+          hidden: hidden || undefined,
         });
       }
     }

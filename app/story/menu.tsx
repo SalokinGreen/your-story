@@ -8,7 +8,6 @@ import {
   StoryLore,
   Relationship,
   AGMTState,
-  CustomTable,
   Variable,
   NumberVariable,
   BooleanVariable,
@@ -30,7 +29,6 @@ import { useNotification } from "../misc/NotificationContext";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { getLocalPlayerId } from "../misc/localPlayerId";
 import { DynamicIcon } from "../components/DynamicIcon";
-import { CustomTablesEditor } from "../components/CustomTablesEditor";
 import ChatDisplaySettings from "./menu/ChatDisplaySettings";
 import BasicSettings, { BasicSettingsForm } from "./menu/BasicSettings";
 import GoalEditor from "./menu/GoalEditor";
@@ -84,7 +82,6 @@ type MenuTab =
   | "npcs"
   | "relationships"
   | "variables"
-  | "tables"
   | "threads"
   | "mythic"
   | "story";
@@ -219,7 +216,6 @@ export default function MenuPage({
     { id: "goals", label: "Goals", icon: "Scroll" },
     { id: "lore", label: "Notes", icon: "Book" },
     { id: "npcs", label: "NPCs", icon: "Users" },
-    { id: "tables", label: "Tables", icon: "Dices" },
     { id: "variables", label: "Variables", icon: "Variable" },
     { id: "relationships", label: "Relationships", icon: "Heart" },
     { id: "threads", label: "Threads", icon: "GitBranch" },
@@ -1317,14 +1313,6 @@ export default function MenuPage({
                     lore={storyData.lore}
                     variables={storyData.variables || []}
                     onUpdate={(lore) => onUpdateStoryData({ lore })}
-                    onImportTables={(tables) =>
-                      onUpdateStoryData({
-                        customTables: [
-                          ...(storyData.customTables || []),
-                          ...tables,
-                        ],
-                      })
-                    }
                     couchPlayers={storyData.multiplayer?.couchPlayers}
                   />
                 </div>
@@ -1341,23 +1329,6 @@ export default function MenuPage({
                   <NPCEditor
                     npcs={storyData.npcs || []}
                     onUpdate={(npcs) => onUpdateStoryData({ npcs })}
-                  />
-                </div>
-
-                <div
-                  ref={(el) => {
-                    sectionRefs.current["tables"] = el;
-                  }}
-                  data-section-id="tables"
-                  style={{ scrollSnapAlign: "start" }}
-                  className="pt-4 sm:pt-6 pb-10 border-b border-white/5"
-                >
-                  <SectionHeading tab={getSection("tables")} />
-                  <CustomTablesEditor
-                    tables={storyData.customTables || []}
-                    setTables={(tables) =>
-                      onUpdateStoryData({ customTables: tables })
-                    }
                   />
                 </div>
 

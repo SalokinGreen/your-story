@@ -101,6 +101,12 @@ const TYPE_CONFIG: Record<
     color: "text-amber-300",
     bgColor: "bg-amber-500/20",
   },
+  table: {
+    label: "Table",
+    icon: "Dices",
+    color: "text-violet-300",
+    bgColor: "bg-violet-500/20",
+  },
   dm_instructions: {
     label: "DM Guide",
     icon: "BookMarked",
@@ -134,6 +140,7 @@ const FILTER_ORDER: (LoreType | "all" | "secrets")[] = [
   "item",
   "event",
   "lore",
+  "table",
   "gm_notes",
   "dm_instructions",
   "story_instructions",

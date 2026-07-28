@@ -37,7 +37,6 @@ import {
   createLibraryNote,
 } from "@/app/misc/localNotesLibraryManager";
 import {
-  libraryTableToCustomTable,
   createLibraryTable,
 } from "@/app/misc/localTablesLibraryManager";
 import LibraryPickerModal from "@/app/components/LibraryPickerModal";
@@ -47,7 +46,7 @@ import ExportFolderModal from "@/app/components/ExportFolderModal";
 import NewFolderDialog from "@/app/components/NewFolderDialog";
 import { readFolderLibraryFile } from "@/app/misc/folderLibraryExport";
 import { SYNC_COMPLETED_EVENT } from "@/app/misc/syncManager";
-import type { CustomTable, StoryLore } from "@/app/misc/structs";
+import type { StoryLore } from "@/app/misc/structs";
 
 type LibraryView = "stories" | "adventures" | "notes" | "folders";
 type StorySortBy = "updated" | "created" | "name" | "chapter";
@@ -262,10 +261,7 @@ export default function LibraryPage() {
     setPendingPlay({ kind: "freeform" });
   };
 
-  const beginPendingPlay = async (
-    initialLore: StoryLore[],
-    initialTables: CustomTable[] = [],
-  ) => {
+  const beginPendingPlay = async (initialLore: StoryLore[]) => {
     if (!pendingPlay) return;
     const context = pendingPlay;
     setPendingPlay(null);
@@ -276,13 +272,10 @@ export default function LibraryPage() {
               context.adventure.adventureData,
               "Player",
               initialLore.length ? initialLore : undefined,
-              initialTables.length ? initialTables : undefined,
             )
           : await startFreeformStoryLocally(
               "Player",
               initialLore.length ? initialLore : undefined,
-              undefined,
-              initialTables.length ? initialTables : undefined,
             );
       router.push(`/story?storyId=${localId}`);
     } catch (error: any) {
@@ -1402,14 +1395,8 @@ export default function LibraryPage() {
         title="Bring a Character or Notes"
         description="Attach an existing character sheet, world notes, or random tables before you start, or skip and go in blank."
         confirmLabel="Attach & Start"
-        includeTables
         onSkip={() => beginPendingPlay([])}
-        onImport={(notes, tables) =>
-          beginPendingPlay(
-            notes.map(libraryNoteToStoryLore),
-            tables.map(libraryTableToCustomTable),
-          )
-        }
+        onImport={(notes) => beginPendingPlay(notes.map(libraryNoteToStoryLore))}
       />
 
       <JoinGameModal

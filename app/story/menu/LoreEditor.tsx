@@ -37,11 +37,8 @@ import {
   libraryNoteToStoryLore,
   storyLoreToLibraryNoteFields,
 } from "../../misc/localNotesLibraryManager";
-import {
-  LibraryTable,
-  createLibraryTable,
-  libraryTableToCustomTable,
-} from "../../misc/localTablesLibraryManager";
+import { createLibraryTable } from "../../misc/localTablesLibraryManager";
+import { customTableToNote } from "../../misc/tableNotes";
 import PDFImporter from "../../components/PDFImporter";
 import LibraryPickerModal from "../../components/LibraryPickerModal";
 
@@ -49,13 +46,11 @@ export default function LoreEditor({
   lore,
   variables,
   onUpdate,
-  onImportTables,
   couchPlayers,
 }: {
   lore: StoryLore[];
   variables: Variable[];
   onUpdate: (lore: StoryLore[]) => void;
-  onImportTables?: (tables: CustomTable[]) => void;
   couchPlayers?: CouchPlayer[];
 }) {
   const [localLore, setLocalLore] = useState([...lore]);
@@ -186,28 +181,19 @@ export default function LoreEditor({
     onUpdate(updated);
   };
 
-  // Append notes (and tables) picked from the shared LibraryPickerModal into
-  // this story's lore, tagged with libraryNoteId so they stay linked for
-  // push/pull. Tables bubble up to the story's customTables via onImportTables.
-  const importSelectedLibraryNotes = (
-    notes: LibraryNote[],
-    tables: LibraryTable[],
-  ) => {
-    if (notes.length === 0 && tables.length === 0) return;
-    if (notes.length > 0) {
-      const newLore = notes.map(libraryNoteToStoryLore);
-      const updated = [...localLore, ...newLore];
-      setLocalLore(updated);
-      onUpdate(updated);
-    }
-    if (tables.length > 0) {
-      onImportTables?.(tables.map(libraryTableToCustomTable));
-    }
-    const parts = [
-      notes.length > 0 ? `${notes.length} note${notes.length === 1 ? "" : "s"}` : null,
-      tables.length > 0 ? `${tables.length} table${tables.length === 1 ? "" : "s"}` : null,
-    ].filter(Boolean);
-    addNotification(`Imported ${parts.join(" and ")} from library`, "success");
+  // Append notes picked from the shared LibraryPickerModal into this story's
+  // lore, tagged with libraryNoteId so they stay linked for push/pull. Random
+  // tables come through here too - they're `type: "table"` notes now, not a
+  // separate list with its own import path.
+  const importSelectedLibraryNotes = (notes: LibraryNote[]) => {
+    if (notes.length === 0) return;
+    const updated = [...localLore, ...notes.map(libraryNoteToStoryLore)];
+    setLocalLore(updated);
+    onUpdate(updated);
+    addNotification(
+      `Imported ${notes.length} note${notes.length === 1 ? "" : "s"} from library`,
+      "success",
+    );
     setShowLibraryPicker(false);
   };
 
@@ -308,12 +294,6 @@ export default function LoreEditor({
       }
     }
 
-    if (linkedNotes.length > 0) {
-      const updated = [...localLore, ...linkedNotes];
-      setLocalLore(updated);
-      onUpdate(updated);
-    }
-
     let savedTableCount = 0;
     const linkedTables: CustomTable[] = [];
     for (const table of data.customTables) {
@@ -333,8 +313,14 @@ export default function LoreEditor({
       }
     }
 
-    if (linkedTables.length > 0) {
-      onImportTables?.(linkedTables);
+    // Notes and tables land in one write - tables arrive from the extractor
+    // in the old structured shape and become table notes here, so everything
+    // the import produced ends up in the same list.
+    const imported = [...linkedNotes, ...linkedTables.map(customTableToNote)];
+    if (imported.length > 0) {
+      const updated = [...localLore, ...imported];
+      setLocalLore(updated);
+      onUpdate(updated);
     }
 
     if (allNotes.length === 0 && linkedTables.length === 0) return;
@@ -423,7 +409,8 @@ export default function LoreEditor({
                         type: e.target.value as
                           | "lore"
                           | "mechanics"
-                          | "character_sheet",
+                          | "character_sheet"
+                          | "table",
                       })
                     }
                     className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-purple-500/40 focus:border-purple-400/40 transition-colors"
@@ -433,13 +420,16 @@ export default function LoreEditor({
                       🧙 Character Sheet (Highest priority - character details)
                     </option>
                     <option value="mechanics">⚙️ Mechanics (Game rules)</option>
+                    <option value="table">🎲 Table (Random table to roll on)</option>
                   </select>
                   <p className="text-xs text-blue-300/60 mt-1">
                     {editLore.type === "character_sheet"
                       ? "Character sheet notes appear at the very top of AI context for character details."
                       : editLore.type === "mechanics"
                         ? "Mechanics notes are prioritized and always visible to the AI for game rules."
-                        : "Standard lore notes are shown based on triggers and visibility."}
+                        : editLore.type === "table"
+                          ? "Name a die and list what each number gives (e.g. \"Roll 1d6:\" then \"1. ...\"). The GM rolls it and reads off the result, so anything else you write here - when to roll it, what the results mean - is context it gets to use."
+                          : "Standard lore notes are shown based on triggers and visibility."}
                   </p>
                 </div>
                 {/* Owner assignment - only meaningful for a character sheet
@@ -1262,7 +1252,6 @@ export default function LoreEditor({
         title="Import from Library"
         description="Bring saved notes or tables into this story. Imported notes stay linked so you can push/pull updates later."
         confirmLabel="Add Selected"
-        includeTables
         onImport={importSelectedLibraryNotes}
       />
     </div>

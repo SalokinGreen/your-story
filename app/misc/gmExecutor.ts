@@ -25,6 +25,7 @@ import {
   LoreVisibility,
   ReactionCategory,
   IncidentalReaction,
+  StoryLore,
 } from "./structs";
 import {
   StartChallengeParams,
@@ -32,6 +33,7 @@ import {
   CalculateParams,
   TakeRestParams,
   FormulaRollParams,
+  GMRollParams,
   AskForRollParams,
   AskQuestionParams,
   AskQuestionItem,
@@ -96,7 +98,6 @@ import {
   ElementCategory,
   markOracleConsulted,
 } from "./mythic";
-import { getTableByName, rollOnCustomTable } from "./tableRoller";
 import {
   collectUsedInitials,
   formatNamePointers,
@@ -142,12 +143,17 @@ export interface GMToolResult {
   toolName: string;
   toolCallId: string;
   success: boolean;
+  // Set by rolls made behind the GM's screen (`gm_roll`). Player-facing
+  // views filter these out entirely; the GM's own context keeps them, since
+  // the whole point is that the GM knows what the player doesn't.
+  hiddenFromPlayer?: boolean;
   result:
     | GMChallengeResult
     | GMCancelChallengeResult
     | GMCalculateResult
     | GMRestResult
     | GMFormulaRollResult
+    | GMHiddenRollResult
     | GMAskForRollResult
     | GMAskQuestionResult
     | GMOpposedFormulaResult
@@ -256,6 +262,19 @@ export interface GMRolledPool {
   rolls: number[]; // Flattened list of all dice rolled in this pool
   total: number;
   label?: string; // Optional model-supplied name for the pool
+}
+
+/**
+ * A roll made behind the GM's screen. Structurally a formula_roll, tagged so
+ * player-facing views (ContextViewer, the per-turn tool log in story.tsx) can
+ * drop it - the GM sees the dice, the player only ever sees the narration.
+ */
+export interface GMHiddenRollResult {
+  type: "gm_roll";
+  pools: GMRolledPool[];
+  reason: string;
+  displayName?: string;
+  secretBecause?: string;
 }
 
 export interface GMFormulaRollResult {
@@ -775,6 +794,21 @@ const OUTCOME_BEARING_TOOL_NAMES = new Set([
   "ask_for_roll",
 ]);
 
+/**
+ * Tools whose results never reach the player, whatever happened to them.
+ *
+ * Keyed by tool name rather than set inside the executor, because a call can
+ * fail before any executor runs - a malformed `gm_roll` is rejected by schema
+ * validation, and that error result would otherwise show up in the player's
+ * tool log as a `gm_roll` row, announcing the secret roll the tool exists to
+ * conceal. Every result for these tools is stamped on the way out.
+ */
+const HIDDEN_FROM_PLAYER_TOOL_NAMES = new Set(["gm_roll"]);
+
+function isHiddenFromPlayerTool(toolName: string): boolean {
+  return HIDDEN_FROM_PLAYER_TOOL_NAMES.has(toolName);
+}
+
 function isRealToolFailure(result: GMToolResult): boolean {
   if (result.success) return false;
   if (!OUTCOME_BEARING_TOOL_NAMES.has(result.toolName)) return true;
@@ -795,7 +829,7 @@ function normalizeLegacyToolArgs(
   toolName: string,
   args: Record<string, unknown>
 ): void {
-  if (toolName !== "formula_roll") return;
+  if (toolName !== "formula_roll" && toolName !== "gm_roll") return;
   if (args.formulas === undefined && typeof args.formula === "string") {
     args.formulas = [args.formula];
   } else if (typeof args.formulas === "string") {
@@ -886,6 +920,8 @@ export async function executeGMTools(
         },
         contextForStory: `[ERROR: ${errorMsg}]`,
       };
+      errorResult.hiddenFromPlayer =
+        isHiddenFromPlayerTool(call.function.name) || undefined;
       results.push(errorResult);
       contextParts.push(errorResult.contextForStory);
       continue;
@@ -942,6 +978,8 @@ export async function executeGMTools(
           },
           contextForStory: `[ERROR: ${errorMsg}]`,
         };
+        errorResult.hiddenFromPlayer =
+          isHiddenFromPlayerTool(call.function.name) || undefined;
         results.push(errorResult);
         contextParts.push(errorResult.contextForStory);
         continue;
@@ -979,6 +1017,9 @@ export async function executeGMTools(
             modified,
             interaction
           );
+          break;
+        case "gm_roll":
+          result = executeGMRoll(call.id, params as GMRollParams);
           break;
         case "ask_for_roll":
           result = await executeAskForRoll(
@@ -1312,6 +1353,11 @@ export async function executeGMTools(
       markOracleConsulted(modified);
     }
 
+    // Stamped centrally so a hidden roll stays hidden no matter which path
+    // produced the result - executor, validation error, or thrown exception.
+    if (isHiddenFromPlayerTool(result.toolName)) {
+      result.hiddenFromPlayer = true;
+    }
     results.push(result);
     if (result.contextForStory) {
       contextParts.push(result.contextForStory);
@@ -2267,6 +2313,98 @@ async function executeFormulaRoll(
 }
 
 /**
+ * Execute gm_roll - a roll made behind the GM's screen.
+ *
+ * Deliberately does NOT go through rollFormulasMaybePhysical: handing a
+ * secret roll to the physical dice tray would put it in the player's hands,
+ * which is the one thing this tool exists to avoid. It always rolls
+ * digitally, in both dice modes.
+ *
+ * Everything else matches formula_roll - the dice are reported, no verdict is
+ * computed - except that the result carries `hiddenFromPlayer`, which keeps
+ * it out of every player-facing view of the turn's tool calls.
+ */
+function executeGMRoll(
+  toolCallId: string,
+  params: GMRollParams
+): GMToolResult {
+  const formulas = readRollFormulas(params as unknown as FormulaRollParams);
+  const displayName = params.display_name || "Hidden Roll";
+
+  const fail = (message: string): GMToolResult => ({
+    toolName: "gm_roll",
+    toolCallId,
+    success: false,
+    hiddenFromPlayer: true,
+    result: {
+      type: "gm_roll",
+      pools: [],
+      reason: params.reason,
+    } as GMHiddenRollResult,
+    contextForStory: message,
+  });
+
+  if (formulas.length === 0) {
+    return fail(
+      `[ERROR: gm_roll needs at least one dice formula in \`formulas\`, e.g. formulas: ["1d20+5"]]`
+    );
+  }
+
+  let rollResults: RollResult[];
+  try {
+    rollResults = formulas.map((formula) => rollFormula(formula));
+  } catch (e) {
+    return fail(
+      `[ERROR: Invalid formula in "${formulas.join(", ")}" - ${
+        e instanceof Error ? e.message : "Unknown error"
+      }]`
+    );
+  }
+
+  const labels = Array.isArray(params.labels) ? params.labels : [];
+  const pools: GMRolledPool[] = rollResults.map((result, i) => ({
+    formula: formulas[i],
+    resolvedFormula: result.breakdown || formulas[i],
+    rolls: flattenRolls(result.rolls),
+    total: result.total,
+    label:
+      typeof labels[i] === "string" && labels[i].trim() ? labels[i] : undefined,
+  }));
+
+  let contextForStory: string;
+  if (pools.length === 1) {
+    contextForStory = `[${displayName} (behind the screen): ${describePool(
+      pools[0]
+    )}]`;
+  } else {
+    contextForStory =
+      `[${displayName} (behind the screen) - ${pools.length} separate pools, NOT added together:]` +
+      pools.map((pool) => `\n[  ${describePool(pool)}]`).join("");
+  }
+  contextForStory += `\n[Reason: ${params.reason}]`;
+  if (params.secret_because) {
+    contextForStory += `\n[Hidden because: ${params.secret_because}]`;
+  }
+  contextForStory += `\n[No verdict was computed. Compare against the target with \`calculate\` before narrating an outcome.]`;
+  contextForStory += `\n[The player cannot see this roll and must not learn it happened. Narrate only what the character perceives - if this check failed, describe the scene as unremarkable rather than saying they notice nothing, which would reveal there was something to notice.]`;
+
+  return {
+    toolName: "gm_roll",
+    toolCallId,
+    success: true,
+    hiddenFromPlayer: true,
+    result: {
+      type: "gm_roll",
+      pools,
+      reason: params.reason,
+      displayName: params.display_name,
+      secretBecause: params.secret_because,
+    } as GMHiddenRollResult,
+    contextForStory,
+  };
+}
+
+/**
  * Execute ask_for_roll (manual dice mode): pause the GM loop and wait for
  * the player to roll physical dice and say what they got. The injected
  * `interaction.requestManualRoll` handler resolves with their answer as
@@ -2749,44 +2887,18 @@ function executeFateQuestion(
 }
 
 /**
- * Execute a roll on a custom table or built-in AGMT element table
+ * Execute a roll on a built-in AGMT element table.
+ *
+ * Adventure-specific tables are NOT handled here any more - they're notes
+ * (`type: "table"`), and the GM rolls them itself: read the note, roll the
+ * die it names with `formula_roll`, read off the matching entry. This tool
+ * now covers only the built-in element tables, which have no note to read.
  */
 function executeRollTable(
   toolCallId: string,
   params: RollTableParams,
   storyData: StoryData
 ): GMToolResult {
-  // Use customTables from storyData
-  const allTables = storyData.customTables || [];
-
-  // First try to find in custom tables
-  const table = getTableByName(allTables, params.table_name);
-
-  if (table) {
-    // Roll on the custom table
-    const rollResult = rollOnCustomTable(table);
-    const resultText = rollResult?.text || "No result";
-
-    // Build context string
-    const displayName = params.display_name || `${table.name} Roll`;
-    let contextForStory = `[${displayName}: "${resultText}"]`;
-    contextForStory += `\n[Reason: ${params.reason}]`;
-
-    return {
-      toolName: "roll_table",
-      toolCallId,
-      success: true,
-      result: {
-        type: "roll_table",
-        tableName: table.name,
-        result: resultText,
-        reason: params.reason,
-        displayName: params.display_name,
-      } as GMRollTableResult,
-      contextForStory,
-    };
-  }
-
   // Try as AGMT element table (normalize name: spaces to underscores, lowercase)
   const normalizedName = params.table_name.toLowerCase().replace(/\s+/g, "_");
   const isAgmtTable = (MYTHIC_TABLE_NAMES as string[]).includes(normalizedName);
@@ -2819,8 +2931,15 @@ function executeRollTable(
     };
   }
 
-  // Table not found
+  // Not a built-in table. The likeliest reason is that the GM reached for
+  // one of this adventure's own tables out of habit, so if a note by that
+  // name exists, point straight at it rather than reporting a dead end.
+  const noteMatch = findTableNote(storyData, params.table_name);
   const displayName = params.display_name || "Table Roll";
+  const guidance = noteMatch
+    ? `[This adventure's table "${noteMatch.title}" is a note, not a built-in table. Read it with \`read_notes\`, roll the die it names with \`formula_roll\`, and read off the entry that came up.]`
+    : `[There's no built-in table called "${params.table_name}". If this adventure has one, it's a note - find it with \`search_notes\`, then roll it yourself with \`formula_roll\`. Otherwise pick a built-in table from the tool description, or just decide.]`;
+
   return {
     toolName: "roll_table",
     toolCallId,
@@ -2833,8 +2952,33 @@ function executeRollTable(
       displayName: params.display_name,
       tableNotFound: true,
     } as GMRollTableResult,
-    contextForStory: `[${displayName}: Table "${params.table_name}" not found]`,
+    contextForStory: `[${displayName}: Table "${params.table_name}" not found]\n${guidance}`,
   };
+}
+
+/**
+ * Finds a `type: "table"` note by name, tolerating the same loose matching
+ * the old custom-table lookup did (case, whitespace, underscores, partial
+ * names) so a near-miss still redirects the GM to the right note.
+ */
+function findTableNote(
+  storyData: StoryData,
+  name: string
+): StoryLore | undefined {
+  const wanted = name.toLowerCase().replace(/[_\s]+/g, " ").trim();
+  if (!wanted) return undefined;
+
+  const tableNotes = (storyData.lore || []).filter((l) => l.type === "table");
+  const normalize = (title: string) =>
+    (title || "").toLowerCase().replace(/[_\s]+/g, " ").trim();
+
+  return (
+    tableNotes.find((l) => normalize(l.title) === wanted) ||
+    tableNotes.find((l) => {
+      const title = normalize(l.title);
+      return title.includes(wanted) || wanted.includes(title);
+    })
+  );
 }
 
 /**

@@ -243,26 +243,37 @@ describe("set_starting_choices", () => {
   });
 });
 
-describe("write_tables", () => {
-  it("defaults entry weights to 1 and keeps only non-empty entries", () => {
-    const { draft } = run("write_tables", {
-      tables: [
-        {
-          name: "Complications",
-          entries: [{ text: "Sirens" }, { text: "" }, { text: "Rain", weight: 3 }],
-        },
-      ],
+// Random tables are notes now (`type: "table"`), written with the same
+// write_note tool as everything else - there is no separate table tool and
+// no separate list on the draft.
+describe("table notes", () => {
+  it("writes a table as a note the GM can roll on", () => {
+    const { draft } = run("write_note", {
+      title: "Complications",
+      type: "table",
+      content: "Roll 1d3:\n1. Sirens\n2. Rain\n3. The contact is late",
     });
-    expect(draft.customTables[0].entries).toHaveLength(2);
-    expect(draft.customTables[0].entries[0].weight).toBe(1);
-    expect(draft.customTables[0].entries[1].weight).toBe(3);
+    expect(draft.lore).toHaveLength(1);
+    expect(draft.lore[0].type).toBe("table");
+    expect(draft.lore[0].title).toBe("Complications");
+    expect(draft.lore[0].content).toContain("Roll 1d3:");
   });
 
-  it("rejects a table with no usable entries", () => {
-    const { draft, result } = run("write_tables", {
-      tables: [{ name: "Empty", entries: [] }],
+  it("leaves a table note keyword-triggered rather than always-on", () => {
+    // Unlike mechanics/character_sheet, a table isn't forced into context -
+    // there can be dozens of them and the GM pulls one when it needs it.
+    const { draft } = run("write_note", {
+      title: "Weather",
+      type: "table",
+      content: "Roll 1d2:\n1. Clear\n2. Fog",
     });
-    expect(draft.customTables).toHaveLength(0);
+    expect(draft.lore[0].alwaysOn).toBe(false);
+  });
+
+  it("no longer exposes a separate table-writing tool", () => {
+    const { result } = run("write_tables", {
+      tables: [{ name: "Complications", entries: [{ text: "Sirens" }] }],
+    });
     expect(result.error).toBeDefined();
   });
 });

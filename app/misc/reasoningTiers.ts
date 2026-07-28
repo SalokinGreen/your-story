@@ -315,6 +315,9 @@ export function computeSceneKey(state: StoryData): string {
 // NLP-style grading of freeform narration as the alternative).
 const ROLL_OR_ORACLE_TOOL_NAMES = new Set([
   "formula_roll",
+  // A roll behind the screen is still a roll - it settles the outcome with
+  // dice rather than with narration, which is all this gate asks for.
+  "gm_roll",
   "opposed_formula",
   "npc_roll",
   "fate_question",
