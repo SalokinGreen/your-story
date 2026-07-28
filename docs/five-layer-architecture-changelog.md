@@ -528,6 +528,73 @@ have her decide to run") as an exoneration, and a judge that reads the
 defendant's account before ruling is a weaker check, not a better-informed one.
 There's a test asserting the reasoning never reaches that prompt.
 
+## Phase 8 (later session): the observer stops waiting on turns it has nothing to say about
+
+Phase 5 overlapped the observer's calls with each other; this phase asks
+whether the player should be waiting on them at all. Two complaints, one about
+what the screen showed while they waited and one about the waiting itself.
+
+### Layer 5 (Adjudication) — deferral, and a rewrite that can arrive late
+
+- **Blocking is decided per-turn, not per-config**
+  (`plausibleResetFlagTypes`). The only gate used to be
+  `canObserverTriggerReset` — "can a rewrite ever happen with these
+  settings" — which is true by default and therefore true on every turn. So
+  every turn ended with the player waiting on a full round of judge calls,
+  including the great majority where nothing could have fired: the word count
+  never tripped, no comparison resolved that narration could contradict, the
+  oracle had already been consulted. The new gate reads the finished turn
+  through free deterministic signals only — no API call, no reading
+  comprehension — and answers the narrower question "could a reset-eligible
+  check fire *here*". When the answer is no, `generateStoryTurn` hands control
+  straight back and the whole observer runs in the existing fire-and-forget
+  background wave.
+- **The background pass can now rewrite, not just warn.** Previously a
+  deferred observer could only attach advisory flags, which was fine when
+  deferral only happened with resets configured off. Now that ordinary turns
+  are deferred, a major violation found back there is the same violation it
+  would have been had it blocked, so it gets the same targeted rewrite,
+  applied to the saved scene part by index (the player may have taken another
+  turn in the meantime) and announced through
+  `onBackgroundObserverRewrite`. What the background pass deliberately can
+  *not* do is the full-turn reset: rolling `storyData` back to a pre-turn
+  snapshot and re-rolling the dice underneath a player who has already read
+  the turn is worse than the flag it fixes, so a failed rewrite leaves the
+  flag advisory. The accepted cost of the whole trade is that on a deferred
+  turn the player briefly reads the flagged draft before the correction lands.
+- **`player_agency` is deferred by design.** It is the one reset-eligible
+  check with no free pre-signal — telling "the GM decided what the player
+  character does" apart from "the GM narrated an NPC" *is* the judge's job,
+  and any regex standing in for it would be wrong in both directions. Listing
+  it as always-plausible would have restored the always-block behavior this
+  phase exists to end, so it is judged in the background and corrected there.
+- **`tier_escalation_missed` blocks only when something is at stake.** Its
+  own precondition (`tierUsed < TOP_TIER`) is true on nearly every turn, so on
+  its own it would also have meant always-block. It is additionally gated on
+  `isSceneGatedForRoll` — active combat, an active challenge, or a
+  high/deadly-stakes roll declared this scene. This is the one check whose
+  correction is a full-turn reset rather than a rewrite, which makes it both
+  the most expensive correction in the system and the only one the background
+  pass cannot perform; spending it on banter is a bad trade, spending it on a
+  combat round is the trade it was designed for. On ordinary turns the flag
+  still fires in the background and still reaches the GM next turn through
+  `buildObserverWarningNote`, so it can self-escalate.
+
+### The UI stopped showing the finished turn
+
+- **"Thinking..." no longer replaces the narration the moment it finishes**
+  (`page.tsx`). `onGMStageComplete` cleared `liveGMEntries` outright, and
+  `story.tsx`'s live bubble renders its spinner-and-"Thinking..." placeholder
+  whenever the timeline is empty and the turn is still loading. On the
+  choice-selection path — the normal way to play, and the one path that never
+  re-added the text afterwards — the whole turn vanished the instant the GM
+  stopped streaming and stayed gone for the entire observer pass. The stage
+  now *freezes* the blocks instead of clearing them, and the story stage
+  appends only when it actually has text of its own to add, which
+  `GenerationCallbacks.onStoryStart(narratedByGMStage)` now reports. The
+  "Not final yet — the Observer may flag and rewrite this response" line is
+  unchanged and still the only signal that a correction may be coming.
+
 ## Deliberately not done
 
 - **H6 (content-safety layer):** explicitly skipped by product decision —

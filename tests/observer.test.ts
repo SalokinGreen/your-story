@@ -28,8 +28,10 @@ import {
   reconcileGmThinkingAfterRewrite,
   rewriteFlaggedNarration,
   settingsFor,
+  plausibleResetFlagTypes,
   DEFAULT_OBSERVER_SETTINGS,
   ObserverCheckSettings,
+  ObserverSettings,
 } from "../app/misc/observer";
 import type {
   ObserverFlag,
@@ -231,6 +233,217 @@ describe("prospectiveLengthFlag", () => {
       global.fetch = originalFetch;
       vi.restoreAllMocks();
     }
+  });
+});
+
+describe("plausibleResetFlagTypes", () => {
+  // The gate that decides whether the player WAITS on the observer for a
+  // given turn (generation.ts's resetPossible). It must answer from free
+  // deterministic signals only - never a fetch - and must never claim a type
+  // is plausible when that type's own check would bail out without a call.
+
+  const LONG = Array(400).fill("word").join(" ");
+  const SHORT = "The lock clicks open.";
+
+  function observerSettings(
+    overrides: Partial<ObserverSettings> = {},
+  ): ObserverSettings {
+    return { ...DEFAULT_OBSERVER_SETTINGS, ...overrides };
+  }
+
+  it("returns nothing for an ordinary turn - short, no comparisons, top tier", () => {
+    expect(
+      plausibleResetFlagTypes({
+        narration: SHORT,
+        replyLength: "medium",
+        rollResults: [],
+        toolNames: ["fate_question", "increment_scene"],
+        tierUsed: TOP_TIER,
+      }),
+    ).toEqual([]);
+  });
+
+  it("returns nothing for empty narration", () => {
+    expect(plausibleResetFlagTypes({ narration: "   " })).toEqual([]);
+  });
+
+  it("makes no API call", () => {
+    const fetchMock = vi.fn();
+    const originalFetch = global.fetch;
+    global.fetch = fetchMock as unknown as typeof fetch;
+    try {
+      plausibleResetFlagTypes({
+        narration: LONG,
+        rollResults: [
+          { toolName: "calculate", success: true, contextForStory: "17 >= 15" },
+        ],
+        tierUsed: 0,
+      });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
+
+  it("flags response_length exactly when the free word count trips", () => {
+    expect(
+      plausibleResetFlagTypes({ narration: LONG, replyLength: "medium" }),
+    ).toContain("response_length");
+    expect(
+      plausibleResetFlagTypes({ narration: SHORT, replyLength: "medium" }),
+    ).not.toContain("response_length");
+  });
+
+  it("never lists player_agency - it has no free pre-signal, so it is judged in the background", () => {
+    // Deliberate: listing it would make every turn "plausible" and restore the
+    // always-block behavior this gate exists to end.
+    expect(
+      plausibleResetFlagTypes({
+        narration: "You decide to run, heart hammering, and you shout for help.",
+        replyLength: "medium",
+      }),
+    ).not.toContain("player_agency");
+  });
+
+  it("flags outcome_narration_mismatch only when a verdict-bearing comparison resolved", () => {
+    // Dice tools report what the dice showed and never judge it, so their
+    // success is not a verdict - only calculate/record_challenge_result are.
+    expect(
+      plausibleResetFlagTypes({
+        narration: SHORT,
+        rollResults: [
+          { toolName: "formula_roll", success: true, contextForStory: "3d6 = 11" },
+        ],
+      }),
+    ).not.toContain("outcome_narration_mismatch");
+
+    expect(
+      plausibleResetFlagTypes({
+        narration: SHORT,
+        rollResults: [
+          { toolName: "calculate", success: false, contextForStory: "11 >= 15" },
+        ],
+      }),
+    ).toContain("outcome_narration_mismatch");
+  });
+
+  it("does not flag outcome_narration_mismatch for a mixed set of comparisons", () => {
+    // checkOutcomeMismatch caps a mixed verdict at "minor" (it's the shape of
+    // a legitimate partial success), so it can never reset and never blocks.
+    expect(
+      plausibleResetFlagTypes({
+        narration: SHORT,
+        rollResults: [
+          { toolName: "calculate", success: true, contextForStory: "7 >= 4" },
+          { toolName: "calculate", success: false, contextForStory: "7 >= 9" },
+        ],
+      }),
+    ).not.toContain("outcome_narration_mismatch");
+  });
+
+  it("flags tier_escalation_missed only below the top tier AND with real stakes on the table", () => {
+    expect(
+      plausibleResetFlagTypes({ narration: SHORT, tierUsed: 0, highStakes: true }),
+    ).toContain("tier_escalation_missed");
+
+    // Nowhere to escalate to.
+    expect(
+      plausibleResetFlagTypes({
+        narration: SHORT,
+        tierUsed: TOP_TIER,
+        highStakes: true,
+      }),
+    ).not.toContain("tier_escalation_missed");
+
+    // Below the top tier is true on nearly every turn, so on its own it is a
+    // precondition, not a signal - without stakes this stays deferred, or the
+    // observer would go straight back to blocking every turn.
+    expect(
+      plausibleResetFlagTypes({ narration: SHORT, tierUsed: 0 }),
+    ).not.toContain("tier_escalation_missed");
+    expect(
+      plausibleResetFlagTypes({
+        narration: SHORT,
+        tierUsed: 0,
+        highStakes: false,
+      }),
+    ).not.toContain("tier_escalation_missed");
+
+    // Caller didn't say which tier ran - checkTierEscalation is skipped too.
+    expect(
+      plausibleResetFlagTypes({ narration: SHORT, highStakes: true }),
+    ).not.toContain("tier_escalation_missed");
+  });
+
+  it("flags a tool-usage gap only once its sensitivity makes it reset-eligible", () => {
+    const base = {
+      narration: SHORT,
+      replyLength: "medium" as const,
+      tierUsed: TOP_TIER,
+      toolNames: [],
+    };
+
+    // Default sensitivity 5: these two report "minor" and can never reset.
+    expect(plausibleResetFlagTypes(base)).toEqual([]);
+
+    expect(
+      plausibleResetFlagTypes({
+        ...base,
+        settings: observerSettings({
+          missing_oracle_or_table: {
+            enabled: true,
+            triggersReset: true,
+            sensitivity: 9,
+          },
+        }),
+      }),
+    ).toContain("missing_oracle_or_table");
+
+    // ...and not when the turn already consulted the oracle.
+    expect(
+      plausibleResetFlagTypes({
+        ...base,
+        toolNames: ["roll_table"],
+        settings: observerSettings({
+          missing_oracle_or_table: {
+            enabled: true,
+            triggersReset: true,
+            sensitivity: 9,
+          },
+        }),
+      }),
+    ).not.toContain("missing_oracle_or_table");
+  });
+
+  it("respects enabled and triggersReset per type", () => {
+    const turn = {
+      narration: LONG,
+      replyLength: "medium" as const,
+      tierUsed: 0,
+    };
+
+    expect(
+      plausibleResetFlagTypes({
+        ...turn,
+        settings: observerSettings({
+          response_length: { enabled: false, triggersReset: true, sensitivity: 5 },
+        }),
+      }),
+    ).not.toContain("response_length");
+
+    expect(
+      plausibleResetFlagTypes({
+        ...turn,
+        highStakes: true,
+        settings: observerSettings({
+          tier_escalation_missed: {
+            enabled: true,
+            triggersReset: false,
+            sensitivity: 5,
+          },
+        }),
+      }),
+    ).not.toContain("tier_escalation_missed");
   });
 });
 

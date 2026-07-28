@@ -53,6 +53,7 @@ import {
   reconcileGmThinkingAfterRewrite,
   settingsFor,
   canObserverTriggerReset,
+  plausibleResetFlagTypes,
   buildObserverCharacterContext,
   observerSuspensionReason,
   hasCharacterSheetNote,
@@ -277,7 +278,13 @@ export interface GenerationOptions {
 }
 
 export interface GenerationCallbacks {
-  onStoryStart?: () => void;
+  // `narratedByGMStage` is true when the GM's own final round already wrote
+  // the prose, so no separate narration call happens and the single
+  // onStoryContent that follows carries the whole (already-streamed) turn at
+  // once. A UI streaming the GM stage live has therefore already displayed
+  // this text and must not append it a second time; when it's false the story
+  // stage is about to stream fresh text that nothing has shown yet.
+  onStoryStart?: (narratedByGMStage: boolean) => void;
   onStoryContent?: (content: string, fullContent: string) => void;
   // Stream the story stage's native reasoning/CoT field as it generates
   // (only fires for providers that support it, e.g. DeepSeek reasoner,
@@ -379,11 +386,36 @@ export interface GenerationCallbacks {
   onObserverReset?: (flags: ObserverFlag[], triggeringFlag: ObserverFlag) => void;
   // Fired when the observer ran in the BACKGROUND (see generateStoryTurn's
   // resetPossible gate) and found flags after the turn had already completed
-  // and handed control back to the player. Only reachable when the current
-  // settings make a reset impossible (canObserverTriggerReset false), so
-  // these flags are always advisory - never a rewrite/reset, just something
-  // to surface to the player the way onComplete's observerFlags normally are.
+  // and handed control back to the player. Advisory only - anything the
+  // background pass could actually fix has already been fixed by
+  // onBackgroundObserverRewrite below, and these are what's left over, to be
+  // surfaced the way onComplete's observerFlags normally are.
   onBackgroundObserverFlags?: (flags: ObserverFlag[]) => void;
+  // The background pass's counterpart to onObserverRewrite: the observer ran
+  // after the turn had already completed (see generateStoryTurn's
+  // resetPossible gate), flagged it as a major violation, and successfully
+  // rewrote the narration. generateStoryTurn has ALREADY patched the scene
+  // part itself - the UI just needs to re-render, persist, and tell the
+  // player the text they may already be reading has changed under them.
+  //
+  // partIndex is the scene part this lands on, captured before the turn
+  // completed: by the time this fires the player may well have submitted
+  // another turn, so it is NOT safe to assume the last part is the right one.
+  // The UI should leave its "current narration" state alone unless partIndex
+  // really is still the newest part.
+  //
+  // There is deliberately no background counterpart to onObserverReset. A
+  // full-turn reset rolls storyData back to a pre-turn snapshot and re-rolls
+  // the dice, which is not something that can happen behind a player who has
+  // already read the turn and possibly acted on it - if the background
+  // rewrite fails, the flag is surfaced as advisory instead.
+  onBackgroundObserverRewrite?: (
+    flags: ObserverFlag[],
+    triggeringFlag: ObserverFlag,
+    rewrittenNarration: string,
+    original: ObserverRewriteOriginal,
+    partIndex: number,
+  ) => void;
   // Fired once the fire-and-forget background wave (memory agent, director
   // assistant, story progress observer, and the observer itself when
   // deferred) finishes, regardless of whether any of it changed anything -
@@ -934,6 +966,74 @@ export async function generateStoryTurn(
       ...resolveSideCallModel(observerModelOverride, sideCallApiOptions.model),
     };
 
+    // Choices are parsed from the narration, so a rewrite invalidates them -
+    // they can offer an action the corrected prose no longer sets up. Shared
+    // by the blocking rewrite path and the background one below. Best-effort
+    // in both: a failed side call means slightly stale choices, which is a far
+    // better outcome than losing the turn over it, so this returns null and
+    // the caller keeps what it had.
+    const regenerateChoicesFor = async (
+      narration: string,
+    ): Promise<Choice[] | null> => {
+      try {
+        callbacks.onChoicesStart?.();
+        const { content: rawChoicesContent, meta: rewrittenChoicesMeta } =
+          await generateChoicesWithRetry(
+            {
+              storyData,
+              storyContent: narration,
+              usePrefill: options.usePrefill !== false,
+            },
+            {
+              token: null,
+              model: sideCallApiOptions.model,
+              openRouterKey: options.openRouterKey,
+              deepseekKey: options.deepseekKey,
+              googleKey: options.googleKey,
+              mistralKey: options.mistralKey,
+              deepinfraKey: options.deepinfraKey,
+              abortSignal: options.abortSignal,
+            },
+          );
+        if (rewrittenChoicesMeta) {
+          recordAICall({
+            stage: "choices",
+            label: "Choices (re-derived after observer rewrite)",
+            modelKey: String(sideCallApiOptions.model),
+            promptTokens: rewrittenChoicesMeta.usage?.promptTokens || 0,
+            completionTokens: rewrittenChoicesMeta.usage?.completionTokens || 0,
+            providerReportedUsd: rewrittenChoicesMeta.estimatedCost,
+            costTurnId,
+          });
+        }
+        const cleanedChoicesContent =
+          options.usePrefill !== false
+            ? stripAffirmationPrefill(rawChoicesContent, CHOICES_AFFIRMATION)
+            : rawChoicesContent;
+        const rewrittenChoices = parseChoices(cleanedChoicesContent, storyData);
+        callbacks.onChoicesComplete?.(
+          rewrittenChoices,
+          rewrittenChoicesMeta?.usage || {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0,
+          },
+        );
+        return rewrittenChoices;
+      } catch (choicesError) {
+        logger.action(
+          "Failed to regenerate choices after observer rewrite, keeping original choices",
+          {
+            error:
+              choicesError instanceof Error
+                ? choicesError.message
+                : String(choicesError),
+          },
+        );
+        return null;
+      }
+    };
+
     // The tier the GM stage actually ran at this turn - reasoningTierState is
     // mutated directly on storyData through generateStoryTurnOnce, so it
     // reflects the final round's tier here (see checkTierEscalation, which
@@ -972,18 +1072,58 @@ export async function generateStoryTurn(
       });
     }
 
-    // Whether the CURRENT settings make an automatic reset-and-retry even
-    // possible (observer.ts's canObserverTriggerReset - true iff at least
-    // one flag type is both enabled and allowed to trigger a reset). If
-    // not, nothing the observer could find this turn will ever force a
-    // rewrite, so there's no reason to make the player wait on it: its
-    // checks run in the background wave below instead, and the turn
-    // completes immediately. If a reset IS possible, the observer keeps
-    // blocking exactly as it always has - a rewrite really might happen,
-    // and the player needs to see the corrected result, not the flagged one.
-    // A suspended turn can't produce a flag at all, so it never blocks either.
+    // Whether the player should WAIT on the observer for this particular
+    // turn. Two gates, cheapest first:
+    //
+    // 1. canObserverTriggerReset - config only: is any flag type both
+    //    enabled and allowed to reset? False means nothing the observer
+    //    finds could ever change the text, whatever the turn contains.
+    // 2. plausibleResetFlagTypes - the turn itself: of those types, which
+    //    could actually fire HERE, judged from free deterministic signals
+    //    (the word count, which comparisons resolved, which tools ran, what
+    //    tier it used). This is the gate that matters in practice, because
+    //    the first one is true by default and so was true on every turn -
+    //    the player sat through a full round of judge calls after every
+    //    single turn, including the great majority where the word count
+    //    never tripped, no comparison could be contradicted, and every
+    //    tool-usage question was already satisfied.
+    //
+    // When nothing is plausible the turn completes immediately and the whole
+    // observer runs in the background wave below, which can still rewrite -
+    // just after the player already has control (see runBackgroundLayers).
+    // A suspended turn can't produce a flag at all, so it never blocks.
+    const plausibleFlagTypes = suspensionReason
+      ? []
+      : plausibleResetFlagTypes({
+          narration: result.content,
+          replyLength: options.replyLength,
+          rollResults: (result.gmResults || []).map((r) => ({
+            toolName: r.toolName,
+            success: r.success,
+            contextForStory: r.contextForStory,
+          })),
+          toolNames: turnToolNames,
+          tierUsed: tierUsedThisTurn,
+          // The same predicate the M2 roll-invariant gate uses for "does this
+          // scene actually have something at stake" - active combat, an active
+          // challenge, or a high/deadly-stakes roll declared this scene. It is
+          // what keeps the tier-escalation full-turn retry available on the
+          // turns that warrant it without imposing it on every one.
+          highStakes: isSceneGatedForRoll(storyData),
+          settings: observerSettings,
+        });
+
     const resetPossible =
-      !suspensionReason && canObserverTriggerReset(observerSettings);
+      !suspensionReason &&
+      canObserverTriggerReset(observerSettings) &&
+      plausibleFlagTypes.length > 0;
+
+    if (!resetPossible && !suspensionReason) {
+      logger.action(
+        "Observer deferred to the background - no reset-eligible check could fire on this turn",
+        { checkedTypes: plausibleFlagTypes },
+      );
+    }
 
     // ---- SPECULATIVE SHORTENED REWRITE -------------------------------
     // The response_length check has a free, deterministic trip (the word
@@ -1294,71 +1434,14 @@ export async function generateStoryTurn(
           );
 
           // Choices were parsed from the flagged narration - regenerate them
-          // off the corrected text. Best-effort: keep the original choices if
-          // this fails rather than losing the whole turn over a side call.
-          try {
-            callbacks.onChoicesStart?.();
-            const { content: rawChoicesContent, meta: rewrittenChoicesMeta } =
-              await generateChoicesWithRetry(
-                {
-                  storyData,
-                  storyContent: rewrittenNarration,
-                  usePrefill: options.usePrefill !== false,
-                },
-                {
-                  token: null,
-                  model: sideCallApiOptions.model,
-                  openRouterKey: options.openRouterKey,
-                  deepseekKey: options.deepseekKey,
-                  googleKey: options.googleKey,
-                  mistralKey: options.mistralKey,
-                  deepinfraKey: options.deepinfraKey,
-                  abortSignal: options.abortSignal,
-                },
-              );
-            if (rewrittenChoicesMeta) {
-              recordAICall({
-                stage: "choices",
-                label: "Choices (re-derived after observer rewrite)",
-                modelKey: String(sideCallApiOptions.model),
-                promptTokens: rewrittenChoicesMeta.usage?.promptTokens || 0,
-                completionTokens:
-                  rewrittenChoicesMeta.usage?.completionTokens || 0,
-                providerReportedUsd: rewrittenChoicesMeta.estimatedCost,
-                costTurnId,
-              });
-            }
-            const cleanedChoicesContent =
-              options.usePrefill !== false
-                ? stripAffirmationPrefill(rawChoicesContent, CHOICES_AFFIRMATION)
-                : rawChoicesContent;
-            const rewrittenChoices = parseChoices(
-              cleanedChoicesContent,
-              storyData,
-            );
+          // off the corrected text (see regenerateChoicesFor above).
+          const rewrittenChoices = await regenerateChoicesFor(rewrittenNarration);
+          if (rewrittenChoices) {
             result.choices = rewrittenChoices;
             result.scenePart = {
               ...result.scenePart,
               choices: rewrittenChoices,
             };
-            callbacks.onChoicesComplete?.(
-              rewrittenChoices,
-              rewrittenChoicesMeta?.usage || {
-                promptTokens: 0,
-                completionTokens: 0,
-                totalTokens: 0,
-              },
-            );
-          } catch (choicesError) {
-            logger.action(
-              "Failed to regenerate choices after observer rewrite, keeping original choices",
-              {
-                error:
-                  choicesError instanceof Error
-                    ? choicesError.message
-                    : String(choicesError),
-              },
-            );
           }
 
           // Any OTHER flags from this turn (the one just fixed aside) still
@@ -1458,14 +1541,156 @@ export async function generateStoryTurn(
                 })),
               },
             );
-            const part = storyData.scene.parts[backgroundPartIndex];
-            if (part && !part.user && part.role === "assistant") {
-              storyData.scene.parts[backgroundPartIndex] = {
-                ...part,
-                observerFlags: backgroundFlags,
-              };
+
+            // A major flag found back here is the same violation it would
+            // have been had it blocked - the only thing that changed is that
+            // the player already has the turn. So it still gets the targeted
+            // rewrite (observer.ts's rewriteFlaggedNarration), applied to the
+            // saved part rather than to a turn still in flight.
+            //
+            // Two of the blocking path's moves are deliberately NOT available
+            // here. The full-turn reset is out: rolling storyData back to a
+            // pre-turn snapshot and re-rolling the dice underneath a player
+            // who has already read the turn (and may have acted on it) would
+            // be far worse than the flag it fixes - so a failed rewrite just
+            // leaves the flag surfaced as advisory. And tier_escalation_missed
+            // is out for the same reason it skips the rewrite when blocking:
+            // its only fix IS a full-turn retry at a higher tier.
+            let survivingFlags = backgroundFlags;
+            const majorFlag = backgroundFlags.find(
+              (f) =>
+                f.severity === "major" &&
+                f.type !== "tier_escalation_missed" &&
+                settingsFor(observerSettings, f.type).triggersReset,
+            );
+
+            if (majorFlag && resetAttempts < MAX_OBSERVER_RESETS) {
+              let rewrittenNarration: string | null = null;
+              try {
+                rewrittenNarration = await rewriteFlaggedNarration({
+                  narration: result.content,
+                  playerChoice: userChoice,
+                  gmStoryContext: result.gmStoryContext,
+                  flag: majorFlag,
+                  replyLength: options.replyLength,
+                  storytellerMode: options.storytellerMode,
+                  characterContext: observerCharacterContext,
+                  conversationMessages: result.gmPromptMessages,
+                  narrationThoughts: result.narrationThoughts,
+                  apiOptions: observerApiOptions,
+                });
+              } catch (rewriteError) {
+                logger.action(
+                  "Background observer rewrite call failed, leaving the flag advisory",
+                  {
+                    error:
+                      rewriteError instanceof Error
+                        ? rewriteError.message
+                        : String(rewriteError),
+                  },
+                );
+              }
+
+              if (rewrittenNarration) {
+                resetAttempts++;
+                logger.action(
+                  "Background observer rewrote the narration after the turn completed",
+                  { type: majorFlag.type, detail: majorFlag.detail },
+                );
+
+                const rewriteOriginal: ObserverRewriteOriginal = {
+                  content: result.content,
+                  flag: majorFlag,
+                  gmConversation: result.scenePart.gmConversation,
+                  gmThinking: result.scenePart.gmThinking,
+                  choices: result.choices,
+                };
+
+                survivingFlags = backgroundFlags.filter((f) => f !== majorFlag);
+
+                // Choices only get re-derived while this is still the newest
+                // part - once the player has moved on they belong to a turn
+                // that's already been answered, and replacing them would swap
+                // the options out from under the turn they're now looking at.
+                const stillNewest =
+                  backgroundPartIndex === storyData.scene.parts.length - 1;
+                const rewrittenChoices = stillNewest
+                  ? await regenerateChoicesFor(rewrittenNarration)
+                  : null;
+
+                // Read fresh rather than up front: the rewrite and the choices
+                // call both yielded, and onChoicesComplete replaces the array
+                // slot with a shallow copy rather than mutating it. The guard
+                // is also what covers a headless caller that never maintains
+                // scene.parts at all (the eval harness) - result above is
+                // already corrected for them, and there's nothing to patch.
+                const currentPart = storyData.scene.parts[backgroundPartIndex];
+                const partIsThisTurn = Boolean(
+                  currentPart && !currentPart.user && currentPart.role === "assistant",
+                );
+                if (partIsThisTurn) {
+                  storyData.scene.parts[backgroundPartIndex] = {
+                    ...currentPart,
+                    content: rewrittenNarration,
+                    // Same history reconciliation the blocking path does, so
+                    // the next turn replays the corrected prose plus why it
+                    // was corrected - not the draft the observer rejected.
+                    gmConversation: reconcileGmConversationAfterRewrite(
+                      currentPart.gmConversation,
+                      rewrittenNarration,
+                      majorFlag,
+                    ),
+                    gmThinking: reconcileGmThinkingAfterRewrite(
+                      currentPart.gmThinking,
+                      rewrittenNarration,
+                      majorFlag,
+                    ),
+                    ...(rewrittenChoices && { choices: rewrittenChoices }),
+                    correctedObserverFlags: [majorFlag],
+                    observerRewriteOriginal: rewriteOriginal,
+                    observerFlags: survivingFlags.length
+                      ? survivingFlags
+                      : undefined,
+                  };
+                }
+
+                // Keep the returned result in step with what was persisted -
+                // callers hold onto it (the eval harness reads result.content
+                // as "what the player saw").
+                result.content = rewrittenNarration;
+                result.scenePart = {
+                  ...result.scenePart,
+                  content: rewrittenNarration,
+                  correctedObserverFlags: [majorFlag],
+                  observerRewriteOriginal: rewriteOriginal,
+                };
+                if (rewrittenChoices) result.choices = rewrittenChoices;
+
+                // Only announced when it landed on a real part - the callback
+                // exists so the UI can re-render and persist that part, and
+                // there is nothing to re-render if there wasn't one.
+                if (partIsThisTurn) {
+                  callbacks.onBackgroundObserverRewrite?.(
+                    backgroundFlags,
+                    majorFlag,
+                    rewrittenNarration,
+                    rewriteOriginal,
+                    backgroundPartIndex,
+                  );
+                }
+              }
             }
-            callbacks.onBackgroundObserverFlags?.(backgroundFlags);
+
+            if (survivingFlags.length > 0) {
+              const part = storyData.scene.parts[backgroundPartIndex];
+              if (part && !part.user && part.role === "assistant") {
+                storyData.scene.parts[backgroundPartIndex] = {
+                  ...part,
+                  observerFlags: survivingFlags,
+                };
+              }
+              callbacks.onBackgroundObserverFlags?.(survivingFlags);
+            }
           }
         } catch (observerError) {
           // Fail open - same posture as the blocking path above.
@@ -2800,7 +3025,7 @@ async function generateStoryTurnOnce(
     // ========================================
     // STAGE 1: Story Generation
     // ========================================
-    callbacks.onStoryStart?.();
+    callbacks.onStoryStart?.(Boolean(gmFinalStoryContent));
 
     // NEW: Check if GM already produced the final story content
     // (When GM completes without tool calls, its content IS the story)
