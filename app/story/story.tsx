@@ -175,6 +175,10 @@ function TimelineEntryPill({ block }: { block: TimelineBlock }) {
   // choice wins. `override === null` means "follow the streaming state".
   const [override, setOverride] = React.useState<boolean | null>(null);
   if (block.kind === "text") return null; // handled by the caller directly
+  // A roll made behind the GM's screen. Not rendered at all - not even as a
+  // collapsed pill, since the pill itself would tell the player the GM
+  // rolled for something.
+  if (block.hidden) return null;
 
   const isTool = block.kind === "tool";
   const isThinking = block.kind === "thinking";
@@ -1140,10 +1144,19 @@ export default function Story({
         reasoningTier: undefined as ReasoningTierDisplay | undefined,
       };
 
-    // Build toolResults map from gmToolCalls (keyed by toolCallId)
+    // Build toolResults map from gmToolCalls (keyed by toolCallId). Rolls
+    // made behind the GM's screen keep their `hiddenFromPlayer` flag here so
+    // buildSavedTimeline can drop them - they're carried in, not filtered
+    // out, precisely so the timeline knows to skip the tool call rather than
+    // falling back to rendering its raw name.
     const toolResults = new Map<
       string,
-      { success: boolean; contextForStory: string; toolName: string }
+      {
+        success: boolean;
+        contextForStory: string;
+        toolName: string;
+        hiddenFromPlayer?: boolean;
+      }
     >();
     if (part.gmToolCalls) {
       for (const tc of part.gmToolCalls) {
@@ -1152,6 +1165,7 @@ export default function Story({
             success: tc.success,
             contextForStory: tc.contextForStory || "",
             toolName: tc.toolName || "",
+            hiddenFromPlayer: tc.hiddenFromPlayer,
           });
         }
       }

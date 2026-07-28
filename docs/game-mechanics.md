@@ -120,9 +120,48 @@ narrative and the adventure's `mechanics` note.
   chart itself is derived from Mythic's probability ladder in
   `mythic.ts` (`fateTargetNumber`), not a hand-typed table: a 50/50
   question at chaos 5 is a literal coin flip.
-- **`roll_table`**: rolls on a custom table (defined in the story's Tables
-  tab) or a built-in element table (character traits, locations, plot
-  twists, atmosphere, and more) for on-the-fly inspiration.
+- **`roll_table`**: rolls on a **built-in** element table (character traits,
+  locations, plot twists, atmosphere, and more) for on-the-fly inspiration.
+- **The adventure's own tables are notes**, not a structured type the engine
+  rolls. A table is a `StoryLore` entry with `type: "table"` that names a die
+  and lists what each number gives, plus whatever prose the author wants
+  around it — when to roll it, what a result means, which entries lead
+  somewhere else. The GM reads the note and rolls it itself with
+  `formula_roll`, then reads off the matching entry.
+
+  This replaced `CustomTable[]` (`{name, description, entries: [{text,
+  weight}]}`) and its weighted-pick executor. The old shape could only hold
+  the results, so everything *around* a table had nowhere to live; the GM
+  also got a bare result string with none of the context that explains it.
+  Existing tables convert on load (`tableNotes.ts`) — weights become ranges
+  over a summed die, so 3/4/3 renders as a d10 reading 1-3 / 4-7 / 8-10 and
+  keeps the distribution the weighted pick had. `CustomTable` and
+  `StoryData.customTables` remain in `structs.ts` as deprecated read-only
+  back-compat; nothing writes them.
+
+## Rolling behind the screen
+
+`gm_roll` is `formula_roll` for checks the player must not know happened.
+It reports pools and computes no verdict like every other dice tool, but it
+is always resolved digitally — never handed to the physical dice tray, since
+asking the player to throw a secret roll defeats it — and it is filtered out
+of every player-facing view of the turn (the tool log in `ContextViewer`,
+the per-turn timeline in `story.tsx`).
+
+The test is whether *the existence of the roll* is a spoiler. A hidden
+Perception check is the archetype: rolled openly, a low total tells the
+player there was something to find even though their character never learned
+it. Ordinary declared actions stay on `formula_roll` — the player is
+entitled to see their own checks.
+
+Results are flagged `hiddenFromPlayer` centrally in `gmExecutor.ts`, keyed by
+tool name rather than set inside the executor, so a call that fails schema
+validation before any executor runs is still hidden — otherwise a malformed
+`gm_roll` would appear in the log and announce the secret. The timeline
+additionally drops the block by tool name, covering saves where the result is
+missing entirely. A hidden roll still satisfies the M2 roll-invariant gate:
+it settles the outcome with dice rather than with narration, which is all
+that gate asks.
 
 ## Naming
 

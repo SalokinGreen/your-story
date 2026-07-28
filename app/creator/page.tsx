@@ -19,7 +19,6 @@ import { useNotification } from "@/app/misc/NotificationContext";
 import { getAvailableModels } from "@/app/misc/ai_prices";
 import { CustomModel, getCustomModels } from "@/app/misc/user_settings";
 import { LibraryNote } from "@/app/misc/localNotesLibraryManager";
-import { LibraryTable } from "@/app/misc/localTablesLibraryManager";
 import { startAdventureLocally } from "@/app/misc/localStoryManager";
 import { draftToAdventure } from "@/app/misc/designer_executor";
 import AdventureInspector from "./AdventureInspector";
@@ -147,10 +146,10 @@ function CreatorPage() {
   const isBlank = !draft.title && !draft.premise && draft.lore.length === 0;
 
   const handleImport = useCallback(
-    (notes: LibraryNote[], tables: LibraryTable[]) => {
-      importFromLibrary(notes, tables);
+    (notes: LibraryNote[]) => {
+      importFromLibrary(notes);
       setShowImport(false);
-      const count = notes.length + tables.length;
+      const count = notes.length;
       addNotification(
         `Imported ${count} item${count === 1 ? "" : "s"} from your library`,
         "success",
@@ -338,7 +337,6 @@ function CreatorPage() {
         title="Import into this adventure"
         description="Bring saved notes, rules, character sheets and random tables into the draft. The Designer builds on top of whatever you import."
         confirmLabel="Import"
-        includeTables
       />
 
       <APIKeysModal

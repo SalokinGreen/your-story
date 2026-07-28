@@ -41,6 +41,19 @@ interface GMToolCallSummary {
   toolName?: string;
   success?: boolean;
   contextForStory?: string;
+  hiddenFromPlayer?: boolean;
+}
+
+/**
+ * Drops rolls the GM made behind its screen (`gm_roll`). This view is the
+ * player's window into the turn's mechanics, and a secret roll showing up
+ * here - even as a bare tool name with no total - would reveal that there
+ * was something to check, which is exactly what the tool exists to prevent.
+ * The rolls are still in the saved turn data and in the GM's own context;
+ * they just don't surface to the player.
+ */
+function visibleToPlayer(toolCalls: GMToolCallSummary[]): GMToolCallSummary[] {
+  return toolCalls.filter((tool) => !tool.hiddenFromPlayer);
 }
 
 interface TurnSummary {
@@ -577,9 +590,16 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const lastAssistantPart = [...storyData.scene.parts]
     .reverse()
     .find((p) => !p.user);
-  const lastToolNames: string[] = (lastAssistantPart?.gmToolCalls || [])
-    .map((t: any) => t.toolName)
-    .filter(Boolean);
+  // Hidden rolls are excluded here too. A gm_roll does satisfy the real gate
+  // (see ROLL_OR_ORACLE_TOOL_NAMES), so this indicator can read "not
+  // satisfied" on a turn the engine was happy with - that's the intended
+  // trade: an inaccurate diagnostic is cheaper than an indicator that
+  // silently announces the GM rolled for something.
+  const lastToolNames: string[] = visibleToPlayer(
+    lastAssistantPart?.gmToolCalls || [],
+  )
+    .map((t) => t.toolName)
+    .filter((name): name is string => Boolean(name));
   const lastTurnSatisfiedGate = lastToolNames.length
     ? hasSatisfiedRollGate(lastToolNames)
     : null;
@@ -602,7 +622,7 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
   const turnSummaries: TurnSummary[] = storyData.scene.parts
     .map((part, i): TurnSummary | null => {
       if (part.user) return null;
-      const toolCalls = part.gmToolCalls || [];
+      const toolCalls = visibleToPlayer(part.gmToolCalls || []);
       const stateChanges = part.stateChanges || [];
       const consistencyWarnings = part.consistencyWarnings || [];
       const observerFlags = part.observerFlags || [];

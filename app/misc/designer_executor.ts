@@ -10,7 +10,6 @@
 import {
   Adventure,
   CharacterSheetTemplate,
-  CustomTable,
   Goal,
   LoreType,
   NPC,
@@ -20,6 +19,7 @@ import {
   StoryLore,
 } from "@/app/misc/structs";
 import { createCharacterSheetTemplate } from "@/app/misc/characterSheetTemplate";
+import { migrateCustomTablesToNotes } from "@/app/misc/tableNotes";
 
 // ============================================
 // DRAFT
@@ -47,7 +47,6 @@ export interface AdventureDraft {
   startingChoices: StartingChoice[];
   presets: Preset[];
   characterSheetTemplate?: CharacterSheetTemplate;
-  customTables: CustomTable[];
 }
 
 export function createEmptyDraft(): AdventureDraft {
@@ -67,7 +66,6 @@ export function createEmptyDraft(): AdventureDraft {
     goals: [],
     startingChoices: [],
     presets: [],
-    customTables: [],
   };
 }
 
@@ -121,6 +119,7 @@ function asRecordArray(value: unknown): Record<string, unknown>[] {
 const VALID_LORE_TYPES: LoreType[] = [
   "lore",
   "secret",
+  "table",
   "mechanics",
   "character_sheet",
   "dm_instructions",
@@ -176,7 +175,6 @@ export function executeDesignerTool(
     goals: [...draft.goals],
     startingChoices: [...draft.startingChoices],
     presets: [...draft.presets],
-    customTables: [...draft.customTables],
   };
   const args = call.arguments || {};
 
@@ -505,53 +503,6 @@ export function executeDesignerTool(
       );
     }
 
-    // ---- tables ---------------------------------------------------------
-    case "write_tables": {
-      const incoming = asRecordArray(args.tables);
-      if (incoming.length === 0) return fail("No tables given.");
-      let added = 0;
-      let updated = 0;
-      for (const raw of incoming) {
-        const name = asString(raw.name)?.trim();
-        if (!name) continue;
-        const entries = asRecordArray(raw.entries)
-          .map((e) => ({
-            text: asString(e.text) ?? "",
-            weight: typeof e.weight === "number" && e.weight > 0 ? e.weight : 1,
-          }))
-          .filter((e) => e.text.trim().length > 0);
-        if (entries.length === 0) continue;
-        const patch = {
-          name,
-          description: asString(raw.description) ?? "",
-          entries,
-        };
-        const index = next.customTables.findIndex((t) => sameName(t.name, name));
-        if (index >= 0) {
-          next.customTables[index] = { ...next.customTables[index], ...patch };
-          updated++;
-        } else {
-          next.customTables.push({ id: newId("table"), ...patch });
-          added++;
-        }
-      }
-      if (added === 0 && updated === 0)
-        return fail("No tables had a usable name and at least one entry.");
-      return ok(describeWrite("table", added, updated));
-    }
-
-    case "delete_tables": {
-      const names = asStringArray(args.names) ?? [];
-      if (names.length === 0) return fail("No names given.");
-      const before = next.customTables.length;
-      next.customTables = next.customTables.filter(
-        (t) => !names.some((x) => sameName(x, t.name)),
-      );
-      const removed = before - next.customTables.length;
-      if (removed === 0) return fail(`No tables matched: ${names.join(", ")}.`);
-      return ok(`Deleted ${removed} table${removed === 1 ? "" : "s"}.`);
-    }
-
     default:
       return fail(`Unknown tool "${call.name}".`);
   }
@@ -598,7 +549,6 @@ export function draftToAdventure(draft: AdventureDraft): Partial<Adventure> {
     lore: draft.lore,
     npcs: draft.npcs.length > 0 ? draft.npcs : undefined,
     goals: draft.goals,
-    customTables: draft.customTables,
     presets: draft.presets,
   };
 
@@ -635,13 +585,19 @@ export function adventureToDraft(adventure: Partial<Adventure>): AdventureDraft 
     premise: story.premise ?? "",
     intro: story.intro ?? "",
     authorNotes: story.author_notes ?? "",
-    lore: story.lore ?? [],
+    // An adventure saved before tables became notes still carries them in
+    // the old structured shape; opening it in the creator converts them, so
+    // the author edits them as notes from here on and the draft never has a
+    // second, separate place tables can live.
+    lore:
+      migrateCustomTablesToNotes(story.lore, story.customTables) ??
+      story.lore ??
+      [],
     npcs: story.npcs ?? [],
     goals: story.goals ?? [],
     startingChoices: adventure.startingChoices ?? [],
     presets: adventure.presets ?? story.presets ?? [],
     characterSheetTemplate: adventure.characterSheetTemplate,
-    customTables: story.customTables ?? [],
   };
 }
 
@@ -701,10 +657,11 @@ export function summarizeDraft(draft: AdventureDraft): string {
         : "(none)"
     }`,
   );
+  const tableNotes = draft.lore.filter((l) => l.type === "table");
   lines.push(
-    `Random tables (${draft.customTables.length}): ${
-      draft.customTables.length
-        ? draft.customTables.map((t) => `"${t.name}"`).join(", ")
+    `Random tables (${tableNotes.length}): ${
+      tableNotes.length
+        ? tableNotes.map((l) => `"${l.title}"`).join(", ")
         : "(none)"
     }`,
   );

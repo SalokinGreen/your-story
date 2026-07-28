@@ -56,6 +56,7 @@ import {
   NARRATION_MODEL_KEY,
   type ResolvedTier,
 } from "../misc/reasoningTiers";
+import { migrateCustomTablesToNotes } from "../misc/tableNotes";
 import Story from "./story";
 import LorePage from "./lore";
 import GoalsPage from "./goals";
@@ -1216,6 +1217,19 @@ function StoryPageContent() {
 
       //Initializegoalarraysiftheydon'texist(forbackwardscompatibility)
       if (!loadedStoryData.goals) loadedStoryData.goals = [];
+
+      // Convert any legacy structured customTables into "table" notes. Runs
+      // before processLoreTriggers so the new notes get their triggers
+      // initialized on this same load rather than only on the next one.
+      const migratedLore = migrateCustomTablesToNotes(
+        loadedStoryData.lore,
+        loadedStoryData.customTables,
+      );
+      if (migratedLore) {
+        loadedStoryData.lore = migratedLore;
+        loadedStoryData.customTables = [];
+        console.log("[Story Load] Migrated custom tables to notes");
+      }
 
       //ProcessLoretriggersonloadtoinitializeLorevisibility
       processLoreTriggers(loadedStoryData, addNotification, true);

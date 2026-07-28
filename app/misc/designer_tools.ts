@@ -113,6 +113,7 @@ export const set_premise: ToolDefinition = {
 const LORE_TYPES = [
   "lore",
   "secret",
+  "table",
   "mechanics",
   "character_sheet",
   "dm_instructions",
@@ -126,6 +127,7 @@ export const write_note: ToolDefinition = {
     "Create a new note or overwrite an existing one (matched by title). Notes are the adventure's real content — this one tool covers world lore, secrets, the rules of the game, the player's character sheet, and private GM/narrator guidance. Choose the right `type`:\n" +
     "- 'lore': world, factions, locations, history. The bulk of most adventures.\n" +
     "- 'secret': twists and hidden truths. Same as lore but flagged so it isn't leaked to the player.\n" +
+    "- 'table': a random table the GM rolls on during play — encounters, complications, rumours, weather. Name a die and list what each number gives ('Roll 1d6:' then '1. ...'), and say in prose when to roll it and what the results mean. The GM rolls the die itself and reads off the entry, so context around the listing is part of the table, not decoration.\n" +
     "- 'mechanics': THE rules note. How dice work in this adventure — what to roll, how to read results, what counts as success. The GM reads this to improvise checks, so write it as instructions to a human GM, not as a rulebook. Every adventure should have exactly one.\n" +
     "- 'character_sheet': who the player is — freeform notes, not a stat block. Skills, gear, ties, and whatever numbers the mechanics note references.\n" +
     "- 'dm_instructions': private pacing/tone guidance for the GM stage.\n" +
@@ -432,69 +434,6 @@ export const set_character_sheet_template: ToolDefinition = {
 };
 
 // ============================================
-// RANDOM TABLES
-// ============================================
-
-export const write_tables: ToolDefinition = {
-  name: "write_tables",
-  description:
-    "Create or update random tables the GM can roll on during play (matched by name), e.g. encounters, complications, rumours, weather.",
-  parameters: {
-    type: "object",
-    properties: {
-      tables: {
-        type: "array",
-        description: "The tables to create or update.",
-        items: {
-          type: "object",
-          properties: {
-            name: { type: "string", description: "Table name." },
-            description: {
-              type: "string",
-              description: "What the table is for and when to roll on it.",
-            },
-            entries: {
-              type: "array",
-              description: "The possible results.",
-              items: {
-                type: "object",
-                properties: {
-                  text: { type: "string", description: "The result text." },
-                  weight: {
-                    type: "number",
-                    description:
-                      "Relative likelihood. Use 1 for an even table; raise it to make a result more common.",
-                  },
-                },
-                required: ["text"],
-              },
-            },
-          },
-          required: ["name", "entries"],
-        },
-      },
-    },
-    required: ["tables"],
-  },
-};
-
-export const delete_tables: ToolDefinition = {
-  name: "delete_tables",
-  description: "Delete random tables by name.",
-  parameters: {
-    type: "object",
-    properties: {
-      names: {
-        type: "array",
-        items: { type: "string" },
-        description: "Names of the tables to delete.",
-      },
-    },
-    required: ["names"],
-  },
-};
-
-// ============================================
 // REGISTRY
 // ============================================
 
@@ -511,8 +450,6 @@ export const DESIGNER_TOOLS: ToolDefinition[] = [
   write_presets,
   delete_presets,
   set_character_sheet_template,
-  write_tables,
-  delete_tables,
 ];
 
 export function getDesignerToolsForAPI(): {

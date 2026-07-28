@@ -1,11 +1,11 @@
 import {
   Adventure,
-  CustomTable,
   DiceMode,
   PlayerArchetype,
   StoryData,
   StoryLore,
 } from "./structs";
+import { customTableToNote } from "./tableNotes";
 import { ARCHETYPE_INFO } from "./gmAdvice";
 import { clearCachedTTSAudioForStory } from "./ttsAudioCache";
 
@@ -171,7 +171,6 @@ export async function startAdventureLocally(
   adventure: Partial<Adventure>,
   playerName: string = "Player",
   initialLore?: StoryLore[],
-  initialTables?: CustomTable[],
 ): Promise<string> {
   const localId = `local_${Date.now()}_${Math.random()
     .toString(36)
@@ -190,10 +189,13 @@ export async function startAdventureLocally(
     player_notes:
       defaultUserNotes || adventure.storyTemplate?.player_notes || "",
     characterSheetTemplate: adventure.characterSheetTemplate,
-    lore: [...(adventure.storyTemplate?.lore || []), ...(initialLore || [])],
-    customTables: [
-      ...(adventure.storyTemplate?.customTables || []),
-      ...(initialTables || []),
+    // An adventure saved before tables became notes still carries them in
+    // the old structured shape; they're rendered into notes here rather than
+    // being copied into a fresh story as legacy data.
+    lore: [
+      ...(adventure.storyTemplate?.lore || []),
+      ...(initialLore || []),
+      ...(adventure.storyTemplate?.customTables || []).map(customTableToNote),
     ],
   } as unknown as StoryData;
 
@@ -320,7 +322,6 @@ export async function startFreeformStoryLocally(
   playerName: string = "Player",
   initialLore?: StoryLore[],
   setup?: { players?: FreeformPlayerSetup[]; diceMode?: DiceMode },
-  initialTables?: CustomTable[],
 ): Promise<string> {
   const localId = `local_${Date.now()}_${Math.random()
     .toString(36)
@@ -406,7 +407,6 @@ export async function startFreeformStoryLocally(
     inventory: [],
     abilities: [],
     lore,
-    customTables: initialTables || [],
     goals: [],
     relationships: [],
     npcs: [],
@@ -459,7 +459,6 @@ export async function createJoinPlaceholderStory(
     inventory: [],
     abilities: [],
     lore: [],
-    customTables: [],
     goals: [],
     relationships: [],
     npcs: [],

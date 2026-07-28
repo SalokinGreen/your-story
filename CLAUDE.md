@@ -113,7 +113,16 @@ stat blocks"), then calls tools such as:
   one is three calls: `formula_roll` → `calculate` → `record_challenge_result`
   (which rolls nothing and just banks the outcome).
 - `fate_question` / `roll_table` — Mythic-style oracle (weighted by a 1-9
-  chaos factor) and random tables.
+  chaos factor) and the ~40 **built-in** element tables. The adventure's own
+  tables are not rolled here: they're `StoryLore` notes with `type: "table"`
+  that name a die and list its results in prose, and the GM rolls them itself
+  with `formula_roll` after reading the note.
+- `gm_roll` — a roll behind the GM's screen, for checks where the player
+  knowing a roll happened is itself the spoiler (hidden Perception, whether a
+  lie lands, offscreen events). Always digital (never routed to the physical
+  dice tray) and filtered out of the player-visible tool log and turn
+  timeline via `hiddenFromPlayer`. Ordinary player-declared actions stay on
+  `formula_roll`.
 - `start_combat` / `add_combatant` / `update_combatant_stat` /
   `toggle_combatant_condition` / `npc_roll` / `advance_turn` / `end_combat` —
   turn-based combat with its own per-combatant stat blocks, independent of the
@@ -157,6 +166,13 @@ rationale):
   character sheet note; `buildInfoMessage` already treats abilities like
   stats/resources.
 - `Passives` — gone (never actually affected mechanics).
+- `CustomTable[]`/`StoryData.customTables` (structured `{text, weight}`
+  tables, `rollOnCustomTable`, the in-story Tables tab, the Designer's
+  `write_tables`/`delete_tables`, and the separate Tables Library) — gone;
+  tables are `type: "table"` notes. Old data converts on load via
+  `tableNotes.ts` (stories/adventures) and `tablesLibraryMigration.ts` (the
+  library). The interfaces survive in `structs.ts` as deprecated read-only
+  back-compat for that conversion; nothing writes them.
 
 Old saves keep these fields for backward compatibility; the GM doesn't read
 them and the UI doesn't expose them.
@@ -171,11 +187,11 @@ lives in `app/misc/designer_ai.ts`.
 
 The pieces:
 
-- `designer_tools.ts` — 14 tools, all targeting things the GM actually reads:
+- `designer_tools.ts` — 12 tools, all targeting things the GM actually reads:
   `set_adventure_info`, `set_premise`, `write_note`/`delete_note` (one tool for
-  every `LoreType`, including the mechanics note and character sheet),
-  `write_npcs`, `write_goals`, `set_starting_choices`, `write_presets`,
-  `set_character_sheet_template`, `write_tables`, plus deletes.
+  every `LoreType`, including the mechanics note, the character sheet and
+  random tables), `write_npcs`, `write_goals`, `set_starting_choices`,
+  `write_presets`, `set_character_sheet_template`, plus deletes.
 - `designer_executor.ts` — the deterministic half. Owns `AdventureDraft` (a
   flat working shape), applies tool calls to a *copy* so a malformed call can't
   corrupt the draft, and converts to/from `Adventure` via
@@ -185,9 +201,10 @@ The pieces:
   keyword-triggered.
 - `useDesignerSession.ts` — the bounded tool loop (max 5 rounds/turn), the
   chat transcript, IndexedDB save, and `importFromLibrary()`, which merges
-  notes/tables picked from the global notes library (`LibraryPickerModal`,
-  shared with story start and the in-game lore editor) into the draft. Imports
-  dedupe on `libraryNoteId`/`libraryTableId` so re-importing updates in place;
+  notes picked from the global notes library (`LibraryPickerModal`,
+  shared with story start and the in-game lore editor) into the draft — tables
+  come through here too, as `type: "table"` notes. Imports
+  dedupe on `libraryNoteId` so re-importing updates in place;
   the Designer learns about imported material through `summarizeDraft()`, not
   through the transcript. The creator offers this on opening a blank adventure
   and from the header's Import button at any time.

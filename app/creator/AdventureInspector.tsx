@@ -92,8 +92,14 @@ export default function AdventureInspector({
 
   const mechanicsNotes = draft.lore.filter((l) => l.type === "mechanics");
   const sheetNotes = draft.lore.filter((l) => l.type === "character_sheet");
+  // Random tables are notes now, so they're edited like every other note -
+  // they just get their own section instead of being mixed into world notes.
+  const tableNotes = draft.lore.filter((l) => l.type === "table");
   const otherNotes = draft.lore.filter(
-    (l) => l.type !== "mechanics" && l.type !== "character_sheet",
+    (l) =>
+      l.type !== "mechanics" &&
+      l.type !== "character_sheet" &&
+      l.type !== "table",
   );
 
   const updateNote = (title: string, patch: Partial<StoryLore>) => {
@@ -123,7 +129,7 @@ export default function AdventureInspector({
         id: "tables",
         label: "Tables",
         icon: "Table",
-        count: draft.customTables.length,
+        count: tableNotes.length,
       },
     ];
 
@@ -570,52 +576,13 @@ export default function AdventureInspector({
           ))}
 
         {openSection === "tables" &&
-          (draft.customTables.length === 0 ? (
-            <EmptyHint>No random tables yet.</EmptyHint>
+          (tableNotes.length === 0 ? (
+            <EmptyHint>
+              No random tables yet. A table is a note that names a die and
+              lists what each number gives — the GM rolls it during play.
+            </EmptyHint>
           ) : (
-            <div className="space-y-2">
-              {draft.customTables.map((table) => (
-                <div
-                  key={table.id}
-                  className="bg-white/[0.03] border border-white/10 rounded-xl p-3"
-                >
-                  <div className="flex items-start justify-between gap-2 mb-1.5">
-                    <div className="min-w-0">
-                      <p className="font-medium text-white text-sm">
-                        {table.name}
-                      </p>
-                      <p className="text-[11px] text-white/40">
-                        {table.entries.length} entries
-                      </p>
-                    </div>
-                    <button
-                      onClick={() =>
-                        onChange({
-                          customTables: draft.customTables.filter(
-                            (t) => t.id !== table.id,
-                          ),
-                        })
-                      }
-                      className="p-1.5 rounded-md hover:bg-red-500/20 text-white/40 hover:text-red-300 transition-colors shrink-0"
-                    >
-                      <DynamicIcon name="Trash2" className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                  <ul className="text-xs text-white/45 space-y-0.5">
-                    {table.entries.slice(0, 5).map((entry, i) => (
-                      <li key={i} className="truncate">
-                        · {entry.text}
-                      </li>
-                    ))}
-                    {table.entries.length > 5 && (
-                      <li className="text-white/25">
-                        +{table.entries.length - 5} more
-                      </li>
-                    )}
-                  </ul>
-                </div>
-              ))}
-            </div>
+            <div className="space-y-2">{tableNotes.map(renderNoteCard)}</div>
           ))}
       </div>
     </div>

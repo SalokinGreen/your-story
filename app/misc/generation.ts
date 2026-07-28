@@ -147,6 +147,7 @@ import { getCustomModelIfUUID, CustomModel } from "@/app/misc/user_settings";
 // dice tools report numbers, and a comparison coming out FALSE is an answer.
 const DICE_TOOLS = [
   "formula_roll",
+  "gm_roll",
   "ask_for_roll",
   "opposed_formula",
   "npc_roll",

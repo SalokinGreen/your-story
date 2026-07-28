@@ -446,6 +446,10 @@ export function buildInfoMessage(
       isPinnedType(type) ||
       type === "mechanics" ||
       type === "secret" ||
+      // Tables are GM-side reference material, listed in their own section of
+      // the GM Stage prompt. The narrator has no use for a list of tables it
+      // can't roll, and mixing them into World Lore just spends context.
+      type === "table" ||
       type === "story_instructions" // Excluded - only for Story Stage
     );
   };
@@ -1100,6 +1104,7 @@ export function buildGMStagePrompt({
       faction: [],
       event: [],
       secret: [],
+      table: [],
     };
     for (const l of notes || []) {
       if (l.enabled === false) continue;
@@ -1107,6 +1112,8 @@ export function buildGMStagePrompt({
       const type = l.type || "lore";
       if (type === "secret") {
         categories.secret.push(l);
+      } else if (type === "table") {
+        categories.table.push(l);
       } else if (type === "npc") {
         categories.npc.push(l);
       } else if (type === "location") {
@@ -1216,6 +1223,15 @@ export function buildGMStagePrompt({
   if (noteCategories.secret.length > 0) {
     loreSection += `\n## 🔒 SECRETS (use read_notes to view)\n`;
     loreSection += noteCategories.secret
+      .map((l) => `- ${l.title}.md`)
+      .join("\n");
+    loreSection += "\n";
+  }
+  // This adventure's random tables. They're notes, so `roll_table` doesn't
+  // touch them - the GM reads one and rolls it with formula_roll.
+  if (noteCategories.table.length > 0) {
+    loreSection += `\n## 🎲 TABLES (use read_notes to view, then roll the die the note names with formula_roll and read off the result)\n`;
+    loreSection += noteCategories.table
       .map((l) => `- ${l.title}.md`)
       .join("\n");
     loreSection += "\n";
@@ -1591,12 +1607,13 @@ You and the player can talk OOC by wrapping text in (round brackets).
 - **Enemy attacks**: Roll for them using their stats, compare with \`calculate\`, apply damage to player resources
 - **Multiple enemies**: Start formal combat with \`start_combat\` for initiative tracking
 - **In combat, on the player's turn**: Still use \`formula_roll\` for the player's attacks/checks, never \`npc_roll\` - \`npc_roll\` is for NPC combatants only and resolves silently with no animation, so using it for the player would hide their own roll from them (the tool rejects this)
+- **Behind the screen**: use \`gm_roll\` when the player *knowing a roll happened* would itself give the game away - a hidden Perception check, whether a lie lands, whether the patrol notices them, whether something offscreen goes their way. A player who sees you roll knows there was something to find, whatever the total said. Then narrate only what the character perceives: on a failed hidden check describe the scene as ordinary, never "you notice nothing unusual". Everything the player openly attempts stays on \`formula_roll\` - secrecy protects surprises, it isn't for dodging scrutiny.
 - **Routine actions**: No roll needed - just narrate success${manualDiceSection}
 
 ### Tables (USE THEM - DON'T JUST IMPROVISE)
-- Before inventing random content (loot, encounters, NPC traits, weather, complications, plot twists, rumors, etc.), check whether a relevant table exists and roll on it with \`roll_table\` instead of making it up.
-- **Custom tables** defined by this adventure take priority - check those first.
-- **Built-in AGMT tables** are always available as a fallback (character traits, locations, plot twists, magic items, and more - see the \`roll_table\` tool description for the full list).
+- Before inventing random content (loot, encounters, NPC traits, weather, complications, plot twists, rumors, etc.), check whether a relevant table exists and roll on it instead of making it up.
+- **This adventure's own tables are notes** (the 🎲 Tables section of your notes) and take priority - check those first. You roll them yourself: read the note, roll the die it names with \`formula_roll\`, and read off the entry that came up. The note is prose, so read what it says around the listing too - when to roll it, what the results mean, whether an entry sends you somewhere else.
+- **Built-in AGMT tables** are the fallback, rolled with \`roll_table\` (character traits, locations, plot twists, magic items, and more - see the tool description for the full list).
 - Only improvise freely when no matching table exists. Tables keep the world feeling alive and unpredictable instead of relying on the same GM instincts every time.
 
 ### Naming (DON'T REACH FOR THE FIRST NAME THAT COMES TO MIND)
@@ -1686,6 +1703,8 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
   const legacyToolNames = [
     // Rolling tools (formula-based)
     "formula_roll",
+    // Rolls the player never sees - hidden checks, offscreen events
+    "gm_roll",
     // Manual dice mode: player rolls real dice, GM asks for the result
     ...(manualDiceMode ? ["ask_for_roll"] : []),
     // Pause and ask the player(s) a predefined-choice + free-text question

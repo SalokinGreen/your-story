@@ -8,8 +8,7 @@ import FullScreenView from "./FullScreenView";
 import LibraryPickerModal from "./LibraryPickerModal";
 import JoinGameModal from "./JoinGameModal";
 import { libraryNoteToStoryLore } from "../misc/localNotesLibraryManager";
-import { libraryTableToCustomTable } from "../misc/localTablesLibraryManager";
-import type { CustomTable, DiceMode, PlayerArchetype, StoryLore } from "../misc/structs";
+import type { DiceMode, PlayerArchetype, StoryLore } from "../misc/structs";
 import type { FreeformPlayerSetup } from "../misc/localStoryManager";
 import type { MPBackend } from "../misc/multiplayer/types";
 import { ARCHETYPE_INFO } from "../misc/gmAdvice";
@@ -152,7 +151,6 @@ export default function GuidedStoryStart() {
     null,
   );
   const [attachedLore, setAttachedLore] = useState<StoryLore[]>([]);
-  const [attachedTables, setAttachedTables] = useState<CustomTable[]>([]);
   const [diceMode, setDiceMode] = useState<DiceMode>("ai");
   const [showJoinGameModal, setShowJoinGameModal] = useState(false);
   // "Play Online" path: you set up only your own profile and host a room others
@@ -203,7 +201,6 @@ export default function GuidedStoryStart() {
     setPlayerIndex(0);
     setPlayers([]);
     setAttachedLore([]);
-    setAttachedTables([]);
     setDiceMode("ai");
     setHostOnlineMode(false);
     setOpen(true);
@@ -329,7 +326,6 @@ export default function GuidedStoryStart() {
         setupPlayers[0]?.name || "Player",
         attachedLore.length ? attachedLore : undefined,
         { players: setupPlayers, diceMode },
-        attachedTables.length ? attachedTables : undefined,
       );
       if (hostOnline) {
         const params = new URLSearchParams({
@@ -908,17 +904,8 @@ export default function GuidedStoryStart() {
                       className="flex-1 px-3 py-2.5 rounded-xl border bg-white/5 hover:bg-white/10 border-white/10 text-blue-200/70 text-xs font-medium transition-all flex items-center justify-center gap-1.5"
                     >
                       <DynamicIcon name="Library" className="w-4 h-4" />
-                      {noteCount > 0 || attachedTables.length > 0
-                        ? [
-                            noteCount > 0
-                              ? `${noteCount} note${noteCount === 1 ? "" : "s"}`
-                              : null,
-                            attachedTables.length > 0
-                              ? `${attachedTables.length} table${attachedTables.length === 1 ? "" : "s"}`
-                              : null,
-                          ]
-                            .filter(Boolean)
-                            .join(", ") + " attached"
+                      {noteCount > 0
+                        ? `${noteCount} note${noteCount === 1 ? "" : "s"} attached`
                         : "Bring world notes"}
                     </button>
                   </div>
@@ -990,21 +977,12 @@ export default function GuidedStoryStart() {
         title="Bring World Notes"
         description="Attach saved lore, mechanics, GM notes, or random tables before you start."
         confirmLabel="Attach & Continue"
-        includeTables
-        onImport={(notes, tables) => {
+        onImport={(notes) => {
           const chosen = notes.map(libraryNoteToStoryLore);
           setAttachedLore((prev) => [
             ...prev,
             ...chosen.filter(
               (c) => !prev.some((p) => p.libraryNoteId === c.libraryNoteId),
-            ),
-          ]);
-          const chosenTables = tables.map(libraryTableToCustomTable);
-          setAttachedTables((prev) => [
-            ...prev,
-            ...chosenTables.filter(
-              (c) =>
-                !prev.some((p) => p.libraryTableId === c.libraryTableId),
             ),
           ]);
           setPickerMode(null);

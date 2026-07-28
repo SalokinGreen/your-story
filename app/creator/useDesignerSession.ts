@@ -29,10 +29,6 @@ import {
   LibraryNote,
   libraryNoteToStoryLore,
 } from "@/app/misc/localNotesLibraryManager";
-import {
-  LibraryTable,
-  libraryTableToCustomTable,
-} from "@/app/misc/localTablesLibraryManager";
 import { APIKeys } from "@/app/misc/APIKeysContext";
 import { getCustomModelIfUUID } from "@/app/misc/user_settings";
 import { getRequiredKeyForModel } from "@/app/misc/ai_prices";
@@ -188,11 +184,10 @@ export function useDesignerSession({
    * handles that), matching what the Designer's own tools do.
    */
   const importFromLibrary = useCallback(
-    (notes: LibraryNote[], tables: LibraryTable[]) => {
-      if (notes.length === 0 && tables.length === 0) return;
+    (notes: LibraryNote[]) => {
+      if (notes.length === 0) return;
 
       const incomingLore = notes.map(libraryNoteToStoryLore);
-      const incomingTables = tables.map(libraryTableToCustomTable);
 
       const current = draftRef.current;
       const lore = [...current.lore];
@@ -206,22 +201,9 @@ export function useDesignerSession({
         else lore.push(note);
       }
 
-      const customTables = [...current.customTables];
-      for (const table of incomingTables) {
-        const index = customTables.findIndex(
-          (t) =>
-            (table.libraryTableId &&
-              t.libraryTableId === table.libraryTableId) ||
-            t.name.trim().toLowerCase() === table.name.trim().toLowerCase(),
-        );
-        if (index >= 0)
-          customTables[index] = { ...customTables[index], ...table };
-        else customTables.push(table);
-      }
-
       // The tool loop reads draftRef synchronously, so keep it in step with
       // the state update rather than waiting for the mirroring effect.
-      const next = { ...current, lore, customTables };
+      const next = { ...current, lore };
       draftRef.current = next;
       setDraft(next);
       setDirty(true);
@@ -229,21 +211,8 @@ export function useDesignerSession({
       // Record the import in the transcript. The Designer reads the draft
       // summary rather than this message, but the author should see what
       // landed and what it means for the adventure.
-      const parts: string[] = [];
-      if (incomingLore.length > 0) {
-        parts.push(
-          `${incomingLore.length} note${incomingLore.length === 1 ? "" : "s"}`,
-        );
-      }
-      if (incomingTables.length > 0) {
-        parts.push(
-          `${incomingTables.length} table${incomingTables.length === 1 ? "" : "s"}`,
-        );
-      }
-      const titles = [
-        ...incomingLore.map((l) => l.title),
-        ...incomingTables.map((t) => t.name),
-      ];
+      const parts = [`${notes.length} note${notes.length === 1 ? "" : "s"}`];
+      const titles = incomingLore.map((l) => l.title);
       setMessages((prev) => [
         ...prev,
         {

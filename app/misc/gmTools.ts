@@ -81,6 +81,28 @@ export interface FormulaRollParams {
 }
 
 /**
+ * A roll made behind the GM's screen. Same dice as formula_roll, but the
+ * player never sees it: it's always resolved digitally (never handed to the
+ * physical dice tray, even in Physical Dice Mode, since asking the player to
+ * throw a roll is the opposite of hiding it) and it's filtered out of the
+ * player-facing tool-call log.
+ *
+ * This is for rolls whose *existence* is information the player shouldn't
+ * have - a hidden Perception check the character would fail without knowing
+ * they failed, whether an NPC's lie lands, whether the patrol notices them.
+ * Rolling those openly tells the player there was something to notice.
+ */
+export interface GMRollParams {
+  formulas: string[]; // ["1d20+3"], same shape and rules as formula_roll
+  labels?: string[]; // Optional per-pool labels, parallel to `formulas`
+  reason: string; // What this settles - GM-facing only, never shown to the player
+  display_name?: string;
+  // Why it's hidden rather than open. Recorded with the roll so the
+  // reasoning survives into the log the author can inspect later.
+  secret_because?: string;
+}
+
+/**
  * Manual dice mode: ask the player to roll physical dice and report what
  * they got. Only offered when storyData.diceMode === "manual". The frontend
  * pauses the GM loop, shows a roll prompt, and returns the player's answer
@@ -621,6 +643,7 @@ export type GMToolParams =
   | { name: "calculate"; params: CalculateParams }
   | { name: "take_rest"; params: TakeRestParams }
   | { name: "formula_roll"; params: FormulaRollParams }
+  | { name: "gm_roll"; params: GMRollParams }
   | { name: "ask_for_roll"; params: AskForRollParams }
   | { name: "ask_question"; params: AskQuestionParams }
   | { name: "opposed_formula"; params: OpposedFormulaParams }
@@ -891,6 +914,62 @@ Never pack independent pools into one formula string ("1d6+2d10") - that adds th
           type: "string",
           description:
             "Optional: name of the stat/resource the flat modifier comes from (e.g. 'Strength'). If it matches a tracked stat/resource, the modifier is cross-checked against it as an integrity check. Omit for narrative-only or character_sheet-lore-based adventures with no tracked stats/resources.",
+        },
+      },
+      required: ["formulas", "reason"],
+    },
+  },
+};
+
+const gmRollTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "gm_roll",
+    description: `Roll behind your screen. Same dice as \`formula_roll\`, but the player never sees that a roll happened at all - it stays out of the roll log they can inspect, and it is never handed to them to throw.
+
+**Use this when the player knowing a roll occurred is itself a spoiler.** That's the whole test. A hidden Perception check is the classic case: if you roll it openly and the player sees a low total, they know there was something to find even though their character doesn't. The roll leaked the secret regardless of the result.
+
+Use for:
+- Checks the character would fail *without knowing they failed* - spotting an ambush, noticing a tail, sensing a lie, resisting an effect they can't feel
+- Whether an NPC's deception or persuasion lands on the player character
+- Whether something offscreen happens - does the patrol pass this way, does the poison take hold tonight, does the rival reach the site first
+- Anything where "the GM picked up dice" would tip the player off
+
+Do NOT use it for:
+- Ordinary player-character actions with a declared outcome - those are \`formula_roll\`, rolled in the open, because the player is entitled to see their own check
+- NPC combat rolls - those are \`npc_roll\`
+- Hiding a roll you simply don't want the player to argue with. Secrecy is for protecting the fiction's surprises, not for avoiding scrutiny.
+
+Like every dice tool, it reports what came up and judges nothing - no DC. Compare with \`calculate\` as usual. Then narrate only what the character would actually perceive: on a failed hidden Perception check, describe the corridor as unremarkable - do NOT write "you notice nothing unusual", which tells the player there was something to notice.`,
+    parameters: {
+      type: "object",
+      properties: {
+        formulas: {
+          type: "array",
+          minItems: 1,
+          items: { type: "string" },
+          description:
+            "One entry per independent dice pool, with actual numbers filled in (e.g. [\"1d20+3\"]). Same rules as formula_roll - never pack separate pools into one string.",
+        },
+        labels: {
+          type: "array",
+          items: { type: "string" },
+          description:
+            "Optional labels for each pool, parallel to `formulas`.",
+        },
+        reason: {
+          type: "string",
+          description:
+            "What this roll settles. GM-facing only - the player never sees it.",
+        },
+        display_name: {
+          type: "string",
+          description: "Optional label for the roll (e.g. 'Hidden Perception').",
+        },
+        secret_because: {
+          type: "string",
+          description:
+            "Why this roll is hidden rather than open - what the player would learn if they saw it.",
         },
       },
       required: ["formulas", "reason"],
@@ -1213,14 +1292,14 @@ const rollTableTool: ToolSchema = {
   type: "function",
   function: {
     name: "roll_table",
-    description: `Roll on a custom table or built-in AGMT table for random content generation. Use it freely - any time you're about to invent open-ended detail, roll for it instead of going with the first idea that comes to mind.
+    description: `Roll on a built-in AGMT table for random content generation. Use it freely - any time you're about to invent open-ended detail, roll for it instead of going with the first idea that comes to mind.
 
 Use when (any of these, not just the dramatic ones):
 - You're inventing open-ended content: loot, an encounter, a rumor, weather, a complication, a plot twist, what a room contains
 - You're fleshing out a new NPC (appearance, personality, background, motivation) or a new location
 - You need a detail and your first instinct feels familiar - that's exactly the reflex this tool exists to break
-- The adventure has custom tables (weather, encounters, NPCs, etc.)
-- You want to use built-in element tables for inspiration
+
+**This adventure's own tables are NOT rolled here.** They're notes (\`type: "table"\`), and you roll them yourself: find the note, roll the die it names with \`formula_roll\`, and read off the entry that came up. Always check for one of those before falling back to a built-in table - an adventure's own weather or encounter table beats a generic one. This tool covers only the built-in list below.
 
 Reserve improvising for when no table fits. A rolled result you have to work with produces a stranger, more alive world than one you picked because it was convenient.
 
@@ -1232,16 +1311,14 @@ BUILT-IN TABLES (always available):
 - Items: magic_item, scavenging_results
 - Narrative: plot_twists, cryptic_message, curses, visions_dreams
 - Atmosphere: smells, sounds, adventure_tone
-- Other: names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions
-
-Adventure-specific custom tables take priority over built-in tables with the same name.`,
+- Other: names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions`,
     parameters: {
       type: "object",
       properties: {
         table_name: {
           type: "string",
           description:
-            "Name of the table to roll on (case-insensitive, partial match supported, underscores or spaces OK)",
+            "Name of the built-in table to roll on (case-insensitive, partial match supported, underscores or spaces OK). Not for this adventure's own tables - those are notes you roll yourself with formula_roll.",
         },
         reason: {
           type: "string",
@@ -2509,6 +2586,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   takeRestTool,
   // Formula-based tools (primary dice mechanics)
   formulaRollTool,
+  gmRollTool,
   askForRollTool,
   askQuestionTool,
   opposedFormulaTool,

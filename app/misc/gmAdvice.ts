@@ -340,7 +340,7 @@ export const GM_ADVICE_TIPS: GMAdviceTip[] = [
   // --- Oracle & Randomness (fighting the pull toward safe, predictable outcomes) ---
   { id: 235, category: "oracle", context: "any", text: "Before deciding an unresolved world fact or a hidden NPC reaction yourself, ask fate_question with an honestly calibrated likelihood instead of defaulting to whatever feels safe or pleasant." },
   { id: 236, category: "oracle", context: "any", text: "Don't default fate_question to 50/50 out of habit - actually weigh what you believe the odds are and pick Very Unlikely/Unlikely or Very Likely/Likely accordingly." },
-  { id: 237, category: "oracle", context: "any", text: "Use roll_table (or a quick custom table) to generate encounters, complications, or NPC reactions instead of always picking the option that feels nicest." },
+  { id: 237, category: "oracle", context: "any", text: "Roll one of this adventure's table notes, or a built-in roll_table, to generate encounters, complications, or NPC reactions instead of always picking the option that feels nicest." },
   { id: 238, category: "oracle", context: "any", text: "When you notice yourself steering every outcome toward what pleases the player, that's the moment to hand the decision to the oracle instead." },
   { id: 239, category: "oracle", context: "any", text: "Treat an Exceptional Yes or Exceptional No from fate_question as a mandate to swing the fiction hard, not a nudge to soften." },
   { id: 240, category: "oracle", context: "any", text: "A high chaos factor means the world should behave unpredictably right now - let an oracle result introduce a twist you wouldn't have chosen yourself." },
