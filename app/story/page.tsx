@@ -257,14 +257,60 @@ function handleObserverReset(
   );
 }
 
-// Fired via GenerationCallbacks.onBackgroundObserverFlags - only reachable
-// when the observer ran in the background (generateStoryTurn's
-// resetPossible was false, so a rewrite/reset was never on the table) and
-// found something worth flagging after the turn already completed and
-// control was already handed back to the player. storyData.scene.parts was
-// already patched in place by generateStoryTurn itself (same object
-// reference), so this just needs to re-render/persist/notify - mirrors the
-// observerFlags branch inside onComplete below, just arriving later.
+// Fired via GenerationCallbacks.onBackgroundObserverRewrite - the observer
+// ran in the background (generateStoryTurn deferred it because no check
+// could plausibly fire, see observer.ts's plausibleResetFlagTypes), found a
+// major violation anyway, and rewrote the narration after the player already
+// had control. generateStoryTurn has already patched the scene part itself,
+// so this only re-renders, persists, and tells the player - which matters
+// more here than on the blocking path, since the text they were reading just
+// changed under them.
+//
+// setStoryText is deliberately conditional on this still being the newest
+// part: that state drives TTS and the composer's view of "the current
+// response", and a late rewrite landing after the player has already taken
+// another turn must not drag those back to an older one.
+function handleBackgroundObserverRewrite(
+  storyData: StoryData,
+  flags: ObserverFlag[],
+  triggeringFlag: ObserverFlag,
+  rewrittenNarration: string,
+  partIndex: number,
+  setStoryText: (text: string) => void,
+  setStoryData: (data: StoryData) => void,
+  saveProgress: (data: StoryData, immediate?: boolean) => void,
+  addNotification: (
+    message: string,
+    type: "success" | "failure" | "info" | "warning",
+  ) => void,
+) {
+  if (partIndex === storyData.scene.parts.length - 1) {
+    setStoryText(rewrittenNarration);
+  }
+  setStoryData({ ...storyData });
+  saveProgress(storyData, true);
+
+  logger.action("Observer rewrote narration in the background", {
+    type: triggeringFlag.type,
+    detail: triggeringFlag.detail,
+    partIndex,
+    totalFlags: flags.length,
+  });
+
+  addNotification(
+    `Narration revised: ${triggeringFlag.detail} Use "Undo revision" to keep the original.`,
+    "warning",
+  );
+}
+
+// Fired via GenerationCallbacks.onBackgroundObserverFlags - the observer ran
+// in the background (see above) and found flags that it could NOT fix by
+// rewriting: minor ones, a tier_escalation_missed (only a full-turn retry
+// fixes that, which the background pass never does), or a major one whose
+// rewrite call failed. storyData.scene.parts was already patched in place by
+// generateStoryTurn itself (same object reference), so this just needs to
+// re-render/persist/notify - mirrors the observerFlags branch inside
+// onComplete below, just arriving later.
 function handleBackgroundObserverFlags(
   storyData: StoryData,
   flags: ObserverFlag[],
@@ -1958,6 +2004,12 @@ function StoryPageContent() {
       choices: [],
     };
 
+    // Set by onStoryStart (see GenerationCallbacks.onStoryStart) - true when
+    // the GM's own last round wrote the prose, meaning the live timeline has
+    // already streamed it and the single onStoryContent that follows must not
+    // append it again.
+    let narratedByGMStage = false;
+
     try {
       const maxToolLoops =
         typeof window !== "undefined"
@@ -2109,7 +2161,14 @@ function StoryPageContent() {
               thinkingLines: thinking?.length || 0,
               usage,
             });
-            setLiveGMEntries([]);
+            // Freeze, don't clear. Clearing wiped the entire live timeline -
+            // the thought/tool pills AND the prose the GM had just streamed -
+            // the moment the GM stage ended, which collapsed the message back
+            // to story.tsx's "Thinking..." placeholder (it renders whenever
+            // the timeline is empty and the turn is still loading) and left it
+            // there for the whole observer pass. The blocks stay put now; the
+            // story stage only appends when it has text of its own to add.
+            setLiveGMEntries((prev) => freezeBlocks(prev));
 
             // Player modeling (PaSSAGE-inspired), second signal: classify
             // this turn's actual GM tool-call activity (what happened),
@@ -2179,6 +2238,9 @@ function StoryPageContent() {
 
             setLoadingStage("story");
           },
+          onStoryStart: (narratedByGM) => {
+            narratedByGMStage = narratedByGM;
+          },
           onStoryReasoning: (delta, fullReasoning) => {
             setLiveGMEntries((prev) =>
               updateLiveReasoningBlock(prev, fullReasoning),
@@ -2201,7 +2263,12 @@ function StoryPageContent() {
             // storyText is sufficient for display, full update happens in onStoryComplete
             // Fallback story stage (GM stage narrated nothing itself) - append as a
             // trailing streaming text block after the GM's thinking/tool blocks.
-            setLiveGMEntries((prev) => appendStreamingText(prev, fullContent));
+            // Skipped when the GM narrated inline: that prose is already in the
+            // timeline (streamed via onGMContent), so appending the whole thing
+            // again would show the turn twice.
+            if (!narratedByGMStage) {
+              setLiveGMEntries((prev) => appendStreamingText(prev, fullContent));
+            }
             setLoading(false); // Let player read while tools/choices generate
             setPendingUserChoice(""); // Clear pending choice - response is here
           },
@@ -2307,6 +2374,25 @@ function StoryPageContent() {
             handleBackgroundObserverFlags(
               storyData,
               flags,
+              setStoryData,
+              saveProgress,
+              addNotification,
+            );
+          },
+          onBackgroundObserverRewrite: (
+            flags,
+            triggeringFlag,
+            rewrittenNarration,
+            original,
+            partIndex,
+          ) => {
+            handleBackgroundObserverRewrite(
+              storyData,
+              flags,
+              triggeringFlag,
+              rewrittenNarration,
+              partIndex,
+              setStoryText,
               setStoryData,
               saveProgress,
               addNotification,
@@ -2528,6 +2614,12 @@ function StoryPageContent() {
       toolCallingEnabled,
     });
 
+    // Set by onStoryStart (see GenerationCallbacks.onStoryStart) - true when
+    // the GM's own last round wrote the prose, meaning the live timeline has
+    // already streamed it and the single onStoryContent that follows must not
+    // append it again.
+    let narratedByGMStage = false;
+
     const maxToolLoops =
       typeof window !== "undefined"
         ? parseInt(localStorage.getItem("maxToolLoops") || "10", 10)
@@ -2674,7 +2766,12 @@ function StoryPageContent() {
               usage,
             });
 
-            setLiveGMEntries([]);
+            // Freeze, don't clear - see the matching comment on the custom
+            // input path above. This path was the worst case of the two:
+            // it never re-added the narration afterwards, so the message
+            // collapsed to "Thinking..." the instant the GM stopped streaming
+            // and stayed there until the observer finished.
+            setLiveGMEntries((prev) => freezeBlocks(prev));
 
             if (gmResults.length > 0) {
               partialPart.gmToolCalls = gmResults;
@@ -2712,6 +2809,9 @@ function StoryPageContent() {
 
             setLoadingStage("story");
           },
+          onStoryStart: (narratedByGM) => {
+            narratedByGMStage = narratedByGM;
+          },
           onStoryReasoning: (delta, fullReasoning) => {
             setLiveGMEntries((prev) =>
               updateLiveReasoningBlock(prev, fullReasoning),
@@ -2728,10 +2828,20 @@ function StoryPageContent() {
             }
 
             setStoryText(fullContent);
+            // Separate story stage (the GM stage narrated nothing itself) -
+            // append as a trailing streaming text block after the GM's
+            // thinking/tool blocks. This path used to skip the live timeline
+            // entirely, so the story stage streamed into a bubble that was
+            // still showing "Thinking...". Skipped when the GM narrated
+            // inline, where the prose is already in the timeline.
+            if (!narratedByGMStage) {
+              setLiveGMEntries((prev) => appendStreamingText(prev, fullContent));
+            }
             setLoading(false); // Let player read while tools/choices generate
             setPendingUserChoice(""); // Clear pending choice - response is here
           },
           onStoryComplete: (content: string, usage: any) => {
+            setLiveGMEntries((prev) => freezeBlocks(prev));
             partialPart.content = content;
             setStoryText(content);
             setStoryData({ ...storyData }); // Full update only at completion
@@ -2832,6 +2942,25 @@ function StoryPageContent() {
             handleBackgroundObserverFlags(
               storyData,
               flags,
+              setStoryData,
+              saveProgress,
+              addNotification,
+            );
+          },
+          onBackgroundObserverRewrite: (
+            flags,
+            triggeringFlag,
+            rewrittenNarration,
+            original,
+            partIndex,
+          ) => {
+            handleBackgroundObserverRewrite(
+              storyData,
+              flags,
+              triggeringFlag,
+              rewrittenNarration,
+              partIndex,
+              setStoryText,
               setStoryData,
               saveProgress,
               addNotification,
@@ -3815,6 +3944,25 @@ function StoryPageContent() {
             handleBackgroundObserverFlags(
               storyData,
               flags,
+              setStoryData,
+              saveProgress,
+              addNotification,
+            );
+          },
+          onBackgroundObserverRewrite: (
+            flags,
+            triggeringFlag,
+            rewrittenNarration,
+            original,
+            partIndex,
+          ) => {
+            handleBackgroundObserverRewrite(
+              storyData,
+              flags,
+              triggeringFlag,
+              rewrittenNarration,
+              partIndex,
+              setStoryText,
               setStoryData,
               saveProgress,
               addNotification,

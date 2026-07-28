@@ -16,7 +16,15 @@
  * fresh, blind attempt. Same fail-open posture as the M2 roll-invariant gate
  * (reasoningTiers.ts/generation.ts): never block play indefinitely.
  *
- * Two things scope every check below:
+ * Three things scope every check below:
+ * - Deferral (plausibleResetFlagTypes): whether the player WAITS on any of
+ *   this is decided per-turn, before a single call is made, from free
+ *   deterministic signals - the word count, which comparisons resolved, which
+ *   tools ran, what tier the turn used. A turn where none of them could
+ *   produce a reset-eligible flag hands control straight back to the player
+ *   and gets judged in generateStoryTurn's background wave instead, which can
+ *   still rewrite (just not roll the turn back). See that function's comment
+ *   for why player_agency is deliberately not on the list.
  * - Suspension (observerSuspensionReason): session zero - a brand-new story
  *   up to and including the turn that calls start_game - is never judged.
  *   Setup turns legitimately run long and legitimately propose character
@@ -195,6 +203,144 @@ export function canObserverTriggerReset(
       return s.enabled && s.triggersReset;
     },
   );
+}
+
+/**
+ * Which flag types could plausibly produce a reset-eligible "major" flag for
+ * THIS turn, judged only from signals that are free and deterministic - the
+ * word count, which tools ran, which comparisons resolved, what tier the turn
+ * used. No API call, no reading comprehension, no guessing.
+ *
+ * canObserverTriggerReset above answers "can a rewrite ever happen with this
+ * config", which is true by default and therefore true on nearly every turn.
+ * That made the observer block the player behind a full round of judge calls
+ * on every single turn, including the overwhelming majority where no check
+ * could have fired in the first place: a turn inside the length ceiling, with
+ * no comparisons to contradict, already at the top tier, that used the oracle.
+ * This answers the narrower and much more useful question - "could a rewrite
+ * happen HERE" - so generateStoryTurn can hand control straight back to the
+ * player and run the observer in the background whenever the answer is no.
+ *
+ * player_agency is deliberately absent. It is the one reset-eligible check
+ * with no free pre-signal at all: telling "the GM decided what the player
+ * character does" apart from "the GM narrated an NPC" needs the judge, and
+ * any regex standing in for it would be wrong in both directions. Listing it
+ * here would mean "always plausible", which is exactly the always-block
+ * behavior this function exists to end - so agency violations are caught by
+ * the background pass instead, which can still rewrite, just after the player
+ * already has control.
+ *
+ * Erring toward NOT listing a type is safe: a missed one still gets judged in
+ * the background wave and can still be rewritten there. The only thing lost
+ * is the guarantee that the player never reads the flagged draft.
+ */
+export function plausibleResetFlagTypes(params: {
+  narration: string;
+  replyLength?: ReplyLength;
+  /** This turn's tool results - reused for both the outcome-comparison and tool-usage-gap preconditions. */
+  rollResults?: RollOutcomeForCheck[];
+  toolNames?: string[];
+  tierUsed?: number;
+  /**
+   * Whether this turn carried a deterministic high-stakes marker - active
+   * combat, an active challenge, or a high/deadly-stakes roll declared this
+   * scene. reasoningTiers.ts's isSceneGatedForRoll is exactly this predicate
+   * and is what callers should pass. See the tier_escalation_missed branch
+   * below for why it gates that check specifically.
+   */
+  highStakes?: boolean;
+  settings?: ObserverSettings;
+}): ObserverFlagType[] {
+  const { narration, rollResults = [], toolNames = [], tierUsed } = params;
+  if (!narration.trim()) return [];
+
+  const types: ObserverFlagType[] = [];
+  const canReset = (type: ObserverFlagType): boolean => {
+    const s = settingsFor(params.settings, type);
+    return s.enabled && s.triggersReset;
+  };
+
+  // Free and exact: this is the same word count checkResponseLength runs, and
+  // if it doesn't trip there is no length flag for the judge to justify.
+  if (
+    canReset("response_length") &&
+    prospectiveLengthFlag(
+      narration,
+      params.replyLength,
+      settingsFor(params.settings, "response_length"),
+    )
+  ) {
+    types.push("response_length");
+  }
+
+  // checkOutcomeMismatch returns null without a call when no comparison
+  // resolved this turn, and caps itself at "minor" (never reset-eligible)
+  // when the comparisons came out mixed - both are decided from the booleans
+  // alone, so both can be decided here too.
+  if (canReset("outcome_narration_mismatch")) {
+    const relevant = rollResults.filter((r) =>
+      OUTCOME_CHECK_TOOL_NAMES.has(r.toolName),
+    );
+    const mixed =
+      relevant.length > 1 &&
+      relevant.some((r) => r.success) &&
+      relevant.some((r) => !r.success);
+    if (relevant.length > 0 && !mixed) {
+      types.push("outcome_narration_mismatch");
+    }
+  }
+
+  // The two tool-usage gaps only report "major" past the sensitivity
+  // threshold, and are skipped entirely for a turn that already did the thing
+  // they ask about.
+  if (
+    canReset("missing_oracle_or_table") &&
+    settingsFor(params.settings, "missing_oracle_or_table").sensitivity >=
+      TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD &&
+    !toolNames.some((name) => ORACLE_OR_TABLE_TOOL_NAMES.has(name))
+  ) {
+    types.push("missing_oracle_or_table");
+  }
+  if (
+    canReset("missing_scene_increment") &&
+    settingsFor(params.settings, "missing_scene_increment").sensitivity >=
+      TOOL_USAGE_MAJOR_SENSITIVITY_THRESHOLD &&
+    !toolNames.includes("increment_scene")
+  ) {
+    types.push("missing_scene_increment");
+  }
+
+  // Two conditions, and the second is the interesting one.
+  //
+  // "Below the top tier" is only checkTierEscalation's own precondition (it
+  // bails before making its call at TOP_TIER) - and with a baseline of
+  // SCENE_BASELINE_TIER and a top of TOP_TIER, it is true on the great
+  // majority of turns. On its own it would make this type permanently
+  // plausible, which is the always-block behavior this whole function exists
+  // to end.
+  //
+  // So it is also gated on the turn carrying a real stakes marker. This is
+  // the one check whose correction is a FULL-TURN reset rather than a
+  // rewrite - the turn is re-run at a higher tier and the dice come out
+  // differently - which is both the most expensive correction in the system
+  // and the only one the background pass can't perform (it can't roll a turn
+  // back underneath a player who has already read it). Spending that on
+  // banter and NPC chatter, where a shallower adjudication costs nothing, is
+  // a bad trade; spending it on a combat round or a deadly-stakes check,
+  // where it costs the fiction, is the trade it was designed for. Ordinary
+  // turns therefore get judged in the background and their flag stays
+  // advisory - the GM still hears about it next turn via
+  // buildObserverWarningNote and can self-escalate.
+  if (
+    canReset("tier_escalation_missed") &&
+    tierUsed !== undefined &&
+    tierUsed < TOP_TIER &&
+    params.highStakes === true
+  ) {
+    types.push("tier_escalation_missed");
+  }
+
+  return types;
 }
 
 function clampSensitivity(sensitivity: number): number {
