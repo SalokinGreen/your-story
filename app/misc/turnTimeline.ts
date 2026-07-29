@@ -19,6 +19,8 @@
  * it no longer changes what's hidden vs shown; only <thinking> does.
  */
 
+import { stripLeakedToolCallMarkup } from "./toolCallFallback";
+
 export type TimelineBlockKind = "thinking" | "tool" | "text";
 
 export interface TimelineBlock {
@@ -52,12 +54,29 @@ function nextId(): string {
 }
 
 const TAG_NAMES = ["thinking", "output"];
+// Tag names from leaked tool-call markup (see toolCallFallback.ts). They are
+// never rendered, but they have to be recognized while streaming so a
+// half-arrived `<||DSML||inv` is held back instead of flashing on screen for
+// a chunk before stripLeakedToolCallMarkup can see the whole opener.
+const LEAKED_MARKUP_TAG_NAMES = [
+  "invoke",
+  "parameter",
+  "tool_calls",
+  "function_calls",
+];
+const NAMESPACE_PREFIX = /^(?:\|+[^|<>\s]*\|+|[a-z][\w.-]*:)\s*/;
 
 /** Could `tail` (a suffix starting with "<") still grow into a recognized tag? */
 function isPossibleTagPrefix(tail: string): boolean {
   const body = tail.slice(1).replace(/^\s*\/\s*/, "").trimStart().toLowerCase();
   if (body.length === 0) return true;
-  return TAG_NAMES.some((name) => name.startsWith(body) || body.startsWith(name));
+  // A pipe-opened namespace token (`<|DSML|…`, `<||DSML||…`) can only be the
+  // start of leaked markup, however little of it has arrived so far.
+  if (body.startsWith("|")) return true;
+  const name = body.replace(NAMESPACE_PREFIX, "");
+  return [...TAG_NAMES, ...LEAKED_MARKUP_TAG_NAMES].some(
+    (tag) => tag.startsWith(name) || name.startsWith(tag),
+  );
 }
 
 /**
@@ -87,7 +106,11 @@ const TAG_BOUNDARY = /<\s*(\/)?\s*(thinking|output)\s*>/gi;
  */
 export function parseTaggedContent(raw: string): Array<Omit<TimelineBlock, "id">> {
   if (!raw) return [];
-  const { safe } = splitPendingTag(raw);
+  const { safe: rawSafe } = splitPendingTag(raw);
+  // Tool-call markup the inference backend failed to strip from `content`
+  // is never narration - drop it before anything else looks at the text, so
+  // it can't reach the player mid-stream or get saved into the scene.
+  const safe = stripLeakedToolCallMarkup(rawSafe);
   if (!safe.trim()) return [];
 
   TAG_BOUNDARY.lastIndex = 0;

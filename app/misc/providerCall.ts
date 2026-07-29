@@ -19,7 +19,10 @@
 import { getModelConfig, AIModelConfig } from "@/app/misc/ai_prices";
 import { logger } from "@/app/misc/logger";
 import { CustomModel } from "@/app/misc/user_settings";
-import { extractFallbackToolCalls } from "@/app/misc/toolCallFallback";
+import {
+  extractFallbackToolCalls,
+  stripLeakedToolCallMarkup,
+} from "@/app/misc/toolCallFallback";
 import {
   SamplingSettings,
   filterSettingsForProvider,
@@ -557,7 +560,7 @@ export async function generateNonStreaming(
     }
 
     const aiResponse = (await response.json()) as AIResponse;
-    const content = aiResponse.choices[0]?.message?.content || "";
+    let content = aiResponse.choices[0]?.message?.content || "";
     // DeepSeek-native models put CoT in `reasoning_content`; OpenRouter/others
     // in `reasoning`. Read whichever is present so reasoning is preserved into
     // saved history regardless of provider.
@@ -576,6 +579,10 @@ export async function generateNonStreaming(
           { provider, recoveredCount: recovered.length, names: recovered.map((c) => c.function.name) },
         );
         toolCalls = recovered;
+        // The call now lives in `toolCalls`; leaving its raw markup in
+        // `content` too would both show it to the player and teach the model
+        // to repeat the leak next round, since content goes into history.
+        content = stripLeakedToolCallMarkup(content);
       }
     }
 
