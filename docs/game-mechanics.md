@@ -139,6 +139,13 @@ narrative and the adventure's `mechanics` note.
   `StoryData.customTables` remain in `structs.ts` as deprecated read-only
   back-compat; nothing writes them.
 
+  Every way a table gets *authored* produces that note directly: the
+  Designer's `write_note`, the notes library, and the PDF/OCR importer, which
+  asks the extraction model for `tableNotes` — a title and prose naming the
+  die and its results (`ocrSummarizeCall.ts`). A model that answers with the
+  old structured shape anyway still has it rendered into a note rather than
+  dropped, both in the committed result and in the live preview.
+
 ## Rolling behind the screen
 
 `gm_roll` is `formula_roll` for checks the player must not know happened.

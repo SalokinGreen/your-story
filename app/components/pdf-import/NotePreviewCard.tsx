@@ -26,7 +26,7 @@ export interface PreviewNote {
   streaming?: boolean;
 }
 
-type NoteKind = "lore" | "mechanics" | "character_sheet";
+type NoteKind = "lore" | "mechanics" | "character_sheet" | "table";
 
 const KIND_STYLES: Record<
   NoteKind,
@@ -53,10 +53,21 @@ const KIND_STYLES: Record<
     accent: "text-emerald-300",
     ring: "hover:border-emerald-400/30",
   },
+  table: {
+    label: "Table",
+    icon: "Table",
+    chip: "bg-purple-500/15 text-purple-200 ring-1 ring-purple-400/25",
+    accent: "text-purple-300",
+    ring: "hover:border-purple-400/30",
+  },
 };
 
 function noteKind(note: PreviewNote, fallback: NoteKind): NoteKind {
-  if (note.type === "mechanics" || note.type === "character_sheet") {
+  if (
+    note.type === "mechanics" ||
+    note.type === "character_sheet" ||
+    note.type === "table"
+  ) {
     return note.type;
   }
   if (note.type === "lore") return "lore";

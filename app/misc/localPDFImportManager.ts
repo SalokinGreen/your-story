@@ -5,7 +5,8 @@
  * Much larger storage limits than localStorage (~5MB vs hundreds of MB).
  */
 
-import { StoryLore, CustomTable } from "./structs";
+import { CustomTable, StoryLore } from "./structs";
+import { migrateCustomTablesToNotes } from "./tableNotes";
 
 const DB_NAME = "YourStoryPDFImportsDB";
 const STORE_NAME = "pdf_imports";
@@ -40,9 +41,31 @@ export interface LocalPDFImport {
   fileName: string;
   lore: StoryLore[];
   mechanicNotes: StoryLore[];
-  customTables: CustomTable[];
+  /** Random tables, as `type: "table"` notes (see tableNotes.ts). */
+  tableNotes: StoryLore[];
   summary: string;
   failedPages?: FailedPageRange[];
+  /**
+   * @deprecated Records written before tables became notes. Read on load and
+   * converted into `tableNotes`; never written.
+   */
+  customTables?: CustomTable[];
+}
+
+/**
+ * Records saved before the extractor stopped producing structured tables
+ * carry them in `customTables` and have no `tableNotes` at all. Everything
+ * that reads a stored import goes through this, so the rest of the app only
+ * ever sees notes.
+ */
+function withTableNotes<T extends { tableNotes?: StoryLore[]; customTables?: CustomTable[] }>(
+  record: T,
+): T & { tableNotes: StoryLore[] } {
+  // `?? []` rather than a plain read: the stored record predates the field
+  // whenever it carries `customTables`, whatever its declared type says.
+  const tableNotes = record.tableNotes ?? [];
+  const migrated = migrateCustomTablesToNotes(tableNotes, record.customTables);
+  return { ...record, tableNotes: migrated ?? tableNotes };
 }
 
 // Per-chunk state persisted for resuming an interrupted chunked import.
@@ -58,7 +81,11 @@ export interface PersistedChunkStatus {
   result?: {
     lore: StoryLore[];
     mechanicNotes: StoryLore[];
-    customTables: CustomTable[];
+    // Filled in by `withTableNotes` on the way out for records written
+    // before tables were notes, so readers never see it missing.
+    tableNotes: StoryLore[];
+    /** @deprecated Pre-table-notes records - converted on load. */
+    customTables?: CustomTable[];
   };
 }
 
@@ -166,7 +193,12 @@ export async function getImportInProgress(): Promise<
     return undefined;
   }
 
-  return record;
+  return {
+    ...record,
+    chunkStatuses: record.chunkStatuses.map((cs) =>
+      cs.result ? { ...cs, result: withTableNotes(cs.result) } : cs,
+    ),
+  };
 }
 
 /** Discard the in-progress import record (job finished or user cancelled it). */
@@ -187,7 +219,7 @@ export async function savePDFImport(
   data: {
     lore: StoryLore[];
     mechanicNotes: StoryLore[];
-    customTables: CustomTable[];
+    tableNotes: StoryLore[];
     summary: string;
     failedPages?: FailedPageRange[];
   },
@@ -201,7 +233,7 @@ export async function savePDFImport(
     fileName,
     lore: data.lore,
     mechanicNotes: data.mechanicNotes,
-    customTables: data.customTables,
+    tableNotes: data.tableNotes,
     summary: data.summary,
     failedPages: data.failedPages,
   };
@@ -228,7 +260,8 @@ export async function getPDFImport(
     const store = transaction.objectStore(STORE_NAME);
     const request = store.get(importId);
 
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () =>
+      resolve(request.result ? withTableNotes(request.result) : undefined);
     request.onerror = () => reject(request.error);
   });
 }
@@ -256,7 +289,7 @@ export async function listPDFImports(): Promise<LocalPDFImport[]> {
           // Mark for deletion
           expiredIds.push(imp.id);
         } else {
-          imports.push(imp);
+          imports.push(withTableNotes(imp));
         }
         cursor.continue();
       } else {

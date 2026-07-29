@@ -40,7 +40,7 @@ const DONE_RESULT = {
   summary: "A rulebook.",
   lore: [{ title: "Karth", content: "A port city." }],
   mechanicNotes: [],
-  customTables: [],
+  tableNotes: [],
   detectedContentType: "rulebook",
   rawExtractedTables: 0,
   extractionRounds: 1,
@@ -65,7 +65,7 @@ describe("streamSummarizeOCR", () => {
         { type: "round_start", round: 1, part: 0, totalParts: 1, reason: "initial" },
         { type: "delta", text: '{"lore":[{"title":"Karth"' },
         { type: "delta", text: ',"content":"A port city."}]}' },
-        { type: "round_end", round: 1, lore: 1, mechanicNotes: 0, customTables: 0 },
+        { type: "round_end", round: 1, lore: 1, mechanicNotes: 0, tableNotes: 0 },
         { type: "done", result: DONE_RESULT },
       ]),
     );

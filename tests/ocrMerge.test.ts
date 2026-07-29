@@ -7,7 +7,7 @@
 import { describe, it, expect } from "vitest";
 import { mergeDeterministic, mergeLoreEntries } from "@/app/misc/ocrMerge";
 import { validateMergeGroups } from "@/app/misc/ocrMergeCall";
-import { StoryLore, CustomTable } from "@/app/misc/structs";
+import { StoryLore } from "@/app/misc/structs";
 
 function makeLore(overrides: Partial<StoryLore>): StoryLore {
   return {
@@ -96,35 +96,50 @@ describe("mergeDeterministic", () => {
     expect(result.mechanicNotes[0].content).toContain("Beat the DC to succeed.");
   });
 
-  it("merges custom tables with the same normalized name and dedupes entries", () => {
-    const tableA: CustomTable = {
-      id: "table-1",
-      name: "Weather Conditions",
-      description: "",
-      entries: [
-        { text: "Sunny", weight: 5 },
-        { text: "Rainy", weight: 3 },
-      ],
-    };
-    const tableB: CustomTable = {
-      id: "table-2",
-      name: "weather conditions",
-      description: "Roll for weather each day.",
-      entries: [
-        { text: "Rainy", weight: 3 },
-        { text: "Stormy", weight: 1 },
-      ],
-    };
+  it("merges table notes with the same normalized title", () => {
+    const tableA = makeLore({
+      title: "Weather Conditions",
+      content: "Roll 1d6:\n1-5. Sunny\n6. Rainy",
+      type: "table",
+      on: false,
+    });
+    const tableB = makeLore({
+      title: "weather conditions",
+      content: "Roll for weather each day.\n\nRoll 1d4:\n1-3. Rainy\n4. Stormy",
+      type: "table",
+      on: false,
+    });
 
     const result = mergeDeterministic([], [], [tableA, tableB]);
 
-    expect(result.customTables).toHaveLength(1);
-    expect(result.customTables[0].description).toBe("Roll for weather each day.");
-    expect(result.customTables[0].entries.map((e) => e.text)).toEqual([
-      "Sunny",
-      "Rainy",
-      "Stormy",
-    ]);
+    expect(result.tableNotes).toHaveLength(1);
+    expect(result.mergedCount).toBe(1);
+    expect(result.tableNotes[0].type).toBe("table");
+    expect(result.tableNotes[0].content).toContain("1-5. Sunny");
+    expect(result.tableNotes[0].content).toContain("4. Stormy");
+    // Merging two halves of a table is no reason to start carrying it in
+    // every prompt - it stays keyword-triggered reference material.
+    expect(result.tableNotes[0].on).toBe(false);
+  });
+
+  it("leaves near-miss table titles alone - they are different rolls", () => {
+    const forest = makeLore({
+      title: "Wilderness Encounters (Forest)",
+      content: "Roll 1d6:\n1. Wolves",
+      type: "table",
+      on: false,
+    });
+    const swamp = makeLore({
+      title: "Wilderness Encounters (Swamp)",
+      content: "Roll 1d6:\n1. Leeches",
+      type: "table",
+      on: false,
+    });
+
+    const result = mergeDeterministic([], [], [forest, swamp]);
+
+    expect(result.tableNotes).toHaveLength(2);
+    expect(result.mergedCount).toBe(0);
   });
 });
 

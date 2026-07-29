@@ -8,7 +8,6 @@ import {
   StoryLore,
   Relationship,
   AGMTState,
-  CustomTable,
   Variable,
   NumberVariable,
   BooleanVariable,
@@ -37,8 +36,6 @@ import {
   libraryNoteToStoryLore,
   storyLoreToLibraryNoteFields,
 } from "../../misc/localNotesLibraryManager";
-import { createLibraryTable } from "../../misc/localTablesLibraryManager";
-import { customTableToNote } from "../../misc/tableNotes";
 import PDFImporter from "../../components/PDFImporter";
 import LibraryPickerModal from "../../components/LibraryPickerModal";
 
@@ -273,10 +270,12 @@ export default function LoreEditor({
   const handlePDFImportComplete = async (data: {
     lore: StoryLore[];
     mechanicNotes: StoryLore[];
-    customTables: CustomTable[];
+    tableNotes: StoryLore[];
     summary: string;
   }) => {
-    const allNotes = [...data.lore, ...data.mechanicNotes];
+    // Tables arrive as notes like everything else the import produced, so
+    // they take the same route into the story and into the library.
+    const allNotes = [...data.lore, ...data.mechanicNotes, ...data.tableNotes];
 
     let savedCount = 0;
     const linkedNotes: StoryLore[] = [];
@@ -294,47 +293,23 @@ export default function LoreEditor({
       }
     }
 
-    let savedTableCount = 0;
-    const linkedTables: CustomTable[] = [];
-    for (const table of data.customTables) {
-      try {
-        const libraryTable = await createLibraryTable({
-          name: table.name,
-          description: table.description,
-          entries: table.entries,
-          tags: [],
-          source: "ocr",
-        });
-        linkedTables.push({ ...table, libraryTableId: libraryTable.id });
-        savedTableCount++;
-      } catch (e) {
-        console.error("Error saving OCR table to library:", e);
-        linkedTables.push(table);
-      }
-    }
-
-    // Notes and tables land in one write - tables arrive from the extractor
-    // in the old structured shape and become table notes here, so everything
-    // the import produced ends up in the same list.
-    const imported = [...linkedNotes, ...linkedTables.map(customTableToNote)];
-    if (imported.length > 0) {
-      const updated = [...localLore, ...imported];
+    if (linkedNotes.length > 0) {
+      const updated = [...localLore, ...linkedNotes];
       setLocalLore(updated);
       onUpdate(updated);
     }
 
-    if (allNotes.length === 0 && linkedTables.length === 0) return;
+    if (allNotes.length === 0) return;
 
+    const tableCount = data.tableNotes.length;
     const parts = [
-      allNotes.length > 0
-        ? `${allNotes.length} note${allNotes.length === 1 ? "" : "s"} (saved ${savedCount} to library)`
-        : null,
-      linkedTables.length > 0
-        ? `${linkedTables.length} table${linkedTables.length === 1 ? "" : "s"} (saved ${savedTableCount} to library)`
+      `${allNotes.length} note${allNotes.length === 1 ? "" : "s"} (saved ${savedCount} to library)`,
+      tableCount > 0
+        ? `${tableCount} of them table${tableCount === 1 ? "" : "s"}`
         : null,
     ].filter(Boolean);
 
-    addNotification(`Added ${parts.join(" and ")} to this story`, "success");
+    addNotification(`Added ${parts.join(", ")} to this story`, "success");
   };
 
   return (
