@@ -330,6 +330,15 @@ export function useDesignerSession({
           historyRef.current.push({
             role: "assistant",
             content,
+            // Carried back into the next round because a reasoning model in
+            // thinking mode requires its own chain of thought alongside the
+            // tool calls it made - DeepSeek rejects the follow-up request
+            // outright without it (see providerCall.ts's reasoning_content
+            // handling).
+            ...(data.reasoning ? { reasoning: data.reasoning } : {}),
+            ...(data.reasoning_details?.length
+              ? { reasoning_details: data.reasoning_details }
+              : {}),
             ...(toolCalls.length > 0 ? { tool_calls: data.toolCalls } : {}),
           });
 

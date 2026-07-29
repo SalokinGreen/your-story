@@ -414,3 +414,137 @@ describe("reasoning field forwarding on outgoing messages (buildRequestMessages)
     expect(assistantMsg.reasoning).toBeUndefined();
   });
 });
+
+/**
+ * DeepSeek's thinking mode rejects a request whose assistant messages carried
+ * tool calls without their `reasoning_content` - "The `reasoning_content` in
+ * the thinking mode must be passed back to the API", HTTP 400
+ * (api-docs.deepseek.com/guides/thinking_mode). The GM stage is a tool loop,
+ * so every round after the first hit this: the CoT was captured off the
+ * response but never sent back under the name DeepSeek expects.
+ */
+describe("DeepSeek thinking-mode reasoning_content round-trip", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  const TOOL_ROUND: GenerateRequestBody["messages"] = [
+    { role: "user", content: "> try the door" },
+    {
+      role: "assistant",
+      content: "",
+      reasoning: "Locked door, opposed roll against the lock.",
+      tool_calls: [
+        {
+          id: "call_1",
+          type: "function",
+          function: { name: "formula_roll", arguments: '{"formulas":["1d20+3"]}' },
+        },
+      ],
+    },
+    { role: "tool", content: "Rolled 17.", tool_call_id: "call_1" },
+  ];
+
+  it("sends the captured reasoning back as reasoning_content", async () => {
+    const fetchMock = mockJsonFetchOnce(SIMPLE_RESPONSE);
+
+    await generateNonStreaming({
+      messages: TOOL_ROUND,
+      model: "DeepSeek V4 Flash",
+      deepseekKey: "test-key",
+      reasoningEffort: "high",
+    });
+
+    const assistantMsg = capturedBody(fetchMock).messages.find(
+      (m: { role: string }) => m.role === "assistant",
+    );
+    expect(assistantMsg.reasoning_content).toBe(
+      "Locked door, opposed roll against the lock.",
+    );
+    // Verbatim - truncating or summarizing it is rejected too.
+    expect(assistantMsg.tool_calls).toHaveLength(1);
+  });
+
+  it("still sends the key on a tool-call message whose reasoning is gone", async () => {
+    // Compaction prunes reasoning off aged scene parts, and legacy saves
+    // synthesize tool calls with none. Omitting the field is a guaranteed
+    // 400, so an empty value is the only remaining shot.
+    const fetchMock = mockJsonFetchOnce(SIMPLE_RESPONSE);
+
+    await generateNonStreaming({
+      messages: [
+        TOOL_ROUND[0],
+        { ...TOOL_ROUND[1], reasoning: undefined },
+        TOOL_ROUND[2],
+      ],
+      model: "DeepSeek V4 Flash",
+      deepseekKey: "test-key",
+      reasoningEffort: "high",
+    });
+
+    const assistantMsg = capturedBody(fetchMock).messages.find(
+      (m: { role: string }) => m.role === "assistant",
+    );
+    expect(assistantMsg.reasoning_content).toBe("");
+  });
+
+  it("leaves an ordinary assistant message without tool calls alone", async () => {
+    const fetchMock = mockJsonFetchOnce(SIMPLE_RESPONSE);
+
+    await generateNonStreaming({
+      messages: [
+        { role: "user", content: "go north" },
+        { role: "assistant", content: "You head north." },
+        { role: "user", content: "look around" },
+      ],
+      model: "DeepSeek V4 Flash",
+      deepseekKey: "test-key",
+      reasoningEffort: "high",
+    });
+
+    const assistantMsg = capturedBody(fetchMock).messages.find(
+      (m: { role: string }) => m.role === "assistant",
+    );
+    expect(assistantMsg.reasoning_content).toBeUndefined();
+  });
+
+  it("does not put reasoning_content on a prefill the model is still writing", async () => {
+    const fetchMock = mockJsonFetchOnce(SIMPLE_RESPONSE);
+
+    await generateNonStreaming({
+      messages: [
+        { role: "user", content: "go north" },
+        {
+          role: "assistant",
+          content: "<thinking>",
+          reasoning: "leftover from an earlier round",
+        },
+      ],
+      model: "DeepSeek V4 Flash",
+      deepseekKey: "test-key",
+    });
+
+    const messages = capturedBody(fetchMock).messages;
+    const prefill = messages[messages.length - 1];
+    expect(prefill.prefix).toBe(true);
+    expect(prefill.reasoning_content).toBeUndefined();
+  });
+
+  it("does not leak reasoning_content into other providers' requests", async () => {
+    const fetchMock = mockJsonFetchOnce(SIMPLE_RESPONSE);
+
+    await generateNonStreaming({
+      messages: TOOL_ROUND,
+      model: "GLM 5.2",
+      openRouterKey: "test-key",
+    });
+
+    const assistantMsg = capturedBody(fetchMock).messages.find(
+      (m: { role: string }) => m.role === "assistant",
+    );
+    expect(assistantMsg.reasoning_content).toBeUndefined();
+    expect(assistantMsg.reasoning).toBe(
+      "Locked door, opposed roll against the lock.",
+    );
+  });
+});
