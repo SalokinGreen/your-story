@@ -169,6 +169,34 @@ describe("extractFallbackToolCalls", () => {
     expect(JSON.parse(calls![0].function.arguments)).toEqual({ title: "Nik" });
   });
 
+  // The delimiter around the namespace token is the part that keeps
+  // changing - full-width pipes, extra pipes, padding spaces. The structure
+  // underneath never does, so every spelling has to recover identically.
+  const spellings: Array<[string, (tag: string) => string]> = [
+    ["single ASCII pipes", (tag) => `|DSML|${tag}`],
+    ["double ASCII pipes", (tag) => `||DSML||${tag}`],
+    ["full-width pipes", (tag) => `｜｜DSML｜｜${tag}`],
+    ["space-padded pipes", (tag) => `| | DSML | | ${tag}`],
+    ["colon namespace", (tag) => `dsml:${tag}`],
+    ["no namespace", (tag) => tag],
+  ];
+
+  for (const [label, ns] of spellings) {
+    it(`recovers leaked markup with ${label}`, () => {
+      const content =
+        `<${ns("tool_calls")}> <${ns("invoke")} name="search_notes"> ` +
+        `<${ns("parameter")} name="query" string="true">setting lore</${ns("parameter")}> ` +
+        `</${ns("invoke")}> </${ns("tool_calls")}>`;
+      const calls = extractFallbackToolCalls(content);
+      expect(calls).not.toBeNull();
+      expect(calls![0].function.name).toBe("search_notes");
+      expect(JSON.parse(calls![0].function.arguments)).toEqual({
+        query: "setting lore",
+      });
+      expect(stripLeakedToolCallMarkup(content)).toBe("");
+    });
+  }
+
   it("still returns null for prose that merely mentions a tool", () => {
     expect(
       extractFallbackToolCalls(

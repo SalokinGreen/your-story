@@ -2500,8 +2500,21 @@ async function generateStoryTurnOnce(
           // toolCallFallback.ts): the call itself is recovered into
           // `toolCalls` server-side, and leaving the raw markup here would
           // write it into the scene and back into conversation history.
+          const gmCleanedContent = stripLeakedToolCallMarkup(gmContent);
+          if (gmCleanedContent !== gmContent) {
+            // Worth a line in the log: it means the provider handed back its
+            // own tool-call template as text, and tells us which model/round
+            // did it next time this resurfaces.
+            logger.action("Stripped leaked tool-call markup from GM content", {
+              round: gmRound,
+              model: gmModel,
+              removedChars: gmContent.length - gmCleanedContent.length,
+              recoveredToolCalls: gmToolCalls.length,
+            });
+          }
+
           const gmResult = {
-            content: stripLeakedToolCallMarkup(gmContent),
+            content: gmCleanedContent,
             reasoning: gmReasoning,
             reasoning_details: gmReasoningDetails,
             toolCalls: gmToolCalls,
