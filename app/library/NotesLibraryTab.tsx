@@ -9,7 +9,7 @@ import NewFolderDialog from "@/app/components/NewFolderDialog";
 import { DraggableScroll } from "../components/DraggableScroll";
 import { LibrarySkeleton } from "@/app/components/Skeleton";
 import PDFImporter from "@/app/components/PDFImporter";
-import { LoreType, StoryLore, CustomTable } from "@/app/misc/structs";
+import { LoreType, StoryLore } from "@/app/misc/structs";
 import {
   listLibraryNotes,
   createLibraryNote,
@@ -508,20 +508,19 @@ export default function NotesLibraryTab({
     data: {
       lore: StoryLore[];
       mechanicNotes: StoryLore[];
-      customTables: CustomTable[];
+      tableNotes: StoryLore[];
       summary: string;
     },
     targetFolder?: string,
   ) => {
     const allNotes = [...data.lore, ...data.mechanicNotes];
-    if (allNotes.length === 0 && data.customTables.length === 0) return;
+    if (allNotes.length === 0 && data.tableNotes.length === 0) return;
 
     try {
-      // The extractor still reports tables in the structured shape it pulls
-      // out of the PDF; they're rendered into table notes here so everything
-      // an import produces lands in one library, as one kind of thing.
-      const createdNotes = await Promise.all([
-        ...allNotes.map((note) =>
+      // Tables come out of the extractor as notes like everything else, so
+      // the whole import is one list saved one way.
+      const createdNotes = await Promise.all(
+        [...allNotes, ...data.tableNotes].map((note) =>
           createLibraryNote({
             title: note.title,
             content: note.content,
@@ -535,29 +534,14 @@ export default function NotesLibraryTab({
             keys: note.keys || [],
           }),
         ),
-        ...data.customTables.map((table) => {
-          const note = customTableToNote(table);
-          return createLibraryNote({
-            title: note.title,
-            content: note.content,
-            type: "table",
-            tags: [],
-            folderId: targetFolder,
-            pinned: false,
-            source: "ocr",
-            relatedCharacters: [],
-            relatedLocations: [],
-            keys: note.keys || [],
-          });
-        }),
-      ]);
+      );
       setNotes((prev) => [...createdNotes, ...prev]);
       const parts = [
         allNotes.length > 0
           ? `${allNotes.length} note${allNotes.length === 1 ? "" : "s"}`
           : null,
-        data.customTables.length > 0
-          ? `${data.customTables.length} table${data.customTables.length === 1 ? "" : "s"}`
+        data.tableNotes.length > 0
+          ? `${data.tableNotes.length} table${data.tableNotes.length === 1 ? "" : "s"}`
           : null,
       ].filter(Boolean);
       addNotification(

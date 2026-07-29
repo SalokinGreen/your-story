@@ -3,9 +3,8 @@
 import { useMemo, useState } from "react";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import NotePreviewCard, { PreviewNote } from "./NotePreviewCard";
-import TablePreviewCard, { PreviewTable } from "./TablePreviewCard";
 
-export type { PreviewNote, PreviewTable };
+export type { PreviewNote };
 
 type Filter = "all" | "lore" | "mechanics" | "tables";
 
@@ -17,21 +16,21 @@ function matches(text: string, query: string): boolean {
 }
 
 /**
- * The extracted material from one chunk, file or saved import: notes and
- * tables as cards, filterable by kind and searchable once there are enough
- * of them to hunt through.
+ * The extracted material from one chunk, file or saved import - lore,
+ * mechanics and tables, all of them notes - as cards, filterable by kind and
+ * searchable once there are enough of them to hunt through.
  */
 export default function ExtractionPreview({
   lore,
   mechanicNotes,
-  customTables,
+  tableNotes,
   streaming = false,
   emptyMessage = "Nothing extracted yet.",
   scrollClass,
 }: {
   lore: PreviewNote[];
   mechanicNotes: PreviewNote[];
-  customTables: PreviewTable[];
+  tableNotes: PreviewNote[];
   /** True while entries are still arriving, for the live indicator. */
   streaming?: boolean;
   emptyMessage?: string;
@@ -46,17 +45,12 @@ export default function ExtractionPreview({
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
 
-  const total = lore.length + mechanicNotes.length + customTables.length;
+  const total = lore.length + mechanicNotes.length + tableNotes.length;
   const needle = query.trim().toLowerCase();
 
   const visible = useMemo(() => {
     const noteMatches = (note: PreviewNote) =>
       !needle || matches(note.title, needle) || matches(note.content, needle);
-    const tableMatches = (table: PreviewTable) =>
-      !needle ||
-      matches(table.name, needle) ||
-      matches(table.description ?? "", needle) ||
-      table.entries.some((entry) => matches(entry.text, needle));
 
     return {
       lore: filter === "all" || filter === "lore" ? lore.filter(noteMatches) : [],
@@ -64,15 +58,15 @@ export default function ExtractionPreview({
         filter === "all" || filter === "mechanics"
           ? mechanicNotes.filter(noteMatches)
           : [],
-      customTables:
+      tableNotes:
         filter === "all" || filter === "tables"
-          ? customTables.filter(tableMatches)
+          ? tableNotes.filter(noteMatches)
           : [],
     };
-  }, [filter, needle, lore, mechanicNotes, customTables]);
+  }, [filter, needle, lore, mechanicNotes, tableNotes]);
 
   const visibleCount =
-    visible.lore.length + visible.mechanicNotes.length + visible.customTables.length;
+    visible.lore.length + visible.mechanicNotes.length + visible.tableNotes.length;
 
   const filters: { id: Filter; label: string; count: number; active: string }[] = [
     { id: "all", label: "All", count: total, active: "bg-white/15 text-white" },
@@ -91,7 +85,7 @@ export default function ExtractionPreview({
     {
       id: "tables",
       label: "Tables",
-      count: customTables.length,
+      count: tableNotes.length,
       active: "bg-purple-500/20 text-purple-100 ring-1 ring-purple-400/30",
     },
   ];
@@ -169,8 +163,12 @@ export default function ExtractionPreview({
             fallbackKind="mechanics"
           />
         ))}
-        {visible.customTables.map((table, i) => (
-          <TablePreviewCard key={`table-${table.name}-${i}`} table={table} />
+        {visible.tableNotes.map((note, i) => (
+          <NotePreviewCard
+            key={`table-${note.title}-${i}`}
+            note={note}
+            fallbackKind="table"
+          />
         ))}
       </div>
     </div>

@@ -13,6 +13,9 @@
  * so it errs towards showing something rather than being exact.
  */
 
+import { CustomTableEntry } from "./structs";
+import { renderTableEntries } from "./tableNotes";
+
 export interface PartialNote {
   title: string;
   content: string;
@@ -28,28 +31,16 @@ export interface PartialNote {
   streaming?: boolean;
 }
 
-export interface PartialTableEntry {
-  text: string;
-  weight: number;
-}
-
-export interface PartialTable {
-  name: string;
-  description?: string;
-  entries: PartialTableEntry[];
-  /** True while the model is still writing this table. */
-  streaming?: boolean;
-}
-
 export interface PartialExtraction {
   summary: string;
   lore: PartialNote[];
   mechanicNotes: PartialNote[];
-  customTables: PartialTable[];
+  /** Random tables - notes like any other (see tableNotes.ts). */
+  tableNotes: PartialNote[];
 }
 
 export function emptyPartialExtraction(): PartialExtraction {
-  return { summary: "", lore: [], mechanicNotes: [], customTables: [] };
+  return { summary: "", lore: [], mechanicNotes: [], tableNotes: [] };
 }
 
 // ============================================================================
@@ -73,7 +64,7 @@ export function parsePartialExtraction(buffer: string): PartialExtraction {
     result.summary = readStringValue(buffer, summary.start);
   }
 
-  for (const key of ["lore", "mechanicNotes"] as const) {
+  for (const key of ["lore", "mechanicNotes", "tableNotes"] as const) {
     const root = valueFor(key);
     if (!root || buffer[root.start] !== "[") continue;
     const { complete, partial } = splitArrayElements(buffer, root.start);
@@ -87,16 +78,20 @@ export function parsePartialExtraction(buffer: string): PartialExtraction {
     }
   }
 
-  const tables = valueFor("customTables");
-  if (tables && buffer[tables.start] === "[") {
-    const { complete, partial } = splitArrayElements(buffer, tables.start);
+  // A model answering with the structured table shape the extractor used to
+  // ask for still gets a preview: the same rendering the committed result
+  // puts it through (see `processParserResult`), so what shows up while it
+  // streams is what ends up being imported.
+  const legacyTables = valueFor("customTables");
+  if (legacyTables && buffer[legacyTables.start] === "[") {
+    const { complete, partial } = splitArrayElements(buffer, legacyTables.start);
     for (const src of complete) {
       const obj = parseObject(src);
-      if (obj) result.customTables.push(toTable(obj, false));
+      if (obj) result.tableNotes.push(legacyTableToNote(obj, false));
     }
     if (partial) {
       const obj = parsePartialObject(partial);
-      if (obj) result.customTables.push(toTable(obj, true));
+      if (obj) result.tableNotes.push(legacyTableToNote(obj, true));
     }
   }
 
@@ -117,16 +112,16 @@ export function mergePartialExtraction(
     summary: base.summary || next.summary,
     lore: mergeNotes(base.lore, next.lore),
     mechanicNotes: mergeNotes(base.mechanicNotes, next.mechanicNotes),
-    customTables: mergeTables(base.customTables, next.customTables),
+    tableNotes: mergeNotes(base.tableNotes, next.tableNotes),
   };
 }
 
-/** Total entries across both note lists and the tables. */
+/** Total entries across all three note lists. */
 export function countPartialExtraction(extraction: PartialExtraction): number {
   return (
     extraction.lore.length +
     extraction.mechanicNotes.length +
-    extraction.customTables.length
+    extraction.tableNotes.length
   );
 }
 
@@ -169,31 +164,6 @@ function mergeNotes(base: PartialNote[], next: PartialNote[]): PartialNote[] {
   return out;
 }
 
-function mergeTables(base: PartialTable[], next: PartialTable[]): PartialTable[] {
-  const out = [...base];
-  const index = new Map<string, number>();
-  out.forEach((table, i) => {
-    const key = titleKey(table.name);
-    if (key) index.set(key, i);
-  });
-
-  for (const table of next) {
-    const key = titleKey(table.name);
-    if (!key) {
-      out.push(table);
-      continue;
-    }
-    const existing = index.get(key);
-    if (existing === undefined) {
-      index.set(key, out.length);
-      out.push(table);
-    } else if (table.entries.length >= out[existing].entries.length) {
-      out[existing] = table;
-    }
-  }
-  return out;
-}
-
 // ============================================================================
 // Shape conversion
 // ============================================================================
@@ -227,9 +197,10 @@ function toNote(obj: JSONObject, streaming: boolean): PartialNote {
   return note;
 }
 
-function toTable(obj: JSONObject, streaming: boolean): PartialTable {
+/** Render a legacy structured table into the note it will be imported as. */
+function legacyTableToNote(obj: JSONObject, streaming: boolean): PartialNote {
   const rawEntries = Array.isArray(obj.entries) ? obj.entries : [];
-  const entries: PartialTableEntry[] = [];
+  const entries: CustomTableEntry[] = [];
   for (const raw of rawEntries) {
     if (!raw || typeof raw !== "object") continue;
     const entry = raw as JSONObject;
@@ -239,13 +210,15 @@ function toTable(obj: JSONObject, streaming: boolean): PartialTable {
     entries.push({ text, weight: Number.isFinite(weight) && weight > 0 ? weight : 1 });
   }
 
-  const table: PartialTable = {
-    name: asString(obj.name),
-    description: asString(obj.description) || undefined,
-    entries,
+  const description = asString(obj.description).trim();
+  const listing = renderTableEntries(entries);
+  const note: PartialNote = {
+    title: asString(obj.name),
+    content: [description, listing].filter(Boolean).join("\n\n"),
+    type: "table",
   };
-  if (streaming) table.streaming = true;
-  return table;
+  if (streaming) note.streaming = true;
+  return note;
 }
 
 // ============================================================================

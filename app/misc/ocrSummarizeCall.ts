@@ -4,12 +4,13 @@
  * the Vercel-hosted web build and client-side for the standalone
  * Tauri/Capacitor build, via ocrFetch.ts).
  *
- * Uses AI to convert raw OCR markdown into structured RPG notes (lore
- * entries, mechanic notes, custom tables, etc). BYOK only.
+ * Uses AI to convert raw OCR markdown into RPG notes - lore entries,
+ * mechanic notes and random tables, all of them `StoryLore`. BYOK only.
  */
 
-import { StoryLore, CustomTable } from "@/app/misc/structs";
+import { CustomTable, StoryLore } from "@/app/misc/structs";
 import { detectContentType, extractTables } from "@/app/misc/ocr";
+import { customTableToNote } from "@/app/misc/tableNotes";
 import {
   attemptJSONRepair,
   cleanContinuationContent,
@@ -49,7 +50,12 @@ export interface OCRSummarizeSuccess {
   summary: string;
   lore: StoryLore[];
   mechanicNotes: StoryLore[];
-  customTables: CustomTable[];
+  /**
+   * Random tables, as `type: "table"` notes rather than a structured table
+   * shape - the GM reads the note and rolls the die itself (see
+   * tableNotes.ts for why the structured form went away).
+   */
+  tableNotes: StoryLore[];
   detectedContentType: string;
   rawExtractedTables: number;
   /** Total generation rounds used (1 = the model finished in one response). */
@@ -81,7 +87,7 @@ export interface ExtractedContent {
   summary: string;
   lore: StoryLore[];
   mechanicNotes: StoryLore[];
-  customTables: CustomTable[];
+  tableNotes: StoryLore[];
 }
 
 /**
@@ -139,7 +145,7 @@ export type OCRSummarizeEvent =
       /** Running totals after this round was folded in. */
       lore: number;
       mechanicNotes: number;
-      customTables: number;
+      tableNotes: number;
     };
 
 export type OCRSummarizeEventHandler = (event: OCRSummarizeEvent) => void;
@@ -487,7 +493,7 @@ export async function summarizeOCR(
       round,
       lore: collected.lore.length,
       mechanicNotes: collected.mechanicNotes.length,
-      customTables: collected.customTables.length,
+      tableNotes: collected.tableNotes.length,
     });
   emitRoundEnd(1);
 
@@ -514,7 +520,7 @@ export async function summarizeOCR(
   parts[0].visited = true;
   parts[0].truncated = first.truncated;
   parts[0].producedOnlyTables =
-    notesCount(collected) === 0 && collected.customTables.length > 0;
+    notesCount(collected) === 0 && collected.tableNotes.length > 0;
 
   let rounds = 1;
   // Truncation continuations are the only rounds the user's setting caps;
@@ -572,7 +578,7 @@ export async function summarizeOCR(
     });
 
     const notesBefore = notesCount(collected);
-    const tablesBefore = collected.customTables.length;
+    const tablesBefore = collected.tableNotes.length;
 
     const roundStartedAt = Date.now();
     const round = await runExtractionRound(
@@ -603,7 +609,7 @@ export async function summarizeOCR(
     state.truncated = round.truncated && added > 0;
     state.producedOnlyTables =
       notesCount(collected) === notesBefore &&
-      collected.customTables.length > tablesBefore;
+      collected.tableNotes.length > tablesBefore;
   };
 
   // ---- Phase 1: sweep ----
@@ -679,11 +685,11 @@ export async function summarizeOCR(
 function buildSystemPrompt(focus: string[], customInstructions: string): string {
   const focusAll = focus.includes("all");
 
-  return `You are an expert RPG content analyzer. Your task is to convert OCR-extracted text from RPG rulebooks, adventures, and supplements into structured data for a text adventure game engine.
+  return `You are an expert RPG content analyzer. Your task is to convert OCR-extracted text from RPG rulebooks, adventures, and supplements into notes for a text adventure game engine.
 
 IMPORTANT: Extract ALL relevant content from the document. Do not limit yourself - capture everything useful.
 
-NOTES ARE THE PRIMARY OUTPUT. "lore" and "mechanicNotes" are what the game engine reads during play and what the player actually sees - they are the point of this extraction. "customTables" are an ADDITION on top of the notes, never a substitute for them. A response full of tables with few or no notes is a failed extraction, no matter how table-heavy the source material is. Write the notes first, then add the tables.
+EVERYTHING YOU WRITE IS A NOTE. All three output lists are the same kind of thing - a title and a body of markdown that a Game Master reads at the table. "lore" and "mechanicNotes" are the primary output: they are what the game engine reads during play and what the player actually sees. "tableNotes" are reference material the GM looks up when it rolls, an ADDITION on top of the other two, never a substitute for them. A response full of tables with few or no lore/mechanic notes is a failed extraction, no matter how table-heavy the source material is. Write the notes first, then add the tables.
 
 OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields:
 {
@@ -710,13 +716,13 @@ OUTPUT FORMAT: You MUST respond with a valid JSON object containing these fields
       "folder": "Rules"
     }
   ],
-  "customTables": [
+  "tableNotes": [
     {
-      "name": "Table name",
-      "description": "What this table is for",
-      "entries": [
-        { "text": "Result text", "weight": 1 }  // weight = probability weight (higher = more likely)
-      ]
+      "title": "Table name",
+      "content": "What the table is for and when it gets rolled, then the die and every result - see TABLE NOTES below",
+      "type": "table",
+      "folder": "Tables",
+      "keys": ["table name", "what it's rolled for"]  // short phrases that should bring this table to mind in play - [] if none
     }
   ]
 }
@@ -725,6 +731,7 @@ NOTE TYPES:
 - type: null or "lore" (default) - World-building, NPCs, locations, factions, history. Normal priority.
 - type: "mechanics" - Game rules, dice systems, combat rules, skill checks. Second priority in AI context.
 - type: "character_sheet" - Player character sheet info (their stats, class, race, background, equipment). Highest priority - always at top of AI context.
+- type: "table" - A random table. Goes in "tableNotes", not in "lore"/"mechanicNotes".
 
 GUIDELINES:
 ${
@@ -746,13 +753,21 @@ ${
   focusAll || focus.includes("tables")
     ? `- Extract ALL TABLES **in addition to** the notes: Random tables, encounter tables, loot tables, oracles, miss/consequence tables. A table never replaces the note that explains it - whatever a table is about (a region's encounters, a faction's rumours, a dungeon's rooms) also gets a lore or mechanic note describing it in prose.
 
-TABLE SHAPE - these tables get rolled on by a dice engine that picks exactly ONE entry at random, so shape them accordingly:
-  - ONE TABLE PER ROLL. If the source has several separate d6 lists under one heading (e.g. six different background questions, each with its own 1-6 answers), that is SIX tables, not one. Merging them produces a table that answers a random question, which is useless. Split them.
-  - The table's identity goes in "name" and "description" - the question, the heading, what you roll it for and when. Never in the entries.
-  - "text" is the RESULT ALONE, exactly as written in the source. Do NOT prefix it with the roll number ("3: ..."), the question, or an abbreviation of the question. "Nothing." is correct; "Miss least? 2: Nothing." is wrong twice over.
+TABLE NOTES - a table note is read by a Game Master who then rolls the die itself, so write it the way the table is printed on the page rather than as data:
+  - "title" is the table's own name, as the source calls it.
+  - "content" opens with a sentence or two of prose - what the table is for, when it gets rolled, who rolls it, and anything the source says about reading the results - and then gives the die and every result as a numbered list. For example:
+
+    Roll when the party spends a night in the marsh. A result the party has already had this week is re-rolled.
+
+    Roll 1d6:
+    1. Nothing - a cold, wet, uneventful night.
+    2. Will-o'-wisps lead a watchman off the path (Wisdom save, DC 13).
+
+  - ONE TABLE PER ROLL, one table per note. If the source has several separate d6 lists under one heading (e.g. six different background questions, each with its own 1-6 answers), that is SIX table notes, not one. Merging them produces a table that answers a random question, which is useless. Split them.
+  - Keep the source's own die and its own numbering. A d100 table stays "Roll 1d100:" with its printed ranges ("01-05.", "06-12."); a d6 table stays 1-6. If the source doesn't name a die, use the one that matches the number of results.
   - Quote results verbatim. Do not paraphrase, shorten, or re-word them - these are the words the game shows the player.
-  - "weight" is the probability weight: use the size of the entry's die range (1-10 on a d100 table = weight 10), or 1 when every result is equally likely.
-  - Never emit a table with an empty "entries" array. If you don't have room to write its results, leave the table out entirely and write it on a later round instead.`
+  - Keep every cross-reference. If a result says to roll on another table, consult a chapter, or apply a named rule, that stays in the result's text.
+  - Never emit a table note whose content has no results in it. If you don't have room to write them, leave the table out entirely and write it on a later round instead.`
     : ""
 }
 ${
@@ -782,8 +797,7 @@ FORMAT NOTES AS MARKDOWN. Plain run-on paragraphs are unreadable at the table an
 - For each lore entry, list any other named NPCs/characters and locations it's connected to (mentioned in the text, allied/opposed to, located at, etc.) in "relatedCharacters"/"relatedLocations" - use the same name you'd use for that entry's own title elsewhere, so entries can be cross-referenced. Leave either as [] if none apply.
 - Give each lore entry a few short "keys" - single words or short phrases (not sentences) a player or GM would plausibly say that should bring this note to mind later (a name, a place, a distinctive item or event). Leave as [] if nothing stands out.
 - Mark secret/hidden information with "secrtet": true
-- For tables, estimate reasonable min/max ranges if not explicitly stated
-- NEVER return "customTables" alongside an empty "lore" and "mechanicNotes". If the source is nothing but tables, the notes are still required: write them from what the tables tell you - what each table is for and when it's rolled, the place/faction/creatures its entries describe, and the setting details buried in its headers, intro text and results.
+- NEVER return "tableNotes" alongside an empty "lore" and "mechanicNotes". If the source is nothing but tables, the other notes are still required: write them from what the tables tell you - what each table is for and when it's rolled, the place/faction/creatures its entries describe, and the setting details buried in its headers, intro text and results.
 - One note per topic. Prefer several focused notes over one note covering a whole chapter - a note is retrieved and shown on its own, so it has to stand alone.
 - If you are running out of output room, write FEWER notes at full fidelity rather than more notes as one-line summaries. Whatever you leave out, a later round will pick up; what you compress is lost for good.
 
@@ -847,14 +861,14 @@ DETECTED CONTENT TYPE: ${contentType} (a hint about the source material, not a r
 
 ${
   extractedTables.length > 0
-    ? `PRE-EXTRACTED TABLES (${extractedTables.length} found) - these are given so you don't have to retype them, NOT a sign that tables are the main output. The notes are still the primary deliverable:\n${JSON.stringify(extractedTables.slice(0, 5), null, 2)}\n\n`
+    ? `PRE-EXTRACTED TABLES (${extractedTables.length} found) - the grid rows as the OCR read them, given so you don't have to pick them back out of the markdown. They are NOT the output shape, and not a sign that tables are the main output: each one still becomes a table note written in prose, and the lore/mechanic notes are still the primary deliverable:\n${JSON.stringify(extractedTables.slice(0, 5), null, 2)}\n\n`
     : ""
 }
 
 DOCUMENT CONTENT:
 ${documentPart}
 
-Please analyze this content and output a JSON object with lore entries, mechanic notes, custom tables, and variables as specified.`;
+Please analyze this content and output a JSON object with lore entries, mechanic notes and table notes as specified.`;
 }
 
 function titleList(titles: string[]): string {
@@ -873,8 +887,8 @@ ${titleList(collected.lore.map((entry) => entry.title))}
 ALREADY EXTRACTED MECHANIC NOTES:
 ${titleList(collected.mechanicNotes.map((entry) => entry.title))}
 
-ALREADY EXTRACTED TABLES:
-${titleList(collected.customTables.map((table) => table.name))}`;
+ALREADY EXTRACTED TABLE NOTES:
+${titleList(collected.tableNotes.map((entry) => entry.title))}`;
 }
 
 /**
@@ -903,7 +917,7 @@ CONTINUE THE EXTRACTION:
 2. Output the SAME JSON format, containing ONLY the new entries. Do not repeat or rewrite anything already listed above.
 3. The one exception: if an entry above was cut off mid-way, you may output that single entry again in full - reuse its exact title so it replaces the incomplete version.
 4. "summary" may be left as an empty string; the first round's summary is kept.
-5. If the document is fully covered and there is genuinely nothing left, output {"summary": "", "lore": [], "mechanicNotes": [], "customTables": []}.`;
+5. If the document is fully covered and there is genuinely nothing left, output {"summary": "", "lore": [], "mechanicNotes": [], "tableNotes": []}.`;
 }
 
 /**
@@ -911,9 +925,10 @@ CONTINUE THE EXTRACTION:
  * tables and nothing else.
  *
  * Table-heavy source material (a rulebook appendix, a page of random tables)
- * reliably pulls models into filling `customTables` and calling it done, even
- * though the notes are what the game engine actually reads during play. When
- * that happens the tables are kept and this asks for the notes alone.
+ * reliably pulls models into filling `tableNotes` and calling it done, even
+ * though the lore and mechanic notes are what the game engine actually reads
+ * during play. When that happens the tables are kept and this asks for the
+ * rest of the notes alone.
  */
 function buildNotesRecoveryPrompt(
   basePrompt: string,
@@ -923,13 +938,13 @@ function buildNotesRecoveryPrompt(
 
 === NOTES STILL MISSING ===
 
-Your previous response for this part extracted tables but no notes. The tables below are already saved - do NOT output them again.
+Your previous response for this part extracted tables but no lore or mechanic notes. The table notes below are already saved - do NOT output them again.
 
-ALREADY EXTRACTED TABLES:
-${titleList(collected.customTables.map((table) => table.name))}
+ALREADY EXTRACTED TABLE NOTES:
+${titleList(collected.tableNotes.map((entry) => entry.title))}
 
-Tables are a supplement; the notes are the primary output and this part has none yet. Output the SAME JSON format with "customTables": [] and fill in "lore" and "mechanicNotes" for this part of the document:
-1. What each table above is for, when it gets rolled, and how to read its results - these belong in "mechanicNotes".
+Tables are a supplement; the lore and mechanic notes are the primary output and this part has none yet. Output the SAME JSON format with "tableNotes": [] and fill in "lore" and "mechanicNotes" for this part of the document:
+1. The rules around the tables - what triggers a roll, how the results are applied, what the subsystem they belong to does - as "mechanicNotes".
 2. The world content the tables and the surrounding text describe - the places, factions, creatures, items and events named in the table titles, intro text and individual entries - as "lore" entries.
 3. Anything in this part that isn't a table at all: prose, headers, sidebars, captions.
 Write real notes with substance, not one-line restatements of the table names.`;
@@ -956,10 +971,15 @@ Extract the notes, mechanics and tables from THIS part of the document, in the s
 // ============================================================================
 
 export function emptyExtraction(): ExtractedContent {
-  return { summary: "", lore: [], mechanicNotes: [], customTables: [] };
+  return { summary: "", lore: [], mechanicNotes: [], tableNotes: [] };
 }
 
-/** Notes (lore + mechanics) collected so far - the primary output. */
+/**
+ * Lore + mechanic notes collected so far - the primary output. Table notes
+ * are deliberately not counted: a round that produced nothing but tables is
+ * exactly the case notes recovery exists to fix (see
+ * `buildNotesRecoveryPrompt`).
+ */
 function notesCount(collected: ExtractedContent): number {
   return collected.lore.length + collected.mechanicNotes.length;
 }
@@ -1007,35 +1027,6 @@ function mergeEntryList(base: StoryLore[], next: StoryLore[]): number {
   return changed;
 }
 
-function mergeTableList(base: CustomTable[], next: CustomTable[]): number {
-  const index = new Map<string, CustomTable>();
-  base.forEach((table) => index.set(titleKey(table.name), table));
-
-  let changed = 0;
-  for (const table of next) {
-    const key = titleKey(table.name);
-    if (!key) continue;
-    const existing = index.get(key);
-    if (!existing) {
-      index.set(key, table);
-      base.push(table);
-      changed++;
-      continue;
-    }
-    // Same table continued across rounds - append the rows it didn't have
-    // room for, skipping any it repeated.
-    const seen = new Set(existing.entries.map((row) => titleKey(row.text)));
-    for (const row of table.entries) {
-      const rowKey = titleKey(row.text);
-      if (!rowKey || seen.has(rowKey)) continue;
-      seen.add(rowKey);
-      existing.entries.push(row);
-      changed++;
-    }
-  }
-  return changed;
-}
-
 /**
  * Fold a continuation round's output into the running result, in place.
  * Returns the number of entries added or replaced - 0 means the round
@@ -1048,7 +1039,9 @@ export function mergeRound(base: ExtractedContent, next: ExtractedContent): numb
   return (
     mergeEntryList(base.lore, next.lore) +
     mergeEntryList(base.mechanicNotes, next.mechanicNotes) +
-    mergeTableList(base.customTables, next.customTables)
+    // Tables fold in like any other note now: a table the model re-sent with
+    // more results in it is simply the longer version of that entry.
+    mergeEntryList(base.tableNotes, next.tableNotes)
   );
 }
 
@@ -1088,12 +1081,7 @@ function isContentTruncated(content: string): boolean {
   return braceCount !== 0 || bracketCount !== 0 || inString;
 }
 
-function tryParseAIResponse(content: string): {
-  summary: string;
-  lore: StoryLore[];
-  mechanicNotes: StoryLore[];
-  customTables: CustomTable[];
-} | null {
+function tryParseAIResponse(content: string): ExtractedContent | null {
   try {
     let jsonStr = content.trim();
 
@@ -1122,12 +1110,7 @@ function normalizeStringArray(raw: unknown): string[] {
     .filter(Boolean);
 }
 
-export function processParserResult(parsed: any): {
-  summary: string;
-  lore: StoryLore[];
-  mechanicNotes: StoryLore[];
-  customTables: CustomTable[];
-} {
+export function processParserResult(parsed: any): ExtractedContent {
   const lore: StoryLore[] = (parsed.lore || []).map((entry: any, index: number) => ({
     title: entry.title || `Entry ${index + 1}`,
     content: entry.content || "",
@@ -1171,52 +1154,102 @@ export function processParserResult(parsed: any): {
     }),
   );
 
-  const customTables: CustomTable[] = (parsed.customTables || [])
-    .map((table: any, index: number) => ({
-      id: `table-ocr-${Date.now()}-${index}`,
-      name: typeof table.name === "string" ? table.name.trim() : `Table ${index + 1}`,
-      description: table.description || "",
-      entries: (table.entries || [])
-        .map((entry: any) => {
-          const raw = entry.text || entry.result || "";
-          const text = typeof raw === "string" ? raw.trim() : "";
-          let weight = entry.weight;
-          if (weight === undefined || weight === null || isNaN(Number(weight))) {
-            if (entry.min !== undefined && entry.max !== undefined) {
-              weight = Math.max(1, Number(entry.max) - Number(entry.min) + 1);
-            } else {
-              weight = 1;
-            }
-          }
-          return {
-            text,
-            weight: Math.max(1, Number(weight) || 1),
-          };
-        })
-        .filter((entry: { text: string }) => entry.text.length > 0),
-    }))
+  const tableNotes: StoryLore[] = [
+    ...(parsed.tableNotes || []).map((entry: any, index: number) =>
+      toTableNote(entry, index),
+    ),
+    // Legacy tolerance: models sometimes answer with the structured table
+    // shape the extractor used to ask for (a name plus weighted entries),
+    // either from their own training or from a prompt that got trimmed.
+    // Rendering it into the note it would have become anyway is better than
+    // silently dropping every table in the document.
+    ...(parsed.customTables || []).map((table: any) =>
+      customTableToNote(normalizeLegacyTable(table)),
+    ),
+  ]
     // Drop table shells. Models routinely emit a named table and then run out
-    // of room (or just never fill it) before writing any results, and an
-    // empty table is unrollable - it can only ever be dead weight in the
-    // user's library. The streaming preview already filtered these; the
-    // committed result did not, so the shells were what actually got saved.
-    .filter((table: CustomTable) => table.name.length > 0 && table.entries.length > 0);
+    // of room (or just never fill it) before writing any results, and a table
+    // note with no results in it is unrollable - it can only ever be dead
+    // weight in the user's library. The streaming preview already filtered
+    // these; the committed result did not, so the shells were what actually
+    // got saved.
+    .filter((note: StoryLore) => note.title.length > 0 && note.content.length > 0);
 
   return {
     summary: parsed.summary || "",
     lore,
     mechanicNotes,
-    customTables,
+    tableNotes,
   };
 }
 
-function parseAIResponse(content: string): {
-  summary: string;
-  lore: StoryLore[];
-  mechanicNotes: StoryLore[];
-  customTables: CustomTable[];
-} {
-  const defaultResult = { summary: "", lore: [], mechanicNotes: [], customTables: [] };
+/** One extracted random table, as the `type: "table"` note it is stored as. */
+function toTableNote(entry: any, index: number): StoryLore {
+  const title =
+    typeof entry.title === "string"
+      ? entry.title.trim()
+      : typeof entry.name === "string"
+        ? entry.name.trim()
+        : `Table ${index + 1}`;
+  const keys = normalizeStringArray(entry.keys);
+
+  return {
+    title,
+    content: typeof entry.content === "string" ? entry.content.trim() : "",
+    type: "table" as const,
+    folder: entry.folder || "Tables",
+    tags: normalizeStringArray(entry.tags),
+    aliases: normalizeStringArray(entry.aliases),
+    relatedCharacters: [],
+    relatedLocations: [],
+    secrtet: false,
+    // Reference material the GM pulls in when it needs it, not context the
+    // whole game carries - so the title is a keyword rather than always-on
+    // (same call `customTableToNote` makes for a converted legacy table).
+    keys: keys.length > 0 ? keys : [title].filter(Boolean),
+    alwaysOn: false,
+    enabled: true,
+    on: false,
+    on_triggers: [],
+    off_triggers: [],
+    trigger_lores: [],
+    untrigger_lores: [],
+    var_on_triggers: [],
+    var_off_triggers: [],
+  };
+}
+
+/**
+ * Coerce a legacy structured table off the model into a `CustomTable` solid
+ * enough for `customTableToNote` to render - the weights in particular, since
+ * a table written as die ranges (`min`/`max`) carries its spread there rather
+ * than in a `weight` field.
+ */
+function normalizeLegacyTable(table: any): CustomTable {
+  return {
+    id: "",
+    name: typeof table?.name === "string" ? table.name.trim() : "",
+    description: typeof table?.description === "string" ? table.description : "",
+    entries: (table?.entries || [])
+      .map((entry: any) => {
+        const raw = entry?.text || entry?.result || "";
+        const text = typeof raw === "string" ? raw.trim() : "";
+        let weight = entry?.weight;
+        if (weight === undefined || weight === null || isNaN(Number(weight))) {
+          if (entry?.min !== undefined && entry?.max !== undefined) {
+            weight = Math.max(1, Number(entry.max) - Number(entry.min) + 1);
+          } else {
+            weight = 1;
+          }
+        }
+        return { text, weight: Math.max(1, Number(weight) || 1) };
+      })
+      .filter((entry: { text: string }) => entry.text.length > 0),
+  };
+}
+
+function parseAIResponse(content: string): ExtractedContent {
+  const defaultResult = emptyExtraction();
 
   try {
     const repairedContent = attemptJSONRepair(content);

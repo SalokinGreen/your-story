@@ -234,25 +234,25 @@ describe("summarizeOCR continuation rounds", () => {
     );
   });
 
-  it("appends new rows to a table the model continued in a later round", async () => {
+  it("replaces a cut-off table note with the fuller version from a later round", async () => {
     queueResponses([
       aiResponse(
         {
-          customTables: [
-            { name: "Wandering Horrors", entries: [{ text: "Brine wraith", weight: 1 }] },
+          tableNotes: [
+            {
+              title: "Wandering Horrors",
+              content: "Roll 1d6:\n1. Brine wraith",
+            },
           ],
         },
         "length",
       ),
       aiResponse(
         {
-          customTables: [
+          tableNotes: [
             {
-              name: "Wandering Horrors",
-              entries: [
-                { text: "Brine wraith", weight: 1 },
-                { text: "Coral golem", weight: 2 },
-              ],
+              title: "Wandering Horrors",
+              content: "Roll 1d6:\n1. Brine wraith\n2-4. Coral golem",
             },
           ],
         },
@@ -263,11 +263,9 @@ describe("summarizeOCR continuation rounds", () => {
     const result = await summarizeOCR(baseBody);
     if ("error" in result) throw new Error(result.error);
 
-    expect(result.customTables).toHaveLength(1);
-    expect(result.customTables[0].entries.map((e) => e.text)).toEqual([
-      "Brine wraith",
-      "Coral golem",
-    ]);
+    expect(result.tableNotes).toHaveLength(1);
+    expect(result.tableNotes[0].content).toContain("Coral golem");
+    expect(result.tableNotes[0].type).toBe("table");
   });
 
   it("gives up after maxContinuationRounds and reports the result as incomplete", async () => {
@@ -453,16 +451,18 @@ describe("summarizeOCR document parts", () => {
  * Notes-recovery tests.
  *
  * Table-heavy source material (a rulebook appendix, a page of random tables)
- * reliably pulls models into filling customTables and calling the job done,
+ * reliably pulls models into filling tableNotes and calling the job done,
  * leaving the import with no lore or mechanic notes at all - but the notes
  * are what the game engine reads during play, and the tables are meant to be
  * an addition on top of them. summarizeOCR now spots a part that came back
  * as tables and nothing else and asks again for the notes.
  */
-function tableResult(name: string, rows: string[]) {
+function tableResult(title: string, rows: string[]) {
   return {
-    name,
-    entries: rows.map((text) => ({ text, weight: 1 })),
+    title,
+    content: `Roll 1d${rows.length}:\n${rows
+      .map((text, i) => `${i + 1}. ${text}`)
+      .join("\n")}`,
   };
 }
 
@@ -478,7 +478,7 @@ describe("summarizeOCR notes recovery", () => {
           summary: "A book of random tables.",
           lore: [],
           mechanicNotes: [],
-          customTables: [tableResult("Wandering Horrors", ["Brine wraith"])],
+          tableNotes: [tableResult("Wandering Horrors", ["Brine wraith"])],
         },
         "stop",
       ),
@@ -486,7 +486,7 @@ describe("summarizeOCR notes recovery", () => {
         {
           lore: [loreEntry("The Brine Wraiths")],
           mechanicNotes: [loreEntry("Rolling for Wandering Horrors")],
-          customTables: [],
+          tableNotes: [],
         },
         "stop",
       ),
@@ -501,13 +501,13 @@ describe("summarizeOCR notes recovery", () => {
       "Rolling for Wandering Horrors",
     ]);
     // The tables it did extract are kept, not re-requested or lost.
-    expect(result.customTables.map((t) => t.name)).toEqual(["Wandering Horrors"]);
+    expect(result.tableNotes.map((t) => t.title)).toEqual(["Wandering Horrors"]);
   });
 
   it("tells the recovery round which tables are already saved and to skip them", async () => {
     queueResponses([
       aiResponse(
-        { customTables: [tableResult("Wandering Horrors", ["Brine wraith"])] },
+        { tableNotes: [tableResult("Wandering Horrors", ["Brine wraith"])] },
         "stop",
       ),
       aiResponse({ lore: [loreEntry("The Brine Wraiths")] }, "stop"),
@@ -520,7 +520,7 @@ describe("summarizeOCR notes recovery", () => {
     ).messages[1].content as string;
     expect(recoveryPrompt).toContain("NOTES STILL MISSING");
     expect(recoveryPrompt).toContain("- Wandering Horrors");
-    expect(recoveryPrompt).toContain('"customTables": []');
+    expect(recoveryPrompt).toContain('"tableNotes": []');
   });
 
   it("does not fire when the response already has notes alongside its tables", async () => {
@@ -528,7 +528,7 @@ describe("summarizeOCR notes recovery", () => {
       aiResponse(
         {
           lore: [loreEntry("The Brine Wraiths")],
-          customTables: [tableResult("Wandering Horrors", ["Brine wraith"])],
+          tableNotes: [tableResult("Wandering Horrors", ["Brine wraith"])],
         },
         "stop",
       ),
@@ -552,7 +552,7 @@ describe("summarizeOCR notes recovery", () => {
   it("only retries once per part, even if the retry brings back no notes", async () => {
     mockProviderFetch.mockImplementation(async () =>
       aiResponse(
-        { customTables: [tableResult("Wandering Horrors", ["Brine wraith"])] },
+        { tableNotes: [tableResult("Wandering Horrors", ["Brine wraith"])] },
         "stop",
       ),
     );
@@ -567,7 +567,7 @@ describe("summarizeOCR notes recovery", () => {
   it("still recovers notes when continuation rounds are turned off", async () => {
     queueResponses([
       aiResponse(
-        { customTables: [tableResult("Wandering Horrors", ["Brine wraith"])] },
+        { tableNotes: [tableResult("Wandering Horrors", ["Brine wraith"])] },
         "stop",
       ),
       aiResponse({ lore: [loreEntry("The Brine Wraiths")] }, "stop"),
@@ -604,8 +604,8 @@ describe("summarizeOCR notes recovery", () => {
 
     queueResponses([
       // Sweep: every part is read once before either is revisited.
-      aiResponse({ customTables: [tableResult("Table A", ["a"])] }, "stop"),
-      aiResponse({ customTables: [tableResult("Table B", ["b"])] }, "stop"),
+      aiResponse({ tableNotes: [tableResult("Table A", ["a"])] }, "stop"),
+      aiResponse({ tableNotes: [tableResult("Table B", ["b"])] }, "stop"),
       // Then each part's notes are recovered, in order.
       aiResponse({ lore: [loreEntry("Notes for A")] }, "stop"),
       aiResponse({ lore: [loreEntry("Notes for B")] }, "stop"),
@@ -616,7 +616,7 @@ describe("summarizeOCR notes recovery", () => {
 
     expect(mockProviderFetch).toHaveBeenCalledTimes(4);
     expect(result.lore.map((e) => e.title)).toEqual(["Notes for A", "Notes for B"]);
-    expect(result.customTables.map((t) => t.name)).toEqual(["Table A", "Table B"]);
+    expect(result.tableNotes.map((t) => t.title)).toEqual(["Table A", "Table B"]);
   });
 });
 
@@ -742,44 +742,50 @@ describe("summarizeOCR part coverage", () => {
 });
 
 /**
- * Empty-table tests.
+ * Table-note tests.
  *
- * Models routinely name a table and then never fill it - they run out of
- * output room, or just move on. An entry-less table is unrollable, so it can
- * only ever be dead weight in the user's library. The streaming preview
- * filtered these out, but the committed result did not, so the shells were
- * what actually got saved.
+ * Tables come out of the extraction as `type: "table"` notes now (see
+ * tableNotes.ts) - prose the GM reads and rolls on itself, not a structured
+ * shape the engine picks from. Two things still have to hold: an empty table
+ * never makes it into the library (models routinely name a table and then
+ * never fill it, and a table with no results in it is dead weight), and a
+ * model that answers with the old structured shape anyway still gets its
+ * tables imported rather than silently dropped.
  */
 describe("processParserResult table handling", () => {
-  it("drops tables that have no entries", () => {
+  it("keeps a table note, typed and keyed for lookup", () => {
     const result = processParserResult({
-      customTables: [
-        { name: "Wandering Horrors", entries: [{ text: "Brine wraith", weight: 1 }] },
-        { name: "Never Filled In", entries: [] },
-        { name: "Also Empty" },
+      tableNotes: [
+        {
+          title: "Wandering Horrors",
+          content: "Roll when the tide turns.\n\nRoll 1d6:\n1. Brine wraith",
+        },
       ],
     });
 
-    expect(result.customTables.map((t) => t.name)).toEqual(["Wandering Horrors"]);
+    expect(result.tableNotes).toHaveLength(1);
+    expect(result.tableNotes[0].type).toBe("table");
+    expect(result.tableNotes[0].content).toContain("Brine wraith");
+    // Reference material: pulled in by keyword rather than always carried.
+    expect(result.tableNotes[0].keys).toEqual(["Wandering Horrors"]);
+    expect(result.tableNotes[0].alwaysOn).toBe(false);
+    expect(result.tableNotes[0].on).toBe(false);
   });
 
-  it("drops tables left with no entries after blank results are stripped", () => {
+  it("drops table notes with no title or no results written yet", () => {
     const result = processParserResult({
-      customTables: [{ name: "Blank Rows", entries: [{ text: "   " }, { text: "" }] }],
+      tableNotes: [
+        { title: "Wandering Horrors", content: "Roll 1d6:\n1. Brine wraith" },
+        { title: "Never Filled In", content: "   " },
+        { title: "   ", content: "Roll 1d6:\n1. Something" },
+        { title: "No Content At All" },
+      ],
     });
 
-    expect(result.customTables).toEqual([]);
+    expect(result.tableNotes.map((t) => t.title)).toEqual(["Wandering Horrors"]);
   });
 
-  it("drops tables with no name", () => {
-    const result = processParserResult({
-      customTables: [{ name: "   ", entries: [{ text: "Something", weight: 1 }] }],
-    });
-
-    expect(result.customTables).toEqual([]);
-  });
-
-  it("keeps a well-formed table intact, trimming its result text", () => {
+  it("renders a legacy structured table into the note it would have become", () => {
     const result = processParserResult({
       customTables: [
         {
@@ -793,11 +799,23 @@ describe("processParserResult table handling", () => {
       ],
     });
 
-    expect(result.customTables).toHaveLength(1);
-    expect(result.customTables[0].description).toBe("Roll 1d6 when the tide turns.");
-    expect(result.customTables[0].entries).toEqual([
-      { text: "Brine wraith", weight: 1 },
-      { text: "Coral golem", weight: 3 },
-    ]);
+    expect(result.tableNotes).toHaveLength(1);
+    expect(result.tableNotes[0].type).toBe("table");
+    expect(result.tableNotes[0].content).toBe(
+      "Roll 1d6 when the tide turns.\n\nRoll 1d4:\n1. Brine wraith\n2-4. Coral golem",
+    );
+  });
+
+  it("drops legacy tables with no name or no usable rows", () => {
+    const result = processParserResult({
+      customTables: [
+        { name: "Blank Rows", entries: [{ text: "   " }, { text: "" }] },
+        { name: "   ", entries: [{ text: "Something", weight: 1 }] },
+        { name: "Never Filled In", entries: [] },
+        { name: "Also Empty" },
+      ],
+    });
+
+    expect(result.tableNotes).toEqual([]);
   });
 });

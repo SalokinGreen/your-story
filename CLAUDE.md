@@ -172,7 +172,9 @@ rationale):
   tables are `type: "table"` notes. Old data converts on load via
   `tableNotes.ts` (stories/adventures) and `tablesLibraryMigration.ts` (the
   library). The interfaces survive in `structs.ts` as deprecated read-only
-  back-compat for that conversion; nothing writes them.
+  back-compat for that conversion; nothing writes them — the PDF/OCR importer
+  extracts `tableNotes` (notes, not structured tables) too, and only
+  *converts* a legacy-shaped table if a model answers with one.
 
 Old saves keep these fields for backward compatibility; the GM doesn't read
 them and the UI doesn't expose them.

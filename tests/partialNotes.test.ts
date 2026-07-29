@@ -45,14 +45,11 @@ describe("parsePartialExtraction", () => {
         mechanicNotes: [
           { title: "Checks", content: "Roll 2d6.", type: "mechanics" },
         ],
-        customTables: [
+        tableNotes: [
           {
-            name: "Weather",
-            description: "Daily weather.",
-            entries: [
-              { text: "Rain", weight: 3 },
-              { text: "Fog", weight: 1 },
-            ],
+            title: "Weather",
+            content: "Daily weather.\n\nRoll 1d4:\n1-3. Rain\n4. Fog",
+            type: "table",
           },
         ],
       }),
@@ -68,10 +65,11 @@ describe("parsePartialExtraction", () => {
     });
     expect(result.lore[0].streaming).toBeUndefined();
     expect(result.mechanicNotes[0].title).toBe("Checks");
-    expect(result.customTables[0].entries).toEqual([
-      { text: "Rain", weight: 3 },
-      { text: "Fog", weight: 1 },
-    ]);
+    expect(result.tableNotes[0]).toMatchObject({
+      title: "Weather",
+      type: "table",
+    });
+    expect(result.tableNotes[0].content).toContain("1-3. Rain");
   });
 
   it("keeps finished entries and shows the one being written", () => {
@@ -139,20 +137,37 @@ describe("parsePartialExtraction", () => {
     expect(result.lore[0].title).toBe("Karth");
   });
 
-  it("keeps a table's finished rows while later ones stream in", () => {
-    const buffer = `{"customTables":[{"name":"Weather","entries":[{"text":"Rain","weight":3},{"text":"Fo`;
+  it("shows a table note as it is being written", () => {
+    const buffer = `{"tableNotes":[{"title":"Weather","content":"Roll 1d6:\\n1-3. Rain\\n4-6. Fo`;
     const result = parsePartialExtraction(buffer);
-    expect(result.customTables).toHaveLength(1);
-    expect(result.customTables[0]).toMatchObject({
-      name: "Weather",
+    expect(result.tableNotes).toHaveLength(1);
+    expect(result.tableNotes[0]).toMatchObject({
+      title: "Weather",
+      streaming: true,
+    });
+    expect(result.tableNotes[0].content).toContain("1-3. Rain");
+  });
+
+  /**
+   * A model can still answer with the structured table shape the extractor
+   * used to ask for. The committed result renders those into table notes
+   * (see processParserResult), so the live preview has to show the same
+   * thing - otherwise the tables appear to be missing until the round ends.
+   */
+  it("renders a legacy structured table into a note as it streams", () => {
+    const buffer = `{"customTables":[{"name":"Weather","description":"Daily weather.","entries":[{"text":"Rain","weight":3},{"text":"Fo`;
+    const result = parsePartialExtraction(buffer);
+    expect(result.tableNotes).toHaveLength(1);
+    expect(result.tableNotes[0]).toMatchObject({
+      title: "Weather",
+      type: "table",
       streaming: true,
     });
     // The half-typed row shows up too, so the table fills in as it is
     // written rather than jumping a row at a time.
-    expect(result.customTables[0].entries).toEqual([
-      { text: "Rain", weight: 3 },
-      { text: "Fo", weight: 1 },
-    ]);
+    expect(result.tableNotes[0].content).toBe(
+      "Daily weather.\n\nRoll 1d4:\n1-3. Rain\n4. Fo",
+    );
   });
 
   it("never loses entries as more of the response arrives", () => {
@@ -163,8 +178,8 @@ describe("parsePartialExtraction", () => {
         { title: "The Deep Guild", content: "A cartel of divers." },
       ],
       mechanicNotes: [{ title: "Checks", content: "Roll 2d6 + skill." }],
-      customTables: [
-        { name: "Weather", entries: [{ text: "Rain", weight: 3 }] },
+      tableNotes: [
+        { title: "Weather", content: "Roll 1d6:\n1-3. Rain\n4-6. Fog" },
       ],
     });
 

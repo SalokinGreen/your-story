@@ -16,7 +16,7 @@
  *    using the same merge logic as pass 1.
  */
 
-import { StoryLore, CustomTable, CustomTableEntry } from "./structs";
+import { StoryLore } from "./structs";
 import { calculateSimilarity } from "./fuzzyMatch";
 import { ocrFetch } from "./ocrFetch";
 import { AIProvider } from "./ocrSummarizeCall";
@@ -144,33 +144,19 @@ export function mergeLoreEntries(
   };
 }
 
-function mergeTableEntries(group: CustomTable[]): CustomTable {
-  if (group.length === 1) return group[0];
-  const seenTexts = new Set<string>();
-  const entries: CustomTableEntry[] = [];
-  for (const table of group) {
-    for (const entry of table.entries) {
-      const key = normalizeKey(entry.text);
-      if (!key || seenTexts.has(key)) continue;
-      seenTexts.add(key);
-      entries.push(entry);
-    }
-  }
-  return {
-    ...group[0],
-    entries,
-    description:
-      group.find((table) => table.description)?.description ??
-      group[0].description,
-  };
-}
-
-function groupTablesByName(tables: CustomTable[]): CustomTable[][] {
-  const map = new Map<string, CustomTable[]>();
-  for (const table of tables) {
-    const key = normalizeKey(table.name);
+/**
+ * Table notes are grouped on an exact (normalized) title match rather than
+ * the fuzzy similarity used for lore, because near-identical table names are
+ * routinely *different* tables - "Wilderness Encounters (Forest)" and
+ * "Wilderness Encounters (Swamp)" are two rolls, and combining them would
+ * quietly produce a table nobody wrote.
+ */
+function groupTableNotesByTitle(tableNotes: StoryLore[]): StoryLore[][] {
+  const map = new Map<string, StoryLore[]>();
+  for (const note of tableNotes) {
+    const key = normalizeKey(note.title);
     if (!map.has(key)) map.set(key, []);
-    map.get(key)!.push(table);
+    map.get(key)!.push(note);
   }
   return Array.from(map.values());
 }
@@ -178,7 +164,7 @@ function groupTablesByName(tables: CustomTable[]): CustomTable[][] {
 export interface MergeResult {
   lore: StoryLore[];
   mechanicNotes: StoryLore[];
-  customTables: CustomTable[];
+  tableNotes: StoryLore[];
   /** Number of entries collapsed into another (0 if nothing was merged). */
   mergedCount: number;
 }
@@ -192,7 +178,7 @@ const loreNames = (entry: StoryLore) => [entry.title, ...(entry.aliases || [])];
 export function mergeDeterministic(
   lore: StoryLore[],
   mechanicNotes: StoryLore[],
-  customTables: CustomTable[],
+  tableNotes: StoryLore[],
 ): MergeResult {
   let mergedCount = 0;
 
@@ -206,7 +192,7 @@ export function mergeDeterministic(
     loreNames,
     DETERMINISTIC_MATCH_THRESHOLD,
   );
-  const tableGroups = groupTablesByName(customTables);
+  const tableGroups = groupTableNotesByTitle(tableNotes);
 
   const mergedLore = loreGroups.map((group) => {
     mergedCount += group.length - 1;
@@ -218,13 +204,17 @@ export function mergeDeterministic(
   });
   const mergedTables = tableGroups.map((group) => {
     mergedCount += group.length - 1;
-    return mergeTableEntries(group);
+    // `mergeLoreEntries` switches the merged entry on, which is right for a
+    // lore entry and wrong for a table: a table is reference material the GM
+    // pulls in by keyword, and two halves of one arriving from different
+    // chunks isn't a reason to start carrying it in every prompt.
+    return { ...mergeLoreEntries(group), on: group[0].on ?? false };
   });
 
   return {
     lore: mergedLore,
     mechanicNotes: mergedMechanics,
-    customTables: mergedTables,
+    tableNotes: mergedTables,
     mergedCount,
   };
 }
@@ -328,10 +318,10 @@ export interface MergeExtractedContentOptions {
 export async function mergeExtractedContent(
   lore: StoryLore[],
   mechanicNotes: StoryLore[],
-  customTables: CustomTable[],
+  tableNotes: StoryLore[],
   options: MergeExtractedContentOptions,
 ): Promise<MergeResult> {
-  const step1 = mergeDeterministic(lore, mechanicNotes, customTables);
+  const step1 = mergeDeterministic(lore, mechanicNotes, tableNotes);
 
   if (step1.lore.length + step1.mechanicNotes.length < 2) {
     return step1;
@@ -376,7 +366,7 @@ export async function mergeExtractedContent(
     return {
       lore: applied.lore,
       mechanicNotes: applied.mechanicNotes,
-      customTables: step1.customTables,
+      tableNotes: step1.tableNotes,
       mergedCount: step1.mergedCount + applied.mergedCount,
     };
   } catch {
