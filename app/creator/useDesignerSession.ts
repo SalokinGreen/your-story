@@ -20,6 +20,7 @@ import {
   executeDesignerTools,
 } from "@/app/misc/designer_executor";
 import { buildDesignerMessages, getDesignerGreeting } from "@/app/misc/designer_ai";
+import { stripLeakedToolCallMarkup } from "@/app/misc/toolCallFallback";
 import { getDesignerToolsForAPI } from "@/app/misc/designer_tools";
 import {
   getLocalAdventure,
@@ -318,7 +319,10 @@ export function useDesignerSession({
           }
 
           const data = await response.json();
-          const content: string = data.content || "";
+          // Tool-call markup a backend leaked into `content` (see
+          // toolCallFallback.ts) is never something to show the author - the
+          // call itself is recovered into `toolCalls` before it gets here.
+          const content: string = stripLeakedToolCallMarkup(data.content || "");
           const toolCalls = parseToolCalls(data.toolCalls);
 
           if (content.trim()) finalContent = content;

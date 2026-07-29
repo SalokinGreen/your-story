@@ -21,7 +21,14 @@
  * `/|DSML|parameter></|DSML|invoke></|DSML|tool_calls>`. This is the same
  * failure mode (inference backend fails to strip/parse its own tool-call
  * template before returning `content`), just a different serialization, so
- * it's recovered the same way via `extractDSMLToolCalls`.
+ * it's recovered the same way via `extractMarkupToolCalls`.
+ *
+ * The exact delimiter around the namespace token varies by model family and
+ * backend - DeepSeek leaked `<|DSML|invoke ...>`, GLM 5.2 leaks the
+ * double-piped `<||DSML||invoke ...>`, and a bare `<invoke ...>` (no
+ * namespace at all) or a `<ns:invoke ...>` form show up too. The structure
+ * underneath is always the same, so the parser matches the structure and
+ * treats the namespace token as noise rather than hard-coding one spelling.
  */
 
 export interface FallbackToolCall {
@@ -72,14 +79,53 @@ function tryParseToolCallObject(obj: unknown): FallbackToolCall | null {
   return null;
 }
 
-const DSML_TOOL_CALLS_BLOCK =
-  /<\|DSML\|tool_calls>([\s\S]*?)<\/\|DSML\|tool_calls>/i;
-const DSML_INVOKE_RE =
-  /<\|DSML\|invoke\s+name="([^"]*)"\s*>([\s\S]*?)<\/\|DSML\|invoke>/gi;
-const DSML_PARAMETER_RE =
-  /<\|DSML\|parameter\s+name="([^"]*)"([^>]*)>([\s\S]*?)<\/\|DSML\|parameter>/gi;
+/**
+ * The namespace token that precedes the tag name in leaked tool-call markup:
+ * pipe-wrapped (`|DSML|`, `||DSML||`), colon-suffixed (`ns:`), or absent.
+ * Matched as noise so one parser covers every spelling seen in the wild.
+ */
+const NS = String.raw`(?:\|+[^|<>\s]*\|+|[A-Za-z][\w.-]*:)?\s*`;
+const WRAPPER = "(?:tool_calls|function_calls)";
 
-function decodeDSMLEntities(value: string): string {
+const wrapperBlockRe = () =>
+  new RegExp(
+    String.raw`<\s*${NS}${WRAPPER}\s*>([\s\S]*?)<\s*/\s*${NS}${WRAPPER}\s*>`,
+    "i",
+  );
+const invokeRe = () =>
+  new RegExp(
+    String.raw`<\s*${NS}invoke\s+name\s*=\s*"([^"]*)"[^>]*>([\s\S]*?)<\s*/\s*${NS}invoke\s*>`,
+    "gi",
+  );
+/** A trailing `<... invoke ...>` whose closing tag never arrived (truncated
+ * generation, or a still-streaming buffer). */
+const danglingInvokeRe = () =>
+  new RegExp(
+    String.raw`<\s*${NS}invoke\s+name\s*=\s*"([^"]*)"[^>]*>([\s\S]*)$`,
+    "i",
+  );
+const parameterRe = () =>
+  new RegExp(
+    String.raw`<\s*${NS}parameter\s+name\s*=\s*"([^"]*)"([^>]*)>([\s\S]*?)<\s*/\s*${NS}parameter\s*>`,
+    "gi",
+  );
+/** Cheap "is any of this worth parsing" probe, and the cut point used when
+ * stripping leaked markup out of player-visible text. */
+const markupOpenerRe = () =>
+  new RegExp(
+    // The `name="` attribute is required on invoke/parameter so prose that
+    // happens to bracket those words (`<Note: parameter of the ward>`) is not
+    // mistaken for a leaked call and cut out of the narration.
+    String.raw`<\s*${NS}(?:${WRAPPER}\s*>|(?:invoke|parameter)\s+name\s*=)`,
+    "i",
+  );
+const markupCloserRe = () =>
+  new RegExp(
+    String.raw`<\s*/\s*${NS}(?:${WRAPPER}|invoke|parameter)\s*>`,
+    "gi",
+  );
+
+function decodeMarkupEntities(value: string): string {
   return value
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
@@ -88,8 +134,8 @@ function decodeDSMLEntities(value: string): string {
     .replace(/&amp;/g, "&");
 }
 
-function coerceDSMLParamValue(rawValue: string, attrs: string): unknown {
-  const value = decodeDSMLEntities(rawValue.trim());
+function coerceMarkupParamValue(rawValue: string, attrs: string): unknown {
+  const value = decodeMarkupEntities(rawValue.trim());
   // An explicit string="true" attribute marks the value as a literal string
   // (matters for things like "3" or "true" that would otherwise parse as a
   // number/boolean rather than the string the tool actually expects).
@@ -101,41 +147,90 @@ function coerceDSMLParamValue(rawValue: string, attrs: string): unknown {
   }
 }
 
-/**
- * Recover tool call(s) leaked as the model's internal `<|DSML|invoke ...>`
- * markup instead of a real `tool_calls` entry. Returns null unless at least
- * one well-formed invoke block is found, so ordinary prose is untouched.
- */
-function extractDSMLToolCalls(content: string): FallbackToolCall[] | null {
-  if (!content.includes("|DSML|invoke")) return null;
+function parseInvokeBody(name: string, body: string): FallbackToolCall {
+  const args: Record<string, unknown> = {};
+  const paramRe = parameterRe();
+  let paramMatch: RegExpExecArray | null;
+  while ((paramMatch = paramRe.exec(body)) !== null) {
+    const [, paramName, attrs, rawValue] = paramMatch;
+    if (!paramName) continue;
+    args[paramName] = coerceMarkupParamValue(rawValue, attrs);
+  }
 
-  const blockMatch = content.match(DSML_TOOL_CALLS_BLOCK);
+  return {
+    id: generateFallbackId(),
+    type: "function",
+    function: { name, arguments: JSON.stringify(args) },
+  };
+}
+
+/**
+ * Recover tool call(s) leaked as the model's internal `<|DSML|invoke ...>` /
+ * `<||DSML||invoke ...>` markup instead of a real `tool_calls` entry.
+ * Returns null unless at least one well-formed invoke block is found, so
+ * ordinary prose is untouched.
+ */
+function extractMarkupToolCalls(content: string): FallbackToolCall[] | null {
+  if (!markupOpenerRe().test(content)) return null;
+
+  const blockMatch = content.match(wrapperBlockRe());
   const searchSpace = blockMatch ? blockMatch[1] : content;
 
   const calls: FallbackToolCall[] = [];
-  DSML_INVOKE_RE.lastIndex = 0;
+  const re = invokeRe();
   let invokeMatch: RegExpExecArray | null;
-  while ((invokeMatch = DSML_INVOKE_RE.exec(searchSpace)) !== null) {
+  let consumedTo = 0;
+  while ((invokeMatch = re.exec(searchSpace)) !== null) {
     const [, name, body] = invokeMatch;
+    consumedTo = re.lastIndex;
     if (!name) continue;
+    calls.push(parseInvokeBody(name, body));
+  }
 
-    const args: Record<string, unknown> = {};
-    DSML_PARAMETER_RE.lastIndex = 0;
-    let paramMatch: RegExpExecArray | null;
-    while ((paramMatch = DSML_PARAMETER_RE.exec(body)) !== null) {
-      const [, paramName, attrs, rawValue] = paramMatch;
-      if (!paramName) continue;
-      args[paramName] = coerceDSMLParamValue(rawValue, attrs);
-    }
-
-    calls.push({
-      id: generateFallbackId(),
-      type: "function",
-      function: { name, arguments: JSON.stringify(args) },
-    });
+  // An invoke whose closing tag never arrived - the provider truncated the
+  // response mid-call. Its complete parameters are still recoverable, and
+  // recovering them beats dropping the call (and printing the raw markup at
+  // the player) entirely.
+  const tail = searchSpace.slice(consumedTo);
+  const dangling = tail.match(danglingInvokeRe());
+  if (dangling?.[1]) {
+    calls.push(parseInvokeBody(dangling[1], dangling[2] ?? ""));
   }
 
   return calls.length > 0 ? calls : null;
+}
+
+/**
+ * Remove leaked tool-call markup from text that is about to be shown to the
+ * player or written into conversation history. Recovering the call (above)
+ * fixes the mechanics; this is what keeps the raw `<||DSML||invoke ...>`
+ * dump out of the narration. Safe to call on a partial streaming buffer: an
+ * opener with no closer yet cuts everything from the opener onward, so the
+ * markup never flashes on screen as it arrives.
+ */
+export function stripLeakedToolCallMarkup(content: string): string {
+  if (
+    !content ||
+    (!markupOpenerRe().test(content) && !markupCloserRe().test(content))
+  ) {
+    return content;
+  }
+
+  let cleaned = content
+    .replace(new RegExp(wrapperBlockRe().source, "gi"), "")
+    .replace(invokeRe(), "");
+
+  // A closing tag whose opener was already removed (or never arrived) is
+  // markup too, not narration.
+  cleaned = cleaned.replace(markupCloserRe(), "");
+
+  // Whatever opener survives is unterminated; nothing after it is narration.
+  const opener = cleaned.match(markupOpenerRe());
+  if (opener?.index !== undefined) {
+    cleaned = cleaned.slice(0, opener.index);
+  }
+
+  return cleaned.replace(/\n{3,}/g, "\n\n").trim();
 }
 
 /**
@@ -150,8 +245,8 @@ export function extractFallbackToolCalls(
 
   const trimmed = content.trim();
 
-  const dsmlCalls = extractDSMLToolCalls(trimmed);
-  if (dsmlCalls) return dsmlCalls;
+  const markupCalls = extractMarkupToolCalls(trimmed);
+  if (markupCalls) return markupCalls;
 
   const fenced = trimmed.match(/```(?:json)?\s*([\s\S]*?)```/);
   const candidates = fenced?.[1] ? [fenced[1].trim(), trimmed] : [trimmed];

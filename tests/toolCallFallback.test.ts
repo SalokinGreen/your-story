@@ -7,7 +7,10 @@
  * ordinary prose.
  */
 import { describe, it, expect } from "vitest";
-import { extractFallbackToolCalls } from "../app/misc/toolCallFallback";
+import {
+  extractFallbackToolCalls,
+  stripLeakedToolCallMarkup,
+} from "../app/misc/toolCallFallback";
 
 describe("extractFallbackToolCalls", () => {
   it("returns null for ordinary prose", () => {
@@ -122,5 +125,96 @@ describe("extractFallbackToolCalls", () => {
     expect(calls).toHaveLength(2);
     expect(calls![0].function.name).toBe("add_memory");
     expect(calls![1].function.name).toBe("skip_tools");
+  });
+
+  // GLM 5.2 leaks the same markup with a double-piped namespace token.
+  it("recovers a leaked <||DSML||invoke> tool call (GLM 5.2 spelling)", () => {
+    const content =
+      '<||DSML||tool_calls><||DSML||invoke name="create_note">' +
+      '<||DSML||parameter name="title" string="true">Nik — Goblin Necromancer</||DSML||parameter>' +
+      '<||DSML||parameter name="type" string="true">character_sheet</||DSML||parameter>' +
+      '<||DSML||parameter name="content" string="true"># Nik\n\nKarma: 3</||DSML||parameter>' +
+      "</||DSML||invoke></||DSML||tool_calls>";
+    const calls = extractFallbackToolCalls(content);
+    expect(calls).not.toBeNull();
+    expect(calls).toHaveLength(1);
+    expect(calls![0].function.name).toBe("create_note");
+    expect(JSON.parse(calls![0].function.arguments)).toEqual({
+      title: "Nik — Goblin Necromancer",
+      type: "character_sheet",
+      content: "# Nik\n\nKarma: 3",
+    });
+  });
+
+  it("recovers leaked markup with no namespace token at all", () => {
+    const content =
+      '<tool_calls><invoke name="formula_roll">' +
+      '<parameter name="formulas">["1d20+5"]</parameter>' +
+      "</invoke></tool_calls>";
+    const calls = extractFallbackToolCalls(content);
+    expect(calls).not.toBeNull();
+    expect(calls![0].function.name).toBe("formula_roll");
+    expect(JSON.parse(calls![0].function.arguments)).toEqual({
+      formulas: ["1d20+5"],
+    });
+  });
+
+  it("recovers a truncated invoke whose closing tag never arrived", () => {
+    const content =
+      '<||DSML||tool_calls><||DSML||invoke name="create_note">' +
+      '<||DSML||parameter name="title" string="true">Nik</||DSML||parameter>';
+    const calls = extractFallbackToolCalls(content);
+    expect(calls).not.toBeNull();
+    expect(calls![0].function.name).toBe("create_note");
+    expect(JSON.parse(calls![0].function.arguments)).toEqual({ title: "Nik" });
+  });
+
+  it("still returns null for prose that merely mentions a tool", () => {
+    expect(
+      extractFallbackToolCalls(
+        "You invoke the name of the old god, and the parameter of the ward shifts."
+      )
+    ).toBeNull();
+  });
+});
+
+describe("stripLeakedToolCallMarkup", () => {
+  it("leaves ordinary prose untouched", () => {
+    const prose = "The door creaks open.\n\nYou step inside.";
+    expect(stripLeakedToolCallMarkup(prose)).toBe(prose);
+  });
+
+  it("removes a complete leaked block but keeps the narration around it", () => {
+    const content =
+      "You steady your breath.\n\n" +
+      '<||DSML||tool_calls><||DSML||invoke name="formula_roll">' +
+      '<||DSML||parameter name="formulas">["1d20+5"]</||DSML||parameter>' +
+      "</||DSML||invoke></||DSML||tool_calls>\n\nThe lock clicks.";
+    expect(stripLeakedToolCallMarkup(content)).toBe(
+      "You steady your breath.\n\nThe lock clicks."
+    );
+  });
+
+  it("cuts an unterminated opener and everything after it (streaming buffer)", () => {
+    const content =
+      "You steady your breath.\n\n<||DSML||tool_calls> <||DSML||invoke name=\"create_no";
+    expect(stripLeakedToolCallMarkup(content)).toBe("You steady your breath.");
+  });
+
+  it("removes the single-piped DeepSeek spelling too", () => {
+    const content =
+      'Before.<|DSML|invoke name="add_memory"><|DSML|parameter name="entry" string="true">x</|DSML|parameter></|DSML|invoke>After.';
+    expect(stripLeakedToolCallMarkup(content)).toBe("Before.After.");
+  });
+
+  it("leaves prose that brackets the tag words alone", () => {
+    const prose = "<Note: parameter of the ward> The seal holds.";
+    expect(stripLeakedToolCallMarkup(prose)).toBe(prose);
+  });
+
+  it("removes a stray closing tag left with no opener", () => {
+    expect(
+      stripLeakedToolCallMarkup("The lock clicks.</||DSML||tool_calls>")
+    ).toBe("The lock clicks.");
   });
 });

@@ -81,6 +81,7 @@ import {
   extractVisibleText,
   extractThinkingText,
 } from "@/app/misc/turnTimeline";
+import { stripLeakedToolCallMarkup } from "@/app/misc/toolCallFallback";
 import { deAiifyText } from "@/app/misc/deAiify";
 import {
   executeGMTools,
@@ -2494,9 +2495,13 @@ async function generateStoryTurnOnce(
             continue gmRoundLoop;
           }
 
-          // Build gmResult object from streamed data
+          // Build gmResult object from streamed data. The content is stripped
+          // of any tool-call markup the inference backend leaked into it (see
+          // toolCallFallback.ts): the call itself is recovered into
+          // `toolCalls` server-side, and leaving the raw markup here would
+          // write it into the scene and back into conversation history.
           const gmResult = {
-            content: gmContent,
+            content: stripLeakedToolCallMarkup(gmContent),
             reasoning: gmReasoning,
             reasoning_details: gmReasoningDetails,
             toolCalls: gmToolCalls,
