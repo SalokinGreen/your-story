@@ -458,10 +458,15 @@ const adventuresAdapter: MergeAdapter<LocalAdventure> = {
       const before = localMap.get(item.id);
       if (before && before.updatedAt === item.updatedAt) continue;
       const a = item.payload;
+      // folder_id is passed through as-is for the same reason it is for
+      // stories above: `??`-collapsing an explicit `null` (unfiled) to
+      // `undefined` would read as "no info, keep this device's filing" and
+      // could re-file an adventure into a stale folder after a merge.
       await saveLocalAdventure(a.id, a.adventureData, {
         serverUpdatedAt: a.serverUpdatedAt,
         markAsSynced: true,
         updatedAt: new Date(item.updatedAt),
+        folderId: a.folder_id,
       });
     }
     for (const before of localItemsBefore) {

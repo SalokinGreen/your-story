@@ -5,6 +5,7 @@ import { useNotification } from "@/app/misc/NotificationContext";
 import { DynamicIcon } from "@/app/components/DynamicIcon";
 import { LocalFolder } from "@/app/misc/localFolderManager";
 import { LocalStory } from "@/app/misc/localStoryManager";
+import { LocalAdventure } from "@/app/misc/localAdventureManager";
 import { listLibraryNotes, LibraryNote } from "@/app/misc/localNotesLibraryManager";
 import { listLibraryTables, LibraryTable } from "@/app/misc/localTablesLibraryManager";
 import { downloadFolderLibrary } from "@/app/misc/folderLibraryExport";
@@ -12,12 +13,14 @@ import { downloadFolderLibrary } from "@/app/misc/folderLibraryExport";
 interface ExportFolderModalProps {
   folder: LocalFolder;
   stories: LocalStory[];
+  adventures: LocalAdventure[];
   onClose: () => void;
 }
 
 export default function ExportFolderModal({
   folder,
   stories,
+  adventures,
   onClose,
 }: ExportFolderModalProps) {
   const { addNotification } = useNotification();
@@ -25,6 +28,7 @@ export default function ExportFolderModal({
   const [notes, setNotes] = useState<LibraryNote[]>([]);
   const [tables, setTables] = useState<LibraryTable[]>([]);
   const [includeStories, setIncludeStories] = useState(true);
+  const [includeAdventures, setIncludeAdventures] = useState(true);
   const [includeNotes, setIncludeNotes] = useState(true);
   const [includeTables, setIncludeTables] = useState(true);
 
@@ -47,16 +51,24 @@ export default function ExportFolderModal({
   }, [addNotification]);
 
   const folderStories = stories.filter((s) => s.folder_id === folder.id);
+  const folderAdventures = adventures.filter((a) => a.folder_id === folder.id);
   const folderNotes = notes.filter((n) => n.folderId === folder.id);
   const folderTables = tables.filter((t) => t.folderId === folder.id);
 
   const handleExport = () => {
     const selection: Parameters<typeof downloadFolderLibrary>[1] = {};
     if (includeStories && folderStories.length > 0) selection.stories = folderStories;
+    if (includeAdventures && folderAdventures.length > 0)
+      selection.adventures = folderAdventures;
     if (includeNotes && folderNotes.length > 0) selection.notes = folderNotes;
     if (includeTables && folderTables.length > 0) selection.tables = folderTables;
 
-    if (!selection.stories && !selection.notes && !selection.tables) {
+    if (
+      !selection.stories &&
+      !selection.adventures &&
+      !selection.notes &&
+      !selection.tables
+    ) {
       addNotification("Nothing selected to export", "warning");
       return;
     }
@@ -67,7 +79,7 @@ export default function ExportFolderModal({
   };
 
   const rows: {
-    key: "stories" | "notes" | "tables";
+    key: "stories" | "adventures" | "notes" | "tables";
     label: string;
     icon: string;
     count: number;
@@ -81,6 +93,14 @@ export default function ExportFolderModal({
       count: folderStories.length,
       checked: includeStories,
       setChecked: setIncludeStories,
+    },
+    {
+      key: "adventures",
+      label: "Adventures",
+      icon: "Gamepad2",
+      count: folderAdventures.length,
+      checked: includeAdventures,
+      setChecked: setIncludeAdventures,
     },
     {
       key: "notes",
