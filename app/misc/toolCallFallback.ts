@@ -80,50 +80,92 @@ function tryParseToolCallObject(obj: unknown): FallbackToolCall | null {
 }
 
 /**
- * The namespace token that precedes the tag name in leaked tool-call markup:
- * pipe-wrapped (`|DSML|`, `||DSML||`), colon-suffixed (`ns:`), or absent.
- * Matched as noise so one parser covers every spelling seen in the wild.
+ * Tag names that only ever come from leaked tool-call markup, never from
+ * narration. Everything else about the tag - what wraps the name, how it is
+ * spaced - is treated as noise.
  */
-const NS = String.raw`(?:\|+[^|<>\s]*\|+|[A-Za-z][\w.-]*:)?\s*`;
-const WRAPPER = "(?:tool_calls|function_calls)";
+const MARKUP_TAG_NAMES = new Set([
+  "tool_calls",
+  "function_calls",
+  "invoke",
+  "parameter",
+]);
 
-const wrapperBlockRe = () =>
-  new RegExp(
-    String.raw`<\s*${NS}${WRAPPER}\s*>([\s\S]*?)<\s*/\s*${NS}${WRAPPER}\s*>`,
-    "i",
+interface MarkupTag {
+  /** index of "<" */
+  start: number;
+  /** index just past ">" */
+  end: number;
+  closing: boolean;
+  name: string;
+  attrs: string;
+}
+
+// Any `<...>` with no nested angle bracket. Bounded so a stray "<" in prose
+// can't drag the scanner across the whole scene looking for a partner.
+const ANY_TAG_RE = /<([^<>]{0,600})>/g;
+const ATTR_START_RE = /\s[A-Za-z_][\w-]*\s*=/;
+const TRAILING_IDENTIFIER_RE = /([A-Za-z_][A-Za-z0-9_]*)[^A-Za-z0-9_]*$/;
+
+function readAttr(attrs: string, attrName: string): string | null {
+  const match = attrs.match(
+    new RegExp(String.raw`\b${attrName}\s*=\s*"([^"]*)"`, "i"),
   );
-const invokeRe = () =>
-  new RegExp(
-    String.raw`<\s*${NS}invoke\s+name\s*=\s*"([^"]*)"[^>]*>([\s\S]*?)<\s*/\s*${NS}invoke\s*>`,
-    "gi",
-  );
-/** A trailing `<... invoke ...>` whose closing tag never arrived (truncated
- * generation, or a still-streaming buffer). */
-const danglingInvokeRe = () =>
-  new RegExp(
-    String.raw`<\s*${NS}invoke\s+name\s*=\s*"([^"]*)"[^>]*>([\s\S]*)$`,
-    "i",
-  );
-const parameterRe = () =>
-  new RegExp(
-    String.raw`<\s*${NS}parameter\s+name\s*=\s*"([^"]*)"([^>]*)>([\s\S]*?)<\s*/\s*${NS}parameter\s*>`,
-    "gi",
-  );
-/** Cheap "is any of this worth parsing" probe, and the cut point used when
- * stripping leaked markup out of player-visible text. */
-const markupOpenerRe = () =>
-  new RegExp(
-    // The `name="` attribute is required on invoke/parameter so prose that
-    // happens to bracket those words (`<Note: parameter of the ward>`) is not
-    // mistaken for a leaked call and cut out of the narration.
-    String.raw`<\s*${NS}(?:${WRAPPER}\s*>|(?:invoke|parameter)\s+name\s*=)`,
-    "i",
-  );
-const markupCloserRe = () =>
-  new RegExp(
-    String.raw`<\s*/\s*${NS}(?:${WRAPPER}|invoke|parameter)\s*>`,
-    "gi",
-  );
+  return match ? match[1] : null;
+}
+
+/**
+ * Find the leaked tool-call tags in `content`, whatever namespace token the
+ * backend wrapped them in.
+ *
+ * The tag name is read as the last identifier before the attributes, so
+ * `<|DSML|invoke name="x">` (DeepSeek), `<||DSML||invoke name="x">` (GLM
+ * 5.2), a full-width-piped or space-padded variant of either, `<ns:invoke
+ * name="x">` and a bare `<invoke name="x">` all read as the same `invoke`
+ * tag. Hard-coding one spelling is what let GLM's leak through twice; the
+ * structure underneath has been identical every time, so that is what gets
+ * matched.
+ *
+ * `invoke`/`parameter` additionally require a `name="..."` attribute, so
+ * prose that merely brackets those words (`<Note: parameter of the ward>`)
+ * is not mistaken for markup and cut out of the narration.
+ */
+function scanMarkupTags(content: string): MarkupTag[] {
+  if (!content.includes("<")) return [];
+
+  const tags: MarkupTag[] = [];
+  ANY_TAG_RE.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = ANY_TAG_RE.exec(content)) !== null) {
+    const inner = match[1].trim();
+    const closing = inner.startsWith("/");
+    const body = closing ? inner.slice(1) : inner;
+
+    const attrStart = body.search(ATTR_START_RE);
+    const namePart = attrStart === -1 ? body : body.slice(0, attrStart);
+    const attrs = attrStart === -1 ? "" : body.slice(attrStart);
+
+    const name = namePart.match(TRAILING_IDENTIFIER_RE)?.[1]?.toLowerCase();
+    if (!name || !MARKUP_TAG_NAMES.has(name)) continue;
+    if (
+      !closing &&
+      (name === "invoke" || name === "parameter") &&
+      readAttr(attrs, "name") === null
+    ) {
+      continue;
+    }
+
+    tags.push({
+      start: match.index,
+      end: match.index + match[0].length,
+      closing,
+      name,
+      attrs,
+    });
+  }
+
+  return tags;
+}
 
 function decodeMarkupEntities(value: string): string {
   return value
@@ -147,55 +189,68 @@ function coerceMarkupParamValue(rawValue: string, attrs: string): unknown {
   }
 }
 
-function parseInvokeBody(name: string, body: string): FallbackToolCall {
-  const args: Record<string, unknown> = {};
-  const paramRe = parameterRe();
-  let paramMatch: RegExpExecArray | null;
-  while ((paramMatch = paramRe.exec(body)) !== null) {
-    const [, paramName, attrs, rawValue] = paramMatch;
-    if (!paramName) continue;
-    args[paramName] = coerceMarkupParamValue(rawValue, attrs);
-  }
-
-  return {
-    id: generateFallbackId(),
-    type: "function",
-    function: { name, arguments: JSON.stringify(args) },
-  };
-}
-
 /**
- * Recover tool call(s) leaked as the model's internal `<|DSML|invoke ...>` /
- * `<||DSML||invoke ...>` markup instead of a real `tool_calls` entry.
- * Returns null unless at least one well-formed invoke block is found, so
- * ordinary prose is untouched.
+ * Recover tool call(s) leaked as the model's internal tool-call markup
+ * (`<|DSML|invoke ...>`, `<||DSML||invoke ...>`, `<invoke ...>`, …) instead
+ * of a real `tool_calls` entry. Returns null unless at least one invoke tag
+ * is found, so ordinary prose is untouched.
  */
 function extractMarkupToolCalls(content: string): FallbackToolCall[] | null {
-  if (!markupOpenerRe().test(content)) return null;
-
-  const blockMatch = content.match(wrapperBlockRe());
-  const searchSpace = blockMatch ? blockMatch[1] : content;
+  const tags = scanMarkupTags(content);
+  if (!tags.some((t) => t.name === "invoke" && !t.closing)) return null;
 
   const calls: FallbackToolCall[] = [];
-  const re = invokeRe();
-  let invokeMatch: RegExpExecArray | null;
-  let consumedTo = 0;
-  while ((invokeMatch = re.exec(searchSpace)) !== null) {
-    const [, name, body] = invokeMatch;
-    consumedTo = re.lastIndex;
-    if (!name) continue;
-    calls.push(parseInvokeBody(name, body));
+  let current: { name: string; args: Record<string, unknown> } | null = null;
+  let openParam: { name: string; attrs: string; valueStart: number } | null =
+    null;
+
+  const closeCurrent = () => {
+    if (!current) return;
+    calls.push({
+      id: generateFallbackId(),
+      type: "function",
+      function: {
+        name: current.name,
+        arguments: JSON.stringify(current.args),
+      },
+    });
+    current = null;
+    openParam = null;
+  };
+
+  for (const tag of tags) {
+    if (tag.name === "invoke") {
+      if (tag.closing) {
+        closeCurrent();
+      } else {
+        // An invoke that never closed (truncated generation) still yields
+        // whatever parameters did arrive - better than dropping the call.
+        closeCurrent();
+        const name = readAttr(tag.attrs, "name");
+        if (name) current = { name, args: {} };
+      }
+      continue;
+    }
+
+    if (tag.name === "parameter" && current) {
+      if (tag.closing) {
+        if (openParam) {
+          current.args[openParam.name] = coerceMarkupParamValue(
+            content.slice(openParam.valueStart, tag.start),
+            openParam.attrs,
+          );
+          openParam = null;
+        }
+      } else {
+        const name = readAttr(tag.attrs, "name");
+        if (name) {
+          openParam = { name, attrs: tag.attrs, valueStart: tag.end };
+        }
+      }
+    }
   }
 
-  // An invoke whose closing tag never arrived - the provider truncated the
-  // response mid-call. Its complete parameters are still recoverable, and
-  // recovering them beats dropping the call (and printing the raw markup at
-  // the player) entirely.
-  const tail = searchSpace.slice(consumedTo);
-  const dangling = tail.match(danglingInvokeRe());
-  if (dangling?.[1]) {
-    calls.push(parseInvokeBody(dangling[1], dangling[2] ?? ""));
-  }
+  closeCurrent();
 
   return calls.length > 0 ? calls : null;
 }
@@ -205,30 +260,47 @@ function extractMarkupToolCalls(content: string): FallbackToolCall[] | null {
  * player or written into conversation history. Recovering the call (above)
  * fixes the mechanics; this is what keeps the raw `<||DSML||invoke ...>`
  * dump out of the narration. Safe to call on a partial streaming buffer: an
- * opener with no closer yet cuts everything from the opener onward, so the
- * markup never flashes on screen as it arrives.
+ * opener whose closer hasn't arrived yet takes everything after it with it,
+ * so the markup never flashes on screen as it streams.
  */
 export function stripLeakedToolCallMarkup(content: string): string {
-  if (
-    !content ||
-    (!markupOpenerRe().test(content) && !markupCloserRe().test(content))
-  ) {
-    return content;
+  const tags = scanMarkupTags(content);
+  if (tags.length === 0) return content;
+
+  // Cut whole open→close regions rather than individual tags, so parameter
+  // values (a character sheet, a search query) go with them.
+  const cuts: Array<[number, number]> = [];
+  let regionStart: number | null = null;
+  let depth = 0;
+
+  for (const tag of tags) {
+    if (!tag.closing) {
+      if (depth === 0) regionStart = tag.start;
+      depth++;
+      continue;
+    }
+    if (depth > 0) {
+      depth--;
+      if (depth === 0 && regionStart !== null) {
+        cuts.push([regionStart, tag.end]);
+        regionStart = null;
+      }
+    } else {
+      // A closer whose opener never arrived is still markup, not narration.
+      cuts.push([tag.start, tag.end]);
+    }
+  }
+  if (depth > 0 && regionStart !== null) {
+    cuts.push([regionStart, content.length]);
   }
 
-  let cleaned = content
-    .replace(new RegExp(wrapperBlockRe().source, "gi"), "")
-    .replace(invokeRe(), "");
-
-  // A closing tag whose opener was already removed (or never arrived) is
-  // markup too, not narration.
-  cleaned = cleaned.replace(markupCloserRe(), "");
-
-  // Whatever opener survives is unterminated; nothing after it is narration.
-  const opener = cleaned.match(markupOpenerRe());
-  if (opener?.index !== undefined) {
-    cleaned = cleaned.slice(0, opener.index);
+  let cleaned = "";
+  let cursor = 0;
+  for (const [start, end] of cuts) {
+    cleaned += content.slice(cursor, start);
+    cursor = end;
   }
+  cleaned += content.slice(cursor);
 
   return cleaned.replace(/\n{3,}/g, "\n\n").trim();
 }

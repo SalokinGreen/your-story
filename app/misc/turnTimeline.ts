@@ -64,18 +64,21 @@ const LEAKED_MARKUP_TAG_NAMES = [
   "tool_calls",
   "function_calls",
 ];
-const NAMESPACE_PREFIX = /^(?:\|+[^|<>\s]*\|+|[a-z][\w.-]*:)\s*/;
+// Delimiters seen wrapping the namespace token in leaked markup - ASCII and
+// full-width pipes, and the colon of an `ns:` prefix. Deliberately narrow:
+// ordinary prose ("x <= y", "<-- see above") must not read as a tag opener
+// and get held back.
+const NAMESPACE_NOISE = /^[|｜¦∣ǀ:.\s]+/;
 
 /** Could `tail` (a suffix starting with "<") still grow into a recognized tag? */
 function isPossibleTagPrefix(tail: string): boolean {
   const body = tail.slice(1).replace(/^\s*\/\s*/, "").trimStart().toLowerCase();
   if (body.length === 0) return true;
-  // A pipe-opened namespace token (`<|DSML|…`, `<||DSML||…`) can only be the
-  // start of leaked markup, however little of it has arrived so far.
-  if (body.startsWith("|")) return true;
-  const name = body.replace(NAMESPACE_PREFIX, "");
+  // A namespace token that hasn't reached its tag name yet (`<|`, `<||DSM`).
+  // Length-bounded so a stray "<" late in a scene can't swallow the rest.
+  if (body.length <= 48 && NAMESPACE_NOISE.test(body)) return true;
   return [...TAG_NAMES, ...LEAKED_MARKUP_TAG_NAMES].some(
-    (tag) => tag.startsWith(name) || name.startsWith(tag),
+    (tag) => tag.startsWith(body) || body.startsWith(tag),
   );
 }
 

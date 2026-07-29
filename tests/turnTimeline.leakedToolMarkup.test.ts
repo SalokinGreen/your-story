@@ -67,4 +67,22 @@ describe("leaked tool-call markup never reaches the player", () => {
     const prose = "The gap is < 2 inches wide, and the pressure > 3 atm.";
     expect(extractVisibleText(prose)).toBe(prose);
   });
+
+  it("does not swallow prose that just ends in an angle bracket", () => {
+    // The pending-tag hold-back is what keeps half-arrived markup off the
+    // screen; it must not eat narration that merely trails a "<".
+    for (const prose of ["The gap is <", "x <= y", "See <-- the mark"]) {
+      const { pending } = splitPendingTag(prose);
+      expect(pending === "" || pending === "<").toBe(true);
+    }
+  });
+
+  it("hides the full-width-piped spelling too", () => {
+    const raw =
+      "Before.\n\n" +
+      '<｜｜DSML｜｜invoke name="search_notes">' +
+      '<｜｜DSML｜｜parameter name="query" string="true">setting lore</｜｜DSML｜｜parameter>' +
+      "</｜｜DSML｜｜invoke>";
+    expect(extractVisibleText(raw)).toBe("Before.");
+  });
 });
