@@ -7,7 +7,7 @@ import { LocalFolder } from "@/app/misc/localFolderManager";
 
 interface FolderActionSheetProps {
   folder: LocalFolder;
-  counts: { stories: number; notes: number; tables: number };
+  counts: { stories: number; adventures: number; notes: number };
   onClose: () => void;
   onSave: (updates: Pick<LocalFolder, "name" | "icon" | "color">) => void;
   onExport: () => void;
@@ -45,7 +45,7 @@ export default function FolderActionSheet({
     onSave({ name: name.trim(), icon, color });
   };
 
-  const totalItems = counts.stories + counts.notes + counts.tables;
+  const totalItems = counts.stories + counts.adventures + counts.notes;
 
   return (
     <div
@@ -82,10 +82,10 @@ export default function FolderActionSheet({
                 counts.stories > 0
                   ? `${counts.stories} stor${counts.stories === 1 ? "y" : "ies"}`
                   : null,
-                counts.notes > 0 ? `${counts.notes} note${counts.notes === 1 ? "" : "s"}` : null,
-                counts.tables > 0
-                  ? `${counts.tables} table${counts.tables === 1 ? "" : "s"}`
+                counts.adventures > 0
+                  ? `${counts.adventures} adventure${counts.adventures === 1 ? "" : "s"}`
                   : null,
+                counts.notes > 0 ? `${counts.notes} note${counts.notes === 1 ? "" : "s"}` : null,
               ]
                 .filter(Boolean)
                 .join(" · ")}

@@ -2,7 +2,7 @@ import { Adventure } from "./structs";
 
 const ADVENTURE_DB_NAME = "YourStoryAdventuresDB";
 const ADVENTURE_STORE_NAME = "local_adventures";
-const ADVENTURE_DB_VERSION = 2; // Bumped for sync metadata
+const ADVENTURE_DB_VERSION = 3; // Bumped for folder filing
 
 export type AdventureSyncStatus = "synced" | "pending" | "local-only";
 
@@ -12,6 +12,12 @@ export interface LocalAdventure {
   description: string;
   updatedAt: Date;
   adventureData: Partial<Adventure>;
+  /**
+   * Shared LocalFolder id, matching LocalStory.folder_id - `null` means
+   * explicitly unfiled, `undefined` on records written before folders
+   * reached adventures (treated the same as unfiled when reading).
+   */
+  folder_id?: string | null;
   // Sync metadata
   syncStatus: AdventureSyncStatus;
   serverUpdatedAt?: string; // ISO timestamp from server
@@ -40,13 +46,18 @@ function openDB(): Promise<IDBDatabase> {
         });
         objectStore.createIndex("updatedAt", "updatedAt", { unique: false });
         objectStore.createIndex("syncStatus", "syncStatus", { unique: false });
-      } else if (oldVersion < 2) {
-        // Migration: add syncStatus index for existing stores
+        objectStore.createIndex("folder_id", "folder_id", { unique: false });
+      } else {
+        // Migrations: add whichever indexes this device's store predates.
+        // Existing records keep an absent folder_id, which reads as unfiled.
         const transaction = (event.target as IDBOpenDBRequest).transaction;
         if (transaction) {
           const store = transaction.objectStore(ADVENTURE_STORE_NAME);
-          if (!store.indexNames.contains("syncStatus")) {
+          if (oldVersion < 2 && !store.indexNames.contains("syncStatus")) {
             store.createIndex("syncStatus", "syncStatus", { unique: false });
+          }
+          if (oldVersion < 3 && !store.indexNames.contains("folder_id")) {
+            store.createIndex("folder_id", "folder_id", { unique: false });
           }
         }
       }
@@ -67,6 +78,11 @@ export async function saveLocalAdventure(
     // this moment - otherwise a later, genuinely newer edit from another
     // device could lose to this device's stale content in a future merge.
     updatedAt?: Date;
+    // Folder to file this adventure into. Left out entirely, the existing
+    // filing is kept; an explicit `null` unfiles it. Callers that only
+    // touch adventure content (the Designer's autosave) therefore can't
+    // knock an adventure out of its folder by omission.
+    folderId?: string | null;
   }
 ): Promise<void> {
   const db = await openDB();
@@ -101,6 +117,8 @@ export async function saveLocalAdventure(
       description: adventure.shortDescription || "",
       updatedAt: options?.updatedAt ?? now,
       adventureData: adventure,
+      folder_id:
+        options?.folderId !== undefined ? options.folderId : existing?.folder_id,
       // Sync metadata
       syncStatus,
       serverUpdatedAt: options?.serverUpdatedAt || existing?.serverUpdatedAt,
@@ -148,6 +166,55 @@ export async function listLocalAdventures(): Promise<LocalAdventure[]> {
     };
     request.onerror = () => reject(request.error);
   });
+}
+
+/**
+ * Clear folder_id on every adventure that references a given folder.
+ * Used when a shared LocalFolder is deleted (from any tab) so adventures
+ * become uncategorized instead of pointing at a dangling folder id.
+ */
+export async function unassignFolderFromAdventures(
+  folderId: string
+): Promise<void> {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([ADVENTURE_STORE_NAME], "readwrite");
+    const store = transaction.objectStore(ADVENTURE_STORE_NAME);
+    const request = store.openCursor();
+
+    request.onsuccess = (event) => {
+      const cursor = (event.target as IDBRequest).result;
+      if (cursor) {
+        const adventure = cursor.value as LocalAdventure;
+        if (adventure.folder_id === folderId) {
+          adventure.folder_id = null;
+          cursor.update(adventure);
+        }
+        cursor.continue();
+      }
+    };
+    request.onerror = () => reject(request.error);
+
+    transaction.oncomplete = () => resolve();
+    transaction.onerror = () => reject(transaction.error);
+  });
+}
+
+/**
+ * Move a single adventure into a folder (or unfile it with `null`) without
+ * having to round-trip its adventureData through the caller.
+ */
+export async function moveLocalAdventure(
+  adventureId: string,
+  folderId: string | null
+): Promise<void> {
+  const existing = await getLocalAdventure(adventureId);
+  if (!existing) throw new Error("Adventure not found");
+  // Stamped "now" like any other write (this is what saveLocalStory does for
+  // a story move): folder filing travels inside the synced payload, so a move
+  // that didn't bump updatedAt would never win a merge and would silently
+  // fail to reach the user's other devices.
+  await saveLocalAdventure(adventureId, existing.adventureData, { folderId });
 }
 
 export async function deleteLocalAdventure(adventureId: string): Promise<void> {

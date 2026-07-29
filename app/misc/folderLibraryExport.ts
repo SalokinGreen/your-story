@@ -2,14 +2,15 @@
  * Folder Library Export/Import Utilities
  *
  * Exports a library folder (and a chosen subset of the data types filed
- * into it - stories, notes, tables) to a single .folder file, and imports
- * that bundle back in as a brand-new folder. Mirrors notesLibraryExport.ts
- * / tablesLibraryExport.ts, but bundles multiple data types together since
- * folders are shared across all of them.
+ * into it - stories, adventures, notes, tables) to a single .folder file,
+ * and imports that bundle back in as a brand-new folder. Mirrors
+ * notesLibraryExport.ts / tablesLibraryExport.ts, but bundles multiple data
+ * types together since folders are shared across all of them.
  */
 
-import { StoryData } from "./structs";
+import { Adventure, StoryData } from "./structs";
 import { LocalStory } from "./localStoryManager";
+import { LocalAdventure } from "./localAdventureManager";
 import { LibraryNote } from "./localNotesLibraryManager";
 import { LibraryTable } from "./localTablesLibraryManager";
 import { ExportedLibraryNote, prepareNotesForExport } from "./notesLibraryExport";
@@ -28,6 +29,12 @@ export interface FolderLibraryExport {
   folder: { name: string; icon: string; color: string };
   /** Present only when stories were included in the export */
   stories?: ExportedFolderStory[];
+  /**
+   * Present only when adventures were included. Absent from files written
+   * before adventures could be filed into folders, which is why every field
+   * here stays optional rather than bumping the format version.
+   */
+  adventures?: ExportedFolderAdventure[];
   /** Present only when notes were included in the export */
   notes?: ExportedLibraryNote[];
   /** Present only when tables were included in the export */
@@ -39,8 +46,14 @@ export interface ExportedFolderStory {
   storyData: StoryData;
 }
 
+/** An adventure stripped of local-only IDs/sync metadata */
+export interface ExportedFolderAdventure {
+  adventureData: Partial<Adventure>;
+}
+
 export interface FolderExportSelection {
   stories?: LocalStory[];
+  adventures?: LocalAdventure[];
   notes?: LibraryNote[];
   tables?: LibraryTable[];
 }
@@ -61,6 +74,11 @@ export function prepareFolderForExport(
 
   if (data.stories) {
     exportData.stories = data.stories.map((s) => ({ storyData: s.storyData }));
+  }
+  if (data.adventures) {
+    exportData.adventures = data.adventures.map((a) => ({
+      adventureData: a.adventureData,
+    }));
   }
   if (data.notes) {
     exportData.notes = prepareNotesForExport(data.notes).notes;
@@ -112,6 +130,7 @@ export interface FolderImportResult {
   success: boolean;
   folder?: { name: string; icon: string; color: string };
   stories?: ExportedFolderStory[];
+  adventures?: ExportedFolderAdventure[];
   notes?: ExportedLibraryNote[];
   tables?: ExportedLibraryTable[];
   error?: string;
@@ -200,6 +219,20 @@ export function parseFolderLibraryFile(content: string): FolderImportResult {
       result.stories = stories;
     }
 
+    if (Array.isArray(data.adventures)) {
+      const adventures = data.adventures
+        .filter((raw: Partial<ExportedFolderAdventure>) => !!raw.adventureData)
+        .map((raw: Partial<ExportedFolderAdventure>) => ({
+          adventureData: raw.adventureData as Partial<Adventure>,
+        }));
+      if (adventures.length !== data.adventures.length) {
+        warnings.push(
+          "Some adventures in the file were missing data and were skipped",
+        );
+      }
+      result.adventures = adventures;
+    }
+
     if (Array.isArray(data.notes)) {
       result.notes = data.notes.map(
         (raw: Partial<ExportedLibraryNote>, index: number) =>
@@ -214,8 +247,13 @@ export function parseFolderLibraryFile(content: string): FolderImportResult {
       );
     }
 
-    if (!result.stories?.length && !result.notes?.length && !result.tables?.length) {
-      warnings.push("Folder file contains no stories, notes, or tables");
+    if (
+      !result.stories?.length &&
+      !result.adventures?.length &&
+      !result.notes?.length &&
+      !result.tables?.length
+    ) {
+      warnings.push("Folder file contains no stories, adventures, notes, or tables");
     }
 
     return result;

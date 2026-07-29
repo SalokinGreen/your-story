@@ -27,6 +27,14 @@ import {
   readLibraryNotesFile,
 } from "@/app/misc/notesLibraryExport";
 import { readLibraryTablesFile } from "@/app/misc/tablesLibraryExport";
+import { getRelativeTime } from "@/app/misc/relativeTime";
+import {
+  ALL_SCOPE,
+  LibraryScope,
+  scopeFolderId,
+  scopeKey,
+  scopeMatches,
+} from "./libraryScope";
 
 const NOTE_TYPE_OPTIONS: { value: LoreType; label: string }[] = [
   { value: "lore", label: "📜 Lore" },
@@ -42,24 +50,31 @@ function noteTypeLabel(type?: LoreType): string {
   return NOTE_TYPE_OPTIONS.find((o) => o.value === type)?.label || "📜 Lore";
 }
 
-function getRelativeTime(dateString: string): string {
-  const date = new Date(dateString);
-  const now = new Date();
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
+/** How many note cards to add each time the list is expanded. */
+const PAGE_SIZE = 60;
 
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
-  return date.toLocaleDateString();
+/** Note counts the home screen needs to label folders without re-reading IDB. */
+export interface NoteCounts {
+  total: number;
+  byFolder: Record<string, number>;
+  unfiled: number;
+}
+
+export function countNotesByFolder(notes: LibraryNote[]): NoteCounts {
+  const byFolder: Record<string, number> = {};
+  let unfiled = 0;
+  for (const note of notes) {
+    if (note.folderId) {
+      byFolder[note.folderId] = (byFolder[note.folderId] || 0) + 1;
+    } else {
+      unfiled++;
+    }
+  }
+  return { total: notes.length, byFolder, unfiled };
 }
 
 interface NotesLibraryTabProps {
-  onCountChange?: (count: number) => void;
+  onCountsChange?: (counts: NoteCounts) => void;
   // Folders are shared with the Stories/Adventures tabs (localFolderManager),
   // so state is lifted to the parent page and kept in sync across tabs.
   folders: LocalFolder[];
@@ -67,13 +82,15 @@ interface NotesLibraryTabProps {
   // Folder export modal also lives on the parent page (it needs to reach
   // across stories/notes/tables), so opening it is just a callback.
   onExportFolder: (folder: LocalFolder) => void;
+  scope?: LibraryScope;
 }
 
 export default function NotesLibraryTab({
-  onCountChange,
+  onCountsChange,
   folders,
   setFolders,
   onExportFolder,
+  scope = ALL_SCOPE,
 }: NotesLibraryTabProps) {
   const { addNotification } = useNotification();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -83,7 +100,13 @@ export default function NotesLibraryTab({
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const [search, setSearch] = useState("");
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  // Only used by the flat view; a folder view pins the filter to its folder.
+  const [chipFolder, setChipFolder] = useState<LibraryScope>(scope);
+  const activeScope = scope.kind === "all" ? chipFolder : scope;
+  // A library can run to thousands of notes (PDF imports produce hundreds at
+  // a time), and rendering every card at once is what made this list crawl.
+  // Cards are revealed a page at a time instead.
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
   const [selectionMode, setSelectionMode] = useState(false);
   const [selectedNotes, setSelectedNotes] = useState<Set<string>>(new Set());
@@ -126,8 +149,24 @@ export default function NotesLibraryTab({
   }, []);
 
   useEffect(() => {
-    onCountChange?.(notes.length);
-  }, [notes, onCountChange]);
+    onCountsChange?.(countNotesByFolder(notes));
+  }, [notes, onCountsChange]);
+
+  const propScopeKey = scopeKey(scope);
+  useEffect(() => {
+    setChipFolder(scope);
+    // Keyed on the scope's identity rather than the object itself - scopes are
+    // literals, so a parent re-render would otherwise look like a scope change
+    // and wipe the chip selection out from under the user.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [propScopeKey]);
+
+  // Narrowing the list should start it from the top again, not leave the user
+  // scrolled past a page boundary of a list they no longer see.
+  const activeScopeKey = scopeKey(activeScope);
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [search, activeScopeKey]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -158,9 +197,10 @@ export default function NotesLibraryTab({
           "success",
         );
       }
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error("Error loading notes library:", error);
-      addNotification(`Failed to load notes library: ${error.message}`, "failure");
+      addNotification(`Failed to load notes library: ${message}`, "failure");
     } finally {
       setLoading(false);
     }
@@ -181,7 +221,8 @@ export default function NotesLibraryTab({
       relatedLocations: [],
       keys: [],
       source: "manual",
-      folderId: selectedFolder || undefined,
+      // A note written while looking at a folder belongs in that folder.
+      folderId: scopeFolderId(activeScope) || undefined,
     });
   };
 
@@ -235,9 +276,10 @@ export default function NotesLibraryTab({
         addNotification("Note updated", "success");
       }
       closeNoteEditor();
-    } catch (error: any) {
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
       console.error("Error saving note:", error);
-      addNotification(`Failed to save note: ${error.message}`, "failure");
+      addNotification(`Failed to save note: ${message}`, "failure");
     } finally {
       setSavingNote(false);
     }
@@ -251,8 +293,9 @@ export default function NotesLibraryTab({
       if (updated) {
         setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n)));
       }
-    } catch (error: any) {
-      addNotification(`Failed to update note: ${error.message}`, "failure");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addNotification(`Failed to update note: ${message}`, "failure");
     }
   };
 
@@ -271,8 +314,9 @@ export default function NotesLibraryTab({
           await deleteLibraryNote(noteId);
           setNotes((prev) => prev.filter((n) => n.id !== noteId));
           addNotification("Note deleted", "success");
-        } catch (error: any) {
-          addNotification(`Failed to delete: ${error.message}`, "failure");
+        } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+          addNotification(`Failed to delete: ${message}`, "failure");
         } finally {
           setDeleting(null);
         }
@@ -290,8 +334,9 @@ export default function NotesLibraryTab({
       }
       setMovingNote(null);
       addNotification("Note moved", "success");
-    } catch (error: any) {
-      addNotification(`Failed to move note: ${error.message}`, "failure");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addNotification(`Failed to move note: ${message}`, "failure");
     }
   };
 
@@ -341,8 +386,9 @@ export default function NotesLibraryTab({
           setSelectedNotes(new Set());
           setSelectionMode(false);
           addNotification(`${ids.length} note${ids.length === 1 ? "" : "s"} deleted`, "success");
-        } catch (error: any) {
-          addNotification(`Failed to delete notes: ${error.message}`, "failure");
+        } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+          addNotification(`Failed to delete notes: ${message}`, "failure");
         }
       },
     });
@@ -365,8 +411,9 @@ export default function NotesLibraryTab({
         ? folders.find((f) => f.id === folderId)?.name || "folder"
         : "Uncategorized";
       addNotification(`${ids.length} note${ids.length === 1 ? "" : "s"} moved to ${folderName}`, "success");
-    } catch (error: any) {
-      addNotification(`Failed to move notes: ${error.message}`, "failure");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addNotification(`Failed to move notes: ${message}`, "failure");
     }
   };
 
@@ -380,8 +427,9 @@ export default function NotesLibraryTab({
       setFolders((prev) => [...prev, folder]);
       setShowNewFolderDialog(false);
       addNotification("Folder created successfully", "success");
-    } catch (error: any) {
-      addNotification(`Failed to create folder: ${error.message}`, "failure");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addNotification(`Failed to create folder: ${message}`, "failure");
     }
   };
 
@@ -434,8 +482,9 @@ export default function NotesLibraryTab({
         }`,
         "success",
       );
-    } catch (error: any) {
-      addNotification(`Failed to import notes: ${error.message}`, "failure");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addNotification(`Failed to import notes: ${message}`, "failure");
     }
   };
 
@@ -515,8 +564,9 @@ export default function NotesLibraryTab({
         `Saved ${parts.join(" and ")} from PDF to your library`,
         "success",
       );
-    } catch (error: any) {
-      addNotification(`Failed to save OCR import: ${error.message}`, "failure");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addNotification(`Failed to save OCR import: ${message}`, "failure");
     }
   };
 
@@ -526,13 +576,7 @@ export default function NotesLibraryTab({
 
   const filteredNotes = notes
     .filter((note) => {
-      if (selectedFolder !== null) {
-        if (selectedFolder === "uncategorized") {
-          if (note.folderId) return false;
-        } else if (note.folderId !== selectedFolder) {
-          return false;
-        }
-      }
+      if (!scopeMatches(activeScope, note.folderId)) return false;
       if (
         search &&
         !note.title.toLowerCase().includes(search.toLowerCase()) &&
@@ -586,14 +630,38 @@ export default function NotesLibraryTab({
         `Imported ${created.length} table${created.length === 1 ? "" : "s"} as notes`,
         "success",
       );
-    } catch (error: any) {
-      addNotification(`Failed to import tables: ${error.message}`, "failure");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      addNotification(`Failed to import tables: ${message}`, "failure");
     }
+  };
+
+  const chipClass = (active: boolean) =>
+    `px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
+      active
+        ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
+        : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
+    }`;
+
+  /**
+   * Opens the OCR importer. Inside a folder there's nothing to ask - the
+   * results belong in the folder you're standing in.
+   */
+  const startPdfImport = () => {
+    if (scope.kind === "folder") {
+      setOcrTargetFolder(scope.folderId);
+      setOcrImporterKey((k) => k + 1);
+      setOcrImporterOpen(true);
+      return;
+    }
+    setShowOcrFolderPrompt(true);
   };
 
   if (loading && notes.length === 0) {
     return <LibrarySkeleton />;
   }
+
+  const visibleNotes = filteredNotes.slice(0, visibleCount);
 
   return (
     <div className="space-y-4">
@@ -621,7 +689,7 @@ export default function NotesLibraryTab({
             New Note
           </button>
           <button
-            onClick={() => setShowOcrFolderPrompt(true)}
+            onClick={startPdfImport}
             className="flex items-center gap-2 px-4 py-2.5 bg-linear-to-r from-purple-900/30 to-blue-900/30 hover:from-purple-800/40 hover:to-blue-800/40 border border-purple-700/50 rounded-xl transition-colors text-sm font-medium"
           >
             <DynamicIcon name="FileUp" className="w-4 h-4" />
@@ -663,66 +731,60 @@ export default function NotesLibraryTab({
         </div>
       </div>
 
-      {/* Folder Chips */}
-      <DraggableScroll className="pb-2" innerClassName="gap-2 px-1">
-        <button
-          onClick={() => setSelectedFolder(null)}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
-            selectedFolder === null
-              ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-              : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
-          }`}
-        >
-          <DynamicIcon name="NotebookText" className="w-3.5 h-3.5" />
-          All ({notes.length})
-        </button>
-        <button
-          onClick={() => setSelectedFolder("uncategorized")}
-          className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
-            selectedFolder === "uncategorized"
-              ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-              : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
-          }`}
-        >
-          <DynamicIcon name="FileText" className="w-3.5 h-3.5" />
-          Uncategorized (
-          {notes.filter((n) => !n.folderId).length})
-        </button>
-        {folders.map((folder) => (
-          <div key={folder.id} className="relative group shrink-0">
-            <button
-              onClick={() => setSelectedFolder(folder.id)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap transition-all flex items-center gap-1.5 ${
-                selectedFolder === folder.id
-                  ? "bg-linear-to-r from-purple-600 to-blue-600 text-white"
-                  : "bg-blue-900/50 text-blue-200/70 hover:bg-blue-800/50"
-              }`}
-              style={{ borderLeft: `3px solid ${folder.color}` }}
-            >
-              <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
-              {folder.name} (
-              {notes.filter((n) => n.folderId === folder.id).length})
-            </button>
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onExportFolder(folder);
-              }}
-              title="Export folder"
-              className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 p-0.5 rounded-full bg-blue-800 hover:bg-purple-600 border border-blue-950 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
-            >
-              <DynamicIcon name="Download" className="w-3 h-3" />
-            </button>
-          </div>
-        ))}
-        <button
-          onClick={() => setShowNewFolderDialog(true)}
-          className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap bg-blue-900/30 text-blue-300/70 hover:bg-blue-800/50 transition-all flex items-center gap-1.5 border border-dashed border-blue-700/50"
-        >
-          <DynamicIcon name="Plus" className="w-3.5 h-3.5" />
-          New Folder
-        </button>
-      </DraggableScroll>
+      {/* Folder Chips - flat view only; a folder view is already scoped */}
+      {scope.kind === "all" && (
+        <DraggableScroll className="pb-2" innerClassName="gap-2 px-1">
+          <button
+            onClick={() => setChipFolder({ kind: "all" })}
+            className={chipClass(chipFolder.kind === "all")}
+          >
+            <DynamicIcon name="NotebookText" className="w-3.5 h-3.5" />
+            All ({notes.length})
+          </button>
+          <button
+            onClick={() => setChipFolder({ kind: "unfiled" })}
+            className={chipClass(chipFolder.kind === "unfiled")}
+          >
+            <DynamicIcon name="FileText" className="w-3.5 h-3.5" />
+            Uncategorized ({notes.filter((n) => !n.folderId).length})
+          </button>
+          {folders.map((folder) => (
+            <div key={folder.id} className="relative group shrink-0">
+              <button
+                onClick={() =>
+                  setChipFolder({ kind: "folder", folderId: folder.id })
+                }
+                className={chipClass(
+                  chipFolder.kind === "folder" &&
+                    chipFolder.folderId === folder.id,
+                )}
+                style={{ borderLeft: `3px solid ${folder.color}` }}
+              >
+                <DynamicIcon name={folder.icon} className="w-3.5 h-3.5" />
+                {folder.name} (
+                {notes.filter((n) => n.folderId === folder.id).length})
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onExportFolder(folder);
+                }}
+                title="Export folder"
+                className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 p-0.5 rounded-full bg-blue-800 hover:bg-purple-600 border border-blue-950 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity"
+              >
+                <DynamicIcon name="Download" className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          <button
+            onClick={() => setShowNewFolderDialog(true)}
+            className="px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap bg-blue-900/30 text-blue-300/70 hover:bg-blue-800/50 transition-all flex items-center gap-1.5 border border-dashed border-blue-700/50"
+          >
+            <DynamicIcon name="Plus" className="w-3.5 h-3.5" />
+            New Folder
+          </button>
+        </DraggableScroll>
+      )}
 
       {/* Select mode + selection bar */}
       <div className="flex items-center gap-2">
@@ -841,7 +903,7 @@ export default function NotesLibraryTab({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-          {filteredNotes.map((note) => (
+          {visibleNotes.map((note) => (
             <div
               key={note.id}
               onClick={() =>
@@ -941,6 +1003,15 @@ export default function NotesLibraryTab({
             </div>
           ))}
         </div>
+      )}
+
+      {visibleNotes.length < filteredNotes.length && (
+        <button
+          onClick={() => setVisibleCount((c) => c + PAGE_SIZE)}
+          className="w-full py-3 bg-blue-900/40 hover:bg-blue-800/50 border border-blue-800/50 rounded-xl text-sm font-medium transition-colors"
+        >
+          Show more ({filteredNotes.length - visibleNotes.length} left)
+        </button>
       )}
 
       {/* New/Edit Note Modal */}
