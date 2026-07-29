@@ -1961,6 +1961,7 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
         // Use the actual saved conversation - this preserves exact tool_calls and tool responses
         for (const msg of part.gmConversation) {
           if (msg.role === "assistant") {
+            const hasToolCalls = !!(msg.tool_calls && msg.tool_calls.length > 0);
             const assistantMsg: ChatMessage = {
               role: "assistant",
               content: cleanString(msg.content),
@@ -1969,9 +1970,18 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
                     reasoning: msg.reasoning,
                     reasoning_details: msg.reasoning_details,
                   }
-                : {}),
+                : // An older round that made tool calls keeps its plain-text
+                  // reasoning: DeepSeek's thinking mode 400s on any assistant
+                  // message carrying tool_calls without its reasoning_content
+                  // (api-docs.deepseek.com/guides/thinking_mode), whatever
+                  // turn it came from. Only `reasoning_details` is dropped -
+                  // that is where the stale `reasoning.encrypted` signature
+                  // this scoping was written for lives.
+                  hasToolCalls
+                  ? { reasoning: msg.reasoning }
+                  : {}),
             };
-            if (msg.tool_calls && msg.tool_calls.length > 0) {
+            if (hasToolCalls) {
               assistantMsg.tool_calls = msg.tool_calls;
             }
             messages.push(assistantMsg);

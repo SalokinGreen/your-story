@@ -471,6 +471,29 @@ function buildRequestMessages(
       }
     }
     if (m.tool_call_id) msg.tool_call_id = m.tool_call_id;
+
+    // DeepSeek's thinking mode requires an assistant message that carried
+    // tool calls to hand its `reasoning_content` back verbatim, or the very
+    // next request fails with 400 "The `reasoning_content` in the thinking
+    // mode must be passed back to the API"
+    // (api-docs.deepseek.com/guides/thinking_mode). We keep the model's CoT
+    // on the message as `reasoning` whatever the provider called it, so map
+    // it back to DeepSeek's field name here - unmodified, since truncating
+    // or summarizing it is rejected too. Messages without tool calls have
+    // theirs ignored by the API, so sending it there costs nothing.
+    //
+    // The empty-string fallback covers histories where the reasoning is
+    // genuinely gone (compaction pruned it, or a legacy save synthesized the
+    // tool call without one): the API needs the key present, and omitting it
+    // fails every time, so an empty value is the only remaining shot.
+    if (provider === "deepseek" && m.role === "assistant") {
+      if (m.reasoning) {
+        msg.reasoning_content = m.reasoning;
+      } else if (msg.tool_calls) {
+        msg.reasoning_content = "";
+      }
+    }
+
     if (
       index === processedMessages.length - 1 &&
       m.role === "assistant" &&
@@ -478,6 +501,10 @@ function buildRequestMessages(
         (provider === "deepseek" && !hasTools))
     ) {
       msg.prefix = true;
+      // A prefill is a message the model continues writing, not one it
+      // already finished thinking through - a reasoning_content on it
+      // describes thinking that never happened.
+      delete msg.reasoning_content;
     }
     return msg;
   });

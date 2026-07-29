@@ -13,7 +13,15 @@
  * message in `gmConversation` had its reasoning/reasoning_details restored
  * unconditionally; now only the last completed round keeps them - older
  * rounds keep their content and tool_calls (still needed for narrative and
- * tool-call continuity) but drop the reasoning metadata.
+ * tool-call continuity) but drop `reasoning_details`, where the encrypted
+ * signature lives.
+ *
+ * The one carve-out: an older round that made tool calls keeps its
+ * plain-text `reasoning`. DeepSeek's thinking mode 400s on any assistant
+ * message carrying tool_calls without its reasoning_content
+ * (api-docs.deepseek.com/guides/thinking_mode), no matter how old the turn
+ * is, and plain reasoning text is not a thought signature - it carries none
+ * of the staleness the scoping above exists to prevent.
  */
 import { describe, it, expect } from "vitest";
 import { buildGMStagePrompt } from "@/app/misc/ai_staged";
@@ -139,7 +147,7 @@ describe("buildGMStagePrompt reasoning replay scoping", () => {
     ]);
   });
 
-  it("still preserves tool_calls on older rounds even though reasoning is stripped", () => {
+  it("still preserves tool_calls on older rounds, with their plain reasoning", () => {
     const storyData = createTestStory({
       scene: {
         parts: [
@@ -187,7 +195,9 @@ describe("buildGMStagePrompt reasoning replay scoping", () => {
     const oldRoundMsg = messages.find(
       (m) => m.role === "assistant" && m.content.includes("search the shelf"),
     );
-    expect(oldRoundMsg?.reasoning).toBeUndefined();
+    // Kept: DeepSeek 400s on a tool-call message with no reasoning_content.
+    expect(oldRoundMsg?.reasoning).toBe("OLD_REASONING");
+    // Still dropped: this is the stale encrypted signature the scoping is for.
     expect(oldRoundMsg?.reasoning_details).toBeUndefined();
     expect(oldRoundMsg?.tool_calls).toEqual([
       {
