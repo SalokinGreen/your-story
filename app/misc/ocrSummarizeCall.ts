@@ -1110,8 +1110,35 @@ function normalizeStringArray(raw: unknown): string[] {
     .filter(Boolean);
 }
 
+/**
+ * The usable entries of one of the response's lists.
+ *
+ * A model that has nothing for a list sometimes writes `null`, `{}` or a
+ * bare string rather than `[]`, and mapping over that throws - which used to
+ * take a whole page range down over an empty list. Entries that aren't
+ * objects go the same way, since there is no note to be made of them.
+ */
+function entryList(raw: unknown): any[] {
+  return Array.isArray(raw)
+    ? raw.filter((entry) => entry && typeof entry === "object")
+    : [];
+}
+
+/**
+ * True for an entry that says it is a random table, wherever it turned up.
+ * "table" is one of the note types the prompt lists, so a model will
+ * occasionally file a table under "lore" with `type: "table"` set. Believing
+ * the entry over the list it arrived in keeps it out of the lore the GM
+ * carries around and puts it under Tables where the author expects it.
+ */
+function declaresTable(entry: any): boolean {
+  return entry?.type === "table";
+}
+
 export function processParserResult(parsed: any): ExtractedContent {
-  const lore: StoryLore[] = (parsed.lore || []).map((entry: any, index: number) => ({
+  const lore: StoryLore[] = entryList(parsed.lore)
+    .filter((entry: any) => !declaresTable(entry))
+    .map((entry: any, index: number) => ({
     title: entry.title || `Entry ${index + 1}`,
     content: entry.content || "",
     type: entry.type || undefined,
@@ -1132,8 +1159,9 @@ export function processParserResult(parsed: any): ExtractedContent {
     var_off_triggers: [],
   }));
 
-  const mechanicNotes: StoryLore[] = (parsed.mechanicNotes || []).map(
-    (entry: any, index: number) => ({
+  const mechanicNotes: StoryLore[] = entryList(parsed.mechanicNotes)
+    .filter((entry: any) => !declaresTable(entry))
+    .map((entry: any, index: number) => ({
       title: entry.title || `Mechanic ${index + 1}`,
       content: entry.content || "",
       type: "mechanics" as const,
@@ -1155,18 +1183,18 @@ export function processParserResult(parsed: any): ExtractedContent {
   );
 
   const tableNotes: StoryLore[] = [
-    ...(parsed.tableNotes || []).map((entry: any, index: number) =>
-      toTableNote(entry, index),
-    ),
+    ...entryList(parsed.tableNotes),
+    // A table the model filed under lore or mechanics, but typed as a table.
+    ...entryList(parsed.lore).filter(declaresTable),
+    ...entryList(parsed.mechanicNotes).filter(declaresTable),
     // Legacy tolerance: models sometimes answer with the structured table
     // shape the extractor used to ask for (a name plus weighted entries),
     // either from their own training or from a prompt that got trimmed.
     // Rendering it into the note it would have become anyway is better than
     // silently dropping every table in the document.
-    ...(parsed.customTables || []).map((table: any) =>
-      customTableToNote(normalizeLegacyTable(table)),
-    ),
+    ...entryList(parsed.customTables),
   ]
+    .map((entry: any, index: number) => toTableNote(entry, index))
     // Drop table shells. Models routinely emit a named table and then run out
     // of room (or just never fill it) before writing any results, and a table
     // note with no results in it is unrollable - it can only ever be dead
@@ -1183,6 +1211,24 @@ export function processParserResult(parsed: any): ExtractedContent {
   };
 }
 
+/**
+ * The body of a table note, from whichever shape the model reached for.
+ *
+ * Asking for prose does not stop a model from writing the table out as data
+ * - a title and a list of rows, no `content` at all, or a `content` plus the
+ * rows beside it. Those are complete tables, so they get rendered into the
+ * listing the note wants instead of being dropped as "empty", which is what
+ * losing every table in a rulebook actually looked like.
+ */
+function tableNoteContent(entry: any): string {
+  const written = typeof entry.content === "string" ? entry.content.trim() : "";
+  if (written) return written;
+
+  const rows = entry.entries ?? entry.rows ?? entry.results;
+  if (!Array.isArray(rows) || rows.length === 0) return "";
+  return customTableToNote(normalizeLegacyTable({ ...entry, name: "" })).content;
+}
+
 /** One extracted random table, as the `type: "table"` note it is stored as. */
 function toTableNote(entry: any, index: number): StoryLore {
   const title =
@@ -1195,7 +1241,7 @@ function toTableNote(entry: any, index: number): StoryLore {
 
   return {
     title,
-    content: typeof entry.content === "string" ? entry.content.trim() : "",
+    content: tableNoteContent(entry),
     type: "table" as const,
     folder: entry.folder || "Tables",
     tags: normalizeStringArray(entry.tags),
@@ -1226,13 +1272,16 @@ function toTableNote(entry: any, index: number): StoryLore {
  * than in a `weight` field.
  */
 function normalizeLegacyTable(table: any): CustomTable {
+  const rows = table?.entries ?? table?.rows ?? table?.results;
   return {
     id: "",
     name: typeof table?.name === "string" ? table.name.trim() : "",
     description: typeof table?.description === "string" ? table.description : "",
-    entries: (table?.entries || [])
+    entries: (Array.isArray(rows) ? rows : [])
       .map((entry: any) => {
-        const raw = entry?.text || entry?.result || "";
+        // A row can be a bare string ("Brine wraith") as easily as an object.
+        const raw =
+          typeof entry === "string" ? entry : entry?.text || entry?.result || "";
         const text = typeof raw === "string" ? raw.trim() : "";
         let weight = entry?.weight;
         if (weight === undefined || weight === null || isNaN(Number(weight))) {

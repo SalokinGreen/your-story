@@ -61,10 +61,14 @@ export interface LocalPDFImport {
 function withTableNotes<T extends { tableNotes?: StoryLore[]; customTables?: CustomTable[] }>(
   record: T,
 ): T & { tableNotes: StoryLore[] } {
-  // `?? []` rather than a plain read: the stored record predates the field
-  // whenever it carries `customTables`, whatever its declared type says.
-  const tableNotes = record.tableNotes ?? [];
-  const migrated = migrateCustomTablesToNotes(tableNotes, record.customTables);
+  // Read defensively rather than by the declared type: a stored record was
+  // written by whatever release the user was on at the time, so the field
+  // this build expects may simply not be there.
+  const tableNotes = Array.isArray(record.tableNotes) ? record.tableNotes : [];
+  const migrated = migrateCustomTablesToNotes(
+    tableNotes,
+    Array.isArray(record.customTables) ? record.customTables : undefined,
+  );
   return { ...record, tableNotes: migrated ?? tableNotes };
 }
 

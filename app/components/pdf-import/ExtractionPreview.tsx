@@ -21,16 +21,20 @@ function matches(text: string, query: string): boolean {
  * searchable once there are enough of them to hunt through.
  */
 export default function ExtractionPreview({
-  lore,
-  mechanicNotes,
-  tableNotes,
+  // Defaulted rather than required-in-practice: these come from records that
+  // outlive the code that wrote them (see `noteList` in PDFImporter.tsx), and
+  // a saved import missing a list should render the lists it has, not blow up
+  // the panel.
+  lore = [],
+  mechanicNotes = [],
+  tableNotes = [],
   streaming = false,
   emptyMessage = "Nothing extracted yet.",
   scrollClass,
 }: {
-  lore: PreviewNote[];
-  mechanicNotes: PreviewNote[];
-  tableNotes: PreviewNote[];
+  lore?: PreviewNote[];
+  mechanicNotes?: PreviewNote[];
+  tableNotes?: PreviewNote[];
   /** True while entries are still arriving, for the live indicator. */
   streaming?: boolean;
   emptyMessage?: string;
