@@ -443,10 +443,38 @@ function salvagePartialExtraction(
  */
 const UNPARSEABLE_OUTPUT_MIN_CHARS = 200;
 
+/**
+ * One of an extraction's note lists, tolerating its absence.
+ *
+ * The types say all three are always there, and every list this code writes
+ * has them - but these objects outlive the code that wrote them. An
+ * IndexedDB record saved by an older release, or a response from a server
+ * the browser hasn't caught up with after a deploy, can be missing a list
+ * this build expects, and reading `.length` off it threw a TypeError that
+ * failed the entire page range. Whatever else went wrong, the notes that did
+ * arrive are worth keeping.
+ */
+function noteList(list: StoryLore[] | undefined): StoryLore[] {
+  return Array.isArray(list) ? list : [];
+}
+
+function extractionCount(result: {
+  lore?: StoryLore[];
+  mechanicNotes?: StoryLore[];
+  tableNotes?: StoryLore[];
+}): number {
+  return (
+    noteList(result.lore).length +
+    noteList(result.mechanicNotes).length +
+    noteList(result.tableNotes).length
+  );
+}
+
 function looksUnparseable(result: OCRSummarizeSuccess, raw: string): boolean {
-  const extracted =
-    result.lore.length + result.mechanicNotes.length + result.tableNotes.length;
-  return extracted === 0 && raw.trim().length >= UNPARSEABLE_OUTPUT_MIN_CHARS;
+  return (
+    extractionCount(result) === 0 &&
+    raw.trim().length >= UNPARSEABLE_OUTPUT_MIN_CHARS
+  );
 }
 
 // Maximum length of any error message we surface to the UI. Raw error
@@ -1367,12 +1395,12 @@ export default function PDFImporter({
       onImportComplete({
         lore: imp.lore,
         mechanicNotes: imp.mechanicNotes,
-        tableNotes: imp.tableNotes,
+        tableNotes: noteList(imp.tableNotes),
         summary: imp.summary,
       });
       addNotification(
-        `Loaded ${imp.lore.length + imp.mechanicNotes.length} notes, ${
-          imp.tableNotes.length
+        `Loaded ${noteList(imp.lore).length + noteList(imp.mechanicNotes).length} notes, ${
+          noteList(imp.tableNotes).length
         } tables from saved import`,
         "success",
       );
@@ -1529,9 +1557,9 @@ export default function PDFImporter({
                   rawSummarizeOutput: undefined,
                   live: undefined,
                   result: {
-                    lore: result.lore || [],
-                    mechanicNotes: result.mechanicNotes || [],
-                    tableNotes: result.tableNotes || [],
+                    lore: noteList(result.lore),
+                    mechanicNotes: noteList(result.mechanicNotes),
+                    tableNotes: noteList(result.tableNotes),
                   },
                 }
               : cs,
@@ -1651,9 +1679,9 @@ export default function PDFImporter({
 
     for (const chunk of chunkStatuses) {
       if (chunk.status === "complete" && chunk.result) {
-        allLore.push(...chunk.result.lore);
-        allMechanicNotes.push(...chunk.result.mechanicNotes);
-        allTableNotes.push(...chunk.result.tableNotes);
+        allLore.push(...noteList(chunk.result.lore));
+        allMechanicNotes.push(...noteList(chunk.result.mechanicNotes));
+        allTableNotes.push(...noteList(chunk.result.tableNotes));
       }
     }
 
@@ -1707,7 +1735,7 @@ export default function PDFImporter({
     );
 
     const totalItems =
-      merged.lore.length + merged.mechanicNotes.length + merged.tableNotes.length;
+      extractionCount(merged);
     addNotification(
       `Imported ${totalItems} items from ${completedCount} chunks (${failedCount} skipped)` +
         (merged.mergedCount > 0
@@ -1898,9 +1926,9 @@ export default function PDFImporter({
       // their stored results directly, without being reprocessed.
       for (const cs of initialStatuses) {
         if (cs.status === "complete" && cs.result) {
-          chunkLore.push(...cs.result.lore);
-          chunkMechanics.push(...cs.result.mechanicNotes);
-          chunkTableNotes.push(...cs.result.tableNotes);
+          chunkLore.push(...noteList(cs.result.lore));
+          chunkMechanics.push(...noteList(cs.result.mechanicNotes));
+          chunkTableNotes.push(...noteList(cs.result.tableNotes));
         }
       }
 
@@ -2156,9 +2184,9 @@ export default function PDFImporter({
             unreachedPartsRef.current += summarizeResult.unreachedParts.length;
 
             const chunkOutput = {
-              lore: summarizeResult.lore || [],
-              mechanicNotes: summarizeResult.mechanicNotes || [],
-              tableNotes: summarizeResult.tableNotes || [],
+              lore: noteList(summarizeResult.lore),
+              mechanicNotes: noteList(summarizeResult.mechanicNotes),
+              tableNotes: noteList(summarizeResult.tableNotes),
             };
 
             setChunkStatuses((prev) =>
@@ -2292,9 +2320,9 @@ export default function PDFImporter({
 
       for (const result of pipelineResults) {
         if (result.stage === "summarize" && result.success) {
-          chunkLore.push(...result.lore);
-          chunkMechanics.push(...result.mechanicNotes);
-          chunkTableNotes.push(...result.tableNotes);
+          chunkLore.push(...noteList(result.lore));
+          chunkMechanics.push(...noteList(result.mechanicNotes));
+          chunkTableNotes.push(...noteList(result.tableNotes));
         }
       }
 
@@ -2468,9 +2496,9 @@ export default function PDFImporter({
             unreachedPartsRef.current += summarizeResult.unreachedParts.length;
 
             const sectionResult = {
-              lore: summarizeResult.lore || [],
-              mechanicNotes: summarizeResult.mechanicNotes || [],
-              tableNotes: summarizeResult.tableNotes || [],
+              lore: noteList(summarizeResult.lore),
+              mechanicNotes: noteList(summarizeResult.mechanicNotes),
+              tableNotes: noteList(summarizeResult.tableNotes),
             };
             allLore.push(...sectionResult.lore);
             allMechanicNotes.push(...sectionResult.mechanicNotes);
@@ -2675,9 +2703,9 @@ export default function PDFImporter({
             if (summarizeResult.incomplete) incompleteExtractionsRef.current++;
             unreachedPartsRef.current += summarizeResult.unreachedParts.length;
             const fileResult = {
-              lore: summarizeResult.lore || [],
-              mechanicNotes: summarizeResult.mechanicNotes || [],
-              tableNotes: summarizeResult.tableNotes || [],
+              lore: noteList(summarizeResult.lore),
+              mechanicNotes: noteList(summarizeResult.mechanicNotes),
+              tableNotes: noteList(summarizeResult.tableNotes),
             };
             allLore.push(...fileResult.lore);
             allMechanicNotes.push(...fileResult.mechanicNotes);
@@ -2738,7 +2766,7 @@ export default function PDFImporter({
 
       // Show success notification
       const totalItems =
-        merged.lore.length + merged.mechanicNotes.length + merged.tableNotes.length;
+        extractionCount(merged);
       addNotification(
         `Imported ${totalItems} items from ${totalPagesProcessed} pages across ${totalFiles} file${
           totalFiles > 1 ? "s" : ""
@@ -2917,9 +2945,9 @@ export default function PDFImporter({
         status: "complete",
         live: undefined,
         result: {
-          lore: summarizeResult.lore || [],
-          mechanicNotes: summarizeResult.mechanicNotes || [],
-          tableNotes: summarizeResult.tableNotes || [],
+          lore: noteList(summarizeResult.lore),
+          mechanicNotes: noteList(summarizeResult.mechanicNotes),
+          tableNotes: noteList(summarizeResult.tableNotes),
         },
       });
 
@@ -2928,9 +2956,9 @@ export default function PDFImporter({
       setProgress(100);
 
       const importData = {
-        lore: summarizeResult.lore || [],
-        mechanicNotes: summarizeResult.mechanicNotes || [],
-        tableNotes: summarizeResult.tableNotes || [],
+        lore: noteList(summarizeResult.lore),
+        mechanicNotes: noteList(summarizeResult.mechanicNotes),
+        tableNotes: noteList(summarizeResult.tableNotes),
         summary: "Imported from link",
       };
 
@@ -2938,9 +2966,7 @@ export default function PDFImporter({
       onImportComplete(importData);
 
       const totalItems =
-        importData.lore.length +
-        importData.mechanicNotes.length +
-        importData.tableNotes.length;
+        extractionCount(importData);
       addNotification(
         `Imported ${totalItems} items from ${ocrResult.totalPages} pages (~$${estimateOCRCostUSD(
           ocrResult.totalPages,
@@ -3060,7 +3086,7 @@ export default function PDFImporter({
       setInterruptedImport(null);
 
       const totalItems =
-        merged.lore.length + merged.mechanicNotes.length + merged.tableNotes.length;
+        extractionCount(merged);
       addNotification(
         `Resumed and imported ${totalItems} items from ${interruptedImport.fileName}` +
           (merged.mergedCount > 0
@@ -3165,9 +3191,9 @@ export default function PDFImporter({
       const part: PartialExtraction | undefined = chunk.result
         ? {
             summary: "",
-            lore: chunk.result.lore,
-            mechanicNotes: chunk.result.mechanicNotes,
-            tableNotes: chunk.result.tableNotes,
+            lore: noteList(chunk.result.lore),
+            mechanicNotes: noteList(chunk.result.mechanicNotes),
+            tableNotes: noteList(chunk.result.tableNotes),
           }
         : chunk.live;
       if (part) combined = mergePartialExtraction(combined, part);
@@ -3211,9 +3237,9 @@ export default function PDFImporter({
     const preview: PartialExtraction | undefined = chunk.result
       ? {
           summary: "",
-          lore: chunk.result.lore,
-          mechanicNotes: chunk.result.mechanicNotes,
-          tableNotes: chunk.result.tableNotes,
+          lore: noteList(chunk.result.lore),
+          mechanicNotes: noteList(chunk.result.mechanicNotes),
+          tableNotes: noteList(chunk.result.tableNotes),
         }
       : chunk.live;
     const previewCount = preview ? countPartialExtraction(preview) : 0;
@@ -3284,9 +3310,9 @@ export default function PDFImporter({
                   ? `Writing notes · ${previewCount} so far`
                   : "Writing notes…")}
               {chunk.status === "complete" &&
-                `${chunk.result?.lore.length ?? 0} lore · ${
-                  chunk.result?.mechanicNotes.length ?? 0
-                } mechanics · ${chunk.result?.tableNotes.length ?? 0} tables`}
+                `${noteList(chunk.result?.lore).length} lore · ${
+                  noteList(chunk.result?.mechanicNotes).length
+                } mechanics · ${noteList(chunk.result?.tableNotes).length} tables`}
               {chunk.status === "failed" && (
                 <span className="text-red-300/80" title={chunk.error}>
                   {chunk.error}
@@ -4073,7 +4099,8 @@ export default function PDFImporter({
                           <div className="p-3 space-y-2 max-h-[28rem] overflow-y-auto border-t border-white/5">
                             {savedImports.map((imp) => {
                               const totalNotes =
-                                imp.lore.length + imp.mechanicNotes.length;
+                                noteList(imp.lore).length +
+                                noteList(imp.mechanicNotes).length;
                               const isExpanded = expandedImport === imp.id;
                               return (
                                 <div
@@ -4100,7 +4127,7 @@ export default function PDFImporter({
                                           imp.timestamp,
                                         ).toLocaleDateString()}{" "}
                                         · {totalNotes} notes ·{" "}
-                                        {imp.tableNotes.length} tables
+                                        {noteList(imp.tableNotes).length} tables
                                       </p>
                                     </div>
                                     {imp.failedPages &&
@@ -4120,9 +4147,9 @@ export default function PDFImporter({
                                   {isExpanded && (
                                     <div className="px-2.5 pb-2.5 space-y-3 border-t border-white/5 pt-3">
                                       <ExtractionPreview
-                                        lore={imp.lore}
-                                        mechanicNotes={imp.mechanicNotes}
-                                        tableNotes={imp.tableNotes}
+                                        lore={noteList(imp.lore)}
+                                        mechanicNotes={noteList(imp.mechanicNotes)}
+                                        tableNotes={noteList(imp.tableNotes)}
                                         emptyMessage="This import came back empty."
                                         scrollClass="max-h-80 overflow-y-auto pr-1"
                                       />

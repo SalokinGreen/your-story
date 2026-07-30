@@ -819,3 +819,95 @@ describe("processParserResult table handling", () => {
     expect(result.tableNotes).toEqual([]);
   });
 });
+
+/**
+ * Half-followed-instruction tests.
+ *
+ * The prompt asks for tables as prose under "tableNotes", but a model is
+ * free to ignore any part of that: it writes the rows out as data instead of
+ * prose, files a table under "lore" with `type: "table"` set (a type the
+ * prompt itself names), or answers with a list that isn't a list. Every one
+ * of those used to end with the table silently absent from the import - the
+ * user's complaint being simply "I don't see any table notes".
+ */
+describe("processParserResult tolerates the shapes models actually write", () => {
+  it("renders rows written inside a tableNotes entry instead of prose", () => {
+    const result = processParserResult({
+      tableNotes: [
+        {
+          title: "Wandering Horrors",
+          description: "Roll 1d6 when the tide turns.",
+          entries: [
+            { text: "Brine wraith", weight: 1 },
+            { text: "Coral golem", weight: 2 },
+          ],
+        },
+      ],
+    });
+
+    expect(result.tableNotes).toHaveLength(1);
+    expect(result.tableNotes[0].content).toBe(
+      "Roll 1d6 when the tide turns.\n\nRoll 1d3:\n1. Brine wraith\n2-3. Coral golem",
+    );
+  });
+
+  it("accepts rows under other names, and rows that are bare strings", () => {
+    const result = processParserResult({
+      tableNotes: [
+        { title: "Rumours", results: ["The lighthouse keeper lies.", "A ship returns."] },
+        { title: "Omens", rows: [{ text: "Gulls fly inland." }] },
+      ],
+    });
+
+    expect(result.tableNotes.map((t) => t.title)).toEqual(["Rumours", "Omens"]);
+    expect(result.tableNotes[0].content).toBe(
+      "Roll 1d2:\n1. The lighthouse keeper lies.\n2. A ship returns.",
+    );
+  });
+
+  it("keeps prose when the model writes both prose and rows", () => {
+    const result = processParserResult({
+      tableNotes: [
+        {
+          title: "Wandering Horrors",
+          content: "Roll 1d6 at midnight:\n1. Brine wraith",
+          entries: [{ text: "Ignore me", weight: 1 }],
+        },
+      ],
+    });
+
+    expect(result.tableNotes[0].content).toBe("Roll 1d6 at midnight:\n1. Brine wraith");
+  });
+
+  it("files a table under Tables even when the model put it in lore", () => {
+    const result = processParserResult({
+      lore: [
+        { title: "Karth", content: "A port city." },
+        { title: "Harbour Rumours", content: "Roll 1d6:\n1. A ship returns.", type: "table" },
+      ],
+      mechanicNotes: [
+        { title: "Miss Results", content: "Roll 1d6:\n1. Lose the trail.", type: "table" },
+      ],
+    });
+
+    expect(result.lore.map((e) => e.title)).toEqual(["Karth"]);
+    expect(result.mechanicNotes).toEqual([]);
+    expect(result.tableNotes.map((t) => t.title)).toEqual([
+      "Harbour Rumours",
+      "Miss Results",
+    ]);
+    expect(result.tableNotes.every((t) => t.type === "table")).toBe(true);
+  });
+
+  it("survives lists that are not lists, and entries that are not entries", () => {
+    const result = processParserResult({
+      lore: null,
+      mechanicNotes: "none",
+      tableNotes: [null, "Weather", { title: "Omens", content: "Roll 1d6:\n1. Gulls." }],
+    });
+
+    expect(result.lore).toEqual([]);
+    expect(result.mechanicNotes).toEqual([]);
+    expect(result.tableNotes.map((t) => t.title)).toEqual(["Omens"]);
+  });
+});

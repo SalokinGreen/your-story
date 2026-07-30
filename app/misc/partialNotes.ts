@@ -64,34 +64,32 @@ export function parsePartialExtraction(buffer: string): PartialExtraction {
     result.summary = readStringValue(buffer, summary.start);
   }
 
-  for (const key of ["lore", "mechanicNotes", "tableNotes"] as const) {
+  // The preview has to agree with what the import will commit, so entries
+  // are sorted the same way `processParserResult` sorts them: a table goes
+  // under Tables whichever list it arrived in and whichever shape it was
+  // written in, and the rest stay where they were put.
+  type NoteList = "lore" | "mechanicNotes" | "tableNotes";
+  const push = (key: NoteList, obj: JSONObject, streaming: boolean) => {
+    const list = key === "tableNotes" || obj.type === "table" ? "tableNotes" : key;
+    result[list].push(
+      list === "tableNotes" ? toTableNote(obj, streaming) : toNote(obj, streaming),
+    );
+  };
+
+  for (const key of ["lore", "mechanicNotes", "tableNotes", "customTables"] as const) {
     const root = valueFor(key);
     if (!root || buffer[root.start] !== "[") continue;
+    // A model answering with the structured table shape the extractor used
+    // to ask for is previewed as the note it will be imported as.
+    const target = key === "customTables" ? "tableNotes" : key;
     const { complete, partial } = splitArrayElements(buffer, root.start);
     for (const src of complete) {
       const obj = parseObject(src);
-      if (obj) result[key].push(toNote(obj, false));
+      if (obj) push(target, obj, false);
     }
     if (partial) {
       const obj = parsePartialObject(partial);
-      if (obj) result[key].push(toNote(obj, true));
-    }
-  }
-
-  // A model answering with the structured table shape the extractor used to
-  // ask for still gets a preview: the same rendering the committed result
-  // puts it through (see `processParserResult`), so what shows up while it
-  // streams is what ends up being imported.
-  const legacyTables = valueFor("customTables");
-  if (legacyTables && buffer[legacyTables.start] === "[") {
-    const { complete, partial } = splitArrayElements(buffer, legacyTables.start);
-    for (const src of complete) {
-      const obj = parseObject(src);
-      if (obj) result.tableNotes.push(legacyTableToNote(obj, false));
-    }
-    if (partial) {
-      const obj = parsePartialObject(partial);
-      if (obj) result.tableNotes.push(legacyTableToNote(obj, true));
+      if (obj) push(target, obj, true);
     }
   }
 
@@ -197,27 +195,35 @@ function toNote(obj: JSONObject, streaming: boolean): PartialNote {
   return note;
 }
 
-/** Render a legacy structured table into the note it will be imported as. */
-function legacyTableToNote(obj: JSONObject, streaming: boolean): PartialNote {
-  const rawEntries = Array.isArray(obj.entries) ? obj.entries : [];
-  const entries: CustomTableEntry[] = [];
-  for (const raw of rawEntries) {
-    if (!raw || typeof raw !== "object") continue;
-    const entry = raw as JSONObject;
-    const text = asString(entry.text) || asString(entry.result);
-    if (!text) continue;
-    const weight = Number(entry.weight);
-    entries.push({ text, weight: Number.isFinite(weight) && weight > 0 ? weight : 1 });
+/**
+ * A table, whichever way the model wrote it: as the prose note that was
+ * asked for, or as a title plus a list of rows (the shape the extractor used
+ * to want, which models still reach for). Rows are rendered into the same
+ * listing the committed import produces, so the preview shows what will
+ * actually be saved rather than nothing at all.
+ */
+function toTableNote(obj: JSONObject, streaming: boolean): PartialNote {
+  const note = toNote(obj, streaming);
+  note.type = "table";
+  note.title = note.title || asString(obj.name);
+
+  if (!note.content.trim()) {
+    const rawEntries = obj.entries ?? obj.rows ?? obj.results;
+    const entries: CustomTableEntry[] = [];
+    for (const raw of Array.isArray(rawEntries) ? rawEntries : []) {
+      const entry = (raw && typeof raw === "object" ? raw : {}) as JSONObject;
+      const text =
+        typeof raw === "string" ? raw : asString(entry.text) || asString(entry.result);
+      if (!text) continue;
+      const weight = Number(entry.weight);
+      entries.push({ text, weight: Number.isFinite(weight) && weight > 0 ? weight : 1 });
+    }
+
+    const description = asString(obj.description).trim();
+    const listing = renderTableEntries(entries);
+    note.content = [description, listing].filter(Boolean).join("\n\n");
   }
 
-  const description = asString(obj.description).trim();
-  const listing = renderTableEntries(entries);
-  const note: PartialNote = {
-    title: asString(obj.name),
-    content: [description, listing].filter(Boolean).join("\n\n"),
-    type: "table",
-  };
-  if (streaming) note.streaming = true;
   return note;
 }
 

@@ -227,3 +227,48 @@ describe("mergePartialExtraction", () => {
     expect(merged.lore[1].streaming).toBe(true);
   });
 });
+
+/**
+ * Preview/import agreement tests.
+ *
+ * The live preview is the only thing the user sees while an extraction runs,
+ * so it has to sort entries the way the committed import will (see
+ * `processParserResult`). A table shown under Lore while it streams and then
+ * filed under Tables on completion reads as the import losing it.
+ */
+describe("parsePartialExtraction sorts entries like the import does", () => {
+  it("previews a table the model filed under lore as a table", () => {
+    const result = parsePartialExtraction(
+      JSON.stringify({
+        lore: [
+          { title: "Karth", content: "A port city." },
+          { title: "Harbour Rumours", content: "Roll 1d6:\n1. A ship returns.", type: "table" },
+        ],
+      }),
+    );
+
+    expect(result.lore.map((n) => n.title)).toEqual(["Karth"]);
+    expect(result.tableNotes.map((n) => n.title)).toEqual(["Harbour Rumours"]);
+  });
+
+  it("previews rows written inside a tableNotes entry as the rendered listing", () => {
+    const result = parsePartialExtraction(
+      JSON.stringify({
+        tableNotes: [
+          {
+            title: "Weather",
+            description: "Daily weather.",
+            entries: [
+              { text: "Rain", weight: 3 },
+              { text: "Fog", weight: 1 },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(result.tableNotes[0].content).toBe(
+      "Daily weather.\n\nRoll 1d4:\n1-3. Rain\n4. Fog",
+    );
+  });
+});
