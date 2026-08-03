@@ -1443,7 +1443,11 @@ export async function checkOutcomeMismatch(
 // The two tool names that count as "consulted the oracle/a table" - either
 // one is enough, they serve the same purpose (letting randomness rather
 // than narrative convenience decide an uncertain outcome).
-const ORACLE_OR_TABLE_TOOL_NAMES = new Set(["fate_question", "roll_table"]);
+const ORACLE_OR_TABLE_TOOL_NAMES = new Set([
+  "fate_question",
+  "roll_table",
+  "roll_portent",
+]);
 
 interface ToolUsageJudgment {
   missedOracleOrTable: boolean;

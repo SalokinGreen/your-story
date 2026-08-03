@@ -15,6 +15,7 @@ const TOOL_LABELS: Record<string, string> = {
   calculate: "Calculating",
   fate_question: "Consulting fate",
   roll_table: "Rolling on a table",
+  roll_portent: "Consulting the portents",
   generate_name: "Rolling up a name",
   start_challenge: "Starting a challenge",
   cancel_challenge: "Cancelling the challenge",

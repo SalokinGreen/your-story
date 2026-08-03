@@ -54,9 +54,20 @@ function answersForEveryRoll(
   return answers;
 }
 
+/**
+ * A yes is a yes however it's qualified. "Yes, but" costs something, but
+ * the thing still happened - it must count on the yes side of the ladder,
+ * or the qualified bands would look like they'd moved the odds.
+ */
+const YES_ANSWERS = new Set<FateAnswer>([
+  "Exceptional Yes",
+  "Normal Yes",
+  "Yes, but",
+]);
+
 function yesChance(likelihood: Likelihood, chaosFactor: number): number {
   return answersForEveryRoll(likelihood, chaosFactor).filter((a) =>
-    a.endsWith("Yes")
+    YES_ANSWERS.has(a)
   ).length;
 }
 
@@ -113,10 +124,15 @@ describe("fate answers", () => {
     // The old branch chain ended in an unconditional `else` that turned
     // every roll past its top threshold into an Exceptional Yes, so the
     // highest rolls could never come back as a no.
+    // Each side of the target is split into fifths: outermost fifth
+    // exceptional, innermost fifth (nearest the target) qualified, the
+    // three in between ordinary.
     const answers = answersForEveryRoll("50/50", 5);
     expect(answers.slice(0, 10)).toEqual(Array(10).fill("Exceptional Yes"));
-    expect(answers.slice(10, 50)).toEqual(Array(40).fill("Normal Yes"));
-    expect(answers.slice(50, 90)).toEqual(Array(40).fill("Normal No"));
+    expect(answers.slice(10, 40)).toEqual(Array(30).fill("Normal Yes"));
+    expect(answers.slice(40, 50)).toEqual(Array(10).fill("Yes, but"));
+    expect(answers.slice(50, 60)).toEqual(Array(10).fill("No, but"));
+    expect(answers.slice(60, 90)).toEqual(Array(30).fill("Normal No"));
     expect(answers.slice(90, 100)).toEqual(Array(10).fill("Exceptional No"));
   });
 
@@ -124,6 +140,8 @@ describe("fate answers", () => {
     const valid = new Set([
       "Exceptional Yes",
       "Normal Yes",
+      "Yes, but",
+      "No, but",
       "Normal No",
       "Exceptional No",
     ]);
@@ -150,10 +168,16 @@ describe("fate answers", () => {
     expect(fateThresholds(50)).toEqual({
       exceptionalYesMax: 10,
       exceptionalNoMin: 91,
+      yesButMin: 41,
+      noButMax: 60,
     });
     // At the extremes a fifth rounds away to nothing - a near-certain
     // question has no room left to swing further.
     expect(fateThresholds(99).exceptionalNoMin).toBeGreaterThan(100);
     expect(fateThresholds(1).exceptionalYesMax).toBe(0);
+    // ...and the qualified bands collapse the same way, expressed as an
+    // empty range rather than a special case.
+    expect(fateThresholds(1).yesButMin).toBeGreaterThan(1);
+    expect(fateThresholds(99).noButMax).toBe(99);
   });
 });

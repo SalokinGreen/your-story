@@ -108,20 +108,45 @@ narrative and the adventure's `mechanics` note.
 
 ## Oracle & Random Tables
 
+There are two oracles, answering different shapes of question. Mythic's
+answers a question you already know how to ask (yes/no, weighted). Prima
+Materia's answers "what is actually going on here?" with a *condition* —
+see [prima-materia.md](prima-materia.md), **including its provenance
+warning: the appendix tables are unlicensed and alpha-only.**
+
 - **`fate_question`**: a Mythic-style yes/no oracle for resolving unknown
   facts about the world ("Is the door locked?"), weighted by likelihood
   (Impossible → Has To Be) and the story's **chaos factor** (1-9, editable
   in the Chaos/Oracle tab). Higher chaos bends the odds toward yes and
-  raises the chance of a triggered Random Event. Answers are **Normal
-  Yes**, **Normal No**, **Exceptional Yes**, **Exceptional No** — the
-  ordinary results are named explicitly because a bare "Yes" next to
-  "Exceptional Yes" reads to the model as a truncation of it, and plain
-  successes were getting narrated as if the oracle had swung hard. The
-  chart itself is derived from Mythic's probability ladder in
-  `mythic.ts` (`fateTargetNumber`), not a hand-typed table: a 50/50
+  raises the chance of a triggered Random Event. Answers are **Exceptional
+  Yes**, **Normal Yes**, **Yes, but**, **No, but**, **Normal No**,
+  **Exceptional No** — the ordinary results are named explicitly because a
+  bare "Yes" next to "Exceptional Yes" reads to the model as a truncation
+  of it, and plain successes were getting narrated as if the oracle had
+  swung hard. The two qualified results are the costed success and the
+  consolation failure: partial outcomes had existed on the dice side
+  (`formula_roll` stakes/consequences) but the oracle only ever spoke in
+  absolutes. Each side of the target splits into fifths — outermost fifth
+  exceptional, innermost fifth qualified — so **the yes/no odds are
+  unchanged**. The chart itself is derived from Mythic's probability ladder
+  in `mythic.ts` (`fateTargetNumber`), not a hand-typed table: a 50/50
   question at chaos 5 is a literal coin flip.
+- **`roll_portent`**: the Prima Materia oracle. Returns two loaded concepts
+  joined by a relation the dice fix (`Knowledge against Spirit`), each with
+  a bright/shadow polarity, read through a **Frame** (Literal / Personal /
+  Structural) the *engine* picks from live state. Use it when a scene feels
+  significant but unreadable, when an NPC's or faction's motive is genuinely
+  open, or when threads are converging. It describes a condition, not an
+  outcome. Doubles trigger a **Lens Shift**, moving the story's standing
+  tonal register (`AGMTState.tint`: Day / Neutral / Night) — the register
+  reaches the narrator stage, not just the GM stage.
 - **`roll_table`**: rolls on a **built-in** element table (character traits,
   locations, plot twists, atmosphere, and more) for on-the-fly inspiration.
+  The `pm_`-prefixed tables (`pm_complications`, `pm_dispositions`,
+  `pm_actions`, `pm_quest_prompts`, and the one-roll oracles) come from
+  Prima Materia and lean toward *pressure* where the rest lean toward
+  *scenery*; `pm_complications` also seeds the director's two pressure
+  moves.
 - **The adventure's own tables are notes**, not a structured type the engine
   rolls. A table is a `StoryLore` entry with `type: "table"` that names a die
   and lists what each number gives, plus whatever prose the author wants

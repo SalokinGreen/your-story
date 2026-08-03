@@ -18,6 +18,7 @@ import type {
   NPC,
 } from "./structs";
 import { pickTagFocusExamples } from "./tagFocusExamples";
+import { rollComplication } from "./primaMateria";
 
 // "Normal Yes"/"Normal No" rather than a bare "Yes"/"No": the answer string
 // is handed straight to the model, and a bare "Yes" next to "Exceptional Yes"
@@ -26,8 +27,10 @@ import { pickTagFocusExamples } from "./tagFocusExamples";
 // explicitly removes the ambiguity without changing what the dice mean.
 export type FateAnswer =
   | "Exceptional Yes"
+  | "Yes, but"
   | "Normal Yes"
   | "Normal No"
+  | "No, but"
   | "Exceptional No";
 export type SceneType = "Normal" | "Altered" | "Interrupted";
 export type Likelihood =
@@ -113,10 +116,26 @@ export function fateTargetNumber(
 export function fateThresholds(target: number): {
   exceptionalYesMax: number;
   exceptionalNoMin: number;
+  yesButMin: number;
+  noButMax: number;
 } {
+  const yesBand = Math.floor(target / 5);
+  const noBand = Math.floor((100 - target) / 5);
   return {
-    exceptionalYesMax: Math.floor(target / 5),
-    exceptionalNoMin: 100 - Math.floor((100 - target) / 5) + 1,
+    exceptionalYesMax: yesBand,
+    exceptionalNoMin: 100 - noBand + 1,
+    // Each side of the target is split into fifths, mirroring the
+    // exceptional rule that already carved off the outermost fifth: the
+    // fifth *nearest* the target is the qualified result. A yes that only
+    // just cleared the number is a yes that cost something; a no that only
+    // just missed leaves something salvageable. See the comment on
+    // `askFate` for why "but" was missing from the oracle until now.
+    //
+    // These collapse to nothing at extreme targets, exactly as the
+    // exceptional bands do - a 1%-target question has no room for a
+    // qualified yes, and `yesButMin > target` is how that's expressed.
+    yesButMin: target - yesBand + 1,
+    noButMax: target + noBand,
   };
 }
 
@@ -167,21 +186,30 @@ export function askFate(
 
   const roll = rollD100();
   const target = fateTargetNumber(likelihood, chaosFactor);
-  const { exceptionalYesMax, exceptionalNoMin } = fateThresholds(target);
+  const { exceptionalYesMax, exceptionalNoMin, yesButMin, noButMax } =
+    fateThresholds(target);
 
   // Ordered so every roll from 1 to 100 lands in exactly one branch - the
   // old chain's final `else` swallowed every roll above its top threshold
   // into an Exceptional Yes, so the highest rolls on the die could never
   // come back as a no.
+  //
+  // The "but" bands subdivide the existing yes and no ranges; they do NOT
+  // move the yes/no boundary, so every likelihood's odds of a yes are
+  // exactly what they were before (`tests/mythicFateChart.test.ts` pins
+  // this). What was missing was the *costed* result: the dice side has had
+  // partial success for a long time via formula_roll's stakes and
+  // consequences, but the oracle only ever spoke in four absolutes, so
+  // every question it answered came back cleanly won or cleanly lost.
   let answer: FateAnswer;
   if (roll <= exceptionalYesMax) {
     answer = "Exceptional Yes";
   } else if (roll <= target) {
-    answer = "Normal Yes";
+    answer = roll >= yesButMin ? "Yes, but" : "Normal Yes";
   } else if (roll >= exceptionalNoMin) {
     answer = "Exceptional No";
   } else {
-    answer = "Normal No";
+    answer = roll <= noButMax ? "No, but" : "Normal No";
   }
 
   const randomEvent = isRandomEvent(roll);
@@ -653,6 +681,7 @@ export function selectDirectorMove(
       move: "announce_future_badness",
       targetThreadId: thread?.id,
       context: `Scene check result: ${sceneType}`,
+      complicationSeed: rollComplication().result,
       createdAt: Date.now(),
     };
   }
@@ -683,6 +712,7 @@ export function selectDirectorMove(
         : `Tension running high (${tension}/10)`,
       hardnessForcesChoice: true,
       hardnessTarget: alliedNpc ? "someone_they_love" : undefined,
+      complicationSeed: rollComplication().result,
       createdAt: Date.now(),
     };
   }
@@ -701,6 +731,7 @@ export function selectDirectorMove(
       context: `Story pacing is lagging its arc (tension ${tension}/10 vs. an expected ~${Math.round(
         targetTension
       )}/10 at this point in the story)`,
+      complicationSeed: rollComplication().result,
       createdAt: Date.now(),
     };
   }
