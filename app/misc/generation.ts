@@ -59,6 +59,7 @@ import {
   hasCharacterSheetNote,
   ObserverSettings,
 } from "@/app/misc/observer";
+import { formatTintLine } from "@/app/misc/primaMateria";
 import { runMemoryAgent } from "@/app/misc/memoryAgent";
 import { runDirectorAssistant } from "@/app/misc/directorAssistant";
 import { runStoryProgressObserver } from "@/app/misc/storyProgressObserver";
@@ -3122,6 +3123,7 @@ async function generateStoryTurnOnce(
         options.storytellerMode || "narrator",
         options.replyLength || "medium",
         pacingNote,
+        formatTintLine(storyData),
       );
 
       // Build messages: GM base + conversation history + story prompt

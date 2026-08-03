@@ -205,6 +205,16 @@ export interface FateQuestionParams {
 }
 
 /**
+ * Roll Portent - Prima Materia's symbolic oracle. Unlike fate_question
+ * (which answers yes/no) this answers "what is actually going on here" -
+ * it returns a *condition*, not an outcome. See primaMateria.ts.
+ */
+export interface RollPortentParams {
+  mode?: "peek" | "pinch" | "portent"; // Default: portent
+  question: string; // What the GM is trying to orient on
+}
+
+/**
  * Roll Table - Roll on a custom table or AGMT table
  * Uses weighted random selection
  */
@@ -650,6 +660,7 @@ export type GMToolParams =
   | { name: "record_challenge_result"; params: RecordChallengeResultParams }
   | { name: "fate_question"; params: FateQuestionParams }
   | { name: "roll_table"; params: RollTableParams }
+  | { name: "roll_portent"; params: RollPortentParams }
   | { name: "generate_name"; params: GenerateNameParams }
   | { name: "read_notes"; params: ReadNotesParams }
   | { name: "search_memory"; params: SearchMemoryParams }
@@ -1243,13 +1254,15 @@ LIKELIHOODS (from least to most likely) - pick the one you honestly believe, don
 - A Sure Thing: Almost certainly yes
 - Has To Be: Definitely yes
 
-Results are one of four, and the difference between the plain and the exceptional ones matters:
-- Normal Yes: yes, plainly. The thing is true / it happens, at ordinary scale. NOT a triumph.
-- Normal No: no, plainly. The thing is false / it doesn't happen, at ordinary scale. NOT a disaster.
+Results are one of six, arranged from best to worst. The differences between them all matter:
 - Exceptional Yes: yes, and more than asked for - swing the fiction hard in that direction.
+- Normal Yes: yes, plainly. The thing is true / it happens, at ordinary scale. NOT a triumph.
+- Yes, but: yes - it happens - but it costs something, comes late, comes partial, or drags a complication in with it. The answer is genuinely YES; the "but" is a price, not a hedge, and you must name what the price actually is.
+- No, but: no - it doesn't happen - but something is salvageable: a consolation, a lead, a partial opening, a reason it isn't total. The answer is genuinely NO; the "but" is real compensation, not a softener.
+- Normal No: no, plainly. The thing is false / it doesn't happen, at ordinary scale. NOT a disaster.
 - Exceptional No: no, and worse than asked for - swing the fiction hard the other way.
 
-Read the result literally. "Normal Yes" is not a quiet Exceptional Yes; narrate it as the ordinary answer it is and save the big swings for the exceptional results.
+Read the result literally. "Normal Yes" is not a quiet Exceptional Yes; narrate it as the ordinary answer it is and save the big swings for the exceptional results. Likewise the two qualified results are not a way to avoid committing - a "Yes, but" that never names its cost is just a Normal Yes, and a "No, but" that offers nothing is just a Normal No.
 
 May also trigger a Random Event (check the result).`,
     parameters: {
@@ -1311,7 +1324,16 @@ BUILT-IN TABLES (always available):
 - Items: magic_item, scavenging_results
 - Narrative: plot_twists, cryptic_message, curses, visions_dreams
 - Atmosphere: smells, sounds, adventure_tone
-- Other: names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions`,
+- Other: names, powers, spell_effects, mutation, alien_species, starship, undead, animal_actions
+
+PRIMA MATERIA TABLES (\`pm_\` prefix - these lean toward *pressure* rather than scenery, and are usually the better reach when you need a force acting on the scene rather than a thing sitting in it):
+- pm_dispositions: an NPC's or faction's underlying stance ("Transactional", "Feral", "Introspective"). Pairs well with \`reaction_check\` - that gives you how warm they are, this gives you what they're *like*.
+- pm_actions: what an NPC, creature or faction does next, when you'd otherwise reach for the obvious verb
+- pm_complications: what goes wrong, or what pressure enters. Reach for this before inventing a complication yourself.
+- pm_quest_prompts: three fragments to combine into a quest, goal or thread seed
+- pm_landmarks: a place, feature or waypoint
+- pm_names: a bank of odd, human, un-fantasy-generic names
+- Quick one-roll oracles: pm_weather, pm_scale, pm_time, pm_distance, pm_power, pm_genus, pm_state, pm_agency, pm_intensity, pm_rate, pm_decision`,
     parameters: {
       type: "object",
       properties: {
@@ -1330,6 +1352,54 @@ BUILT-IN TABLES (always available):
         },
       },
       required: ["table_name", "reason"],
+    },
+  },
+};
+
+const rollPortentTool: ToolSchema = {
+  type: "function",
+  function: {
+    name: "roll_portent",
+    description: `Consult the Prima Materia oracle - a symbolic oracle that answers "what is actually going on here?" rather than yes/no.
+
+**How this differs from your other oracle tools.** \`fate_question\` answers a question you already know how to ask ("is the door locked?"). \`roll_table\` gives you a piece of content ("what's in the room?"). \`roll_portent\` gives you a *condition* - two loaded concepts and the relationship between them, e.g. "Knowledge against Spirit" or "Fortune within Freedom". It doesn't tell you what happens; it tells you what this moment is *about*, and you work out what happens from there.
+
+Use it when:
+- A scene feels significant but you can't say why, or you've lost the thread of what this moment means
+- You need to know an NPC's or faction's underlying motivation and nothing established covers it
+- Several plot threads seem to be converging and you want to know what the convergence *is*
+- You want foreshadowing that isn't a fixed outcome
+- You're transitioning between phases of play and want to recalibrate
+- You're about to invent a motive, a theme, or a reason and your first instinct feels familiar - same reflex-breaking purpose as \`generate_name\` and \`roll_table\`
+
+MODES:
+- \`portent\` (default, and what you want most of the time): three dice. Two concepts joined by a relation - "Body over Self", "Society within Body". The richest result and the one to reach for when you genuinely need orientation.
+- \`pinch\`: two dice, two concepts, no relation. Both are true at once; meaning comes from the friction between them. Good when a situation should feel unstable or two forces are visibly competing.
+- \`peek\`: one die, one concept. A tonal nudge, nothing more. Good for a quick cue when you don't need synthesis.
+
+WHAT COMES BACK:
+- Each concept arrives with a polarity. **Sol** is the bright reading (Fortune = luck, reward, timing). **Nox** is the shadowed reading of the *same* concept (Fortune = gamble, debt, misfortune). These are not good and bad - they're the two faces a concept genuinely has.
+- The relation comes tagged **celestial** (the two align/agree/work together) or **chthonic** (they're at odds/in tension/separate). Let that steer whether the condition is a gift or a cost.
+- A **Frame** is chosen for you by the engine - Literal (what's physically happening), Personal (what's happening inside someone), or Structural (how factions/systems/large forces are shifting). Read the result through that frame. You don't pick it and you shouldn't argue with it; it's set from what's actually live in the story right now.
+- Occasionally a **Lens Shift** fires (the dice matched). That moves the story's standing tonal register between Day / Neutral / Night. It is not an event - do not narrate "something shifted". It changes the register of everything that follows.
+
+**This is an input, not an instruction.** It describes a condition; you decide what that condition means here. Never name the dice, the symbols, the frame, or this system in your narration - the player should feel the result, not see the mechanism.`,
+    parameters: {
+      type: "object",
+      properties: {
+        mode: {
+          type: "string",
+          enum: ["peek", "pinch", "portent"],
+          description:
+            "Which reading to take (default: portent - use it unless you specifically want something lighter)",
+        },
+        question: {
+          type: "string",
+          description:
+            "What you're trying to orient on, e.g. 'what is really driving the magistrate here?' or 'what is this ruined village about?'",
+        },
+      },
+      required: ["question"],
     },
   },
 };
@@ -2594,6 +2664,7 @@ export const GM_TOOL_SCHEMAS: ToolSchema[] = [
   // Oracle & utility tools
   fateQuestionTool,
   rollTableTool,
+  rollPortentTool,
   generateNameTool,
   // Note & memory lookup tools
   readNotesTool,

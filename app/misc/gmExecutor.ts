@@ -41,6 +41,7 @@ import {
   RecordChallengeResultParams,
   FateQuestionParams,
   RollTableParams,
+  RollPortentParams,
   GenerateNameParams,
   ReadNotesParams,
   SearchMemoryParams,
@@ -98,6 +99,16 @@ import {
   ElementCategory,
   markOracleConsulted,
 } from "./mythic";
+import {
+  currentTint,
+  formatPortentForModel,
+  isPrimaMateriaTable,
+  pluck,
+  rollPortent,
+  selectFrame,
+  type PortentMode,
+  type PortentResult,
+} from "./primaMateria";
 import {
   collectUsedInitials,
   formatNamePointers,
@@ -160,6 +171,7 @@ export interface GMToolResult {
     | GMChallengeResultRecord
     | GMFateQuestionResult
     | GMRollTableResult
+    | GMRollPortentResult
     | GMGenerateNameResult
     | GMReadNotesResult
     | GMSearchMemoryResult
@@ -380,6 +392,18 @@ export interface GMRollTableResult {
   reason: string;
   displayName?: string;
   tableNotFound?: boolean;
+}
+
+export interface GMRollPortentResult {
+  type: "roll_portent";
+  question: string;
+  mode: PortentMode;
+  statement: string;
+  frame: string;
+  relation?: string;
+  relationGroup?: string;
+  /** Present only when the roll moved the story's tonal register. */
+  tintShiftedTo?: string;
 }
 
 export interface GMGenerateNameResult {
@@ -777,7 +801,11 @@ export interface GMExecutionResult {
 // the observer's missing_oracle_or_table check watches (observer.ts) - both
 // serve the same purpose of letting randomness rather than narrative
 // convenience settle an uncertain question.
-const ORACLE_TOOL_NAMES = new Set(["fate_question", "roll_table"]);
+const ORACLE_TOOL_NAMES = new Set([
+  "fate_question",
+  "roll_table",
+  "roll_portent",
+]);
 
 /**
  * Whether a `success: false` result means something actually went wrong, or
@@ -1061,6 +1089,13 @@ export async function executeGMTools(
           result = executeRollTable(
             call.id,
             params as RollTableParams,
+            modified
+          );
+          break;
+        case "roll_portent":
+          result = executeRollPortent(
+            call.id,
+            params as RollPortentParams,
             modified
           );
           break;
@@ -2845,6 +2880,17 @@ function executeFateQuestion(
     // moves on without addressing it.
     const focusResult = generateEventFocus();
     const meaningResult = generateEventMeaning();
+    // Roll a portent alongside the Mythic action/subject pair: the pair
+    // says what happens, the portent says what the event is *about*, with
+    // the relation between its terms fixed by the dice. Deliberately does
+    // not apply a Lens Shift - a tint change is a deliberate act of the
+    // director layer, not a side effect of a random event that may sit
+    // unresolved for several turns.
+    const eventPortent = rollPortent(
+      "portent",
+      selectFrame(storyData),
+      currentTint(storyData)
+    );
     storyData.pendingRandomEvents = storyData.pendingRandomEvents || [];
     const pendingEvent: PendingRandomEvent = {
       id: `event_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
@@ -2852,6 +2898,7 @@ function executeFateQuestion(
       focus: focusResult.focus,
       action: meaningResult.action,
       subject: meaningResult.subject,
+      portent: eventPortent.statement,
       context: params.question,
       createdAt: Date.now(),
     };
@@ -2861,7 +2908,7 @@ function executeFateQuestion(
         -MAX_PENDING_RANDOM_EVENTS
       );
     }
-    contextForStory += `\n[⚡ RANDOM EVENT TRIGGERED: [${pendingEvent.focus}] "${pendingEvent.action} ${pendingEvent.subject}" - incorporate this into the narrative, then call resolve_random_event(id: "${pendingEvent.id}"). It will keep reappearing every turn until resolved.]`;
+    contextForStory += `\n[⚡ RANDOM EVENT TRIGGERED: [${pendingEvent.focus}] "${pendingEvent.action} ${pendingEvent.subject}" — condition: ${pendingEvent.portent} - incorporate this into the narrative, then call resolve_random_event(id: "${pendingEvent.id}"). It will keep reappearing every turn until resolved.]`;
   }
 
   if (params.reason) {
@@ -2887,6 +2934,56 @@ function executeFateQuestion(
 }
 
 /**
+ * Execute a Prima Materia portent roll.
+ *
+ * The Frame is picked here from live state rather than accepted as a
+ * parameter - see `selectFrame`. Handing the model the choice of where to
+ * stand when reading its own oracle result is the same self-selection hole
+ * closed for reasoning tiers and director moves; it would reliably pick
+ * whichever frame let it narrate what it already intended to.
+ *
+ * A Lens Shift mutates `agmtState.tint`, which is why this takes
+ * `storyData` mutably. That's the only durable state a portent writes.
+ */
+function executeRollPortent(
+  toolCallId: string,
+  params: RollPortentParams,
+  storyData: StoryData
+): GMToolResult {
+  const mode: PortentMode = params.mode || "portent";
+  const frame = selectFrame(storyData);
+  const tintBefore = currentTint(storyData);
+
+  const result: PortentResult = rollPortent(mode, frame, tintBefore);
+
+  if (result.lensShift && storyData.agmtState) {
+    storyData.agmtState.tint = result.lensShift.to;
+    storyData.agmtState.lastTintShiftScene = storyData.agmtState.sceneCount;
+  }
+
+  const contextForStory = `[Portent asked: "${params.question}"]\n${formatPortentForModel(
+    result
+  )}`;
+
+  return {
+    toolName: "roll_portent",
+    toolCallId,
+    success: true,
+    result: {
+      type: "roll_portent",
+      question: params.question,
+      mode: result.mode,
+      statement: result.statement,
+      frame: result.frame,
+      relation: result.relation,
+      relationGroup: result.relationGroup,
+      tintShiftedTo: result.lensShift?.to,
+    } as GMRollPortentResult,
+    contextForStory,
+  };
+}
+
+/**
  * Execute a roll on a built-in AGMT element table.
  *
  * Adventure-specific tables are NOT handled here any more - they're notes
@@ -2901,6 +2998,38 @@ function executeRollTable(
 ): GMToolResult {
   // Try as AGMT element table (normalize name: spaces to underscores, lowercase)
   const normalizedName = params.table_name.toLowerCase().replace(/\s+/g, "_");
+
+  // Prima Materia tables are checked first: their names are all `pm_`-
+  // prefixed so they can't collide with the AGMT set, and a couple of them
+  // (pm_names, pm_actions) would otherwise be shadowed by similarly-named
+  // built-ins.
+  if (isPrimaMateriaTable(normalizedName)) {
+    const pluckResult = pluck(
+      normalizedName,
+      normalizedName === "pm_quest_prompts" ? 3 : 1
+    )!;
+    const displayName =
+      params.display_name ||
+      `${normalizedName.replace(/^pm_/, "").replace(/_/g, " ")} (Prima Materia)`;
+    return {
+      toolName: "roll_table",
+      toolCallId,
+      success: true,
+      result: {
+        type: "roll_table",
+        tableName: normalizedName,
+        result: pluckResult.result,
+        reason: params.reason,
+        displayName: params.display_name,
+      } as GMRollTableResult,
+      contextForStory:
+        `[${displayName}: "${pluckResult.result}"]\n` +
+        `[Rolled: ${pluckResult.detail}]\n` +
+        `[Reason: ${params.reason}]\n` +
+        `[This is an input, not a script - work it into the fiction on your own terms, and don't name the table or the dice in narration.]`,
+    };
+  }
+
   const isAgmtTable = (MYTHIC_TABLE_NAMES as string[]).includes(normalizedName);
 
   if (isAgmtTable) {

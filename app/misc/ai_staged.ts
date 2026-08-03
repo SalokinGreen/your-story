@@ -19,6 +19,7 @@ import {
   formatGMAdviceNote,
 } from "@/app/misc/gmAdvice";
 import { formatOracleRecencyLine } from "@/app/misc/mythic";
+import { formatTintLine } from "@/app/misc/primaMateria";
 import {
   getSetupReminder,
   SETUP_REMINDER_URGENT_TURNS,
@@ -680,7 +681,9 @@ export function buildInfoMessage(
         storyData.agmtState.chaosFactor,
       )})
 - Scene Count: ${storyData.agmtState.sceneCount}
-${formatOracleRecencyLine(storyData)}`
+${[formatTintLine(storyData), formatOracleRecencyLine(storyData)]
+  .filter(Boolean)
+  .join("\n")}`
     : "";
 
   // Pending random events (from fate_question/scene checks) - shown every
@@ -693,9 +696,9 @@ ${formatOracleRecencyLine(storyData)}`
 ${pendingEvents
   .map(
     (e) =>
-      `- [${e.id}] [${e.focus || "Event"}] "${e.action} ${
-        e.subject
-      }" - work this into the story, then call resolve_random_event(id: "${e.id}")`,
+      `- [${e.id}] [${e.focus || "Event"}] "${e.action} ${e.subject}"${
+        e.portent ? ` — condition: ${e.portent}` : ""
+      } - work this into the story, then call resolve_random_event(id: "${e.id}")`,
   )
   .join("\n")}`
     : "";
@@ -1260,9 +1263,9 @@ export function buildGMStagePrompt({
 ${gmStagePendingEvents
   .map(
     (e) =>
-      `- [${e.id}] [${e.focus || "Event"}] "${e.action} ${
-        e.subject
-      }" - work this into the story, then call resolve_random_event(id: "${e.id}")`,
+      `- [${e.id}] [${e.focus || "Event"}] "${e.action} ${e.subject}"${
+        e.portent ? ` — condition: ${e.portent}` : ""
+      } - work this into the story, then call resolve_random_event(id: "${e.id}")`,
   )
   .join("\n")}`
     : "";
@@ -1413,7 +1416,9 @@ ${gmStagePendingMoves.map(formatDirectorMoveLine).join("\n")}`
         storyData.agmtState.chaosFactor
       }/9 (${getChaosDescription(storyData.agmtState.chaosFactor)})\n- Scene Count: ${
         storyData.agmtState.sceneCount
-      }\n${formatOracleRecencyLine(storyData)}`
+      }\n${[formatTintLine(storyData), formatOracleRecencyLine(storyData)]
+        .filter(Boolean)
+        .join("\n")}`
     : "";
 
   // 🆕 Fresh story setup: no character_sheet note exists yet, meaning this
@@ -1714,6 +1719,7 @@ Keep every turn tight and short: one action, one consequence, then stop and hand
     "opposed_formula",
     "fate_question",
     "roll_table",
+    "roll_portent",
     "generate_name",
     // Calculator - also the only thing that turns a roll into a pass/fail
     // verdict, since no dice tool takes a DC any more
@@ -2216,13 +2222,22 @@ export function buildStoryContinuationPrompt(
   storytellerMode: StorytellerMode = "narrator",
   replyLength: ReplyLength = "medium",
   pacingNote?: string,
+  // Prima Materia's standing tonal register. Repeated here rather than
+  // left to the GM stage alone because this is the stage that actually
+  // writes the prose - a register the narrator never sees is a register
+  // that doesn't affect the words the player reads. Empty at Neutral tint,
+  // which is the common case and costs nothing.
+  tintLine?: string,
 ): string {
   const { paragraphs } = getLengthGuidance(replyLength);
   const pacingFeedbackLine = pacingNote ? `\n\n${pacingNote}` : "";
+  const tintFeedbackLine = tintLine
+    ? `\n\nTonal register for this stretch of the story (colour the prose with it - do not announce it, do not let it flatten the scene's own content):\n${tintLine}`
+    : "";
 
   const basePrompt = `Now write the story from the player's perspective. Write only the prose the player should see - no meta-commentary, no notes to yourself.
 
-Keep it tight and hand the mic back - this is a back-and-forth roleplay, not a monologue. ${paragraphs} End the instant the player has something to react to; never write what the player character does next.${pacingFeedbackLine}`;
+Keep it tight and hand the mic back - this is a back-and-forth roleplay, not a monologue. ${paragraphs} End the instant the player has something to react to; never write what the player character does next.${pacingFeedbackLine}${tintFeedbackLine}`;
 
   const narratorGuidelines = `
 Write immersive prose - show, don't tell, and no dice results or mechanical language.

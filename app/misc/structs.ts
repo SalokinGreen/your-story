@@ -1119,6 +1119,16 @@ export interface AGMTState {
   // consulted in this story. Never set by the model; it only moves when an
   // oracle tool actually runs.
   lastOracleTurn?: number;
+  // Prima Materia's tonal register (see primaMateria.ts). Distinct from
+  // chaosFactor/tension, which are both *intensity* dials - this tracks
+  // what KIND of moment the story is in, and is what stops the GM drifting
+  // monotone between tension changes. Moved only by a Lens Shift (doubles
+  // on the two d12s of a portent roll), never set by the model. Undefined
+  // on older saves and treated as "neutral".
+  tint?: "day" | "neutral" | "night";
+  // Scene count at the last Lens Shift, so a shift can be reported as new
+  // in the turn it happened and as standing register thereafter.
+  lastTintShiftScene?: number;
 }
 
 // Cap on how many unresolved random events accumulate on StoryData - if the
@@ -1135,6 +1145,13 @@ export interface PendingRandomEvent {
   focus?: string; // Event Focus category (e.g. "NPC action", "Move toward a thread")
   action: string; // Meaning table Action roll (e.g. "Betray")
   subject: string; // Meaning table Subject roll (e.g. "A rival")
+  // Prima Materia portent describing the *condition* the event embodies,
+  // rolled alongside the Mythic action/subject pair. The pair says what
+  // happens; the portent says what it means, with the relation between its
+  // two terms fixed by the dice instead of left for the model to invent.
+  // Optional: older saves and any event created before this shipped won't
+  // have one, and the event is still fully usable without it.
+  portent?: string;
   context?: string; // The fate question asked, or scene-check context
   createdAt: number;
 }
@@ -1179,6 +1196,14 @@ export interface PendingDirectorMove {
   // pending/unacknowledged, rather than re-rolling on every render.
   targetPlayerName?: string;
   targetTag?: string;
+  // Prima Materia complication seed, rolled once when a pressure move
+  // fires (announce_future_badness / put_someone_in_a_spot). The engine
+  // already decides WHICH move fires; without this the move's actual
+  // content was pure model improvisation, which is where its habitual
+  // complications came from. Same split as tagFocusExamples above: rolled
+  // once at selectDirectorMove time and persisted so it stays stable while
+  // the move is pending, and it seeds the model rather than scripting it.
+  complicationSeed?: string;
   tagFocusExamples?: { prompt: string; table: string }[];
 }
 

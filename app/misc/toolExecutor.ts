@@ -41,6 +41,11 @@ import {
   generateEventFocus,
   generateEventMeaning,
 } from "@/app/misc/mythic";
+import {
+  currentTint,
+  rollPortent,
+  selectFrame,
+} from "@/app/misc/primaMateria";
 import { selectGMAdviceForScene, formatGMAdviceNote } from "@/app/misc/gmAdvice";
 import {
   findSpinePlanNote,
@@ -2001,6 +2006,13 @@ export function executeTools(
             focus: eventFocus,
             action: eventMeaning.action,
             subject: eventMeaning.subject,
+            // Same pairing as the fate_question path: the action/subject
+            // says what happens, the portent says what it's about.
+            portent: rollPortent(
+              "portent",
+              selectFrame(storyData),
+              currentTint(storyData)
+            ).statement,
             context: `Scene ${storyData.agmtState.sceneCount} interrupted (roll ${sceneRoll} vs chaos ${oldChaos})`,
             createdAt: Date.now(),
           };
@@ -2042,6 +2054,15 @@ export function executeTools(
               )
               .join("\n");
             message += `\nInspiration - pick one, blend them, or improvise your own take on the tag:\n${examplesText}`;
+          }
+
+          // The two pressure moves carry a rolled complication (see
+          // primaMateria.ts). Same status as the tag examples above: a
+          // seed the model shapes to fit, not a line to reproduce. Its
+          // job is to break the handful of complications the model
+          // otherwise reaches for every time.
+          if (directorMove.complicationSeed) {
+            message += `\nComplication seed (shape this to fit the fiction - don't reproduce the wording, and don't name the mechanism): "${directorMove.complicationSeed}"`;
           }
 
           message += ` - render this as prose without naming it, then call acknowledge_director_move(id: "${directorMove.id}"). It will keep reappearing every turn until resolved.`;
