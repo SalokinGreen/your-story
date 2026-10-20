@@ -7,7 +7,7 @@
     "frontendDist": "../out",
     "devUrl": "http://localhost:3000",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "NEXT_PUBLIC_STANDALONE=true npm run build"
+    "beforeBuildCommand": "node scripts/build-standalone.mjs"
   },
   "app": {
     "windows": [
