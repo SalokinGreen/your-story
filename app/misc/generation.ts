@@ -32,6 +32,7 @@ import {
   EmbeddingContext,
   CHOICES_AFFIRMATION,
   GM_STAGE_DEFAULT_BUDGET,
+  GM_STAGE_DEFAULT_MAX_OUTPUT,
   computeGMStageBudget,
   CHOICES_STAGE_TOKEN_BUDGET,
 } from "@/app/misc/ai_staged";
@@ -1972,6 +1973,7 @@ async function generateStoryTurnOnce(
         storyData,
         userChoice: gmUserChoice,
         customMaxContext: options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
+        customMaxOutput: options.customMaxOutput,
         modelName: narrationModel,
         replyLength: options.replyLength,
         pacingNote,
@@ -2001,6 +2003,7 @@ async function generateStoryTurnOnce(
           userChoice: "",
           customMaxContext:
             options.customMaxContext || GM_STAGE_DEFAULT_BUDGET,
+          customMaxOutput: options.customMaxOutput,
           modelName: narrationModel,
           replyLength: options.replyLength,
           pacingNote,
@@ -2109,6 +2112,7 @@ async function generateStoryTurnOnce(
           const { historyBudget: gmHistoryBudget } = computeGMStageBudget(
             options.customMaxContext,
             gmModel,
+            options.customMaxOutput,
           );
           const compactionResult = await ensureStoryCompacted(
             storyData,
@@ -2262,6 +2266,7 @@ async function generateStoryTurnOnce(
               storyData,
               userChoice: gmUserChoice,
               customMaxContext: currentGMBudget,
+              customMaxOutput: options.customMaxOutput,
               modelName: gmModel,
               replyLength: options.replyLength,
               pacingNote,
@@ -2335,7 +2340,7 @@ async function generateStoryTurnOnce(
               // it had no effect on normal play (the GM stage's own output IS the
               // player-visible story, see gmFinalStoryContent below).
               maxTokens: Math.min(
-                options.customMaxOutput || 12000,
+                options.customMaxOutput || GM_STAGE_DEFAULT_MAX_OUTPUT,
                 getModelConfig(model).maxOutputTokens || 4000,
               ),
               // Base 0.4 for natural GM thinking, nudged by the story's
@@ -2534,7 +2539,7 @@ async function generateStoryTurnOnce(
           {
             const finishReason = gmResult.meta?.finishReason ?? "unknown";
             const maxTokensCap = Math.min(
-              options.customMaxOutput || 12000,
+              options.customMaxOutput || GM_STAGE_DEFAULT_MAX_OUTPUT,
               getModelConfig(gmModel).maxOutputTokens || 4000,
             );
             logger.action(`GM stage round ${gmRound} finish diagnostic`, {

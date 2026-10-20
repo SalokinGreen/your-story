@@ -145,29 +145,51 @@ export { estimateTokens };
 // GM Stage uses customMaxContext (Memory Size slider) - it does the heavy lifting
 export const CHOICES_STAGE_TOKEN_BUDGET = 4000; // ~4k tokens for choices stage history
 export const GM_STAGE_DEFAULT_BUDGET = 36000; // Default GM context if no customMaxContext set
+// GM round reply cap when customMaxOutput isn't set - generation.ts requests
+// min(customMaxOutput || this, model.maxOutputTokens) per round.
+export const GM_STAGE_DEFAULT_MAX_OUTPUT = 12000;
 
 /**
- * GM Stage context budget: customMaxContext (Memory Size slider), capped by
- * the model's real limit, split 60% story history / 40% lore-mechanics-state.
- * Shared by buildGMStagePrompt and compaction.ts's compaction-budget check so
- * the two can't drift apart on what "the GM stage's history budget" means.
+ * GM Stage context budget: customMaxContext (Memory Size slider) is the GM's
+ * input budget, capped so input plus one round's reply still fits the
+ * model's context window, then split 60% story history / 40%
+ * lore-mechanics-state. Shared by buildGMStagePrompt and compaction.ts's
+ * compaction-budget check so the two can't drift apart on what "the GM
+ * stage's history budget" means.
+ *
+ * The reply reserve is what a GM round actually requests (customMaxOutput,
+ * capped by the model's maxOutputTokens), never the model's declared
+ * ceiling - subtracting that from the slider went negative for every model
+ * advertising 65k+ of output (DeepSeek V4, Kimi K3, GLM 5.2...) and left the
+ * GM with no history at all. It's also held to half the window, so a model
+ * whose declared output equals its window (Kimi K2.6, Phi 4) still gets
+ * room for input.
  */
 export function computeGMStageBudget(
   customMaxContext: number | undefined,
   modelName: string,
+  customMaxOutput?: number,
 ): { historyBudget: number; infoBudget: number; totalContextBudget: number } {
   const modelConfig = getModelConfig(modelName);
   const modelMaxTokens = modelConfig.maxTokens;
-  const maxOutputTokens = modelConfig.maxOutputTokens || 4000;
 
-  const effectiveMaxTokens = Math.min(
-    customMaxContext && customMaxContext > 0
-      ? customMaxContext
-      : GM_STAGE_DEFAULT_BUDGET,
-    modelMaxTokens,
+  const replyReserve = Math.min(
+    customMaxOutput && customMaxOutput > 0
+      ? customMaxOutput
+      : GM_STAGE_DEFAULT_MAX_OUTPUT,
+    modelConfig.maxOutputTokens || 4000,
+    Math.floor(modelMaxTokens / 2),
   );
 
-  const totalContextBudget = effectiveMaxTokens - maxOutputTokens;
+  const totalContextBudget = Math.max(
+    0,
+    Math.min(
+      customMaxContext && customMaxContext > 0
+        ? customMaxContext
+        : GM_STAGE_DEFAULT_BUDGET,
+      modelMaxTokens - replyReserve,
+    ),
+  );
   return {
     historyBudget: Math.floor(totalContextBudget * 0.6),
     infoBudget: Math.floor(totalContextBudget * 0.4),
@@ -985,6 +1007,7 @@ export function buildGMStagePrompt({
   storyData,
   userChoice,
   customMaxContext,
+  customMaxOutput,
   modelName = "DeepSeek V4 Flash",
   replyLength = "medium",
   pacingNote,
@@ -997,6 +1020,7 @@ export function buildGMStagePrompt({
   storyData: StoryData;
   userChoice: string;
   customMaxContext?: number; // Memory Size slider - this is the main context control now
+  customMaxOutput?: number; // Response Length cap - reserved out of the model's window for the reply
   modelName?: string; // Used to get model's actual context limit
   replyLength?: ReplyLength; // Reply Length setting - controls narration verbosity
   pacingNote?: string; // Deterministic pacing nudge (see pacingFeedback.ts)
@@ -1053,7 +1077,7 @@ export function buildGMStagePrompt({
   // Calculate GM context budget from customMaxContext (Memory Size slider)
   // This is where the real context allocation happens now
   const { historyBudget, infoBudget, totalContextBudget } =
-    computeGMStageBudget(customMaxContext, modelName);
+    computeGMStageBudget(customMaxContext, modelName, customMaxOutput);
 
   // Get recent story parts for context - now uses the calculated history budget
   const recentParts = getPartsWithinTokenBudget(
