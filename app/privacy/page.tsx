@@ -3,6 +3,70 @@
 import { useRouter } from "next/navigation";
 import { DynamicIcon } from "../components/DynamicIcon";
 
+function Section({
+  icon,
+  iconClassName,
+  title,
+  children,
+}: {
+  icon: string;
+  iconClassName: string;
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
+      <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
+        <DynamicIcon name={icon} className={`w-5 h-5 ${iconClassName}`} />
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
+
+function Point({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex items-start gap-3">
+      <DynamicIcon
+        name="Check"
+        className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
+      />
+      <div>
+        <h3 className="font-medium text-white">{title}</h3>
+        <p className="text-sm text-blue-200/60">{children}</p>
+      </div>
+    </div>
+  );
+}
+
+function Bullet({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2">
+      <span className="text-blue-400 shrink-0">•</span>
+      <span className="flex-1 min-w-0">{children}</span>
+    </li>
+  );
+}
+
+function Summary({ children }: { children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2">
+      <DynamicIcon
+        name="Check"
+        className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
+      />
+      <span className="flex-1 min-w-0">{children}</span>
+    </li>
+  );
+}
+
 export default function PrivacyPolicy() {
   const router = useRouter();
 
@@ -20,303 +84,213 @@ export default function PrivacyPolicy() {
           </button>
           <h1 className="text-3xl font-bold text-white mb-2">Privacy Policy</h1>
           <p className="text-blue-200/40 text-sm">
-            Last updated: November 27, 2025
+            Last updated: October 20, 2026
           </p>
         </div>
 
         {/* Content */}
         <div className="space-y-8 text-blue-200/80">
-          {/* Introduction */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Shield" className="w-5 h-5 text-blue-400" />
-              Your Privacy Matters
-            </h2>
+          <Section
+            icon="Shield"
+            iconClassName="text-blue-400"
+            title="Your Privacy Matters"
+          >
             <p className="leading-relaxed">
-              At Your Story, we believe your creative content belongs to you.
-              We&apos;ve designed our platform with privacy as a core principle.
-              This policy explains how we handle your data in plain, simple
-              terms.
+              Your Story has no accounts and no database of its own. Your
+              stories live on your device, and the app talks to AI services
+              with API keys you bring yourself. This page lists every place
+              your data can go, in plain terms.
             </p>
-          </section>
+          </Section>
 
-          {/* Stories & Content */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon
-                name="BookOpen"
-                className="w-5 h-5 text-purple-400"
-              />
-              Your Stories & Content
-            </h2>
+          <Section
+            icon="BookOpen"
+            iconClassName="text-purple-400"
+            title="Your Stories Stay on Your Device"
+          >
             <div className="space-y-4">
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 className="font-medium text-white">
-                    You own your stories
-                  </h3>
-                  <p className="text-sm text-blue-200/60">
-                    All stories you create remain your property. We don&apos;t
-                    claim any ownership over your creative content.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 className="font-medium text-white">
-                    Stories are stored until you delete them
-                  </h3>
-                  <p className="text-sm text-blue-200/60">
-                    Your stories persist in our database so you can access them
-                    anytime. When you delete a story, it&apos;s permanently
-                    removed from our servers.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 className="font-medium text-white">
-                    Your stories are access-controlled
-                  </h3>
-                  <p className="text-sm text-blue-200/60">
-                    Your stories are protected by authentication and
-                    row-level security policies restricting access to your
-                    own account. Story content is not end-to-end encrypted -
-                    our servers process it as plaintext to generate your
-                    story with the AI provider, the same way any AI writing
-                    tool must.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 className="font-medium text-white">
-                    We don&apos;t log your story content
-                  </h3>
-                  <p className="text-sm text-blue-200/60">
-                    We don&apos;t keep logs of your story text or AI requests.
-                    Your narrative content isn&apos;t recorded, analyzed, or
-                    used for any purpose beyond generating your story.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-start gap-3">
-                <DynamicIcon
-                  name="Check"
-                  className="w-5 h-5 text-green-400 shrink-0 mt-0.5"
-                />
-                <div>
-                  <h3 className="font-medium text-white">Private by default</h3>
-                  <p className="text-sm text-blue-200/60">
-                    Your stories are private unless you explicitly choose to
-                    make them public or share them. No one can see your content
-                    without your permission.
-                  </p>
-                </div>
-              </div>
+              <Point title="You own your stories">
+                Everything you create - stories, adventures, notes - is yours.
+                We don&apos;t claim any ownership over it.
+              </Point>
+              <Point title="Saved on your device, not on our servers">
+                Stories, adventures, notes, folders and settings are saved in
+                the app&apos;s local storage on your device. We don&apos;t
+                have a copy and can&apos;t see them.
+              </Point>
+              <Point title="No account">
+                We never ask for your email address, your name or a password.
+              </Point>
+              <Point title="Deleting is up to you">
+                Deleting a story removes it from your device. Uninstalling the
+                app, or clearing this site&apos;s data in your browser,
+                removes everything. If you use sync, your next sync removes
+                deleted items from the synced copy too.
+              </Point>
             </div>
-          </section>
+          </Section>
 
-          {/* AI & Third Parties */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Bot" className="w-5 h-5 text-cyan-400" />
-              AI Processing
-            </h2>
+          <Section icon="Bot" iconClassName="text-cyan-400" title="AI Processing">
             <div className="space-y-4">
               <p className="leading-relaxed">
-                When you play a story, your choices and context are sent to AI
-                providers (DeepSeek, OpenRouter) to generate continuations.
-                Here&apos;s what you should know:
+                To write each turn, the app sends the AI provider you chose
+                what it needs to continue the story: your action, the recent
+                story, and the relevant notes, such as your character sheet
+                and the adventure&apos;s rules. It uses your own API key, so
+                the request is between you and that provider.
               </p>
               <ul className="space-y-2 text-sm">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    AI providers process your requests to generate responses but
-                    don&apos;t retain your data for training (per their
-                    enterprise/API terms)
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    We send only the minimum context needed for story generation
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    Your full story history stays on our servers, not with AI
-                    providers
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    <strong className="text-white">
-                      We do not train AI on your stories
-                    </strong>{" "}
-                    - your content is only sent to the AI provider to
-                    generate your story, per their API terms
-                  </span>
-                </li>
+                <Bullet>
+                  <strong className="text-white">Story generation</strong> -
+                  DeepSeek, OpenRouter, Google, Mistral or DeepInfra, whichever
+                  serves the model you picked. OpenRouter passes requests on to
+                  the company hosting that model.
+                </Bullet>
+                <Bullet>
+                  <strong className="text-white">Optional features</strong>,
+                  only when you use them - voice narration goes to Cartesia or
+                  ElevenLabs, voice input and PDF import go to Mistral, and
+                  image generation goes to OpenRouter or DeepInfra.
+                </Bullet>
+                <Bullet>
+                  Each provider handles your data under its own privacy policy
+                  and your agreement with it. Whether it keeps your requests or
+                  trains on them depends on that provider and your account
+                  settings there, so check their terms.
+                </Bullet>
+                <Bullet>
+                  <strong className="text-white">
+                    We do not train AI on your stories.
+                  </strong>
+                </Bullet>
               </ul>
+              <p className="text-sm text-blue-200/60">
+                In the desktop and mobile apps, these requests go straight from
+                your device to the provider. In the browser version they pass
+                through a small relay on our web server, because a browser
+                can&apos;t call every provider directly. The relay forwards
+                the request, including your API key, and hands back the
+                answer. It doesn&apos;t save your story or your key, though
+                like any website its host may keep standard access logs, such
+                as your IP address and the time of the request.
+              </p>
             </div>
-          </section>
+          </Section>
 
-          {/* Account Data */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="User" className="w-5 h-5 text-pink-400" />
-              Account Information
-            </h2>
+          <Section icon="Key" iconClassName="text-amber-400" title="Your API Keys">
+            <ul className="space-y-2 text-sm">
+              <Bullet>
+                Your keys are saved only on your device, in the app&apos;s
+                local storage. They aren&apos;t encrypted there, so anyone who
+                can use your device or browser profile can read them.
+              </Bullet>
+              <Bullet>
+                Each key is sent only to the provider it belongs to (through
+                the relay, in the browser version).
+              </Bullet>
+              <Bullet>
+                Keys are never synced and never sent to other players.
+              </Bullet>
+            </ul>
+          </Section>
+
+          <Section
+            icon="RefreshCw"
+            iconClassName="text-green-400"
+            title="Sync Between Devices (Optional)"
+          >
+            <div className="space-y-4">
+              <Point title="Off until you set it up">
+                Nothing leaves your device for sync unless you link a sync key
+                and press Sync Now in Settings.
+              </Point>
+              <Point title="Encrypted before it leaves your device">
+                Your stories, adventures, notes, folders and settings are
+                encrypted on your device with a key made from your sync key.
+                Our sync server stores only that encrypted data and a
+                fingerprint (hash) of your sync key.
+              </Point>
+              <Point title="Treat your sync key like a password">
+                Your device sends the sync key with each sync to prove the
+                data is yours. Anyone who has it can download and decrypt your
+                synced data, and if you lose it, the synced copy can&apos;t be
+                recovered.
+              </Point>
+              <Point title="Rate limiting">
+                The sync server keeps your IP address for a couple of minutes
+                to limit how many requests one device can make.
+              </Point>
+            </div>
+          </Section>
+
+          <Section
+            icon="Users"
+            iconClassName="text-pink-400"
+            title="Playing Online"
+          >
+            <ul className="space-y-2 text-sm">
+              <Bullet>
+                Online play connects players&apos; devices directly to each
+                other. To find each other, devices use a public matchmaking
+                service - BitTorrent trackers, Nostr relays, MQTT brokers or
+                the PeerJS server, depending on the connection you choose.
+                These services see your IP address, not your story.
+              </Bullet>
+              <Bullet>
+                Players in the same room can see each other&apos;s IP
+                addresses. That&apos;s how direct connections work.
+              </Bullet>
+              <Bullet>
+                <strong className="text-white">
+                  The host&apos;s device sends the whole story to everyone in
+                  the room
+                </strong>
+                , including notes the GM keeps hidden from players. Only play
+                online with people you&apos;d trust with those notes.
+              </Bullet>
+            </ul>
+          </Section>
+
+          <Section
+            icon="EyeOff"
+            iconClassName="text-amber-400"
+            title="No Tracking"
+          >
             <div className="space-y-3 text-sm">
-              <p>We collect and store:</p>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    <strong className="text-white">Email address</strong> - for
-                    account authentication and important communications
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    <strong className="text-white">
-                      Display name &amp; profile info
-                    </strong>{" "}
-                    - optional, shown on your public profile
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    <strong className="text-white">
-                      Token balance &amp; transactions
-                    </strong>{" "}
-                    - to track your coin usage
-                  </span>
-                </li>
-              </ul>
-              <p className="text-blue-200/60 mt-4">
-                We do not sell your personal information to third parties.
+              <p>
+                The app contains no analytics, advertising, crash-reporting or
+                tracking code, and sets no tracking cookies. Fonts, icons and
+                dice are bundled with the app, so just opening it doesn&apos;t
+                contact anyone.
+              </p>
+              <p className="text-blue-200/60">
+                Links to other sites, such as Ko-fi, open those sites under
+                their own policies.
               </p>
             </div>
-          </section>
+          </Section>
 
-          {/* Data Deletion */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Trash2" className="w-5 h-5 text-red-400" />
-              Deleting Your Data
-            </h2>
-            <div className="space-y-3">
-              <p>You have full control over your data:</p>
-              <ul className="space-y-2 text-sm">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    Delete individual stories anytime from your library
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    Delete adventures you&apos;ve created from the creator page
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    Request complete account deletion by contacting us
-                  </span>
-                </li>
-              </ul>
-              <p className="text-sm text-blue-200/60 mt-4">
-                When you delete content, it&apos;s permanently removed from our
-                database. We don&apos;t keep shadow copies or backups of deleted
-                content.
-              </p>
-            </div>
-          </section>
-
-          {/* Cookies & Analytics */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Cookie" className="w-5 h-5 text-amber-400" />
-              Cookies & Local Storage
-            </h2>
-            <div className="space-y-3 text-sm">
-              <p>We use minimal browser storage for essential functionality:</p>
-              <ul className="space-y-2">
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    <strong className="text-white">
-                      Authentication tokens
-                    </strong>{" "}
-                    - to keep you logged in
-                  </span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-blue-400 shrink-0">•</span>
-                  <span className="flex-1 min-w-0">
-                    <strong className="text-white">Preferences</strong> - AI
-                    model selection, TTS settings, UI preferences
-                  </span>
-                </li>
-              </ul>
-              <p className="text-blue-200/60 mt-4">
-                We don&apos;t use tracking cookies or third-party analytics that
-                follow you across the web.
-              </p>
-            </div>
-          </section>
-
-          {/* Security */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Lock" className="w-5 h-5 text-green-400" />
-              Security
-            </h2>
+          <Section icon="Lock" iconClassName="text-green-400" title="Security">
             <p className="text-sm leading-relaxed">
-              Your data is protected with industry-standard security measures
-              including encrypted connections (HTTPS), secure authentication via
-              Supabase, and row-level security policies that ensure you can only
-              access your own data.
+              Connections to AI providers, the relay and the sync server use
+              HTTPS, and online play uses the encryption built into WebRTC.
+              Since your device is where your data lives, its own security
+              matters most: a screen lock, disk encryption, and being careful
+              who else uses your browser.
             </p>
-          </section>
+          </Section>
 
-          {/* Contact */}
-          <section className="bg-blue-950/30 rounded-xl border border-blue-800/30 p-6">
-            <h2 className="text-xl font-semibold text-white mb-3 flex items-center gap-2">
-              <DynamicIcon name="Mail" className="w-5 h-5 text-blue-400" />
-              Questions?
-            </h2>
+          <Section
+            icon="Mail"
+            iconClassName="text-blue-400"
+            title="Questions?"
+          >
             <p className="text-sm leading-relaxed">
-              If you have any questions about this privacy policy or how we
-              handle your data, please reach out to us. We&apos;re happy to
+              If you have any questions about this privacy policy or how your
+              data is handled, please reach out to us. We&apos;re happy to
               explain anything in more detail.
             </p>
-          </section>
+          </Section>
 
           {/* Summary Box */}
           <section className="bg-green-500/10 rounded-xl border border-green-500/30 p-6">
@@ -325,79 +299,22 @@ export default function PrivacyPolicy() {
               TL;DR
             </h2>
             <ul className="space-y-2 text-sm">
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Your stories are yours - we don&apos;t claim ownership
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Stories are access-controlled to your account, not shared
-                  with other users
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  We don&apos;t train AI on your stories
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Stories are stored until you delete them
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  We don&apos;t log your story content or AI requests
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Private by default - only you can see your stories
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  Delete anytime - no shadow copies kept
-                </span>
-              </li>
-              <li className="flex items-start gap-2">
-                <DynamicIcon
-                  name="Check"
-                  className="w-4 h-4 text-green-400 shrink-0 mt-0.5"
-                />
-                <span className="flex-1 min-w-0">
-                  No tracking cookies or creepy analytics
-                </span>
-              </li>
+              <Summary>
+                Your stories are yours, and they stay on your device
+              </Summary>
+              <Summary>No account - we don&apos;t collect your email or name</Summary>
+              <Summary>
+                AI requests go to the provider you choose, with your own key
+              </Summary>
+              <Summary>We don&apos;t train AI on your stories</Summary>
+              <Summary>
+                Sync is optional and encrypted on your device first
+              </Summary>
+              <Summary>
+                Online play shares the whole story, hidden notes included,
+                with everyone in the room
+              </Summary>
+              <Summary>No analytics, no tracking cookies</Summary>
             </ul>
           </section>
         </div>
