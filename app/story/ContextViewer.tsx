@@ -1040,10 +1040,6 @@ export default function ContextViewer({ storyData }: ContextViewerProps) {
               </h4>
               <div className="text-xs text-slate-400 space-y-1">
                 <p>
-                  Stats: <strong>{storyData.stats.length}</strong> · Resources:{" "}
-                  <strong>{storyData.resources.length}</strong>
-                </p>
-                <p>
                   Goals: <strong>{activeGoals}</strong> active /{" "}
                   {goals.length} total
                 </p>

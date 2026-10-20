@@ -57,6 +57,7 @@ import {
   type ResolvedTier,
 } from "../misc/reasoningTiers";
 import { migrateCustomTablesToNotes } from "../misc/tableNotes";
+import { ensureStoryDataArrays } from "../misc/storyDataDefaults";
 import Story from "./story";
 import LorePage from "./lore";
 import GoalsPage from "./goals";
@@ -1261,8 +1262,10 @@ function StoryPageContent() {
         },
       );
 
-      //Initializegoalarraysiftheydon'texist(forbackwardscompatibility)
-      if (!loadedStoryData.goals) loadedStoryData.goals = [];
+      // Backfill the arrays StoryData requires. Older saves can lack goals,
+      // and a story started from a Designer-made adventure before the fix
+      // was saved without the legacy stat-block arrays.
+      ensureStoryDataArrays(loadedStoryData);
 
       // Convert any legacy structured customTables into "table" notes. Runs
       // before processLoreTriggers so the new notes get their triggers

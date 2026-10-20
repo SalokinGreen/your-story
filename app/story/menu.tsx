@@ -998,12 +998,6 @@ export default function MenuPage({
               {storyData.memory.length}
             </span>
           </div>
-          <div className="flex justify-between py-2.5 border-b border-white/5">
-            <span className="text-blue-200/60">Inventory Items:</span>
-            <span className="font-semibold text-white">
-              {storyData.inventory.length}
-            </span>
-          </div>
           <div className="flex justify-between py-2.5">
             <span className="text-blue-200/60">Notes:</span>
             <span className="font-semibold text-white">
